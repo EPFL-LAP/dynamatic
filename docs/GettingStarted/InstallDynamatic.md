@@ -1,5 +1,3 @@
-[Return to table of contents](../README.md)
-
 # Setting up Dynamatic
 
 There are currently two ways to setup and use Dynamatic

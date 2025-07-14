@@ -1,4 +1,3 @@
-[Documentation Table of Contents](../../../README.md)  
 # Using Dynamatic
 > [!NOTE]
 > Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](../../InstallDynamatic.md).

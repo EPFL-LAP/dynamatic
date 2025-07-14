@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../README.md)
-
 # Dependencies
 
 Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules) to manage its software dependencies (all hosted on GitHub). We depend on [Polygeist](https://github.com/llvm/Polygeist), a C/C++ frontend for MLIR which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) through a git submodule. The project is set up so that you can include LLVM/MLIR headers directly from Dynamatic code without having to specify their path through Polygeist. We also depend on [godot-cpp](https://github.com/godotengine/godot-cpp), the official C++ bindings for the Godot game engine which we use as the frontend to our interactive dataflow circuit visualizer. Finally, we inherit two MLIR dialects (*Handshake* and *HW*) from the [CIRCT](https://github.com/EPFL-LAP/circt) project (details [below](#circt)).

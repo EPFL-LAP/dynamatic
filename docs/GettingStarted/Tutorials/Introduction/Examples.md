@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../../../README.md)
-
 # Examples
 ## 1. Binary Search  
 This example describes how to use Dynamatic to obtain an RTL description of the binary search algorithm  

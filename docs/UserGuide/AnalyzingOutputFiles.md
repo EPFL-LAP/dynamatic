@@ -1,4 +1,3 @@
-[Documentation Table of Contents](../README.md)  
 # Analyzing Output Files
 Running the main commands in Dynamatic creates different directories containing relevant files that can be used by the user for various purposes. By default, Dynamatic creates output and temporary files in an `out/` directory where the C source code is located. This document describes the organization of the `out/` directory when different commands are ran. 
 

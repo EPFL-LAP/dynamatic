@@ -1,4 +1,3 @@
-[Documentation Table of Contents](../../../README.md)
 # Introduction to Dynamatic
 
 This tutorial is meant as the entry-point for new Dynamatic users and will guide you through your first interactions with the compiler and its surrounding toolchain. Following it requires that you have Dynamatic built locally on your machine, either from source or using our custom virtual machine ([VM setup instructions](../../VMSetup.md)).

@@ -1,0 +1,757 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="220.68387mm"
+   height="121.30593mm"
+   viewBox="0 0 220.68389 121.30593"
+   version="1.1"
+   id="svg1"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <marker
+       style="overflow:visible"
+       id="Triangle"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-7"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-7" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-7-4"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-7-3" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-7-3"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-7-1" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-74"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-4" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-75"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-3" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Triangle-7-2-74-7"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.5)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 5.77,0 -2.88,5 V -5 Z"
+         id="path135-5-1-4-0" />
+    </marker>
+  </defs>
+  <g
+     id="layer2"
+     transform="translate(-44.924729,-12.733088)"
+     style="display:inline">
+    <rect
+       style="display:inline;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.705555;stroke-opacity:1"
+       id="rect16"
+       width="220.68385"
+       height="121.30593"
+       x="44.924728"
+       y="12.733088"
+       ry="0" />
+    <g
+       id="g10-9-6"
+       transform="translate(-131.32022,84.697377)"
+       style="display:inline">
+      <path
+         style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:0.352778, 0.352778;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2-74-7)"
+         d="m 254.99501,22.566093 c 0,8.76171 0,8.76171 0,8.76171"
+         id="path1-5-5-0-0" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="255.03987"
+         y="35.716476"
+         id="text4-7-9-1-6"><tspan
+           id="tspan4-4-4-0-2"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="255.03987"
+           y="35.716476">end</tspan></text>
+    </g>
+    <g
+       id="g7-3-4"
+       transform="translate(-39.631235,83.775794)"
+       style="display:inline;opacity:1">
+      <rect
+         style="fill:#d57609;fill-opacity:0.29745;stroke:#d57609;stroke-width:0.705557;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3-2-8-8"
+         width="76.020096"
+         height="21.80298"
+         x="175.01302"
+         y="20.826736"
+         ry="0.75339949" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="175.51909"
+         y="47.991367"
+         id="text4-7-5-1"><tspan
+           id="tspan4-4-6-0"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="175.51909"
+           y="47.991367">Memory control outputs (M)</tspan></text>
+    </g>
+    <g
+       id="g8-5"
+       transform="translate(-107.40812,90.706702)"
+       style="display:inline">
+      <g
+         id="g4-8-0-8"
+         transform="translate(-27.499085,20.532269)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#use18"
+           id="use19"
+           transform="translate(58.211093,-26.54159)"
+           style="display:inline" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="335.9325"
+           y="9.1748857"
+           id="text4-7-9-6-0"><tspan
+             id="tspan4-4-4-2-4"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="335.9325"
+             y="9.1748857">memM_end</tspan></text>
+      </g>
+      <g
+         id="g9-8"
+         transform="translate(-3.5857203,-5.9934015)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-0"
+           id="use18"
+           style="display:inline"
+           transform="translate(22.681526)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="277.72141"
+           y="35.716476"
+           id="text4-7-9-5-4"><tspan
+             id="tspan4-4-4-1-2"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="277.72141"
+             y="35.716476">mem2_end</tspan></text>
+      </g>
+      <g
+         id="g10-9"
+         transform="translate(-1.7285506,-6.0093217)">
+        <path
+           style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:0.352778, 0.352778;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2-74)"
+           d="m 254.99501,22.566093 c 0,8.76171 0,8.76171 0,8.76171"
+           id="path1-5-5-0" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="255.03987"
+           y="35.716476"
+           id="text4-7-9-1"><tspan
+             id="tspan4-4-4-0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="255.03987"
+             y="35.716476">mem1_end</tspan></text>
+      </g>
+      <g
+         id="g5-3-6-55-7"
+         transform="translate(218.25185,8.221607)"
+         style="display:inline">
+        <circle
+           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-7-9-9-4-4"
+           cx="76.78093"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-5-9-7-5"
+           cx="72.987839"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-7-2-65-2"
+           cx="69.194748"
+           cy="13.833644"
+           r="0.84771383" />
+      </g>
+    </g>
+    <g
+       id="g7-3"
+       transform="translate(-122.10587,83.828789)"
+       style="display:inline;opacity:1">
+      <rect
+         style="fill:#1019cf;fill-opacity:0.29745;stroke:#1019cf;stroke-width:0.705557;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3-2-8"
+         width="57.726738"
+         height="21.80298"
+         x="176.37299"
+         y="20.826736"
+         ry="0.75339949" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#1019cf;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="175.51909"
+         y="47.991367"
+         id="text4-7-5"><tspan
+           id="tspan4-4-6"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#1019cf;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="175.51909"
+           y="47.991367">Results (L)</tspan></text>
+    </g>
+    <g
+       id="g11-0"
+       transform="translate(-126.95496,84.697379)"
+       style="display:inline">
+      <g
+         id="g4-86-2"
+         transform="translate(35.43263,1.388931)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#use16"
+           id="use17"
+           style="display:inline" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="34.486027"
+           id="text4-4-3"><tspan
+             id="tspan4-88-8"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="34.486027">resL</tspan></text>
+      </g>
+      <g
+         id="g4-88-0"
+         transform="translate(9.5934473,1.4048512)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-3-4"
+           id="use16"
+           style="display:inline"
+           transform="translate(-0.07091981)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="34.486027"
+           id="text4-1-0"><tspan
+             id="tspan4-8-9"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="34.486027">res2</tspan></text>
+      </g>
+      <g
+         id="g4-1"
+         transform="translate(-1.799371,1.388931)">
+        <path
+           style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2-7-3)"
+           d="m 193.24733,21.177162 c 0,8.761714 0,8.761714 0,8.761714"
+           id="path1-5-5-3-4" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="34.486027"
+           id="text4-2"><tspan
+             id="tspan4-5"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="34.486027">res1</tspan></text>
+      </g>
+      <g
+         id="g5-3-6-55"
+         transform="translate(142.73707,14.208858)"
+         style="display:inline">
+        <circle
+           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-7-9-9-4"
+           cx="76.78093"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-5-9-7"
+           cx="72.987839"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-7-2-65"
+           cx="69.194748"
+           cy="13.833644"
+           r="0.84771383" />
+      </g>
+    </g>
+    <g
+       id="g7-3-4-4-7"
+       transform="translate(37.990455,25.841828)"
+       style="display:inline;opacity:1">
+      <rect
+         style="fill:#d57609;fill-opacity:0.29745;stroke:#d57609;stroke-width:0.705557;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3-2-8-8-4-5"
+         width="48.316517"
+         height="42.263313"
+         x="175.01302"
+         y="26.412569"
+         ry="1.4604039" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="178.54298"
+         y="23.703381"
+         id="text4-7-5-1-4-9"><tspan
+           id="tspan4-4-6-0-7-6"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="178.54298"
+           y="23.703381">Memory interfaces (M)</tspan></text>
+    </g>
+    <g
+       id="g15"
+       style="display:inline"
+       transform="translate(-119.21512,-0.12661214)">
+      <g
+         id="g13-68-2-8"
+         transform="translate(103.65276,106.36487)">
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="262.88507"
+           y="-15.372558"
+           id="text4-7-0-4-9-6-7"><tspan
+             id="tspan4-4-3-1-0-5-0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="262.88507"
+             y="-15.372558">memM_interface</tspan></text>
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-3-1"
+           id="use13-2-8" />
+      </g>
+      <g
+         id="g13-68-2"
+         transform="translate(103.65276,82.752093)">
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="262.88507"
+           y="-15.372558"
+           id="text4-7-0-4-9-6"><tspan
+             id="tspan4-4-3-1-0-5"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="262.88507"
+             y="-15.372558">mem2_interface</tspan></text>
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-3-1"
+           id="use13-2" />
+      </g>
+      <g
+         id="g13-68"
+         transform="translate(103.65276,73.591416)">
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="262.88507"
+           y="-15.372558"
+           id="text4-7-0-4-9"><tspan
+             id="tspan4-4-3-1-0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="262.88507"
+             y="-15.372558">mem1_interface</tspan></text>
+        <path
+           style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.705555;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker-start:url(#Triangle);marker-end:url(#Triangle-7-2-7-4)"
+           d="m 233.52993,-16.228631 c 13.25077,0 13.25077,0 13.25077,0"
+           id="path1-5-5-3-1" />
+      </g>
+      <g
+         id="g5-3-6-5"
+         transform="rotate(90,177.39758,182.7396)"
+         style="display:inline">
+        <circle
+           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-7-9-9-3"
+           cx="76.78093"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-5-9-5"
+           cx="72.987839"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-7-2-6"
+           cx="69.194748"
+           cy="13.833644"
+           r="0.84771383" />
+      </g>
+    </g>
+    <g
+       id="g7-3-4-4"
+       transform="translate(-39.631235,-5.7124452)"
+       style="display:inline;opacity:1">
+      <rect
+         style="fill:#d57609;fill-opacity:0.29745;stroke:#d57609;stroke-width:0.705557;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3-2-8-8-4"
+         width="76.020096"
+         height="20.310354"
+         x="175.01302"
+         y="26.412569"
+         ry="0.70182198" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="175.51909"
+         y="23.703381"
+         id="text4-7-5-1-4"><tspan
+           id="tspan4-4-6-0-7"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="175.51909"
+           y="23.703381">Memory control inputs (M)</tspan></text>
+    </g>
+    <g
+       id="g8"
+       transform="translate(-109.16416,5.3861814)"
+       style="display:inline">
+      <g
+         id="g4-8-0"
+         transform="translate(-25.770534,26.541591)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5"
+           id="use7-4"
+           transform="translate(80.892613,-26.54159)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="335.9325"
+           y="-6.5128603"
+           id="text4-7-9-6"><tspan
+             id="tspan4-4-4-2"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="335.9325"
+             y="-6.5128603">memM_start</tspan></text>
+      </g>
+      <g
+         id="g9"
+         transform="translate(-1.8571697,0.01592022)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5"
+           id="use7-0"
+           transform="translate(22.68152)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="287.61694"
+           y="-6.5128603"
+           id="text4-7-9-5"
+           transform="translate(-9.8955241,26.54159)"><tspan
+             id="tspan4-4-4-1"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="287.61694"
+             y="-6.5128603">mem2_start</tspan></text>
+      </g>
+      <g
+         id="g10">
+        <path
+           style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:0.352778, 0.352778;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2)"
+           d="m 194.91773,21.177161 c 0,8.761713 0,8.761713 0,8.761713"
+           id="path1-5-5"
+           transform="translate(60.077286,1.3889294)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="264.93539"
+           y="-6.5128603"
+           id="text4-7-9"
+           transform="translate(-9.8955241,26.54159)"><tspan
+             id="tspan4-4-4"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="264.93539"
+             y="-6.5128603">mem1_start</tspan></text>
+      </g>
+      <use
+         x="0"
+         y="0"
+         xlink:href="#g5-3-6"
+         id="use11"
+         transform="translate(77.24333,0.022071)" />
+    </g>
+    <g
+       id="g7"
+       transform="translate(-122.10587,-0.12661214)"
+       style="display:inline;opacity:1">
+      <rect
+         style="display:inline;fill:#a722b8;fill-opacity:0.29745;stroke:#a722b8;stroke-width:0.705557;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3-2"
+         width="57.726738"
+         height="20.310354"
+         x="176.37299"
+         y="20.826736"
+         ry="0.70182198" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-decoration-color:#000000;text-anchor:start;display:inline;fill:#a722b8;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="175.51909"
+         y="18.117548"
+         id="text4-7"><tspan
+           id="tspan4-4"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#a722b8;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="175.51909"
+           y="18.117548">Arguments (N)</tspan></text>
+    </g>
+    <g
+       id="g11"
+       transform="translate(-126.93203,5.3861819)"
+       style="display:inline">
+      <g
+         id="g4-86"
+         transform="translate(35.43263,1.388931)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-3"
+           id="use8-9" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="18.595657"
+           id="text4-4"><tspan
+             id="tspan4-88"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="18.595657">argN</tspan></text>
+      </g>
+      <g
+         id="g4-88"
+         transform="translate(9.5934473,1.4048512)">
+        <use
+           x="0"
+           y="0"
+           xlink:href="#path1-5-5-3"
+           id="use8-7" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="18.595657"
+           id="text4-1"><tspan
+             id="tspan4-8"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="18.595657">arg2</tspan></text>
+      </g>
+      <g
+         id="g4"
+         transform="translate(-1.799371,1.388931)">
+        <path
+           style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2-7)"
+           d="m 273.30774,77.726433 c 0,8.761714 0,8.761714 0,8.761714"
+           id="path1-5-5-3"
+           transform="translate(-80.06041,-56.549271)" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="193.26759"
+           y="18.595657"
+           id="text4"><tspan
+             id="tspan4"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+             x="193.26759"
+             y="18.595657">arg1</tspan></text>
+      </g>
+      <g
+         id="g5-3-6"
+         transform="translate(142.73707,14.208858)"
+         style="display:inline">
+        <circle
+           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-7-9-9"
+           cx="76.78093"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-9-5-9"
+           cx="72.987839"
+           cy="13.833644"
+           r="0.84771383" />
+        <circle
+           style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           id="path2-7-2"
+           cx="69.194748"
+           cy="13.833644"
+           r="0.84771383" />
+      </g>
+    </g>
+    <g
+       id="g1"
+       style="display:inline"
+       transform="translate(-8.2576663)">
+      <path
+         style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:0.352778, 0.352778;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-7-2-75)"
+         d="m 131.9122,27.952275 c 0,8.761713 0,8.761713 0,8.761713"
+         id="path1-5-5-6" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="131.95706"
+         y="25.414915"
+         id="text4-7-9-2"><tspan
+           id="tspan4-4-4-9"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="131.95706"
+           y="25.414915">start</tspan></text>
+    </g>
+  </g>
+  <g
+     id="layer1"
+     style="display:inline"
+     transform="translate(153.72138,30.600356)">
+    <g
+       id="g12"
+       style="display:inline"
+       transform="translate(-319.90678,-43.460056)">
+      <rect
+         style="fill:#000000;fill-opacity:0.29745;stroke:#000000;stroke-width:0.705555;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect15-3"
+         width="164.30821"
+         height="68.928047"
+         x="172.06177"
+         y="38.462036"
+         ry="2.3818009" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="254.11166"
+         y="71.389755"
+         id="text4-7-05"><tspan
+           id="tspan4-4-0"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="254.11166"
+           y="71.389755">DYNAMATIC-GENERATED</tspan><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="254.11166"
+           y="78.445305"
+           id="tspan12">DATAFLOW CIRCUIT</tspan></text>
+    </g>
+  </g>
+</svg>

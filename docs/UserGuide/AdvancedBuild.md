@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../README.md)
-
 # Advanced Build Instructions
 ### Table of contents
 1. [Gurobi](#1-gurobi)

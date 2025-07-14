@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../README.md)
-
 # Verifying the Generated Design
 ## C-RTL Cosimulation  
 

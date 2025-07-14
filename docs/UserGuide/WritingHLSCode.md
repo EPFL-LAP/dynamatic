@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../README.md)
-
 # Writing Hls C Code for Dynamatic
 Before passing your C kernel (function) to Dynamatic for compilation, it is important that you ensure it meets the following guidelines.
 

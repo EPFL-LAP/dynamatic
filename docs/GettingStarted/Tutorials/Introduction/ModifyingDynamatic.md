@@ -54,7 +54,7 @@ Let's try to make this circuit smaller by writing a compiler pass that will auto
 
 ## Writing a Small Compiler Pass
 
-In this section, we will add a small transformation pass that achieves the optimization opportunity we identified in the previous section. We will not go into much details into how C++ or MLIR works, our focus will be instead in writing something minimal that accomplishes the job cleanly. For a more complete tutorial on pass-writing, feel free to go through the ["*Creating Passes*" tutorial](../../../DeveloperGuide/Tutorials/CreatingPasses/CreatingPasses.md) after completing this one.
+In this section, we will add a small transformation pass that achieves the optimization opportunity we identified in the previous section. We will not go into much details into how C++ or MLIR works, our focus will be instead in writing something minimal that accomplishes the job cleanly. For a more complete tutorial on pass-writing, feel free to go through the ["*Creating Passes*" tutorial](../../../DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/CreatingPassesTutorial.md) after completing this one.
 
 Creating this pass will involve creating 2 new source files and making minor editions to 3 existing source files. In order, we will
 1. [Declare the Pass in TableGen](#declaring-the-pass-in-tablegen) (a LLVM/MLIR language that eventually transpiles to C++).
