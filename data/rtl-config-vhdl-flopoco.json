@@ -694,7 +694,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/br.vhd"
+    "generic": "$DYNAMATIC/data/vhdl/handshake/br.vhd",
+    "dependencies": ["br_dataless"]
   },
   {
     "name": "handshake.cond_br",
