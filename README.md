@@ -7,10 +7,10 @@ Dynamatic typically has a better or similar performance to state-of-the-art HLS 
 ## Installation & Documentation
 For more information:
 - [Dynamatic Installation](docs/GettingStarted/InstallDynamatic.md)
-- [Documentation](docs/README.md)
+- [Documentation](docs/)
 
-## Supoport  
-We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/DeveloperGuide/Contributing.md)
+## Contribution  
+We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/DeveloperGuide/IntroductoryMaterial/Contributing.md)
 
 ## License
 See the [LICENSE](LICENSE) file
