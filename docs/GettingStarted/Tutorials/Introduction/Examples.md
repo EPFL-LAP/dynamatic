@@ -100,7 +100,10 @@ dynamatic> compile --buffer-algorithm fpga20
 [INFO] Compilation succeeded
 ```
 #### Generate HDL from DOT File
-A dot file is generated near the end of the compile stage (see output above). `write-hdl` converts it into HDL code for your kernel. The default HDL is VHDL. You can choose verilog or vhdl with the `--hdl` flag
+A dot file is generated near the end of the compile stage (see output above).
+> [!NOTE]  
+> The DOT file can be visualized using a DOT file reader without installing the interactive visualizer
+`write-hdl` converts it into HDL code for your kernel. The default HDL is VHDL. You can choose verilog or vhdl with the `--hdl` flag
 ```
 dynamatic> write-hdl --hdl vhdl
 [INFO] Exported RTL (vhdl)

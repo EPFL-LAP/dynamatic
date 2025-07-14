@@ -120,7 +120,7 @@ The default for compile is to use the minimum buffering for correctness (simple 
 | --sharing | use credit-based resource shaing|None|
 | --buffer-alogithm | Indicate buffer placement algorithm to use, values are 'on merges' |fpga20, fpl22|
 
-> [!WARNING]
+> [!WARNING]  
 > `compile` requires a MILP solver (Gurobi) for smart buffer placement. If you don't have Gurobi, abstain from using the `--buffer-algorithm` flag
 
 You should see the following printed on the terminal after running `compile`:
@@ -146,6 +146,9 @@ dynamatic> compile
 [INFO] Compilation succeeded
 ```
 After successful compilation, all results are placed in a folder named `out/comp` created next to the C source file under consideration. In this case, it is located at `tutorials/Introduction/Ch1/out/comp`. It is not necessary that you look inside this folder for this tutorial.  
+
+> [!NOTE]  
+> A DOT file and equivalent PNG of the resulting circuit is generated after compilation (`kernel_name.dot` and `kernel_name.png`) and can be visualized using a DOT file reader or image viewer without installing the interactive visualizer.
 
 In addition to the final optimized version of the IR (in `tutorials/Introduction/Ch1/out/comp/handshake_export.mlir`), the compilation script generates an equivalent Graphviz-formatted file (`tutorials/Introduction/Ch1/out/comp/loop_multiply.dot`) which serves as input to our VHDL backend, which we call using the `write-hdl` command.
 
