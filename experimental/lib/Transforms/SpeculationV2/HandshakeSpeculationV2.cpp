@@ -965,7 +965,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     selector = newSelector;
   }
 
-  if (n > 0) {
+  if (n >= 2) {
     // Reduce the passer chain by introducing interpolator op and performing
     // induction.
 
@@ -1044,6 +1044,11 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     }
 
     if (variable) {
+      if (n < 2) {
+        funcOp.emitError("Variable speculation requires n >= 2.");
+        return signalPassFailure();
+      }
+
       MergeOp merge = replaceRIChainWithMerge(repeatingInits[n - 1], n);
 
       // Optimize for buffering
