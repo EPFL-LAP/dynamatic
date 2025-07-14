@@ -186,16 +186,22 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     setLSQControlConstraints(lsqOp);
 
   // SpecV2 Constraints
-  for (handshake::InitOp initOp : funcOp.getOps<handshake::InitOp>()) {
+  for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
     Channel channel(initOp.getOperand(), true);
     channel.props->minSlots = std::max(channel.props->minSlots, 2U);
   }
 
-  for (handshake::SpecV2RepeatingInitOp repeatingInitOp :
+  for (auto repeatingInitOp :
        funcOp.getOps<handshake::SpecV2RepeatingInitOp>()) {
     Channel channel(repeatingInitOp.getOperand(), true);
     channel.props->minSlots = std::max(channel.props->minSlots, 2U);
   }
+
+  // for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
+  //   Channel channel(muxOp.getSelectOperand(), true);
+  //   channel.props->maxOpaque = 0U;
+  //   channel.props->maxTrans = 0U;
+  // }
 }
 
 namespace {
