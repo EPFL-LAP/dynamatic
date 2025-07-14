@@ -345,7 +345,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   }
   declareConstant(os, "HALF_CLK_PERIOD", "TIME",
                   std::to_string(HALF_CLK_PERIOD_NS) + " ns");
-  declareConstant(os, "RESET_PERIOD", "TIME",
+  declareConstant(os, "RESET_LATENCY", "TIME",
                   std::to_string(RESET_PERIOD_NS) + " ns");
   declareConstant(os, "TRANSACTION_NUM", "INTEGER", to_string(1));
 }

@@ -22,7 +22,8 @@ use ieee.numeric_std.all;
 -- Entity of extui
 entity {name} is 
 port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     ins       : in  std_logic_vector({input_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic;

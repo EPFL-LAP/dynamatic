@@ -786,8 +786,7 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
   // Specify "buffer_as_sink" to hide the result edge from the buffering
   // algorithm.
   BufferOp specLoopContinueTehb = builder.create<BufferOp>(
-      specLoc, topRI.getOperand(), TimingInfo::break_r(), 1,
-      BufferOp::ONE_SLOT_BREAK_R);
+      specLoc, topRI.getOperand(), 1, BufferType::ONE_SLOT_BREAK_R);
   setBB(specLoopContinueTehb, bb);
   specLoopContinueTehb->setAttr("specv2_buffer_as_sink",
                                 builder.getBoolAttr(true));

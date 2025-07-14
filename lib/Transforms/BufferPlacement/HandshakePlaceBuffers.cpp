@@ -163,15 +163,15 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
-    if (llvm::isa<dynamatic::handshake::ArithOpInterface>(op)) {
+    if (auto internalDelayInterface =
+            llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
                                                          delay, targetCP))) {
 
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
-        op->setAttr("internal_delay",
-                    mlir::StringAttr::get(op->getContext(), delayStr));
+        internalDelayInterface.setInternalDelay(delayStr);
       }
     }
   });
@@ -587,13 +587,12 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](const TimingInfo &timing,
-                           const StringRef &bufferType, unsigned numSlots) {
+    auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, timing, numSlots, bufferType);
+          bufferIn.getLoc(), bufferIn, numSlots, bufferType);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -605,20 +604,17 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     /// Prefered order of each buffer type on a channel:
     /// {SHIFT_REG_BREAK_DV, ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV,
     /// FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_R}
-    placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV,
-                placeRes.numShiftRegDV);
+    placeBuffer(BufferType::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
     for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
-      placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_DVR, 1);
     }
     for (unsigned int i = 0; i < placeRes.numOneSlotDV; i++) {
-      placeBuffer(TimingInfo::break_dv(), BufferOp::ONE_SLOT_BREAK_DV, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_DV, 1);
     }
-    placeBuffer(TimingInfo::break_dv(), BufferOp::FIFO_BREAK_DV,
-                placeRes.numFifoDV);
-    placeBuffer(TimingInfo::break_none(), BufferOp::FIFO_BREAK_NONE,
-                placeRes.numFifoNone);
+    placeBuffer(BufferType::FIFO_BREAK_DV, placeRes.numFifoDV);
+    placeBuffer(BufferType::FIFO_BREAK_NONE, placeRes.numFifoNone);
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
-      placeBuffer(TimingInfo::break_r(), BufferOp::ONE_SLOT_BREAK_R, 1);
+      placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
   }
 }

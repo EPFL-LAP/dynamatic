@@ -410,8 +410,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                                                     forkOp);
 
       BufferOp ndSpecPreBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[1], TimingInfo::break_dv(),
-          bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+          forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, ndSpecPreBufferOp, BB_IN,
                              "in_nd_spec_pre_buffer");
       SpecV2NDSpeculatorOp ndSpecOp = builder.create<SpecV2NDSpeculatorOp>(
@@ -438,11 +438,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
     BufferOp lhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[0], TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        forkOp.getLoc(), forkOp.getResult()[0], bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     BufferOp rhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[1], TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
     setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
 
@@ -517,15 +517,13 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       setHandshakeAttributes(builder, lazyForkOp, BB_OUT, "out_lf_" + outName);
 
       BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
-          nextLocation->getLoc(), lazyForkOp.getResults()[0],
-          TimingInfo::break_dv(), bufferSlots,
-          dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+          nextLocation->getLoc(), lazyForkOp.getResults()[0], bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, lhsNDSBufferOp, BB_OUT,
                              "out_buf_lhs_nds_" + outName);
       BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
-          nextLocation->getLoc(), lazyForkOp.getResults()[1],
-          TimingInfo::break_dv(), bufferSlots,
-          dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+          nextLocation->getLoc(), lazyForkOp.getResults()[1], bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, rhsNDSBufferOp, BB_OUT,
                              "out_buf_rhs_nds_" + outName);
 
@@ -554,13 +552,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, rhsEndNDWireOp, BB_OUT, rhsNDwName);
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), lhsEndNDWireOp.getResult(),
-        TimingInfo::break_dv(), bufferSlots,
-        dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        nextLocation->getLoc(), lhsEndNDWireOp.getResult(), bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     BufferOp rhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), rhsEndNDWireOp.getResult(),
-        TimingInfo::break_dv(), bufferSlots,
-        dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        nextLocation->getLoc(), rhsEndNDWireOp.getResult(), bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 

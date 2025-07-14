@@ -3,6 +3,7 @@ import re
 ATTR_SIZE = "size"
 ATTR_SLOTS = "num_slots"
 ATTR_TRANSPARENT = "transparent"
+ATTR_BUFFER_TYPE = "buffer_type"
 ATTR_VALUE = "value"
 ATTR_LATENCY = "latency"
 ATTR_PREDICATE = "predicate"

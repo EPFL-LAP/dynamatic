@@ -542,10 +542,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
-            handshake::NDWireOp, handshake::BlockerOp>([&](auto) {
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp,
+            handshake::BlockerOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
+      })
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
+        // Bitwidth
+        addType("DATA_TYPE", bufferOp.getOperand());
+
+        addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
@@ -650,14 +657,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
-        auto delayAttr = op->getAttrOfType<StringAttr>("internal_delay");
-        if (delayAttr) {
-          addString("INTERNAL_DELAY", delayAttr.getValue());
-        } else {
-          llvm::errs() << "Missing 'internal_delay' attribute in op: "
-                       << op->getName() << "\n";
-          addString("INTERNAL_DELAY", "0.0");
-        }
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
@@ -718,6 +717,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
+
+  if (auto internalDelayInterface =
+          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+    auto delayAttr = internalDelayInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {

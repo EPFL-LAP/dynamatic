@@ -57,7 +57,8 @@ entity selector is
   );
   port (
     -- inputs
-    clk, rst         : in std_logic;
+    clk		           : in std_logic;
+    rst              : in std_logic;
     condition        : in std_logic_vector(0 downto 0);
     condition_valid  : in std_logic;
     trueValue        : in std_logic_vector(DATA_TYPE - 1 downto 0);

@@ -21,7 +21,8 @@ use ieee.numeric_std.all;
 -- Entity of sink
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     {data(f"ins       : in  std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in  std_logic;
