@@ -34,7 +34,7 @@ add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
 add_custom_target(
   run-all-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --output-on-failure
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 500 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
