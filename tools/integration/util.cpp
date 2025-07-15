@@ -273,13 +273,13 @@ int getSimulationTime(const fs::path &logFile) {
     lines.push_back(line);
   }
 
-  std::regex pattern("Time: (\\d+) ns");
+  std::regex pattern("Simulation done! Latency = (\\d+) cycles");
   std::smatch match;
 
   // Search lines in reverse order
   for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
     if (std::regex_search(*it, match, pattern)) {
-      return std::stoi(match[1]) / 4;
+      return std::stoi(match[1]);
     }
   }
 
