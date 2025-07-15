@@ -1,5 +1,5 @@
 # Writing Hls C Code for Dynamatic
-Before passing your C kernel (function) to Dynamatic for compilation, it is important that you ensure it meets the following guidelines.
+Before passing your C kernel (function) to Dynamatic for compilation, it is important that you ensure it meets some guidelines. This document presents the said guidelines and some constraints that the user must follow to make their code suitable inputs for Dynamatic.
 
 > [!NOTE]  
 > These guidelines target the function to be compiled and not the `main` function of your program except for the `CALL_KERNEL`. Main is primarily useful for passing inputs for simulation and is not compiled by Dynamatic
@@ -7,13 +7,14 @@ Before passing your C kernel (function) to Dynamatic for compilation, it is impo
 ## Summary
 1. [Dynamatic header](#1-include-the-dynamatic-integration-header)
 2. [`CALL_KERNEL` macro in `main`](#2-use-the-call_kernel-macro-in-the-main-function)
-3. [Inline functions called by the kernel](#3-do-not-call-functions-in-your-target-function)
-4. [No recursive calls](#4-recursive-calls-are-not-supported)
-5. [No pointers](#5-pointers--are-not-supported)
-6. [No dynamic memory allocation](#6-dynamic-memory-allocation-is-not-supported)
-7. [Pass global variables](#7-global-variables)
-8. [No support for local array declarations](#8-local-array-declarations-are-not-supported)
-9. [Data type support](#data-types-supported-by-dynamatic)
+3. [Variable Types and Names in `main` Must Match Parameter Names in Kernel Declaration]()
+4. [Inline functions called by the kernel](#3-do-not-call-functions-in-your-target-function)
+5. [No recursive calls](#4-recursive-calls-are-not-supported)
+6. [No pointers](#5-pointers--are-not-supported)
+7. [No dynamic memory allocation](#6-dynamic-memory-allocation-is-not-supported)
+8. [Pass global variables](#7-global-variables)
+9. [No support for local array declarations](#8-local-array-declarations-are-not-supported)
+10. [Data type support](#data-types-supported-by-dynamatic)
 
 ### 1. Include the Dynamatic Integration Header
 
@@ -30,8 +31,11 @@ It does two things in the compiler flow:
 ```c
 CALL_KERNEL(func, input_1, input_2, ... , input_n)
 ```
+### 3. Match Variable Names and Types in `main` to the Parameter Declared as Kernel Inputs
+For simulation purposes, the variables declared in the `main` function must have the same names and data types as the function parameters of your function under test. This makes it easier for the simulator to identify and properly match parameters when passing them.  
 
-### 3. Do Not Call Functions in Your Target Function
+## Limitations
+### 1. Do Not Call Functions in Your Target Function
 
 The target function is the top level function to be implemented by Dynamatic. Use macros to implement any extra functionality before using them in your target function.
 ```c
@@ -43,24 +47,24 @@ void loop(int x) {
     }
 }  // inlined with macro definition.
 ```
-### 4. Recursive Calls Are Not Supported  
+### 2. Recursive Calls Are Not Supported  
 Like other HLS tools, Dynamatic does not support recursive function calls because:
 - they are difficult to map to hardware
 - have unpredictable depths and control flow
 - unbounded execution
 - the absence of call-stack in FPGA platforms would be too resource demanding to implement efficiently epecially without knowing the bounds ahead of time.  
 
-### 5. Pointers  Are Not Supported 
+### 3. Pointers  Are Not Supported 
 
 Pointers should not be used.  `*(x + 1) = 4;` is invalid. Use regular indexing and fixed sized arrays if need be as shown below.
 ```c
 int x[10]; // fixed sized
 x[1] = 4; // non-pointer indexing
 ```
-### 6. Dynamic Memory Allocation is Not Supported
+### 4. Dynamic Memory Allocation is Not Supported
 Dynamic memory allocation is also disallowed because it's not deterministic enough to allow enough hardware resources to be allocated at compile time.  
 
-### 7. Global Variables  
+### 5. Global Variables  
 Pass global variables to functions as parameters else they will not be seen by Dynamatic at compilation and yield errors. See appropriate use below.
 
 ```c
@@ -72,7 +76,7 @@ int scaler(int scale, int number) // scale is still passed as parameter
 }
 ```
 
-### 8. Local Array Declarations are Not Supported  
+### 6. Local Array Declarations are Not Supported  
 Local array declaration are not yet supported. Pass all arrays as parameters.  
 
 ```c

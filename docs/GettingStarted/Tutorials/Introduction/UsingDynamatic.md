@@ -4,7 +4,7 @@
 
 This section covers:
 - how to use Dynamatic
-- constructs to include and invalid C/C++ features (see [Writing HLS C Code](../../../UserGuide/WritingHLSCode.md))
+- constructs to include and invalid C/C++ features (see [Kernel Code Guidelines](../../../UserGuide/KernelCodeGuideLines.md))
 - Dynamatic commands and respective flags.
 
 ## Introduction to Dynamatic
@@ -261,6 +261,6 @@ There are several interactive elements at the bottom of the window that you can 
 
 ### Conclusion
 Congratulations on reaching the end of this tutorial! You now know how to use Dynamatic to compile C kernels into functional dataflow circuits, visualize these circuits to better understand them to identify potential optimization opportunities.  
-Before moving on to use Dynamatic for your custom programs, kindly refer to the [Writing HLS C Code](../../../UserGuide/WritingHLSCode.md) guide. You can also view a more [detailed example](Examples.md) that uses some of the optional commands not mentioned in this introductory tutorial.
+Before moving on to use Dynamatic for your custom programs, kindly refer to the [Kernel Code Guidelines](../../../UserGuide/KernelCodeGuideLines.md) guide. You can also view a more [detailed example](Examples.md) that uses some of the optional commands not mentioned in this introductory tutorial.
 
 We are now ready for an introduction to [modiying Dynamatic](ModifyingDynamatic.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.

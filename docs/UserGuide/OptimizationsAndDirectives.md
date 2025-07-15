@@ -2,12 +2,13 @@
 1. [Clock frequency](#1-achieving-a-specific-clock-frequency)  
 2. [Area](#2-area)  
 3. [Latency and throughput](#3-latency-and-throughput)  
-4. [Optimization algorithms in Dynamatic](#optimization-algorithms-in-dynamatic)
+4. [Customizing Design to Specific Hardware: Floating Point IPs](#adjusting-design-to-specific-hardware-floating-point-ips)
+5. [Optimization algorithms in Dynamatic](#optimization-algorithms-in-dynamatic)
     - [Buffer placement algorithm: FPGA'20](#buffer-placement-algorithm-fpga20)
     - [Buffer placement algorithm: FPL'22](#buffer-placement-algorithm-fpl22)
     - [Area optimization: Sizing Load Store Queue depths](#area-optimization-sizing-load-store-queue-depths)
     - [Resource sharing of functional units](#resource-sharing-of-functional-units)
-5. [Custom compilation flows](#custom-compilation-flows)  
+6. [Custom compilation flows](#custom-compilation-flows)  
 
 
 ### 1. Achieving a Specific Clock Frequency   
@@ -21,6 +22,21 @@ Circuit area can be optimized using the following compile flags
 
 ### 3. Latency and Throughput
 Latency and throughput can be improved using buffer placement with either the `fpga20` or `fpl22` values for the `--buffer-algorithm` compile flag.  
+
+### Adjusting Design to Specific Hardware: Floating Point IPs
+Dynamatic uses open-source [FloPoCo](https://flopoco.org/) components proprietory [Vivado](https://docs.amd.com/v/u/en-US/pg060-floating-point) to allow users to customize their floating point units. For instructions on how to achieve this, see [the floating point units guide](../DeveloperGuide/Specs/FloatingPointUnits.md). Floating point units can be selected using the `set-fp-units-generator <flopoco|vivado>` command as shown in the [command reference](../UserGuide/CommandReference.md).
+
+#### Advantages of Using Vivado Over FloPoCo Floating Point IP
+- Tailored for Xilinx hardware and ideal for industry level projects.
+- Supports IEEE-754 single, double, and half precision floating point representation.
+-  Supports NaN, infinity, denormals, exception flags, and rounding models.
+- Provides plug and play floating point units.
+
+#### Advantages of Using FloPoCo Over Vivado Floating Point IP
+- Open source, hence ideal for academic research involving fine grained parameter tuning and RTL transparency
+- Very good for custom floating point formats such as FP8 or "quasi-floating point".
+- Users can explicitly control pipeline depth.
+- Generated RTL is portable to any toolchanin unlike Vivado which is limited to Xilinx-specific resources.
 
 ## Optimization Algorithms in Dynamatic
 
@@ -80,9 +96,11 @@ Dynamatic uses a resource sharing strategy based on [ASPLOS'25](https://dl.acm.o
 compile <...> --sharing
 ```
 
-## Floating Point IPs
-For implementing floating point operations, Dynamatic uses open-source [FloPoCo](https://flopoco.org/) components. It is possible to use proprietary Xilinx FP units from Vivado. For instructions on how to achieve this, see [the floating point units guide](../DeveloperGuide/Specs/FloatingPointUnits.md). Floating point units can be selected using the `set-fp-units-generator <flopoco|vivado>` command as shown in the [command reference](../UserGuide/CommandReference.md).
-
 ## Custom Compilation Flows  
 Some other transformations also optimize the circuit, but they are not included in the normal compilation flow.
-In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.
+In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.  
+
+Some optimization strategies, such as speculation or fast token delivery, aren't accessible through the standard `dynamatic` interactive environment.  
+These approaches often require a custom compilation flow. For example, speculation provides a Python script that enables a push-button flow execution.  
+
+For more details, refer to the [speculation documentation](../DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md).
