@@ -30,9 +30,11 @@ bool runSubprocess(const std::vector<std::string> &args,
   return std::system(command.str().c_str()) == 0;
 };
 
-int runIntegrationTest(const std::string &name, int &outSimTime) {
+int runIntegrationTest(const std::string &name, int &outSimTime,
+                       const std::optional<fs::path> &customPath) {
   fs::path path =
-      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+      customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
+      name / (name + ".c");
 
   std::cout << "[INFO] Running " << name << std::endl;
   std::string tmpFilename = "tmp_" + name + ".dyn";
