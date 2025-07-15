@@ -32,12 +32,28 @@ It does two things in the compiler flow:
 CALL_KERNEL(func, input_1, input_2, ... , input_n)
 ```
 ### 3. Match Variable Names and Types in `main` to the Parameter Declared as Kernel Inputs
-For simulation purposes, the variables declared in the `main` function must have the same names and data types as the function parameters of your function under test. This makes it easier for the simulator to identify and properly match parameters when passing them.  
+For simulation purposes, the variables declared in the `main` function must have the same names and data types as the function parameters of your function under test. This makes it easy for the simulator to correctly identify and properly match parameters when passing them. For example:
+```c
+void loop_scaler(int arr[10], int scale_factor){
+    ...
+}; // function declaration
+
+int main(){
+    int arr[10]; // same name and type 
+    int size;    // as in kernel declaration
+
+    scale_factor = 50;
+    // initialize arr[10] values
+
+    CALL_KERNEL(loop_scaler, arr, scale_factor);
+    return 0;
+}
+```
 
 ## Limitations
 ### 1. Do Not Call Functions in Your Target Function
 
-The target function is the top level function to be implemented by Dynamatic. Use macros to implement any extra functionality before using them in your target function.
+The target function is the top level function to be implemented by Dynamatic. Dynamatic does not support calling other functions in the target kernel. Alternatively, you can use macros to implement any extra functionality before using them in your target kernel.
 ```c
 #define increment(x) x+1; // macro for increment function
 
@@ -53,31 +69,32 @@ Like other HLS tools, Dynamatic does not support recursive function calls becaus
 - have unpredictable depths and control flow
 - unbounded execution
 - the absence of call-stack in FPGA platforms would be too resource demanding to implement efficiently epecially without knowing the bounds ahead of time.  
+An alternative would be to manually unroll recursive calls and replace them with loops where possible.  
 
 ### 3. Pointers  Are Not Supported 
-
 Pointers should not be used.  `*(x + 1) = 4;` is invalid. Use regular indexing and fixed sized arrays if need be as shown below.
 ```c
 int x[10]; // fixed sized
 x[1] = 4; // non-pointer indexing
 ```
 ### 4. Dynamic Memory Allocation is Not Supported
-Dynamic memory allocation is also disallowed because it's not deterministic enough to allow enough hardware resources to be allocated at compile time.  
+Dynamic memory allocation is also not allowed because it's not deterministic enough to allow enough hardware resources to be allocated at compile time.  
 
 ### 5. Global Variables  
-Pass global variables to functions as parameters else they will not be seen by Dynamatic at compilation and yield errors. See appropriate use below.
+Dynamatic compiles the kernel code only. Any variables declared outside the kernel function will not be converted unless they are passed to the kernel. Global variables are no exception. You can pass global variables as parameters to your kernel or define them as macros to make your kernel simpler.
 
 ```c
+#define scale_alternative (2)
 int scale = 2; 
 
 int scaler(int scale, int number) // scale is still passed as parameter
 { 
-    return number * scale;
+    return number * scale * scale_alternative;
 }
 ```
 
 ### 6. Local Array Declarations are Not Supported  
-Local array declaration are not yet supported. Pass all arrays as parameters.  
+Local array declaration in kernels is not yet supported by Dynamatic. Pass all arrays as parameters to your kernel.  
 
 ```c
 void convolution(unsigned char input[HEIGHT][WIDTH], unsigned char output[HEIGHT][WIDTH]) {
@@ -131,13 +148,12 @@ __int128|x|
 ### Supported Operations
 - Arithmetic operations: `+`, `-`, `*`, `/`, `++`, `--`.  
 - Logical operations on `int`: `>`, `<`, `&&`, `||`, `!`, `^`
-- Logical operations on `float`: `>`, `<`
 
 ### Unsupported Operations
 - Arithmetic operations: `%`
-- Logical operations on float: `&&`, `||`, `!`, `^`
 - Pointer operations: `*`, `&` (indexing is supported - `a[i]`)
 - Most math functions excluding absolute value functions
+- Logical operations can be used with variable of type `float` in C but the following are not yet supported in Dynamatic: `&&`, `||`, `!`, `^`.
 
 > [!TIP]  
 > Data type and operation related errors generally state explicitly that an operation or type is not supported. Kindly report those as bugs on our repository while we work on making more data types supported.

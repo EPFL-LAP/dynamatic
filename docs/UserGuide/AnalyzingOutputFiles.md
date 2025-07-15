@@ -1,7 +1,8 @@
 # Analyzing Output Files
 Dynamatic stores the compiled IR, generated RTL, simulation results, and useful intermediate data in the `out/` directory.
 Learning about these files is essential for identifying performance bottlenecks, gaining deeper insight into the generated circuits, exporting the generated design to integrate into your existing designs, etc.  
-This document provides guidance on how to analyze these files effectively
+
+This document provides guidance on the locations of these files and how to analyze them effectively.
 
 ### Compilation Results 
 > [!NOTE]  

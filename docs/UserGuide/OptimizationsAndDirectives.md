@@ -1,3 +1,6 @@
+# Optimizations And Directives
+Dynamatic offers a number of options to optimize the generated RTL code to meet specific requirements. This document describes the various optimization options available as well as some directives to customize the generated RTL to specific hardware using proprietory floating point unit generators.
+
 ## Overview: What if I Want to Optimize ...
 1. [Clock frequency](#1-achieving-a-specific-clock-frequency)  
 2. [Area](#2-area)  
