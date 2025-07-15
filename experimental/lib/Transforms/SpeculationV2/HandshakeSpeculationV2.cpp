@@ -864,7 +864,7 @@ readFromJSON(const std::string &jsonPath) {
 }
 
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
-  // Parse json
+  // Parse json (jsonPath is a member variable handled by tablegen)
   auto bbOrFailure = readFromJSON(jsonPath);
   if (failed(bbOrFailure))
     return signalPassFailure();
@@ -874,6 +874,10 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp
+  assert(std::distance(modOp.getOps<FuncOp>().begin(),
+                       modOp.getOps<FuncOp>().end()) == 1 &&
+         "Expected a single FuncOp in the module");
+
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
   OpBuilder builder(funcOp->getContext());
 
@@ -908,6 +912,8 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   Value selector = selectorOrFailure.value();
 
   DenseSet<PasserOp> frontiers;
+  // n is a member variable handled by tablegen.
+  // Storing repeating inits for post-processing.
   SmallVector<SpecV2RepeatingInitOp> repeatingInits(n);
   Value specLoopContinue = loopContinue;
   // Repeatedly move passers past Muxes and PMSC.
@@ -929,8 +935,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
       if (!isEligibleForMuxPasserSwap(muxOp, newSelector,
                                       newSpecLoopContinue)) {
-        muxOp.emitWarning("MuxOp is not eligible for Passer swap, skipping");
-        continue;
+        muxOp.emitWarning(
+            "MuxOp is not eligible for Passer swap, exiting the pass.");
+        return signalPassFailure();
       }
 
       auto passerOp =
@@ -1043,6 +1050,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       }
     }
 
+    // variable is a member variable handled by tablegen.
     if (variable) {
       if (n < 2) {
         funcOp.emitError("Variable speculation requires n >= 2.");
