@@ -39,6 +39,7 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
   VERBATIM
+  USES_TERMINAL
 )
 
 add_custom_target(
@@ -48,4 +49,5 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests that aren't marked with '_NoCI'."
   VERBATIM
+  USES_TERMINAL
 )
