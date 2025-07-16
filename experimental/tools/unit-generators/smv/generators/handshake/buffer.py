@@ -4,7 +4,7 @@ from generators.support.tehb import generate_tehb
 from generators.support.ofifo import generate_ofifo
 from generators.support.oehb import generate_oehb
 
-from enum import Enum
+from support.utils import try_enum_cast
 
 class BufferType(Enum):
     ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
@@ -18,11 +18,8 @@ def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
     bitwidth = params[ATTR_BITWIDTH]
 
-    try:
-        buffer_type = BufferType(params[ATTR_BUFFER_TYPE])
-    except ValueError:
-        raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
-                         f"Beta backend supports: {[bt.value for bt in BufferType]}")
+    buffer_type = try_enum_cast(params[ATTR_BUFFER_TYPE], BufferType)
+
     match buffer_type:
         case BufferType.ONE_SLOT_BREAK_R:
             return generate_tehb(name, {ATTR_BITWIDTH: bitwidth})

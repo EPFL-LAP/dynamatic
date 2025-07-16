@@ -232,7 +232,7 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let extraClassDeclaration = [{
     // can a data token bypass the buffer
-    bool isBypass(){
+    bool isBypassDV(){
       switch (getBufferType()) {
         case BufferType::ONE_SLOT_BREAK_DV:
         case BufferType::FIFO_BREAK_DV:
@@ -243,7 +243,22 @@ def BufferOp : Handshake_Op<"buffer", [
         case BufferType::FIFO_BREAK_NONE:
           return true;
       }
-      llvm_unreachable("Unknown BufferType in isBypass()");
+      llvm_unreachable("Unknown BufferType in isBypassDV()");
+    }
+
+    int getLatencyDV(){
+      switch (getBufferType()) {
+        case BufferType::ONE_SLOT_BREAK_R:
+        case BufferType::FIFO_BREAK_NONE:
+          return 0;
+        case BufferType::ONE_SLOT_BREAK_DV:
+        case BufferType::FIFO_BREAK_DV:
+        case BufferType::ONE_SLOT_BREAK_DVR:
+          return 1;
+        case BufferType::SHIFT_REG_BREAK_DV:
+          return getNumSlots();
+      }
+      llvm_unreachable("Unknown BufferType in getLatencyDV()");
     }
   }];
 

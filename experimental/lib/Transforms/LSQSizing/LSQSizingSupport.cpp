@@ -47,7 +47,7 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
   }
 
   if (auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op)) {             
-    return bufferOp.isBypass() ? 0 : 1;
+    return bufferOp.getLatency();
   }
 
   return 0;

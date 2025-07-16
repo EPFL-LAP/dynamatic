@@ -81,13 +81,13 @@ struct HandshakePlaceBuffersCustomPass
     // returns optional wrapper around buffer type enum
     auto bufferTypeOpt = handshake::symbolizeBufferType(type);
 
-    if (!bufferTypeOpt) {
+    if (!bufferTypeOpt.has_value()) {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
 
-    // dereference the optional to get the enum itself
-    auto bufferType = *bufferTypeOpt;
+    // pull the enum itself from the optional
+    auto bufferType = bufferTypeOpt.get();
 
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
                                                      slots, bufferType);

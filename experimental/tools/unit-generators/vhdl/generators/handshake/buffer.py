@@ -5,6 +5,8 @@ from generators.handshake.one_slot_break_dvr import generate_one_slot_break_dvr
 from generators.handshake.shift_reg_break_dvr import generate_shift_reg_break_dv
 from generators.handshake.oehb import generate_oehb
 
+from support.utils import try_enum_cast
+
 from enum import Enum
 
 class BufferType(Enum):
@@ -17,11 +19,9 @@ class BufferType(Enum):
 
 
 def generate_buffer(name, params):
-    try:
-        buffer_type = BufferType(params["buffer_type"])
-    except ValueError:
-        raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
-                         f"Beta backend supports: {[bt.value for bt in BufferType]}")
+
+    buffer_type = try_enum_cast(params["buffer_type"], BufferType)
+
     match buffer_type:
         case BufferType.ONE_SLOT_BREAK_R:
             return generate_tehb(name, params)

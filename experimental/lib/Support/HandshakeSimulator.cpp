@@ -1409,7 +1409,7 @@ void Simulator::associateModel(Operation *op) {
         // but it didn't register them either
         // Now I guess it adds a 1-slot buffer based only on bypass behaviour?
 
-        if (bufferOp.isBypass())
+        if (bufferOp.isBypassDV())
           registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
         else
           registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
