@@ -1,21 +1,48 @@
 # Dependencies
+Dynamatic uses a number of libraries and tools to implement its full functionality. This document provides a list of these dependencies with some information on them.  
 
-Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules) to manage its software dependencies (all hosted on GitHub). We depend on [Polygeist](https://github.com/llvm/Polygeist), a C/C++ frontend for MLIR which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) through a git submodule. The project is set up so that you can include LLVM/MLIR headers directly from Dynamatic code without having to specify their path through Polygeist. We also depend on [godot-cpp](https://github.com/godotengine/godot-cpp), the official C++ bindings for the Godot game engine which we use as the frontend to our interactive dataflow circuit visualizer. 
+## Libraries
+### Git Submodules  
+Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules) to manage its software dependencies (all hosted on GitHub). We depend on [Polygeist](https://github.com/llvm/Polygeist), a C/C++ frontend for MLIR which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) through a git submodule. The project is set up so that you can include LLVM/MLIR headers directly from Dynamatic code without having to specify their path through Polygeist. We also depend on [godot-cpp](https://github.com/godotengine/godot-cpp), the official C++ bindings for the Godot game engine which we use as the frontend to our interactive dataflow circuit visualizer. See the [git submodules guide](./SubModulesGuide.md) for a summary on how to work with submodules in this project.
+
 ### Polygeist
 
 [Polygeist](https://github.com/llvm/Polygeist) is a C/C++ frontend for MLIR including polyhedral optimizations and parallel optimizations features. Polygeist is thus responsible for the first step of our compilation process, that is taking source code written in C/C++ into the MLIR ecosystem. In particular, we care that our entry point to MLIR is at a very high semantic level, namely, at a level where polyhedral analysis is possible. The latter allows us to easily identify dependencies between memory accesses in source programs in a very accurate manner, which is key to optimizing the allocation of memory interfaces and resources in our elastic circuits down the line. Polygeist is able to emit MLIR code in the [*Affine*](https://mlir.llvm.org/docs/Dialects/Affine/) dialect, which is perfectly suited for this kind of analysis. 
 
-### Working With Submodules
+### CMake & Ninja
+These constitute the primary build system for Dynamatic. They are used to build Dynamatic core, Polygeist, and LLVM/MLIR. You can have more details on [CMake](https://cmake.org/cmake/help/latest/index.html) and [Ninja](https://ninja-build.org/manual.html) by checking their official documentations.
 
-Having a project with submodules means that you have to pay attention to a couple additional things when pulling/pushing code to the project to maintain it in sync with the submodules. If you are unfamiliar with submodules, you can learn more about how to work with them [here](https://git-scm.com/book/en/v2/Git-Tools-Submodules). Below is a very short and incomplete description of how our submodules are managed by our repository as well as a few pointers on how to perform simple git-related tasks in this context.
+### Boost.Regex
+[Boost.Regex](https://www.boost.org/doc/libs/1_88_0/libs/regex/doc/html/index.html) is used to resolve Dynamatic regex expressions.
 
-Along the history of Dynamatic's (in this context, called the *superproject*) directory structure and file contents, the repository stores the commit hash of a specific commit for each submodule's repository to identify the version of each *subproject* that the superproject currently depends on. These commit hashes are added and commited the same way as any other modification to the repository, and can thus evolve as development moves forward, allowing us to use more recent version of our submodules as they are pushed to their respective repositories. Here are a few concrete things you need to keep in mind while using the repository that may differ from the submodule-free workflow. 
-- Clone the repository with `git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git` to instruct git to also pull and check out the version of the submodules referenced in the latest commit of Dynamatic's `main` branch.
-- When pulling the latest commit(s), use `git pull --recurse-submodules` from the top level repository to also update the checked out commit from submodules in case the superproject changed the subprojects commits it is tracking.
-- To commit changes made to files within Polygeist from the superproject (which is possible thanks to the fact that we use a fork of Polygeist), you first need to commit these changes to the Polygeist fork, and then update the Polygeist commit tracked by the superproject. More precisely,
-  1. `cd` to the `polygeist` subdirectory,
-  2. `git add` your changes and `git commit` them to the Polygeist fork,
-  3. `cd` back to the top level directory,
-  4. `git add polygeist` to tell the superproject to track your new Polygeist commit and `git commit` to Dynamatic.
-  
-  If you want to push these changes to remote, note that you will need to `git push` **twice**, once from the `polygeist` subdirectory (the Polygeist commit) and once from the top level directory (the Dynamatic commit). 
+## Scripting & Tools
+### Python (≥ 3.6)
+Used in build systems, scripting, testing. See official [documentation](https://docs.python.org/3/)
+
+### Graphviz (dot)
+Generates visual representations of dataflow circuits (i.e., .dot). See official [documentation](https://graphviz.org/documentation/)
+
+### JDK (Java Development Kit)
+Required to run Scala/Chisel compilation. See official [documentation](https://docs.oracle.com/en/java/javase/17/).
+
+## Tools
+Dynamatic uses some third party tools to implement smart buffer placement, simulation, and interactive dataflow circuit visualization. Below is a list of the tools:
+
+### Optimization & Scheduling: Gurobi
+[Gurobi](https://www.gurobi.com/) solves MILP (Mixed-Integer Linear Programming) problems used during buffer placement and optimization. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. See how to set up gurobi in the [advanced build section](docs/UserGuide/AdvancedBuild.md)
+
+### Simulation Tool: ModelSim/Questa
+Dynamatic uses [ModelSim](https://www.intel.com/content/www/us/en/software-kit/750368/modelsim-intel-fpgas-standard-edition-software-version-18-1.html)/[Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) to perform simulations. See [installation](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) page on how to setup ModelSim/Questa.
+
+### Graphical Tools: Godot
+[godot-cpp](https://github.com/godotengine/godot-cpp), the official C++ bindings for the Godot game engine which we use as the frontend to our interactive dataflow circuit visualizer.
+
+### Utility/Development Tools
+#### `clang`, `lld`, `ccache`
+These are optional compiler/linker improvements to speed up builds. See their official documentations for details.
+
+### Git
+Dynamatic uses [git]() for project and submodule version control
+
+### Standard UNIX Toolchain: `curl`, `gzip`, etc.
+These are used for the various build scripts in the Dynamatic project.

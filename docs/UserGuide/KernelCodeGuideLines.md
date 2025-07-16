@@ -153,7 +153,7 @@ __int128|x|
 - Arithmetic operations: `%`
 - Pointer operations: `*`, `&` (indexing is supported - `a[i]`)
 - Most math functions excluding absolute value functions
-- Logical operations can be used with variable of type `float` in C but the following are not yet supported in Dynamatic: `&&`, `||`, `!`, `^`.
+- Logical operations can be used with variables of type `float` in C but the following are not yet supported in Dynamatic: `&&`, `||`, `!`, `^`.
 
 > [!TIP]  
 > Data type and operation related errors generally state explicitly that an operation or type is not supported. Kindly report those as bugs on our repository while we work on making more data types supported.
