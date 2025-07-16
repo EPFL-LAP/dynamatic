@@ -136,7 +136,8 @@ struct Argument {
 struct CommandArguments {
   SmallVector<StringRef> positionals;
   mlir::DenseSet<StringRef> flags;
-  StringMap<StringRef> options;
+  StringMap<StringRef> options;                   // single-valued options
+  StringMap<SmallVector<StringRef>> multiOptions; // multi-valued options
 };
 
 class Command {
@@ -147,6 +148,7 @@ public:
   StringMap<Argument> positionals;
   StringMap<Argument> flags;
   StringMap<Argument> options;
+  StringMap<Argument> multiOptions;
 
   Command(StringRef keyword, StringRef desc, FrontendState &state)
       : keyword(keyword), desc(desc), state(state) {}
@@ -159,13 +161,25 @@ public:
   void addFlag(const Argument &arg) {
     assert(!flags.contains(arg.name) && "duplicate flag name");
     assert(!options.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and flag have same name");
     flags[arg.name] = arg;
   }
 
   void addOption(const Argument &arg) {
     assert(!options.contains(arg.name) && "duplicate option name");
     assert(!flags.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and option have same name");
     options[arg.name] = arg;
+  }
+
+  void addMultiOption(const Argument &arg) {
+    assert(!multiOptions.contains(arg.name) && "duplicate multi-option name");
+    assert(!flags.contains(arg.name) && "multi-option and flag have same name");
+    assert(!options.contains(arg.name) &&
+           "multi-option and option have same name");
+    multiOptions[arg.name] = arg;
   }
 
   CommandResult parseAndExecute(ArrayRef<std::string> tokens);
@@ -190,6 +204,8 @@ private:
 
   LogicalResult parseOption(StringRef name, StringRef value,
                             CommandArguments &args) const;
+  LogicalResult parseMultiOption(StringRef name, SmallVector<StringRef> value,
+                                 CommandArguments &args) const;
 };
 
 class Exit : public Command {
@@ -257,6 +273,7 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
+
   static constexpr llvm::StringLiteral OPTIMIZE_ZERO = "optimize-zero";
 
   Compile(FrontendState &state)
@@ -269,7 +286,7 @@ public:
                "'on-merges' (default option: minimum buffering for "
                "correctness), 'fpga20' (throughput-driven buffering), or "
                "'fpl22' (throughput- and timing-driven buffering)"});
-    addOption({SKIPPABLE_SEQ_N, "Num of Comparators"});
+    addMultiOption({SKIPPABLE_SEQ_N, "Num of Comparators"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({OPTIMIZE_ZERO, "optimize zero conditions"});
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
@@ -399,7 +416,22 @@ CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
         }
         if (failed(parseOption(name, *nextToken, parsed)))
           return CommandResult::SYNTAX_ERROR;
-      } else {
+      } else if (multiOptions.contains(name)) {
+        // This is a multi-valued option
+        SmallVector<StringRef> values;
+        ++tokIt;
+        StringRef nextTokenStr = *tokIt;
+        while (tokIt != opts.end() && !nextTokenStr.starts_with("--")) {
+          values.push_back(*tokIt);
+          ++tokIt;
+          nextTokenStr = *tokIt;
+        }
+        --tokIt; // Adjust for the loop increment
+        if (failed(parseMultiOption(name, values, parsed)))
+          return CommandResult::SYNTAX_ERROR;
+      }
+
+      else {
         llvm::errs() << ERR << "Unknow flag/option '" << tok << "'\n";
         return CommandResult::SYNTAX_ERROR;
       }
@@ -443,6 +475,18 @@ LogicalResult Command::parseOption(StringRef name, StringRef value,
   args.options.insert({name, value});
   return success();
 };
+
+LogicalResult Command::parseMultiOption(StringRef name,
+                                        SmallVector<StringRef> values,
+                                        CommandArguments &args) const {
+  if (args.multiOptions.contains(name)) {
+    llvm::errs() << ERR << "Multi-option '" << name
+                 << "' given more than once\n";
+    return failure();
+  }
+  args.multiOptions[name] = values;
+  return success();
+}
 
 std::string Command::getShortCmdDesc() const {
   std::stringstream ss;
@@ -584,7 +628,9 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
   std::string optimizeZero = args.flags.contains(OPTIMIZE_ZERO) ? "1" : "0";
-  std::string skippableSeqN = args.flags.contains(SKIPPABLE_SEQ_N) ? "3" : "0";
+  std::string skippableSeqNListString = "none";
+  // std::string skippableSeqN = args.flags.contains(SKIPPABLE_SEQ_N) ? "3"
+  // : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -600,15 +646,27 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
-  if (auto it = args.options.find(SKIPPABLE_SEQ_N); it != args.options.end()) {
-    // if (stoul(it->second.str())) {
-    //   skippableSeqN = it->second;
-    // } else {
-    //   llvm::errs() << "Unknown N";
-    //   return CommandResult::FAIL;
-    // }
-    skippableSeqN = it->second;
+  llvm::errs() << args.multiOptions.size() << " multi options\n";
+
+  if (auto it = args.multiOptions.find(SKIPPABLE_SEQ_N);
+      it != args.multiOptions.end()) {
+    skippableSeqNListString = "";
+    for (const auto &valStr : it->second) {
+      int val = std::stoi(std::string(valStr));
+      skippableSeqNListString += std::to_string(val) + ",";
+    }
   }
+
+  // if (auto it = args.options.find(SKIPPABLE_SEQ_N); it != args.options.end())
+  // {
+  //   // if (stoul(it->second.str())) {
+  //   //   skippableSeqN = it->second;
+  //   // } else {
+  //   //   llvm::errs() << "Unknown N";
+  //   //   return CommandResult::FAIL;
+  //   // }
+  //   skippableSeqN = it->second;
+  // }
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
@@ -617,7 +675,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 fastTokenDelivery, straightToQueue, skippableSeqN,
+                 fastTokenDelivery, straightToQueue, skippableSeqNListString,
                  optimizeZero);
 }
 

@@ -17,8 +17,39 @@ POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
 STRAIGHT_TO_QUEUE=${10}
-SKIPPABLE_SEQ_N=${11}
-OPTIMIZE_ZERO=${12}
+
+echo $DYNAMATIC_DIR
+echo $SRC_DIR
+echo $OUTPUT_DIR
+echo $KERNEL_NAME
+echo $BUFFER_ALGORITHM
+echo $TARGET_CP
+echo $POLYGEIST_PATH
+echo $USE_SHARING
+echo $FAST_TOKEN_DELIVERY
+echo $STRAIGHT_TO_QUEUE
+
+for i in {1..10}; do shift; done
+
+SKIPPABLE_ACTTIVE=0
+SKIPPABLE_SEQ_N=()
+
+echo $1
+
+if [ "$1" != "none" ]; then
+  SKIPPABLE_ACTTIVE=1
+  while [[ "$#" -gt 0 && "${1}" != "--" ]]; do
+    echo test
+    echo $1
+    SKIPPABLE_ACTTIVE=1
+    SKIPPABLE_SEQ_N+=("$1")
+    shift
+  done
+else
+  shift
+fi
+
+OPTIMIZE_ZERO=$1
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -159,21 +190,36 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
     "Applied transformations to handshake"
 
 else 
-
+echo peyda
 echo $SKIPPABLE_SEQ_N
-
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-inactivate-enforced-deps \
-  --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME optimizeZero=$OPTIMIZE_ZERO" \
-  --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width \
-  --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake  ------ "
-
+  if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
+    echo $SKIPPABLE_SEQ_N
+    echo "Running handshake transformations with skippable seq"
+    echo $SKIPPABLE_ACTTIVE
+    # handshake transformations
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-inactivate-enforced-deps \
+      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME optimizeZero=$OPTIMIZE_ZERO" \
+      --handshake-replace-memory-interfaces \
+      --handshake-minimize-cst-width \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize --handshake-infer-basic-blocks \
+      > "$F_HANDSHAKE_TRANSFORMED"
+    exit_on_fail "Failed to apply transformations to handshake" \
+      "Applied transformations to handshake with skippable seq"
+  else
+    echo "Skipping skippable seq transformations"
+    # handshake transformations
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-inactivate-enforced-deps \
+      --handshake-replace-memory-interfaces \
+      --handshake-minimize-cst-width \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize --handshake-infer-basic-blocks \
+      > "$F_HANDSHAKE_TRANSFORMED"
+    exit_on_fail "Failed to apply transformations to handshake" \
+      "Applied transformations to handshake without skippable seq"
+  fi
 fi
 
 # Credit-based sharing
