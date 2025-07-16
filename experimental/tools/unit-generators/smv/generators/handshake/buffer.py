@@ -6,6 +6,7 @@ from generators.support.oehb import generate_oehb
 
 from support.utils import try_enum_cast
 
+
 class BufferType(Enum):
     ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
     ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
@@ -13,6 +14,7 @@ class BufferType(Enum):
     FIFO_BREAK_DV = "FIFO_BREAK_DV"
     ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR"
     SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV"
+
 
 def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
@@ -41,4 +43,3 @@ def generate_buffer(name, params):
             return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")
-

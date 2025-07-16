@@ -45,6 +45,7 @@ class SmvScalarType:
     def __str__(self):
         return f"{self.smv_type}"
 
+
 def try_enum_cast(value: str, enum_class: Type[Enum]) -> Union[Enum, str]:
     try:
         return enum_class(value)

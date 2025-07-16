@@ -9,6 +9,7 @@ from support.utils import try_enum_cast
 
 from enum import Enum
 
+
 class BufferType(Enum):
     ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
     ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
