@@ -211,6 +211,14 @@ class LSQWrapper:
         ### io_ldData_*_bits: output
         io_ldData_bits = VHDLLogicVecTypeArray('io_ldData_bits', 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW)
         self.lsq_wrapper_str += io_ldData_bits.signalInit()
+
+        ### io_ldDone_*_ready: input
+        io_ldDone_ready = VHDLLogicTypeArray('io_ldDone_ready', 'i', self.lsq_config.numLdPorts)
+        self.lsq_wrapper_str += io_ldDone_ready.signalInit()
+        
+        ### io_ldDone_*_valid: input
+        io_ldDone_valid = VHDLLogicTypeArray('io_ldDone_valid', 'o', self.lsq_config.numLdPorts)
+        self.lsq_wrapper_str += io_ldDone_valid.signalInit()
         
         ### io_stAddr_ready: output
         io_stAddr_ready = VHDLLogicTypeArray('io_stAddr_ready', 'o', self.lsq_config.numStPorts)
@@ -235,6 +243,14 @@ class LSQWrapper:
         ### io_stData_bits: input
         io_stData_bits = VHDLLogicVecTypeArray('io_stData_bits', 'i', self.lsq_config.numStPorts, self.lsq_config.dataW)
         self.lsq_wrapper_str += io_stData_bits.signalInit()
+
+        ### io_stDone_*_ready: input
+        io_stDone_ready = VHDLLogicTypeArray('io_stDone_ready', 'i', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stDone_ready.signalInit()
+        
+        ### io_stDone_*_valid: input
+        io_stDone_valid = VHDLLogicTypeArray('io_stDone_valid', 'o', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stDone_valid.signalInit()
         
         ### io_memStart_ready: output
         io_memStart_ready = VHDLLogicType('io_memStart_ready', 'o')
@@ -404,6 +420,8 @@ class LSQWrapper:
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n'
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n'
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_done_ready_{i}_i => {io_ldDone_ready[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_done_valid_{i}_o => {io_ldDone_valid[i].getNameWrite()},\n'
             
         for i in range(self.lsq_config.numStPorts):
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n'
@@ -412,6 +430,8 @@ class LSQWrapper:
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n'
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n'
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_done_ready_{i}_i => {io_stDone_ready[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_done_valid_{i}_o => {io_stDone_valid[i].getNameWrite()},\n'
             
         ### Define all AXI ports, we assume there is only 1 channel
         for i in range(self.lsq_config.numLdMem):  
@@ -496,11 +516,19 @@ class LSQWrapper:
       ### io_ldData_*_valid: output
       io_ldData_valid = VHDLLogicTypeArray('io_ldData_valid', 'o', self.lsq_config.numLdPorts)
       self.lsq_wrapper_str += io_ldData_valid.signalInit()
-      
+
       ### io_ldData_*_bits: output
       io_ldData_bits = VHDLLogicVecTypeArray('io_ldData_bits', 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW)
       self.lsq_wrapper_str += io_ldData_bits.signalInit()
       
+      ### io_ldDone_*_ready: input
+      io_ldDone_ready = VHDLLogicTypeArray('io_ldDone_ready', 'i', self.lsq_config.numLdPorts);
+      self.lsq_wrapper_str += io_ldDone_ready.signalInit()
+      
+      ### io_ldDone_*_valid: input
+      io_ldDone_valid = VHDLLogicTypeArray('io_ldDone_valid', 'o', self.lsq_config.numLdPorts);
+      self.lsq_wrapper_str += io_ldDone_valid.signalInit()
+
       ### io_stAddr_ready: output
       io_stAddr_ready = VHDLLogicTypeArray('io_stAddr_ready', 'o', self.lsq_config.numStPorts)
       self.lsq_wrapper_str += io_stAddr_ready.signalInit()
@@ -524,6 +552,14 @@ class LSQWrapper:
       ### io_stData_bits: input
       io_stData_bits = VHDLLogicVecTypeArray('io_stData_bits', 'i', self.lsq_config.numStPorts, self.lsq_config.dataW)
       self.lsq_wrapper_str += io_stData_bits.signalInit()
+
+      ### io_stDone_*_ready: input
+      io_stDone_ready = VHDLLogicTypeArray('io_stDone_ready', 'i', self.lsq_config.numStPorts);
+      self.lsq_wrapper_str += io_stDone_ready.signalInit()
+      
+      ### io_stDone_*_valid: input
+      io_stDone_valid = VHDLLogicTypeArray('io_stDone_valid', 'o', self.lsq_config.numStPorts);
+      self.lsq_wrapper_str += io_stDone_valid.signalInit()
       
       ### io_ldAddrToMC_ready: input
       io_ldAddrToMC_ready = VHDLLogicType('io_ldAddrToMC_ready', 'i')
@@ -684,6 +720,8 @@ class LSQWrapper:
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n'
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n'
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_done_ready_{i}_i => {io_ldDone_ready[i].getNameRead()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_done_valid_{i}_o => {io_ldDone_valid[i].getNameWrite()},\n'
           
       for i in range(self.lsq_config.numStPorts):
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n'
@@ -692,6 +730,8 @@ class LSQWrapper:
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n'
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n'
           self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_done_ready_{i}_i => {io_stDone_ready[i].getNameRead()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_done_valid_{i}_o => {io_stDone_valid[i].getNameWrite()},\n'
           
       ### Define all AXI ports, we assume there is only 1 channel
       for i in range(self.lsq_config.numLdMem):  

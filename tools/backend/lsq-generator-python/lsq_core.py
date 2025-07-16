@@ -1233,6 +1233,10 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     ldp_data_valid_o   = LogicArray('ldp_data_valid', 'o', configs.numLdPorts)
     ldp_data_ready_i   = LogicArray('ldp_data_ready', 'i', configs.numLdPorts)
 
+    # Load done signal (valid, ready) to kernel
+    ldp_done_valid_o   = LogicArray('ldp_done_valid', 'o', configs.numLdPorts)
+    ldp_done_ready_i   = LogicArray('ldp_done_ready', 'i', configs.numLdPorts)      
+
     # Store address channel (addr, valid, ready) from kernel
     stp_addr_i         = LogicVecArray('stp_addr', 'i', configs.numStPorts, configs.addrW)
     stp_addr_valid_i   = LogicArray('stp_addr_valid', 'i', configs.numStPorts)
@@ -1242,6 +1246,10 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     stp_data_i         = LogicVecArray('stp_data', 'i', configs.numStPorts, configs.dataW)
     stp_data_valid_i   = LogicArray('stp_data_valid', 'i', configs.numStPorts)
     stp_data_ready_o   = LogicArray('stp_data_ready', 'o', configs.numStPorts)
+
+    # Store done signal (valid, ready) to kernel
+    stp_done_valid_o   = LogicArray('stp_done_valid', 'o', configs.numStPorts)
+    stp_done_ready_i   = LogicArray('stp_done_ready', 'i', configs.numStPorts)
 
     if configs.stResp:
         stp_exec_valid_o   = LogicArray('stp_exec_valid', 'o', configs.numStPorts)
@@ -2326,6 +2334,9 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 )
         arch += Op(stq_resp_en, wresp_valid_i[0])
         arch += Op(wresp_ready_o[0], '\'1\'')
+
+        for i in range(0, configs.numStMem):
+            arch += Op(stp_done_valid_o[i], wresp_valid_i[i])
     else:
         ######    Read/Write    ######
         # Read Request
@@ -2388,6 +2399,10 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 )
         arch += Op(stq_resp_en, wresp_valid_i[0])
         arch += Op(wresp_ready_o[0], '\'1\'')
+
+        for i in range(0, configs.numStMem):
+            arch += Op(stp_done_valid_o[i], wresp_valid_i[i])
+            
 
 
     ######   Write To File  ######

@@ -134,7 +134,7 @@ static ChannelVal getMinimalValue(ChannelVal val, ExtType *ext = nullptr) {
 // "single data input data-forwarders" (i.e., Handshake operations which forward
 // one their single "data input" to one of their outputs).
 static ChannelVal backtrack(ChannelVal val) {
-  llvm::errs() << "here: " << val << "\n";
+  // llvm::errs() << "here: " << val << "\n";
   VisitedOps visitedOps;
   while (Operation *defOp = val.getDefiningOp()) {
     // Stop when reaching an operation that was already backtracked through
@@ -621,24 +621,21 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
 
       llvm::errs() << "check point 1 \n";
 
-
       // iterate over the users of the channelVal
       for (Operation *user : channelVal.getUsers()) {
         llvm::errs() << "user: " << *user << "\n";
       }
 
       llvm::errs() << "check point 1 \n";
-      
+
       for (mlir::OpOperand &use : channelVal.getUses()) {
         mlir::Operation *useOwner = use.getOwner();
-        llvm::outs() << "Value is used as operand number " 
-                     << use.getOperandNumber() << " of operation "
-                     << useOwner << "\n";
+        llvm::outs() << "Value is used as operand number "
+                     << use.getOperandNumber() << " of operation " << useOwner
+                     << "\n";
       }
 
       llvm::errs() << "check point 1 \n";
-      
-
     }
     if (optWidth >= dataWidth)
       return failure();
@@ -1358,8 +1355,8 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
                                 PatternRewriter &rewriter) const override {
 
-    llvm::errs() << "!!!!!yyyy\n";
-    llvm::errs() << condOp.getResult(0) << "\n";
+    // llvm::errs() << "!!!!!yyyy\n";
+    // llvm::errs() << condOp.getResult(0) << "\n";
     // The data type must be optimizable
     ChannelVal channelVal = asTypedIfLegal(condOp.getDataOperand());
     if (!channelVal)
@@ -1382,15 +1379,11 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     llvm::errs() << "^^" << condOp.getConditionOperand() << "\n";
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
     for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
-      llvm::errs() << "LHS: " << cmpOp.getLhs() << "\n";
-      llvm::errs() << "RHS: " << cmpOp.getRhs() << "\n";
 
       ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
       ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
-      llvm::errs() << "min RHS:" << minRhs << "\n";
 
       ChannelVal minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
-      llvm::errs() << "min LHS:" << minLhs << "\n";
 
       // One of the two comparison operands must be the data input
       unsigned width;
@@ -1618,7 +1611,7 @@ struct HandshakeOptimizeBitwidthsPass
     llvm::errs() << "pattern end\n";
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
-      funcOp.print(llvm::errs());
+      // funcOp.print(llvm::errs());
 
       bool fwChanged, bwChanged;
       SmallVector<Operation *> ops;

@@ -90,8 +90,10 @@ void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
   assert(bb && "MC port must belong to basic block");
   if (isa<handshake::LoadOp>(portOp)) {
     ++mcNumLoads;
+    mcLoadAndStorePorts.push_back(true);
   } else if (isa<handshake::StoreOp>(portOp)){
     ++mcNumStores;
+    mcLoadAndStorePorts.push_back(false);
   }
   mcPorts[*bb].push_back(portOp);
 }
@@ -100,8 +102,10 @@ void MemoryInterfaceBuilder::addLSQPort(unsigned group,
                                         handshake::MemPortOpInterface portOp) {
   if (isa<handshake::LoadOp>(portOp)) {
     ++lsqNumLoads;
+    lsqLoadAndStorePorts.push_back(true);
   } else if (isa<handshake::StoreOp>(portOp)) {
     ++lsqNumStores;
+    lsqLoadAndStorePorts.push_back(false);
   }
   lsqPorts[group].push_back(portOp);
 }
@@ -169,13 +173,13 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads, mcNumStores);
+        mcNumLoads, mcNumStores, mcLoadAndStorePorts);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
     llvm::errs() << "---LSQ\n";
     lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
                                              inputs.lsqInputs, ctrlEnd,
-                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
+                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores, lsqLoadAndStorePorts);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
@@ -198,20 +202,22 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create the memory controller, adding 1 to its load count so that it
     // generates a load data result for the LSQ
+    mcLoadAndStorePorts.push_back(true); // Load data port
+    mcLoadAndStorePorts.push_back(false); // Store data port
     mcOp = builder.create<handshake::MemoryControllerOp>(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads + 1, mcNumStores);
+        mcNumLoads + 1, mcNumStores, mcLoadAndStorePorts);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
     // outputs that will go to the MC
     ResultRange lastThree = mcOp.getOutputs().take_back(3);
-    for (Value last: lastThree){
-      llvm::errs() << "uuu\n";
-      inputs.lsqInputs.push_back(last);
-    }
+    inputs.lsqInputs.push_back(lastThree[0]); // Load data
+    inputs.lsqInputs.push_back(lastThree[1]); // Load done
+    inputs.lsqInputs.push_back(lastThree[2]); // Store done
+
     lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
-                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
+                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores, lsqLoadAndStorePorts);
 
     // Resolve the backedges to fully connect the MC and LSQ
     ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
