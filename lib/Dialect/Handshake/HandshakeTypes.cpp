@@ -16,6 +16,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeSupport.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -115,13 +116,13 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser,
-                  SmallVectorImpl<ExtraSignal::Storage> &extraSignalsStorage) {
+                  SmallVectorImpl<ExtraSignal> &extraSignals) {
 
   auto parseSignal = [&]() -> ParseResult {
-    auto &signal = extraSignalsStorage.emplace_back();
+    auto &extraSignal = extraSignals.emplace_back();
 
-    if (odsParser.parseKeywordOrString(&signal.name) ||
-        odsParser.parseColon() || odsParser.parseType(signal.type))
+    if (odsParser.parseKeyword(&extraSignal.name) || odsParser.parseColon() ||
+        odsParser.parseType(extraSignal.type))
       return failure();
 
     // Attempt to parse the optional upstream symbol
@@ -130,7 +131,7 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
       if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
           upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
         return failure();
-      signal.downstream = false;
+      extraSignal.downstream = false;
     }
     return success();
   };
@@ -166,18 +167,13 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   };
 
   // Declare vector of structs for storing parse results
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
-  if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
+  SmallVector<ExtraSignal> extraSignals;
+  if (failed(parseExtraSignals(emitError, odsParser, extraSignals)))
     return nullptr;
 
   // Parse ']' and '>'
   if (odsParser.parseRSquare() || odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert parse results to ExtraSignal instances
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
@@ -267,14 +263,14 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
+  SmallVector<ExtraSignal> extraSignals;
   if (!odsParser.parseOptionalComma()) {
     // Parsed literal ','
     // The channel has extra bits
 
     // Parse '[', extra signals and ']'
     if (odsParser.parseLSquare() ||
-        failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)) ||
+        failed(parseExtraSignals(emitError, odsParser, extraSignals)) ||
         odsParser.parseRSquare())
       return nullptr;
   }
@@ -282,12 +278,6 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   // Parse literal '>'
   if (odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert the element type of the extra signal storage list to its
-  // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
@@ -352,14 +342,8 @@ Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
 // ExtraSignal
 //===----------------------------------------------------------------------===//
 
-ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
-    : name(name), type(type), downstream(downstream) {}
-
 ExtraSignal::ExtraSignal(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
-
-ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
-    : name(storage.name), type(storage.type), downstream(storage.downstream) {}
 
 unsigned ExtraSignal::getBitWidth() const {
   return type.getIntOrFloatBitWidth();
@@ -369,6 +353,10 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {
   return lhs.name == rhs.name && lhs.type == rhs.type &&
          lhs.downstream == rhs.downstream;
+}
+
+ExtraSignal ExtraSignal::allocateInto(mlir::TypeStorageAllocator &alloc) const {
+  return ExtraSignal(alloc.copyInto(name), type, downstream);
 }
 
 llvm::hash_code dynamatic::handshake::hash_value(const ExtraSignal &signal) {

@@ -217,14 +217,16 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/sitofp.vhd"
+    "generic": "$DYNAMATIC/data/vhdl/arith/sitofp.vhd",
+    "dependencies": ["delay_buffer", "oehb"]
   },
   {
     "name": "handshake.fptosi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/fptosi.vhd"
+    "generic": "$DYNAMATIC/data/vhdl/arith/fptosi.vhd",
+    "dependencies": ["delay_buffer", "oehb"]
   },
   {
     "name": "handshake.absf",
