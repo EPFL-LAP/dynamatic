@@ -19,7 +19,7 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 include "dynamatic/Dialect/Handshake/HandshakeInterfaces.td"
 
 class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
-  Handshake_Op<mnemonic, traits # [Pure, ArithOpInterface]> {
+  Handshake_Op<mnemonic, traits # [Pure, ArithOpInterface, InternalDelayInterface]> {
 }
 
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
@@ -27,7 +27,7 @@ class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
     SameOperandsAndResultType,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
-  let arguments = (ins ChannelType:$lhs, ChannelType:$rhs, OptionalAttr<StrAttr>:$internal_delay);
+  let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
@@ -64,7 +64,7 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
                                          IsFloatChannel<"operand">,
                                          IsFloatChannel<"result">]
 > {
-  let arguments = (ins ChannelType:$operand, OptionalAttr<StrAttr>:$internal_delay);
+  let arguments = (ins ChannelType:$operand);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$operand attr-dict `:` type($result)";

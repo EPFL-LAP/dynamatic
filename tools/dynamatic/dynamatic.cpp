@@ -280,6 +280,7 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
+  static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -289,10 +290,14 @@ public:
     addOption({BUFFER_ALGORITHM,
                "The buffer placement algorithm to use, values are "
                "'on-merges' (default option: minimum buffering for "
-               "correctness), 'fpga20' (throughput-driven buffering), or "
-               "'fpl22' (throughput- and timing-driven buffering)"});
+               "correctness), 'fpga20' (throughput-driven buffering), "
+               "'fpl22' (throughput- and timing-driven buffering), or "
+               "costaware (throughput- and area-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
+    addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
+                          "Warning: This may result in out-of-order memory "
+                          "accesses, use with caution!"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -629,27 +634,29 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22") {
+        it->second == "fpl22" || it->second == "costaware") {
       buffers = it->second;
     } else {
       llvm::errs()
           << "Unknown buffer placement algorithm " << it->second
           << "! Possible options are 'on-merges' (minimum buffering for "
-             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
-             "(throughput- and timing-driven buffering).";
+             "correctness), 'fpga20' (throughput-driven buffering), 'fpl22' "
+             "(throughput- and timing-driven buffering), or 'costaware' "
+             "(throughput- and area-driven buffering).";
       return CommandResult::FAIL;
     }
   }
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
+  std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification);
+                 state.fpUnitsGenerator, rigidification, disableLSQ);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
