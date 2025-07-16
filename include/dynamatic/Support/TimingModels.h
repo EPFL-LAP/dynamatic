@@ -321,6 +321,9 @@ private:
   /// Maps operation names to their timing model.
   DenseMap<StringRef, TimingModel> models;
 
+  /// We need to store the underlying strings representing different timing models
+  /// which we parse from the JSON file
+  /// As they stored in the model DenseMap as StringRefs
   llvm::StringSet<> ownedNames;
 };
 
