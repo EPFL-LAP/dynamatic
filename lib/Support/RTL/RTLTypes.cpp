@@ -44,8 +44,8 @@ bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
     path.field(KEY_TYPE).report(ERR_MISSING_VALUE);
     return false;
   }
-  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLDataflowType
-               >(paramType)) {
+  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLDataflowType>(
+          paramType)) {
     path.field(KEY_TYPE).report(ERR_UNKNOWN_TYPE);
     return false;
   }
