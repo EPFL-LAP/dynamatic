@@ -87,7 +87,7 @@ struct HandshakePlaceBuffersCustomPass
     }
 
     // pull the enum itself from the optional
-    auto bufferType = bufferTypeOpt.get();
+    auto bufferType = bufferTypeOpt.value();
 
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
                                                      slots, bufferType);
