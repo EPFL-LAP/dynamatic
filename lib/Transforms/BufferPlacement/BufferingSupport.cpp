@@ -146,7 +146,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
     handshake::FuncOp funcOp, const TimingDatabase &timingDB,
     llvm::MapVector<Value, ChannelBufProps> &channelProps) {
 
-    llvm::errs() << "------------------------1 \n";
+  llvm::errs() << "------------------------1 \n";
 
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
@@ -183,8 +183,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
     return success();
   };
 
-
-llvm::errs() << "------------------------404 \n";
+  llvm::errs() << "------------------------404 \n";
 
   // Add channels originating from function arguments to the channel map
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
@@ -200,28 +199,37 @@ llvm::errs() << "------------------------404 \n";
     // }
     // }
 
-      
     Channel channel(arg, funcOp, *arg.getUsers().begin());
-    if (failed(deriveBufferingProperties(channel))){
+    if (failed(deriveBufferingProperties(channel))) {
       llvm::errs() << "------------------------4 \n";
       exit(0);
     }
-
   }
-
-  
 
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       // llvm::errs() << "[*] " << idx << res << "\n";
+
       Channel channel(res, &op, *res.getUsers().begin());
-      if (failed(deriveBufferingProperties(channel))){
+
+      if (isa<handshake::UnbundleOp>(op)) {
+        // UnbundleOp's first result is the channel-like value, which is not a
+        // channel, so we skip it
+        llvm::errs() << "Skipping unbundle channel-like value: " << res << "\n";
+        channel.props->minTrans = 0;
+        channel.props->minOpaque = 0;
+        channel.props->maxTrans = 0;
+        channel.props->maxOpaque = 0;
+        channelProps[res] = *channel.props;
+        continue;
+      }
+
+      if (failed(deriveBufferingProperties(channel))) {
 
         llvm::errs() << "------------------------3 \n";
         exit(0);
       }
-
     }
   }
 

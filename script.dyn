@@ -15,21 +15,37 @@
 #set-src integration-test/gaussian/gaussian.c
 #set-src integration-test/video_filter/video_filter.c
 
-set-clock-period 4
-#set-src integration-test/memory/test_memory_2/test_memory_2.c
+
 #set-src integration-test/gemm/gemm.c
 
 
 #set-src integration-test/matching/matching.c
 
+#set-src integration-test/lu/lu.c
+
+
+
+#set-src integration-test/simple_example_1/simple_example_1.c
+
+#set-src integration-test/histogram/histogram.c
+#set-src integration-test/triangular/triangular.c
+
+#set-src integration-test/memory/test_memory_6/test_memory_6.c
+
+#set-src integration-test/gemm/gemm.c
 
 set-src integration-test/histogram/histogram.c
 
+set-clock-period 20
+
+#set-src integration-test/simple_example_1/simple_example_1.c
 
 #compile --buffer-algorithm fpga20 --fast-token-delivery
-compile --skippable-seq-n 3 --optimize-zero --buffer-algorithm fpga20
+#compile --skippable-seq-n 3 --optimize-zero --buffer-algorithm fpga20
+
+#compile --skippable-seq-n 1 3
 #compile --skippable-seq-n 7 --buffer-algorithm fpga20
-#compile
+compile --skippable-seq-n 1 --buffer-algorithm fpga20
 write-hdl
 simulate
 #visualize

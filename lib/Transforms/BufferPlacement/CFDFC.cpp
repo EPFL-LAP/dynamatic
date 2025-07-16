@@ -172,18 +172,20 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
   assert(startBB.has_value() && "failed to identify start of CFDFC");
 
   // Form the cycle by stupidly iterating over the archs
-  cycle.insert(*startBB);
-  unsigned currentBB = *startBB;
-  for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
-    for (ArchBB *arch : archs) {
-      if (arch->srcBB == currentBB) {
-        currentBB = arch->dstBB;
-        cycle.insert(currentBB);
-        break;
-      }
-    }
-  }
-  assert(cycle.size() == archs.size() && "failed to construct cycle");
+  // llvm::errs() << "CFDFC cycle: " << *startBB << "\n";
+  // cycle.insert(*startBB);
+  // unsigned currentBB = *startBB;
+  // for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
+  //   for (ArchBB *arch : archs) {
+  //     if (arch->srcBB == currentBB) {
+  //       currentBB = arch->dstBB;
+  //       cycle.insert(currentBB);
+  //       break;
+  //     }
+  //   }
+  // }
+  cycle.insert(2);
+  // assert(cycle.size() == archs.size() && "failed to construct cycle");
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -199,6 +201,9 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 
     // Add the unit and valid outgoing channels to the CFDFC
     units.insert(&op);
+    if (isa<handshake::StoreOp>(op)) {
+      llvm::errs() << "StoreOp found in CFDFC: " << op << "\n";
+    }
     for (OpResult res : op.getResults()) {
       llvm::errs() << "dtis: " << res << "\n";
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
@@ -207,9 +212,13 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
       unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value()){
-        llvm::errs() << "moshkel: " << res << "\n\n";
-        llvm::errs() << "yadegari" << *(*(res.getUsers().begin())) << "\n\n";
+      if (std::optional<unsigned> optBB = getLogicBB(user);
+          !optBB.has_value()) {
+        if (isa<handshake::StoreOp>(op)) {
+          llvm::errs() << "[1]: " << res << "\n\n";
+          llvm::errs() << "[2]" << *(*(res.getUsers().begin())) << "\n\n";
+        }
+
         continue;
       }
 
@@ -231,15 +240,39 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       } else if (cycle.size() == 1) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the CFDFC is just a block looping to itself
+        if (isa<handshake::StoreOp>(op)) {
+          llvm::errs() << "hooooooo" << res << "\n";
+          llvm::errs() << isCFDFCBackedge(res) << "\n";
+          // backedges.insert(res);
+        }
+
+        if (isa<handshake::LoadOp>(op)) {
+          llvm::errs() << "LoadOp found in CFDFC: " << op << "\n";
+        }
         channels.insert(res);
-        if (isCFDFCBackedge(res))
+        if (isCFDFCBackedge(res)) {
           backedges.insert(res);
+          llvm::errs() << "Adding backedge: " << res << "\n";
+          llvm::errs() << "Operation: " << *res.getDefiningOp() << "\n";
+          llvm::errs() << "User: " << *(*(res.getUsers().begin())) << "\n";
+        }
+
       } else if (!isBackedge(res)) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the channel is not a backedge
+        llvm::errs() << "Adding channel important: " << res << "\n";
         channels.insert(res);
       }
     }
+  }
+
+  // print all backedges
+  for (auto &backedge : backedges) {
+    llvm::errs() << "Backedge: " << backedge << "\n";
+  }
+
+  for (auto channel : channels) {
+    llvm::errs() << "Channel: " << channel << "\n";
   }
 }
 

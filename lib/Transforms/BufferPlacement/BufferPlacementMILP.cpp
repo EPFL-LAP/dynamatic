@@ -254,8 +254,8 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
     if (failed(timingDB.getTotalDelay(unit, type, delay)))
       delay = 0.0;
 
-    //The delay of the unit must be positive.
-    delay = std::max(delay,0.001);
+    // The delay of the unit must be positive.
+    delay = std::max(delay, 0.001);
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
     forEachIOPair(unit, [&](Value in, Value out) {
@@ -382,6 +382,16 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
+    if (isa<handshake::StoreOp>(srcOp)) {
+      llvm::errs() << "StoreOp found in channel: " << channel << "\n";
+      /// print the first user of the channel
+      llvm::errs() << "First user of the channel: ";
+      llvm::errs() << **channel.getUsers().begin() << "\n";
+    }
+    if (isa<handshake::StoreOp>(dstOp)) {
+      llvm::errs() << "dst " << channel << "\n";
+    }
+
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
@@ -426,10 +436,11 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     // The following constraint encodes the case where readyBuf holds, and is
     // trivially satisfied when readyBuf does not hold (since the earlier
     // constraint already enforces it):
-    if(chVars.signalVars.count(SignalType::READY)){
+    if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      model.addConstr(chThroughput + cfVars.throughput + readyBuf - bufNumSlots <= 1,
-                    "throughput_ready");
+      model.addConstr(
+          chThroughput + cfVars.throughput + readyBuf - bufNumSlots <= 1,
+          "throughput_ready");
     }
     // Note: Additional buffers may be needed to prevent combinational cycles
     // if the model does not select all three signals (or only selects DATA).
@@ -445,15 +456,15 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
         latency == 0.0)
       continue;
 
-      // For each unit with non-zero data latency, add a constraint enforcing
-      // (CFDFC throughput * latency) <= channel throughput, as described in the FPGA 20 paper.
-    for (Value channel: cfdfc.channels) {
-      Operation *dstOp = *channel.getUsers().begin();
-      if (dstOp != unit)
-        continue;
-      GRBVar &chThroughput = cfVars.channelThroughputs[channel];
-      model.addConstr(cfVars.throughput * latency <= chThroughput, "UnitThroughput_pipelined");
-    }
+    // Retrieve the MILP variables corresponding to the unit's fluid retiming
+    UnitVars &unitVars = cfVars.unitVars[unit];
+    GRBVar &retIn = unitVars.retIn;
+    GRBVar &retOut = unitVars.retOut;
+
+    // The fluid retiming of tokens across the non-combinational unit must
+    // be the same as its latency multiplied by the CFDFC's throughput
+    model.addConstr(cfVars.throughput * latency == retOut - retIn,
+                    "through_unitRetiming");
   }
 }
 
@@ -505,8 +516,8 @@ void BufferPlacementMILP::addObjective(ValueRange channels,
 
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
-  double bufPenaltyMul = 1e-4;
-  double slotPenaltyMul = 1e-5;
+  double bufPenaltyMul = 1e-10;
+  double slotPenaltyMul = 1e-10;
   for (Value channel : channels) {
     ChannelVars &channelVars = vars.channelVars[channel];
     objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
@@ -573,7 +584,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-    os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
+    os << "Throughput of CFDFC #" << idx << ": " << throughput * 1e10 + 3
+       << "\n";
   }
 
   os << "\n# =================== #\n";
@@ -588,6 +600,27 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     for (auto [val, channelTh] : cfVars.channelThroughputs) {
       os << getUniqueName(*val.getUses().begin()) << ": "
          << channelTh.get(GRB_DoubleAttr_X) << "\n";
+    }
+    os.unindent();
+    os << "\n";
+  }
+
+  os << "# ================== #\n";
+  os << "# Unit Retiming Values #\n";
+  os << "# ================== #\n\n";
+  // Log retiming values of all units in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Per-unit retiming values of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (auto &[unit, unitVars] : cfVars.unitVars) {
+      // Skip units that are not part of the CFDFC
+      if (!cf->units.contains(unit))
+        continue;
+      double retIn = unitVars.retIn.get(GRB_DoubleAttr_X);
+      double retOut = unitVars.retOut.get(GRB_DoubleAttr_X);
+      os << getUniqueName(unit) << "new : retIn = " << retIn
+         << ", retOut = " << retOut << "\n";
     }
     os.unindent();
     os << "\n";

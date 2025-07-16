@@ -330,7 +330,7 @@
   },
   "handshake.store": {
     "latency": {
-      "64": 16.0
+      "64": 0.0
     },
     "delay": {
       "data": {

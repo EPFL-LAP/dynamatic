@@ -617,7 +617,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
                                  "unsigned":$numLoads,
-                                 "unsigned":$numStores)>];
+                                 "unsigned":$numStores,
+                                 "SmallVector<bool>":$loadAndStorePorts)>];
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -694,11 +695,12 @@ def LSQOp : Handshake_Op<"lsq", [
 
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
-                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads, "unsigned":$numStores)>,
+                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads, "unsigned":$numStores, "SmallVector<bool>":$loadAndStorePorts)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
                    "unsigned":$numLoads,
-                   "unsigned":$numStores)>,
+                   "unsigned":$numStores,
+                   "SmallVector<bool>":$loadAndStorePorts)>
   ];
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;

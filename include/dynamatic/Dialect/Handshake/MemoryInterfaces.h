@@ -176,6 +176,10 @@ protected:
   /// Number of stores to the LSQ.
   unsigned lsqNumStores = 0;
 
+  SmallVector<bool> mcLoadAndStorePorts;
+
+  SmallVector<bool> lsqLoadAndStorePorts;
+
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the
   /// validity of the ports or their ordering. Fails if inputs could not be
