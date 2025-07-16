@@ -32,7 +32,8 @@ use ieee.numeric_std.all;
 -- Entity of load
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- address from circuit channel
     addrIn       : in  std_logic_vector({addr_bitwidth} - 1 downto 0);
     addrIn_valid : in  std_logic;
