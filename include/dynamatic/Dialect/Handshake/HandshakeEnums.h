@@ -22,8 +22,7 @@
 #include "mlir/IR/Dialect.h"
 
 
-// Pull in all enum type definitions, attributes,
-// and utility function declarations.
+// Pull in all enum type definitions and utility function declarations.
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
 
 #endif // DYNAMATIC_ENUM_HANDSHAKE_HANDSHAKE_ENUMS_H
