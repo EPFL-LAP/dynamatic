@@ -24,7 +24,8 @@ use ieee.numeric_std.all;
 -- Entity of specgenCore
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
@@ -612,7 +613,8 @@ use ieee.numeric_std.all;
 -- Entity of predFifo
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     data_in : in std_logic_vector({bitwidth} - 1 downto 0);
     data_in_valid : in std_logic;

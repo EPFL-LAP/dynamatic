@@ -27,7 +27,8 @@ use ieee.numeric_std.all;
 -- Entity of cond_br_dataless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- data input channel
     data_valid : in  std_logic;
     data_ready : out std_logic;
@@ -85,7 +86,8 @@ use ieee.numeric_std.all;
 -- Entity of cond_br
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- data input channel
     data       : in  std_logic_vector({bitwidth} - 1 downto 0);
     data_valid : in  std_logic;

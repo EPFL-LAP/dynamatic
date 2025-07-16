@@ -289,31 +289,6 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-  registerSelectedDelayParameter(modOp, modName, modType);
-}
-
-void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
-                                              llvm::StringRef modName,
-                                              hw::ModuleType &modType) {
-  // Look for INTERNAL_DELAY in hw.parameters
-  if (auto paramsAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters")) {
-    if (auto selectedDelay = paramsAttr.get("INTERNAL_DELAY")) {
-      if (auto stringAttr = selectedDelay.dyn_cast<StringAttr>()) {
-        std::string delayStr = stringAttr.getValue().str();
-        serializedParams["INTERNAL_DELAY"] = delayStr;
-        return;
-      }
-    }
-  }
-
-  // Fallback: also check for direct attribute (in case some modules have it
-  // there)
-  if (auto selectedDelay = modOp->getAttrOfType<StringAttr>("internal_delay")) {
-    std::string delayStr = selectedDelay.getValue().str();
-    serializedParams["INTERNAL_DELAY"] = delayStr;
-  } else {
-    serializedParams["INTERNAL_DELAY"] = "0.0";
-  }
 }
 
 void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
@@ -370,7 +345,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.mem_controller") {
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "handshake.lsq") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     // Warning: Ports differ from instance to instance.

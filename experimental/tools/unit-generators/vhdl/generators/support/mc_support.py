@@ -206,7 +206,8 @@ use ieee.numeric_std.all;
 -- Entity of mc_control
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
