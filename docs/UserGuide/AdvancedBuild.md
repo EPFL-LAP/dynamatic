@@ -30,11 +30,13 @@ To install Gurobi, first extract your downloaded file to your desired installati
 
 Use the following command to pass your obtained license to Gurobi, which it stores in  `~/gurobi.lic`
 
+
 ```sh
 # Replace x's with obtained license
 /opt/gurobiXXXX/linux64/bin/grbgetkey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
 ```
-> If you choose a web library, copy the gurobi.lic file provided to your home directory rather than running the command above
+> [!NOTE]  
+> If you chose a web library (WLS license), copy the gurobi.lic file provided to your home directory rather than running the command above
 
 #### Configuring Your Environment
 
