@@ -50,12 +50,13 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 # NOTE:
 # Here is a brief summary of what each llvm pass does:
 # - mem2reg: Suppresses allocas (allocate memory on the heap) into regs
-# - instcombine: combine operations; seems optional
+# - instcombine: combine operations. Needed to canonicalize a chain of GEPs
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
-# - the optnone attribute sliently disables all the optimization in the passes;
-# Check out the complete list: https://llvm.org/docs/Passes.html
+# 
+# NOTE: the optnone attribute sliently disables all the optimization in the
+# passes; Check out the complete list: https://llvm.org/docs/Passes.html
 $LLVM_BINS/opt -S \
   -passes="mem2reg,instcombine,loop-rotate,consthoist,simplifycfg" \
   -strip-debug \
