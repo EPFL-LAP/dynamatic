@@ -57,7 +57,6 @@ class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
     IsFloatChannel<"lhs">,
     IsFloatChannel<"rhs">,
     IsFloatChannel<"result">,
-    FPUImplInterface
   ]> {}
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
@@ -65,7 +64,6 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
     SameOperandsAndResultType,
     IsFloatChannel<"operand">,
     IsFloatChannel<"result">,
-    FPUImplInterface
 ]> {
   let arguments = (ins ChannelType:$operand);
   let results = (outs ChannelType:$result);
@@ -155,7 +153,9 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
 // Operation definitions
 //===----------------------------------------------------------------------===//
 
-def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [Commutative]> {
+def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [
+  Commutative,
+  FPUImplInterface]> {
   let summary = "Floating-point addition.";
 }
 
@@ -259,7 +259,9 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   let hasVerifier = 1;
 }
 
-def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf"> {
+def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
+  FPUImplInterface
+]> {
   let summary = "Floating-point division.";
 }
 
@@ -292,7 +294,10 @@ def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
   let summary = "Floating-point minimum.";
 }
 
-def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [Commutative]> {
+def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [
+  Commutative,
+  FPUImplInterface
+]> {
   let summary = "Floating-point multiplication.";
 }
 
@@ -338,7 +343,9 @@ def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
   let summary = "Logical right shift.";
 }
 
-def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf"> {
+def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf", [
+  FPUImplInterface
+]> {
   let summary = "Floating-point subtraction.";
 }
 
