@@ -23,6 +23,7 @@ using namespace dynamatic::handshake;
 
 namespace dynamatic {
 
+// include tblgen base class definition
 #define GEN_PASS_DEF_HANDSHAKEMARKFPUIMPL
 #include "dynamatic/Transforms/Passes.h.inc"
 
@@ -34,6 +35,7 @@ namespace {
 struct HandshakeMarkFPUImplPass
     : public dynamatic::impl::HandshakeMarkFPUImplBase<HandshakeMarkFPUImplPass> {
 public:
+    // use tblgen constructors from base class
     using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
 
     // inherited TableGen Pass Options:
@@ -45,9 +47,10 @@ public:
 } // namespace
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
+  // this->impl is the pass option declared in tablegen
   auto implOpt = symbolizeFPUImpl(this->impl);
 
-  if(!implOpt){
+  if(!implOpt.has_value()){
     llvm::errs()
       << "Invalid FPU implementation: expected one of FLOPOCO or VIVADO, but got '"
       << this->impl << "'";
@@ -55,9 +58,11 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
     return;
   }
 
-  auto impl = *implOpt;
+  auto impl = implOpt.value();
 
+  // iterate over each operation that implements FPUImplInterface
   getOperation()->walk([&](FPUImplInterface fpuImplInterface) {
+    // and set it based on the pass option
     fpuImplInterface.setFPUImpl(impl);
   });
 }
