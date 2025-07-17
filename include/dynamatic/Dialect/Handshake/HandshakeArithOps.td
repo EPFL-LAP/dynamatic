@@ -56,7 +56,7 @@ class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_BinaryOp<mnemonic, traits # [
     IsFloatChannel<"lhs">,
     IsFloatChannel<"rhs">,
-    IsFloatChannel<"result">,
+    IsFloatChannel<"result">
   ]> {}
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
