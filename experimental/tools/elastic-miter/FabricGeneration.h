@@ -24,10 +24,10 @@ namespace dynamatic::experimental {
 // Instead of keeping the original BB for the LHS/RHS circuit, the BB is used to
 // organize the different part of the miter circuit. The BBs can therefore not
 // be used for any control-flow analysis.
-constexpr unsigned int BB_IN = 0;  // Input auxillary logic
-constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
-constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
-constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+// constexpr unsigned int BB_IN = 0;  // Input auxillary logic
+// constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
+// constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
+// constexpr unsigned int BB_OUT = 3; // Output auxillary logic
 
 struct ElasticMiterConfig {
   SmallVector<std::pair<std::string, std::string>> inputBuffers;
@@ -80,8 +80,8 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
 // contain exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   size_t bufferSlots, bool ndSpec = false,
-                   bool allowNonacceptance = false);
+                   ModuleOp contextModule, size_t bufferSlots,
+                   bool ndSpec = false, bool allowNonacceptance = false);
 
 // Creates a reachability circuit. Essentially ND wires are put at all in- and
 // outputs of the circuit. Additionally creates a json config file with the name
@@ -97,6 +97,7 @@ createReachabilityCircuit(MLIRContext &context,
 FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
+                  const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
                   bool ndSpec = false, bool allowNonacceptance = false);
 

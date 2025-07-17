@@ -243,8 +243,8 @@ static FailureOr<bool> checkEquivalence(
   // Create an elastic-miter circuit with a needed nrOfTokens to emulate an
   // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, miterDir.string(), nrOfTokens, ndSpec,
-      allowNonacceptance);
+      context, lhsPath, rhsPath, contextFilePath, miterDir.string(), nrOfTokens,
+      ndSpec, allowNonacceptance);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();
