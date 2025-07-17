@@ -42,7 +42,6 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
-
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HW="$COMP_DIR/hw.mlir"
@@ -172,7 +171,6 @@ if [[ $USE_SHARING -ne 0 ]]; then
 else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
-
 
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
