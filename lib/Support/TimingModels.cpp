@@ -96,14 +96,16 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
-  auto inserted = ownedNames.insert(name);
-  auto newStringRef = inserted.first->getKey();
-  return models.insert(std::make_pair(newStringRef, model)).second;
+bool TimingDatabase::insertTimingModel(StringRef fromJsonTimingModelKey, TimingModel &model) {
+  // copy the raw string into the storage vector
+  ownedKeys.emplace_back(fromJsonTimingModelKey.str());
+  // make an StringRef from it
+  StringRef ownedTimingModelKey = ownedKeys.back();
+  return models.insert(std::make_pair(ownedTimingModelKey, model)).second;
 }
 
-const TimingModel *TimingDatabase::getModel(StringRef opName) const {
-  auto it = models.find(opName);
+const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
+  auto it = models.find(timingModelKey);
   if (it == models.end())
     return nullptr;
   return &it->second;
@@ -111,14 +113,18 @@ const TimingModel *TimingDatabase::getModel(StringRef opName) const {
 
 const TimingModel *TimingDatabase::getModel(Operation *op) const {
   StringRef baseName = op->getName().getStringRef();
-  std::string modelName;
+  std::string timingModelKey;
+
+  // if the operation is a floating point operation with multiple
+  // possible implementations
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
-    modelName = (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    // include the implementation in the key
+    timingModelKey = (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
   } else {
-    modelName = baseName.str();
+    timingModelKey = baseName.str();
   }
-  return getModel(modelName);
+  return getModel(timingModelKey);
 }
 
 LogicalResult TimingDatabase::getLatency(
@@ -476,12 +482,13 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
   if (!components)
     return false;
 
-  for (const auto &[opName, cmpInfo] : *components) {
+  for (const auto &[timingModelKey, cmpInfo] : *components) {
     TimingModel model;
-    ljson::Path opPath = path.field(opName);
-    fromJSON(cmpInfo, model, opPath);
-    if (!timingDB.insertTimingModel(opName, model)) {
-      opPath.report("Overriding existing timing model for operation");
+    ljson::Path keyPath = path.field(timingModelKey);
+    fromJSON(cmpInfo, model, keyPath);
+    if (!timingDB.insertTimingModel(timingModelKey, model)) {
+      keyPath.report("Timing model was not inserted as "
+                    "key was already present in the database");
       return false;
     }
   }
