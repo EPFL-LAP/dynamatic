@@ -71,7 +71,7 @@ $LLVM_BINS/mlir-translate \
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/clang_optimized_translated.mlir \
   --remove-polygeist-attributes \
-  --drop-unlisted-functions="function-names=fir" \
+  --drop-unlisted-functions="function-names=$FUNC_NAME" \
   --allow-unregistered-dialect \
   > $OUT/clang_optimized_translated_droped_main_removed_attributes.mlir \
 
