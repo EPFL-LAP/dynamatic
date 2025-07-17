@@ -24,7 +24,6 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-
 //===----------------------------------------------------------------------===//
 // Attribute classes 
 //===----------------------------------------------------------------------===//
@@ -424,7 +423,6 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
   let parameters = (ins "unsigned":$loadQueueDepth, "unsigned":$storeQueueDepth);
   let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
 }
-
 
 
 //===----------------------------------------------------------------------===//
