@@ -414,7 +414,7 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
     /// \note: GEPOp has the following syntax (some details omitted):
     /// GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
     /// When you iterate through the indices, it also returns indices from left
-    /// to right. However, LLVM treats the following two as the same op
+    /// to right. However, the following two syntaxes are equivalent in LLVM:
     /// - (1) GEPop %basePtr, %firstDim, 0, 0
     /// - (2) GEPop %basePtr, %firstDim
     /// Notice that, in the second example, the trailing constant 0s are
