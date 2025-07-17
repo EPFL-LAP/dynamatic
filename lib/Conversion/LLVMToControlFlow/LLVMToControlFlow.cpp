@@ -351,8 +351,7 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 ///
 /// \note: Currently, it assumes that the instcombine LLVM pass has been applied
 /// to remove the GEP -> GEP -> ... -> GEP patterns.
-struct ConvertGEPToLoadStoreOpPattern
-    : public OpConversionPattern<LLVM::GEPOp> {
+struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
   using OpConversionPattern<LLVM::GEPOp>::OpConversionPattern;
 
   LogicalResult
@@ -377,7 +376,7 @@ struct ConvertGEPToLoadStoreOpPattern
              "check if you have ran \"instcombine\" before!\n");
     }
 
-    /// \note: Before applying this rewrite patterm, we assume that we have
+    /// \note: Before applying this rewrite pattern, we assume that we have
     /// fixed the function type from the LLVM void pointers to the memref types.
     /// See the comments above runOnOperations() below.
     auto memrefType = gepBasePtr.getType().dyn_cast<MemRefType>();
@@ -420,6 +419,8 @@ struct ConvertGEPToLoadStoreOpPattern
     /// - (2) GEPop %basePtr, %firstDim
     /// Notice that, in the second example, the trailing constant 0s are
     /// omitted.
+    /// Source:
+    /// https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
     ///
     /// However, memref::LoadOp and memref::StoreOp must have their indices
     /// match the memref. So here we need to fill in the constant zeros.
@@ -457,17 +458,15 @@ struct ConvertGEPToLoadStoreOpPattern
   }
 };
 
-template <typename LLVMOpTy, typename ArithOpTy>
-struct LLVMTOBinaryArithOpPattern : public OpConversionPattern<LLVMOpTy> {
-  using OpConversionPattern<LLVMOpTy>::OpConversionPattern;
-
+template <typename LLVMBinaryOp, typename ArithBinaryOp>
+struct LLVMTOBinaryArithOpPattern : public OpConversionPattern<LLVMBinaryOp> {
+  using OpConversionPattern<LLVMBinaryOp>::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(LLVMOpTy op,
-                  typename OpConversionPattern<LLVMOpTy>::OpAdaptor adapter,
+  matchAndRewrite(LLVMBinaryOp op,
+                  typename OpConversionPattern<LLVMBinaryOp>::OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    Value lhs = adapter.getLhs();
-    Value rhs = adapter.getRhs();
-    rewriter.replaceOpWithNewOp<ArithOpTy>(op, lhs, rhs);
+    rewriter.replaceOpWithNewOp<ArithBinaryOp>(op, adapter.getLhs(),
+                                               adapter.getRhs());
     return success();
   }
 };
@@ -480,16 +479,13 @@ struct LLVMToUnaryArithOpPattern : public OpConversionPattern<LLVMUnaryOp> {
   matchAndRewrite(LLVMUnaryOp op,
                   typename OpConversionPattern<LLVMUnaryOp>::OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.setInsertionPoint(op);
-    Location loc = op.getLoc();
-    Value operand = adapter.getArg();
     rewriter.replaceOpWithNewOp<ArithUnaryOp>(op, op.getRes().getType(),
-                                              operand);
+                                              adapter.getArg());
     return success();
   }
 };
 
-struct ICmpOpLowering : OpConversionPattern<LLVM::ICmpOp> {
+struct LLVMICmpToArithICmp : OpConversionPattern<LLVM::ICmpOp> {
   using OpConversionPattern<LLVM::ICmpOp>::OpConversionPattern;
 
   LogicalResult
@@ -519,7 +515,7 @@ struct ICmpOpLowering : OpConversionPattern<LLVM::ICmpOp> {
   }
 };
 
-struct FCmpOpLowering : OpConversionPattern<LLVM::FCmpOp> {
+struct LLVMFCmpToArithFCmp : OpConversionPattern<LLVM::FCmpOp> {
   using OpConversionPattern<LLVM::FCmpOp>::OpConversionPattern;
 
   LogicalResult
@@ -553,7 +549,7 @@ struct FCmpOpLowering : OpConversionPattern<LLVM::FCmpOp> {
   }
 };
 
-struct LLVMConstantOpLowering : OpConversionPattern<LLVM::ConstantOp> {
+struct LLVMConstantToArithConstant : OpConversionPattern<LLVM::ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
@@ -579,7 +575,7 @@ struct LLVMConstantOpLowering : OpConversionPattern<LLVM::ConstantOp> {
   }
 };
 
-struct BranchOpLowering : OpConversionPattern<LLVM::BrOp> {
+struct LLVMBrToCFBr : OpConversionPattern<LLVM::BrOp> {
   using OpConversionPattern<LLVM::BrOp>::OpConversionPattern;
 
   LogicalResult
@@ -594,7 +590,7 @@ struct BranchOpLowering : OpConversionPattern<LLVM::BrOp> {
   }
 };
 
-struct CondBranchOpLowering : OpConversionPattern<LLVM::CondBrOp> {
+struct LLVMCondBrToCFCondBr : OpConversionPattern<LLVM::CondBrOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
@@ -619,46 +615,31 @@ struct CondBranchOpLowering : OpConversionPattern<LLVM::CondBrOp> {
   }
 };
 
-struct LLVMSelectToArithSelectPattern : mlir::ConversionPattern {
-  explicit LLVMSelectToArithSelectPattern(mlir::MLIRContext *context)
-      : mlir::ConversionPattern(mlir::LLVM::SelectOp::getOperationName(), 1,
-                                context) {}
+struct LLVMSelectToArithSelectPattern : OpConversionPattern<LLVM::SelectOp> {
+
+  using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::Operation *op, llvm::ArrayRef<mlir::Value> operands,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto selectOp = llvm::cast<mlir::LLVM::SelectOp>(op);
-
-    // Check if the condition is i1 and the true/false values are of the same
-    // type
-    auto condType = selectOp.getCondition().getType();
-    auto trueType = selectOp.getTrueValue().getType();
-    auto falseType = selectOp.getFalseValue().getType();
-
-    if (condType != rewriter.getI1Type())
-      return rewriter.notifyMatchFailure(op, "condition is not i1");
-
-    if (trueType != falseType)
-      return rewriter.notifyMatchFailure(
-          op, "true and false values must have the same type");
+  matchAndRewrite(LLVM::SelectOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
 
     rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
-        op, trueType, selectOp.getCondition(), selectOp.getTrueValue(),
-        selectOp.getFalseValue());
+        op, op.getRes().getType(), adapter.getCondition(),
+        adapter.getTrueValue(), adapter.getFalseValue());
 
     return mlir::success();
   }
 };
 
-struct LLVMReturnOpLowering : public mlir::OpConversionPattern<LLVM::ReturnOp> {
+struct LLVMReturnToFuncReturn
+    : public mlir::OpConversionPattern<LLVM::ReturnOp> {
   using OpConversionPattern<LLVM::ReturnOp>::OpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::LLVM::ReturnOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    llvm::SmallVector<mlir::Value> operands(op.getOperands());
-
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, operands);
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op,
+                                                      adapter.getOperands());
     return mlir::success();
   }
 };
@@ -804,7 +785,7 @@ void LLVMToControlFlowPass::runOnOperation() {
   RewritePatternSet rewriteLoadStoreOperations(ctx);
   rewriteLoadStoreOperations.add<
       // clang-format off
-      ConvertGEPToLoadStoreOpPattern
+      GEPToMemRefLoadAndStore
       // clang-format on
       >(ctx);
   if (failed(applyPartialConversion(modOp, target,
@@ -818,7 +799,7 @@ void LLVMToControlFlowPass::runOnOperation() {
       // clang-format off
 
       // Zero-ary operation:
-      LLVMConstantOpLowering,
+      LLVMConstantToArithConstant,
       
       // Unary operations
       SExtOpLowering,
@@ -846,13 +827,13 @@ void LLVMToControlFlowPass::runOnOperation() {
       RemFOpLowering,
 
       // Binary predicate comparisons:
-      ICmpOpLowering,
-      FCmpOpLowering,
+      LLVMICmpToArithICmp,
+      LLVMFCmpToArithFCmp,
 
       // Control flow operations:
-      BranchOpLowering,
-      CondBranchOpLowering,
-      LLVMReturnOpLowering,
+      LLVMBrToCFBr,
+      LLVMCondBrToCFCondBr,
+      LLVMReturnToFuncReturn,
 
       LLVMSelectToArithSelectPattern
       // clang-format on
