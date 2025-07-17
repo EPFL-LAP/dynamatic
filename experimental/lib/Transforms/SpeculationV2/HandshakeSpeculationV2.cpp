@@ -386,8 +386,8 @@ static llvm::SmallVector<Value> getEffectiveResults(Operation *op) {
 
 /// Performs the motion of the OpT operation over a PM unit.
 template <typename OpT>
-static LogicalResult performMotion(Operation *pmOp,
-                                   std::function<OpT(Value)> buildOp) {
+static LogicalResult performMotionOverPM(Operation *pmOp,
+                                         std::function<OpT(Value)> buildOp) {
   // Add new OpT for each effective result of the PM unit.
   for (Value result : getEffectiveResults(pmOp)) {
     OpT newOp = buildOp(result);
@@ -423,7 +423,7 @@ static LogicalResult performMotion(Operation *pmOp,
 }
 
 /// Returns if the specified PasserOp is eligible for motion past a PM unit.
-static bool isEligibleForPasserMotionPastPM(PasserOp passerOp) {
+static bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
   Value passerControl = passerOp.getCtrl();
 
   Operation *targetOp = getUniqueUser(passerOp.getResult());
