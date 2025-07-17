@@ -499,6 +499,62 @@ std::pair<FuncOp, unsigned> fuseContext(FuncOp contextFuncOp, FuncOp funcOp) {
   return std::make_pair(newFuncOp, maxBB);
 }
 
+// FuncOp addStartAndEndSignals(FuncOp funcOp) {
+//   OpBuilder builder(funcOp.getContext());
+
+//   llvm::SmallVector<Type> argTypes(funcOp.getArgumentTypes().begin(),
+//                                    funcOp.getArgumentTypes().end());
+//   argTypes.push_back(handshake::ControlType::get(builder.getContext()));
+
+//   llvm::SmallVector<Type> resultTypes(funcOp.getResultTypes().begin(),
+//                                       funcOp.getResultTypes().end());
+//   resultTypes.push_back(handshake::ControlType::get(builder.getContext()));
+
+//   llvm::SmallVector<Attribute> argNames(funcOp.getArgNames().begin(),
+//                                         funcOp.getArgNames().end());
+//   argNames.push_back(builder.getStringAttr("start"));
+
+//   llvm::SmallVector<Attribute> resNames(funcOp.getResNames().begin(),
+//                                         funcOp.getResNames().end());
+//   resNames.push_back(builder.getStringAttr("end"));
+
+//   auto [newFuncOp, newBlock] = buildNewFuncWithBlock(
+//       funcOp.getName(), argTypes, resultTypes,
+//       builder.getArrayAttr(argNames), builder.getArrayAttr(resNames));
+
+//   funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
+//   builder.setInsertionPointToStart(newBlock);
+
+//   for (auto [i, arg] : llvm::enumerate(funcOp.getArguments())) {
+//     // Replace the old argument with the new one
+//     arg.replaceAllUsesWith(newFuncOp.getArgument(i));
+//   }
+
+//   auto endOps = funcOp.getOps<EndOp>();
+//   assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
+//          "There should be exactly one EndOp in the original function");
+//   EndOp endOp = *endOps.begin();
+
+//   llvm::SmallVector<Value> newEndOpOperands(endOp->getOperands());
+//   newEndOpOperands.push_back(
+//       newFuncOp.getArgument(newFuncOp.getNumArguments() - 1));
+
+//   auto newEndOp = builder.create<EndOp>(funcOp.getLoc(), newEndOpOperands);
+//   inheritBB(endOp, newEndOp);
+//   newEndOp->setAttr(NameAnalysis::ATTR_NAME,
+//                     endOp->getAttrOfType<StringAttr>(NameAnalysis::ATTR_NAME));
+
+//   endOp->erase();
+
+//   for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+//     op.moveBefore(newEndOp);
+//   }
+
+//   funcOp->erase();
+
+//   return newFuncOp;
+// }
+
 // Create the reachability circuit by putting ND wires at all the in- and
 // outputs
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
@@ -529,12 +585,8 @@ createReachabilityCircuit(MLIRContext &context,
 
   funcOp = fuseValueManager(contextFuncOrFailure.value(), funcOp);
 
-  mod->dump();
-
   auto [newFuncOp, maxBB] = fuseContext(contextFuncOrFailure.value(), funcOp);
   funcOp = newFuncOp;
-
-  mod->dump();
 
   OpBuilder builder(&context);
 
@@ -609,6 +661,8 @@ createReachabilityCircuit(MLIRContext &context,
     config.results.push_back(
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
+
+  // funcOp = addStartAndEndSignals(funcOp);
 
   return std::make_pair(mod.release(), config);
 }
