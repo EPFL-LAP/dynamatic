@@ -284,7 +284,7 @@ def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
     This pass takes a single floating point unit 'vendor' as input and
     marks every floating point arithmetic operation. This is later used
     to decide how to generate the RTL of these units.
-    Defaults to vivado
+    Defaults to vivado.
   }];
   let options = [
     Option<"impl", "impl", "::std::string",
