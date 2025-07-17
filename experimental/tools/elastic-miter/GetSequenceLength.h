@@ -29,7 +29,8 @@ namespace dynamatic::experimental {
 // states is equivalent.
 FailureOr<size_t> getSequenceLength(MLIRContext &context,
                                     const std::filesystem::path &outputDir,
-                                    const std::filesystem::path &mlirPath);
+                                    const std::filesystem::path &mlirPath,
+                                    const std::filesystem::path &contextPath);
 } // namespace dynamatic::experimental
 
 #endif

@@ -6,10 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
+#include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -57,11 +66,16 @@ LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
   return success();
 }
 
-FailureOr<std::pair<FuncOp, Block *>>
-buildNewFuncWithBlock(OpBuilder builder, llvm::StringRef name,
-                      ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
-                      NamedAttribute argNamedAttr,
-                      NamedAttribute resNamedAttr) {
+std::pair<FuncOp, Block *> buildNewFuncWithBlock(llvm::StringRef name,
+                                                 ArrayRef<Type> inputTypes,
+                                                 ArrayRef<Type> outputTypes,
+                                                 ArrayAttr argNames,
+                                                 ArrayAttr resNames) {
+
+  OpBuilder builder(argNames.getContext());
+
+  auto argNamedAttr = builder.getNamedAttr("argNames", argNames);
+  auto resNamedAttr = builder.getNamedAttr("resNames", resNames);
 
   SmallVector<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
 
@@ -106,11 +120,10 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
 
   // The inputs to the elastic-miter circuit are the same as the input signature
   // of the LHS/RHS circuit. We assign them the same argument names as the LHS.
-  auto argNamedAttr = builder.getNamedAttr("argNames", lhsFuncOp.getArgNames());
+  auto argAttr = lhsFuncOp.getArgNames();
   // Create the resNames namedAttribute for the new miter funcOp, this is just a
   // copy of the LHS resNames with an added EQ_ prefix
-  auto resNamedAttr =
-      builder.getNamedAttr("resNames", builder.getArrayAttr(prefixedResAttr));
+  auto resAttr = builder.getArrayAttr(prefixedResAttr);
 
   ChannelType i1ChannelType = ChannelType::get(builder.getI1Type());
 
@@ -134,8 +147,36 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
   mlir::ArrayRef<mlir::Type> newArrayRef(outputTypes);
 
   // Create the elastic-miter function
-  return buildNewFuncWithBlock(builder, funcName, lhsFuncOp.getArgumentTypes(),
-                               outputTypes, argNamedAttr, resNamedAttr);
+  return buildNewFuncWithBlock(funcName, lhsFuncOp.getArgumentTypes(),
+                               outputTypes, argAttr, resAttr);
+}
+
+static inline bool eligibleForMaterialization(Value val) {
+  return isa<handshake::ControlType, handshake::ChannelType>(val.getType());
+}
+
+LogicalResult verifyIRMaterializedExceptForArgs(handshake::FuncOp funcOp) {
+  auto checkUses = [&](Operation *op, Value val, StringRef desc,
+                       unsigned idx) -> LogicalResult {
+    if (!eligibleForMaterialization(val))
+      return success();
+
+    auto numUses = std::distance(val.getUses().begin(), val.getUses().end());
+    if (numUses == 0)
+      return op->emitError() << desc << " " << idx << " has no uses.";
+    if (numUses > 1)
+      return op->emitError() << desc << " " << idx << " has multiple uses.";
+    return success();
+  };
+
+  // Check results of operations
+  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+    for (OpResult res : op.getResults()) {
+      if (failed(checkUses(&op, res, "result", res.getResultNumber())))
+        return failure();
+    }
+  }
+  return success();
 }
 
 // Get the first and only non-external FuncOp from the module.
@@ -143,7 +184,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module,
+                                          bool allowArgsNonmaterialization) {
   // We only support one function per module
   FuncOp funcOp = nullptr;
   for (auto op : module.getOps<FuncOp>()) {
@@ -159,9 +201,16 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
 
   if (funcOp) {
     // Check that the FuncOp is materialized
-    if (failed(dynamatic::verifyIRMaterialized(funcOp))) {
-      llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
-      return failure();
+    if (allowArgsNonmaterialization) {
+      if (failed(verifyIRMaterializedExceptForArgs(funcOp))) {
+        llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
+        return failure();
+      }
+    } else {
+      if (failed(dynamatic::verifyIRMaterialized(funcOp))) {
+        llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
+        return failure();
+      }
     }
   }
 
@@ -213,22 +262,279 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
   return success();
 }
 
+llvm::StringMap<Type> getAllInputValuesFromMiterContext(FuncOp contextFunc) {
+  auto endOps = contextFunc.getOps<EndOp>();
+  assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
+         "There should be exactly one EndOp in the context function");
+  EndOp endOp = *endOps.begin();
+
+  llvm::StringMap<Type> inputValues;
+  for (auto [i, result] : llvm::enumerate(endOp.getOperands())) {
+    // Get the name of the result
+    auto resName = contextFunc.getResName(i);
+    // Get the type of the result
+    auto resType = result.getType();
+    // Add to the map
+    inputValues.insert({resName.str(), resType});
+  }
+  return inputValues;
+}
+
+std::optional<BlockArgument> findArg(FuncOp funcOp, StringRef argName) {
+  for (auto [i, attr] : llvm::enumerate(funcOp.getArgNames())) {
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    if (strAttr && strAttr.getValue() == argName) {
+      return funcOp.getArgument(i);
+    }
+  }
+
+  return std::nullopt;
+}
+
+ForkOp flattenFork(ForkOp topFork) {
+  SmallVector<Value> values;
+  SmallVector<ForkOp> forksToBeErased;
+  for (OpResult result : llvm::make_early_inc_range(topFork.getResults())) {
+    materializeValue(result);
+    Operation *user = getUniqueUser(result);
+
+    if (auto forkOp = dyn_cast<ForkOp>(user)) {
+      ForkOp newForkOp = flattenFork(forkOp);
+      for (OpResult forkResult : newForkOp.getResults()) {
+        assertMaterialization(forkResult);
+        values.push_back(forkResult);
+      }
+      forksToBeErased.push_back(newForkOp);
+    } else {
+      values.push_back(result);
+    }
+  }
+
+  if (values.size() == topFork.getResults().size())
+    return topFork; // No need to flatten, already flat
+
+  OpBuilder builder(topFork->getContext());
+  builder.setInsertionPoint(topFork);
+  ForkOp newForkOp = builder.create<ForkOp>(
+      topFork.getLoc(), topFork.getOperand(), values.size());
+  inheritBB(topFork, newForkOp);
+
+  for (unsigned i = 0; i < values.size(); ++i) {
+    values[i].replaceAllUsesWith(newForkOp.getResult()[i]);
+  }
+
+  for (ForkOp forkOp : forksToBeErased) {
+    // Erase the old fork
+    forkOp->erase();
+  }
+  topFork->erase();
+
+  return newForkOp;
+}
+
+void materializeValue(Value val) {
+  Operation *definingOp = val.getDefiningOp();
+  OpBuilder builder(definingOp->getContext());
+  builder.setInsertionPoint(definingOp);
+
+  if (val.use_empty()) {
+    SinkOp sinkOp = builder.create<SinkOp>(val.getLoc(), val);
+    inheritBB(definingOp, sinkOp);
+    return;
+  }
+  if (val.hasOneUse())
+    return;
+
+  unsigned numUses = std::distance(val.getUses().begin(), val.getUses().end());
+
+  ForkOp forkOp = builder.create<ForkOp>(val.getLoc(), val, numUses);
+  inheritBB(definingOp, forkOp);
+
+  int i = 0;
+  // To allow operand mutation, we use an early-increment range.
+  // TODO: The original author may have been unaware of this approach;
+  // the materialization pass appears unnecessarily complex. Consider
+  // refactoring it to use an early-increment range as well.
+  for (OpOperand &opOperand : llvm::make_early_inc_range(val.getUses())) {
+    if (opOperand.getOwner() == forkOp)
+      continue;
+    opOperand.set(forkOp.getResult()[i]);
+    i++;
+  }
+
+  flattenFork(forkOp);
+}
+
+void materializeArg(BlockArgument val, unsigned bb) {
+  OpBuilder builder(val.getContext());
+  builder.setInsertionPointToStart(val.getParentBlock());
+
+  if (val.use_empty()) {
+    SinkOp sinkOp = builder.create<SinkOp>(val.getLoc(), val);
+    setBB(sinkOp, bb);
+    return;
+  }
+  if (val.hasOneUse())
+    return;
+
+  unsigned numUses = std::distance(val.getUses().begin(), val.getUses().end());
+
+  ForkOp forkOp = builder.create<ForkOp>(val.getLoc(), val, numUses);
+  setBB(forkOp, bb);
+
+  int i = 0;
+  // To allow operand mutation, we use an early-increment range.
+  // TODO: The original author may have been unaware of this approach;
+  // the materialization pass appears unnecessarily complex. Consider
+  // refactoring it to use an early-increment range as well.
+  for (OpOperand &opOperand : llvm::make_early_inc_range(val.getUses())) {
+    if (opOperand.getOwner() == forkOp)
+      continue;
+    opOperand.set(forkOp.getResult()[i]);
+    i++;
+  }
+
+  flattenFork(forkOp);
+}
+
+Operation *getUniqueUser(Value val) {
+  assertMaterialization(val);
+  return *val.getUsers().begin();
+}
+
+void assertMaterialization(Value val) {
+  if (val.hasOneUse())
+    return;
+  val.getDefiningOp()->emitError("Expected the value to be materialized, but "
+                                 "it has zero or multiple users");
+  llvm_unreachable("MaterializationUtil failed");
+}
+
+FuncOp fuseValueManager(FuncOp contextFuncOp, FuncOp funcOp) {
+  OpBuilder builder(funcOp.getContext());
+
+  auto [newFuncOp, newBlock] = buildNewFuncWithBlock(
+      funcOp.getName(), contextFuncOp.getResultTypes(), funcOp.getResultTypes(),
+      contextFuncOp.getResNames(), funcOp.getResNames());
+
+  funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
+
+  builder.setInsertionPointToStart(newBlock);
+
+  for (auto [i, newArg] : llvm::enumerate(newFuncOp.getArguments())) {
+    // Get the name and type of the input value
+    auto name = contextFuncOp.getArgName(i);
+
+    if (auto arg = findArg(funcOp, name)) {
+      assert(arg->getType() == newArg.getType() &&
+             "The type of the argument does not match the expected type");
+
+      arg->replaceAllUsesWith(newArg);
+    }
+
+    materializeArg(newArg, 1);
+  }
+
+  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+    op.remove();
+    newBlock->getOperations().push_back(&op);
+    unsigned bb = getLogicBB(&op).value_or(0);
+    setBB(&op, bb + 1);
+  }
+
+  funcOp->erase();
+  return newFuncOp;
+}
+
+std::pair<FuncOp, unsigned> fuseContext(FuncOp contextFuncOp, FuncOp funcOp) {
+  OpBuilder builder(funcOp.getContext());
+
+  auto [newFuncOp, newBlock] =
+      buildNewFuncWithBlock(funcOp.getName(), contextFuncOp.getArgumentTypes(),
+                            funcOp.getResultTypes(),
+                            contextFuncOp.getArgNames(), funcOp.getResNames());
+
+  funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
+
+  builder.setInsertionPointToStart(newBlock);
+
+  for (auto [i, newArg] : llvm::enumerate(newFuncOp.getArguments())) {
+    auto oldArg = contextFuncOp.getArgument(i);
+    oldArg.replaceAllUsesWith(newArg);
+  }
+
+  auto endOps = contextFuncOp.getOps<EndOp>();
+  assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
+         "There should be exactly one EndOp in the context function");
+  EndOp endOp = *endOps.begin();
+
+  for (auto [i, oldArg] : llvm::enumerate(funcOp.getArguments())) {
+    auto newResult = endOp->getOperand(i);
+    oldArg.replaceAllUsesWith(newResult);
+  }
+  endOp->erase();
+
+  // move all operations from the context function to the new function
+  unsigned contextMaxBB = 0;
+  for (Operation &op : llvm::make_early_inc_range(contextFuncOp.getOps())) {
+    op.remove();
+    newBlock->getOperations().push_back(&op);
+    unsigned bb = getLogicBB(&op).value_or(0);
+    setBB(&op, bb + 1);
+    contextMaxBB = std::max(contextMaxBB, bb + 1);
+  }
+
+  unsigned maxBB = contextMaxBB;
+  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+    op.remove();
+    newBlock->getOperations().push_back(&op);
+    unsigned bb = getLogicBB(&op).value_or(0);
+    setBB(&op, bb + contextMaxBB);
+    maxBB = std::max(maxBB, bb + contextMaxBB);
+  }
+
+  contextFuncOp->erase();
+  funcOp->erase();
+
+  return std::make_pair(newFuncOp, maxBB);
+}
+
 // Create the reachability circuit by putting ND wires at all the in- and
 // outputs
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
-                          const std::filesystem::path &filename) {
+                          const std::filesystem::path &filename,
+                          const std::filesystem::path &contextPath) {
 
   OwningOpRef<ModuleOp> mod =
       parseSourceFile<ModuleOp>(filename.string(), &context);
   if (!mod)
     return failure();
 
+  OwningOpRef<ModuleOp> contextMod =
+      parseSourceFile<ModuleOp>(contextPath.string(), &context);
+  if (!contextMod)
+    return failure();
+  auto contextFuncOrFailure = getModuleFuncOpAndCheck(contextMod.get(), false);
+  if (failed(contextFuncOrFailure)) {
+    llvm::errs() << "Failed to get context FuncOp.\n";
+    return failure();
+  }
+
   // Get the FuncOp from the module, also check some needed properties
-  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get());
+  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get(), true);
   if (failed(funcOrFailure))
     return failure();
   FuncOp funcOp = funcOrFailure.value();
+
+  funcOp = fuseValueManager(contextFuncOrFailure.value(), funcOp);
+
+  mod->dump();
+
+  auto [newFuncOp, maxBB] = fuseContext(contextFuncOrFailure.value(), funcOp);
+  funcOp = newFuncOp;
+
+  mod->dump();
 
   OpBuilder builder(&context);
 
@@ -290,7 +596,7 @@ createReachabilityCircuit(MLIRContext &context,
     std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
     NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
-    setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
+    setHandshakeAttributes(builder, endNDWireOp, maxBB + 1, ndwName);
 
     // Use the newly created NDwire's output instead of the original argument in
     // the FuncOp's operations
@@ -315,7 +621,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                    size_t bufferSlots, bool ndSpec, bool allowNonacceptance) {
 
   // Get the LHS FuncOp from the LHS module, also check some required properties
-  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
+  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule, true);
   if (failed(funcOrFailure)) {
     llvm::errs() << "Failed to get LHS FuncOp.\n";
     return failure();
@@ -323,7 +629,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   FuncOp lhsFuncOp = funcOrFailure.value();
 
   // Get the RHS FuncOp from the RHS module
-  funcOrFailure = getModuleFuncOpAndCheck(rhsModule);
+  funcOrFailure = getModuleFuncOpAndCheck(rhsModule, true);
   if (failed(funcOrFailure)) {
     llvm::errs() << "Failed to get RHS FuncOp.\n";
     return failure();
@@ -652,6 +958,67 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
     return failure();
   }
   return std::make_pair(outputDir / mlirFilename, config);
+}
+
+FailureOr<llvm::StringMap<Type>>
+analyzeInputValue(MLIRContext &context, const std::filesystem::path &path) {
+  OwningOpRef<ModuleOp> mod =
+      parseSourceFile<ModuleOp>(path.string(), &context);
+  if (!mod)
+    return failure();
+
+  auto funcOps = mod.get().getOps<FuncOp>();
+  assert(std::distance(funcOps.begin(), funcOps.end()) == 1 &&
+         "Expected a single function");
+
+  FuncOp funcOp = *funcOps.begin();
+  llvm::StringMap<Type> inputValues;
+  OpPrintingFlags defaultFlag;
+  auto argNames = funcOp.getArgNames();
+  for (auto [i, blockArg] : llvm::enumerate(funcOp.getArguments())) {
+    inputValues.insert(
+        {argNames[i].cast<StringAttr>().getValue(),
+         blockArg.getType()}); // Remove the leading '%' from the name
+  }
+
+  return inputValues;
+}
+
+LogicalResult
+generateDefaultMiterContext(MLIRContext &context,
+                            const llvm::StringMap<mlir::Type> &allInputValues,
+                            const std::filesystem::path &outputFile) {
+  OpBuilder builder(&context);
+  ModuleOp module = ModuleOp::create(builder.getUnknownLoc());
+
+  // Create a new function with the input values as arguments
+  SmallVector<Attribute> argNames;
+  SmallVector<Type> argTypes;
+
+  for (const auto &pair : allInputValues) {
+    argNames.push_back(builder.getStringAttr(pair.first()));
+    argTypes.push_back(pair.second);
+  }
+
+  auto argAttr = builder.getArrayAttr(argNames);
+  auto resAttr = builder.getArrayAttr(argNames);
+  auto [funcOp, entryBlock] =
+      buildNewFuncWithBlock("context", argTypes, argTypes, argAttr, resAttr);
+  module.push_back(funcOp);
+
+  builder.setInsertionPointToStart(entryBlock);
+
+  EndOp endOp =
+      builder.create<EndOp>(builder.getUnknownLoc(), funcOp.getArguments());
+  setHandshakeAttributes(builder, endOp, 1, "end");
+
+  // Write the module to the output file
+  if (failed(createMlirFile(outputFile, module))) {
+    llvm::errs() << "Failed to write default context MLIR file.\n";
+    return failure();
+  }
+
+  return success();
 }
 
 } // namespace dynamatic::experimental

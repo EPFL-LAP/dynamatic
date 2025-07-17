@@ -32,8 +32,9 @@
 namespace cl = llvm::cl;
 using namespace mlir;
 using namespace dynamatic::handshake;
+using namespace dynamatic::experimental;
 
-// CLI Settings
+// CLI Options
 
 static cl::OptionCategory generalCategory("1. General Elastic-Miter Options");
 static cl::OptionCategory constraintsCategory("2. Constraints Options");
@@ -46,6 +47,11 @@ static cl::opt<std::string> lhsFilenameArg(
 static cl::opt<std::string> rhsFilenameArg(
     "rhs", cl::Prefix, cl::Required,
     cl::desc("The right-hand side (RHS) input handshake MLIR file"),
+    cl::cat(generalCategory));
+
+static cl::opt<std::string> customContextArg(
+    "custom-context", cl::Prefix, cl::Optional,
+    cl::desc("MLIR file specifying the custom context (optional)"),
     cl::cat(generalCategory));
 
 static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
@@ -175,20 +181,55 @@ parseSequenceConstraints() {
 
 static FailureOr<bool> checkEquivalence(
     MLIRContext &context, const std::filesystem::path &lhsPath,
-    const std::filesystem::path &rhsPath,
+    const std::filesystem::path &rhsPath, const std::string customContextPath,
     const std::filesystem::path &outputDir,
     const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
         &constraints) {
 
+  auto lhsInputValuesOrFailure = analyzeInputValue(context, lhsPath);
+  auto rhsInputValuesOrFailure = analyzeInputValue(context, rhsPath);
+
+  if (failed(lhsInputValuesOrFailure) || failed(rhsInputValuesOrFailure)) {
+    llvm::errs() << "Failed to analyze input values.\n";
+    return failure();
+  }
+
+  llvm::StringMap<mlir::Type> allInputValues;
+  for (const auto &pair : lhsInputValuesOrFailure.value()) {
+    allInputValues.insert({pair.first(), pair.second});
+  }
+  for (const auto &pair : rhsInputValuesOrFailure.value()) {
+    if (allInputValues.contains(pair.first())) {
+      if (allInputValues[pair.first()] != pair.second) {
+        llvm::errs() << "Input value '" << pair.first()
+                     << "' has different types in LHS and RHS.\n";
+        return failure();
+      }
+    } else {
+      allInputValues.insert({pair.first(), pair.second});
+    }
+  }
+
+  std::filesystem::path contextFilePath = outputDir / "context.mlir";
+  if (customContextPath.empty()) {
+    // Create a default context if no custom context is provided
+    if (failed(generateDefaultMiterContext(context, allInputValues,
+                                           contextFilePath)))
+      return failure();
+  } else {
+    // Copy the custom context file to the output directory
+    std::filesystem::copy(customContextPath, contextFilePath);
+  }
+
   // Find out needed number of tokens for the LHS
   auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "lhs_reachability", lhsPath);
+      context, outputDir / "lhs_reachability", lhsPath, contextFilePath);
   if (failed(failOrLHSseqLen))
     return failure();
 
   // Find out needed number of tokens for the RHS
   auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "rhs_reachability", rhsPath);
+      context, outputDir / "rhs_reachability", rhsPath, contextFilePath);
   if (failed(failOrRHSseqLen))
     return failure();
 
@@ -299,8 +340,9 @@ int main(int argc, char **argv) {
   }
   std::filesystem::create_directories(outputDir);
 
-  auto failOrEquivalent = checkEquivalence(context, lhsPath, rhsPath, outputDir,
-                                           failOrSequenceConstraints.value());
+  auto failOrEquivalent =
+      checkEquivalence(context, lhsPath, rhsPath, customContextArg, outputDir,
+                       failOrSequenceConstraints.value());
   if (failed(failOrEquivalent)) {
     llvm::errs() << "Equivalence checking failed.\n";
     return 1;

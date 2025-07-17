@@ -52,10 +52,11 @@ void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
 // Returns failure() when the operation doesn't already have a handshake.name
 LogicalResult prefixOperation(Operation &op, const std::string &prefix);
 
-FailureOr<std::pair<FuncOp, Block *>>
-buildNewFuncWithBlock(OpBuilder builder, llvm::StringRef name,
-                      ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
-                      NamedAttribute argNamedAttr, NamedAttribute resNamedAttr);
+std::pair<FuncOp, Block *> buildNewFuncWithBlock(llvm::StringRef name,
+                                                 ArrayRef<Type> inputTypes,
+                                                 ArrayRef<Type> outputTypes,
+                                                 ArrayAttr argNames,
+                                                 ArrayAttr resNames);
 
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
 // The result names have EQ_ prefixed.
@@ -68,7 +69,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module);
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module,
+                                          bool allowArgsNonmaterialization);
 
 LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
                              ModuleOp mod);
@@ -86,7 +88,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 // of the funcOp, and its argument and results.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
-                          const std::filesystem::path &filename);
+                          const std::filesystem::path &filename,
+                          const std::filesystem::path &contextPath);
 
 // This creates an elastic-miter MLIR module and a JSON config file given the
 // path to two MLIR files. The input files need to contain exactly one module
@@ -97,6 +100,30 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
                   bool ndSpec = false, bool allowNonacceptance = false);
 
+FailureOr<llvm::StringMap<Type>>
+analyzeInputValue(MLIRContext &context, const std::filesystem::path &path);
+
+LogicalResult
+generateDefaultMiterContext(MLIRContext &context,
+                            const llvm::StringMap<mlir::Type> &allInputValues,
+                            const std::filesystem::path &outputFile);
+
+// TODO: MaterializationUtil
+
+/// Flatten nested forks. Returns the new top fork.
+ForkOp flattenFork(ForkOp topFork);
+
+/// Materialize the value (i.e., ensuring it has a single user), by introducing
+/// a fork unit. Nested forks are flattened internally.
+void materializeValue(Value val);
+
+/// Under the materialization, the user of the value should be unique (as long
+/// as it's handshake-typed). This function returns the unique user of the
+/// value.
+Operation *getUniqueUser(Value val);
+
+/// Asserts the value is materialized.
+void assertMaterialization(Value val);
 } // namespace dynamatic::experimental
 
 #endif
