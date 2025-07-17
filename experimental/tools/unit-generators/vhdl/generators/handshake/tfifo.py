@@ -1,4 +1,4 @@
-from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
+from generators.handshake.fifo_break_dv import generate_fifo_break_dv
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
@@ -16,11 +16,11 @@ def generate_tfifo(name, params):
         return _generate_tfifo(name, num_slots, bitwidth)
 
 
-def _generate_tfifo(name, size, bitwidth):
+def _generate_tfifo(name, num_slots, bitwidth):
     fifo_inner_name = f"{name}_fifo"
     dependencies = \
-        generate_elastic_fifo_inner(fifo_inner_name, {
-            "size": size,
+        generate_fifo_break_dv(fifo_inner_name, {
+            "num_slots": num_slots,
             "bitwidth": bitwidth,
         })
 
@@ -91,9 +91,9 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_tfifo_dataless(name, size):
+def _generate_tfifo_dataless(name, num_slots):
     fifo_inner_name = f"{name}_fifo"
-    dependencies = generate_elastic_fifo_inner(fifo_inner_name, {"size": size})
+    dependencies = generate_fifo_break_dv(fifo_inner_name, {"num_slots": num_slots})
 
     entity = f"""
 library ieee;
