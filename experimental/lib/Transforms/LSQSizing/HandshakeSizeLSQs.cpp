@@ -143,7 +143,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB();
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     signalPassFailure();
 
