@@ -90,10 +90,9 @@ For more information related to timing information, please refer to [this markdo
 
 ## Performance comparison : FloPoCo vs Vivado
 
-This section presents side-by-side comparisons of the performance of FloPoCo and Vivado units. The provided graphs represent both comparisons in terms of operating frequency and ressource usage.
+This section presents side-by-side comparisons of the performance of FloPoCo and Vivado units. The provided graphs represent both comparisons in terms of operating frequency and ressource usage, and can serve as a reference for the decision to use one or the other backend.
 
-**Note : current values are based off of performance measured post-implementation in viavdo 2019.1 for FloPoCo units. For the vivado units, performance and ressource costs reported on the AMD website are used instead.**
-
+**Note : current values are based off of performance measured post-implementation in viavdo 2019.1 for both the FloPoCo units.**
 
 
 <img width="4459" height="2458" alt="comparison_srls_vs_frequency" src="https://github.com/user-attachments/assets/e784952a-eb40-4004-8343-30b100aae9c1" />
