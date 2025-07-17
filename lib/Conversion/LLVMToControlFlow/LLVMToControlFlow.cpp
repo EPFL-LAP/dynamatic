@@ -345,6 +345,9 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
 /// \brief: This struct rewrites all the pattern that connects GEP -> {Load1,
 /// Load2, ..., Store1, Store2, ...}.
+///
+/// \note: Currently, it assumes that the instcombine LLVM pass has been applied
+/// to remove the GEP -> GEP -> ... -> GEP patterns.
 struct ConvertGEPToLoadStoreOpPattern
     : public OpConversionPattern<LLVM::GEPOp> {
   using OpConversionPattern<LLVM::GEPOp>::OpConversionPattern;
@@ -353,13 +356,27 @@ struct ConvertGEPToLoadStoreOpPattern
   matchAndRewrite(LLVM::GEPOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
 
-    Location loc = op->getLoc();
     if (!op || op.use_empty()) {
       return failure();
     }
 
+    Location loc = op->getLoc();
+
     Value gepBasePtr = op.getBase();
 
+    auto gepParent = op->getParentOfType<LLVM::GEPOp>();
+    assert(!gepParent && "Chained GEPs should be canonicalized away! Please "
+                         "check if you have ran \"instcombine\" before!\n");
+
+    for (auto *gepChild : op->getUsers()) {
+      assert(!isa<LLVM::GEPOp>(gepChild) &&
+             "Chained GEPs should be canonicalized away! Please "
+             "check if you have ran \"instcombine\" before!\n");
+    }
+
+    /// \note: Before applying this rewrite patterm, we assume that we have
+    /// fixed the function type from the LLVM void pointers to the memref types.
+    /// See the comments above runOnOperations() below.
     auto memrefType = gepBasePtr.getType().dyn_cast<MemRefType>();
     if (!memrefType) {
       // note: maybe we need to signal pass failure here if the GEP is not
@@ -373,17 +390,51 @@ struct ConvertGEPToLoadStoreOpPattern
     // pass.
     rewriter.setInsertionPoint(op);
     SmallVector<Value> indexValues;
-    for (auto i64Value : op.getIndices()) {
-      Value index = i64Value.dyn_cast<Value>();
-      assert(index);
+
+    /// \note: The type of op.getIndices() can be either a Value (if the index
+    /// is dynamic) or IntegerAttr (if the index is a constant).
+    for (auto gepIndex : op.getIndices()) {
+      if (auto dynamicValue = dyn_cast<Value>(gepIndex)) {
+        auto idxCastOp = rewriter.create<arith::IndexCastOp>(
+            loc, rewriter.getIndexType(), dynamicValue);
+        indexValues.push_back(idxCastOp);
+      } else if (auto intAttrOfConstIdx = dyn_cast<IntegerAttr>(gepIndex)) {
+        auto constAddrOp =
+            rewriter.create<arith::ConstantOp>(loc, intAttrOfConstIdx);
+        auto idxCastOp = rewriter.create<arith::IndexCastOp>(
+            loc, rewriter.getIndexType(), constAddrOp);
+        indexValues.push_back(idxCastOp);
+      } else {
+        assert(false && "GEP index must be either Value or IntAttr");
+      }
+    }
+
+    /// \note: GEPOp has the following syntax (some details omitted):
+    /// GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
+    /// When you iterate through the indices, it also returns indices from left
+    /// to right. However, LLVM treats the following two as the same op
+    /// - (1) GEPop %basePtr, %firstDim, 0, 0
+    /// - (2) GEPop %basePtr, %firstDim
+    /// Notice that, in the second example, the trailing constant 0s are
+    /// omitted.
+    ///
+    /// However, memref::LoadOp and memref::StoreOp must have their indices
+    /// match the memref. So here we need to fill in the constant zeros.
+    int remainingConstZeros =
+        memrefType.getShape().size() - op.getIndices().size();
+    assert(remainingConstZeros >= 0 &&
+           "GEP should only omit indices, but shouldn't have more indices than "
+           "the original memref type extracted from the function argument!");
+    for (int i = 0; i < remainingConstZeros; i++) {
+      auto constZeroOp = rewriter.create<arith::ConstantOp>(
+          loc, rewriter.getI64IntegerAttr(0));
       auto idxCastOp = rewriter.create<arith::IndexCastOp>(
-          loc, rewriter.getIndexType(), index);
+          loc, rewriter.getIndexType(), constZeroOp);
       indexValues.push_back(idxCastOp);
     }
 
     // For each llvm::load or llvm::store connected to GEP, create a
     // memref::load or memref::store that takes the indices from indexValues
-
     for (Operation *op : op->getUsers()) {
       rewriter.setInsertionPoint(op);
       if (auto loadOp = dyn_cast<LLVM::LoadOp>(op)) {
