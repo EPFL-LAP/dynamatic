@@ -327,7 +327,7 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
     // Convert function type
     LLVM::LLVMFunctionType oldFuncType = op.getFunctionType();
     rewriter.setInsertionPoint(op);
-    SmallVector<Type, 4> newTypes;
+    SmallVector<Type, 10> newTypes;
     auto newFuncType = rewriter.getFunctionType(oldFuncType.getParams(),
                                                 oldFuncType.getReturnTypes());
     // Create new func::FuncOp
@@ -336,12 +336,6 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
     // If function has a body, move it over (with argument remapping)
     rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(), newFunc.end());
-
-    for (auto [oldArg, newArg] :
-         llvm::zip_equal(newFunc.getBody().front().getArguments(),
-                         oldFuncType.getParams())) {
-      oldArg.setType(newArg);
-    }
 
     rewriter.eraseOp(op);
 
@@ -730,7 +724,7 @@ void LLVMToControlFlowPass::runOnOperation() {
     assert(nameToArgTypesMap.at(funcOp.getSymName().str()).size() ==
                oldFuncType.getNumInputs() &&
            "Unmatched number of function arguments!");
-    SmallVector<Type, 4> convertedInputs =
+    SmallVector<Type, 10> convertedInputs =
         getFuncArgTypes(funcOp.getSymName().str(), nameToArgTypesMap, builder);
 
     SmallVector<Type, 1> convertedResults;
