@@ -1,12 +1,20 @@
 # Set the source file to run
-set-src             tutorials/Introduction/Ch1/loop_multiply.c
+set-src     integration-test/iterative_sqrt/tests/multiple_exit/multiple_exit.c
+#integration-test/iterative_sqrt/tests/iterative_sqrt_break/iterative_sqrt.c
+#integration-test/iterative_sqrt/tests/iterative_sqrt_original/iterative_sqrt.c
+#integration-test/iterative_sqrt/iterative_sqrt.c   
+#integration-test/iterative_sqrt/tests/multiple_exit/multiple_exit.c
+#integration-test/iterative_sqrt/tests/while_if_array_crashatQ/iterative_sqrt.c
+#integration-test/iterative_sqrt/iterative_sqrt.c      
+#integration-test/iterative_sqrt/tests/comparator/comparator.c
+# tutorials/Introduction/Ch1/loop_multiply.c
 
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
 # strategy which does not require an MILP solver.
 # Provide the --out-of-order-execution flag to `compile` to use out-of-order
 # execution 
-compile      
+compile  --fast-token-delivery --straight-to-queue  # 
 
 # Generate the VHDL design corresponding to the source code
 write-hdl

@@ -1,0 +1,254 @@
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(9): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(9): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(10): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity iterative_sqrt_wrapper_tb
+# -- Compiling architecture behavior of iterative_sqrt_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# ** Error: (vcom-11) Could not find work.iterative_sqrt_wrapper.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): (vcom-1195) Cannot find expanded name "work.iterative_sqrt_wrapper".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): Unknown expanded name.
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(245): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity iterative_sqrt_wrapper_tb
+# -- Compiling architecture behavior of iterative_sqrt_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# ** Error: (vcom-11) Could not find work.iterative_sqrt_wrapper.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): (vcom-1195) Cannot find expanded name "work.iterative_sqrt_wrapper".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): Unknown expanded name.
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(245): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:51:49 on Jun 26,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity iterative_sqrt_wrapper_tb
+# -- Compiling architecture behavior of iterative_sqrt_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# ** Error: (vcom-11) Could not find work.iterative_sqrt_wrapper.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): (vcom-1195) Cannot find expanded name "work.iterative_sqrt_wrapper".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): Unknown expanded name.
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(245): VHDL Compiler exiting
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Compile of hls_verify_iterative_sqrt_tb.vhd failed.
+# There were 1 file(s) that could not be compiled successfullyvcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity iterative_sqrt_wrapper_tb
+# -- Compiling architecture behavior of iterative_sqrt_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# ** Error: (vcom-11) Could not find work.iterative_sqrt_wrapper.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): (vcom-1195) Cannot find expanded name "work.iterative_sqrt_wrapper".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(53): Unknown expanded name.
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/VHDL_SRC/hls_verify_iterative_sqrt_tb.vhd(245): VHDL Compiler exiting
+# /home/pourghei/intelFPGA/20.1/modelsim_ase/linuxaloem/vcom failed.
+# 5 compiles, 0 failed with no errors.
+# vsim iterative_sqrt_wrapper_tb 
+# Start time: 11:51:49 on Jun 26,2025
+# Loading std.standard
+# ** Error: (vsim-3173) Entity '/home/pourghei/dynamatic/integration-test/iterative_sqrt/out/sim/HLS_VERIFY/work.iterative_sqrt_wrapper_tb' has no architecture.
+# Error loading design
+# End time: 11:51:49 on Jun 26,2025, Elapsed time: 0:00:00
+# Errors: 1, Warnings: 9

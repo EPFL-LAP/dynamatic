@@ -327,6 +327,7 @@ LogicalResult experimental::ftd::createPhiNetwork(
 
   mlir::DominanceInfo domInfo;
   // Type of the inputs
+  llvm::errs() << "\n\n[][][]In createPhiNetwork val size is =" << vals.size()<<"\n\n";
   Type valueType = vals[0].getType();
   // All the input values associated to one block
   DenseMap<Block *, SmallVector<Value>> valuesPerBlock;
@@ -370,6 +371,17 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // In which block a new phi is necessary
   DenseSet<Block *> blocksToAddPhi =
       runCrytonAlgorithm(funcRegion, inputBlocks);
+  llvm::errs()<< "\n\nblocksToAddPhi:";
+  for (auto bb: blocksToAddPhi){
+    llvm::errs()<< "BB";
+    bb->printAsOperand(llvm::errs(), /*printType=*/false);
+    llvm::errs()<< ",\t";
+  }
+  llvm::errs()<< "\n\n";
+///////////////////////////////////////////////////////////////////////////in
+//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+ //th ebackedge place holder is not cleared
 
   // A backedge is created for each block in `blocksToAddPhi`, and it will
   // contain the value used as placeholder for the phi
@@ -378,6 +390,11 @@ LogicalResult experimental::ftd::createPhiNetwork(
     operandsPerPhi.insert({bb, SmallVector<Value>()});
     resultPerPhi.insert({bb, mergeResult});
   }
+for (auto result : resultPerPhi){
+  llvm::errs()<< "\n result per phi: BB" ;
+  result.first->printAsOperand(llvm::errs(), /*printType=*/false);
+}
+llvm::errs()<< "\n" ;
 
   // For each phi, we need one input for every predecessor of the block
   for (auto &bb : blocksToAddPhi) {
@@ -386,7 +403,12 @@ LogicalResult experimental::ftd::createPhiNetwork(
     llvm::DenseSet<Block *> coveredPred;
     auto predecessors = bb->getPredecessors();
 
+    llvm::errs()<< "\npreds are: \t";
     for (Block *pred : predecessors) {
+      pred->printAsOperand(llvm::errs(),false) ;
+    }
+    for (Block *pred : predecessors) {
+      llvm::errs()<<"\nstart:\n" ;
       if (coveredPred.contains(pred))
         continue;
       coveredPred.insert(pred);
@@ -396,16 +418,43 @@ LogicalResult experimental::ftd::createPhiNetwork(
       Block *predecessorOrDominator = nullptr;
       Value valueToUse = nullptr;
 
+      int ittr =0;
       do {
+        llvm::errs()<<"\nRound:" << ittr++ << "\npredecessorOrDominator=";
         predecessorOrDominator =
             !predecessorOrDominator
                 ? pred
                 : getImmediateDominator(funcRegion, predecessorOrDominator);
 
+        predecessorOrDominator->printAsOperand(llvm::errs(),false);
         if (inputBlocks.contains(predecessorOrDominator))
+        {
           valueToUse = inputBlocks[predecessorOrDominator];
+        llvm::errs()<< "\nif pred evaluation\t current BB=";
+            bb->printAsOperand(llvm::errs(), /*printType=*/false);
+            llvm::errs()<< "\tpred = ";
+           predecessorOrDominator->printAsOperand(llvm::errs(), /*printType=*/false);
+           for (auto result : resultPerPhi){
+              llvm::errs()<< "\n result per phi: BB" ;
+              result.first->printAsOperand(llvm::errs(), /*printType=*/false);
+            }
+            llvm::errs()<< "\n" ;
+        }
+
         else if (resultPerPhi.contains(predecessorOrDominator))
-          valueToUse = resultPerPhi.find(predecessorOrDominator)->getSecond();
+        {
+          //valueToUse = resultPerPhi.find(predecessorOrDominator)->getSecond();
+           llvm::errs()<< "\nelseif pred evaluation\t current BB=";
+            bb->printAsOperand(llvm::errs(), /*printType=*/false);
+            llvm::errs()<< "\tpred = ";
+           predecessorOrDominator->printAsOperand(llvm::errs(), /*printType=*/false);
+           for (auto result : resultPerPhi){
+              llvm::errs()<< "\n result per phi: BB" ;
+              result.first->printAsOperand(llvm::errs(), /*printType=*/false);
+            }
+            llvm::errs()<< "\n" ;
+
+        }
 
       } while (!valueToUse);
 
@@ -737,9 +786,16 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
   if (Block *loopExit = loop->getExitingBlock(); loopExit) {
 
     // Do not add the branch in case of a while loop with backward edge
-    if (btlt == BackwardRelationship &&
+    /*if (btlt == BackwardRelationship &&
         bi.isGreater(connection.getParentBlock(), loopExit))
-      return connection;
+      return connection;*/
+      
+     if (btlt == BackwardRelationship &&
+       (bi.isGreater(connection.getParentBlock(), loopExit) || 
+       (connection.getParentBlock() == loopExit && 
+       llvm::isa<handshake::MuxOp>(connection.getDefiningOp()) &&
+        connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_PHI))))
+      return connection; 
 
     // Get the termination operation, which is supposed to be conditional
     // branch.
@@ -829,13 +885,23 @@ static void insertDirectSuppression(
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
 
-  bool accountMuxCondition =
+/*  bool accountMuxCondition =
       llvm::isa<handshake::MuxOp>(consumer) &&
       consumer->hasAttr(FTD_EXPLICIT_PHI) &&
       (consumer->getOperand(1) == connection ||
        consumer->getOperand(2) == connection) &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock;
+      consumer->getBlock() != producerBlock;*/
+
+  bool accountMuxCondition =
+      llvm::isa<handshake::MuxOp>(consumer) &&
+      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
+      (consumer->getOperand(1) == connection ||
+      consumer->getOperand(2) == connection) &&
+      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
+      (consumer->getBlock() != producerBlock ||
+      (llvm::isa<handshake::MuxOp>(connection.getDefiningOp()) &&
+        connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_PHI)));
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =

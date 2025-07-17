@@ -1,0 +1,161 @@
+Initail phi
+
+[GSA] Block ^bb1 arg 0 type PHI_1
+[GSA]    VALUE  : %21 = arith.addi %13, %c-1_i32 {handshake.name = "addi2"} : i32       (^bb5)
+[GSA]    GATE   : PHI_6 (^bb2)
+[GSA]    VALUE  : <block argument> of type 'i32' at index: 0    (^bb0)
+[GSA] Block ^bb1 arg 1 type PHI_2
+[GSA]    GATE   : PHI_9 (^bb2)
+[GSA]    VALUE  : %20 = arith.addi %13, %c1_i32_0 {handshake.name = "addi1"} : i32      (^bb4)
+[GSA]    VALUE  : %c0_i32 = arith.constant {handshake.name = "constant0"} 0 : i32       (^bb0)
+[GSA] Block ^bb1 arg 2 type PHI_3
+[GSA]    VALUE  : %17 = arith.andi %16, %9 {handshake.name = "andi1"} : i1      (^bb2)
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA] Block ^bb1 arg 3 type PHI_4
+[GSA]    VALUE  : %18 = arith.select %15, %13, %10 {handshake.name = "select0"} : i32   (^bb2)
+[GSA]    VALUE  : %0 = llvm.mlir.undef {handshake.name = "mlir.undef0"} : i32   (^bb0)
+[GSA] Block ^bb1 arg 4 type PHI_5
+[GSA]    VALUE  : %16 = arith.cmpi ne, %14, %arg0 {handshake.name = "cmpi2"} : i32      (^bb2)
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA] Block ^bb2 arg 0 type PHI_6
+[GSA]    GATE   : PHI_1 (^bb1)
+[GSA] Block ^bb2 arg 1 type PHI_7
+[GSA]    GATE   : PHI_3 (^bb1)
+[GSA] Block ^bb2 arg 2 type PHI_8
+[GSA]    GATE   : PHI_4 (^bb1)
+[GSA] Block ^bb2 arg 3 type PHI_9
+[GSA]    GATE   : PHI_2 (^bb1)
+
+After Mu Placement
+
+[GSA] Block ^bb1 arg 0 type MU_1 condition ^bb1
+[GSA]    VALUE  : <block argument> of type 'i32' at index: 0    (^bb0)
+[GSA]    GATE   : PHI_10        (^bb1)
+[GSA] Block ^bb1 arg 1 type MU_2 condition ^bb1
+[GSA]    VALUE  : %c0_i32 = arith.constant {handshake.name = "constant0"} 0 : i32       (^bb0)
+[GSA]    GATE   : PHI_11        (^bb1)
+[GSA] Block ^bb1 arg 2 type MU_3 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %17 = arith.andi %16, %9 {handshake.name = "andi1"} : i1      (^bb2)
+[GSA] Block ^bb1 arg 3 type MU_4 condition ^bb1
+[GSA]    VALUE  : %0 = llvm.mlir.undef {handshake.name = "mlir.undef0"} : i32   (^bb0)
+[GSA]    VALUE  : %18 = arith.select %15, %13, %10 {handshake.name = "select0"} : i32   (^bb2)
+[GSA] Block ^bb1 arg 4 type MU_5 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %16 = arith.cmpi ne, %14, %arg0 {handshake.name = "cmpi2"} : i32      (^bb2)
+[GSA] Block ^bb1 arg 0 type PHI_10
+[GSA]    VALUE  : %21 = arith.addi %13, %c-1_i32 {handshake.name = "addi2"} : i32       (^bb5)
+[GSA]    GATE   : PHI_6 (^bb2)
+[GSA] Block ^bb1 arg 1 type PHI_11
+[GSA]    GATE   : PHI_9 (^bb2)
+[GSA]    VALUE  : %20 = arith.addi %13, %c1_i32_0 {handshake.name = "addi1"} : i32      (^bb4)
+[GSA] Block ^bb2 arg 0 type PHI_6
+[GSA]    GATE   : MU_1  (^bb1)
+[GSA] Block ^bb2 arg 1 type PHI_7
+[GSA]    GATE   : MU_3  (^bb1)
+[GSA] Block ^bb2 arg 2 type PHI_8
+[GSA]    GATE   : MU_4  (^bb1)
+[GSA] Block ^bb2 arg 3 type PHI_9
+[GSA]    GATE   : MU_2  (^bb1)
+
+
+
+After Gamma Placement
+
+[GSA] Block ^bb1 arg 0 type MU_1 condition ^bb1
+[GSA]    VALUE  : <block argument> of type 'i32' at index: 0    (^bb0)
+[GSA]    GATE   : GAMMA_13      (^bb1)
+[GSA] Block ^bb1 arg 1 type MU_2 condition ^bb1
+[GSA]    VALUE  : %c0_i32 = arith.constant {handshake.name = "constant0"} 0 : i32       (^bb0)
+[GSA]    GATE   : GAMMA_15      (^bb1)
+[GSA] Block ^bb1 arg 2 type MU_3 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %17 = arith.andi %16, %9 {handshake.name = "andi1"} : i1      (^bb2)
+[GSA] Block ^bb1 arg 3 type MU_4 condition ^bb1
+[GSA]    VALUE  : %0 = llvm.mlir.undef {handshake.name = "mlir.undef0"} : i32   (^bb0)
+[GSA]    VALUE  : %18 = arith.select %15, %13, %10 {handshake.name = "select0"} : i32   (^bb2)
+[GSA] Block ^bb1 arg 4 type MU_5 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %16 = arith.cmpi ne, %14, %arg0 {handshake.name = "cmpi2"} : i32      (^bb2)
+[GSA] Block ^bb1 arg 0 type PHI_10
+[GSA]    VALUE  : %21 = arith.addi %13, %c-1_i32 {handshake.name = "addi2"} : i32       (^bb5)
+[GSA]    GATE   : GAMMA_16      (^bb2)
+[GSA] Block ^bb1 arg 1 type PHI_11
+[GSA]    GATE   : GAMMA_19      (^bb2)
+[GSA]    VALUE  : %20 = arith.addi %13, %c1_i32_0 {handshake.name = "addi1"} : i32      (^bb4)
+[GSA] Block ^bb1 arg 0 type GAMMA_12 condition ^bb3
+[GSA]    VALUE  : %21 = arith.addi %13, %c-1_i32 {handshake.name = "addi2"} : i32       (^bb5)
+[GSA]    GATE   : GAMMA_16      (^bb2)
+[GSA] Block ^bb1 arg 0 type GAMMA_13 condition ^bb2
+[GSA]    GATE   : GAMMA_16      (^bb2)
+[GSA]    GATE   : GAMMA_12      (^bb1)
+[GSA] Block ^bb1 arg 1 type GAMMA_14 condition ^bb3
+[GSA]    GATE   : GAMMA_19      (^bb2)
+[GSA]    VALUE  : %20 = arith.addi %13, %c1_i32_0 {handshake.name = "addi1"} : i32      (^bb4)
+[GSA] Block ^bb1 arg 1 type GAMMA_15 condition ^bb2
+[GSA]    GATE   : GAMMA_19      (^bb2)
+[GSA]    GATE   : GAMMA_14      (^bb1)
+[GSA] Block ^bb2 arg 0 type PHI_6
+[GSA]    GATE   : MU_1  (^bb1)
+[GSA] Block ^bb2 arg 1 type PHI_7
+[GSA]    GATE   : MU_3  (^bb1)
+[GSA] Block ^bb2 arg 2 type PHI_8
+[GSA]    GATE   : MU_4  (^bb1)
+[GSA] Block ^bb2 arg 3 type PHI_9
+[GSA]    GATE   : MU_2  (^bb1)
+[GSA] Block ^bb2 arg 0 type GAMMA_16 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_1  (^bb1)
+[GSA] Block ^bb2 arg 1 type GAMMA_17 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_3  (^bb1)
+[GSA] Block ^bb2 arg 2 type GAMMA_18 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_4  (^bb1)
+[GSA] Block ^bb2 arg 3 type GAMMA_19 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_2  (^bb1)
+
+
+After deleting phis
+
+[GSA] Block ^bb1 arg 0 type MU_1 condition ^bb1
+[GSA]    VALUE  : <block argument> of type 'i32' at index: 0    (^bb0)
+[GSA]    GATE   : GAMMA_13      (^bb1)
+[GSA] Block ^bb1 arg 1 type MU_2 condition ^bb1
+[GSA]    VALUE  : %c0_i32 = arith.constant {handshake.name = "constant0"} 0 : i32       (^bb0)
+[GSA]    GATE   : GAMMA_15      (^bb1)
+[GSA] Block ^bb1 arg 2 type MU_3 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %17 = arith.andi %16, %9 {handshake.name = "andi1"} : i1      (^bb2)
+[GSA] Block ^bb1 arg 3 type MU_4 condition ^bb1
+[GSA]    VALUE  : %0 = llvm.mlir.undef {handshake.name = "mlir.undef0"} : i32   (^bb0)
+[GSA]    VALUE  : %18 = arith.select %15, %13, %10 {handshake.name = "select0"} : i32   (^bb2)
+[GSA] Block ^bb1 arg 4 type MU_5 condition ^bb1
+[GSA]    VALUE  : %true = arith.constant {handshake.name = "constant3"} true    (^bb0)
+[GSA]    VALUE  : %16 = arith.cmpi ne, %14, %arg0 {handshake.name = "cmpi2"} : i32      (^bb2)
+[GSA] Block ^bb1 arg 0 type GAMMA_12 condition ^bb3
+[GSA]    VALUE  : %21 = arith.addi %13, %c-1_i32 {handshake.name = "addi2"} : i32       (^bb5)
+[GSA]    GATE   : GAMMA_16      (^bb2)
+[GSA] Block ^bb1 arg 0 type GAMMA_13 condition ^bb2
+[GSA]    GATE   : GAMMA_16      (^bb2)
+[GSA]    GATE   : GAMMA_12      (^bb1)
+[GSA] Block ^bb1 arg 1 type GAMMA_14 condition ^bb3
+[GSA]    GATE   : GAMMA_19      (^bb2)
+[GSA]    VALUE  : %20 = arith.addi %13, %c1_i32_0 {handshake.name = "addi1"} : i32      (^bb4)
+[GSA] Block ^bb1 arg 1 type GAMMA_15 condition ^bb2
+[GSA]    GATE   : GAMMA_19      (^bb2)
+[GSA]    GATE   : GAMMA_14      (^bb1)
+[GSA] Block ^bb2 arg 0 type GAMMA_16 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_1  (^bb1)
+[GSA] Block ^bb2 arg 1 type GAMMA_17 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_3  (^bb1)
+[GSA] Block ^bb2 arg 2 type GAMMA_18 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_4  (^bb1)
+[GSA] Block ^bb2 arg 3 type GAMMA_19 condition ^bb1
+[GSA]    EMPTY
+[GSA]    GATE   : MU_2  (^bb1)
+convertSSAToGSA is finished

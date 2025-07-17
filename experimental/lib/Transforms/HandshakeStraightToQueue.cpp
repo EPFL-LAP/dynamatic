@@ -328,7 +328,7 @@ connectForkGraph(handshake::FuncOp &funcOp,
                  const DenseSet<MemoryGroup *> &groupsGraph,
                  const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
                  PatternRewriter &rewriter) {
-
+int num_calls = 0;
   for (MemoryGroup *consumerGroup : groupsGraph) {
 
     DenseMap<OpOperand *, SmallVector<Value>> deps;
@@ -340,7 +340,7 @@ connectForkGraph(handshake::FuncOp &funcOp,
     }
 
     deps[&forksGraph.at(consumerGroup->bb)->getOpOperand(0)] = forkDeps;
-
+llvm::errs()<<"\nnumberof calling createPhiNetworkDeps= "<<num_calls++ <<"\tfork depth size = "<<forkDeps.size()<<"\n";
     if (failed(ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps)))
       return failure();
   }
@@ -467,6 +467,11 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     // Build a group graph out of the dependencies
     auto groupsGraph = constructGroupsGraph(lsqOps, lsqMemDeps);
 
+     for (auto &g : groupsGraph)
+      g->print();
+
+    llvm::errs() <<"\n\n";
+
     // Apply group minimization techniques
     minimizeGroupsConnections(funcOp, groupsGraph);
 
@@ -478,9 +483,38 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     auto forksGraph =
         connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, rewriter);
 
+llvm::errs() << "\n=== Lazy Forks per Block ===\n";
+for (auto &[block, fork] : forksGraph) {
+  llvm::errs() << "Block: ";
+  block->printAsOperand(llvm::errs(), /*printType=*/false);
+  llvm::errs() << "\nFork Operation:\n";
+  fork->print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+  llvm::errs() << "\n----\n";
+}
+
     // Connect the lazy forks together through a network of merges
     if (failed(connectForkGraph(funcOp, groupsGraph, forksGraph, rewriter)))
       return failure();
+llvm::errs() << "\n=== Lazy Forks per Block ===\n";
+for (auto &[block, fork] : forksGraph) {
+  llvm::errs() << "Block: ";
+  block->printAsOperand(llvm::errs(), /*printType=*/false);
+  llvm::errs() << "\nFork Operation:\n";
+  fork->print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+  llvm::errs() << "\n----\n";
+}
+     
+llvm::errs() << "\n=== Merge/Select Network Created ===\n";
+for (Block &block : funcOp.getBody()) {
+  for (Operation &op : block) {
+    if (llvm::isa<handshake::MergeOp>(op) ||
+        llvm::isa<handshake::SelectOp>(op) ||
+        llvm::isa<handshake::ControlMergeOp>(op)) {
+      op.print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+      llvm::errs() << "\n";
+    }
+  }
+}
 
     // Delete the groups
     for (auto *g : groupsGraph)
@@ -488,6 +522,62 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   }
 
   // Replace each merge created by `createPhiNetwork` with a multiplxer
+ /* llvm::errs()<<"\n\n\nhandshakes calles replaceMergto gsa\n\n";
+
+  Region &region = funcOp.getBody();  // funcOp is a handshake::FuncOp
+
+for (Block &block : region) {
+  for (Operation &op : block) {
+    for (Value operand : op.getOperands()) {
+      Operation *defOp = operand.getDefiningOp();
+      llvm::errs() << "Operation ";
+      if (defOp)
+        defOp->print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+      else
+        llvm::errs() << "null";
+      llvm::errs() << " is feeding ";
+      op.print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+ llvm::errs() << "\n\n=== Debug Print: Operand Producers in Function ===\n";
+
+Region &region = funcOp.getBody();  // funcOp is a handshake::FuncOp
+
+int blockIdx = 0;
+for (Block &block : region) {
+  llvm::errs() << "\n-- Block #" << blockIdx << " --\n";
+  blockIdx++;
+
+  for (Operation &op : block) {
+    llvm::errs() << "Operation: ";
+    op.print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+    llvm::errs() << "\n";
+
+    unsigned opIdx = 0;
+    for (Value operand : op.getOperands()) {
+      Operation *defOp = operand.getDefiningOp();
+      Block *defBlock = operand.getParentBlock();
+
+      llvm::errs() << "  Operand #" << opIdx++ << ": ";
+      if (defOp) {
+        llvm::errs() << "Produced by: ";
+        defOp->print(llvm::errs(), mlir::OpPrintingFlags().useLocalScope());
+        if (defOp->getBlock() != &block) {
+          llvm::errs() << " (from different block → possible phi needed)";
+        }
+      } else {
+        llvm::errs() << "null (function argument or constant?)";
+      }
+      llvm::errs() << "\n";
+    }
+
+    llvm::errs() << "----\n";
+  }
+}*/
+ 
   if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 

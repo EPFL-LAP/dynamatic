@@ -1,0 +1,2039 @@
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/sink.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of sink.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd(33): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd(33): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd(50): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd(50): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd(66): VHDL Compiler exiting
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit
+# -- Compiling architecture behavioral of multiple_exit
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(540): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(540): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(554): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(554): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(564): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(564): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_lsq_lsq1.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(574): (vcom-1195) Cannot find expanded name "work.handshake_lsq_lsq1".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(574): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(622): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(622): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(630): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(630): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(641): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(641): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(653): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(653): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_1.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(661): (vcom-1195) Cannot find expanded name "work.handshake_constant_1".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(661): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(672): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(672): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(687): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(687): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(699): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(699): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(711): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(711): Unknown expanded name.
+# -- Loading entity sink
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(738): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(738): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(750): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(750): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(762): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(762): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(789): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(789): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(801): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(801): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(813): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(813): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(840): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(840): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(852): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(852): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(864): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(864): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.merge_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(891): (vcom-1195) Cannot find expanded name "work.merge_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(891): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(907): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(907): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(919): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(919): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(931): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(931): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(949): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(949): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(967): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(967): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(985): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(985): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1003): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1003): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1015): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1015): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1027): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1027): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1045): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1045): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1063): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1063): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1074): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1074): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1089): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1089): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1101): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1101): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.merge.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1119): (vcom-1195) Cannot find expanded name "work.merge".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1119): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1134): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1134): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1146): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1146): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1158): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1158): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1179): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1179): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1197): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1197): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1209): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1209): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1221): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1221): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1236): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1236): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1254): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1254): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1266): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1266): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1278): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1278): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1293): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1293): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1311): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1311): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1323): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1323): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1335): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1335): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1356): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1356): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_2.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1364): (vcom-1195) Cannot find expanded name "work.handshake_constant_2".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1364): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1375): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1375): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_cmpi_0.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1387): (vcom-1195) Cannot find expanded name "work.handshake_cmpi_0".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1387): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1402): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1402): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1414): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1414): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.andi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1426): (vcom-1195) Cannot find expanded name "work.andi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1426): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1441): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1441): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1477): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1477): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1487): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1487): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1497): (vcom-1195) Cannot find expanded name "work.cond_br_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1497): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1512): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1512): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1522): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1522): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.lazy_fork_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1532): (vcom-1195) Cannot find expanded name "work.lazy_fork_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1532): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1544): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1544): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1552): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1552): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1563): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1563): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_3.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1571): (vcom-1195) Cannot find expanded name "work.handshake_constant_3".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1571): Unknown expanded name.
+# -- Loading entity load
+# ** Error: (vcom-11) Could not find work.handshake_cmpi_1.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1600): (vcom-1195) Cannot find expanded name "work.handshake_cmpi_1".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1600): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1615): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1615): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1639): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1639): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1649): (vcom-1195) Cannot find expanded name "work.cond_br_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1649): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1664): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1664): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1682): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1682): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1694): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1694): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1712): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1712): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1722): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1722): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.lazy_fork_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1732): (vcom-1195) Cannot find expanded name "work.lazy_fork_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1732): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1744): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1744): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_4.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1752): (vcom-1195) Cannot find expanded name "work.handshake_constant_4".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1752): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1763): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1763): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1771): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1771): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1782): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1782): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1794): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1794): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1827): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1827): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_cmpi_2.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1842): (vcom-1195) Cannot find expanded name "work.handshake_cmpi_2".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1842): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_cmpi_1.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1857): (vcom-1195) Cannot find expanded name "work.handshake_cmpi_1".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1857): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1872): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1872): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.andi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1896): (vcom-1195) Cannot find expanded name "work.andi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1896): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.selector.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1911): (vcom-1195) Cannot find expanded name "work.selector".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1911): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1929): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1929): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1939): (vcom-1195) Cannot find expanded name "work.cond_br_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1939): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1954): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1954): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1981): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1981): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2005): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2005): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2017): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2017): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2029): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2029): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2041): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2041): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2053): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2053): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2063): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2063): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.lazy_fork_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2073): (vcom-1195) Cannot find expanded name "work.lazy_fork_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2073): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2085): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2085): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_1.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2093): (vcom-1195) Cannot find expanded name "work.handshake_constant_1".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2093): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2104): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2104): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_4.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2112): (vcom-1195) Cannot find expanded name "work.handshake_constant_4".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2112): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2123): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2123): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2135): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2135): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2168): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2168): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.store.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2183): (vcom-1195) Cannot find expanded name "work.store".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2183): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2201): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2201): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2216): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2216): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2226): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2226): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_5.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2234): (vcom-1195) Cannot find expanded name "work.handshake_constant_5".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2234): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.selector.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2245): (vcom-1195) Cannot find expanded name "work.selector".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2245): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2263): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2263): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2275): VHDL Compiler exiting
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 354, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# ** Error: (vcom-11) Could not find work.join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd(28): (vcom-1195) Cannot find expanded name "work.join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd(28): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd(41): VHDL Compiler exiting
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/selector.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity antitokens
+# -- Compiling architecture arch of antitokens
+# -- Compiling entity selector
+# -- Compiling architecture arch of selector
+# -- Loading entity antitokens
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of selector.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/store.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of store.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/trunci.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of trunci.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# End time: 16:55:53 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:53 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/mem_to_bram.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_lsq_lsq1
+# -- Compiling architecture arch of handshake_lsq_lsq1
+# ** Error: (vcom-11) Could not find work.handshake_lsq_lsq1_core.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd(107): (vcom-1195) Cannot find expanded name "work.handshake_lsq_lsq1_core".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd(107): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd(162): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/eager_fork_register_block.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of eager_fork_register_block.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd(3): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd(3): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd(5): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/extsi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of extsi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd(26): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd(26): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd(49): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_2
+# -- Compiling architecture arch of handshake_cmpi_2
+# ** Error: (vcom-11) Could not find work.join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd(28): (vcom-1195) Cannot find expanded name "work.join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd(28): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd(41): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/source.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of source.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of merge_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1_core.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_lsq_lsq1_core_ga
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_ga
+# -- Compiling entity handshake_lsq_lsq1_core_lda
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_lda
+# -- Compiling entity handshake_lsq_lsq1_core_ldd
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_ldd
+# -- Compiling entity handshake_lsq_lsq1_core_sta
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_sta
+# -- Compiling entity handshake_lsq_lsq1_core_std
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_std
+# -- Compiling entity handshake_lsq_lsq1_core
+# -- Compiling architecture arch of handshake_lsq_lsq1_core
+# -- Loading entity handshake_lsq_lsq1_core_ga
+# -- Loading entity handshake_lsq_lsq1_core_lda
+# -- Loading entity handshake_lsq_lsq1_core_ldd
+# -- Loading entity handshake_lsq_lsq1_core_sta
+# -- Loading entity handshake_lsq_lsq1_core_std
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_lsq_lsq1_core.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# ** Error: (vcom-11) Could not find work.join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd(27): (vcom-1195) Cannot find expanded name "work.join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd(27): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd(45): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of oehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity lazy_fork_dataless
+# -- Compiling architecture arch of lazy_fork_dataless
+# ** Error: (vcom-11) Could not find work.and_n.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd(22): (vcom-1195) Cannot find expanded name "work.and_n".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd(22): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd(42): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# ** Error: (vcom-11) Could not find work.join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd(28): (vcom-1195) Cannot find expanded name "work.join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd(28): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd(41): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/logic.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of logic.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd(4): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd(6): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity andi
+# -- Compiling architecture arch of andi
+# ** Error: (vcom-11) Could not find work.join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd(28): (vcom-1195) Cannot find expanded name "work.join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd(28): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd(41): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of cond_br.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/types.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of types.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity multiple_exit_wrapper_tb
+# -- Compiling architecture behavior of multiple_exit_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(60): (vcom-1236) Shared variables must be of a protected type.
+# ** Error: (vcom-11) Could not find work.multiple_exit_wrapper.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(63): (vcom-1195) Cannot find expanded name "work.multiple_exit_wrapper".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(63): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.single_argument.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(89): (vcom-1195) Cannot find expanded name "work.single_argument".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(89): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.two_port_ram.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(107): (vcom-1195) Cannot find expanded name "work.two_port_RAM".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(107): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tb_join.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(131): (vcom-1195) Cannot find expanded name "work.tb_join".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(131): Unknown expanded name.
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(274): VHDL Compiler exiting
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 12, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/mux.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mux.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit_wrapper
+# -- Compiling architecture behavioral of multiple_exit_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity multiple_exit
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of multiple_exit_wrapper.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+# End time: 16:55:54 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of fork_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:54 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of load.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit
+# -- Compiling architecture behavioral of multiple_exit
+# -- Loading entity fork_dataless
+# -- Loading entity oehb_dataless
+# -- Loading entity tehb_dataless
+# -- Loading entity handshake_lsq_lsq1
+# -- Loading entity source
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(672): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(672): Unknown expanded name.
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity merge_dataless
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Loading entity mux
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1074): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1074): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.merge.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1119): (vcom-1195) Cannot find expanded name "work.merge".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1119): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1158): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1158): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1221): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1221): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1278): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1278): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1335): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1335): Unknown expanded name.
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity andi
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1441): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1441): Unknown expanded name.
+# -- Loading entity cond_br_dataless
+# -- Loading entity lazy_fork_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity load
+# -- Loading entity handshake_cmpi_1
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1615): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1615): Unknown expanded name.
+# -- Loading entity handshake_constant_4
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1794): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1794): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1827): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1827): Unknown expanded name.
+# -- Loading entity handshake_cmpi_2
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1872): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1872): Unknown expanded name.
+# -- Loading entity selector
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1981): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(1981): Unknown expanded name.
+# -- Loading entity trunci
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2135): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2135): Unknown expanded name.
+# -- Loading entity addi
+# -- Loading entity store
+# -- Loading entity handshake_constant_5
+# ** Note: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd(2275): VHDL Compiler exiting
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 42, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_lsq_lsq1
+# -- Compiling architecture arch of handshake_lsq_lsq1
+# -- Loading entity handshake_lsq_lsq1_core
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_lsq_lsq1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of oehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_2
+# -- Compiling architecture arch of handshake_cmpi_2
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of cond_br_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity lazy_fork_dataless
+# -- Compiling architecture arch of lazy_fork_dataless
+# -- Loading entity and_n
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of lazy_fork_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of addi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity merge
+# -- Compiling architecture arch of merge
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of merge.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity andi
+# -- Compiling architecture arch of andi
+# -- Loading entity join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of andi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity multiple_exit_wrapper_tb
+# -- Compiling architecture behavior of multiple_exit_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(60): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity multiple_exit_wrapper
+# -- Loading entity single_argument
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of hls_verify_multiple_exit_tb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 16:55:55 on Jul 15,2025
+# vcom -work work -2008 -explicit /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit
+# -- Compiling architecture behavioral of multiple_exit
+# -- Loading entity fork_dataless
+# -- Loading entity oehb_dataless
+# -- Loading entity tehb_dataless
+# -- Loading entity handshake_lsq_lsq1
+# -- Loading entity source
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# -- Loading package types
+# -- Loading entity handshake_fork
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity merge_dataless
+# -- Loading package MATH_REAL
+# -- Loading entity mux
+# -- Loading entity merge
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity andi
+# -- Loading entity cond_br_dataless
+# -- Loading entity lazy_fork_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity load
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_cmpi_2
+# -- Loading entity selector
+# -- Loading entity trunci
+# -- Loading entity addi
+# -- Loading entity store
+# -- Loading entity handshake_constant_5
+# End time: 16:55:55 on Jul 15,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of multiple_exit.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/sink.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/selector.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity antitokens
+# -- Compiling architecture arch of antitokens
+# -- Compiling entity selector
+# -- Compiling architecture arch of selector
+# -- Loading entity antitokens
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/store.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/trunci.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/mem_to_bram.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/eager_fork_register_block.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/extsi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/source.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1_core.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_lsq_lsq1_core_ga
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_ga
+# -- Compiling entity handshake_lsq_lsq1_core_lda
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_lda
+# -- Compiling entity handshake_lsq_lsq1_core_ldd
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_ldd
+# -- Compiling entity handshake_lsq_lsq1_core_sta
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_sta
+# -- Compiling entity handshake_lsq_lsq1_core_std
+# -- Compiling architecture arch of handshake_lsq_lsq1_core_std
+# -- Compiling entity handshake_lsq_lsq1_core
+# -- Compiling architecture arch of handshake_lsq_lsq1_core
+# -- Loading entity handshake_lsq_lsq1_core_ga
+# -- Loading entity handshake_lsq_lsq1_core_lda
+# -- Loading entity handshake_lsq_lsq1_core_ldd
+# -- Loading entity handshake_lsq_lsq1_core_sta
+# -- Loading entity handshake_lsq_lsq1_core_std
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/logic.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/types.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/mux.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit_wrapper.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit_wrapper
+# -- Compiling architecture behavioral of multiple_exit_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity multiple_exit
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/fork_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_constant_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/load.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_lsq_lsq1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_lsq_lsq1
+# -- Compiling architecture arch of handshake_lsq_lsq1
+# -- Loading entity handshake_lsq_lsq1_core
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_fork.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/oehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/handshake_cmpi_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_2
+# -- Compiling architecture arch of handshake_cmpi_2
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/cond_br_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/lazy_fork_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity lazy_fork_dataless
+# -- Compiling architecture arch of lazy_fork_dataless
+# -- Loading entity and_n
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/addi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/merge.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity merge
+# -- Compiling architecture arch of merge
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/andi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity andi
+# -- Compiling architecture arch of andi
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity multiple_exit_wrapper_tb
+# -- Compiling architecture behavior of multiple_exit_wrapper_tb
+# ** Warning: /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/hls_verify_multiple_exit_tb.vhd(60): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity multiple_exit_wrapper
+# -- Loading entity single_argument
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+# vcom -work work -2008 -explicit -stats=none /home/pourghei/dynamatic/integration-test/iterative_sqrt/tests/multiple_exit/out/sim/VHDL_SRC/multiple_exit.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity multiple_exit
+# -- Compiling architecture behavioral of multiple_exit
+# -- Loading entity fork_dataless
+# -- Loading entity oehb_dataless
+# -- Loading entity tehb_dataless
+# -- Loading entity handshake_lsq_lsq1
+# -- Loading entity source
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# -- Loading package types
+# -- Loading entity handshake_fork
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity merge_dataless
+# -- Loading package MATH_REAL
+# -- Loading entity mux
+# -- Loading entity merge
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity andi
+# -- Loading entity cond_br_dataless
+# -- Loading entity lazy_fork_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity load
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_cmpi_2
+# -- Loading entity selector
+# -- Loading entity trunci
+# -- Loading entity addi
+# -- Loading entity store
+# -- Loading entity handshake_constant_5
+# 44 compiles, 0 failed with no errors.
+# vsim multiple_exit_wrapper_tb 
+# Start time: 16:55:57 on Jul 15,2025
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.multiple_exit_wrapper_tb(behavior)
+# Loading work.multiple_exit_wrapper(behavioral)
+# Loading work.mem_to_bram(arch)
+# Loading work.types
+# Loading ieee.math_real(body)
+# Loading work.multiple_exit(behavioral)
+# Loading work.fork_dataless(arch)
+# Loading work.or_n(arch)
+# Loading work.eager_fork_register_block(arch)
+# Loading work.oehb_dataless(arch)
+# Loading work.tehb_dataless(arch)
+# Loading work.handshake_lsq_lsq1(arch)
+# Loading work.handshake_lsq_lsq1_core(arch)
+# Loading work.handshake_lsq_lsq1_core_ga(arch)
+# Loading work.handshake_lsq_lsq1_core_lda(arch)
+# Loading work.handshake_lsq_lsq1_core_ldd(arch)
+# Loading work.handshake_lsq_lsq1_core_sta(arch)
+# Loading work.handshake_lsq_lsq1_core_std(arch)
+# Loading work.source(arch)
+# Loading work.handshake_constant_0(arch)
+# Loading work.extsi(arch)
+# Loading work.handshake_constant_1(arch)
+# Loading work.handshake_fork(arch)
+# Loading work.oehb(arch)
+# Loading work.tehb(arch)
+# Loading work.cond_br(arch)
+# Loading work.cond_br_dataless(arch)
+# Loading work.join(arch)
+# Loading work.and_n(arch)
+# Loading work.sink(arch)
+# Loading work.merge_dataless(arch)
+# Loading work.mux(arch)
+# Loading work.merge(arch)
+# Loading work.handshake_constant_2(arch)
+# Loading work.handshake_cmpi_0(arch)
+# Loading work.andi(arch)
+# Loading work.lazy_fork_dataless(arch)
+# Loading work.handshake_constant_3(arch)
+# Loading work.load(arch)
+# Loading work.handshake_cmpi_1(arch)
+# Loading work.handshake_constant_4(arch)
+# Loading work.handshake_cmpi_2(arch)
+# Loading work.selector(arch)
+# Loading work.antitokens(arch)
+# Loading work.trunci(arch)
+# Loading work.addi(arch)
+# Loading work.store(arch)
+# Loading work.handshake_constant_5(arch)
+# Loading work.single_argument(behav)
+# Loading work.two_port_ram(behav)
+# Loading work.tb_join(arch)
+# ** Warning: Design size of 37220 statements exceeds ModelSim-Intel FPGA Starter Edition recommended capacity.
+# Expect performance to be adversely affected.
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux0
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 0  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux0
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 ps  Iteration: 1  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/lsq1/handshake_lsq_lsq1_core
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 2  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 4  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 ps  Iteration: 4  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /multiple_exit_wrapper_tb/duv_inst/multiple_exit_wrapped/mux6

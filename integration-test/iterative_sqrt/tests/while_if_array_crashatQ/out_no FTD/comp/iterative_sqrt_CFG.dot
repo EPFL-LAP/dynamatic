@@ -1,0 +1,16 @@
+digraph "iterative_sqrt" {
+  node [shape=box];
+  "^bb0" [label="^bb0", shape="oval"];
+  "^bb0" -> "^bb1"[color="black"];
+  "^bb1" [label="^bb1", shape="oval"];
+  "^bb1" -> "^bb2"[label="true", color="black"];
+  "^bb1" -> "^bb5"[label="false", color="black"];
+  "^bb2" [label="^bb2", shape="oval"];
+  "^bb2" -> "^bb3"[label="true", color="black"];
+  "^bb2" -> "^bb4"[label="false", color="black"];
+  "^bb3" [label="^bb3", shape="oval"];
+  "^bb3" -> "^bb1"[color="red"];
+  "^bb4" [label="^bb4", shape="oval"];
+  "^bb4" -> "^bb1"[color="red"];
+  "^bb5" [label="^bb5", shape="oval"];
+}

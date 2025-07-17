@@ -1,0 +1,102 @@
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src           integration-test/iterative_sqrt/iterative_sqrt.c
+dynamatic> compile   --fast-token-delivery --straight-to-queue
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Running FTD algorithm for handshake conversion
+module
+convertSSAToGSA is called
+number of my operands = 4        > 1 operands
+one init operand
+3 loop operands loopPhi id= 10
+number of my operands = 4        > 1 operands
+one init operand
+3 loop operands loopPhi id= 11
+number of my operands = 2        > 1 operands
+one init operand
+one loop operand
+number of my operands = 2        > 1 operands
+one init operand
+one loop operand
+number of my operands = 2        > 1 operands
+one init operand
+one loop operand
+number of my operands = 1        < 1 operands, move on
+number of my operands = 1        < 1 operands, move on
+number of my operands = 1        < 1 operands, move on
+number of my operands = 1        < 1 operands, move on
+shallalalllallallal
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace.
+Stack dump:
+0.      Program arguments: /home/pourghei/dynamatic/bin/dynamatic-opt /home/pourghei/dynamatic/integration-test/iterative_sqrt/out/comp/cf_dyn_transformed.mlir --ftd-lower-cf-to-handshake --handshake-combine-steering-logic
+ #0 0x0000604b6f1a313d llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) /home/pourghei/dynamatic/polygeist/llvm-project/llvm/lib/Support/Unix/Signals.inc:723:11
+ #1 0x0000604b6f1a362b PrintStackTraceSignalHandler(void*) /home/pourghei/dynamatic/polygeist/llvm-project/llvm/lib/Support/Unix/Signals.inc:798:1
+ #2 0x0000604b6f1a1656 llvm::sys::RunSignalHandlers() /home/pourghei/dynamatic/polygeist/llvm-project/llvm/lib/Support/Signals.cpp:105:5
+ #3 0x0000604b6f1a3e45 SignalHandler(int) /home/pourghei/dynamatic/polygeist/llvm-project/llvm/lib/Support/Unix/Signals.inc:413:1
+ #4 0x00007169d6642520 (/lib/x86_64-linux-gnu/libc.so.6+0x42520)
+ #5 0x00007169d66969fc __pthread_kill_implementation ./nptl/./nptl/pthread_kill.c:44:76
+ #6 0x00007169d66969fc __pthread_kill_internal ./nptl/./nptl/pthread_kill.c:78:10
+ #7 0x00007169d66969fc pthread_kill ./nptl/./nptl/pthread_kill.c:89:10
+ #8 0x00007169d6642476 gsignal ./signal/../sysdeps/posix/raise.c:27:6
+ #9 0x00007169d66287f3 abort ./stdlib/./stdlib/abort.c:81:7
+#10 0x0000604b6f061939 (/home/pourghei/dynamatic/bin/dynamatic-opt+0x1836939)
+#11 0x0000604b70441e4d std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >::front() /usr/bin/../lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/bits/stl_queue.h:218:2
+#12 0x0000604b7043e7e7 dynamatic::experimental::gsa::GSAAnalysis::expandGammaTree(std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&, std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >, dynamatic::experimental::gsa::Gate*, dynamatic::experimental::ftd::BlockIndexing const&) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:142:29
+#13 0x0000604b7043ed07 dynamatic::experimental::gsa::GSAAnalysis::expandGammaTree(std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&, std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >, dynamatic::experimental::gsa::Gate*, dynamatic::experimental::ftd::BlockIndexing const&)::$_3::operator()(int, std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&) const /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:202:21
+#14 0x0000604b7043ea82 dynamatic::experimental::gsa::GSAAnalysis::expandGammaTree(std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&, std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >, dynamatic::experimental::gsa::Gate*, dynamatic::experimental::ftd::BlockIndexing const&) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:214:3
+#15 0x0000604b7043ed07 dynamatic::experimental::gsa::GSAAnalysis::expandGammaTree(std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&, std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >, dynamatic::experimental::gsa::Gate*, dynamatic::experimental::ftd::BlockIndexing const&)::$_3::operator()(int, std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&) const /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:202:21
+#16 0x0000604b7043ea82 dynamatic::experimental::gsa::GSAAnalysis::expandGammaTree(std::vector<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*>, std::allocator<std::pair<dynamatic::experimental::boolean::BoolExpression*, dynamatic::experimental::gsa::GateInput*> > >&, std::queue<unsigned int, std::deque<unsigned int, std::allocator<unsigned int> > >, dynamatic::experimental::gsa::Gate*, dynamatic::experimental::ftd::BlockIndexing const&) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:214:3
+#17 0x0000604b7043d6bb dynamatic::experimental::gsa::GSAAnalysis::convertPhiToGamma(mlir::Region&, dynamatic::experimental::ftd::BlockIndexing const&) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:459:11
+#18 0x0000604b7043e717 dynamatic::experimental::gsa::GSAAnalysis::convertSSAToGSA(mlir::Region&) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:365:3
+#19 0x0000604b7043dd25 dynamatic::experimental::gsa::GSAAnalysis::GSAAnalysis(mlir::Operation*) /home/pourghei/dynamatic/experimental/lib/Analysis/GSAAnalysis.cpp:113:25
+#20 0x0000604b6f648444 mlir::detail::AnalysisModel<dynamatic::experimental::gsa::GSAAnalysis>::AnalysisModel<mlir::ModuleOp&>(mlir::ModuleOp&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/AnalysisManager.h:120:48
+#21 0x0000604b6f6483ce std::_MakeUniq<mlir::detail::AnalysisModel<dynamatic::experimental::gsa::GSAAnalysis> >::__single_object std::make_unique<mlir::detail::AnalysisModel<dynamatic::experimental::gsa::GSAAnalysis>, mlir::ModuleOp&>(mlir::ModuleOp&) /usr/bin/../lib/gcc/x86_64-linux-gnu/11/../../../../include/c++/11/bits/unique_ptr.h:962:34
+#22 0x0000604b6f648097 auto mlir::detail::AnalysisMap::constructAnalysis<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp, (void*)0>(mlir::AnalysisManager&, mlir::ModuleOp) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/AnalysisManager.h:233:12
+#23 0x0000604b6f647ecc dynamatic::experimental::gsa::GSAAnalysis& mlir::detail::AnalysisMap::getAnalysisImpl<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp>(mlir::PassInstrumentor*, mlir::ModuleOp, mlir::AnalysisManager&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/AnalysisManager.h:211:27
+#24 0x0000604b6f647de5 std::enable_if<(std::is_constructible<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp>::value) || (std::is_constructible<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp, mlir::AnalysisManager&>::value), dynamatic::experimental::gsa::GSAAnalysis&>::type mlir::detail::AnalysisMap::getAnalysis<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp>(mlir::PassInstrumentor*, mlir::AnalysisManager&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/AnalysisManager.h:167:5
+#25 0x0000604b6f647d94 dynamatic::experimental::gsa::GSAAnalysis& mlir::AnalysisManager::getAnalysis<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp>() /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/AnalysisManager.h:326:5
+#26 0x0000604b6f647d52 dynamatic::experimental::gsa::GSAAnalysis& mlir::Pass::getAnalysis<dynamatic::experimental::gsa::GSAAnalysis, mlir::ModuleOp>() /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/Pass.h:224:5
+#27 0x0000604b6f644575 dynamatic::experimental::gsa::GSAAnalysis& mlir::OperationPass<mlir::ModuleOp>::getAnalysis<dynamatic::experimental::gsa::GSAAnalysis>() /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/Pass/Pass.h:372:5
+#28 0x0000604b6f64202e (anonymous namespace)::FtdCfToHandshakePass::runDynamaticPass() /home/pourghei/dynamatic/experimental/lib/Conversion/FtdCfToHandshake.cpp:54:9
+#29 0x0000604b6f1ae056 dynamatic::DynamaticPass::runOnOperation() /home/pourghei/dynamatic/include/dynamatic/Support/DynamaticPass.h:76:5
+#30 0x0000604b70b4f19b mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)::$_7::operator()() const /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Pass/Pass.cpp:0:17
+#31 0x0000604b70b4f135 void llvm::function_ref<void ()>::callback_fn<mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)::$_7>(long) /home/pourghei/dynamatic/polygeist/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:45:5
+#32 0x0000604b6f0baf19 llvm::function_ref<void ()>::operator()() const /home/pourghei/dynamatic/polygeist/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:68:5
+#33 0x0000604b70b5228d void mlir::MLIRContext::executeAction<mlir::PassExecutionAction, mlir::Pass&>(llvm::function_ref<void ()>, llvm::ArrayRef<mlir::IRUnit>, mlir::Pass&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/include/mlir/IR/MLIRContext.h:276:3
+#34 0x0000604b70b4a653 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Pass/Pass.cpp:509:17
+#35 0x0000604b70b4ac04 mlir::detail::OpToOpPassAdaptor::runPipeline(mlir::OpPassManager&, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int, mlir::PassInstrumentor*, mlir::PassInstrumentation::PipelineParentInfo const*) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Pass/Pass.cpp:569:16
+#36 0x0000604b70b4c6ec mlir::PassManager::runPasses(mlir::Operation*, mlir::AnalysisManager) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Pass/Pass.cpp:880:10
+#37 0x0000604b70b4c60f mlir::PassManager::run(mlir::Operation*) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Pass/Pass.cpp:860:60
+#38 0x0000604b70258cd2 performActions(llvm::raw_ostream&, std::shared_ptr<llvm::SourceMgr> const&, mlir::MLIRContext*, mlir::MlirOptMainConfig const&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp:376:17
+#39 0x0000604b70258909 processBuffer(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, mlir::MlirOptMainConfig const&, mlir::DialectRegistry&, llvm::ThreadPool*) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp:431:12
+#40 0x0000604b702586fb mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_2::operator()(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&) const /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp:472:12
+#41 0x0000604b7025867d mlir::LogicalResult llvm::function_ref<mlir::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&)>::callback_fn<mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_2>(long, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&) /home/pourghei/dynamatic/polygeist/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:45:12
+#42 0x0000604b702ac679 llvm::function_ref<mlir::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&)>::operator()(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&) const /home/pourghei/dynamatic/polygeist/llvm-project/llvm/include/llvm/ADT/STLFunctionalExtras.h:68:12
+#43 0x0000604b702abc55 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::function_ref<mlir::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, llvm::raw_ostream&)>, llvm::raw_ostream&, bool, bool) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Support/ToolUtilities.cpp:28:12
+#44 0x0000604b702554b9 mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer> >, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp:475:10
+#45 0x0000604b7025598e mlir::MlirOptMain(int, char**, llvm::StringRef, mlir::DialectRegistry&) /home/pourghei/dynamatic/polygeist/llvm-project/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp:531:14
+#46 0x0000604b6f05fd6c main /home/pourghei/dynamatic/tools/dynamatic-opt/dynamatic-opt.cpp:87:23
+#47 0x00007169d6629d90 __libc_start_call_main ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+#48 0x00007169d6629e40 call_init ./csu/../csu/libc-start.c:128:20
+#49 0x00007169d6629e40 __libc_start_main ./csu/../csu/libc-start.c:379:5
+#50 0x0000604b6f05fbd5 _start (/home/pourghei/dynamatic/bin/dynamatic-opt+0x1834bd5)
+/home/pourghei/dynamatic/tools/dynamatic/scripts/compile.sh: line 152:  7121 Aborted                 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake --handshake-combine-steering-logic > "$F_HANDSHAKE"
+[FATAL] Failed to compile cf to handshake with FTD
+dynamatic> write-hdl
+/home/pourghei/dynamatic/bin/export-rtl: could not open input file '/home/pourghei/dynamatic/integration-test/iterative_sqrt/out/comp/hw.mlir': No such file or directory
+[FATAL] Failed to export RTL (vhdl)
+dynamatic> simulate
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[FATAL] Simulation failed
+dynamatic> exit
