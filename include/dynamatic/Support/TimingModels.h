@@ -257,23 +257,22 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
 
 /// Holds the timing models for a set of operations (internally identified by
-/// their unique name), usually parsed from a JSON file. The class provides
+/// their unique timing model key), usually parsed from a JSON file. The class provides
 /// accessor methods to quickly get specific information from the underlying
 /// timing models, which can also be retrieved in their entirety.
 class TimingDatabase {
 public:
-  /// Creates a TimingDatabase with an MLIR context used internally to identify
-  /// MLIR operations from their name.
-  inline TimingDatabase(MLIRContext *ctx) : ctx(ctx) {}
+  /// Creates a TimingDatabase
+  inline TimingDatabase() : {}
 
-  /// Inserts a timing model in the database with the provided name. Returns
-  /// true if no timing model existed for this name prior to the calls, or false
+  /// Inserts a timing model in the database with the provided key. Returns
+  /// true if no timing model existed for this key prior to the calls, or false
   /// otherwise.
-  bool insertTimingModel(StringRef name, TimingModel &model);
+  bool insertTimingModel(StringRef fromJsonTimingModelKey, TimingModel &model);
 
-  /// Returns the timing model corresponding to the operation whose name is
-  /// passed as argument, if any exists.
-  const TimingModel *getModel(StringRef opName) const;
+  /// Returns the timing model corresponding to the timing model key,
+  /// if any exists
+  const TimingModel *getModel(StringRef timingModelKey) const;
 
   /// Returns the timing model corresponding to the operation, if any exists.
   const TimingModel *getModel(Operation *op) const;
