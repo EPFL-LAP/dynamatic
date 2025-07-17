@@ -429,9 +429,6 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-// TODO: Move these comments into a markdown doc for all enums to link to
-// once the new documentation is approved.
-//
 // Enum Tablegen declaration structure taken from the test enum in TestOps.td
 // in https://reviews.llvm.org/D115181, which is the PR which introduced
 // the version of enums we use in Dynamatic
@@ -445,8 +442,10 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // Declare the underlying C++ enum and accompanying utility functions
 // by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
 // which tells tablegen not to actually generate the attribute
-def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "::dynamatic::handshake", [
+  // C++ symbolic name is FPUImpl::FLOPOCO, string version is "flopoco"
   I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+  // C++ value is FPUImpl::VIVADO, string version is "vivado"
   I64EnumAttrCase<"VIVADO", 1, "vivado">
 ]> {
   let genSpecializedAttr = 0;
