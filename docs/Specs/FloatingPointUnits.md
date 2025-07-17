@@ -88,5 +88,16 @@ Internally, Dynamatic uses two sets of files to track how they are generated and
 For more information related to timing information, please refer to [this markdown](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md).
 
 
+## Performance comparison : FloPoCo vs Vivado
+
+This section presents side-by-side comparisons of the performance of FloPoCo and Vivado units. The provided graphs represent both comparisons in terms of operating frequency and ressource usage, and can serve as a reference for the decision to use one or the other backend.
+
+**Note : current values are based off of performance measured post-implementation in viavdo 2019.1 for both the FloPoCo units.**
+
+
+<img width="4459" height="2458" alt="comparison_srls_vs_frequency" src="https://github.com/user-attachments/assets/e784952a-eb40-4004-8343-30b100aae9c1" />
+<img width="4460" height="2458" alt="comparison_registers_vs_frequency" src="https://github.com/user-attachments/assets/62695bc4-72ef-49b1-a340-a9692015161c" />
+<img width="4459" height="2458" alt="comparison_luts_vs_frequency" src="https://github.com/user-attachments/assets/4ca20ecc-cb69-4cd6-891f-7a13e5fe35c1" />
+<img width="4467" height="2458" alt="comparison_dsps_vs_frequency" src="https://github.com/user-attachments/assets/4189efda-ce43-47f6-a331-649d6990de6c" />
 
 
