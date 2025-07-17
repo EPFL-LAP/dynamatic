@@ -96,10 +96,9 @@ This section presents side-by-side comparisons of the performance of FloPoCo and
 
 
 
-![comparison_dsps_vs_frequency](https://github.com/user-attachments/assets/183e82e8-d810-4f0f-aea8-7e855e888166)
-![comparison_luts_vs_frequency](https://github.com/user-attachments/assets/2012a853-4d86-4262-bbe2-5c2f4d88a1ad)
-![comparison_registers_vs_frequency](https://github.com/user-attachments/assets/1a003b83-7957-4238-958c-9a8cc067c438)
-![comparison_srls_vs_frequency](https://github.com/user-attachments/assets/53fcc950-1803-44bf-88bb-93334d3932ac)
-
+<img width="4459" height="2458" alt="comparison_srls_vs_frequency" src="https://github.com/user-attachments/assets/e784952a-eb40-4004-8343-30b100aae9c1" />
+<img width="4460" height="2458" alt="comparison_registers_vs_frequency" src="https://github.com/user-attachments/assets/62695bc4-72ef-49b1-a340-a9692015161c" />
+<img width="4459" height="2458" alt="comparison_luts_vs_frequency" src="https://github.com/user-attachments/assets/4ca20ecc-cb69-4cd6-891f-7a13e5fe35c1" />
+<img width="4467" height="2458" alt="comparison_dsps_vs_frequency" src="https://github.com/user-attachments/assets/4189efda-ce43-47f6-a331-649d6990de6c" />
 
 
