@@ -287,7 +287,7 @@ static CXChildVisitResult visitFuncDecl(CXCursor cursor, CXCursor parent,
   return CXChildVisit_Continue;
 }
 
-/// \brief: for a givne function "funcName", get the corresponding types that
+/// \brief: for a given function "funcName", get the corresponding types that
 /// will be used in Dynamatic.
 FuncNameToCFuncArgsMap inferArgTypes(const std::string &source,
                                      const std::string &includePath) {
@@ -322,20 +322,23 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
   LogicalResult
   matchAndRewrite(LLVM::LLVMFuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (op.isExternal())
-      return failure();
     // Convert function type
     LLVM::LLVMFunctionType oldFuncType = op.getFunctionType();
     rewriter.setInsertionPoint(op);
-    SmallVector<Type, 10> newTypes;
+
+    // LLVMFunctionType cannot be used directly in the builder of func::FuncOp
+    // (which needs FunctionType).
     auto newFuncType = rewriter.getFunctionType(oldFuncType.getParams(),
                                                 oldFuncType.getReturnTypes());
     // Create new func::FuncOp
     auto newFunc =
         rewriter.create<func::FuncOp>(op.getLoc(), op.getName(), newFuncType);
-
-    // If function has a body, move it over (with argument remapping)
-    rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(), newFunc.end());
+    // If function has a body (i.e., is not an external function), move it over
+    // (with argument remapping).
+    if (!op.isExternal()) {
+      rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(),
+                                  newFunc.end());
+    }
 
     rewriter.eraseOp(op);
 
