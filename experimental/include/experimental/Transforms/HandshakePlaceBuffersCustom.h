@@ -20,17 +20,13 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace buffer {
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffersCustom(
-    const std::string &pred = "", const unsigned &outid = 1,
-    const unsigned &slots = 1, const std::string &type = "one_slot_break_dv");
-
+// import auto-generate base class declaration
+// options struct
+// and create function
 #define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERSCUSTOM
-#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERSCUSTOM
 #include "experimental/Transforms/Passes.h.inc"
 
-} // namespace buffer
 } // namespace experimental
 } // namespace dynamatic
 

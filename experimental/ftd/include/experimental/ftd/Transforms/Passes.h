@@ -1,4 +1,4 @@
-//===- HandshakeSpeculation.h - Speculation units placement -----*- C++ -*-===//
+//===- Passes.h - FTD transformation passes registration -------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,28 +6,28 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --handshake-speculation pass.
+// This file contains the registration code for all ftd transformation
+// passes.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
-#define DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
+#ifndef FTD_TRANSFORMS_PASSES_H
+#define FTD_TRANSFORMS_PASSES_H
 
-#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/ftd/Transforms/HandshakeCombineSteeringLogic.h"
 #include "mlir/Pass/Pass.h"
-#include <string>
 
 namespace dynamatic {
 namespace experimental {
+namespace ftd {
 
-// import auto-generate base class declaration
-// options struct
-// and create function
-#define GEN_PASS_DECL_HANDSHAKESPECULATION
-#include "experimental/Transforms/Passes.h.inc"
+/// Generate the code for registering passes.
+#define GEN_PASS_REGISTRATION
+#include "experimental/ftd/Transforms/Passes.h.inc"
 
+}
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
+#endif // FTD_TRANSFORMS_PASSES_H

@@ -22,7 +22,11 @@ namespace experimental {
 
 inline void registerAllPasses() {
   registerAnalysisPasses();
-  dynamatic::experimental::registerPasses();
+  registerHandshakeSpeculation();
+  registerHandshakePlaceBuffersCustom();
+  registerCreditBasedSharing();
+  registerHandshakeSizeLSQs();
+  registerHandshakeRigidification();
 }
 
 } // namespace experimental

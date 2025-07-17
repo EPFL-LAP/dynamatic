@@ -16,17 +16,6 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
-  let summary = "Combine common steering logic between different handshake operations.";
-  let description = [{
-      Eliminates redundant steering units that have the same inputs but
-      different outputs by combining them into single units feeding multiple 
-      outputs. This is a simplification which comes immediately after the FTD 
-      logic.
-  }];
-  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
-}
-
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
@@ -42,7 +31,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       The pass needs to specify the position of the Speculation Units by 
       means of an input JSON file.
   }];
-  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the positions for speculative "
@@ -58,7 +46,6 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   let description = [{ Placing a single buffer on a specific output channel of
   a specfiic unit, this pass is useful for prototyping a custom placing pass
   externally, e.g., written in python. }];
-  let constructor = "dynamatic::experimental::buffer::createHandshakePlaceBuffersCustom()";
   let options = [
   	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
   	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
