@@ -5,10 +5,50 @@ def generate_elastic_fifo_inner(name, params):
     slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
+    if slots == 1:
+        # A range of 0..0 makes the variables constant, causing errors on
+        # assignment. To avoid this, we use a special RTL for one-slot FIFOs
+        # that omits head and tail variables.
+        if data_type.bitwidth == 0:
+            return _generate_elastic_fifo_inner_dataless_oneslot(name)
+        else:
+            return _generate_elastic_fifo_inner_oneslot(name, data_type)
     if data_type.bitwidth == 0:
         return _generate_elastic_fifo_inner_dataless(name, slots)
     else:
         return _generate_elastic_fifo_inner(name, slots, data_type)
+
+
+def _generate_elastic_fifo_inner_dataless_oneslot(name):
+    return f"""
+MODULE {name}(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+  empty : boolean;
+
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid & (!full | outs_ready);
+
+  init(full) := FALSE;
+  next(full) := case
+    write_en & !read_en : TRUE;
+    !write_en & read_en : FALSE;
+    TRUE : full;
+  esac;
+
+  init(empty) := TRUE;
+  next(empty) := case
+    !write_en & read_en : TRUE;
+    write_en & !read_en : FALSE;
+    TRUE : empty;
+  esac;
+
+  -- output
+  DEFINE
+  ins_ready := !full | outs_ready;
+  outs_valid := !empty;
+"""
 
 
 def _generate_elastic_fifo_inner_dataless(name, slots):
@@ -63,6 +103,44 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE
   ins_ready := !full | outs_ready;
   outs_valid := !empty;
+"""
+
+
+def _generate_elastic_fifo_inner_oneslot(name, data_type):
+    return f"""
+MODULE {name}(ins, ins_valid, outs_ready)
+  VAR
+  mem : {data_type};
+  full : boolean;
+  empty : boolean;
+
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid & (!full | outs_ready);
+
+  ASSIGN
+  init(mem) := {data_type.format_constant(0)};
+  next(mem) := write_en ? ins : mem;
+
+  init(full) := FALSE;
+  next(full) := case
+    write_en & !read_en : TRUE;
+    !write_en & read_en : FALSE;
+    TRUE : full;
+  esac;
+
+  init(empty) := TRUE;
+  next(empty) := case
+    !write_en & read_en : TRUE;
+    write_en & !read_en : FALSE;
+    TRUE : empty;
+  esac;
+
+  -- output
+  DEFINE
+  ins_ready := !full | outs_ready;
+  outs_valid := !empty;
+  outs := mem;
 """
 
 
