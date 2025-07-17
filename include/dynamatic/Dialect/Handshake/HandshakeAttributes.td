@@ -443,7 +443,7 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
 // which tells tablegen not to actually generate the attribute
 def FPUImplEnum : I64EnumAttr<"FPUImpl", "::dynamatic::handshake", [
-  // C++ symbolic name is FPUImpl::FLOPOCO, string version is "flopoco"
+  // C++ value is FPUImpl::FLOPOCO, string version is "flopoco"
   I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
   // C++ value is FPUImpl::VIVADO, string version is "vivado"
   I64EnumAttrCase<"VIVADO", 1, "vivado">
