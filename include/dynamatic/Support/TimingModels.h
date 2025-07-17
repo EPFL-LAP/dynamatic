@@ -23,8 +23,6 @@
 #include "dynamatic/Support/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Allocator.h"
 #include <unordered_map>
 
 namespace dynamatic {
@@ -318,13 +316,14 @@ private:
   /// MLIR context with which to identify MLIR operations from their name.
   MLIRContext *ctx;
 
-  /// Maps operation names to their timing model.
+  /// Maps from an operation's timing key to their timing model.
+  /// Timing keys are generated based on operation name and implementation
   DenseMap<StringRef, TimingModel> models;
 
-  /// We need to store the underlying strings representing different timing models
+  /// We need to store the strings representing different timing models
   /// which we parse from the JSON file
-  /// As they stored in the model DenseMap as StringRefs
-  llvm::StringSet<> ownedNames;
+  /// As they are stored in the model DenseMap as StringRefs
+  std::vector<std::string> ownedKeys;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's
