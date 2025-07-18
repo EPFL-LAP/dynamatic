@@ -12,6 +12,7 @@ This document explains how to use and extend this script.
 ## Running the Script
 The script accepts an optional argument specifying a hardware module name. If provided, only that module’s BLIF will be generated. Otherwise, BLIF files will be created for all supported modules.
 
+ABC and YOSYS needs to be added to 
 
 ### Generating BLIF for All Modules
 ```
@@ -25,15 +26,27 @@ $ python3 tools/blif-generator.py (module_name)
 
 Example for generating BLIF files of addi:
 ```
-$ python3 tools/blif-generator.py addi
+$ python3 tools/blif-generator.py handshake.addi
 ```
 
+## Configuration
+The script uses the JSON configuration file located at:
+```
+$DYNAMATIC/data/rtl-config-verilog.json
+```
+This file defines all module specifications including:
+
+- Module names and paths to Verilog files
+- Parameter definitions
+- Dependencies between modules
+- Generator commands for some modules
+ 
 ## Directory Structure
 Generated BLIF files are stored under:
 ```
 /data/blif/<module_name>/<param1>/<param2>/.../<module_name>.blif
 ```
-Parameter subdirectories are created based on the order of definition in the Verilog files.
+Parameter subdirectories are created based on the order of definition in specified in the JSON file.
 
 **Example:**
 For mux with SIZE=2, DATA_TYPE=5, SELECT_TYPE=1:
@@ -41,18 +54,46 @@ For mux with SIZE=2, DATA_TYPE=5, SELECT_TYPE=1:
 /data/blif/mux/2/5/1/mux.blif
 ```
 
-
 ## BLIF Generation Flow
 
-1) The script loops over all modules one by one.
+1) The script loads module configurations from the JSON file.
 
-2) All parameter combinations of a module is iterated over, retrieved by get_range_for_param() function.
+2) For each module, it retrieves the dependencies recursively to collect the Verilog files needed to synthesize the module.
 
-3) It creates the corresponding YOSYS script to synthesize the module.
+3) Parameter combinations are generated based on the definitions in the JSON file.
 
-4) An ABC script then generates the AIG of the module.
+4) For modules with generators, the generator is executed to create custom Verilog files.
 
-5) Both Yosys and ABC scripts as well as Yosys output is saved alongside the final BLIF file for debugging.
+5) A YOSYS script is created and executed to synthesize the module.
+
+6) An ABC script then generates the AIG of the module.
+
+7) Blackbox processing is applied to specific modules (addi, cmpi, subi, muli, divsi, divui).
+
+8) Both Yosys and ABC scripts as well as intermediate files are saved for debugging.
+
+## Key Features
+### Recursive Dependency Resolution:
+The script automatically automatically resolves complete dependency tree by recursively collecting the dependencies. For example, when module A depends on module B, and module B depends on module C, ```collect_dependencies_recursive()``` function ensures module C is also added as a dependency. 
+
+### Parameter Handling
+- Range-based iteration: Uses get_range_for_param() for upper bounds. For example, SIZE parameters iterate from 1-10, while DATA_TYPE parameters span 1-33, ensuring AIGs are generated for all possible parameter choices.
+- Constraint support: Handles eq, data-eq, lb, data-lb constraints. If eq or data-eq are set, the iteration values retrieved from the get_range_for_param() are not used.
+
+## Blackbox Processing
+The following modules are automatically converted to blackboxes:
+
+- addi, cmpi, subi: For DATA_TYPE > 4, removes .names lines (except ready/valid signals) in the BLIF.
+- muli: Removes all .names and .latch lines for all DATA_TYPEs.
+- divsi and divui: BLIF file is copied from the BLIFs generated fro muli.
+
+
+## Extending the Script with New Hardware Modules
+If a new hardware module is added to Dynamatic, for most cases, it is sufficient to simply add the module in the JSON configuration. Therefore no script modifications are required. However, if the module is not mapped to LUTs but mapped to carry-chains or DSPs (e.g., addi, muli units), an additional step is necessary. The module's name must be added to the BLACKBOX_COMPONENTS list. Once this is done, the script can be run as usual.
+
+```
+$ python3 tools/blif-generator.py {new_module}
+```
 
 ### Yosys Commands
 ```
@@ -99,33 +140,4 @@ refactor;
 b;
 write_blif <dest_file>"
 ```
-
-## Extending the Script with New Hardware Modules
-If a new hardware module is added to Dynamatic, the script needs to be extended with this module. 
-
-1) Add it to the appropriate dictionary:
-  - ARITH_MODULES for arithmetic modules
-  - HANDSHAKE_MODULES for handshake modules
-
-Add the module to the corresponding dictionary, ARITH_MODULES for arith modules and HANDSHAKE_MODULES for handshake modules.
-
-2) Use the module name as a key, and a list of parameter names (in Verilog declaration order) as the value.
-
-3) No new additions are needed for the Verilog paths. The script automatically reads all Verilog files.
-
-**Example:**
-If a new handshake module with name TEST_MODULE and with parameters SIZE and DATA_TYPE is added to Dynamatic, HANDSHAKE_MODULES will be extended with:
-```
-HANDSHAKE_MODULES = {
-  ...,
-  'TEST_MODULE': ['SIZE', 'DATA_TYPE']
-}
-```
-
-Then the script can be run with:
-```
-$ python3 tools/blif-generator.py TEST_MODULE
-```
-
-to generate the BLIF files.
 
