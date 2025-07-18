@@ -345,7 +345,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.mem_controller") {
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "handshake.lsq") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     // Warning: Ports differ from instance to instance.

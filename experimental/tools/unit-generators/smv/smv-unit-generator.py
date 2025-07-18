@@ -23,6 +23,7 @@ import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
 import generators.handshake.spec_v2.resolver as spec_v2_resolver
 import generators.handshake.spec_v2.nd_speculator as spec_v2_nd_speculator
 import generators.handshake.passer as passer
+import generators.handshake.ndwire as ndwire
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -53,12 +54,12 @@ import generators.arith.subi as subi
 import generators.arith.truncf as truncf
 import generators.arith.trunci as trunci
 import generators.arith.xori as xori
-import generators.handshake.ndwire as ndwire
 import generators.handshake.init as init
 import generators.handshake.ndsource as ndsource
 import generators.handshake.blocker as blocker
 
 import generators.memory.memory_controller as memory_controller
+import generators.memory.lsq as lsq
 
 
 def generate_code(name, mod_type, parameters):
@@ -153,8 +154,6 @@ def generate_code(name, mod_type, parameters):
             return xori.generate_xori(name, parameters)
         case "memory_controller":
             return memory_controller.generate_memory_controller(name, parameters)
-        case "ndwire":
-            return ndwire.generate_ndwire(name, parameters)
         case "ndsource":
             return ndsource.generate_ndsource(name, parameters)
         case "blocker":
@@ -171,6 +170,8 @@ def generate_code(name, mod_type, parameters):
             return spec_v2_nd_speculator.generate_spec_v2_nd_speculator(name, parameters)
         case "passer":
             return passer.generate_passer(name, parameters)
+        case "lsq":
+            return lsq.generate_lsq(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
