@@ -586,36 +586,26 @@ struct LLVMConstantToArithConstant : OpConversionPattern<LLVM::ConstantOp> {
   matchAndRewrite(LLVM::ConstantOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
     auto valueAttr = op.getValue();
-
     // Handle only integer and float types
     if (auto intAttr = valueAttr.dyn_cast<IntegerAttr>()) {
-      rewriter.setInsertionPoint(op);
-
       rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, intAttr);
       return success();
     }
-
     if (auto floatAttr = valueAttr.dyn_cast<FloatAttr>()) {
-      rewriter.setInsertionPoint(op);
       rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, floatAttr);
       return success();
     }
-
     return failure();
   }
 };
 
 struct LLVMBrToCFBr : OpConversionPattern<LLVM::BrOp> {
   using OpConversionPattern<LLVM::BrOp>::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(LLVM::BrOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    // llvm.br has only one operand: the target block
-    Block *targetBlock = op.getSuccessor();
-    rewriter.setInsertionPoint(op);
-    rewriter.create<cf::BranchOp>(op->getLoc(), op->getOperands(), targetBlock);
-    rewriter.eraseOp(op);
+    rewriter.replaceOpWithNewOp<cf::BranchOp>(op, adapter.getOperands(),
+                                              op.getSuccessor());
     return success();
   }
 };
@@ -626,21 +616,10 @@ struct LLVMCondBrToCFCondBr : OpConversionPattern<LLVM::CondBrOp> {
   LogicalResult
   matchAndRewrite(LLVM::CondBrOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    Value condition = op.getCondition();
-    Block *trueDest = op.getTrueDest();
-    Block *falseDest = op.getFalseDest();
-
-    // TODO: We need to look up the block argument of the branch target block to
-    // see the branch argument.
-
-    ValueRange trueOperands = op.getTrueDestOperands();
-    ValueRange falseOperands = op.getFalseDestOperands();
-
-    rewriter.setInsertionPoint(op);
-
-    rewriter.create<cf::CondBranchOp>(op->getLoc(), condition, trueDest,
-                                      trueOperands, falseDest, falseOperands);
-    rewriter.eraseOp(op);
+    rewriter.replaceOpWithNewOp<cf::CondBranchOp>(
+        op, adapter.getCondition(), op.getTrueDest(),
+        adapter.getTrueDestOperands(), op.getFalseDest(),
+        adapter.getFalseDestOperands());
     return success();
   }
 };
