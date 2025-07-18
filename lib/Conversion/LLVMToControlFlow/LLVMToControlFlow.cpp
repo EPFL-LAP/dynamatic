@@ -422,8 +422,8 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
     rewriter.setInsertionPoint(op);
     SmallVector<Value> indexValues;
 
-    /// \note: The type of op.getIndices() can be either a Value (if the index
-    /// is dynamic) or IntegerAttr (if the index is a constant).
+    // NOTE: The type of op.getIndices() can be either a Value (if the index
+    // is dynamic) or IntegerAttr (if the index is a constant).
     for (auto gepIndex : op.getIndices()) {
       if (auto dynamicValue = dyn_cast<Value>(gepIndex)) {
         auto idxCastOp = rewriter.create<arith::IndexCastOp>(
