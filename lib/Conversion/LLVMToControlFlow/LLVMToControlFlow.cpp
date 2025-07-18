@@ -94,33 +94,17 @@ struct ArgType {
 Type ArgType::getMlirType(OpBuilder &builder) const {
   Type baseMLIRElemType;
   switch (baseElemType) {
-  case Void:
-    baseMLIRElemType = builder.getNoneType();
-    break;
-  case Bool:
-    baseMLIRElemType = builder.getI1Type();
-    break;
-  case Int8:
-    baseMLIRElemType = builder.getI8Type();
-    break;
-  case Int16:
-    baseMLIRElemType = builder.getI16Type();
-    break;
-  case Int32:
-    baseMLIRElemType = builder.getI32Type();
-    break;
-  case Int64:
-    baseMLIRElemType = builder.getI64Type();
-    break;
-  case Float:
-    baseMLIRElemType = builder.getF32Type();
-    break;
-  case Double:
-    baseMLIRElemType = builder.getF64Type();
-    break;
-  case LongDouble:
-    baseMLIRElemType = builder.getF128Type();
-    break;
+    // clang-format off
+  case Void:       baseMLIRElemType = builder.getNoneType(); break;
+  case Bool:       baseMLIRElemType = builder.getI1Type();   break;
+  case Int8:       baseMLIRElemType = builder.getI8Type();   break;
+  case Int16:      baseMLIRElemType = builder.getI16Type();  break;
+  case Int32:      baseMLIRElemType = builder.getI32Type();  break;
+  case Int64:      baseMLIRElemType = builder.getI64Type();  break;
+  case Float:      baseMLIRElemType = builder.getF32Type();  break;
+  case Double:     baseMLIRElemType = builder.getF64Type();  break;
+  case LongDouble: baseMLIRElemType = builder.getF128Type(); break;
+    // clang-format on
   case Elaborated:
     assert(false && "Dynamatic currently cannot handle elaborated types (e.g., "
                     "struct, typedef, etc).");
@@ -133,9 +117,9 @@ Type ArgType::getMlirType(OpBuilder &builder) const {
                          baseMLIRElemType);
 }
 
-/// This function checks if clangType is a scalar type (e.g., int, float, ...,
-/// anything that is not an array) and returns the corresponding enum "ArgType".
-/// It return nothing if it is not a scalar type.
+/// \brief: This function checks if clangType is a scalar type (e.g., int,
+/// float, ..., anything that is not an array) and returns the corresponding
+/// enum "ArgType". It return nothing if it is not a scalar type.
 std::optional<BaseScalarType> processScalarType(CXType clangType) {
   switch (clangType.kind) {
   case CXType_Bool:
@@ -220,11 +204,11 @@ std::optional<ArgType> fromCXType(CXType type) {
       return ArgType{scalarType.value(), arrayDimSizes, false};
     }
   }
-  /// \todo: One important thing to handle in the future is the arguments that
-  /// are **passed by reference**. It is probably correct to promote them to
-  /// the function return values.
-  ///
-  /// \todo: Everything else is not handled yet.
+  // TODO: One important thing to handle in the future is the arguments that
+  // are **passed by reference**. It is probably correct to promote them to
+  // the function return values.
+  //
+  // TODO: Everything else is not handled yet.
   return std::nullopt;
 }
 
@@ -349,10 +333,10 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
     // Fix the raw types of the original LLVMFuncOp (e.g., from void pointer to
     // a memref).
-    SmallVector<Type, 20> convertedInputs =
+    SmallVector<Type> convertedArgumentTypes =
         getFuncArgTypes(op.getSymName().str(), map, rewriter);
 
-    SmallVector<Type, 1> convertedResults;
+    SmallVector<Type> convertedResultTypes;
 
     // The LLVM function returns llvm.void if the original function has a void
     // type (instead of an empty list of types like in FuncOp). So the. number
@@ -361,13 +345,13 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
     assert(oldFuncType.getReturnTypes().size() == 1);
 
     if (!oldFuncType.getReturnType().isa<LLVM::LLVMVoidType>()) {
-      convertedResults.push_back(oldFuncType.getReturnType());
+      convertedResultTypes.push_back(oldFuncType.getReturnType());
     }
 
     // LLVMFunctionType cannot be used directly in the builder of func::FuncOp
     // (which needs FunctionType).
     auto newFuncType =
-        rewriter.getFunctionType(convertedInputs, convertedResults);
+        rewriter.getFunctionType(convertedArgumentTypes, convertedResultTypes);
     // Create new func::FuncOp
     auto newFuncOp =
         rewriter.create<func::FuncOp>(op.getLoc(), op.getName(), newFuncType);
@@ -379,14 +363,14 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
       // The function argument also feeds the first block, since we fixed some
       // types, we also need to update the block argument.
-      for (auto [oldArg, newArg] : llvm::zip_equal(
-               newFuncOp.getBody().front().getArguments(), convertedInputs)) {
-        oldArg.setType(newArg);
+      for (auto [oldArgFromFirstBlock, newArg] :
+           llvm::zip_equal(newFuncOp.getBody().front().getArguments(),
+                           convertedArgumentTypes)) {
+        oldArgFromFirstBlock.setType(newArg);
       }
     }
 
     rewriter.eraseOp(op);
-
     return success();
   }
 };
@@ -421,9 +405,9 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
              "check if you have ran \"instcombine\" before!\n");
     }
 
-    /// \note: Before applying this rewrite pattern, we assume that we have
-    /// fixed the function type from the LLVM void pointers to the memref types.
-    /// See the comments above runOnOperations() below.
+    // NOTE: Before applying this rewrite pattern, we assume that we have
+    // fixed the function type from the LLVM void pointers to the memref types.
+    // See the comments above runOnOperations() below.
     auto memrefType = gepBasePtr.getType().dyn_cast<MemRefType>();
     if (!memrefType) {
       // note: maybe we need to signal pass failure here if the GEP is not
@@ -456,19 +440,18 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
       }
     }
 
-    /// \note: GEPOp has the following syntax (some details omitted):
-    /// GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
-    /// When you iterate through the indices, it also returns indices from left
-    /// to right. However, the following two syntaxes are equivalent in LLVM:
-    /// - (1) GEPop %basePtr, %firstDim, 0, 0
-    /// - (2) GEPop %basePtr, %firstDim
-    /// Notice that, in the second example, the trailing constant 0s are
-    /// omitted.
-    /// Source:
-    /// https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
-    ///
-    /// However, memref::LoadOp and memref::StoreOp must have their indices
-    /// match the memref. So here we need to fill in the constant zeros.
+    // NOTE: GEPOp has the following syntax (some details omitted):
+    // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
+    // When you iterate through the indices, it also returns indices from left
+    // to right. However, the following two syntaxes are equivalent in LLVM:
+    // - (1) GEPop %basePtr, %firstDim, 0, 0
+    // - (2) GEPop %basePtr, %firstDim
+    // Notice that, in the second example, the trailing constant 0s are omitted.
+    // Source:
+    // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
+    //
+    // However, memref::LoadOp and memref::StoreOp must have their indices
+    // match the memref. So here we need to fill in the constant zeros.
     int remainingConstZeros =
         memrefType.getShape().size() - op.getIndices().size();
     assert(remainingConstZeros >= 0 &&
@@ -699,31 +682,31 @@ struct LLVMReturnToFuncReturn
 // like rounding, wrap around, etc..)
 
 // Integer arithmetic
-using AddIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::AddOp, arith::AddIOp>;
-using SubIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::SubOp, arith::SubIOp>;
-using MulIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::MulOp, arith::MulIOp>;
-using DivSIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::SDivOp, arith::DivSIOp>;
-using DivUIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::UDivOp, arith::DivUIOp>;
-using RemSIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::SRemOp, arith::RemSIOp>;
-using RemUIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::URemOp, arith::RemUIOp>;
+using AddIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::AddOp, arith::AddIOp>;
+using SubIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::SubOp, arith::SubIOp>;
+using MulIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::MulOp, arith::MulIOp>;
+using DivSIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::SDivOp, arith::DivSIOp>;
+using DivUIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::UDivOp, arith::DivUIOp>;
+using RemSIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::SRemOp, arith::RemSIOp>;
+using RemUIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::URemOp, arith::RemUIOp>;
 
 // Floating point arithmetic
-using AddFOpLowering = LLVMTOBinaryArithOpPattern<LLVM::FAddOp, arith::AddFOp>;
-using SubFOpLowering = LLVMTOBinaryArithOpPattern<LLVM::FSubOp, arith::SubFOp>;
-using MulFOpLowering = LLVMTOBinaryArithOpPattern<LLVM::FMulOp, arith::MulFOp>;
-using DivFOpLowering = LLVMTOBinaryArithOpPattern<LLVM::FDivOp, arith::DivFOp>;
-using RemFOpLowering = LLVMTOBinaryArithOpPattern<LLVM::FRemOp, arith::RemFOp>;
+using AddFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FAddOp, arith::AddFOp>;
+using SubFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FSubOp, arith::SubFOp>;
+using MulFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FMulOp, arith::MulFOp>;
+using DivFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FDivOp, arith::DivFOp>;
+using RemFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FRemOp, arith::RemFOp>;
 
 // Unary cast arithmetic
-using SExtOpLowering = LLVMToUnaryArithOpPattern<LLVM::SExtOp, arith::ExtSIOp>;
-using ZExtOpLowering = LLVMToUnaryArithOpPattern<LLVM::ZExtOp, arith::ExtUIOp>;
-using FPExtOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPExtOp, arith::ExtFOp>;
-using TruncIOpLowering = LLVMToUnaryArithOpPattern<LLVM::TruncOp, arith::TruncIOp>;
+using SExtOpLowering    = LLVMToUnaryArithOpPattern<LLVM::SExtOp, arith::ExtSIOp>;
+using ZExtOpLowering    = LLVMToUnaryArithOpPattern<LLVM::ZExtOp, arith::ExtUIOp>;
+using FPExtOpLowering   = LLVMToUnaryArithOpPattern<LLVM::FPExtOp, arith::ExtFOp>;
+using TruncIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::TruncOp, arith::TruncIOp>;
 using FPTruncOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPTruncOp, arith::TruncFOp>;
-using SIToFPOpLowering = LLVMToUnaryArithOpPattern<LLVM::SIToFPOp, arith::SIToFPOp>;
-using UIToFPOpLowering = LLVMToUnaryArithOpPattern<LLVM::UIToFPOp, arith::UIToFPOp>;
-using FPToSIOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPToSIOp, arith::FPToSIOp>;
-using FPToUIOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
+using SIToFPOpLowering  = LLVMToUnaryArithOpPattern<LLVM::SIToFPOp, arith::SIToFPOp>;
+using UIToFPOpLowering  = LLVMToUnaryArithOpPattern<LLVM::UIToFPOp, arith::UIToFPOp>;
+using FPToSIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::FPToSIOp, arith::FPToSIOp>;
+using FPToUIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
 // clang-format on
 
 namespace {
