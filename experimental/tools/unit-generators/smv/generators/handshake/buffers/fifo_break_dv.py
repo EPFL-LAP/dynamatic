@@ -1,17 +1,20 @@
 from generators.support.utils import *
+from one_slot_break_dv import generate_one_slot_break_dv
 
-
-def generate_elastic_fifo_inner(name, params):
+def generate_fifo_break_dv(name, params):
     slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
+    if slots == 1:
+        return generate_one_slot_break_dv({ATTR_BITWIDTH: params[ATTR_BITWIDTH]})
+
     if data_type.bitwidth == 0:
-        return _generate_elastic_fifo_inner_dataless(name, slots)
+        return _generate_fifo_break_dv_dataless(name, slots)
     else:
-        return _generate_elastic_fifo_inner(name, slots, data_type)
+        return _generate_fifo_break_dv(name, slots, data_type)
 
 
-def _generate_elastic_fifo_inner_dataless(name, slots):
+def _generate_fifo_break_dv_dataless(name, slots):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
@@ -66,7 +69,7 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_elastic_fifo_inner(name, slots, data_type):
+def _generate_fifo_break_dv(name, slots, data_type):
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   {"\n  ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}

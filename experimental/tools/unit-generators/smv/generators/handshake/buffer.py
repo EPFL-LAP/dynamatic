@@ -1,8 +1,10 @@
 from generators.support.utils import *
-from generators.support.tfifo import generate_tfifo
-from generators.support.tehb import generate_tehb
-from generators.support.ofifo import generate_ofifo
-from generators.support.oehb import generate_oehb
+
+from buffers.fifo_break_dv import generate_fifo_break_dv
+from buffers.fifo_break_none import generate_fifo_break_none
+from buffers.one_slot_break_dv import generate_one_slot_break_dv
+from buffers.one_slot_break_r import generate_one_slot_break_r
+from buffers.ofifo import generate_ofifo
 
 from support.utils import try_enum_cast
 
@@ -24,21 +26,19 @@ def generate_buffer(name, params):
 
     match buffer_type:
         case BufferType.ONE_SLOT_BREAK_R:
-            return generate_tehb(name, {ATTR_BITWIDTH: bitwidth})
+            return generate_one_slot_break_r(name, {ATTR_BITWIDTH: bitwidth})
         case BufferType.FIFO_BREAK_NONE:
-            return generate_tfifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_fifo_break_none(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
         case BufferType.ONE_SLOT_BREAK_DV:
-            return generate_oehb(name, params)
+            return generate_one_slot_break_dv(name, {ATTR_BITWIDTH: bitwidth})
         case BufferType.FIFO_BREAK_DV:
-            # this is not an ofifo
-            # but it is what was being generated based on the previous code
-            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_fifo_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
         case BufferType.ONE_SLOT_BREAK_DVR:
-            # this is not an ofifo
+            # this is wrong
             # but it is what was being generated based on the previous code
-            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_one_slot_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
         case BufferType.SHIFT_REG_BREAK_DV:
-            # this is not an ofifo
+            # this is wrong
             # but it is what was being generated based on the previous code
             return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
         case _:
