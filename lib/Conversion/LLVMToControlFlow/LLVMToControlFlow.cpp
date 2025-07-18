@@ -332,8 +332,8 @@ SmallVector<Type> getFuncArgTypes(const std::string &funcName,
 namespace {
 
 struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
-  // using OpConversionPattern<LLVM::LLVMFuncOp>::OpConversionPattern;
 
+  // Map: Function names -> "List of ArgTypes in the original C code".
   FuncNameToCFuncArgsMap map;
 
   ConvertLLVMFuncOp(MLIRContext *ctx, const FuncNameToCFuncArgsMap &map)
@@ -349,7 +349,7 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
     // Fix the raw types of the original LLVMFuncOp (e.g., from void pointer to
     // a memref).
-    SmallVector<Type, 10> convertedInputs =
+    SmallVector<Type, 20> convertedInputs =
         getFuncArgTypes(op.getSymName().str(), map, rewriter);
 
     SmallVector<Type, 1> convertedResults;
@@ -693,10 +693,10 @@ struct LLVMReturnToFuncReturn
 
 } // namespace
 
-// Naive conversion patterns (note that they don't handle any semantic details
-// like rounding, etc..)
-
 // clang-format off
+
+// Naive conversion patterns (note that they don't handle any semantic details
+// like rounding, wrap around, etc..)
 
 // Integer arithmetic
 using AddIOpLowering = LLVMTOBinaryArithOpPattern<LLVM::AddOp, arith::AddIOp>;
