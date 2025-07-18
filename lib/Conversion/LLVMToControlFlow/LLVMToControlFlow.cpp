@@ -1,6 +1,7 @@
 #include "dynamatic/Conversion/LLVMToControlFlow.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/VectorPattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -15,6 +16,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Pass/Pass.h"
@@ -217,12 +219,11 @@ std::optional<ArgType> fromCXType(CXType type) {
         scalarType.has_value()) {
       return ArgType{scalarType.value(), arrayDimSizes, false};
     }
-
-    /// \todo: One important thing to handle in the future is the arguments that
-    /// are **passed by reference**. It is probably correct to promote them to
-    /// the function return values.
   }
-
+  /// \todo: One important thing to handle in the future is the arguments that
+  /// are **passed by reference**. It is probably correct to promote them to
+  /// the function return values.
+  ///
   /// \todo: Everything else is not handled yet.
   return std::nullopt;
 }
@@ -315,29 +316,73 @@ FuncNameToCFuncArgsMap inferArgTypes(const std::string &source,
   return data;
 }
 
+/// \brief: Read the function arguments in the C source code, and convert them
+/// into the corresponding types in MLIR that we support.
+SmallVector<Type> getFuncArgTypes(const std::string &funcName,
+                                  FuncNameToCFuncArgsMap map,
+                                  OpBuilder &rewriter) {
+  SmallVector<Type> mlirArgTypes;
+  for (const ArgType &clangType : map.at(funcName)) {
+    mlirArgTypes.push_back(clangType.getMlirType(rewriter));
+  }
+
+  return mlirArgTypes;
+}
+
 namespace {
 
 struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
-  using OpConversionPattern<LLVM::LLVMFuncOp>::OpConversionPattern;
+  // using OpConversionPattern<LLVM::LLVMFuncOp>::OpConversionPattern;
+
+  FuncNameToCFuncArgsMap map;
+
+  ConvertLLVMFuncOp(MLIRContext *ctx, const FuncNameToCFuncArgsMap &map)
+      : OpConversionPattern(ctx), map(map){};
+
   LogicalResult
   matchAndRewrite(LLVM::LLVMFuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Convert function type
+    // Convert function type (i.e., the types of the function arguments and
+    // return value(s)).
     LLVM::LLVMFunctionType oldFuncType = op.getFunctionType();
     rewriter.setInsertionPoint(op);
 
+    // Fix the raw types of the original LLVMFuncOp (e.g., from void pointer to
+    // a memref).
+    SmallVector<Type, 10> convertedInputs =
+        getFuncArgTypes(op.getSymName().str(), map, rewriter);
+
+    SmallVector<Type, 1> convertedResults;
+
+    // The LLVM function returns llvm.void if the original function has a void
+    // type (instead of an empty list of types like in FuncOp). So the. number
+    // of results of the converted function must be 1. Reference:
+    // https://mlir.llvm.org/docs/Dialects/LLVM/#function-types
+    assert(oldFuncType.getReturnTypes().size() == 1);
+
+    if (!oldFuncType.getReturnType().isa<LLVM::LLVMVoidType>()) {
+      convertedResults.push_back(oldFuncType.getReturnType());
+    }
+
     // LLVMFunctionType cannot be used directly in the builder of func::FuncOp
     // (which needs FunctionType).
-    auto newFuncType = rewriter.getFunctionType(oldFuncType.getParams(),
-                                                oldFuncType.getReturnTypes());
+    auto newFuncType =
+        rewriter.getFunctionType(convertedInputs, convertedResults);
     // Create new func::FuncOp
-    auto newFunc =
+    auto newFuncOp =
         rewriter.create<func::FuncOp>(op.getLoc(), op.getName(), newFuncType);
-    // If function has a body (i.e., is not an external function), move it over
-    // (with argument remapping).
     if (!op.isExternal()) {
-      rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(),
-                                  newFunc.end());
+      // If function has a body (i.e., is not an external function), transfer it
+      // to the new function.
+      rewriter.inlineRegionBefore(op.getBody(), newFuncOp.getBody(),
+                                  newFuncOp.end());
+
+      // The function argument also feeds the first block, since we fixed some
+      // types, we also need to update the block argument.
+      for (auto [oldArg, newArg] : llvm::zip_equal(
+               newFuncOp.getBody().front().getArguments(), convertedInputs)) {
+        oldArg.setType(newArg);
+      }
     }
 
     rewriter.eraseOp(op);
@@ -449,7 +494,9 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
         rewriter.replaceOpWithNewOp<memref::StoreOp>(
             storeOp, storeOp.getValue(), gepBasePtr, ValueRange(indexValues));
       } else {
-        assert(false && "Unhandled connection GEPOp -> ???");
+        op->emitError("Unhandled child operation of GEP!");
+        assert(false &&
+               "Potentially a malformed IR (see the previous error message)!");
       }
     }
 
@@ -679,19 +726,6 @@ using FPToSIOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPToSIOp, arith::FPToSI
 using FPToUIOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
 // clang-format on
 
-/// \brief: Read the function arguments in the C source code, and convert them
-/// into the corresponding types in MLIR that we support.
-SmallVector<Type> getFuncArgTypes(const std::string &funcName,
-                                  FuncNameToCFuncArgsMap map,
-                                  OpBuilder &rewriter) {
-  SmallVector<Type> mlirArgTypes;
-  for (const ArgType &clangType : map.at(funcName)) {
-    mlirArgTypes.push_back(clangType.getMlirType(rewriter));
-  }
-
-  return mlirArgTypes;
-}
-
 namespace {
 struct LLVMToControlFlowPass
     : public dynamatic::impl::LLVMToControlFlowBase<LLVMToControlFlowPass> {
@@ -704,17 +738,17 @@ struct LLVMToControlFlowPass
 } // namespace
 
 /// \brief: Conversion steps:
-/// 1. Function rewrite: Rewrite all LLVMFuncOps to func::FuncOps and move
-/// all the blocks in the old functions into the new functions (this step
-/// doesn't touch anything inside the functions).
-/// 2. Fixing the function arguments: Convert all the raw types in LLVMIR to
-/// more descriptive types. E.g., raw pointer to memref. The function argument
-/// information is not available in the LLVM IR or the MLIR LLVMIR dialect, so
-/// we use libclang to get these information from the original C code.
-/// 3. Rewrite all the memory operations. LLVM uses GEP -> LoadOps/StoreOps,
+/// - Function rewrite: Rewrite all LLVMFuncOps to func::FuncOps and move all
+/// the blocks in the old functions into the new functions (this step doesn't
+/// touch anything inside the functions).  Fixing the function arguments:
+/// Convert all the raw types in LLVMIR to descriptive types. E.g., raw pointer
+/// to memref. The function argument information is not available in the LLVM IR
+/// or the MLIR LLVMIR dialect, so we use libclang to get these information from
+/// the original C code.
+/// - Rewrite all the memory operations. LLVM uses GEP -> LoadOps/StoreOps,
 /// since we use memref, we can convert all the GEP -> {many loads/stores} to
 /// memref::load and memref::stores.
-/// 4. Rewrite all the remaining operations that have trivial conversion
+/// - Rewrite all the remaining operations that have trivial conversion
 /// patterns.
 ///
 /// \note: it is not clear if we can combine all the 4 steps in a single
@@ -729,6 +763,10 @@ void LLVMToControlFlowPass::runOnOperation() {
   // Setup conversion target
   ConversionTarget target(*ctx);
 
+  // Fixing the argument types of the funcOps using the information available
+  // from the original C code.
+  nameToArgTypesMap = inferArgTypes(source, dynamatic_path + "/include");
+
   // NOTE: somehow if I don't explicit mark the legal dialects, the inserted new
   // ops just simply gets dropped?!
   target.addLegalOp<mlir::ModuleOp>();
@@ -738,48 +776,13 @@ void LLVMToControlFlowPass::runOnOperation() {
 
   RewritePatternSet convertLLVMToFuncDialectPatterns(ctx);
 
-  convertLLVMToFuncDialectPatterns.add<ConvertLLVMFuncOp>(ctx);
+  convertLLVMToFuncDialectPatterns.add<ConvertLLVMFuncOp>(ctx,
+                                                          nameToArgTypesMap);
 
   if (failed(applyPartialConversion(
           modOp, target, std::move(convertLLVMToFuncDialectPatterns)))) {
     llvm::errs() << "LLVMFuncOp -> func::FuncOp conversion failed!\n";
     return signalPassFailure();
-  }
-
-  // Fixing the argument types of the funcOps using the information available
-  // from the original C code.
-  nameToArgTypesMap = inferArgTypes(source, dynamatic_path + "/include");
-  for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-    if (funcOp.isExternal())
-      continue;
-
-    // Convert function type
-    auto oldFuncType = funcOp.getFunctionType();
-
-    assert(nameToArgTypesMap.at(funcOp.getSymName().str()).size() ==
-               oldFuncType.getNumInputs() &&
-           "Unmatched number of function arguments!");
-    SmallVector<Type, 10> convertedInputs =
-        getFuncArgTypes(funcOp.getSymName().str(), nameToArgTypesMap, builder);
-
-    SmallVector<Type, 1> convertedResults;
-
-    // The LLVM function returns llvm.void even if it has no results. So the
-    // number of results must be 1.
-    // Reference: https://mlir.llvm.org/docs/Dialects/LLVM/#function-types
-    assert(oldFuncType.getNumResults() == 1);
-
-    if (!oldFuncType.getResult(0).isa<LLVM::LLVMVoidType>()) {
-      convertedResults.push_back(oldFuncType.getResult(0));
-    }
-
-    auto newType = builder.getFunctionType(convertedInputs, convertedResults);
-
-    funcOp.setFunctionType(newType);
-    for (auto [oldArg, newArg] : llvm::zip_equal(
-             funcOp.getBody().front().getArguments(), convertedInputs)) {
-      oldArg.setType(newArg);
-    }
   }
 
   RewritePatternSet rewriteLoadStoreOperations(ctx);
