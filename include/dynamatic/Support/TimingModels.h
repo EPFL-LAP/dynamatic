@@ -262,9 +262,6 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
 /// timing models, which can also be retrieved in their entirety.
 class TimingDatabase {
 public:
-  /// Creates a TimingDatabase
-  inline TimingDatabase() : {}
-
   /// Inserts a timing model in the database with the provided key. Returns
   /// true if no timing model existed for this key prior to the calls, or false
   /// otherwise.
