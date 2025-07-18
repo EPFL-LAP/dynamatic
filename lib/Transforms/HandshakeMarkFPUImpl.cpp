@@ -53,6 +53,7 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
     llvm::errs() << "Invalid FPU implementation: expected one of FLOPOCO or "
                     "VIVADO, but got '"
                  << this->impl << "'";
+  }
 
   auto impl = implOpt.value();
 
