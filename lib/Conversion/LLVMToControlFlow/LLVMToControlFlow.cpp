@@ -624,7 +624,7 @@ struct LLVMCondBrToCFCondBr : OpConversionPattern<LLVM::CondBrOp> {
   }
 };
 
-struct LLVMSelectToArithSelectPattern : OpConversionPattern<LLVM::SelectOp> {
+struct LLVMSelectToArithSelect : OpConversionPattern<LLVM::SelectOp> {
 
   using OpConversionPattern::OpConversionPattern;
 
@@ -796,7 +796,7 @@ void LLVMToControlFlowPass::runOnOperation() {
       LLVMCondBrToCFCondBr,
       LLVMReturnToFuncReturn,
 
-      LLVMSelectToArithSelectPattern
+      LLVMSelectToArithSelect
       // clang-format on
       >(ctx);
 
