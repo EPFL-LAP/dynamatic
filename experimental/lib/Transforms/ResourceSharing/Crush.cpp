@@ -746,7 +746,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
 void CreditBasedSharingPass::runDynamaticPass() {
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     signalPassFailure();
 
