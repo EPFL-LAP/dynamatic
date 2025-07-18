@@ -20,7 +20,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-
 namespace dynamatic {
 
 // include tblgen base class definition
@@ -29,19 +28,19 @@ namespace dynamatic {
 
 } // namespace dynamatic
 
-
 namespace {
 
 struct HandshakeMarkFPUImplPass
-    : public dynamatic::impl::HandshakeMarkFPUImplBase<HandshakeMarkFPUImplPass> {
+    : public dynamatic::impl::HandshakeMarkFPUImplBase<
+          HandshakeMarkFPUImplPass> {
 public:
-    // use tblgen constructors from base class
-    using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
+  // use tblgen constructors from base class
+  using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
 
-    // inherited TableGen Pass Options:
-    // FPUImpl imp
+  // inherited TableGen Pass Options:
+  // FPUImpl imp
 
-    void runDynamaticPass() override;
+  void runDynamaticPass() override;
 };
 
 } // namespace
@@ -50,13 +49,10 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
   // this->impl is the pass option declared in tablegen
   auto implOpt = symbolizeFPUImpl(this->impl);
 
-  if(!implOpt.has_value()){
-    llvm::errs()
-      << "Invalid FPU implementation: expected one of FLOPOCO or VIVADO, but got '"
-      << this->impl << "'";
-    signalPassFailure();
-    return;
-  }
+  if (!implOpt.has_value()) {
+    llvm::errs() << "Invalid FPU implementation: expected one of FLOPOCO or "
+                    "VIVADO, but got '"
+                 << this->impl << "'";
 
   auto impl = implOpt.value();
 
