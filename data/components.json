@@ -1132,8 +1132,8 @@
   "handshake.cmpf.vivado": {
     "latency": {
       "64": {
-        "0.0": 0.0
-      }
+             "0.0" : 0.0
+        }
     },
     "delay": {
       "data": {
