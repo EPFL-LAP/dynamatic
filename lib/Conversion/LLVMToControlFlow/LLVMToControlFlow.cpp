@@ -769,11 +769,7 @@ void LLVMToControlFlowPass::runOnOperation() {
   }
 
   RewritePatternSet rewriteLoadStoreOperations(ctx);
-  rewriteLoadStoreOperations.add<
-      // clang-format off
-      GEPToMemRefLoadAndStore
-      // clang-format on
-      >(ctx);
+  rewriteLoadStoreOperations.add<GEPToMemRefLoadAndStore>(ctx);
   if (failed(applyPartialConversion(modOp, target,
                                     std::move(rewriteLoadStoreOperations)))) {
     llvm::errs() << "Failed to convert GEP -> Load/Store patterns!\n";
