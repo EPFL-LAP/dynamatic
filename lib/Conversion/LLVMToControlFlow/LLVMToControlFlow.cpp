@@ -169,13 +169,13 @@ std::optional<BaseScalarType> processScalarType(CXType clangType) {
   }
 }
 
-/// \brief: Construct a new ArgType from a CXType (which will not be
-/// deallocated later).
+/// \brief: Construct a new ArgType from a CXType (which will not be deallocated
+/// later).
 ///
 /// \note: This type inference is on a **best-effort** basis: it returns a null
 /// value when we don't know what the type is.
 ///
-/// \note: For non-built-in types, Clang treat them as "Elaborated".
+/// \note: For non-built-in types, Clang marks them as "CXType_Elaborated".
 /// - For scalar types defined through typedef, we use clang_getCanonicalType to
 /// retrieve the basic type.
 /// - For user defined types (e.g., through struct), we mark them as Elaborate
@@ -415,15 +415,15 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
       return failure();
     }
 
-    // NOTE: Unlike LLVM::GEPOp, memref::LoadOp and memref::StoreOp expect
-    // indices to be of IndexType. So here we cast the i32/i64 indices to
+    // NOTE: Unlike LLVM::GEPOp, memref::LoadOp and memref::StoreOp expect their
+    // indices to be of IndexType. Therefore, we cast the i32/i64 indices to
     // IndexType. This pattern will later be folded in the bitwidth optimization
     // pass.
     rewriter.setInsertionPoint(op);
     SmallVector<Value> indexValues;
 
-    // NOTE: The type of op.getIndices() can be either a Value (if the index
-    // is dynamic) or IntegerAttr (if the index is a constant).
+    // NOTE: The type of op.getIndices() can be either a Value (if the index is
+    // dynamic) or IntegerAttr (if the index is a constant).
     for (auto gepIndex : op.getIndices()) {
       if (auto dynamicValue = dyn_cast<Value>(gepIndex)) {
         auto idxCastOp = rewriter.create<arith::IndexCastOp>(
@@ -465,7 +465,7 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
       indexValues.push_back(idxCastOp);
     }
 
-    // For each llvm::load or llvm::store connected to GEP, create a
+    // For each llvm::load or llvm::store connected to GEP, replace it with a
     // memref::load or memref::store that takes the indices from indexValues
     for (Operation *op : op->getUsers()) {
       rewriter.setInsertionPoint(op);
