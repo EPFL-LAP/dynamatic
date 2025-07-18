@@ -85,6 +85,7 @@ MODULE {name}(ins_valid, outs_ready)
   read_en := outs_ready & !empty;
   write_en := ins_valid & (!full | outs_ready);
 
+  ASSIGN
   init(full) := FALSE;
   next(full) := case
     write_en & !read_en : TRUE;
