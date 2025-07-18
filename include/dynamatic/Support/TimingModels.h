@@ -309,9 +309,6 @@ public:
                                     TimingDatabase &timingDB);
 
 private:
-  /// MLIR context with which to identify MLIR operations from their name.
-  MLIRContext *ctx;
-
   /// Maps from an operation's timing key to their timing model.
   /// Timing keys are generated based on operation name and implementation
   DenseMap<StringRef, TimingModel> models;
