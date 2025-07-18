@@ -447,10 +447,13 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
 
 void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
+    // Gurobi variables of the node
     GRBVar &nodeVarIn = node->gurobiVars->tIn;
     GRBVar &nodeVarOut = node->gurobiVars->tOut;
     GRBVar &bufVarSignal = node->gurobiVars->bufferVar;
 
+    // If the AIG node is a channel, match the Gurobi variables of the AIG
+    // node with channel variables
     if (Value nodeChannel = node->value) {
       std::string nodeName = node->str();
       SignalType signalType =
@@ -458,6 +461,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
           : nodeName.find("valid") != std::string::npos ? SignalType::VALID
                                                         : SignalType::DATA;
 
+      // Retrieve the channel variable corresponding to the AIG node
       ChannelSignalVars &signalVars =
           vars.channelVars[nodeChannel].signalVars[signalType];
 
@@ -465,6 +469,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
       nodeVarOut = signalVars.path.tOut;
       bufVarSignal = signalVars.bufPresent;
 
+      // Add clock period constraints
       model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
       model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
       model.addConstr(nodeVarOut - nodeVarIn + bigConstant * bufVarSignal >= 0,
@@ -472,7 +477,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
     } else {
       // Create the timing variable for Subject Graph Node. If the node is a
       // Primary Input, the delay is 0. Also, there is only one timing variable
-      // is needed for these Nodes, therefore nodeVarOut and nodeVarIn are the
+      // is needed for these nodes, therefore nodeVarOut and nodeVarIn are the
       // same.
       nodeVarIn =
           model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
@@ -567,17 +572,20 @@ void MAPBUFBuffers::setup() {
     }
   }
 
-  // Generates Subject Graphs
+  // Generate Subject Graphs
   experimental::subjectGraphGenerator(funcInfo.funcOp, blifFiles);
 
+  // Insert buffers to break cycles. 
   if (!acyclicType) {
     addCutLoopbackBuffers();
   } else {
     findMinimumFeedbackArcSet();
   }
 
+  // Connect input/output nodes of Subject Graphs
   blifData = experimental::connectSubjectGraphs();
 
+  // Generate cuts of the circuit.
   auto cuts = experimental::generateCuts(blifData, lutSize);
 
   addClockPeriodConstraintsNodes();
