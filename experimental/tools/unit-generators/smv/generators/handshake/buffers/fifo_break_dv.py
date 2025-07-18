@@ -1,4 +1,5 @@
 from generators.support.utils import *
+from fifo_break_none import generate_fifo_break_none
 from one_slot_break_dv import generate_one_slot_break_dv
 
 def generate_fifo_break_dv(name, params):
@@ -14,120 +15,47 @@ def generate_fifo_break_dv(name, params):
         return _generate_fifo_break_dv(name, slots, data_type)
 
 
+
+
+
 def _generate_fifo_break_dv_dataless(name, slots):
+    fifo_name = f"{name}__fifo"
+    one_slot_name = f"{name}__dv"
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
-  full : boolean;
-  empty : boolean;
-  head : 0..{slots - 1};
-  tail : 0..{slots - 1};
+    fifo : {fifo_name}(ins_valid, break_dv_ready);
+    break_dv   : {one_slot_name}(fifo_valid, outs_ready);
 
   DEFINE
-  read_en := outs_ready & !empty;
-  write_en := ins_valid & (!full | outs_ready);
+    fifo_valid := fifo.outs_valid;
+    break_dv_ready := dv.ins_ready;
 
-  ASSIGN
-  init(tail) := 0;
-  next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : tail;
-  esac;
-
-  init(head) := 0;
-  next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : head;
-  esac;
-
-  init(full) := FALSE;
-  next(full) := case
-    write_en & !read_en : case
-      tail < {slots - 1} & head = tail + 1: TRUE;
-      tail = {slots - 1} & head = 0 : TRUE;
-      TRUE : full;
-    esac;
-    !write_en & read_en : FALSE;
-    TRUE : full;
-  esac;
-
-  init(empty) := TRUE;
-  next(empty) := case
-    !write_en & read_en : case
-      head < {slots - 1} & tail = head + 1: TRUE;
-      head = {slots - 1} & tail = 0 : TRUE;
-      TRUE : empty;
-    esac;
-    write_en & !read_en : FALSE;
-    TRUE : empty;
-  esac;
-
-  -- output
-  DEFINE
-  ins_ready := !full | outs_ready;
-  outs_valid := !empty;
+    ins_ready := fifo.ins_ready;
+    outs_valid := dv.outs_valid;
+    
+{generate_fifo_break_none(fifo_name, {ATTR_SLOTS: slots - 1, ATTR_BITWIDTH: 0})}
+{generate_one_slot_break_dv(one_slot_name, {ATTR_BITWIDTH: 0})}
 """
 
-
 def _generate_fifo_break_dv(name, slots, data_type):
+    fifo_name = f"{name}__fifo"
+    one_slot_name = f"{name}__dv"
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-  {"\n  ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}
   VAR
-  full : boolean;
-  empty : boolean;
-  head : 0..{slots - 1};
-  tail : 0..{slots - 1};
+    fifo : {fifo_name}(ins, ins_valid, break_dv_ready);
+    break_dv : {one_slot_name}(fifo_data, fifo_valid, outs_ready);
 
   DEFINE
-  read_en := outs_ready & !empty;
-  write_en := ins_valid & (!full | outs_ready);
+    fifo_data := fifo.outs;
+    fifo_valid := fifo.outs_valid;
+    break_dv_ready := break_dv.ins_ready;
 
-  ASSIGN
-  init(tail) := 0;
-  next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : tail;
-  esac;
+    ins_ready := fifo.ins_ready;
+    outs_valid := break_dv.outs_valid;
+    outs := break_dv.outs;
 
-  init(head) := 0;
-  next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : head;
-  esac;
-
-  {"\n  ".join([f"""ASSIGN
-  init(mem_{n}) := {data_type.format_constant(0)};
-  next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n};""" for n in range(slots)])}
-
-  init(full) := FALSE;
-  next(full) := case
-    write_en & !read_en : case
-      tail < {slots - 1} & head = tail + 1: TRUE;
-      tail = {slots - 1} & head = 0 : TRUE;
-      TRUE : full;
-    esac;
-    !write_en & read_en : FALSE;
-    TRUE : full;
-  esac;
-
-  init(empty) := TRUE;
-  next(empty) := case
-    !write_en & read_en : case
-      head < {slots - 1} & tail = head + 1: TRUE;
-      head = {slots - 1} & tail = 0 : TRUE;
-      TRUE : empty;
-    esac;
-    write_en & !read_en : FALSE;
-    TRUE : empty;
-  esac;
-
-  -- output
-  DEFINE
-  ins_ready := !full | outs_ready;
-  outs_valid := !empty;
-  outs := case
-    {"\n    ".join([f"head = {n} : mem_{n};" for n in range(slots)])}
-    TRUE : mem_0;
-  esac;
+{generate_fifo_break_none(fifo_name, {ATTR_SLOTS: slots - 1, ATTR_BITWIDTH: data_type.bitwidth})}
+{generate_one_slot_break_dv(one_slot_name, {ATTR_BITWIDTH: data_type.bitwidth})}
 """
