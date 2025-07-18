@@ -101,17 +101,12 @@ struct ChannelBufProps {
                   std::optional<unsigned> maxTrans = std::nullopt,
                   unsigned minOpaque = 0,
                   std::optional<unsigned> maxOpaque = std::nullopt,
-                  unsigned minSlots = 0,
-                  double inDelay = 0.0, double outDelay = 0.0,
-                  double delay = 0.0);
+                  unsigned minSlots = 0, double inDelay = 0.0,
+                  double outDelay = 0.0, double delay = 0.0);
 
   /// Determines whether these buffering properties are satisfiable i.e.,
   /// whether it's possible to create a buffer that respects them.
   bool isSatisfiable() const;
-
-  /// Determines whether these buffering properties forbid the placement of
-  /// any buffer on the associated channel.
-  bool isBufferizable() const;
 
   /// Computes member-wise equality.
   bool operator==(const ChannelBufProps &rhs) const;
@@ -128,8 +123,8 @@ template <typename Os>
 Os &operator<<(Os &os, ChannelBufProps &props) {
   os << "{\n\ttransparent slots: [" << props.minTrans << ", "
      << getMaxStr(props.maxTrans) << "\n\topaque slots: [" << props.minOpaque
-     << ", " << getMaxStr(props.maxOpaque) << "\n\tTotal slots: " 
-     << props.minSlots << ", " << "\n\tin/out delays: ("
+     << ", " << getMaxStr(props.maxOpaque)
+     << "\n\tTotal slots: " << props.minSlots << ", " << "\n\tin/out delays: ("
      << props.inDelay << ", " << props.outDelay << ")"
      << "\n\ttotal delay: " << props.delay << "\n}\n";
   return os;

@@ -27,6 +27,7 @@ using namespace dynamatic;
 
 /// Determines whether the value should be concerned by materialization rules;
 /// only SSA values with dataflow semantics must have a single use.
+/// Memref values are not considered for materialization.
 static inline bool eligibleForMaterialization(Value val) {
   return isa<handshake::ControlType, handshake::ChannelType>(val.getType());
 }

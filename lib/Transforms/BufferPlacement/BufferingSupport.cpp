@@ -123,18 +123,6 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       return channel.consumer->emitError() << ss.str();
     }
 
-    // Check for satisfiability
-    if (!channel.props->isSatisfiable()) {
-      std::stringstream ss;
-      std::string channelName;
-      ss << "Including internal component buffers into buffering "
-            "properties of channel '"
-         << getUniqueName(*channel.value.getUses().begin())
-         << "' made them unsatisfiable.\nProperties were " << ogProps
-         << "before inclusion and were changed to " << *channel.props
-         << "Cannot proceed with buffer placement.";
-      return channel.consumer->emitError() << ss.str();
-    }
     channelProps[channel.value] = *channel.props;
     return success();
   };

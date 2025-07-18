@@ -154,10 +154,11 @@ But if we always make sure that there is a buffer in between the merge and the f
 
 ### Unbufferizable Channels
 
-- Memory reference arguments are not real edges in the graph and are excluded from buffering.
-- Ports of memory interface operations are also unbufferizable.
+The following edges are excluded from buffering:
+- Top-level function arguments (both memref and handshake channels): External channels do not require buffering.
+- Channels of operations implementing MemoryOpInterface (MemoryControllerOp, LSQOp): The optimization model is not aware of these channels.
 
-These channels are skipped during buffer placement.
+For these channels, both `maxOpaque` and `maxTrans` are set to 0.
 
 ### Buffering on LSQ Control Paths
 

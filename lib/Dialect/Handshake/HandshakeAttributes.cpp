@@ -311,25 +311,21 @@ ChannelBufProps::ChannelBufProps(unsigned minTrans,
                                  std::optional<unsigned> maxTrans,
                                  unsigned minOpaque,
                                  std::optional<unsigned> maxOpaque,
-                                 unsigned minSlots,
-                                 double inDelay, double outDelay, double delay)
+                                 unsigned minSlots, double inDelay,
+                                 double outDelay, double delay)
     : minTrans(minTrans), maxTrans(maxTrans), minOpaque(minOpaque),
-      maxOpaque(maxOpaque), minSlots(minSlots), inDelay(inDelay), outDelay(outDelay),
-      delay(delay) {};
+      maxOpaque(maxOpaque), minSlots(minSlots), inDelay(inDelay),
+      outDelay(outDelay), delay(delay){};
 
 bool ChannelBufProps::isSatisfiable() const {
   return (!maxTrans.has_value() || *maxTrans >= minTrans) &&
          (!maxOpaque.has_value() || *maxOpaque >= minOpaque);
 }
 
-bool ChannelBufProps::isBufferizable() const {
-  return !maxTrans.has_value() || *maxTrans != 0 || !maxOpaque.has_value() ||
-         *maxOpaque != 0;
-}
-
 bool ChannelBufProps::operator==(const ChannelBufProps &rhs) const {
   return (this->minTrans == rhs.minTrans) && (this->maxTrans == rhs.maxTrans) &&
-         (this->minOpaque == rhs.minOpaque) && (this->maxOpaque == rhs.maxOpaque) &&
+         (this->minOpaque == rhs.minOpaque) &&
+         (this->maxOpaque == rhs.maxOpaque) &&
          (this->minSlots == rhs.minSlots) && (this->inDelay == rhs.inDelay) &&
          (this->outDelay == rhs.outDelay) && (this->delay == rhs.delay);
 }
@@ -389,8 +385,7 @@ Attribute ChannelBufPropsAttr::parse(AsmParser &odsParser, Type odsType) {
 void ChannelBufPropsAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "[" << getMinTrans() << "," << getMaxStr(getMaxTrans()) << ", ["
              << getMinOpaque() << "," << getMaxStr(getMaxOpaque()) << ", "
-             << getMinSlots() << ", "
-             << getInDelay().getValueAsDouble() << ", "
+             << getMinSlots() << ", " << getInDelay().getValueAsDouble() << ", "
              << getOutDelay().getValueAsDouble() << ", "
              << getDelay().getValueAsDouble();
 }
