@@ -14,9 +14,9 @@ def generate_elastic_fifo_inner(name, params):
             return _generate_slot_based_elastic_fifo_inner(name, slots, data_type)
     else:
         if data_type.bitwidth == 0:
-            return _generate_elastic_fifo_inner_dataless(name, slots)
+            return _generate_one_slot_elastic_fifo_inner_dataless(name)
         else:
-            return _generate_elastic_fifo_inner(name, slots, data_type)
+            return _generate_one_slot_elastic_fifo_inner(name, data_type)
 
 
 def _generate_one_slot_break_none_dataless(name):
@@ -74,7 +74,7 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_elastic_fifo_inner_dataless_oneslot(name):
+def _generate_one_slot_elastic_fifo_inner_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
@@ -106,61 +106,6 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_elastic_fifo_inner_dataless(name, slots):
-    return f"""
-MODULE {name}(ins_valid, outs_ready)
-  VAR
-  full : boolean;
-  empty : boolean;
-  head : 0..{slots - 1};
-  tail : 0..{slots - 1};
-
-  DEFINE
-  read_en := outs_ready & !empty;
-  write_en := ins_valid & (!full | outs_ready);
-
-  ASSIGN
-  init(tail) := 0;
-  next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : tail;
-  esac;
-
-  init(head) := 0;
-  next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : head;
-  esac;
-
-  init(full) := FALSE;
-  next(full) := case
-    write_en & !read_en : case
-      tail < {slots - 1} & head = tail + 1: TRUE;
-      tail = {slots - 1} & head = 0 : TRUE;
-      TRUE : full;
-    esac;
-    !write_en & read_en : FALSE;
-    TRUE : full;
-  esac;
-
-  init(empty) := TRUE;
-  next(empty) := case
-    !write_en & read_en : case
-      head < {slots - 1} & tail = head + 1: TRUE;
-      head = {slots - 1} & tail = 0 : TRUE;
-      TRUE : empty;
-    esac;
-    write_en & !read_en : FALSE;
-    TRUE : empty;
-  esac;
-
-  -- output
-  DEFINE
-  ins_ready := !full | outs_ready;
-  outs_valid := !empty;
-"""
-
-
 def _generate_slot_based_elastic_fifo_inner(name, slots, data_type):
     # fifo generated as chain of fully transparent slots for faster model checking
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
@@ -180,55 +125,32 @@ MODULE {name}(ins, ins_valid, outs_ready)
 """
 
 
-def _generate_elastic_fifo_inner(name, slots, data_type):
+def _generate_one_slot_elastic_fifo_inner(name, data_type):
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-  {"\n  ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}
   VAR
+  mem : {data_type};
   full : boolean;
   empty : boolean;
-  head : 0..{slots - 1};
-  tail : 0..{slots - 1};
 
   DEFINE
   read_en := outs_ready & !empty;
   write_en := ins_valid & (!full | outs_ready);
 
   ASSIGN
-  init(tail) := 0;
-  next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : tail;
-  esac;
-
-  init(head) := 0;
-  next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
-    TRUE : head;
-  esac;
-
-  {"\n  ".join([f"""ASSIGN
-  init(mem_{n}) := {data_type.format_constant(0)};
-  next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n};""" for n in range(slots)])}
+  init(mem) := {data_type.format_constant(0)};
+  next(mem) := write_en ? ins : mem;
 
   init(full) := FALSE;
   next(full) := case
-    write_en & !read_en : case
-      tail < {slots - 1} & head = tail + 1: TRUE;
-      tail = {slots - 1} & head = 0 : TRUE;
-      TRUE : full;
-    esac;
+    write_en & !read_en : TRUE;
     !write_en & read_en : FALSE;
     TRUE : full;
   esac;
 
   init(empty) := TRUE;
   next(empty) := case
-    !write_en & read_en : case
-      head < {slots - 1} & tail = head + 1: TRUE;
-      head = {slots - 1} & tail = 0 : TRUE;
-      TRUE : empty;
-    esac;
+    !write_en & read_en : TRUE;
     write_en & !read_en : FALSE;
     TRUE : empty;
   esac;
@@ -237,8 +159,5 @@ MODULE {name}(ins, ins_valid, outs_ready)
   DEFINE
   ins_ready := !full | outs_ready;
   outs_valid := !empty;
-  outs := case
-    {"\n    ".join([f"head = {n} : mem_{n};" for n in range(slots)])}
-    TRUE : mem_0;
-  esac;
+  outs := mem;
 """
