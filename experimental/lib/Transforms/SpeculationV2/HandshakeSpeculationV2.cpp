@@ -469,7 +469,7 @@ static void performPasserMotionPastPM(PasserOp passerOp,
   }
 
   // Perform the motion
-  auto motionResult = performMotion<PasserOp>(targetOp, [&](Value v) {
+  auto motionResult = performMotionOverPM<PasserOp>(targetOp, [&](Value v) {
     // Use unchanged passer control.
     return builder.create<PasserOp>(passerLoc, v, passerControl);
   });
@@ -630,7 +630,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
 
   // Perform repeating init motion over this fork.
   builder.setInsertionPoint(forkOp);
-  if (performMotion<SpecV2RepeatingInitOp>(forkOp, [&](Value v) {
+  if (performMotionOverPM<SpecV2RepeatingInitOp>(forkOp, [&](Value v) {
         return builder.create<SpecV2RepeatingInitOp>(topRI.getLoc(), v, 1);
       }).failed()) {
     forkOp->emitError("Failed to perform motion for SpecV2RepeatingInitOp");
@@ -639,7 +639,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
 
   // Perform passer motion over this fork.
   builder.setInsertionPoint(forkOp);
-  if (performMotion<PasserOp>(forkOp, [&](Value v) {
+  if (performMotionOverPM<PasserOp>(forkOp, [&](Value v) {
         return builder.create<PasserOp>(oldPasserOp.getLoc(), v,
                                         oldPasserOp.getCtrl());
       }).failed()) {
@@ -956,7 +956,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     do {
       frontiersUpdated = false;
       for (auto passerOp : frontiers) {
-        if (isEligibleForPasserMotionPastPM(passerOp)) {
+        if (isEligibleForPasserMotionOverPM(passerOp)) {
           performPasserMotionPastPM(passerOp, frontiers);
           frontiersUpdated = true;
           // If frontiers are updated, the iterator is outdated.
