@@ -489,7 +489,8 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
 };
 
 template <typename LLVMBinaryOp, typename ArithBinaryOp>
-struct LLVMTOBinaryArithOpPattern : public OpConversionPattern<LLVMBinaryOp> {
+struct LLVMToArithBinaryOpConversion
+    : public OpConversionPattern<LLVMBinaryOp> {
   using OpConversionPattern<LLVMBinaryOp>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(LLVMBinaryOp op,
@@ -502,7 +503,7 @@ struct LLVMTOBinaryArithOpPattern : public OpConversionPattern<LLVMBinaryOp> {
 };
 
 template <typename LLVMUnaryOp, typename ArithUnaryOp>
-struct LLVMToUnaryArithOpPattern : public OpConversionPattern<LLVMUnaryOp> {
+struct LLVMToArithUnaryOpPattern : public OpConversionPattern<LLVMUnaryOp> {
   using OpConversionPattern<LLVMUnaryOp>::OpConversionPattern;
 
   LogicalResult
@@ -661,31 +662,31 @@ struct LLVMReturnToFuncReturn
 // like rounding, wrap around, etc..)
 
 // Integer arithmetic
-using AddIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::AddOp, arith::AddIOp>;
-using SubIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::SubOp, arith::SubIOp>;
-using MulIOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::MulOp, arith::MulIOp>;
-using DivSIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::SDivOp, arith::DivSIOp>;
-using DivUIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::UDivOp, arith::DivUIOp>;
-using RemSIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::SRemOp, arith::RemSIOp>;
-using RemUIOpLowering   = LLVMTOBinaryArithOpPattern<LLVM::URemOp, arith::RemUIOp>;
+using AddIOpConversion    = LLVMToArithBinaryOpConversion<LLVM::AddOp, arith::AddIOp>;
+using SubIOpConversion    = LLVMToArithBinaryOpConversion<LLVM::SubOp, arith::SubIOp>;
+using MulIOpConversion    = LLVMToArithBinaryOpConversion<LLVM::MulOp, arith::MulIOp>;
+using DivSIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::SDivOp, arith::DivSIOp>;
+using DivUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::UDivOp, arith::DivUIOp>;
+using RemSIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::SRemOp, arith::RemSIOp>;
+using RemUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::URemOp, arith::RemUIOp>;
 
 // Floating point arithmetic
-using AddFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FAddOp, arith::AddFOp>;
-using SubFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FSubOp, arith::SubFOp>;
-using MulFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FMulOp, arith::MulFOp>;
-using DivFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FDivOp, arith::DivFOp>;
-using RemFOpLowering    = LLVMTOBinaryArithOpPattern<LLVM::FRemOp, arith::RemFOp>;
+using AddFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FAddOp, arith::AddFOp>;
+using SubFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FSubOp, arith::SubFOp>;
+using MulFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FMulOp, arith::MulFOp>;
+using DivFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FDivOp, arith::DivFOp>;
+using RemFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FRemOp, arith::RemFOp>;
 
 // Unary cast arithmetic
-using SExtOpLowering    = LLVMToUnaryArithOpPattern<LLVM::SExtOp, arith::ExtSIOp>;
-using ZExtOpLowering    = LLVMToUnaryArithOpPattern<LLVM::ZExtOp, arith::ExtUIOp>;
-using FPExtOpLowering   = LLVMToUnaryArithOpPattern<LLVM::FPExtOp, arith::ExtFOp>;
-using TruncIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::TruncOp, arith::TruncIOp>;
-using FPTruncOpLowering = LLVMToUnaryArithOpPattern<LLVM::FPTruncOp, arith::TruncFOp>;
-using SIToFPOpLowering  = LLVMToUnaryArithOpPattern<LLVM::SIToFPOp, arith::SIToFPOp>;
-using UIToFPOpLowering  = LLVMToUnaryArithOpPattern<LLVM::UIToFPOp, arith::UIToFPOp>;
-using FPToSIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::FPToSIOp, arith::FPToSIOp>;
-using FPToUIOpLowering  = LLVMToUnaryArithOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
+using SExtOpConversion    = LLVMToArithUnaryOpPattern<LLVM::SExtOp, arith::ExtSIOp>;
+using ZExtOpConversion    = LLVMToArithUnaryOpPattern<LLVM::ZExtOp, arith::ExtUIOp>;
+using FPExtOpConversion   = LLVMToArithUnaryOpPattern<LLVM::FPExtOp, arith::ExtFOp>;
+using TruncIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::TruncOp, arith::TruncIOp>;
+using FPTruncOpConversion = LLVMToArithUnaryOpPattern<LLVM::FPTruncOp, arith::TruncFOp>;
+using SIToFPOpConversion  = LLVMToArithUnaryOpPattern<LLVM::SIToFPOp, arith::SIToFPOp>;
+using UIToFPOpConversion  = LLVMToArithUnaryOpPattern<LLVM::UIToFPOp, arith::UIToFPOp>;
+using FPToSIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::FPToSIOp, arith::FPToSIOp>;
+using FPToUIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
 // clang-format on
 
 namespace {
@@ -763,29 +764,29 @@ void LLVMToControlFlowPass::runOnOperation() {
       LLVMConstantToArithConstant,
       
       // Unary operations
-      SExtOpLowering,
-      ZExtOpLowering,
-      FPExtOpLowering,
-      TruncIOpLowering,
-      FPTruncOpLowering,
-      SIToFPOpLowering,
-      UIToFPOpLowering,
-      FPToSIOpLowering,
-      FPToUIOpLowering,
+      SExtOpConversion,
+      ZExtOpConversion,
+      FPExtOpConversion,
+      TruncIOpConversion,
+      FPTruncOpConversion,
+      SIToFPOpConversion,
+      UIToFPOpConversion,
+      FPToSIOpConversion,
+      FPToUIOpConversion,
 
       // Binary operations:
-      AddIOpLowering,
-      SubIOpLowering,
-      MulIOpLowering,
-      DivSIOpLowering,
-      DivUIOpLowering,
-      RemSIOpLowering,
-      RemUIOpLowering,
-      AddFOpLowering,
-      SubFOpLowering,
-      MulFOpLowering,
-      DivFOpLowering,
-      RemFOpLowering,
+      AddIOpConversion,
+      SubIOpConversion,
+      MulIOpConversion,
+      DivSIOpConversion,
+      DivUIOpConversion,
+      RemSIOpConversion,
+      RemUIOpConversion,
+      AddFOpConversion,
+      SubFOpConversion,
+      MulFOpConversion,
+      DivFOpConversion,
+      RemFOpConversion,
 
       // Binary predicate comparisons:
       LLVMICmpToArithICmp,
