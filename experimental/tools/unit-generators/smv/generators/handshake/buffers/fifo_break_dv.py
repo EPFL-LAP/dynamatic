@@ -15,9 +15,6 @@ def generate_fifo_break_dv(name, params):
         return _generate_fifo_break_dv(name, slots, data_type)
 
 
-
-
-
 def _generate_fifo_break_dv_dataless(name, slots):
     fifo_name = f"{name}__fifo"
     one_slot_name = f"{name}__dv"
@@ -37,6 +34,7 @@ MODULE {name}(ins_valid, outs_ready)
 {generate_fifo_break_none(fifo_name, {ATTR_SLOTS: slots - 1, ATTR_BITWIDTH: 0})}
 {generate_one_slot_break_dv(one_slot_name, {ATTR_BITWIDTH: 0})}
 """
+
 
 def _generate_fifo_break_dv(name, slots, data_type):
     fifo_name = f"{name}__fifo"
