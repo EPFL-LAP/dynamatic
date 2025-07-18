@@ -26,7 +26,6 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/RegionKindInterface.h"
 
-
 namespace dynamatic {
 namespace handshake {
 

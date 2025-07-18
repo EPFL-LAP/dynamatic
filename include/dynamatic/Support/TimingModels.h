@@ -257,9 +257,9 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
 
 /// Holds the timing models for a set of operations (internally identified by
-/// their unique timing model key), usually parsed from a JSON file. The class provides
-/// accessor methods to quickly get specific information from the underlying
-/// timing models, which can also be retrieved in their entirety.
+/// their unique timing model key), usually parsed from a JSON file. The class
+/// provides accessor methods to quickly get specific information from the
+/// underlying timing models, which can also be retrieved in their entirety.
 class TimingDatabase {
 public:
   /// Inserts a timing model in the database with the provided key. Returns

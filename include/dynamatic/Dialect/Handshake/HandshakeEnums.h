@@ -21,7 +21,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Dialect.h"
 
-
 // Pull in all enum type definitions and utility function declarations.
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
 

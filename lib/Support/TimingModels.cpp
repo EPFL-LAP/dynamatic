@@ -96,7 +96,8 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef fromJsonTimingModelKey, TimingModel &model) {
+bool TimingDatabase::insertTimingModel(StringRef fromJsonTimingModelKey,
+                                       TimingModel &model) {
   // copy the raw string into the storage vector
   ownedKeys.emplace_back(fromJsonTimingModelKey.str());
   // make an StringRef from it
@@ -120,7 +121,8 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     // include the implementation in the key
-    timingModelKey = (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    timingModelKey =
+        (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
   } else {
     timingModelKey = baseName.str();
   }
@@ -488,7 +490,7 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
     fromJSON(cmpInfo, model, keyPath);
     if (!timingDB.insertTimingModel(timingModelKey, model)) {
       keyPath.report("Timing model was not inserted as "
-                    "key was already present in the database");
+                     "key was already present in the database");
       return false;
     }
   }
