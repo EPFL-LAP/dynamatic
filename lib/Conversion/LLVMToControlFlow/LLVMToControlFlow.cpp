@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -488,6 +489,64 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
   }
 };
 
+/// \brief: This pattern handles a special case where a load only has constant
+/// indices, e.g., tmp = mat[0][0].
+struct LLVMLoadWithConstantIndex : OpConversionPattern<LLVM::LoadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LLVM::LoadOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto address = adapter.getAddr();
+    if (!address)
+      return failure();
+    auto memrefType = address.getType().dyn_cast<MemRefType>();
+    if (!memrefType)
+      return failure();
+    SmallVector<Value> indexValues;
+    int constZerosToAdd = memrefType.getShape().size();
+    Location loc = op->getLoc();
+    rewriter.setInsertionPoint(op);
+    for (int i = 0; i < constZerosToAdd; i++) {
+      auto constZeroOp =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
+      indexValues.push_back(constZeroOp);
+    }
+    rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        op, op.getResult().getType(), address, ValueRange(indexValues));
+    return success();
+  }
+};
+
+/// \brief: This pattern handles a special case where a store only has constant
+/// indices, e.g., mat[0][0] = 1.
+struct LLVMStoreWithConstantIndex : OpConversionPattern<LLVM::StoreOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LLVM::StoreOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto address = adapter.getAddr();
+    if (!address)
+      return failure();
+    auto memrefType = address.getType().dyn_cast<MemRefType>();
+    if (!memrefType)
+      return failure();
+    SmallVector<Value> indexValues;
+    int constZerosToAdd = memrefType.getShape().size();
+    Location loc = op->getLoc();
+    rewriter.setInsertionPoint(op);
+    for (int i = 0; i < constZerosToAdd; i++) {
+      auto constZeroOp =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
+      indexValues.push_back(constZeroOp);
+    }
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        op, adapter.getValue(), address, ValueRange(indexValues));
+    return success();
+  }
+};
+
 template <typename LLVMBinaryOp, typename ArithBinaryOp>
 struct LLVMToArithBinaryOpConversion
     : public OpConversionPattern<LLVMBinaryOp> {
@@ -670,6 +729,10 @@ using DivUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::UDivOp, arith::D
 using RemSIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::SRemOp, arith::RemSIOp>;
 using RemUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::URemOp, arith::RemUIOp>;
 
+using AndConversion       = LLVMToArithBinaryOpConversion<LLVM::AndOp, arith::AndIOp>;
+using OrConversion        = LLVMToArithBinaryOpConversion<LLVM::OrOp, arith::OrIOp>;
+using XorConversion       = LLVMToArithBinaryOpConversion<LLVM::XOrOp, arith::XOrIOp>;
+
 // Floating point arithmetic
 using AddFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FAddOp, arith::AddFOp>;
 using SubFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FSubOp, arith::SubFOp>;
@@ -749,7 +812,13 @@ void LLVMToControlFlowPass::runOnOperation() {
   }
 
   RewritePatternSet rewriteLoadStoreOperations(ctx);
-  rewriteLoadStoreOperations.add<GEPToMemRefLoadAndStore>(ctx);
+  rewriteLoadStoreOperations.add<
+      // clang-format off
+      GEPToMemRefLoadAndStore,
+      LLVMLoadWithConstantIndex,
+      LLVMStoreWithConstantIndex
+      // clang-format on
+      >(ctx);
   if (failed(applyPartialConversion(modOp, target,
                                     std::move(rewriteLoadStoreOperations)))) {
     llvm::errs() << "Failed to convert GEP -> Load/Store patterns!\n";
@@ -791,7 +860,10 @@ void LLVMToControlFlowPass::runOnOperation() {
       // Binary predicate comparisons:
       LLVMICmpToArithICmp,
       LLVMFCmpToArithFCmp,
-
+      AndConversion,
+      OrConversion,
+      XorConversion,
+      
       // Control flow operations:
       LLVMBrToCFBr,
       LLVMCondBrToCFCondBr,
