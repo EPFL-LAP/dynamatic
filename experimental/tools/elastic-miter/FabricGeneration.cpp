@@ -304,7 +304,7 @@ FuncOp fuseValueManager(FuncOp contextFuncOp, FuncOp funcOp) {
 
   for (auto [i, newArg] : llvm::enumerate(newFuncOp.getArguments())) {
     // Get the name and type of the input value
-    auto name = contextFuncOp.getArgName(i);
+    auto name = contextFuncOp.getResName(i);
 
     if (auto arg = findArg(funcOp, name)) {
       assert(arg->getType() == newArg.getType() &&
@@ -747,11 +747,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     // the rhsFuncOp's operations
     for (Operation *op : llvm::make_early_inc_range(rhsArg.getUsers()))
       op->replaceUsesOfWith(rhsArg, rhsNDWireOp.getResult());
+  }
 
-    Attribute attr = lhsFuncOp.getArgNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+  for (auto [i, arg] : llvm::enumerate(contextFuncOp.getArguments())) {
+    StringAttr attr = cast<StringAttr>(contextFuncOp.getArgNames()[i]);
     config.arguments.push_back(
-        std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
+        std::make_pair(attr.getValue().str(), arg.getType()));
   }
 
   size_t lhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
