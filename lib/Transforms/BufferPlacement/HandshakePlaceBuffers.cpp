@@ -159,7 +159,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   // parsing is not a performance bottleneck, so this should be acceptable.
   // TODO : this should go into a bespoke function
 
-  TimingDatabase timingDB();
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
@@ -212,7 +212,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   // Read the operations' timing models from disk
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
@@ -527,7 +527,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // buffering constraints
 
   // Read the operations' timing models from disk
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
