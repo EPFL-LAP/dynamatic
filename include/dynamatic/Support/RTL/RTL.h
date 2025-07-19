@@ -292,20 +292,17 @@ public:
   /// Registers different parameters for each type of extern op.
   /// Temporary function. These parameters should be added to hw.parameters
   /// (generation_params in the future)
-  void registerParameters(hw::HWModuleExternOp &modOp);
+  LogicalResult registerParameters(hw::HWModuleExternOp &modOp);
 
-  void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+  LogicalResult registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                  llvm::StringRef modName,
                                  hw::ModuleType &modType);
   void registerTransparentParameter(hw::HWModuleExternOp &modOp,
                                     llvm::StringRef modName,
                                     hw::ModuleType &modType);
-  void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+  LogicalResult registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                      llvm::StringRef modName,
                                      hw::ModuleType &modType);
-  void registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
-                                      llvm::StringRef modName,
-                                      hw::ModuleType &modType);
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the

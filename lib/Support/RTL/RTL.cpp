@@ -281,17 +281,18 @@ static std::string getBitwidthString(Type type) {
   return std::to_string(handshake::getHandshakeTypeBitWidth(type));
 }
 
-void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
+LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   auto modName =
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-  registerBitwidthParameter(modOp, modName, modType);
+  LogicalResult gotBitwidth = registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
-  registerExtraSignalParameters(modOp, modName, modType);
+  LogicalResult gotExtraSignals = registerExtraSignalParameters(modOp, modName, modType);
+  return failed(gotBitwidth) || failed(gotExtraSignals);
 }
 
-void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                          llvm::StringRef modName,
                                          hw::ModuleType &modType) {
   if (
@@ -372,7 +373,11 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
+  } else{
+    modOp.emit_error("Failed to get bitwidth of operation");
+    return failure()
   }
+  return success();
 }
 
 void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
@@ -399,7 +404,7 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
   }
 }
 
-void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                              llvm::StringRef modName,
                                              hw::ModuleType &modType) {
   if (
@@ -430,7 +435,11 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
+  } else {
+    modOp.emit_error("Failed to get extra signals of operation");
+    return failure();
   }
+  return success();
 }
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,

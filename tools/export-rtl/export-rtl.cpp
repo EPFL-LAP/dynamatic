@@ -199,7 +199,9 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // Parameter analysis
     // TODO: Do this at the HW-level analysis
     if (extOp)
-      match->registerParameters(extOp);
+      if(!match->registerParameters(extOp)){
+        return failure();
+      }
 
     // ...then generate the component itself
     return match->concretize(request, dynamaticPath, outputPath);
