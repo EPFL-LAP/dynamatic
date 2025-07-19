@@ -280,7 +280,6 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
-  static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -295,9 +294,6 @@ public:
                "costaware (throughput- and area-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
-    addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
-                          "Warning: This may result in out-of-order memory "
-                          "accesses, use with caution!"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -518,6 +514,12 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+  
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
@@ -543,6 +545,12 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string polygeistPath = args.positionals.front().str();
@@ -569,6 +577,12 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -589,6 +603,13 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n"
+                << "Options: flopoco, vivado\n";
+    return CommandResult::FAIL;
+  }
+  
   StringRef generator = args.positionals.front();
   if (generator == "flopoco" || generator == "vivado") {
     state.fpUnitsGenerator = generator.str();
@@ -600,6 +621,12 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
 }
 
 CommandResult SetSrc::execute(CommandArguments &args) {
+  // Verify if source is empty
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a non-empty source\n";
+    return CommandResult::FAIL;
+  }
+
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
   if (!srcName.ends_with(".c")) {
@@ -615,6 +642,12 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
 CommandResult SetCP::execute(CommandArguments &args) {
   // Parse the float argument and check if the argument is legal.
+  // Verify if argument is empty
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
+    return CommandResult::FAIL;
+  }
+              
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
   llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
@@ -649,14 +682,13 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
-  std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ);
+                 state.fpUnitsGenerator, rigidification);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
