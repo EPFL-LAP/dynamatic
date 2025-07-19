@@ -412,6 +412,14 @@ LogicalResult BufferOp::verify() {
            << numSlots;
   }
 
+  auto startingTokensAttr = getStartingTokens();
+  if (startingTokensAttr.size() > static_cast<size_t>(numSlots))
+    return emitOpError("has ")
+           << tokensAttr.size() << " starting tokens but only " << numSlots << " slots";
+
+  if (getOperand().getType().isa<FloatType>() && !startingTokensAttr.empty())
+    return emitOpError("float starting tokens are not currently supported.");
+
   return success();
 }
 
