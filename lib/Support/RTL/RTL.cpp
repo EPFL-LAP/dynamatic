@@ -375,7 +375,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     // Skip
   } else{
     modOp->emitError("Failed to get bitwidth of operation");
-    return failure()
+    return failure();
   }
   return success();
 }
