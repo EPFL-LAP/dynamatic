@@ -550,8 +550,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Bitwidth
         addType("DATA_TYPE", bufferOp.getOperand());
 
+
+
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
+        addSpaceSeparatedListOfInt("STARTING_TOKENS",
+                                bufferOp.getStartingTokens());
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
