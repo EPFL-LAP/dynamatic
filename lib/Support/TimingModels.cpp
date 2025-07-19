@@ -100,7 +100,7 @@ bool TimingDatabase::insertTimingModel(StringRef timingModelKey,
                                        TimingModel &model) {
   llvm::errs() << timingModelKey << "\n";
   bool success = models.try_emplace(timingModelKey, model).second;
-  llvm::errs() << models.count(timingModelKey) << "\n";
+  llvm::errs() << models.size() << "\n";
   llvm::errs() << success << "\n";
   return success;
 }
