@@ -45,11 +45,8 @@ public:
 
 } // namespace
 
-void HandshakeMarkFPUImplPass::runDynamaticPass() {
-  // this->impl is the pass option declared in tablegen
-  auto implOpt = symbolizeFPUImpl(this->impl);
-
-  if (!implOpt.has_value()) {
+bool checkPassOption(Optional<dynamatic::handshake::FPUImpl> implOpt){
+  if(!implOpt.has_value()){
     llvm::errs() << "Invalid FPU implementation: '"
                  << this->impl << "'\n";
     llvm::errs() << "Valid FPU Implementations:\n";
@@ -57,6 +54,16 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
       if (auto e = symbolizeFPUImpl(i))
         llvm::errs() << "'" << stringifyFPUImpl(*e) << "'\n";
     }
+    return false;
+  }
+  return true;
+}
+
+void HandshakeMarkFPUImplPass::runDynamaticPass() {
+  // this->impl is the pass option declared in tablegen
+  auto implOpt = symbolizeFPUImpl(this->impl);
+
+  if (!checkPassOption(implOpt)) {
     signalPassFailure();
     return;
   }
