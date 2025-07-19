@@ -77,7 +77,7 @@ $LLVM_BINS/opt -S \
 # ===============================
 # Notice that the load and store instructions are tagged with !group !6
 
-$LLVM_BINS/opt $LL -S \
+$LLVM_BINS/opt $OUT/clang_optimized.ll -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/dep-analysis/libDependenceAnalysisPass.so" \
   -passes="polly-dependence-pass" \
   > $OUT/clang_optimized_lsq_groups_marked.ll
