@@ -265,7 +265,8 @@ public:
   /// Inserts a timing model in the database with the provided key. Returns
   /// true if no timing model existed for this key prior to the calls, or false
   /// otherwise.
-  bool insertTimingModel(StringRef fromJsonTimingModelKey, TimingModel &model);
+
+  bool insertTimingModel(StringRef timingModelKey, TimingModel &model);
 
   /// Returns the timing model corresponding to the timing model key,
   /// if any exists
@@ -311,12 +312,7 @@ public:
 private:
   /// Maps from an operation's timing key to their timing model.
   /// Timing keys are generated based on operation name and implementation
-  DenseMap<StringRef, TimingModel> models;
-
-  /// We need to store the strings representing different timing models
-  /// which we parse from the JSON file
-  /// As they are stored in the model DenseMap as StringRefs
-  std::vector<std::string> ownedKeys;
+  llvm::StringMap<TimingModel> models;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's

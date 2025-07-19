@@ -96,13 +96,9 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef fromJsonTimingModelKey,
+bool TimingDatabase::insertTimingModel(StringRef timingModelKey,
                                        TimingModel &model) {
-  // copy the raw string into the storage vector
-  ownedKeys.emplace_back(fromJsonTimingModelKey.str());
-  // make an StringRef from it
-  StringRef ownedTimingModelKey = ownedKeys.back();
-  return models.insert(std::make_pair(ownedTimingModelKey, model)).second;
+  return models.try_emplace(timingModelKey, model).second;
 }
 
 const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
@@ -114,19 +110,17 @@ const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
 
 const TimingModel *TimingDatabase::getModel(Operation *op) const {
   StringRef baseName = op->getName().getStringRef();
-  std::string timingModelKey;
-
   // if the operation is a floating point operation with multiple
   // possible implementations
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     // include the implementation in the key
-    timingModelKey =
+    std::string timingModelKey =
         (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
-  } else {
-    timingModelKey = baseName.str();
+    return getModel(timingModelKey);
   }
-  return getModel(timingModelKey);
+
+  return getModel(baseName);
 }
 
 LogicalResult TimingDatabase::getLatency(
