@@ -15,8 +15,8 @@
 #include <gtest/gtest.h>
 
 class BasicFixture : public testing::TestWithParam<std::string> {};
-class GroupFixture
-    : public testing::TestWithParam<std::tuple<fs::path, std::string>> {};
+class MemoryFixture : public testing::TestWithParam<std::string> {};
+class SharingFixture : public testing::TestWithParam<std::string> {};
 class SpecFixture : public testing::TestWithParam<std::string> {};
 
 TEST_P(BasicFixture, basic) {
@@ -28,9 +28,9 @@ TEST_P(BasicFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
-TEST_P(GroupFixture, basic) {
-  fs::path root = std::get<0>(GetParam());
-  std::string name = std::get<1>(GetParam());
+TEST_P(MemoryFixture, basic) {
+  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
+  std::string name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
@@ -38,7 +38,17 @@ TEST_P(GroupFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
-TEST_P(SpecFixture, spec) {
+TEST_P(SharingFixture, basic) {
+  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
+  std::string name = GetParam();
+  int simTime = -1;
+
+  EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
+
+  RecordProperty("cycles", std::to_string(simTime));
+}
+
+TEST_P(SpecFixture, spec_NoCI) {
   std::string name = GetParam();
   int simTime = -1;
 
@@ -48,7 +58,7 @@ TEST_P(SpecFixture, spec) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    IndividualTests, BasicFixture,
+    MiscBenchmarks, BasicFixture,
     testing::Values("single_loop", "atax", "atax_float", "bicg", "bicg_float",
                     "binary_search", "factorial", "fir", "float_basic",
                     "gaussian", "gcd", "gemm", "gemm_float", "gemver",
@@ -65,31 +75,24 @@ INSTANTIATE_TEST_SUITE_P(
                     "test_stdint", "threshold", "triangular", "vector_rescale",
                     "video_filter", "while_loop_1", "while_loop_3"));
 
-fs::path memoryTestRoot =
-    fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
-fs::path sharingTestRoot =
-    fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
-
 INSTANTIATE_TEST_SUITE_P(
-    Memory, GroupFixture,
-    testing::Combine(
-        testing::Values(memoryTestRoot),
-        testing::Values("test_flatten_array", "test_memory_1", "test_memory_2",
-                        "test_memory_3", "test_memory_4", "test_memory_5",
-                        "test_memory_6", "test_memory_7", "test_memory_8",
-                        "test_memory_9", "test_memory_10", "test_memory_11",
-                        "test_memory_12", "test_memory_13", "test_memory_14",
-                        "test_memory_15", "test_memory_16", "test_memory_17",
-                        "test_memory_18", "test_smallbound")),
-    [](const auto &info) { return "memory_" + std::get<1>(info.param); });
+    MemoryBenchmarks, MemoryFixture,
+    testing::Values("test_flatten_array", "test_memory_1", "test_memory_2",
+                    "test_memory_3", "test_memory_4", "test_memory_5",
+                    "test_memory_6", "test_memory_7", "test_memory_8",
+                    "test_memory_9", "test_memory_10", "test_memory_11",
+                    "test_memory_12", "test_memory_13", "test_memory_14",
+                    "test_memory_15", "test_memory_16", "test_memory_17",
+                    "test_memory_18", "test_smallbound"),
+    [](const auto &info) { return "memory_" + info.param; });
 
-INSTANTIATE_TEST_SUITE_P(
-    Sharing, GroupFixture,
-    testing::Combine(testing::Values(sharingTestRoot),
-                     testing::Values("share_test_1", "share_test_2")),
-    [](const auto &info) { return "sharing_" + std::get<1>(info.param); });
+INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+                         testing::Values("share_test_1", "share_test_2"),
+                         [](const auto &info) {
+                           return "sharing_" + info.param;
+                         });
 
-INSTANTIATE_TEST_SUITE_P(SpecSingleLoop_NoCI, SpecFixture,
+INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
                                          "loop_path", "nested_loop",
                                          "single_loop", "sparse", "subdiag",
