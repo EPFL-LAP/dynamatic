@@ -55,7 +55,8 @@ namespace dynamatic {
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
 
-struct LoadStoreData {
+// Metadata unseralized from the memory dependency analysis pass
+struct UnserializedLoadStoreMetaData {
   // LLVM instruction
   Instruction *llvmInstr;
 
@@ -86,7 +87,7 @@ unsigned getMemId(Instruction *instr) {
   llvm::MDString *strData = llvm::dyn_cast<llvm::MDString>(data);
   assert(strData);
   // It's a metadata string
-  LoadStoreData item;
+  UnserializedLoadStoreMetaData item;
   return std::stoi(strData->getString().str());
 }
 
@@ -112,21 +113,21 @@ std::vector<int32_t> getDestOps(Instruction *instr) {
   return destOps;
 }
 
-std::vector<LoadStoreData>
+std::vector<UnserializedLoadStoreMetaData>
 retriveLoadStoreAnalysisDataFromMetaData(Function &f) {
-  std::vector<LoadStoreData> items;
+  std::vector<UnserializedLoadStoreMetaData> items;
 
   for (llvm::BasicBlock &bb : f) {
     for (llvm::Instruction &instr : bb) {
       if (llvm::LoadInst *loadInstr = llvm::dyn_cast<llvm::LoadInst>(&instr)) {
-        LoadStoreData item;
+        UnserializedLoadStoreMetaData item;
         item.llvmInstr = &instr;
         item.id = getMemId(loadInstr);
         item.destinations = getDestOps(loadInstr);
         items.push_back(item);
       } else if (llvm::StoreInst *storeInstr =
                      llvm::dyn_cast<llvm::StoreInst>(&instr)) {
-        LoadStoreData item;
+        UnserializedLoadStoreMetaData item;
         item.llvmInstr = &instr;
         item.id = getMemId(storeInstr);
         item.destinations = getDestOps(storeInstr);
@@ -136,6 +137,60 @@ retriveLoadStoreAnalysisDataFromMetaData(Function &f) {
   }
 
   return items;
+}
+
+LogicalResult nameAndMarkDependencyEdges(
+    LLVM::LLVMFuncOp funcOp,
+    std::vector<UnserializedLoadStoreMetaData> loadStoreData,
+    OpBuilder &builder) {
+
+  // Following the visiting order in the funcOp, collect all the load store ops.
+  std::vector<Operation *> loadStoreOperations;
+  for (auto &regions : funcOp->getRegions()) {
+    for (auto &block : regions.getBlocks()) {
+      for (auto &op : block.getOperations()) {
+        if (isa<LLVM::LoadOp>(op) || isa<LLVM::StoreOp>(op)) {
+          loadStoreOperations.push_back(&op);
+        }
+      }
+    }
+  }
+
+  // NOTE: we should definitely add more sanity checks in this pass.
+  if (loadStoreData.size() == loadStoreOperations.size()) {
+    funcOp.emitError("The number of loads and stores in the MLIR LLVM dialect "
+                     "does not match the number in the LLVM IR!");
+    return failure();
+  }
+
+  for (auto [op, data] : llvm::zip_equal(loadStoreOperations, loadStoreData)) {
+    // Assign the operations using the natual handshake names. TODO: maybe we
+    // separate the naming for loads and stores?
+    std::string opName;
+    if (isa<LLVM::LoadOp>(op)) {
+      opName = "load" + std::to_string(data.id);
+    } else {
+      opName = "store" + std::to_string(data.id);
+    }
+
+    op->setAttr(StringRef("handshake.name"), builder.getStringAttr(opName));
+
+    std::vector<StringRef> destNames;
+
+    for (auto id : data.destinations) {
+      auto *op = loadStoreOperations[id];
+      if (isa<LLVM::LoadOp>(op)) {
+        destNames.emplace_back("load" + std::to_string(id));
+      } else {
+        destNames.emplace_back("store" + std::to_string(id));
+      }
+    }
+
+    op->setAttr(StringRef("mem.dest"),
+                builder.getStrArrayAttr(ArrayRef(destNames)));
+  }
+
+  return success();
 }
 
 void LLVMMetadataToAttributePass::runOnOperation() {
@@ -150,7 +205,7 @@ void LLVMMetadataToAttributePass::runOnOperation() {
     signalPassFailure();
   }
 
-  std::map<std::string, std::vector<LoadStoreData>> data;
+  std::map<std::string, std::vector<UnserializedLoadStoreMetaData>> data;
   for (Function &f : llvmModule->functions()) {
     data.emplace(f.getName(), retriveLoadStoreAnalysisDataFromMetaData(f));
   }
@@ -164,29 +219,10 @@ void LLVMMetadataToAttributePass::runOnOperation() {
   // might be changes to them.
   for (auto func : modOp.getOps<LLVM::LLVMFuncOp>()) {
     assert(func->use_empty());
-
     auto loadStoreData = data[func.getName().str()];
-
-    std::vector<Operation *> loadStoreOperations;
-
-    for (auto &regions : func->getRegions()) {
-      for (auto &block : regions.getBlocks()) {
-        for (auto &op : block.getOperations()) {
-          if (auto loadOp = dyn_cast<LLVM::LoadOp>(op)) {
-            loadStoreOperations.push_back(&op);
-          } else if (auto storeOp = dyn_cast<LLVM::StoreOp>(op)) {
-            loadStoreOperations.push_back(&op);
-          }
-        }
-      }
-    }
-    assert(loadStoreData.size() == loadStoreOperations.size());
-
-    for (auto [op, data] :
-         llvm::zip_equal(loadStoreOperations, loadStoreData)) {
-      op->setAttr(StringRef("mem.op"), builder.getI32IntegerAttr(data.id));
-      op->setAttr(StringRef("mem.dest"),
-                  builder.getI32ArrayAttr(ArrayRef(data.destinations)));
+    if (failed(nameAndMarkDependencyEdges(func, loadStoreData, builder))) {
+      func.emitError("Failed to name memory operations!");
+      signalPassFailure();
     }
   }
 }
