@@ -442,12 +442,13 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // Declare the underlying C++ enum and accompanying utility functions
 // by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
 // which tells tablegen not to actually generate the attribute
-def FPUImplEnum : I64EnumAttr<"FPUImpl", "::dynamatic::handshake", [
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
   // C++ value is FPUImpl::FLOPOCO, string version is "flopoco"
   I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
   // C++ value is FPUImpl::VIVADO, string version is "vivado"
   I64EnumAttrCase<"VIVADO", 1, "vivado">
 ]> {
+  let cppNamespace = "::dynamatic::handshake";
   let genSpecializedAttr = 0;
 }
 // and then we pass that "fake" attribute to this, which is the real attribute
