@@ -1,4 +1,4 @@
-# Examples
+# Running an Integration Test
 ## 1. Binary Search  
 This example describes how to use Dynamatic and become more familiarized with its HLS flow. You will see how:
 - compile your C code to RTL
