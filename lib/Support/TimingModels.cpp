@@ -478,7 +478,7 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
     ljson::Path keyPath = path.field(timingModelKey);
     fromJSON(cmpInfo, model, keyPath);
     // insert model in StringMap
-    models.emplace(timingModelKey, model);
+    models.emplace(std::make_pair(timingModelKey, model));
   }
   return true;
 }
