@@ -173,6 +173,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     if (!match) {
       extOp->emitError("Failed to find matching RTL component for external module");
       llvm::errs() << extOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME) << "\n";
+      llvm::errs() << modOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME) << "\n";
       return failure();
     }
     // If match is not external, it must be freed when function returns
