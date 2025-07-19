@@ -12,7 +12,7 @@ def generate_fifo_break_none(name, params):
             return _generate_fifo_break_none_dataless(name, slots)
     else:
         if slots == 1:
-            return _generate_one_slot_break_none(name)
+            return _generate_one_slot_break_none(name, data_type)
         else:
             return _generate_fifo_break_none(name, slots, data_type)
 
