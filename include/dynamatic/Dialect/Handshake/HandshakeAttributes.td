@@ -448,4 +448,33 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 }
 
 
+//===----------------------------------------------------------------------===//
+// FPU Implementation
+//===----------------------------------------------------------------------===//
+
+// Enum Tablegen declaration structure taken from the test enum in TestOps.td
+// in https://reviews.llvm.org/D115181, which is the PR which introduced
+// the version of enums we use in Dynamatic
+//
+// this weird structure has been removed in up-to-date MLIR
+//
+// I64EnumAttrs can be used directly,
+// but they serialize as integers when in the attribute dictionary
+// which makes the IR difficult for humans to interpret.
+
+// Declare the underlying C++ enum and accompanying utility functions
+// by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
+// which tells tablegen not to actually generate the attribute
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
+  // C++ value is FPUImpl::FLOPOCO, string version is "flopoco"
+  I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+  // C++ value is FPUImpl::VIVADO, string version is "vivado"
+  I64EnumAttrCase<"VIVADO", 1, "vivado">
+]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
+}
+// and then we pass that "fake" attribute to this, which is the real attribute
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

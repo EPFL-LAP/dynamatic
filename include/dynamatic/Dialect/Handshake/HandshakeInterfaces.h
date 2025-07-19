@@ -18,7 +18,7 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/OpDefinition.h"
