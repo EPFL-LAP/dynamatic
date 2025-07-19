@@ -63,6 +63,25 @@ $LLVM_BINS/opt -S \
   $OUT/clang.ll \
   > $OUT/clang_optimized.ll
 
+# This pass uses polyhedral analysis to determine which set of memory ops need
+# to be connected to a separate LSQ, it attaches meta data to those instructions
+# and indicate that they belong to certain set of LSQ nodes.
+#
+# Example:
+# ======== histogram.ll =========
+#  %2 = load float, ptr %arrayidx4, align 4, !group !6
+#  ...
+#  store float %add, ptr %arrayidx6, align 4, !group !6
+#  ...
+# !6 = !{!"group_0"}
+# ===============================
+# Notice that the load and store instructions are tagged with !group !6
+
+$LLVM_BINS/opt $LL -S \
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/dep-analysis/libDependenceAnalysisPass.so" \
+  -passes="polly-dependence-pass" \
+  > $OUT/clang_optimized_lsq_groups_marked.ll
+
 $LLVM_BINS/mlir-translate \
   --import-llvm $OUT/clang_optimized.ll \
   > $OUT/clang_optimized_translated.mlir
