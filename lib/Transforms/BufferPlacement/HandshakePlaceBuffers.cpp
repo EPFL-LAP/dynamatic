@@ -164,7 +164,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
     if (auto fpuImplInterface =
-            llvm::dyn_cast<dynamatic::handshake::fpuImplInterface>(op)) {
+            llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
                                                          delay, targetCP))) {
