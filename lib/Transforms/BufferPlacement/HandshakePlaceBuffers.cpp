@@ -172,6 +172,9 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
         internalDelayInterface.setInternalDelay(delayStr);
+      } else {
+         op->emitError("Failed to get internal delay from timing model");
+         return signalPassFailure();
       }
     }
   });
