@@ -52,7 +52,7 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
   if (!implOpt.has_value()) {
     llvm::errs() << "Invalid FPU implementation: '"
                  << this->impl << "'\n";
-    llvm::errs() << "Valid FPU Implementations:";
+    llvm::errs() << "Valid FPU Implementations:\n";
     for (int64_t i = 0; i <= getMaxEnumValForFPUImpl(); ++i) {
       if (auto e = symbolizeFPUImpl(i))
         llvm::errs() << "'" << stringifyFPUImpl(*e) << "'\n";
