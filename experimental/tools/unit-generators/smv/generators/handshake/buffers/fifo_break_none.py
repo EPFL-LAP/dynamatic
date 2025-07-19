@@ -57,29 +57,65 @@ def _generate_fifo_break_none_dataless(name, slots):
     # fifo generated as chain of fully transparent slots for faster model checking
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
-    return f"""
-MODULE {name}(ins_valid, outs_ready)
-    {"\\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
+#     return f"""
+# MODULE {name}(ins_valid, outs_ready)
+#     {"\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
 
-    -- outputs
-		DEFINE outs_valid := b{slots - 1}.outs_valid;
-		DEFINE ins_ready := b0.ins_ready;
-{_generate_one_slot_break_none_dataless(f"{name}_tslot")}
-"""
+#     -- outputs
+# 		DEFINE outs_valid := b{slots - 1}.outs_valid;
+# 		DEFINE ins_ready := b0.ins_ready;
+# {_generate_one_slot_break_none_dataless(f"{name}_tslot")}
+# """
+
+    slot_lines = [
+        f"    VAR b{n} : {name}_tslot({valid}, {ready});"
+        for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))
+    ]
+
+    return (
+        f"MODULE {name}(ins_valid, outs_ready)\n"
+        + "\n".join(slot_lines) + "\n"
+        + f"\n    -- outputs\n"
+        + f"    DEFINE outs_valid := b{slots - 1}.outs_valid;\n"
+        + f"    DEFINE ins_ready := b0.ins_ready;\n"
+        + _generate_one_slot_break_none_dataless(f"{name}_tslot")
+    )
+
+
+
 
 
 def _generate_fifo_break_none(name, slots, data_type):
     # fifo generated as chain of fully transparent slots for faster model checking
+#     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
+#     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
+#     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
+#     return f"""
+# MODULE {name}(ins, ins_valid, outs_ready)
+#     {"\n    ".join([f"VAR b{n} : {name}_tslot({data}, {valid}, {ready});" for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))])}
+
+#     -- output
+# 		DEFINE outs   := b{slots - 1}.outs;
+# 		DEFINE outs_valid   := b{slots - 1}.outs_valid;
+# 		DEFINE ins_ready   := b0.ins_ready;
+# {_generate_one_slot_break_none(f"{name}_tslot", data_type)}
+# """
+
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
-    return f"""
-MODULE {name}(ins, ins_valid, outs_ready)
-    {"\\n    ".join([f"VAR b{n} : {name}_tslot({data}, {valid}, {ready});" for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))])}
 
-    -- output
-		DEFINE outs   := b{slots - 1}.outs;
-		DEFINE outs_valid   := b{slots - 1}.outs_valid;
-		DEFINE ins_ready   := b0.ins_ready;
-{_generate_one_slot_break_none(f"{name}_tslot", data_type)}
-"""
+    slot_lines = [
+        f"    VAR b{n} : {name}_tslot({data}, {valid}, {ready});"
+        for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))
+    ]
+
+    return (
+        f"MODULE {name}(ins, ins_valid, outs_ready)\n"
+        + "\n".join(slot_lines) + "\n"
+        + f"\n    -- output\n"
+        + f"    DEFINE outs   := b{slots - 1}.outs;\n"
+        + f"    DEFINE outs_valid   := b{slots - 1}.outs_valid;\n"
+        + f"    DEFINE ins_ready   := b0.ins_ready;\n"
+        + _generate_one_slot_break_none(f"{name}_tslot", data_type)
+    )
