@@ -1,6 +1,6 @@
 from generators.support.utils import *
-from fifo_break_none import generate_fifo_break_none
-from one_slot_break_dv import generate_one_slot_break_dv
+from generators.handshake.buffers.fifo_break_none import generate_fifo_break_none
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
 def generate_fifo_break_dv(name, params):
     slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1

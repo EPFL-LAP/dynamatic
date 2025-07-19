@@ -1,6 +1,6 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
-from handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
 def generate_fifo_break_dv(name, params):
     bitwidth = params["bitwidth"]
