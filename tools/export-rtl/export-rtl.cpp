@@ -199,7 +199,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // Parameter analysis
     // TODO: Do this at the HW-level analysis
     if (extOp)
-      if(!match->registerParameters(extOp)){
+      if(match->registerParameters(extOp).failed()){
         return failure();
       }
 
