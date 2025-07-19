@@ -387,7 +387,7 @@ struct CreditBasedSharingPass
   // Call the wrapper class HandshakePlaceBuffersPassWrapper, which again wraps
   // FPGA20BuffersWrapper
   LogicalResult runBufferPlacementPass(ModuleOp &modOp, SharingInfo &data) {
-    TimingDatabase timingDB(&getContext());
+    TimingDatabase timingDB;
     if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
       return failure();
 
@@ -746,7 +746,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
 void CreditBasedSharingPass::runDynamaticPass() {
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     signalPassFailure();
 
