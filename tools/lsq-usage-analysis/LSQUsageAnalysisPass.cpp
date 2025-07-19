@@ -268,7 +268,7 @@ class ScopMeta {
   /* Each Minimized Scop has a separate context. This ensures that
    * trying to intersect maps for instructions from separate Scops
    * will raise an error */
-  isl::ctx *ctx;
+  isl::ctx ctx;
   /* Used by the dependsInternal() function */
   std::map<instPairT, bool> dependsCache;
   std::set<instPairT> outstandingDependsQueries;
@@ -306,11 +306,16 @@ class ScopMeta {
 
     const auto currentMap = instToCurrentMap[inst];
 
-    const unsigned int inDims = currentMap.dim(isl::dim::in).release();
-    assert(inDims >= depthToKeep);
+    auto inDimsToBeChecked = currentMap.dim(isl::dim::in);
 
-    isl::map retMap =
-        currentMap.project_out(isl::dim::in, depthToKeep, inDims - depthToKeep);
+    assert(!inDimsToBeChecked.is_error());
+
+    unsigned inDimValue = static_cast<unsigned>(inDimsToBeChecked);
+
+    assert(inDimValue >= depthToKeep);
+
+    isl::map retMap = currentMap.project_out(isl::dim::in, depthToKeep,
+                                             inDimValue - depthToKeep);
     if (getFuture && depthToKeep > 0) {
       retMap = makeFutureMap(retMap);
     }
@@ -322,7 +327,11 @@ class ScopMeta {
   isl::map makeFutureMap(const isl::map &map) {
     isl::map fMap, tmpMap;
 
-    const unsigned int nIns = map.dim(isl::dim::in).release();
+    auto nInsToBeChecked = map.dim(isl::dim::in);
+
+    assert(!nInsToBeChecked.is_error());
+
+    unsigned nIns = static_cast<unsigned>(nInsToBeChecked);
 
     /* Add input vars */
     tmpMap = map.add_dims(isl::dim::in, nIns);
@@ -342,7 +351,12 @@ class ScopMeta {
 
   /* Add constraints on the 'n' most significant dimensions */
   isl::map addFutureCondition(const isl::map &map, int n) {
-    int nIns = map.dim(isl::dim::in).release() / 2;
+
+    auto nInsToBeChecked = map.dim(isl::dim::in);
+
+    assert(!nInsToBeChecked.is_error());
+
+    int nIns = static_cast<unsigned>(nInsToBeChecked) / 2;
     isl::map constrMap = map;
 
     isl_local_space *lsp =
@@ -379,7 +393,7 @@ class ScopMeta {
   }
 
   isl::map removeMapMeta(isl::map map) {
-    auto emptyID = isl::id::alloc(*ctx, "", nullptr);
+    auto emptyID = isl::id::alloc(ctx, "", nullptr);
 
     map = map.set_tuple_id(isl::dim::in, emptyID);
     map = map.set_tuple_id(isl::dim::out, emptyID);
@@ -388,8 +402,9 @@ class ScopMeta {
   }
 
 public:
-  ScopMeta(Scop &scop) : s(scop), tdi(*scop.getLI()) {
-    ctx = new isl::ctx(isl_ctx_alloc());
+  ScopMeta(Scop &scop)
+      : s(scop), tdi(*scop.getLI()), ctx(isl::ctx(isl_ctx_alloc())) {
+    // ctx = isl::ctx(isl_ctx_alloc());
     dominatorTree = scop.getDT();
     loopInfo = scop.getLI();
 
@@ -400,7 +415,7 @@ public:
     assert(scopMinDepth > 0);
   }
 
-  ~ScopMeta();
+  ~ScopMeta() = default;
   /* Use addScopStmt() to add all ScopStmt's in a Scop. Then,
    * computeIntersections() and finally getIntersectionList() */
 
@@ -415,8 +430,11 @@ public:
 
         isl::map domain = isl::map::from_domain(stmt.getDomain());
 
-        domain = domain.add_dims(isl::dim::out,
-                                 currentMap.dim(isl::dim::out).release());
+        auto outDim = currentMap.dim(isl::dim::out);
+
+        assert(!outDim.is_error());
+
+        domain = domain.add_dims(isl::dim::out, static_cast<unsigned>(outDim));
 
         domain = copyMapMeta(domain, currentMap);
 
@@ -702,7 +720,7 @@ struct MemElemInfo {
 namespace {
 struct LSQUsageAnalysisPass : PassInfoMixin<LSQUsageAnalysisPass> {
 
-  std::vector<ScopMeta *> scopeMetas;
+  std::vector<ScopMeta> scopeMetas;
 
   /// Memory metadata for top-level loops
   struct TLLMeta {
@@ -906,7 +924,7 @@ PreservedAnalyses LSQUsageAnalysisPass::run(Function &f,
 
 void LSQUsageAnalysisPass::processScop(Scop &s) {
 
-  auto *meta = new ScopMeta(s);
+  auto meta = ScopMeta(s);
 
   scopeMetas.push_back(meta);
 
@@ -918,13 +936,13 @@ void LSQUsageAnalysisPass::processScop(Scop &s) {
     if (!hasMemoryReadOrWrite(stmt))
       continue;
 
-    meta->addScopStmt(stmt);
+    meta.addScopStmt(stmt);
   }
 
-  meta->computeIntersections();
-  auto intersectList = meta->getIntersectionList();
+  meta.computeIntersections();
+  auto intersectList = meta.getIntersectionList();
 
-  for (auto it : meta->getInstsToBase()) {
+  for (auto it : meta.getInstsToBase()) {
     const auto *i = it.first;
     const auto *v = it.second;
     indexAnalysis.instToBase[i] = v;
