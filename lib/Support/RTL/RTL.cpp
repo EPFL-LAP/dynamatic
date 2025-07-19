@@ -374,7 +374,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
   } else{
-    modOp.emit_error("Failed to get bitwidth of operation");
+    modOp->emitError("Failed to get bitwidth of operation");
     return failure()
   }
   return success();
@@ -436,7 +436,7 @@ LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modO
              modName == "mem_to_bram") {
     // Skip
   } else {
-    modOp.emit_error("Failed to get extra signals of operation");
+    modOp.emitError("Failed to get extra signals of operation");
     return failure();
   }
   return success();
