@@ -257,12 +257,12 @@ class ScopMeta {
   TokenDependenceInfo tdi;
 
   int scopMinDepth;
-  std::vector<const Instruction *> memInsts;
-  std::map<const Instruction *, isl::map> instToCurrentMap;
-  std::map<const Instruction *, int> instToLoopDepth;
+  std::vector<Instruction *> memInsts;
+  std::map<Instruction *, isl::map> instToCurrentMap;
+  std::map<Instruction *, int> instToLoopDepth;
   std::set<instPairT> intersections;
   std::set<instPairT> nonIntersections;
-  std::map<const Instruction *, const Value *> instToBase;
+  std::map<Instruction *, Value *> instToBase;
   /* Each Minimized Scop has a separate context. This ensures that
    * trying to intersect maps for instructions from separate Scops
    * will raise an error */
@@ -271,7 +271,7 @@ class ScopMeta {
   std::map<instPairT, bool> dependsCache;
   std::set<instPairT> outstandingDependsQueries;
 
-  int getMaxCommonDepth(const Instruction *i0, const Instruction *i1) {
+  int getMaxCommonDepth(Instruction *i0, Instruction *i1) {
     // DEBUG(dbgs() << *I0 << " and " << *I1 << " \n");
     const auto *bb0 = i0->getParent();
     const auto *bb1 = i1->getParent();
@@ -299,7 +299,7 @@ class ScopMeta {
     return depth0;
   }
 
-  isl::map getMap(const Instruction *inst, const unsigned int depthToKeep,
+  isl::map getMap(Instruction *inst, const unsigned int depthToKeep,
                   const bool getFuture) {
 
     const auto currentMap = instToCurrentMap[inst];
@@ -433,7 +433,7 @@ public:
     //       << *Inst << InstToCurrentMap[Inst].to_str() << "\n");
 
     /* Checking for RAW and WAW conflicts */
-    for (const auto *wrInst : memInsts) {
+    for (auto *wrInst : memInsts) {
       if (!wrInst->mayWriteToMemory())
         continue;
 
@@ -460,7 +460,7 @@ public:
         * */
       // clang-format on
 
-      for (const auto *inst : memInsts) {
+      for (auto *inst : memInsts) {
         /* Skip checking with self */
         if (inst == wrInst)
           continue;
@@ -521,11 +521,9 @@ public:
 
   std::set<instPairT> &getIntersectionList() { return intersections; }
 
-  std::map<const Instruction *, const Value *> &getInstsToBase() {
-    return instToBase;
-  }
+  std::map<Instruction *, Value *> &getInstsToBase() { return instToBase; }
 
-  using iterator = std::vector<const Instruction *>::iterator;
+  using iterator = std::vector<Instruction *>::iterator;
   iterator begin() { return memInsts.begin(); }
   iterator end() { return memInsts.end(); }
 };
@@ -611,20 +609,20 @@ Value *findBaseInternal(Value *addr) {
   llvm_unreachable("Cannot  determine base array, aborting...");
 }
 
-Value *findBase(const Instruction *inst) {
-
+Value *findBase(Instruction *inst) {
   Value *addr;
-  if (isa<LoadInst>(inst)) {
-    addr = static_cast<const LoadInst *>(inst)->getPointerOperand();
-  } else if (isa<StoreInst>(inst)) {
-    addr = static_cast<const StoreInst *>(inst)->getPointerOperand();
+  if (auto *loadInst = dyn_cast<LoadInst>(inst)) {
+    addr = loadInst->getPointerOperand();
+  } else if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
+    addr = storeInst->getPointerOperand();
   } else {
     llvm_unreachable("Instruction is not a memory access");
   }
+
   return findBaseInternal(addr);
 }
 
-bool equalBase(const Instruction *a, const Instruction *b) {
+bool equalBase(Instruction *a, Instruction *b) {
   return findBase(a) == findBase(b);
 }
 
@@ -823,23 +821,20 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
 
   mei.finalize();
 
-  llvm::LLVMContext &Ctx = f.getContext();
-
+  llvm::LLVMContext &ctx = f.getContext();
   errs() << "Dependence report for function: " << f.getName() << "\n";
   unsigned id = 0;
-  for (auto lsqSet : mei.getLSQList()) {
+  for (auto *lsqSet : mei.getLSQList()) {
     llvm::errs() << "Instructions in LSQ " << id << ":\n";
     llvm::MDNode *groupMD = llvm::MDNode::get(
-        Ctx, llvm::MDString::get(Ctx, "group_" + std::to_string(id)));
-    for (auto inst : lsqSet->insts) {
+        ctx, llvm::MDString::get(ctx, "group_" + std::to_string(id)));
+    for (auto *inst : lsqSet->insts) {
       llvm::errs() << "Inst: " << inst << " ";
-
-      inst->setMetadata(groupMD->getMetadataID(), groupMD);
+      inst->setMetadata("lsq-group", groupMD);
     }
     llvm::errs() << "\n";
     id += 1;
   }
-
   return PreservedAnalyses::all();
 }
 
@@ -913,9 +908,9 @@ PollyDependencePass::getDependencyPairs(struct TLLMeta &lm) {
   auto rdInstrSet = lm.rdInsts;
   auto wrInstrSet = lm.wrInsts;
 
-  for (const auto *wrInst : wrInstrSet) {
+  for (auto *wrInst : wrInstrSet) {
     /* Find RAW dependencies */
-    for (const auto *rdInst : rdInstrSet) {
+    for (auto *rdInst : rdInstrSet) {
       auto pair = instPairT(wrInst, rdInst);
 
       /* Each base array is emitted as a separate RAM in the design. Two
@@ -949,7 +944,7 @@ PollyDependencePass::getDependencyPairs(struct TLLMeta &lm) {
         intersectList.push_back(pair);
     }
     /* Find WAW dependencies */
-    for (const auto *wrInst1 : wrInstrSet) {
+    for (auto *wrInst1 : wrInstrSet) {
       if (wrInst1 == wrInst)
         continue;
 
@@ -1001,7 +996,7 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
 
   for (auto *wrInst : wrInstrSet) {
     /* Find RAW dependencies */
-    for (const auto *rdInst : rdInstrSet) {
+    for (auto *rdInst : rdInstrSet) {
       auto pair = instPairT(wrInst, rdInst);
 
       /* Each base array is emitted as a separate RAM in the design. Two
@@ -1035,7 +1030,7 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
         intersectList.push_back(pair);
     }
     /* Find WAW dependencies */
-    for (const auto *wrInst1 : wrInstrSet) {
+    for (auto *wrInst1 : wrInstrSet) {
       if (wrInst1 == wrInst)
         continue;
 
@@ -1084,7 +1079,7 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
     auto *rInst = instPair.second;
 
     /* Find base array */
-    const Value *base = findBase(lInst);
+    Value *base = findBase(lInst);
     if (!equalBase(lInst, rInst)) {
       llvm_unreachable("Must only emit LSQs for memory accesses "
                        "targeting the same base arrays");
