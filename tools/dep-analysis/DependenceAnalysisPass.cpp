@@ -973,6 +973,10 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
     }
   }
 
+  for (const auto &[linst, rinst] : intersectList) {
+    llvm::errs() << "Dependency edge: " << linst << " -> " << rinst << "\n";
+  }
+
   /* Create sets from pairs of intersecting accesses such that
    * both instructions of every pair end up in the same set */
   for (auto instPair : intersectList) {
