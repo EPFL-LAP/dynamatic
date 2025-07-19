@@ -248,7 +248,7 @@ bool TokenDependenceInfo::hasRevTokenDependence(const Instruction *iA,
   return tokenRevDepends(p, iB, ls);
 }
 
-using instPairT = std::pair<const Instruction *, const Instruction *>;
+using instPairT = std::pair<Instruction *, Instruction *>;
 
 class ScopMeta {
   Scop &s;
@@ -580,7 +580,7 @@ bool hasMemoryReadOrWrite(ScopStmt &stmt) {
   return hasRdWr;
 }
 
-const Value *findBaseInternal(const Value *addr) {
+Value *findBaseInternal(Value *addr) {
   if (auto *arg = dyn_cast<Argument>(addr)) {
     if (!arg->getType()->isPointerTy())
       llvm_unreachable("Only pointer arguments are considered addresses");
@@ -593,11 +593,11 @@ const Value *findBaseInternal(const Value *addr) {
   if (auto *inst = dyn_cast_or_null<Instruction>(addr)) {
     if (isa<AllocaInst>(inst))
       return addr;
-    if (const auto *gepi = dyn_cast<GetElementPtrInst>(inst))
+    if (auto *gepi = dyn_cast<GetElementPtrInst>(inst))
       return findBaseInternal(gepi->getPointerOperand());
-    if (const auto *si = dyn_cast<SelectInst>(inst)) {
-      const auto *trueBase = findBaseInternal(si->getTrueValue());
-      const auto *falseBase = findBaseInternal(si->getFalseValue());
+    if (auto *si = dyn_cast<SelectInst>(inst)) {
+      auto *trueBase = findBaseInternal(si->getTrueValue());
+      auto *falseBase = findBaseInternal(si->getFalseValue());
 
       /* Select must choose pointers to same array. Otherwise cannot
        * choose relevant arrayRAM in elastic circuit */
@@ -611,9 +611,9 @@ const Value *findBaseInternal(const Value *addr) {
   llvm_unreachable("Cannot  determine base array, aborting...");
 }
 
-const Value *findBase(const Instruction *inst) {
+Value *findBase(const Instruction *inst) {
 
-  Value const *addr;
+  Value *addr;
   if (isa<LoadInst>(inst)) {
     addr = static_cast<const LoadInst *>(inst)->getPointerOperand();
   } else if (isa<StoreInst>(inst)) {
@@ -632,7 +632,7 @@ bool equalBase(const Instruction *a, const Instruction *b) {
  * dependences in a function and hence, need runtime address
  * aliasing via an LSQ */
 using LSQset = struct LSQset {
-  LSQset(const Value *v, const Instruction *i0, const Instruction *i1) {
+  LSQset(const Value *v, Instruction *i0, Instruction *i1) {
     base = v;
     insts.insert(i0);
     insts.insert(i1);
@@ -640,9 +640,9 @@ using LSQset = struct LSQset {
   LSQset(const Value *v) { base = v; }
 
   const Value *base;
-  std::set<const Instruction *> insts;
+  std::set<Instruction *> insts;
 
-  using iterator = std::set<const Instruction *>::iterator;
+  using iterator = std::set<Instruction *>::iterator;
   iterator begin() { return insts.begin(); }
   iterator end() { return insts.end(); }
 };
@@ -658,43 +658,43 @@ struct MemElemInfo {
   const std::set<LSQset *> &getLSQList() const { return lsqList; }
 
   /// Returns a reference to the LSQset containing
-  const LSQset &getInstLSQ(const Instruction *inst) const {
+  const LSQset &getInstLSQ(Instruction *inst) const {
     return *instToLSQ.at(inst);
   }
 
   /// To query whetherB B needs to be connected to any LSQs
-  bool bbHasLSQ(const BasicBlock *bb) const {
+  bool bbHasLSQ(BasicBlock *bb) const {
     return bbToLsqs.find(bb) != bbToLsqs.end();
   }
 
   /// Get a set of LSQs to which the block connects
-  const std::set<LSQset *> &getBBLSQs(const BasicBlock *bb) const {
+  const std::set<LSQset *> &getBBLSQs(BasicBlock *bb) const {
     return bbToLsqs.at(bb);
   }
 
   ///  Query whether the component forI needs to be connected to a LSQ
-  bool needsLSQ(const Instruction *inst) const {
+  bool needsLSQ(Instruction *inst) const {
     return (instToLSQ.find(inst) != instToLSQ.end());
   }
 
   std::set<LSQset *> lsqList;
-  std::map<const Instruction *, LSQset *> instToLSQ;
-  std::map<const Value *, LSQset *> baseToLSQ;
-  std::map<const BasicBlock *, std::set<LSQset *>> bbToLsqs;
-  std::vector<const Instruction *> otherInsts;
+  std::map<Instruction *, LSQset *> instToLSQ;
+  std::map<Value *, LSQset *> baseToLSQ;
+  std::map<BasicBlock *, std::set<LSQset *>> bbToLsqs;
+  std::vector<Instruction *> otherInsts;
 
   ///  List of instructions within some loop
-  std::vector<const Instruction *> loopInstrSet;
+  std::vector<Instruction *> loopInstrSet;
 
   void finalize() {
     /* Make list of non-conflicting loop instructions */
-    for (const auto *inst : loopInstrSet)
+    for (auto *inst : loopInstrSet)
       if (instToLSQ.find(inst) == instToLSQ.end())
         otherInsts.push_back(inst);
 
     /* Create mapping from BB to relevant LSQs */
     for (auto it : instToLSQ) {
-      const auto *bb = it.first->getParent();
+      auto *bb = it.first->getParent();
       auto *lsq = it.second;
 
       /* std::map's [] operator will create an empty set
@@ -715,9 +715,9 @@ struct PollyDependencePass : PassInfoMixin<PollyDependencePass> {
     TLLMeta() = default;
     ~TLLMeta() = default;
 
-    std::set<const Instruction *> rdInsts;
-    std::set<const Instruction *> wrInsts;
-    std::map<const Instruction *, int> instToScop;
+    std::set<Instruction *> rdInsts;
+    std::set<Instruction *> wrInsts;
+    std::map<Instruction *, int> instToScop;
   };
 
   /// List of metadata for top-level loops
@@ -732,6 +732,8 @@ struct PollyDependencePass : PassInfoMixin<PollyDependencePass> {
   void processScop(Scop &s);
   void processLoop(Loop *l);
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
+
+  std::vector<instPairT> getDependencyPairs(struct TLLMeta &lm);
 
   AAManager::Result *aliasAnalysis;
 };
@@ -774,8 +776,8 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
   ///     1. LSQ already exists due to other loop instructions
   ///     2. More than one access to the array outside loops
   ///
-  std::multimap<const Value *, const Instruction *> instsByBase;
-  std::set<const Value *> bases;
+  std::multimap<Value *, Instruction *> instsByBase;
+  std::set<Value *> bases;
   for (auto &bb : f) {
     /* Ignore BBs within loops */
     if (loopAnalysis.getLoopDepth(&bb) != 0)
@@ -788,7 +790,7 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
       if (isa<CallInst>(inst))
         continue;
 
-      const auto *base = findBase(&inst);
+      auto *base = findBase(&inst);
       auto lsqIt = mei.baseToLSQ.find(base);
 
       // If an LSQ has already been emitted for the given address base,
@@ -798,14 +800,14 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
         mei.instToLSQ[&inst] = lsqIt->second;
       } else {
         /* Only accesses to arrays without LSQs already */
-        instsByBase.insert({base, &inst});
-        bases.insert(base);
+        instsByBase.emplace(base, &inst);
+        bases.emplace(base);
       }
     }
   }
 
   /// LSQ emmission
-  for (const auto *base : bases) {
+  for (auto *base : bases) {
     if (instsByBase.count(base) > 1) {
       auto *lsq = new LSQset(base);
       auto range = instsByBase.equal_range(base);
@@ -821,7 +823,22 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
 
   mei.finalize();
 
+  llvm::LLVMContext &Ctx = f.getContext();
+
   errs() << "Dependence report for function: " << f.getName() << "\n";
+  unsigned id = 0;
+  for (auto lsqSet : mei.getLSQList()) {
+    llvm::errs() << "Instructions in LSQ " << id << ":\n";
+    llvm::MDNode *groupMD = llvm::MDNode::get(
+        Ctx, llvm::MDString::get(Ctx, "group_" + std::to_string(id)));
+    for (auto inst : lsqSet->insts) {
+      llvm::errs() << "Inst: " << inst << " ";
+
+      inst->setMetadata(groupMD->getMetadataID(), groupMD);
+    }
+    llvm::errs() << "\n";
+    id += 1;
+  }
 
   return PreservedAnalyses::all();
 }
@@ -890,8 +907,9 @@ void PollyDependencePass::processLoop(Loop *l) {
   }
 }
 
-void PollyDependencePass::createSets(struct TLLMeta &lm) {
-  std::list<instPairT> intersectList;
+std::vector<instPairT>
+PollyDependencePass::getDependencyPairs(struct TLLMeta &lm) {
+  std::vector<instPairT> intersectList;
   auto rdInstrSet = lm.rdInsts;
   auto wrInstrSet = lm.wrInsts;
 
@@ -973,15 +991,97 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
     }
   }
 
-  for (const auto &[linst, rinst] : intersectList) {
-    llvm::errs() << "Dependency edge: " << linst << " -> " << rinst << "\n";
+  return intersectList;
+}
+
+void PollyDependencePass::createSets(struct TLLMeta &lm) {
+  std::list<instPairT> intersectList;
+  auto rdInstrSet = lm.rdInsts;
+  auto wrInstrSet = lm.wrInsts;
+
+  for (auto *wrInst : wrInstrSet) {
+    /* Find RAW dependencies */
+    for (const auto *rdInst : rdInstrSet) {
+      auto pair = instPairT(wrInst, rdInst);
+
+      /* Each base array is emitted as a separate RAM in the design. Two
+       * instructions targetting differing base arrays can never depend */
+      if (!equalBase(wrInst, rdInst))
+        continue;
+
+      /*  If both instructions are in the same scop,
+          use the result from IndexAnalysis */
+      auto rdIt = lm.instToScop.find(rdInst);
+      auto wrIt = lm.instToScop.find(wrInst);
+      if (rdIt != lm.instToScop.end() && wrIt != lm.instToScop.end() &&
+          rdIt->second == wrIt->second) {
+        if (indexAnalysis.getRAWlist().find(pair) !=
+            indexAnalysis.getRAWlist().end())
+          intersectList.push_back(pair);
+        continue;
+      }
+
+      /* Otherwise, use results from AA */
+      auto *li = dyn_cast<LoadInst>(rdInst);
+      auto *si = dyn_cast<StoreInst>(wrInst);
+
+      if (li == nullptr || si == nullptr) {
+        llvm_unreachable("Expecting only Read-Write pairs of "
+                         "instructions when locating RAW dependencies");
+      }
+
+      if (aliasAnalysis->alias(MemoryLocation::get(li),
+                               MemoryLocation::get(si)) != AliasResult::NoAlias)
+        intersectList.push_back(pair);
+    }
+    /* Find WAW dependencies */
+    for (const auto *wrInst1 : wrInstrSet) {
+      if (wrInst1 == wrInst)
+        continue;
+
+      /* Each base array is emitted as a separate RAM in the design. Two
+       * instructions targetting differing base arrays can never depend */
+      if (!equalBase(wrInst, wrInst1))
+        continue;
+
+      auto pair = instPairT(wrInst1, wrInst);
+      auto pairRev = instPairT(wrInst, wrInst1);
+      /*  If both instructions are in the same scop,
+          use the result rom IndexAnalysis */
+      auto wr1It = lm.instToScop.find(wrInst1);
+      auto wrIt = lm.instToScop.find(wrInst);
+      if (wr1It != lm.instToScop.end() && wrIt != lm.instToScop.end() &&
+          wr1It->second == wrIt->second) {
+        if (indexAnalysis.getWAWlist().find(pair) !=
+            indexAnalysis.getWAWlist().end())
+          intersectList.push_back(pair);
+        else if (indexAnalysis.getWAWlist().find(pairRev) !=
+                 indexAnalysis.getWAWlist().end())
+          intersectList.push_back(pairRev);
+        continue;
+      }
+
+      /* Otherwise, use results from AA */
+      auto *storeInst0 = dyn_cast<StoreInst>(wrInst);
+      auto *storeInst1 = dyn_cast<StoreInst>(wrInst1);
+
+      if (storeInst0 == nullptr || storeInst1 == nullptr) {
+        llvm_unreachable("Expecting only Write-Write pairs of "
+                         "instructions when locating WAW dependencies");
+      }
+
+      if (aliasAnalysis->alias(MemoryLocation::get(storeInst0),
+                               MemoryLocation::get(storeInst1)) !=
+          AliasResult::NoAlias)
+        intersectList.push_back(pair);
+    }
   }
 
   /* Create sets from pairs of intersecting accesses such that
    * both instructions of every pair end up in the same set */
   for (auto instPair : intersectList) {
-    const auto *lInst = instPair.first;
-    const auto *rInst = instPair.second;
+    auto *lInst = instPair.first;
+    auto *rInst = instPair.second;
 
     /* Find base array */
     const Value *base = findBase(lInst);
@@ -1003,8 +1103,8 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
       lsq = lsQit->second;
       /* Not checking for existence since this allows for a single access
        * only */
-      lsq->insts.insert(lInst);
-      lsq->insts.insert(rInst);
+      lsq->insts.emplace(lInst);
+      lsq->insts.emplace(rInst);
     }
     mei.instToLSQ[lInst] = mei.instToLSQ[rInst] = lsq;
   }
