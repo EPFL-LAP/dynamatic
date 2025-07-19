@@ -98,6 +98,7 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
 
 bool TimingDatabase::insertTimingModel(StringRef timingModelKey,
                                        TimingModel &model) {
+  llvm::errs() << timingModelKey << "\n";
   return models.try_emplace(timingModelKey, model).second;
 }
 
