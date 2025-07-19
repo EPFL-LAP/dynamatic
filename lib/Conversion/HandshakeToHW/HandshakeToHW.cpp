@@ -690,16 +690,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         unsupported = true;
       });
 
-  if (auto internalDelayInterface =
-          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
-    auto delayAttr = internalDelayInterface.getInternalDelay();
-    addParam("INTERNAL_DELAY", delayAttr);
-  }
-
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     auto impl = fpuImplInterface.getFPUImpl();
     addString("FPU_IMPL", stringifyEnum(impl));
+
+    auto delayAttr = fpuImplInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
   }
 }
 
