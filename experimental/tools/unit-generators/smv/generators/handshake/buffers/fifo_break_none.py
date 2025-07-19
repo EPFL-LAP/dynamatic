@@ -59,7 +59,7 @@ def _generate_fifo_break_none_dataless(name, slots):
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
 MODULE {name}(ins_valid, outs_ready)
-    {"\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
+    {"\\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
 
     -- outputs
 		DEFINE outs_valid := b{slots - 1}.outs_valid;
@@ -75,7 +75,7 @@ def _generate_fifo_break_none(name, slots, data_type):
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-    {"\n    ".join([f"VAR b{n} : {name}_tslot({data}, {valid}, {ready});" for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))])}
+    {"\\n    ".join([f"VAR b{n} : {name}_tslot({data}, {valid}, {ready});" for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))])}
 
     -- output
 		DEFINE outs   := b{slots - 1}.outs;
