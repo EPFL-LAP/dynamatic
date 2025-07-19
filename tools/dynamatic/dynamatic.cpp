@@ -280,6 +280,7 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
+  static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -294,6 +295,9 @@ public:
                "costaware (throughput- and area-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
+    addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
+                          "Warning: This may result in out-of-order memory "
+                          "accesses, use with caution!"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -645,13 +649,14 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
+  std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification);
+                 state.fpUnitsGenerator, rigidification, disableLSQ);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

@@ -18,6 +18,7 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.ndwire as ndwire
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -50,6 +51,7 @@ import generators.arith.trunci as trunci
 import generators.arith.xori as xori
 
 import generators.memory.memory_controller as memory_controller
+import generators.memory.lsq as lsq
 
 
 def generate_code(name, mod_type, parameters):
@@ -146,6 +148,8 @@ def generate_code(name, mod_type, parameters):
             return memory_controller.generate_memory_controller(name, parameters)
         case "ndwire":
             return ndwire.generate_ndwire(name, parameters)
+        case "lsq":
+            return lsq.generate_lsq(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
@@ -160,7 +164,8 @@ def parse_parameters(param_list):
                     param_dict[key.strip()] = ast.literal_eval(value.strip())
         return param_dict
     except ValueError:
-        raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
+        raise ValueError(
+            "Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():

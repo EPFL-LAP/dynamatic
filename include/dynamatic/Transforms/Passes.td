@@ -419,4 +419,26 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
   let constructor = "dynamatic::createRemovePolygeistAttributes()";
 }
 
+// Remark: this is an example where the implicit name analysis in DynamaticPass
+// creates a problem (still need to investigate why). If you switch this to
+// DynamaticPass instead of Pass, somehow it deletes the listed operation from
+// the module in the end.
+def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
+  let summary = "Remove all unlisted functions from a given module.";
+  let description = [{The output from Clang + opt + mlir-translate contains
+  functions that we cannot synthesize (e.g., main(), rand(), srand()...). This
+  function is useful for dropping them. This pass scans the LLVMFuncOp and
+  func::FuncOps and remove the unlisted ones.}];
+
+  let options =
+    [
+      ListOption<"function_names", "function-names", "std::string",
+            "A list of (comma-separated) function names to keep. For example: function-names=fir,wrapper">,
+    ];
+  let dependentDialects = [
+  "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
+  "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
+  "mlir::LLVM::LLVMDialect"];
+}
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

@@ -406,6 +406,13 @@ def OpTab(out, tabLevel, *list_in) -> str:
 
 
 def MaskLess(din, size) -> str:
+    """
+    Example:
+        MaskLess(3, 5)  # Output: "00111"
+        MaskLess(2, 6)  # Output: "000011"
+        MaskLess(5, 5)  # Output: "11111"
+        MaskLess(0, 4)  # Output: "0000"
+    """
     if (din > size):
         raise ValueError("Unknown value!")
     return '\"' + '0'*(size-din) + '1'*din + '\"'
