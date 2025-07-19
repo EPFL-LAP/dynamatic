@@ -17,9 +17,9 @@
 using namespace llvm;
 using namespace polly;
 
-class TokenDependenceInfo {
+class InstructionDependenceInfo {
 public:
-  TokenDependenceInfo(const LoopInfo &li) : loopInfo(li) {}
+  InstructionDependenceInfo(const LoopInfo &li) : loopInfo(li) {}
 
   /// Query whether I_B is dependant on I_A: I_A -D-> I_B
   /// Returns true if every token coming to I_A has passed through I_B
@@ -216,8 +216,8 @@ static bool tokenRevDepends(Path path, const Instruction *instA,
 
 } // namespace
 
-bool TokenDependenceInfo::hasTokenDependence(const Instruction *iB,
-                                             const Instruction *iA) {
+bool InstructionDependenceInfo::hasTokenDependence(const Instruction *iB,
+                                                   const Instruction *iA) {
 
   Path p;
   const auto *bb = iB->getParent();
@@ -233,8 +233,8 @@ bool TokenDependenceInfo::hasTokenDependence(const Instruction *iB,
   return tokenDepends(p, iA, loopSet);
 }
 
-bool TokenDependenceInfo::hasRevTokenDependence(const Instruction *iA,
-                                                const Instruction *iB) {
+bool InstructionDependenceInfo::hasRevTokenDependence(const Instruction *iA,
+                                                      const Instruction *iB) {
   Path p;
   const auto *bb = iA->getParent();
   p.blocks.push_back(bb);
@@ -254,7 +254,7 @@ class ScopMeta {
   Scop &s;
   DominatorTree *dominatorTree;
   LoopInfo *loopInfo;
-  TokenDependenceInfo tdi;
+  InstructionDependenceInfo tdi;
 
   int scopMinDepth;
   std::vector<Instruction *> memInsts;
@@ -427,11 +427,6 @@ public:
   }
 
   void computeIntersections() {
-    // DEBUG(dbgs() << "ScopMeta:" << __func__ << "START\n");
-    // DEBUG(for (auto Inst
-    //            : MemInsts) dbgs()
-    //       << *Inst << InstToCurrentMap[Inst].to_str() << "\n");
-
     /* Checking for RAW and WAW conflicts */
     for (auto *wrInst : memInsts) {
       if (!wrInst->mayWriteToMemory())
