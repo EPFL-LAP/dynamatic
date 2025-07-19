@@ -38,37 +38,40 @@ public:
   using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
 
   // inherited TableGen Pass Options:
-  // FPUImpl imp
+  // std::string impl
 
   void runDynamaticPass() override;
+
+private:
+  bool checkPassOption(Optional<dynamatic::handshake::FPUImpl> implOpt);
+
 };
 
 } // namespace
 
-bool checkPassOption(Optional<dynamatic::handshake::FPUImpl> implOpt){
-  if(!implOpt.has_value()){
-    llvm::errs() << "Invalid FPU implementation: '"
-                 << this->impl << "'\n";
-    llvm::errs() << "Valid FPU Implementations:\n";
-    for (int64_t i = 0; i <= getMaxEnumValForFPUImpl(); ++i) {
-      if (auto e = symbolizeFPUImpl(i))
-        llvm::errs() << "'" << stringifyFPUImpl(*e) << "'\n";
-    }
-    return false;
+std::optional<FPUImpl> symbolizeFPUImplOrEmitError(StringRef implStr) {
+  if (auto parsed = symbolizeFPUImpl(implStr))
+    return parsed;
+
+  llvm::errs() << "Invalid FPU implementation: '" << implStr << "'\n";
+  llvm::errs() << "Valid FPU Implementations:\n";
+  for (int64_t i = 0; i <= getMaxEnumValForFPUImpl(); ++i) {
+    if (auto e = symbolizeFPUImpl(i))
+      llvm::errs() << "  '" << stringifyFPUImpl(*e) << "'\n";
   }
-  return true;
+  return std::nullopt;
 }
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
-  // this->impl is the pass option declared in tablegen
-  auto implOpt = symbolizeFPUImpl(this->impl);
-
-  if (!checkPassOption(implOpt)) {
+  // this->impl is the std::string pass option declared in tablegen
+  auto implOpt = symbolizeFPUImplOrEmitError(this->impl);
+  if (!implOpt.has_value()) {
     signalPassFailure();
     return;
   }
 
-  auto impl = implOpt.value();
+  // FPUImpl local variable hides std::string pass option
+  FPUImpl impl = implOpt.value();
 
   // iterate over each operation that implements FPUImplInterface
   getOperation()->walk([&](FPUImplInterface fpuImplInterface) {
