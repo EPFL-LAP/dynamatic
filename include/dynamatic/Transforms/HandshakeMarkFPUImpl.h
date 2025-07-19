@@ -15,7 +15,6 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 
-
 namespace dynamatic {
 
 // include tblgen base class declaration,
