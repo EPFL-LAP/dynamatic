@@ -37,6 +37,11 @@ void handshake::HandshakeDialect::initialize() {
 #define GET_ATTRDEF_LIST
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.cpp.inc"
       >();
+
+  attachInterface<mlir::DialectResourceBlobHandler>(
+    new mlir::DialectResourceBlobHandler([](StringRef name) {
+      return name == "timingDB";
+    }));
 }
 
 // Provide implementations for the attributes, enums, and types that we use

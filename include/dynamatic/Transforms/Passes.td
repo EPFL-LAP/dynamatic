@@ -224,6 +224,18 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
+def HandshakeSetTimingDBPath : DynamaticPass<"handshake-set-timing-db-path"> {
+  let summary = "Sets the JSON file path used for timing models";
+  let description = [{
+    This pass stores the path to the timing database JSON file as a resource
+    accessible to other passes via the MLIR context.
+  }];
+
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "", "Path to timing JSON file">
+  ];
+}
+
 def HandshakeSetBufferingProperties :
   DynamaticPass<"handshake-set-buffering-properties"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
