@@ -13,7 +13,6 @@
 #ifndef DYNAMATIC_TRANSFORMS_PASSES_H
 #define DYNAMATIC_TRANSFORMS_PASSES_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Transforms/BackAnnotate.h"

@@ -13,7 +13,6 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEREMARKFPUIMPL_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEREMARKFPUIMPL_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Support/DynamaticPass.h"
 
 

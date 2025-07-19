@@ -287,9 +287,9 @@ def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
     Defaults to vivado.
   }];
   let options = [
-    Option<"impl", "impl", "dynamatic::handshake::FPUImpl",
-      "dynamatic::handshake::FPUImpl::VIVADO",
-      "Which FPU impl to use">
+    Option<"impl", "impl", "::std::string",
+      "\"VIVADO\"",
+      "Which FPU impl to use.">
   ];
 }
 
