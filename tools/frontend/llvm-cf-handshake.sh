@@ -5,7 +5,7 @@ DYNAMATIC_PATH=$1
 
 DYNAMATIC_BINS=$DYNAMATIC_PATH/build/bin
 
-LLVM=$DYNAMATIC_PATH/polygeist/llvm-project 
+LLVM=$DYNAMATIC_PATH/polygeist/llvm-project
 
 LLVM_BINS=$LLVM/build/bin
 
@@ -33,7 +33,7 @@ $LLVM_BINS/clang -O0 -S -emit-llvm $F_SRC \
   -ffp-contract=off \
   -o $OUT/clang.ll
 
-# NOTE: 
+# NOTE:
 # - When calling clang with "-ffp-contract=off", clang will bypass the
 # "-disable-O0-optnone" flag and still adds "optnone" to the IR. This is a hacky
 # way to ignore it
@@ -54,7 +54,7 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
-# 
+#
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
 $LLVM_BINS/opt -S \
@@ -63,24 +63,22 @@ $LLVM_BINS/opt -S \
   $OUT/clang.ll \
   > $OUT/clang_optimized.ll
 
-# This pass uses polyhedral analysis to determine which set of memory ops need
-# to be connected to a separate LSQ, it attaches meta data to those instructions
-# and indicate that they belong to certain set of LSQ nodes.
+# This pass uses polyhedral analysis to determine the dependency between memory operations
 #
 # Example:
 # ======== histogram.ll =========
-#  %2 = load float, ptr %arrayidx4, align 4, !group !6
+#  %2 = load float, ptr %arrayidx4, align 4, !mem.op !5
 #  ...
-#  store float %add, ptr %arrayidx6, align 4, !group !6
+#  store float %add, ptr %arrayidx6, align 4, !mem.op !6 !dest.ops !5 ; this means that the store must happen before the load
 #  ...
-# !6 = !{!"group_0"}
+# !5 = !{!"load1"}
+# !6 = !{!"store1"}
 # ===============================
-# Notice that the load and store instructions are tagged with !group !6
 
 $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
-  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/lsq-usage-analysis/libLSQUsageAnalysis.so" \
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/lsq-usage-analysis/libLSQUsageAnalysisPass.so" \
   -passes="lsq-usage-analysis" \
-  > $OUT/clang_optimized_lsq_groups_marked.ll
+  > $OUT/clang_optimized_dep_marked.ll
 
 $LLVM_BINS/mlir-translate \
   --import-llvm $OUT/clang_optimized.ll \
@@ -106,10 +104,12 @@ $DYNAMATIC_BINS/dynamatic-opt \
   --func-set-arg-names="source=$F_SRC" \
   --mark-memory-dependencies \
   --flatten-memref-row-major \
+  --canonicalize \
+  --push-constants \
   --mark-memory-interfaces \
-  > $OUT/cf_optimized.mlir
+  > $OUT/cf_transformed.mlir
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/cf_optimized.mlir \
+  $OUT/cf_transformed.mlir \
   --lower-cf-to-handshake \
   > $OUT/handshake.mlir
