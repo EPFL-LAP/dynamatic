@@ -1436,7 +1436,7 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
 
   auto newFifoConfig =
       xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
-                               /*bypass=*/bufferOp.isBypass(),
+                               /*bypass=*/bufferOp.isBypassDV(),
                                /*register_push_outputs=*/false,
                                /*register_pop_outputs=*/false);
   ch.setFifoConfigAttr(newFifoConfig);

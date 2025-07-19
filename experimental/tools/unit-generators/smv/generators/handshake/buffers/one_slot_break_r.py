@@ -1,16 +1,16 @@
 from generators.support.utils import *
 
 
-def generate_tehb(name, params):
+def generate_one_slot_break_r(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if data_type.bitwidth == 0:
-        return _generate_tehb_dataless(name)
+        return _generate_one_slot_break_r_dataless(name)
     else:
-        return _generate_tehb(name, data_type)
+        return _generate_one_slot_break_r(name, data_type)
 
 
-def _generate_tehb_dataless(name):
+def _generate_one_slot_break_r_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
@@ -27,11 +27,11 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_tehb(name, data_type):
+def _generate_one_slot_break_r(name, data_type):
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR
-  inner_tehb : {name}__tehb_dataless(ins_valid, outs_ready);
+  inner_one_slot_break_r : {name}__one_slot_break_r_dataless(ins_valid, outs_ready);
   data : {data_type};
 
   ASSIGN
@@ -40,9 +40,9 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
   -- output
   DEFINE
-  ins_ready := inner_tehb.ins_ready;
-  outs_valid := inner_tehb.outs_valid;
-  outs := inner_tehb.full ? data : ins;
+  ins_ready := inner_one_slot_break_r.ins_ready;
+  outs_valid := inner_one_slot_break_r.outs_valid;
+  outs := inner_one_slot_break_r.full ? data : ins;
 
-{_generate_tehb_dataless(f"{name}__tehb_dataless")}
+{_generate_one_slot_break_r_dataless(f"{name}__one_slot_break_r_dataless")}
 """
