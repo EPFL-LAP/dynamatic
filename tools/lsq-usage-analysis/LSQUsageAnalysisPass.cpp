@@ -25,17 +25,13 @@ public:
   /// Returns true if every token coming to I_A has passed through I_B
   /// without traversing any BB-edge that would increment common induction
   /// variables
-  bool hasTokenDependence(const Instruction *iB, const Instruction *iA);
+  bool hasDependency(const Instruction *iB, const Instruction *iA);
 
   /// Query whether I_B is reversely dependant on I_A: I_A -RD-> I_B
   /// Returns true if every token coming to I_A will pass through I_B
   /// without traversing any BB-edge that would increment common induction
   /// variables
-  bool hasRevTokenDependence(const Instruction *iA, const Instruction *iB);
-
-  bool hasControlDependence(const Instruction *iA, const Instruction *iB) {
-    return false;
-  }
+  bool hasReverseDependency(const Instruction *iA, const Instruction *iB);
 
 private:
   const LoopInfo &loopInfo;
@@ -216,8 +212,8 @@ static bool tokenRevDepends(Path path, const Instruction *instA,
 
 } // namespace
 
-bool InstructionDependenceInfo::hasTokenDependence(const Instruction *iB,
-                                                   const Instruction *iA) {
+bool InstructionDependenceInfo::hasDependency(const Instruction *iB,
+                                              const Instruction *iA) {
 
   Path p;
   const auto *bb = iB->getParent();
@@ -233,8 +229,8 @@ bool InstructionDependenceInfo::hasTokenDependence(const Instruction *iB,
   return tokenDepends(p, iA, loopSet);
 }
 
-bool InstructionDependenceInfo::hasRevTokenDependence(const Instruction *iA,
-                                                      const Instruction *iB) {
+bool InstructionDependenceInfo::hasReverseDependency(const Instruction *iA,
+                                                     const Instruction *iB) {
   Path p;
   const auto *bb = iA->getParent();
   p.blocks.push_back(bb);
@@ -474,9 +470,8 @@ public:
 
         isl::map instMap, wrInstMap;
 
-        bool depends = tdi.hasTokenDependence(wrInst, inst) ||
-                       tdi.hasRevTokenDependence(inst, wrInst) ||
-                       tdi.hasControlDependence(wrInst, inst);
+        bool depends = tdi.hasDependency(wrInst, inst) ||
+                       tdi.hasReverseDependency(inst, wrInst);
 
         /* Only WrInst may only depend on Inst if Inst is a load */
         if (rdInst != nullptr && depends) {
@@ -699,7 +694,7 @@ struct MemElemInfo {
 };
 
 namespace {
-struct PollyDependencePass : PassInfoMixin<PollyDependencePass> {
+struct LSQUsageAnalysisPass : PassInfoMixin<LSQUsageAnalysisPass> {
 
   std::vector<ScopMeta *> scopeMetas;
 
@@ -731,8 +726,8 @@ struct PollyDependencePass : PassInfoMixin<PollyDependencePass> {
   AAManager::Result *aliasAnalysis;
 };
 
-PreservedAnalyses PollyDependencePass::run(Function &f,
-                                           FunctionAnalysisManager &fam) {
+PreservedAnalyses LSQUsageAnalysisPass::run(Function &f,
+                                            FunctionAnalysisManager &fam) {
 
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
 
@@ -833,7 +828,7 @@ PreservedAnalyses PollyDependencePass::run(Function &f,
   return PreservedAnalyses::all();
 }
 
-void PollyDependencePass::processScop(Scop &s) {
+void LSQUsageAnalysisPass::processScop(Scop &s) {
 
   auto *meta = new ScopMeta(s);
 
@@ -870,7 +865,7 @@ void PollyDependencePass::processScop(Scop &s) {
   }
 }
 
-void PollyDependencePass::processLoop(Loop *l) {
+void LSQUsageAnalysisPass::processLoop(Loop *l) {
   loopMetaInfos.emplace_back();
   auto &loopMetaData = loopMetaInfos.back();
 
@@ -898,7 +893,7 @@ void PollyDependencePass::processLoop(Loop *l) {
 }
 
 std::vector<instPairT>
-PollyDependencePass::getDependencyPairs(struct TLLMeta &lm) {
+LSQUsageAnalysisPass::getDependencyPairs(struct TLLMeta &lm) {
   std::vector<instPairT> intersectList;
   auto rdInstrSet = lm.rdInsts;
   auto wrInstrSet = lm.wrInsts;
@@ -984,7 +979,7 @@ PollyDependencePass::getDependencyPairs(struct TLLMeta &lm) {
   return intersectList;
 }
 
-void PollyDependencePass::createSets(struct TLLMeta &lm) {
+void LSQUsageAnalysisPass::createSets(struct TLLMeta &lm) {
   std::list<instPairT> intersectList;
   auto rdInstrSet = lm.rdInsts;
   auto wrInstrSet = lm.wrInsts;
@@ -1108,13 +1103,13 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
 // https://stackoverflow.com/questions/51474188/using-shared-object-so-by-command-opt-in-llvm
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "PollyDependencePass", LLVM_VERSION_STRING,
+  return {LLVM_PLUGIN_API_VERSION, "LSQUsageAnalysis", LLVM_VERSION_STRING,
           [](PassBuilder &pb) {
             pb.registerPipelineParsingCallback(
                 [](StringRef name, FunctionPassManager &fpm,
                    ArrayRef<PassBuilder::PipelineElement>) {
-                  if (name == "polly-dependence-pass") {
-                    fpm.addPass(PollyDependencePass());
+                  if (name == "lsq-usage-analysis") {
+                    fpm.addPass(LSQUsageAnalysisPass());
                     return true;
                   }
                   return false;
