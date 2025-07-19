@@ -1,16 +1,16 @@
 from generators.support.utils import *
 
 
-def generate_oehb(name, params):
+def generate_one_slot_break_dv(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if data_type.bitwidth == 0:
-        return _generate_oehb_dataless(name)
+        return _generate_one_slot_break_dv_dataless(name)
     else:
-        return _generate_oehb(name, data_type)
+        return _generate_one_slot_break_dv(name, data_type)
 
 
-def _generate_oehb_dataless(name):
+def _generate_one_slot_break_dv_dataless(name):
     return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
@@ -27,11 +27,11 @@ MODULE {name} (ins_valid, outs_ready)
 """
 
 
-def _generate_oehb(name, data_type):
+def _generate_one_slot_break_dv(name, data_type):
     return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
-  inner_oehb : {name}__oehb_dataless(ins_valid, outs_ready);
+  inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(ins_valid, outs_ready);
   data : {data_type};
 
   ASSIGN
@@ -43,9 +43,9 @@ MODULE {name} (ins, ins_valid, outs_ready)
     
   -- output
   DEFINE
-  ins_ready := inner_oehb.ins_ready;
-  outs_valid := inner_oehb.outs_valid;
+  ins_ready := inner_one_slot_break_dv.ins_ready;
+  outs_valid := inner_one_slot_break_dv.outs_valid;
   outs := data;
 
-{_generate_oehb_dataless(f"{name}__oehb_dataless")}
+{_generate_one_slot_break_dv_dataless(f"{name}__one_slot_break_dv_dataless")}
 """

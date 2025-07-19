@@ -295,6 +295,9 @@ def run_test(c_file: str, spec: bool) -> bool:
 
     # Simulate
     print("Simulator launching")
+
+    # simulate now needs the vivado path + should we use vivado floating point units
+    # this should probably be changed
     result = subprocess.run([
         SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name, "", "false"
     ])

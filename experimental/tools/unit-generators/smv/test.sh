@@ -9,7 +9,7 @@ test_generator () {
   else
     OUT="module.smv"
   fi
-  GENERATOR_CALL="python3 ${GENPATH}smv-unit-generator.py -n test_module -o $OUT"
+  GENERATOR_CALL="python ${GENPATH}smv-unit-generator.py -n test_module -o $OUT"
   PARAMS=$1
 
   $GENERATOR_CALL $@

@@ -1,8 +1,8 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
-from generators.handshake.tehb import generate_tehb
-from generators.handshake.ofifo import generate_ofifo
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
+from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 
 
 def generate_load(name, params):
@@ -17,12 +17,12 @@ def generate_load(name, params):
 
 
 def _generate_load(name, data_bitwidth, addr_bitwidth):
-    addr_tehb_name = f"{name}_addr_tehb"
-    data_tehb_name = f"{name}_data_tehb"
+    addr_one_slot_break_r_name = f"{name}_addr_one_slot_break_r"
+    data_one_slot_break_r_name = f"{name}_data_one_slot_break_r"
 
     dependencies = \
-        generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
-        generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
+        generate_one_slot_break_r(addr_one_slot_break_r_name, {"bitwidth": addr_bitwidth}) + \
+        generate_one_slot_break_r(data_one_slot_break_r_name, {"bitwidth": data_bitwidth})
 
     entity = f"""
 library ieee;
@@ -58,7 +58,7 @@ end entity;
 -- Architecture of load
 architecture arch of {name} is
 begin
-  addr_tehb : entity work.{addr_tehb_name}(arch)
+  addr_one_slot_break_r : entity work.{addr_one_slot_break_r_name}(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -72,7 +72,7 @@ begin
       outs_ready => addrOut_ready
     );
 
-  data_tehb : entity work.{data_tehb_name}(arch)
+  data_one_slot_break_r : entity work.{data_one_slot_break_r_name}(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -101,9 +101,9 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
     inner_name = f"{name}_inner"
     inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
 
-    # Generate ofifo to store extra signals for in-flight memory requests
-    ofifo_name = f"{name}_ofifo"
-    ofifo = generate_ofifo(ofifo_name, {
+    # Generate fifo_break_dv to store extra signals for in-flight memory requests
+    fifo_break_dv_name = f"{name}_fifo_break_dv"
+    fifo_break_dv = generate_fifo_break_dv(fifo_break_dv_name, {
         "bitwidth": extra_signals_total_bitwidth,
         "num_slots": 1  # Assume LoadOp is connected to a memory controller
     })
@@ -151,8 +151,8 @@ begin
 
   -- Buffer to store extra signals for in-flight memory requests
   -- LoadOp is assumed to be connected to a memory controller
-  -- Use ofifo with latency 1 (MC latency)
-  ofifo : entity work.{ofifo_name}(arch)
+  -- Use fifo_break_dv with latency 1 (MC latency)
+  fifo_break_dv : entity work.{fifo_break_dv_name}(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -184,4 +184,4 @@ begin
 end architecture;
 """
 
-    return inner + ofifo + entity + architecture
+    return inner + fifo_break_dv + entity + architecture

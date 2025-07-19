@@ -1,7 +1,7 @@
 from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.handshake.oehb import generate_oehb
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
 
 def generate_subf(name, params):
@@ -27,11 +27,11 @@ def _get_latency(is_double):
 
 def _generate_subf_single_precision(name):
     join_name = f"{name}_join"
-    oehb_name = f"{name}_oehb"
+    one_slot_break_dv_name = f"{name}_one_slot_break_dv"
     buff_name = f"{name}_buff"
 
     dependencies = generate_join(join_name, {"size": 2}) + \
-        generate_oehb(oehb_name, {"bitwidth": 0}) + \
+        generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0}) + \
         generate_delay_buffer(
         buff_name, {"slots": _get_latency(is_double=False) - 1})
 
@@ -64,7 +64,7 @@ end entity;
 -- Architecture of subf_single_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
-  signal buff_valid, oehb_valid, oehb_ready : std_logic;
+  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
 
   -- subf is the same as addf, but we flip the sign bit of rhs
   signal rhs_neg : std_logic_vector(32 - 1 downto 0);
@@ -80,21 +80,21 @@ begin
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      outs_ready => oehb_ready,
+      outs_ready => one_slot_break_dv_ready,
       -- outputs
       outs_valid => join_valid,
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.{oehb_name}(arch)
+  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
     port map(
       clk => clk,
       rst => rst,
       ins_valid => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready => oehb_ready
+      ins_ready => one_slot_break_dv_ready
     );
 
   rhs_neg <= not rhs(32 - 1) & rhs(32 - 2 downto 0);
@@ -104,7 +104,7 @@ begin
       clk,
       rst,
       join_valid,
-      oehb_ready,
+      one_slot_break_dv_ready,
       buff_valid
     );
 
@@ -129,7 +129,7 @@ begin
   operator : entity work.FloatingPointAdder(arch)
     port map(
       clk => clk,
-      ce => oehb_ready,
+      ce => one_slot_break_dv_ready,
       X => ip_lhs,
       Y => ip_rhs,
       R => ip_result
@@ -142,11 +142,11 @@ end architecture;
 
 def _generate_subf_double_precision(name):
     join_name = f"{name}_join"
-    oehb_name = f"{name}_oehb"
+    one_slot_break_dv_name = f"{name}_one_slot_break_dv"
     buff_name = f"{name}_buff"
 
     dependencies = generate_join(join_name, {"size": 2}) + \
-        generate_oehb(oehb_name, {"bitwidth": 1}) + \
+        generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 1}) + \
         generate_delay_buffer(
         buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -179,7 +179,7 @@ end entity;
 -- Architecture of subf_double_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
-  signal buff_valid, oehb_valid, oehb_ready : std_logic;
+  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
 
   -- subf is the same as addf, but we flip the sign bit of rhs
   signal rhs_neg : std_logic_vector(64 - 1 downto 0);
@@ -195,20 +195,20 @@ begin
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      outs_ready => oehb_ready,
+      outs_ready => one_slot_break_dv_ready,
       -- outputs
       outs_valid => join_valid,
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready
     );
-  oehb : entity work.{oehb_name}(arch)
+  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
     port map(
       clk => clk,
       rst => rst,
       ins_valid => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready => oehb_ready,
+      ins_ready => one_slot_break_dv_ready,
       ins(0) => '0',
       outs => open
     );
@@ -220,7 +220,7 @@ begin
       clk,
       rst,
       join_valid,
-      oehb_ready,
+      one_slot_break_dv_ready,
       buff_valid
     );
 
@@ -245,7 +245,7 @@ begin
   operator : entity work.FPAdd_64bit(arch)
     port map(
       clk => clk,
-      ce => oehb_ready,
+      ce => one_slot_break_dv_ready,
       X => ip_lhs,
       Y => ip_rhs,
       R => ip_result

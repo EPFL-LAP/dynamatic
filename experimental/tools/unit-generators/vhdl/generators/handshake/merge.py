@@ -1,7 +1,7 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.merge_notehb import generate_merge_notehb
-from generators.handshake.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 
 
 def generate_merge(name, params):
@@ -20,10 +20,10 @@ def generate_merge(name, params):
 
 def _generate_merge_dataless(name, size):
     inner_name = f"{name}_inner"
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
     dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-        generate_tehb(tehb_name, {"bitwidth": 0, "size": 0})
+        generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": 0, "size": 0})
 
     entity = f"""
 library ieee;
@@ -48,27 +48,27 @@ end entity;
     architecture = f"""
 -- Architecture of merge_dataless
 architecture arch of {name} is
-  signal tehb_pvalid : std_logic;
-  signal tehb_ready  : std_logic;
+  signal one_slot_break_r_pvalid : std_logic;
+  signal one_slot_break_r_ready  : std_logic;
 begin
   merge_ins : entity work.{inner_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
       ins_valid  => ins_valid,
-      outs_ready => tehb_ready,
+      outs_ready => one_slot_break_r_ready,
       ins_ready  => ins_ready,
-      outs_valid => tehb_pvalid
+      outs_valid => one_slot_break_r_pvalid
     );
 
-  tehb : entity work.{tehb_name}(arch)
+  one_slot_break_r : entity work.{one_slot_break_r_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
-      ins_valid  => tehb_pvalid,
+      ins_valid  => one_slot_break_r_pvalid,
       outs_ready => outs_ready,
       outs_valid => outs_valid,
-      ins_ready  => tehb_ready
+      ins_ready  => one_slot_break_r_ready
     );
 end architecture;
 """
@@ -78,14 +78,14 @@ end architecture;
 
 def _generate_merge(name, size, bitwidth):
     inner_name = f"{name}_inner"
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
     dependencies = \
         generate_merge_notehb(inner_name, {
             "size": size,
             "bitwidth": bitwidth,
         }) + \
-        generate_tehb(tehb_name, {"bitwidth": bitwidth})
+        generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": bitwidth})
 
     entity = f"""
 library ieee;
@@ -113,9 +113,9 @@ end entity;
     architecture = f"""
 -- Architecture of merge
 architecture arch of {name} is
-  signal tehb_data_in : std_logic_vector({bitwidth} - 1 downto 0);
-  signal tehb_pvalid  : std_logic;
-  signal tehb_ready   : std_logic;
+  signal one_slot_break_r_data_in : std_logic_vector({bitwidth} - 1 downto 0);
+  signal one_slot_break_r_pvalid  : std_logic;
+  signal one_slot_break_r_ready   : std_logic;
 begin
 
   merge_ins : entity work.{inner_name}(arch)
@@ -124,21 +124,21 @@ begin
       rst        => rst,
       ins        => ins,
       ins_valid  => ins_valid,
-      outs_ready => tehb_ready,
+      outs_ready => one_slot_break_r_ready,
       ins_ready  => ins_ready,
-      outs       => tehb_data_in,
-      outs_valid => tehb_pvalid
+      outs       => one_slot_break_r_data_in,
+      outs_valid => one_slot_break_r_pvalid
     );
 
-  tehb : entity work.{tehb_name}(arch)
+  one_slot_break_r : entity work.{one_slot_break_r_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
-      ins_valid  => tehb_pvalid,
+      ins_valid  => one_slot_break_r_pvalid,
       outs_ready => outs_ready,
       outs_valid => outs_valid,
-      ins_ready  => tehb_ready,
-      ins        => tehb_data_in,
+      ins_ready  => one_slot_break_r_ready,
+      ins        => one_slot_break_r_data_in,
       outs       => outs
     );
 end architecture;

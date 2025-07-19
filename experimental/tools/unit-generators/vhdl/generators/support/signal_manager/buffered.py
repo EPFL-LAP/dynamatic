@@ -91,7 +91,7 @@ def generate_buffered_signal_manager(
       A string representing the complete VHDL architecture for the signal manager.
     """
     # Delayed import to avoid circular dependency
-    from generators.handshake.ofifo import generate_ofifo
+    from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 
     inner_name = f"{name}_inner"
     inner = generate_inner(inner_name)
@@ -104,7 +104,7 @@ def generate_buffered_signal_manager(
 
     # Generate FIFO to buffer concatenated extra signals
     buff_name = f"{name}_buff"
-    buff = generate_ofifo(buff_name, {
+    buff = generate_fifo_break_dv(buff_name, {
         "num_slots": latency,
         "bitwidth": extra_signals_bitwidth
     })
@@ -171,7 +171,7 @@ begin
       {mappings}
     );
 
-  -- Generate ofifo to store extra signals
+  -- Generate fifo_break_dv to store extra signals
   -- num_slots = {latency}, bitwidth = {extra_signals_bitwidth}
   buff : entity work.{buff_name}(arch)
     port map(
