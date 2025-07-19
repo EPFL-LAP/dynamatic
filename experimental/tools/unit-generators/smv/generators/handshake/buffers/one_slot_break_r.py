@@ -14,17 +14,16 @@ def _generate_one_slot_break_r_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
-  full_i : boolean;
+  full : boolean;
 
   ASSIGN
-  init(full_i) := FALSE;
-  next(full_i) := outs_valid & !outs_ready;
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
 
   -- output
   DEFINE
-  ins_ready := !full_i;
-  outs_valid := ins_valid | full_i;
-  full := full_i;
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
 """
 
 

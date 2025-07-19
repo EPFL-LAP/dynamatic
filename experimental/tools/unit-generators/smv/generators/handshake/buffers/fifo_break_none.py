@@ -38,6 +38,7 @@ def _generate_one_slot_break_none(name, data_type):
 MODULE {name}(ins, ins_valid, outs_ready)
     VAR 
     reg : {data_type};
+    full : boolean;
 
     ASSIGN
     init(reg) := {data_type.format_constant(0)};
