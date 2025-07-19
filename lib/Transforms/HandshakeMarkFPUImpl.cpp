@@ -41,10 +41,6 @@ public:
   // std::string impl
 
   void runDynamaticPass() override;
-
-private:
-  bool checkPassOption(Optional<dynamatic::handshake::FPUImpl> implOpt);
-
 };
 
 } // namespace
