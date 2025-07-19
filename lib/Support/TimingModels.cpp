@@ -96,6 +96,11 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
+void TimingDatabase::insertTimingModel(StringRef timingModelKey,
+                                       TimingModel &model) {
+  models.emplace(std::make_pair(timingModelKey, model));
+}
+
 const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
   auto it = models.find(timingModelKey);
   if (it == models.end())
@@ -477,8 +482,7 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
     TimingModel model;
     ljson::Path keyPath = path.field(timingModelKey);
     fromJSON(cmpInfo, model, keyPath);
-    // insert model in StringMap
-    models.emplace(std::make_pair(timingModelKey, model));
+    timingDB.insertTimingModel(timingModelKey, model);
   }
   return true;
 }
