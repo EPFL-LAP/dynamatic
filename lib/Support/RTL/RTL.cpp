@@ -289,7 +289,7 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   LogicalResult gotBitwidth = registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   LogicalResult gotExtraSignals = registerExtraSignalParameters(modOp, modName, modType);
-  return failed(gotBitwidth) || failed(gotExtraSignals);
+  return success(gotBitwidth.succeeded() && gotExtraSignals.succeeded());
 }
 
 LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
