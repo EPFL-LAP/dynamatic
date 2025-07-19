@@ -58,6 +58,7 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
         llvm::errs() << "'" << stringifyFPUImpl(*e) << "'\n";
     }
     signalPassFailure();
+    return;
   }
 
   auto impl = implOpt.value();

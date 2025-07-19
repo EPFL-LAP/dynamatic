@@ -595,7 +595,7 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
     return CommandResult::SUCCESS;
   }
   llvm::outs() << ERR << "Unknown floating-point units generator '" << generator
-               << "', possible options are 'flopoco' and 'vivado'.\n";
+               << "'.\n";
   return CommandResult::FAIL;
 }
 
