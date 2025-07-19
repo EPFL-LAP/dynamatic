@@ -1,5 +1,4 @@
 #include "polly/DependenceInfo.h"
-#include "polly/LinkAllPasses.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
@@ -9,7 +8,6 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "polly/ScopInfo.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -867,7 +865,7 @@ void PollyDependencePass::processScop(Scop &s) {
 
 void PollyDependencePass::processLoop(Loop *l) {
   loopMetaInfos.emplace_back();
-  auto &lm = loopMetaInfos.back();
+  auto &loopMetaData = loopMetaInfos.back();
 
   for (auto *bb : l->getBlocks()) {
     int scopId = indexAnalysis.getScopID(bb);
@@ -882,12 +880,12 @@ void PollyDependencePass::processLoop(Loop *l) {
       mei.loopInstrSet.push_back(&inst);
 
       if (inst.mayReadFromMemory())
-        lm.rdInsts.insert(&inst);
+        loopMetaData.rdInsts.insert(&inst);
       if (inst.mayWriteToMemory())
-        lm.wrInsts.insert(&inst);
+        loopMetaData.wrInsts.insert(&inst);
 
       if (isInScop)
-        lm.instToScop[&inst] = scopId;
+        loopMetaData.instToScop[&inst] = scopId;
     }
   }
 }
@@ -1011,6 +1009,9 @@ void PollyDependencePass::createSets(struct TLLMeta &lm) {
 } // end anonymous namespace
 
 // Register the pass for opt-style loading
+// Important note: you need to enable shared libarary in LLVM to load pass
+// plugin:
+// https://stackoverflow.com/questions/51474188/using-shared-object-so-by-command-opt-in-llvm
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "PollyDependencePass", LLVM_VERSION_STRING,

@@ -1,16 +1,8 @@
 add_library(DependenceAnalysisPass SHARED DependenceAnalysisPass.cpp)
 
-
 # Link to required LLVM and Polly libraries
 target_link_libraries(DependenceAnalysisPass
-  PRIVATE
-  LLVMCore
-  LLVMIRReader
-  LLVMAnalysis
-  LLVMPasses
-  LLVMFrontendOpenMP
-
-  Polly # The main Polly library
+  PRIVATE LLVMCore LLVMSupport LLVMAnalysis Polly
 )
 
 # Required for plugins using new PassManager
