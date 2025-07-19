@@ -58,6 +58,15 @@ static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(generalCategory));
 
+static cl::opt<bool>
+    disableNDWire("disable_ndwire",
+                  cl::desc("Disables NDWire in the miter fabric"),
+                  cl::init(false), cl::cat(generalCategory));
+static cl::opt<bool>
+    disableDecoupling("disable_decoupling",
+                      cl::desc("Disables decoupling in the miter fabric"),
+                      cl::init(false), cl::cat(generalCategory));
+
 // Specify a Sequence Length Relation constraint.
 // Can be used multiple times. E.g.: --seq_length="0+1=2" --seq_length="1<2"
 // It controls the relative length of the input sequences.
@@ -244,7 +253,7 @@ static FailureOr<bool> checkEquivalence(
   // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
       context, lhsPath, rhsPath, contextFilePath, miterDir.string(), nrOfTokens,
-      ndSpec, allowNonacceptance);
+      ndSpec, allowNonacceptance, disableNDWire, disableDecoupling);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();

@@ -30,10 +30,12 @@ namespace dynamatic::experimental {
 // constexpr unsigned int BB_OUT = 3; // Output auxillary logic
 
 struct ElasticMiterConfig {
+  SmallVector<std::string> inputForks;
   SmallVector<std::pair<std::string, std::string>> inputBuffers;
   SmallVector<std::pair<std::string, std::string>> inputNDWires;
   SmallVector<std::pair<std::string, std::string>> outputBuffers;
   SmallVector<std::pair<std::string, std::string>> outputNDWires;
+  SmallVector<std::pair<std::string, std::string>> outputBlockers;
   SmallVector<std::pair<std::string, Type>> arguments;
   SmallVector<std::pair<std::string, Type>> results;
   SmallVector<std::string> eq;
@@ -80,8 +82,9 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
 // contain exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   ModuleOp contextModule, size_t bufferSlots,
-                   bool ndSpec = false, bool allowNonacceptance = false);
+                   ModuleOp contextModule, size_t bufferSlots, bool ndSpec,
+                   bool allowNonacceptance, bool disableNDWire,
+                   bool disableDecoupling);
 
 // Creates a reachability circuit. Essentially ND wires are put at all in- and
 // outputs of the circuit. Additionally creates a json config file with the name
@@ -99,7 +102,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpec = false, bool allowNonacceptance = false);
+                  bool ndSpece, bool allowNonacceptance, bool disableNDWire,
+                  bool disableDecoupling);
 
 FailureOr<llvm::StringMap<Type>>
 analyzeInputValue(MLIRContext &context, const std::filesystem::path &path);

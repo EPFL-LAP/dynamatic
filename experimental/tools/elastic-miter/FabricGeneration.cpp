@@ -573,7 +573,8 @@ createReachabilityCircuit(MLIRContext &context,
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                    ModuleOp contextModule, size_t bufferSlots, bool ndSpec,
-                   bool allowNonacceptance) {
+                   bool allowNonacceptance, bool disableNDWire,
+                   bool disableDecoupling) {
 
   // Get the LHS FuncOp from the LHS module, also check some required properties
   auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule, true);
@@ -656,8 +657,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   builder.setInsertionPointToStart(newBlock);
 
-  Operation *nextLocation;
-
   if (ndSpec) {
     assert(lhsFuncOp.getNumArguments() == 2 &&
            "The ND speculator context only supports two arguments.");
@@ -672,7 +671,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // the original input of the circuits. This completely decouples the
   // operation of the two circuits.
   unsigned bbIn = 0;
+  size_t inputBufferSlots = disableDecoupling ? 1 : bufferSlots;
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
+    // if (i == 1)
+    //   inputBufferSlots = 1;
+    // else
+    //   inputBufferSlots = disableDecoupling ? 1 : bufferSlots;
     Value lhsArg = lhsFuncOp.getArgument(i);
     Value rhsArg = rhsFuncOp.getArgument(i);
     Value miterArg = newFuncOp.getArgument(i);
@@ -690,7 +694,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                                                     forkOp);
 
       BufferOp ndSpecPreBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
+          forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, ndSpecPreBufferOp, bbIn,
                              "in_nd_spec_pre_buffer");
@@ -713,16 +717,16 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string lhsNdwName = "lhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
-    LazyForkOp forkOp =
-        builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
+    auto forkOp = builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
     setHandshakeAttributes(builder, forkOp, bbIn, forkName);
+    config.inputForks.push_back(forkName);
 
     Value lhsNDWireInput = forkOp.getResult()[0];
     if (isa<SinkOp>(*lhsArg.getUsers().begin())) {
       lhsBufName = "";
     } else {
       BufferOp lhsBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[0], bufferSlots,
+          forkOp.getLoc(), forkOp.getResult()[0], inputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
       lhsNDWireInput = lhsBufferOp.getResult();
@@ -733,20 +737,27 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       rhsBufName = "";
     } else {
       BufferOp rhsBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
+          forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
       rhsNDWireInput = rhsBufferOp.getResult();
     }
 
-    NDWireOp lhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), lhsNDWireInput);
-    NDWireOp rhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), rhsNDWireInput);
-    setHandshakeAttributes(builder, lhsNDWireOp, bbIn, lhsNdwName);
-    setHandshakeAttributes(builder, rhsNDWireOp, bbIn, rhsNdwName);
-
-    nextLocation = rhsNDWireOp;
+    Value lhsInput = lhsNDWireInput;
+    Value rhsInput = rhsNDWireInput;
+    if (disableNDWire) {
+      lhsNdwName = "";
+      rhsNdwName = "";
+    } else {
+      NDWireOp lhsNDWireOp =
+          builder.create<NDWireOp>(forkOp.getLoc(), lhsNDWireInput);
+      NDWireOp rhsNDWireOp =
+          builder.create<NDWireOp>(forkOp.getLoc(), rhsNDWireInput);
+      setHandshakeAttributes(builder, lhsNDWireOp, bbIn, lhsNdwName);
+      setHandshakeAttributes(builder, rhsNDWireOp, bbIn, rhsNdwName);
+      lhsInput = lhsNDWireOp.getResult();
+      rhsInput = rhsNDWireOp.getResult();
+    }
 
     config.inputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
     config.inputNDWires.push_back(std::make_pair(lhsNdwName, rhsNdwName));
@@ -754,12 +765,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     // Use the newly created fork's output instead of the original argument in
     // the lhsFuncOp's operations
     for (Operation *op : llvm::make_early_inc_range(lhsArg.getUsers()))
-      op->replaceUsesOfWith(lhsArg, lhsNDWireOp.getResult());
+      op->replaceUsesOfWith(lhsArg, lhsInput);
 
     // Use the newly created fork's output instead of the original argument in
     // the rhsFuncOp's operations
     for (Operation *op : llvm::make_early_inc_range(rhsArg.getUsers()))
-      op->replaceUsesOfWith(rhsArg, rhsNDWireOp.getResult());
+      op->replaceUsesOfWith(rhsArg, rhsInput);
   }
 
   for (auto [i, arg] : llvm::enumerate(contextFuncOp.getArguments())) {
@@ -792,87 +803,109 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // equivalent.
   unsigned bbOut = lhsBBMax + rhsBBMax + 1;
   llvm::SmallVector<Value> miterResultValues;
+  Location loc = newFuncOp.getLoc();
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
 
     std::string outName = lhsFuncOp.getResName(i).str();
-    std::string lhsBufName = "lhs_out_buf_" + lhsFuncOp.getResName(i).str();
-    std::string rhsBufName = "rhs_out_buf_" + lhsFuncOp.getResName(i).str();
-    std::string lhsNDwName = "lhs_out_ndw_" + lhsFuncOp.getResName(i).str();
-    std::string rhsNDwName = "rhs_out_ndw_" + lhsFuncOp.getResName(i).str();
-    std::string eqName = "out_eq_" + lhsFuncOp.getResName(i).str();
+    std::string lhsBufName = "lhs_out_buf_" + outName;
+    std::string rhsBufName = "rhs_out_buf_" + outName;
+    std::string lhsNDwName = "lhs_out_ndw_" + outName;
+    std::string rhsNDwName = "rhs_out_ndw_" + outName;
+    std::string lhsBlockerName = "lhs_out_bl_" + outName;
+    std::string rhsBlockerName = "rhs_out_bl_" + outName;
+    std::string eqName = "out_eq_" + outName;
 
     if (allowNonacceptance) {
-      NDSourceOp ndSourceOp =
-          builder.create<NDSourceOp>(nextLocation->getLoc());
+      NDSourceOp ndSourceOp = builder.create<NDSourceOp>(loc);
       setHandshakeAttributes(builder, ndSourceOp, bbOut, "out_nds_" + outName);
-      LazyForkOp lazyForkOp = builder.create<LazyForkOp>(
-          nextLocation->getLoc(), ndSourceOp.getResult(), 2);
+      LazyForkOp lazyForkOp =
+          builder.create<LazyForkOp>(loc, ndSourceOp.getResult(), 2);
       setHandshakeAttributes(builder, lazyForkOp, bbOut, "out_lf_" + outName);
 
+      size_t outputBufferSlots = disableDecoupling ? 1 : bufferSlots;
       BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
-          nextLocation->getLoc(), lazyForkOp.getResults()[0], bufferSlots,
+          loc, lazyForkOp.getResults()[0], outputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, lhsNDSBufferOp, bbOut,
                              "out_buf_lhs_nds_" + outName);
       BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
-          nextLocation->getLoc(), lazyForkOp.getResults()[1], bufferSlots,
+          loc, lazyForkOp.getResults()[1], outputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
       setHandshakeAttributes(builder, rhsNDSBufferOp, bbOut,
                              "out_buf_rhs_nds_" + outName);
+      Value lhsBlockerCtrl = lhsNDSBufferOp.getResult();
+      Value rhsBlockerCtrl = rhsNDSBufferOp.getResult();
 
-      BlockerOp lhsBlockerOp = builder.create<BlockerOp>(
-          nextLocation->getLoc(), lhsResult, lhsNDSBufferOp.getResult());
-      setHandshakeAttributes(builder, lhsBlockerOp, bbOut,
-                             "out_lhs_bl_" + outName);
-      BlockerOp rhsBlockerOp = builder.create<BlockerOp>(
-          nextLocation->getLoc(), rhsResult, rhsNDSBufferOp.getResult());
-      setHandshakeAttributes(builder, rhsBlockerOp, bbOut,
-                             "out_rhs_bl_" + outName);
+      BlockerOp lhsBlockerOp =
+          builder.create<BlockerOp>(loc, lhsResult, lhsBlockerCtrl);
+      setHandshakeAttributes(builder, lhsBlockerOp, bbOut, lhsBlockerName);
+      BlockerOp rhsBlockerOp =
+          builder.create<BlockerOp>(loc, rhsResult, rhsBlockerCtrl);
+      setHandshakeAttributes(builder, rhsBlockerOp, bbOut, rhsBlockerName);
 
       lhsResult = lhsBlockerOp.getResult();
       rhsResult = rhsBlockerOp.getResult();
     }
 
-    NDWireOp lhsEndNDWireOp;
-    NDWireOp rhsEndNDWireOp;
+    Value lhsBufferInput = lhsResult;
+    Value rhsBufferInput = rhsResult;
 
-    lhsEndNDWireOp =
-        builder.create<NDWireOp>(nextLocation->getLoc(), lhsResult);
-    rhsEndNDWireOp =
-        builder.create<NDWireOp>(nextLocation->getLoc(), rhsResult);
+    if (disableNDWire) {
+      lhsNDwName = "";
+      rhsNDwName = "";
+    } else {
+      NDWireOp lhsEndNDWireOp;
+      NDWireOp rhsEndNDWireOp;
 
-    setHandshakeAttributes(builder, lhsEndNDWireOp, bbOut, lhsNDwName);
-    setHandshakeAttributes(builder, rhsEndNDWireOp, bbOut, rhsNDwName);
+      lhsEndNDWireOp = builder.create<NDWireOp>(loc, lhsResult);
+      rhsEndNDWireOp = builder.create<NDWireOp>(loc, rhsResult);
 
-    BufferOp lhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), lhsEndNDWireOp.getResult(), bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    BufferOp rhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), rhsEndNDWireOp.getResult(), bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, lhsEndNDWireOp, bbOut, lhsNDwName);
+      setHandshakeAttributes(builder, rhsEndNDWireOp, bbOut, rhsNDwName);
 
-    setHandshakeAttributes(builder, lhsEndBufferOp, bbOut, lhsBufName);
-    setHandshakeAttributes(builder, rhsEndBufferOp, bbOut, rhsBufName);
+      lhsBufferInput = lhsEndNDWireOp.getResult();
+      rhsBufferInput = rhsEndNDWireOp.getResult();
+    }
+
+    Value lhsInput = lhsBufferInput;
+    Value rhsInput = rhsBufferInput;
+    if (disableDecoupling) {
+      lhsBufName = "";
+      rhsBufName = "";
+    } else {
+      BufferOp lhsEndBufferOp = builder.create<BufferOp>(
+          loc, lhsBufferInput, bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      BufferOp rhsEndBufferOp = builder.create<BufferOp>(
+          loc, rhsBufferInput, bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+
+      setHandshakeAttributes(builder, lhsEndBufferOp, bbOut, lhsBufName);
+      setHandshakeAttributes(builder, rhsEndBufferOp, bbOut, rhsBufName);
+
+      lhsInput = lhsEndBufferOp.getResult();
+      rhsInput = rhsEndBufferOp.getResult();
+    }
 
     if (lhsResult.getType().isa<handshake::ControlType>()) {
-      SmallVector<Value> joinInputs = {lhsEndBufferOp.getResult(),
-                                       rhsEndBufferOp.getResult()};
+      SmallVector<Value> joinInputs = {lhsInput, rhsInput};
       JoinOp joinOp =
           builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
       setHandshakeAttributes(builder, joinOp, bbOut, eqName);
       miterResultValues.push_back(joinOp.getResult());
     } else {
       CmpIOp compOp = builder.create<CmpIOp>(
-          builder.getUnknownLoc(), CmpIPredicate::eq,
-          lhsEndBufferOp.getResult(), rhsEndBufferOp.getResult());
+          builder.getUnknownLoc(), CmpIPredicate::eq, lhsInput, rhsInput);
       setHandshakeAttributes(builder, compOp, bbOut, eqName);
       miterResultValues.push_back(compOp.getResult());
     }
 
     config.outputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
     config.outputNDWires.push_back(std::make_pair(lhsNDwName, rhsNDwName));
+    config.outputBlockers.push_back(
+        std::make_pair(lhsBlockerName, rhsBlockerName));
 
     config.eq.push_back(eqName);
 
@@ -883,29 +916,29 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
         std::make_pair("EQ_" + strAttr.getValue().str(), lhsResult.getType()));
   }
 
-  EndOp newEndOp =
-      builder.create<EndOp>(builder.getUnknownLoc(), miterResultValues);
-  setHandshakeAttributes(builder, newEndOp, bbOut, "end");
-
   // Delete old end operation, we can only have one end operation in a
   // function
   rhsEndOp.erase();
   lhsEndOp.erase();
 
   // Move operations from lhs to the new miter FuncOp and set the handshake.bb
-  Operation *previousOp = nextLocation;
   for (Operation &op : llvm::make_early_inc_range(lhsFuncOp.getOps())) {
-    op.moveAfter(previousOp);
-    previousOp = &op;
+    op.remove();
+    newBlock->getOperations().push_back(&op);
   }
 
   // Move operations from rhs to the new miter FuncOp and set the handshake.bb
   for (Operation &op : llvm::make_early_inc_range(rhsFuncOp.getOps())) {
-    op.moveAfter(previousOp);
+    op.remove();
+    newBlock->getOperations().push_back(&op);
     unsigned bb = getLogicBB(&op).value_or(0);
     dynamatic::setBB(&op, bb + lhsBBMax);
-    previousOp = &op;
   }
+
+  builder.setInsertionPointToEnd(newBlock);
+  EndOp newEndOp =
+      builder.create<EndOp>(builder.getUnknownLoc(), miterResultValues);
+  setHandshakeAttributes(builder, newEndOp, bbOut, "end");
 
   newFuncOp = fuseContext(contextFuncOp, newFuncOp).first;
 
@@ -917,7 +950,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpec, bool allowNonacceptance) {
+                  bool ndSpec, bool allowNonacceptance, bool disableNDWire,
+                  bool disableDecoupling) {
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
   if (!lhsModuleRef) {
@@ -943,7 +977,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   ModuleOp contextModule = contextModuleRef.get();
 
   auto ret = createElasticMiter(context, lhsModule, rhsModule, contextModule,
-                                nrOfTokens, ndSpec, allowNonacceptance);
+                                nrOfTokens, ndSpec, allowNonacceptance,
+                                disableNDWire, disableDecoupling);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();
