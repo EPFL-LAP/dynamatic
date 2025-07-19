@@ -258,7 +258,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -274,7 +274,19 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"blifFiles", "blif-files", "std::string", "",
+    "Path to AND-Inverter Graphs of dataflow components in Berkeley "
+    "Logic Interchange Format (BLIF).">,
+    Option<"lutDelay", "lut-delay", "double", "0.55",
+    "Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.">,
+    Option<"lutSize", "lut-size", "int", "6",
+    "Maximum LUT input size of the target FPGA.">,
+    Option<"acyclicType", "acyclic-type", "bool", "false",
+    "Method for creating acyclic graphs from cyclic dataflow graph. Required by "
+    "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
+    "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
+    "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
 }
 
 //===----------------------------------------------------------------------===//

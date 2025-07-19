@@ -20,6 +20,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Value.h"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -35,7 +36,7 @@ class LogicNetwork;
 struct MILPVarsSubjectGraph {
   GRBVar tIn;
   GRBVar tOut;
-  std::optional<GRBVar> bufferVar;
+  GRBVar bufferVar;
 };
 
 /// Represents a node in an And-Inverter Graph (AIG) circuit representation.
@@ -63,6 +64,7 @@ public:
   bool isOutput = false;
   bool isLatchInput = false;
   bool isLatchOutput = false;
+  Value value; // MLIR Value associated with the node, if any
 
   MILPVarsSubjectGraph *gurobiVars;
   std::set<Node *> fanins = {};
@@ -101,7 +103,10 @@ public:
   // node. This function is used to merge different LogicNetwork objects. Input
   // node of one LogicNetwork object is connected to the output node of
   // LogicNetwork object that comes before it.
-  static void connectNodes(Node *currentNode, Node *previousNode) {
+  static void connectNodes(Node *currentNode, Node *previousNode, Value channel) {
+    currentNode->value = channel;
+    previousNode->value = channel;
+
     // Once Input/Output Nodes are connected, they should not be Input/Output in
     // the BLIF, but just become internal Nodes
     currentNode->convertIOToChannel();
