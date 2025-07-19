@@ -1,12 +1,13 @@
 from generators.support.utils import *
 
-from buffers.fifo_break_dv import generate_fifo_break_dv
-from buffers.fifo_break_none import generate_fifo_break_none
-from buffers.one_slot_break_dv import generate_one_slot_break_dv
-from buffers.one_slot_break_r import generate_one_slot_break_r
-from buffers.ofifo import generate_ofifo
 
-from support.utils import try_enum_cast
+from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
+from generators.handshake.buffers.fifo_break_none import generate_fifo_break_none
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
+from generators.handshake.buffers.ofifo import generate_ofifo
+
+from generators.support.utils import try_enum_cast
 
 
 class BufferType(Enum):
