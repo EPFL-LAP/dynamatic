@@ -24,6 +24,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE
   ins_ready := !full;
   outs_valid := ins_valid | full;
+  full := full;
 """
 
 
