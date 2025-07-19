@@ -263,12 +263,6 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
 /// underlying timing models, which can also be retrieved in their entirety.
 class TimingDatabase {
 public:
-  /// Inserts a timing model in the database with the provided key. Returns
-  /// true if no timing model existed for this key prior to the calls, or false
-  /// otherwise.
-
-  bool insertTimingModel(StringRef timingModelKey, TimingModel &model);
-
   /// Returns the timing model corresponding to the timing model key,
   /// if any exists
   const TimingModel *getModel(StringRef timingModelKey) const;

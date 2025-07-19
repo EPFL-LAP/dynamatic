@@ -96,15 +96,6 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef timingModelKey,
-                                       TimingModel &model) {
-  llvm::errs() << timingModelKey << "\n";
-  bool success = models.try_emplace(timingModelKey, model).second;
-  llvm::errs() << models.size() << "\n";
-  llvm::errs() << success << "\n";
-  return success;
-}
-
 const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
   auto it = models.find(timingModelKey);
   if (it == models.end())
@@ -486,11 +477,8 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
     TimingModel model;
     ljson::Path keyPath = path.field(timingModelKey);
     fromJSON(cmpInfo, model, keyPath);
-    if (!timingDB.insertTimingModel(timingModelKey, model)) {
-      keyPath.report("Timing model was not inserted as "
-                     "key was already present in the database");
-      return false;
-    }
+    // insert model in StringMap
+    models.emplace(timingModelKey, model);
   }
   return true;
 }
