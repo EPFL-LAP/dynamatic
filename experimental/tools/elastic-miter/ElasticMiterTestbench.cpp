@@ -58,28 +58,44 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[lhsBuffer, rhsBuffer] : config.inputBuffers) {
-    if (nrOfTokens > 1) {
-      // Ofifo is used.
-      // HACK: To ensure the buffers have the same number of tokens, we use the
-      // internal values of these units, which are subject to change.
-      // Particularly, we compare the head and tail pointers of the inner
-      // elastic FIFO.
+    if (lhsBuffer == "") {
       bufferProperties.push_back(
-          llvm::formatv("({0}.{1}.inner_elastic_fifo.head = "
-                        "{0}.{2}.inner_elastic_fifo.head)",
-                        moduleName, lhsBuffer, rhsBuffer)
-              .str());
+          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBuffer).str());
+    } else if (rhsBuffer == "") {
       bufferProperties.push_back(
-          llvm::formatv("({0}.{1}.inner_elastic_fifo.tail = "
-                        "{0}.{2}.inner_elastic_fifo.tail)",
-                        moduleName, lhsBuffer, rhsBuffer)
-              .str());
+          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
     } else {
-      // OEHB is used. outs_valid indicates whether the buffer has a token or
-      // not.
+      // if (nrOfTokens > 1) {
+      //   // Ofifo is used.
+      //   // HACK: To ensure the buffers have the same number of tokens, we use
+      //   the
+      //   // internal values of these units, which are subject to change.
+      //   // Particularly, we compare the head and tail pointers of the inner
+      //   // elastic FIFO.
+      //   bufferProperties.push_back(
+      //       llvm::formatv("({0}.{1}.inner_elastic_fifo.head = "
+      //                     "{0}.{2}.inner_elastic_fifo.head)",
+      //                     moduleName, lhsBuffer, rhsBuffer)
+      //           .str());
+      //   bufferProperties.push_back(
+      //       llvm::formatv("({0}.{1}.inner_elastic_fifo.tail = "
+      //                     "{0}.{2}.inner_elastic_fifo.tail)",
+      //                     moduleName, lhsBuffer, rhsBuffer)
+      //           .str());
+      // } else {
+      //   // OEHB is used. outs_valid indicates whether the buffer has a token
+      //   or
+      //   // not.
+      //   bufferProperties.push_back(
+      //       llvm::formatv("({0}.{1}.outs_valid = {0}.{2}.outs_valid)",
+      //       moduleName,
+      //                     lhsBuffer, rhsBuffer)
+      //           .str());
+      // }
       bufferProperties.push_back(
-          llvm::formatv("({0}.{1}.outs_valid = {0}.{2}.outs_valid)", moduleName,
-                        lhsBuffer, rhsBuffer)
+          llvm::formatv("({0}.{1}.inner_counter.counter = "
+                        "{0}.{2}.inner_counter.counter)",
+                        moduleName, lhsBuffer, rhsBuffer)
               .str());
     }
   }

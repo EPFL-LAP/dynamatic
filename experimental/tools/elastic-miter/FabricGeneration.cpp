@@ -717,19 +717,32 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
         builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
     setHandshakeAttributes(builder, forkOp, bbIn, forkName);
 
-    BufferOp lhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[0], bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    BufferOp rhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
-    setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
+    Value lhsNDWireInput = forkOp.getResult()[0];
+    if (isa<SinkOp>(*lhsArg.getUsers().begin())) {
+      lhsBufName = "";
+    } else {
+      BufferOp lhsBufferOp = builder.create<BufferOp>(
+          forkOp.getLoc(), forkOp.getResult()[0], bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
+      lhsNDWireInput = lhsBufferOp.getResult();
+    }
+
+    Value rhsNDWireInput = forkOp.getResult()[1];
+    if (isa<SinkOp>(*rhsArg.getUsers().begin())) {
+      rhsBufName = "";
+    } else {
+      BufferOp rhsBufferOp = builder.create<BufferOp>(
+          forkOp.getLoc(), forkOp.getResult()[1], bufferSlots,
+          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
+      rhsNDWireInput = rhsBufferOp.getResult();
+    }
 
     NDWireOp lhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), lhsBufferOp.getResult());
+        builder.create<NDWireOp>(forkOp.getLoc(), lhsNDWireInput);
     NDWireOp rhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), rhsBufferOp.getResult());
+        builder.create<NDWireOp>(forkOp.getLoc(), rhsNDWireInput);
     setHandshakeAttributes(builder, lhsNDWireOp, bbIn, lhsNdwName);
     setHandshakeAttributes(builder, rhsNDWireOp, bbIn, rhsNdwName);
 
@@ -950,8 +963,10 @@ FailureOr<llvm::StringMap<Type>>
 analyzeInputValue(MLIRContext &context, const std::filesystem::path &path) {
   OwningOpRef<ModuleOp> mod =
       parseSourceFile<ModuleOp>(path.string(), &context);
-  if (!mod)
+  if (!mod) {
+    llvm::errs() << "Failed to parse the provided MLIR file: " << path << "\n";
     return failure();
+  }
 
   auto funcOps = mod.get().getOps<FuncOp>();
   assert(std::distance(funcOps.begin(), funcOps.end()) == 1 &&
@@ -959,12 +974,10 @@ analyzeInputValue(MLIRContext &context, const std::filesystem::path &path) {
 
   FuncOp funcOp = *funcOps.begin();
   llvm::StringMap<Type> inputValues;
-  OpPrintingFlags defaultFlag;
   auto argNames = funcOp.getArgNames();
   for (auto [i, blockArg] : llvm::enumerate(funcOp.getArguments())) {
     inputValues.insert(
-        {argNames[i].cast<StringAttr>().getValue(),
-         blockArg.getType()}); // Remove the leading '%' from the name
+        {argNames[i].cast<StringAttr>().getValue(), blockArg.getType()});
   }
 
   return inputValues;
