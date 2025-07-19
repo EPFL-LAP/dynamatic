@@ -1,19 +1,20 @@
 from generators.support.utils import *
 
+
 def generate_fifo_break_none(name, params):
     slots = params[ATTR_SLOTS]
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if data_type.bitwidth == 0:
-      if slots == 1:
-        return _generate_one_slot_break_none_dataless(name)
-      else:
-        return _generate_fifo_break_none_dataless(name, slots)
+        if slots == 1:
+            return _generate_one_slot_break_none_dataless(name)
+        else:
+            return _generate_fifo_break_none_dataless(name, slots)
     else:
         if slots == 1:
-           return _generate_one_slot_break_none(name)
+            return _generate_one_slot_break_none(name)
         else:
-          return _generate_fifo_break_none(name, slots, data_type)
+            return _generate_fifo_break_none(name, slots, data_type)
 
 
 def _generate_one_slot_break_none_dataless(name):
@@ -67,10 +68,6 @@ MODULE {name}(ins_valid, outs_ready)
 		DEFINE ins_ready := b0.ins_ready;
 {_generate_one_slot_break_none_dataless(f"{name}_tslot")}
 """
-    
-
-
-
 
 
 def _generate_fifo_break_none(name, slots, data_type):

@@ -80,7 +80,7 @@ def _generate_shift_reg_break_dv(name, num_slots, bitwidth):
     inner_name = f"{name}_inner"
 
     dependencies = _generate_shift_reg_break_dv_dataless(inner_name)
-    
+
     entity = f"""
 
 library ieee;
@@ -104,7 +104,6 @@ entity {name} is
 end entity;
 
     """
-
 
     architecture = f"""
 -- Architecture of shift_reg_break_dv
@@ -176,8 +175,3 @@ def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra
         }],
         extra_signals,
         lambda name: _generate_shift_reg_break_dv(name, num_slots, bitwidth + extra_signals_bitwidth))
-
-
-
-
-

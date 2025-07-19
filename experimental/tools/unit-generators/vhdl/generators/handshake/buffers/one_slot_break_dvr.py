@@ -103,7 +103,7 @@ entity {name} is
   );
 end entity;
 """
-    
+
     architecture = f"""
 -- Architecture of one_slot_break_dvr
 architecture arch of {name} is
@@ -158,7 +158,3 @@ def _generate_one_slot_break_dvr_signal_manager(name, bitwidth, extra_signals):
         }],
         extra_signals,
         lambda name: _generate_one_slot_break_dvr(name, bitwidth + extra_signals_bitwidth))
-
-
-
-
