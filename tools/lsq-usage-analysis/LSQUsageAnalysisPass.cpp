@@ -2,8 +2,11 @@
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
@@ -16,6 +19,9 @@
 
 using namespace llvm;
 using namespace polly;
+
+const std::string MEMORY_OP_NAME = "mem.op";
+const std::string DEST_OPS_ID = "dest.ops";
 
 class InstructionDependenceInfo {
 public:
@@ -726,6 +732,47 @@ struct LSQUsageAnalysisPass : PassInfoMixin<LSQUsageAnalysisPass> {
   AAManager::Result *aliasAnalysis;
 };
 
+std::map<Instruction *, unsigned> nameAllLoadStores(Function &f) {
+  unsigned memCount = 0;
+  llvm::LLVMContext &context = f.getContext();
+
+  std::map<Instruction *, unsigned> nameMapping;
+
+  for (llvm::BasicBlock &bb : f) {
+    for (llvm::Instruction &instr : bb) {
+      if (llvm::LoadInst *loadInstr = llvm::dyn_cast<llvm::LoadInst>(&instr)) {
+        // Create a metadata string
+        llvm::MDString *mdStr =
+            llvm::MDString::get(context, std::to_string(memCount));
+
+        // Create an MDNode containing the MDString
+        // MDNode::get takes a context and an arrayref of llvm::Value*
+        llvm::MDNode *md = llvm::MDNode::get(context, mdStr);
+
+        // Attach the metadata node with a unique kind ID (e.g., "my.load.id")
+        // You can define your own metadata kind IDs.
+        loadInstr->setMetadata(MEMORY_OP_NAME, md);
+        nameMapping[&instr] = memCount;
+        memCount++;
+      } else if (llvm::StoreInst *storeInstr =
+                     llvm::dyn_cast<llvm::StoreInst>(&instr)) {
+        // Create a metadata string
+        llvm::MDString *mdStr =
+            llvm::MDString::get(context, std::to_string(memCount));
+
+        // Create an MDNode containing the MDString
+        llvm::MDNode *md = llvm::MDNode::get(context, mdStr);
+
+        // Attach the metadata node with a unique kind ID (e.g., "my.store.id")
+        storeInstr->setMetadata(MEMORY_OP_NAME, md);
+        nameMapping[&instr] = memCount;
+        memCount++;
+      }
+    }
+  }
+  return nameMapping;
+}
+
 PreservedAnalyses LSQUsageAnalysisPass::run(Function &f,
                                             FunctionAnalysisManager &fam) {
 
@@ -755,9 +802,37 @@ PreservedAnalyses LSQUsageAnalysisPass::run(Function &f,
 
     processLoop(loop);
   }
+
+  auto nameMapping = nameAllLoadStores(f);
+  llvm::LLVMContext &ctx = f.getContext();
+
+  std::map<Instruction *, std::vector<unsigned>>
+      instrToListOfDependentDestinations;
+
+  for (auto &meta : loopMetaInfos) {
+    for (auto &[src, dst] : getDependencyPairs(meta)) {
+      // Get the name meta data
+      if (instrToListOfDependentDestinations.count(src) == 0) {
+        instrToListOfDependentDestinations[src] = {nameMapping[dst]};
+      } else {
+        instrToListOfDependentDestinations[src].emplace_back(nameMapping[dst]);
+      }
+    }
+  }
+
+  for (auto [src, dests] : instrToListOfDependentDestinations) {
+    std::vector<llvm::Metadata *> mdVals;
+    for (auto id : dests) {
+      llvm::MDString *dstId = llvm::MDString::get(ctx, std::to_string(id));
+      mdVals.push_back(dstId);
+    }
+    src->setMetadata(DEST_OPS_ID, llvm::MDNode::get(ctx, mdVals));
+  }
+
+#if 0
+
   for (auto &meta : loopMetaInfos)
     createSets(meta);
-
   /// Determine whether memory accessing instructions outside any loop must be
   /// connected to an LSQ.
   /// For instructions outside loops, they use LSQ connection if:
@@ -825,6 +900,7 @@ PreservedAnalyses LSQUsageAnalysisPass::run(Function &f,
     llvm::errs() << "\n";
     id += 1;
   }
+#endif
   return PreservedAnalyses::all();
 }
 

@@ -441,4 +441,23 @@ def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
   "mlir::LLVM::LLVMDialect"];
 }
 
+def LLVMMetadataToAttribute : Pass<"llvm-metadata-to-attribute"> {
+  let summary = "Copy the meta data stored in LLVM IR that are relavant for us to LLVM dialect.";
+
+  let description = [{The mlir-translate only retains very few types of meta
+  data from the original LLVMIR. This pass assumes that the LLVM IR and MLIR
+  have identical sequence in the operations and converts the metadata nodes in
+  the original IR into MLIR attributes.}];
+
+  let options =
+    [
+      Option<"llvmir", "llvmir", "std::string", "",
+            "Path to the LLVM IR file.">,
+    ];
+
+  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
+}
+
+
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

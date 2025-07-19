@@ -21,6 +21,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
+  LLVMMetadataToAttribute.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
