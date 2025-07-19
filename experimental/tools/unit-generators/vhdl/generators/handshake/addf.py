@@ -1,7 +1,7 @@
 from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.handshake.oehb import generate_oehb
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
 
 def generate_addf(name, params):
@@ -27,11 +27,11 @@ def _get_latency(is_double):
 
 def _generate_addf_single_precision(name):
     join_name = f"{name}_join"
-    oehb_name = f"{name}_oehb"
+    one_slot_break_dv_name = f"{name}_one_slot_break_dv"
     buff_name = f"{name}_buff"
 
     dependencies = generate_join(join_name, {"size": 2}) + \
-        generate_oehb(oehb_name, {"bitwidth": 0}) + \
+        generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0}) + \
         generate_delay_buffer(
         buff_name, {"slots": _get_latency(is_double=False) - 1})
 
