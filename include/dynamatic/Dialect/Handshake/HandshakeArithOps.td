@@ -155,8 +155,7 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
 
 def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [
   Commutative,
-  FPUImplInterface,
-  InternalDelayInterface
+  FPUImplInterface
 ]> {
   let summary = "Floating-point addition.";
 }
@@ -196,8 +195,7 @@ def Handshake_CmpFPredicateAttr : I64EnumAttr<
 def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
   IsFloatChannel<"lhs">,
   IsFloatChannel<"rhs">,
-  FPUImplInterface,
-  InternalDelayInterface
+  FPUImplInterface
 ]> {
   let summary = "Floating-point comparison.";
  
@@ -263,8 +261,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 }
 
 def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
-  FPUImplInterface,
-  InternalDelayInterface
+  FPUImplInterface
 ]> {
   let summary = "Floating-point division.";
 }
@@ -300,8 +297,7 @@ def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
 
 def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [
   Commutative,
-  FPUImplInterface,
-  InternalDelayInterface
+  FPUImplInterface
 ]> {
   let summary = "Floating-point multiplication.";
 }
@@ -349,8 +345,7 @@ def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
 }
 
 def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf", [
-  FPUImplInterface,
-  InternalDelayInterface
+  FPUImplInterface
 ]> {
   let summary = "Floating-point subtraction.";
 }
