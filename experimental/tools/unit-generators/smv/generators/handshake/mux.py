@@ -1,4 +1,4 @@
-from generators.support.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.support.utils import *
 
 
