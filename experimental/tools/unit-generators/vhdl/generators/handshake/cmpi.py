@@ -17,7 +17,7 @@ def _get_symbol_from_predicate(pred):
     match pred:
         case "eq":
             return "="
-        case "neq":
+        case "ne":
             return "/="
         case "slt" | "ult":
             return "<"
