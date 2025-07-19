@@ -46,20 +46,10 @@ public:
 } // namespace
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
-  // this->impl is the pass option declared in tablegen
-  auto implOpt = symbolizeFPUImpl(this->impl);
-
-  if (!implOpt.has_value()) {
-    llvm::errs() << "Invalid FPU implementation: expected one of FLOPOCO or "
-                    "VIVADO, but got '"
-                 << this->impl << "'";
-  }
-
-  auto impl = implOpt.value();
 
   // iterate over each operation that implements FPUImplInterface
   getOperation()->walk([&](FPUImplInterface fpuImplInterface) {
     // and set it based on the pass option
-    fpuImplInterface.setFPUImpl(impl);
+    fpuImplInterface.setFPUImpl(this->impl);
   });
 }
