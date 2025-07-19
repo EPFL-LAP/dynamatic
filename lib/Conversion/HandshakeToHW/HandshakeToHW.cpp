@@ -1352,12 +1352,22 @@ ConvertInstance::matchAndRewrite(handshake::InstanceOp instOp,
 
 /// Returns the module's input ports.
 static ArrayRef<hw::ModulePort> getModInputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumInputPorts() == 0) {
+    // When there are no input ports, getPortIdForInputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForInputId(0),
                                                   modOp.getNumInputPorts());
 }
 
 /// Returns the module's output ports.
 static ArrayRef<hw::ModulePort> getModOutputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumOutputPorts() == 0) {
+    // When there are no output ports, getPortIdForOutputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForOutputId(0),
                                                   modOp.getNumOutputPorts());
 }
