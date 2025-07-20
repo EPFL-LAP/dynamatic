@@ -514,7 +514,6 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
-  // Verify if user entered no input
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Kindly enter a valid path.\n";
     return CommandResult::FAIL;
@@ -545,7 +544,6 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetPolygeistPath::execute(CommandArguments &args) {
-  // Verify if user entered no input
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Kindly enter a valid path.\n";
     return CommandResult::FAIL;
@@ -577,7 +575,6 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
-  // Verify if user entered no input
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Kindly enter a valid path.\n";
     return CommandResult::FAIL;
@@ -591,19 +588,27 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
-  if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
+  if (fs::exists(vivadoPath)){
+    if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
                     "please specify the top-level Vivado directory.\n";
     return CommandResult::FAIL;
+    }
   }
+  else{
+    llvm::outs() << ERR
+                 << "The path to Vivado does not exist, "
+                    "please specify a valid top-level Vivado directory.\n";
+    return CommandResult::FAIL;
+  }
+  
 
   state.vivadoPath = state.makeAbsolutePath(vivadoPath);
   return CommandResult::SUCCESS;
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
-  // Verify if user entered no input
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n"
                 << "Options: flopoco, vivado\n";
@@ -621,7 +626,6 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
 }
 
 CommandResult SetSrc::execute(CommandArguments &args) {
-  // Verify if source is empty
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Kindly enter a non-empty source\n";
     return CommandResult::FAIL;
@@ -629,12 +633,22 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
-  if (!srcName.ends_with(".c")) {
+  if (fs::exists(sourcePath)){
+    if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
                  << "Expected source file to have .c extension, but got '"
                  << path::extension(srcName) << "'.\n";
     return CommandResult::FAIL;
+    }
   }
+  else{
+    llvm::outs() << ERR
+                 << "Source path <<"
+                 << sourcePath
+                 << ">> does not exist. Kindly enter a valid source path\n";
+    return CommandResult::FAIL;
+  }
+  
 
   state.sourcePath = state.makeAbsolutePath(sourcePath);
   return CommandResult::SUCCESS;
@@ -642,7 +656,6 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
 CommandResult SetCP::execute(CommandArguments &args) {
   // Parse the float argument and check if the argument is legal.
-  // Verify if argument is empty
   if (args.positionals.empty()){
     llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
     return CommandResult::FAIL;
