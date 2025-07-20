@@ -23,3 +23,15 @@ Memory controller storeless:
 
 Memory controller loadless:
 ![Image](https://github.com/user-attachments/assets/68eff081-3adc-4fdc-89e7-789c4ebbc2f6)
+
+## Load-Store Queues (LSQs)
+
+Load-Store Queues (LSQs) are modeled using non-deterministic behavior to reduce implementation complexity. To capture arbitrary stalls that may occur due to memory access latency or memory dependencies, we employ `nd-wires`.
+
+The `nd-wires` are used in two entities that simulate loads and stores:
+![image](https://github.com/user-attachments/assets/13be6367-9975-4601-b345-a766807264a5)
+
+
+## [WARNING] Argument ordering
+
+The argument ordering of MCs and LSQs is highly dependent on the export-rtl implementation. Therefore any changes to such implementation should be reflected in the SMV generators.
