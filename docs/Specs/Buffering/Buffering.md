@@ -173,3 +173,16 @@ The RTL backend selects buffer implementations based on the `BUFFER_TYPE` attrib
 The backend does not use `TIMING` when generating RTL. Latency information is kept in the IR for buffer placement only.
 
 This design simplifies support for new buffer types: adding a new module and registering it in the JSON file is sufficient.
+
+## Code Structure
+
+The following is the code structure in the [BufferPlacement folder](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Transforms/BufferPlacement/):
+- **BufferPlacementMILP.cpp**: It contains all the functions and variables that are essential to instantiate variables and constraints in the MILP. All constraint instantiation functions should be defined in this file.
+- **BufferingSupport.cpp**: It contains all the utilities for the files in this folder.
+- **CFDFC.cpp**: It contains the functions generating the MILP formulation used to identify CFDFC in the dataflow circuit.
+- **CostAwareBuffer.cpp**: It contains the functions generating the MILP formulation for cost-aware buffer placement.
+- **FPGA20Buffers.cpp**: It contains the functions generating the MILP formulation for FPGA20 buffer placement.
+- **FPL22Buffers.cpp**: It contains the functions generating the MILP formulation for FPL22 buffer placement.
+- **HandshakePlaceBuffers.cpp**: It contains the main functions that orchestrate which buffer placement to call and the correct instantiation of buffers in the dataflow circuit.
+- **HandshakeSetBufferingProperties.cpp**: It sets specific buffering properties for particular dataflow units (i.e., LSQ).
+- **MapBuf.cpp**: It contains the functions generating the MILP formulation for MapBuf buffer placement.

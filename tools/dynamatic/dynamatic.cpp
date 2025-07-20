@@ -592,15 +592,13 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
   StringRef generator = args.positionals.front();
-  if (generator == "flopoco" || generator == "vivado") {
-    state.fpUnitsGenerator = generator.str();
-    return CommandResult::SUCCESS;
+  if (generator.empty()) {
+    llvm::outs() << ERR << "Please specify a floating-point units generator.\n";
+    return CommandResult::FAIL;
   }
-  llvm::outs() << ERR << "Unknown floating-point units generator '" << generator
-               << "', possible options are 'flopoco' and 'vivado'.\n";
-  return CommandResult::FAIL;
+  state.fpUnitsGenerator = generator.str();
+  return CommandResult::SUCCESS;
 }
-
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
@@ -686,7 +684,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl, state.fpUnitsGenerator);
+                 state.getKernelName(), hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
