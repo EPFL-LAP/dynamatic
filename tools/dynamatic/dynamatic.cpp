@@ -576,7 +576,7 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
   if (args.positionals.empty()){
-    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    llvm::outs() << ERR << "Kindly enter a valid path such as\n /home/username/Xilinx/2025.1/Vivado/\n";
     return CommandResult::FAIL;
   }
 
@@ -592,14 +592,14 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
     if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
-                    "please specify the top-level Vivado directory.\n";
+                    "please specify the top-level Vivado directory such as\n /home/username/Xilinx/2025.1/Vivado/\n";
     return CommandResult::FAIL;
     }
   }
   else{
     llvm::outs() << ERR
                  << "The path to Vivado does not exist, "
-                    "please specify a valid top-level Vivado directory.\n";
+                    "please specify a valid top-level Vivado directory such as\n /home/username/Xilinx/2025.1/Vivado/\n";
     return CommandResult::FAIL;
   }
   
