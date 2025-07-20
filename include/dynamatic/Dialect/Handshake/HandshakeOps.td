@@ -320,7 +320,7 @@ def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
     Similar to a buffer, its timing behavior is configurable.
   }];
   
-  let arguments = (ins ChannelType:$operand, UI32Attr:$initToken);
+  let arguments = (ins ChannelType:$operand, UI1Attr:$initToken);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{
