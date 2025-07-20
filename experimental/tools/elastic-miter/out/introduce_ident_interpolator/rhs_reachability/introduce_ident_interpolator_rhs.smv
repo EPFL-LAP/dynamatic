@@ -1,0 +1,21 @@
+#include "handshake_sink_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE introduce_ident_interpolator_rhs (A_in, A_in_valid)
+
+
+-- input and output
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, vm_fork_0.ins_ready);
+VAR vm_fork_0 : handshake_fork_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, interpolate.short_ready, interpolate.long_ready);
+VAR interpolate : handshake_spec_v2_interpolator_0(vm_fork_0.outs_0, vm_fork_0.outs_0_valid, vm_fork_0.outs_1, vm_fork_0.outs_1_valid, sink.ins_ready);
+VAR sink : handshake_sink_0(interpolate.result, interpolate.result_valid);
+
+-- properties

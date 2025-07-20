@@ -1,0 +1,16 @@
+#include "handshake_sink_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE add_init_lhs_wrapper (val, val_valid)
+
+
+-- input and output
+DEFINE add_init_lhs_wrapped_val := val;
+DEFINE add_init_lhs_wrapped_val_valid := val_valid;
+DEFINE val_ready := add_init_lhs_wrapped.val_ready;
+
+
+VAR add_init_lhs_wrapped : add_init_lhs(add_init_lhs_wrapped_val, add_init_lhs_wrapped_val_valid);
+
+-- properties

@@ -1,0 +1,17 @@
+#include "handshake_ndwire_0.smv"
+#include "handshake_sink_0.smv"
+
+
+MODULE introduce_ident_interpolator_lhs (A_in, A_in_valid)
+
+
+-- input and output
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, vm_sink_0.ins_ready);
+VAR vm_sink_0 : handshake_sink_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid);
+
+-- properties

@@ -1,0 +1,81 @@
+-- handshake_buffer_0 : buffer(['num_slots=1', 'bitwidth=1', 'buffer_type="FIFO_BREAK_DV"'])
+
+
+MODULE handshake_buffer_0 (ins, ins_valid, outs_ready)
+  VAR
+  inner_tehb : handshake_buffer_0__tehb(ins, ins_valid, inner_elastic_fifo.ins_ready);
+  inner_elastic_fifo : handshake_buffer_0__elastic_fifo_inner(inner_tehb.outs, inner_tehb.outs_valid, outs_ready);
+
+  -- output
+  DEFINE
+  ins_ready := inner_tehb.ins_ready;
+  outs_valid := inner_elastic_fifo.outs_valid;
+  outs := inner_elastic_fifo.outs;
+
+
+MODULE handshake_buffer_0__tehb(ins, ins_valid, outs_ready)
+  VAR
+  inner_tehb : handshake_buffer_0__tehb__tehb_dataless(ins_valid, outs_ready);
+  data : boolean;
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+
+  -- output
+  DEFINE
+  ins_ready := inner_tehb.ins_ready;
+  outs_valid := inner_tehb.outs_valid;
+  outs := inner_tehb.full ? data : ins;
+
+
+MODULE handshake_buffer_0__tehb__tehb_dataless(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+
+  ASSIGN
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
+
+  -- output
+  DEFINE
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
+
+
+
+MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
+  VAR
+  mem : boolean;
+  full : boolean;
+  empty : boolean;
+
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid & (!full | outs_ready);
+
+  ASSIGN
+  init(mem) := FALSE;
+  next(mem) := write_en ? ins : mem;
+
+  init(full) := FALSE;
+  next(full) := case
+    write_en & !read_en : TRUE;
+    !write_en & read_en : FALSE;
+    TRUE : full;
+  esac;
+
+  init(empty) := TRUE;
+  next(empty) := case
+    !write_en & read_en : TRUE;
+    write_en & !read_en : FALSE;
+    TRUE : empty;
+  esac;
+
+  -- output
+  DEFINE
+  ins_ready := !full | outs_ready;
+  outs_valid := !empty;
+  outs := mem;
+
+

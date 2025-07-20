@@ -1,0 +1,19 @@
+#include "handshake_init_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_sink_0.smv"
+
+
+MODULE add_init_lhs (val, val_valid)
+
+
+-- input and output
+DEFINE ndw_in_val_ins := val;
+DEFINE ndw_in_val_ins_valid := val_valid;
+DEFINE val_ready := ndw_in_val.ins_ready;
+
+
+VAR ndw_in_val : handshake_ndwire_0(ndw_in_val_ins, ndw_in_val_ins_valid, init0.ins_ready);
+VAR init0 : handshake_init_0(ndw_in_val.outs, ndw_in_val.outs_valid, sink.ins_ready);
+VAR sink : handshake_sink_0(init0.outs, init0.outs_valid);
+
+-- properties

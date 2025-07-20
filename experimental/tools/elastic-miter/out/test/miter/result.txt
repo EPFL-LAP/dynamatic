@@ -1,0 +1,190 @@
+*** This is NuSMV 2.7.0 (compiled on (unknown))
+*** Enabled addons are: compass
+*** For more information on NuSMV see <http://nusmv.fbk.eu>
+*** or email to <nusmv-users@list.fbk.eu>.
+*** Please report bugs to <Please report bugs to <nusmv-users@fbk.eu>>
+
+*** Copyright (c) 2010-2025, Fondazione Bruno Kessler
+
+*** This version of NuSMV is linked to the CUDD library version 2.4.1
+*** Copyright (c) 1995-2004, Regents of the University of Colorado
+
+-- specification AF (AG elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.counter = elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.counter)  is false
+-- as demonstrated by the following execution sequence
+Trace Description: CTL Counterexample 
+Trace Type: Counterexample 
+  -> State: 1.1 <-
+    seq_generator_A_in.exact_tokens = 31
+    elastic_miter_test_lhs_test_rhs.lhs_nds.exact_tokens = 31
+    elastic_miter_test_lhs_test_rhs.rhs_nds.exact_tokens = 15
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.counter = 0
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.counter = 0
+    seq_generator_A_in.counter = 0
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_tehb.full = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_tehb.full = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.empty = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_nds.result_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.full = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_nds.result_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.full = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 0
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.empty = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 0
+    seq_generator_A_in.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in_ins_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.A_in_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.others_ready_1 = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.others_ready_0 = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.all_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.outs_1_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.outs_0_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_tehb.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_tehb.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.write_en = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.write_en = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_tehb.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_tehb.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.write_en = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.write_en = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_join.all_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.ins_1_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.ins_0_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_sink.ins_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_join.all_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.ins_1_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.ins_0_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_sink.ins_ready = TRUE
+  -> State: 1.2 <-
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.counter = 1
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.counter = 1
+    seq_generator_A_in.counter = 1
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.empty = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.full = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.full = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.empty = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.read_en = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.read_en = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.read_en = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.read_en = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_join.all_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_join.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_join.ins_1_ready = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_join.all_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_join.outs_valid = TRUE
+    elastic_miter_test_lhs_test_rhs.rhs_join.ins_1_ready = TRUE
+  -> State: 1.3 <-
+    seq_generator_A_in.counter = 2
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 1
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 1
+  -> State: 1.4 <-
+    seq_generator_A_in.counter = 3
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 2
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 2
+  -> State: 1.5 <-
+    seq_generator_A_in.counter = 4
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 3
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 3
+  -> State: 1.6 <-
+    seq_generator_A_in.counter = 5
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 4
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 4
+  -> State: 1.7 <-
+    seq_generator_A_in.counter = 6
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 5
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 5
+  -> State: 1.8 <-
+    seq_generator_A_in.counter = 7
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 6
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 6
+  -> State: 1.9 <-
+    seq_generator_A_in.counter = 8
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 7
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 7
+  -> State: 1.10 <-
+    seq_generator_A_in.counter = 9
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 8
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 8
+  -> State: 1.11 <-
+    seq_generator_A_in.counter = 10
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 9
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 9
+  -> State: 1.12 <-
+    seq_generator_A_in.counter = 11
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 10
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 10
+  -> State: 1.13 <-
+    seq_generator_A_in.counter = 12
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 11
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 11
+  -> State: 1.14 <-
+    seq_generator_A_in.counter = 13
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 12
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 12
+  -> State: 1.15 <-
+    seq_generator_A_in.counter = 14
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 13
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 13
+  -> State: 1.16 <-
+    seq_generator_A_in.counter = 15
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 14
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 14
+  -> State: 1.17 <-
+    seq_generator_A_in.counter = 16
+    elastic_miter_test_lhs_test_rhs.rhs_nds.result_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 15
+    elastic_miter_test_lhs_test_rhs.rhs_nds.counter = 15
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.write_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_elastic_fifo.ins_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.all_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_join.ins_0_ready = FALSE
+  -> State: 1.18 <-
+    seq_generator_A_in.counter = 17
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_tehb.full = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 16
+    elastic_miter_test_lhs_test_rhs.A_in_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.others_ready_0 = FALSE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.all_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.outs_0_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.in_fork_A_in.ins_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_tehb.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.write_en = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.write_en = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.ins_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_tehb.ins_ready = FALSE
+    elastic_miter_test_lhs_test_rhs.rhs_in_buf_A_in.inner_counter.write_en = FALSE
+  -- Loop starts here
+  -> State: 1.19 <-
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.counter = 0
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.empty = TRUE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.full = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_nds.counter = 17
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_elastic_fifo.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_in_buf_A_in.inner_counter.read_en = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.all_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.outs_valid = FALSE
+    elastic_miter_test_lhs_test_rhs.lhs_join.ins_1_ready = FALSE
+  -> State: 1.20 <-

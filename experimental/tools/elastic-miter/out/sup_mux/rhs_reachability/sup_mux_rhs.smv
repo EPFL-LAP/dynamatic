@@ -1,37 +1,38 @@
 #include "handshake_spec_v2_repeating_init_0.smv"
-#include "handshake_ndwire_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
 #include "handshake_mux_0.smv"
 #include "handshake_fork_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_init_0.smv"
+#include "handshake_ndwire_0.smv"
 
 
-MODULE sup_mux_rhs (In1, In1_valid, In2, In2_valid, Ctrl, Ctrl_valid, Out1_ready)
+MODULE sup_mux_rhs (loopLiveIn, loopLiveIn_valid, oldContinue, oldContinue_valid, iterLiveOut, iterLiveOut_valid, iterLiveIn_ready)
 
 
 -- input and output
-DEFINE Out1 := ndw_out_Out1.outs;
-DEFINE Out1_valid := ndw_out_Out1.outs_valid;
-DEFINE ndw_out_Out1_outs_ready := Out1_ready;
-DEFINE ndw_in_In1_ins := In1;
-DEFINE ndw_in_In1_ins_valid := In1_valid;
-DEFINE In1_ready := ndw_in_In1.ins_ready;
-DEFINE ndw_in_In2_ins := In2;
-DEFINE ndw_in_In2_ins_valid := In2_valid;
-DEFINE In2_ready := ndw_in_In2.ins_ready;
-DEFINE ndw_in_Ctrl_ins := Ctrl;
-DEFINE ndw_in_Ctrl_ins_valid := Ctrl_valid;
-DEFINE Ctrl_ready := ndw_in_Ctrl.ins_ready;
+DEFINE iterLiveIn := ndw_out_iterLiveIn.outs;
+DEFINE iterLiveIn_valid := ndw_out_iterLiveIn.outs_valid;
+DEFINE ndw_out_iterLiveIn_outs_ready := iterLiveIn_ready;
+DEFINE ndw_in_loopLiveIn_ins := loopLiveIn;
+DEFINE ndw_in_loopLiveIn_ins_valid := loopLiveIn_valid;
+DEFINE loopLiveIn_ready := ndw_in_loopLiveIn.ins_ready;
+DEFINE ndw_in_oldContinue_ins := oldContinue;
+DEFINE ndw_in_oldContinue_ins_valid := oldContinue_valid;
+DEFINE oldContinue_ready := ndw_in_oldContinue.ins_ready;
+DEFINE ndw_in_iterLiveOut_ins := iterLiveOut;
+DEFINE ndw_in_iterLiveOut_ins_valid := iterLiveOut_valid;
+DEFINE iterLiveOut_ready := ndw_in_iterLiveOut.ins_ready;
 
 
-VAR ndw_in_In1 : handshake_ndwire_0(ndw_in_In1_ins, ndw_in_In1_ins_valid, data_mux.ins_1_ready);
-VAR ndw_in_In2 : handshake_ndwire_0(ndw_in_In2_ins, ndw_in_In2_ins_valid, data_mux.ins_0_ready);
-VAR ndw_in_Ctrl : handshake_ndwire_0(ndw_in_Ctrl_ins, ndw_in_Ctrl_ins_valid, ri.ins_ready);
-VAR ndw_out_Out1 : handshake_ndwire_0(passer.result, passer.result_valid, ndw_out_Out1_outs_ready);
-VAR ri : handshake_spec_v2_repeating_init_0(ndw_in_Ctrl.outs, ndw_in_Ctrl.outs_valid, fork_data_mux.ins_ready);
-VAR fork_data_mux : handshake_fork_0(ri.outs, ri.outs_valid, init_buffer_ctrl.ins_ready, passer.ctrl_ready);
-VAR init_buffer_ctrl : handshake_init_0(fork_data_mux.outs_0, fork_data_mux.outs_0_valid, data_mux.index_ready);
-VAR data_mux : handshake_mux_0(init_buffer_ctrl.outs, init_buffer_ctrl.outs_valid, ndw_in_In2.outs, ndw_in_In1.outs, ndw_in_In2.outs_valid, ndw_in_In1.outs_valid, passer.data_ready);
-VAR passer : handshake_passer_0(data_mux.outs, data_mux.outs_valid, fork_data_mux.outs_1, fork_data_mux.outs_1_valid, ndw_out_Out1.ins_ready);
+VAR ndw_in_loopLiveIn : handshake_ndwire_0(ndw_in_loopLiveIn_ins, ndw_in_loopLiveIn_ins_valid, data_mux.ins_0_ready);
+VAR ndw_in_oldContinue : handshake_ndwire_0(ndw_in_oldContinue_ins, ndw_in_oldContinue_ins_valid, vm_fork_1.ins_ready);
+VAR ndw_in_iterLiveOut : handshake_ndwire_0(ndw_in_iterLiveOut_ins, ndw_in_iterLiveOut_ins_valid, data_mux.ins_1_ready);
+VAR ndw_out_iterLiveIn : handshake_ndwire_0(passer.result, passer.result_valid, ndw_out_iterLiveIn_outs_ready);
+VAR vm_fork_1 : handshake_fork_0(ndw_in_oldContinue.outs, ndw_in_oldContinue.outs_valid, ri1.ins_ready, ri2.ins_ready);
+VAR ri1 : handshake_spec_v2_repeating_init_0(vm_fork_1.outs_0, vm_fork_1.outs_0_valid, newInit.ins_ready);
+VAR newInit : handshake_init_0(ri1.outs, ri1.outs_valid, data_mux.index_ready);
+VAR data_mux : handshake_mux_0(newInit.outs, newInit.outs_valid, ndw_in_loopLiveIn.outs, ndw_in_iterLiveOut.outs, ndw_in_loopLiveIn.outs_valid, ndw_in_iterLiveOut.outs_valid, passer.data_ready);
+VAR ri2 : handshake_spec_v2_repeating_init_0(vm_fork_1.outs_1, vm_fork_1.outs_1_valid, passer.ctrl_ready);
+VAR passer : handshake_passer_0(data_mux.outs, data_mux.outs_valid, ri2.outs, ri2.outs_valid, ndw_out_iterLiveIn.ins_ready);
 
 -- properties

@@ -1,0 +1,16 @@
+#include "test_lhs.smv"
+
+
+MODULE ctrl_input_inf(nReady0)
+  DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_A_in : ctrl_input_inf(test_lhs.A_in_ready);
+
+  VAR test_lhs : test_lhs (seq_generator_A_in.outs_valid);
+
+

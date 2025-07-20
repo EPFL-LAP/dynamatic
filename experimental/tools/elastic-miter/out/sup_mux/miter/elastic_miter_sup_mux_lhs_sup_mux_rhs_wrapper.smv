@@ -1,36 +1,36 @@
 #include "handshake_ndwire_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_mux_0.smv"
 #include "handshake_lazy_fork_1.smv"
-#include "handshake_init_0.smv"
-#include "handshake_cmpi_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_blocker_0.smv"
 #include "handshake_buffer_0.smv"
 #include "handshake_fork_0.smv"
-#include "handshake_blocker_0.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_spec_v2_repeating_init_0.smv"
-#include "handshake_buffer_1.smv"
+#include "handshake_cmpi_0.smv"
 
 
-MODULE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapper (In1, In1_valid, In2, In2_valid, Ctrl, Ctrl_valid, EQ_Out1_ready)
+MODULE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapper (loopLiveIn, loopLiveIn_valid, oldContinue, oldContinue_valid, iterLiveOut, iterLiveOut_valid, EQ_iterLiveIn_ready)
 
 
 -- input and output
-DEFINE EQ_Out1 := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.EQ_Out1;
-DEFINE EQ_Out1_valid := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.EQ_Out1_valid;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_Out1_ready := EQ_Out1_ready;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In1 := In1;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In1_valid := In1_valid;
-DEFINE In1_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.In1_ready;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In2 := In2;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In2_valid := In2_valid;
-DEFINE In2_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.In2_ready;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_Ctrl := Ctrl;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_Ctrl_valid := Ctrl_valid;
-DEFINE Ctrl_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.Ctrl_ready;
+DEFINE EQ_iterLiveIn := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.EQ_iterLiveIn;
+DEFINE EQ_iterLiveIn_valid := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.EQ_iterLiveIn_valid;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_iterLiveIn_ready := EQ_iterLiveIn_ready;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn := loopLiveIn;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn_valid := loopLiveIn_valid;
+DEFINE loopLiveIn_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.loopLiveIn_ready;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue := oldContinue;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid := oldContinue_valid;
+DEFINE oldContinue_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.oldContinue_ready;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut := iterLiveOut;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut_valid := iterLiveOut_valid;
+DEFINE iterLiveOut_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.iterLiveOut_ready;
 
 
-VAR elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped : elastic_miter_sup_mux_lhs_sup_mux_rhs(elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In1, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In1_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In2, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_In2_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_Ctrl, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_Ctrl_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_Out1_ready);
+VAR elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped : elastic_miter_sup_mux_lhs_sup_mux_rhs(elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_iterLiveIn_ready);
 
 -- properties

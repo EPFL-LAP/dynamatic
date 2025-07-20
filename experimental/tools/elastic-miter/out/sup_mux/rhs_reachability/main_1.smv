@@ -25,11 +25,11 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_In1 : bool_input_exact(sup_mux_rhs.In1_ready, 1);
-  VAR seq_generator_In2 : bool_input_exact(sup_mux_rhs.In2_ready, 1);
-  VAR seq_generator_Ctrl : bool_input_exact(sup_mux_rhs.Ctrl_ready, 1);
+  VAR seq_generator_loopLiveIn : bool_input_exact(sup_mux_rhs.loopLiveIn_ready, 1);
+  VAR seq_generator_oldContinue : bool_input_exact(sup_mux_rhs.oldContinue_ready, 1);
+  VAR seq_generator_iterLiveOut : bool_input_exact(sup_mux_rhs.iterLiveOut_ready, 1);
 
-  VAR sup_mux_rhs : sup_mux_rhs (seq_generator_In1.outs, seq_generator_In1.outs_valid, seq_generator_In2.outs, seq_generator_In2.outs_valid, seq_generator_Ctrl.outs, seq_generator_Ctrl.outs_valid, sink_Out1.ins_ready);
+  VAR sup_mux_rhs : sup_mux_rhs (seq_generator_loopLiveIn.outs, seq_generator_loopLiveIn.outs_valid, seq_generator_oldContinue.outs, seq_generator_oldContinue.outs_valid, seq_generator_iterLiveOut.outs, seq_generator_iterLiveOut.outs_valid, sink_iterLiveIn.ins_ready);
 
-  VAR sink_Out1 : sink_main(sup_mux_rhs.Out1_valid);
+  VAR sink_iterLiveIn : sink_main(sup_mux_rhs.iterLiveIn_valid);
 

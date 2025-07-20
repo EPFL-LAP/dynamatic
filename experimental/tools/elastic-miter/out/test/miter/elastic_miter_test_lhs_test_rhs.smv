@@ -1,0 +1,26 @@
+#include "handshake_join_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_sink_0.smv"
+
+
+MODULE elastic_miter_test_lhs_test_rhs (A_in_valid)
+
+
+-- input and output
+DEFINE in_fork_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := in_fork_A_in.ins_ready;
+
+
+VAR in_fork_A_in : handshake_lazy_fork_0(in_fork_A_in_ins_valid, lhs_in_buf_A_in.ins_ready, rhs_in_buf_A_in.ins_ready);
+VAR lhs_in_buf_A_in : handshake_buffer_0(in_fork_A_in.outs_0_valid, lhs_join.ins_0_ready);
+VAR rhs_in_buf_A_in : handshake_buffer_0(in_fork_A_in.outs_1_valid, rhs_join.ins_0_ready);
+VAR lhs_nds : handshake_ndsource_0(lhs_join.ins_1_ready);
+VAR lhs_join : handshake_join_0(lhs_in_buf_A_in.outs_valid, lhs_nds.result_valid, lhs_sink.ins_ready);
+VAR lhs_sink : handshake_sink_0(lhs_join.outs_valid);
+VAR rhs_nds : handshake_ndsource_0(rhs_join.ins_1_ready);
+VAR rhs_join : handshake_join_0(rhs_in_buf_A_in.outs_valid, rhs_nds.result_valid, rhs_sink.ins_ready);
+VAR rhs_sink : handshake_sink_0(rhs_join.outs_valid);
+
+-- properties

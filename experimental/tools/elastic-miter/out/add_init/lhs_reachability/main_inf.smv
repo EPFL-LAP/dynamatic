@@ -1,0 +1,24 @@
+#include "add_init_lhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_val : bool_input_inf(add_init_lhs.val_ready);
+
+  VAR add_init_lhs : add_init_lhs (seq_generator_val.outs, seq_generator_val.outs_valid);
+
+

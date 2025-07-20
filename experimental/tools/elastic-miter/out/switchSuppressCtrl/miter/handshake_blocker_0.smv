@@ -1,0 +1,20 @@
+-- handshake_blocker_0 : blocker(['bitwidth=1'])
+
+
+MODULE handshake_blocker_0(ins, ins_valid, ctrl_valid, outs_ready)
+  VAR inner_blocker : handshake_blocker_0__tc_dataless(ins_valid, ctrl_valid, outs_ready);
+  DEFINE
+  // output
+  outs := ins;
+  outs_valid := inner_blocker.outs_valid;
+  ins_ready := inner_blocker.ins_ready;
+  ctrl_ready := inner_blocker.ctrl_ready;
+
+MODULE handshake_blocker_0__tc_dataless(ins_valid, ctrl_valid, outs_ready)
+  DEFINE
+  // output
+  outs_valid := ins_valid & ctrl_valid;
+  ins_ready := outs_ready & ctrl_valid;
+  ctrl_ready := outs_ready & ins_valid;
+
+

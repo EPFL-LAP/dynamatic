@@ -1,0 +1,9 @@
+-- handshake_sink_0 : sink(['bitwidth=0'])
+
+
+MODULE handshake_sink_0(ins_valid)
+
+  -- output
+  DEFINE
+  ins_ready  :=  TRUE;
+

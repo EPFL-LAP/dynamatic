@@ -1,0 +1,19 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "A_in" ["style"="dotted", "shape"="diamond", "label"="A_in", "mlir_op"="handshake.func"]
+  "A_in" -> "ndw_in_A_in" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="A_in", "to_idx"="0"]
+  "ndw_in_A_in" -> "join" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins_0", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_A_in" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "nds" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndsource", "mlir_op"="handshake.ndsource"]
+    "join" ["style"="filled, dotted", "fillcolor"="lavender", "shape"="box", "label"="join", "mlir_op"="handshake.join"]
+    "sink" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="sink", "mlir_op"="handshake.sink"]
+    "nds" -> "join" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins_1", "arrowtail"="none", "from"="result", "to_idx"="1"]
+    "join" -> "sink" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  }
+}

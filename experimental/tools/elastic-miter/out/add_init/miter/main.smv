@@ -1,0 +1,35 @@
+#include "elastic_miter_add_init_lhs_add_init_lhs.smv"
+
+
+MODULE bool_input(nReady0, max_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_val : bool_input(elastic_miter_add_init_lhs_add_init_lhs.val_ready, 1);
+
+  VAR elastic_miter_add_init_lhs_add_init_lhs : elastic_miter_add_init_lhs_add_init_lhs (seq_generator_val.outs, seq_generator_val.outs_valid);
+
+
+CTLSPEC AF (AG ((elastic_miter_add_init_lhs_add_init_lhs.lhs_in_buf_val.outs_valid = elastic_miter_add_init_lhs_add_init_lhs.rhs_in_buf_val.outs_valid)));
+

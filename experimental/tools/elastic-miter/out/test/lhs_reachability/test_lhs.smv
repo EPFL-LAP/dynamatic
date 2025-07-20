@@ -1,0 +1,20 @@
+#include "handshake_join_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE test_lhs (A_in_valid)
+
+
+-- input and output
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins_valid, join.ins_0_ready);
+VAR nds : handshake_ndsource_0(join.ins_1_ready);
+VAR join : handshake_join_0(ndw_in_A_in.outs_valid, nds.result_valid, sink.ins_ready);
+VAR sink : handshake_sink_0(join.outs_valid);
+
+-- properties
