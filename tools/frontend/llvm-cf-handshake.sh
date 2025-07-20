@@ -63,7 +63,6 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
 # ------------------------------------------------------------------------------
-
 $LLVM_BINS/opt -S \
  -passes="mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
   $OUT/clang.ll \
