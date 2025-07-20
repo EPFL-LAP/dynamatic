@@ -32,10 +32,10 @@ namespace dynamatic {
 namespace buffer {
 namespace mapbuf {
 
-using pathMap = std::unordered_map<
-    std::pair<experimental::Node *, experimental::Node *>,
-    std::vector<experimental::Node *>,
-    experimental::NodePairHash>;
+using pathMap =
+    std::unordered_map<std::pair<experimental::Node *, experimental::Node *>,
+                       std::vector<experimental::Node *>,
+                       experimental::NodePairHash>;
 
 /// Holds the state and logic for MapBuf smart buffer placement.
 class MAPBUFBuffers : public BufferPlacementMILP {
@@ -63,11 +63,9 @@ protected:
 
 private:
   // Method for creating acyclic graphs from cyclic dataflow graph. If false,
-  // addCutLoopbackBuffers() method is used. If true,
+  // cut loopbacks method is used. If true,
   // findMinimumFeedbackArcSet() method is used.
   bool acyclicType;
-  // Big constant value used in MILP constraints
-  int bigConstant = 100;
   // Maximum LUT input size of the target FPGA.
   int lutSize;
   // Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.
@@ -79,62 +77,9 @@ private:
   // Path of BLIF files
   StringRef blifFiles;
 
-  // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
-  // CMPI modules or any other component that is not directly implemented as an
-  // LUT. These delays are retrieved from Vivado Timing Reports. Ready and Valid
-  // signals are not blackboxed.
-  void addBlackboxConstraints(Value channel);
-
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
-
-  // Adds Cut Selection Constraints, ensuring that only 1 cut is selected per
-  // node.
-  void addCutSelectionConstraints(std::vector<experimental::Cut> &cutVector);
-
-  // Adds Cut Selection Conflict Constraints. These constraints ensure that
-  // either a buffer is placed on a DFG edge or the cut that containts that edge
-  // is selected.
-  void addCutSelectionConflicts(experimental::Node *root,
-                                experimental::Node *leaf,
-                                GRBVar &cutSelectionVar);
-
-  // Inserts Buffers on Back Edges. This is done by adding constraints to the
-  // Gurobi Model, and inserting buffers into Subject Graph. The function loops
-  // over all the channels and checks if the channel is a back edge. If it is a
-  // back edge, then a buffer is inserted.
-  void addCutLoopbackBuffers();
-
-  // This is an alternative method to addCutLoopbackBuffers() function to create
-  // an acyclic graph. This function converts the cyclic dataflow graph into an
-  // acyclic graph by determining the Minimum Feedback Arc Set (MFAS). A graph
-  // can only be acyclic if a topological ordering can be found. An additional
-  // MILP is used here, which enforces a topological ordering. Since our graph
-  // is cyclic, a topological ordering cannot be found without removing some
-  // edges. The MILP formulated here minimizes the number of edges that needs to
-  // be removed in order to make the graph acyclic. Then, buffers are inserted
-  // on the edges that needs to be removed to make the graph acyclic.
-  void findMinimumFeedbackArcSet();
-
-  // Add clock period constraints for subject graph edges. For subject graph
-  // edges, only a single timing variable is required, as opposed to data flow
-  // graph edges where two timing variables are required. Also adds constraints
-  // for primary inputs and constants.
-  void addClockPeriodConstraintsNodes();
-
-  // Adds Clock Period Constraints, Buffer Insertion and Channel Constraints to
-  // the Dataflow Graph Edges.
-  void addClockPeriodConstraintsChannels(Value channel, SignalType signal);
-
-  // Adds Delay Propagation Constraints for all the cuts by looping over cuts
-  // map. If a node has only one fanin, delay is propagated from the fanin.
-  // Otherwise, delay is propagated from the leaves of the cut. Loops over the
-  // leaves of the cut and adds delay propagation constraints for each leaf.
-  // Also adds cut selection conflict constraints.
-  void
-  addDelayAndCutConflictConstraints(experimental::Node *root,
-                                    std::vector<experimental::Cut> &cutVector);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
