@@ -211,8 +211,6 @@ begin
     outs_ready => result_ready,
     outs_valid => result_valid,
     ins_ready  => oehb_ready,
-    ins(0)     => '0',
-    outs    => open
   );
 
   ieee2nfloat_lhs: entity work.InputIEEE_64bit(arch)

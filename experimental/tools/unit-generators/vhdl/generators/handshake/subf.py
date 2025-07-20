@@ -146,7 +146,7 @@ def _generate_subf_double_precision(name):
     buff_name = f"{name}_buff"
 
     dependencies = generate_join(join_name, {"size": 2}) + \
-        generate_oehb(oehb_name, {"bitwidth": 1}) + \
+        generate_oehb(oehb_name, {"bitwidth": 0}) + \
         generate_delay_buffer(
         buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -209,8 +209,6 @@ begin
       outs_ready => result_ready,
       outs_valid => result_valid,
       ins_ready => oehb_ready,
-      ins(0) => '0',
-      outs => open
     );
 
   rhs_neg <= not rhs(64 - 1) & rhs(64 - 2 downto 0);
