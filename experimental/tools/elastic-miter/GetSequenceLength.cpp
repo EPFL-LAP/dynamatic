@@ -72,8 +72,8 @@ static std::string stripString(const std::string &string) {
 // is different for the other three states.
 // So in this example we have two unique states.
 static FailureOr<llvm::StringSet<>>
-getStateSet(const std::filesystem::path &filePath,
-            const std::string &modelName) {
+getStateSet(const std::filesystem::path &filePath, const std::string &modelName,
+            unsigned nrOfTokens) {
   std::ifstream file(filePath);
   llvm::StringSet<> states;
   std::string line, currentState;
@@ -99,6 +99,50 @@ getStateSet(const std::filesystem::path &filePath,
     if (!recording)
       continue;
 
+    // For the sequence generator states, we only include
+    // - whether the sequence generator is emitting the value or not
+    // - if it's emitting, then the value of the generator.
+    if (line.find("seq_generator_", 0) == 0) {
+      size_t dotPos = line.find('.');
+      if (dotPos == std::string::npos) {
+        llvm::errs() << "Invalid state line: " << line << "\n";
+        return failure();
+      }
+      if (nrOfTokens == 0) {
+        // If the sequence generator emits infinite tokens, we always include
+        // the value.
+        if (line.find("outs", dotPos + 1) == dotPos + 1) {
+          // Include the value
+          currentState += line + "\n";
+        }
+      } else {
+        // Determine if the sequence generator is emitting a value or not from
+        // the counter value.
+        if (line.find("counter", dotPos + 1) == dotPos + 1) {
+          auto strValue = line.substr(dotPos + 10); // "counter = "
+          unsigned counterValue = std::stoi(strValue);
+          if (counterValue > nrOfTokens) {
+            llvm::errs() << "Counter value " << counterValue
+                         << " exceeds the number of tokens: " << nrOfTokens
+                         << "\n";
+            return failure();
+          }
+
+          if (counterValue == nrOfTokens) {
+            // The sequence generator is not emitting a value
+            // Include the current line to indicate the generator is not
+            // generating a token.
+            currentState += line + "\n";
+          } else {
+            // The sequence generator is emitting a value. Include the value.
+            if (line.find("outs", dotPos + 1) == dotPos + 1) {
+              // Include the value
+              currentState += line + "\n";
+            }
+          }
+        }
+      }
+    }
     // Skip if it doesn't start with "miter." or starts with "miter.ndw",
     // indicating it is a ND wire
     if (line.find(modelName + ".", 0) != 0 ||
@@ -118,17 +162,16 @@ getStateSet(const std::filesystem::path &filePath,
 
 // Count how many states are in the set reached by infinite tokens but are not
 // in the set reached by finite tokens.
-static FailureOr<size_t>
-compareReachableStates(const std::string &modelName,
-                       const std::filesystem::path &infinitePath,
-                       const std::filesystem::path &finitePath) {
+static FailureOr<size_t> compareReachableStates(
+    const std::string &modelName, const std::filesystem::path &infinitePath,
+    const std::filesystem::path &finitePath, unsigned nrOfTokens) {
 
-  auto failOrInfiniteStates = getStateSet(infinitePath, modelName);
+  auto failOrInfiniteStates = getStateSet(infinitePath, modelName, nrOfTokens);
   if (failed(failOrInfiniteStates)) {
     llvm::errs() << "Failed to get the state set with infinite tokens.\n";
     return failure();
   }
-  auto failOrFiniteStates = getStateSet(finitePath, modelName);
+  auto failOrFiniteStates = getStateSet(finitePath, modelName, nrOfTokens);
   if (failed(failOrFiniteStates)) {
     llvm::errs() << "Failed to get the state set with finite tokens.\n";
     return failure();
@@ -247,7 +290,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     auto failOrNrOfDifferences =
         dynamatic::experimental::compareReachableStates(
             smvModelName, outputDir / "inf_states.txt",
-            outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
+            outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"),
+            numberOfTokens);
     if (failed(failOrNrOfDifferences)) {
       llvm::errs() << "Failed to compare the number of reachable states with "
                    << numberOfTokens << " tokens.\n";
