@@ -9,3 +9,6 @@
 	url = https://github.com/godotengine/godot-cpp
 	branch = 4.1
   shallow = true
+[submodule "data/aig"]
+	path = data/aig
+	url = https://github.com/ETHZ-DYNAMO/dataflow-aig-library
