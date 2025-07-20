@@ -34,11 +34,11 @@ private:
   std::string constraint;
 };
 
-class LengthRelationWithOutputConstraint : public ElasticMiterConstraint {
+class SequenceLengthEnhancedRelationConstraint : public ElasticMiterConstraint {
 public:
   // We don't need to parse a LengthRelationWithOutputConstraint, we can just
   // copy the constraint string.
-  LengthRelationWithOutputConstraint(const std::string &option)
+  SequenceLengthEnhancedRelationConstraint(const std::string &option)
       : constraint(option){};
   std::string createSmvConstraint(
       const std::string &moduleName,

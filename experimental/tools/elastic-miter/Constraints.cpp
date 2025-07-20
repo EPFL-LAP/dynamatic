@@ -74,7 +74,7 @@ std::string SequenceLengthRelationConstraint::createSmvConstraint(
   return output;
 }
 
-std::string LengthRelationWithOutputConstraint::createSmvConstraint(
+std::string SequenceLengthEnhancedRelationConstraint::createSmvConstraint(
     const std::string &moduleName,
     const dynamatic::experimental::ElasticMiterConfig &config) const {
 

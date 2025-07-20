@@ -80,8 +80,8 @@ static cl::list<std::string> seqLengthRelationConstraints(
     cl::desc("Specify constraints for the relation of sequence lengths."),
     cl::cat(constraintsCategory));
 
-static cl::list<std::string> seqLengthRelationWithOutputConstraints(
-    "seq_length_with_output", cl::Prefix,
+static cl::list<std::string> seqLengthRelationEnhancedConstraint(
+    "seq_length_enhanced", cl::Prefix,
     cl::desc("Specify constraints for the relation of sequence lengths (with "
              "output. heavier)."),
     cl::cat(constraintsCategory));
@@ -152,9 +152,9 @@ parseSequenceConstraints() {
         new dynamatic::experimental::SequenceLengthRelationConstraint(
             constraint));
 
-  for (const auto &constraint : seqLengthRelationWithOutputConstraints)
+  for (const auto &constraint : seqLengthRelationEnhancedConstraint)
     constraints.push_back(
-        new dynamatic::experimental::LengthRelationWithOutputConstraint(
+        new dynamatic::experimental::SequenceLengthEnhancedRelationConstraint(
             constraint));
 
   // A Loop Condition sequence contraint has the form
