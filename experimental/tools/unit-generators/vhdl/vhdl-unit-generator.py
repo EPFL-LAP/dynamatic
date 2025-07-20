@@ -21,6 +21,7 @@ import generators.handshake.merge as merge
 import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
+import generators.handshake.ori as ori
 import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
@@ -83,6 +84,8 @@ def generate_code(name, mod_type, parameters):
             return muli.generate_muli(name, parameters)
         case "mux":
             return mux.generate_mux(name, parameters)
+        case "ori":
+            return ori.generate_ori(name, parameters)
         case "select":
             return select.generate_select(name, parameters)
         case "sink":
