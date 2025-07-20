@@ -57,7 +57,7 @@ void BaseSubjectGraph::connectInputNodesHelper(
     BaseSubjectGraph *moduleBeforeSubjectGraph) {
 
   auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
-  Value channel;
+  Value channel = nullptr;
 
   if (moduleBeforeSubjectGraph->op != nullptr)
     channel = moduleBeforeSubjectGraph->op->getResult(resultNumber);

@@ -22,7 +22,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-#include <boost/functional/hash/extensions.hpp>
 #include <string>
 #include <vector>
 

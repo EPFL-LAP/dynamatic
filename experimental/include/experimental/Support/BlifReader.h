@@ -18,7 +18,6 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
-#include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Value.h"
 #include <set>
@@ -64,7 +63,7 @@ public:
   bool isOutput = false;
   bool isLatchInput = false;
   bool isLatchOutput = false;
-  Value value; // MLIR Value associated with the node, if any
+  Value nodeMLIRValue; // MLIR Value associated with the node, if any
 
   MILPVarsSubjectGraph *gurobiVars;
   std::set<Node *> fanins = {};
@@ -104,8 +103,8 @@ public:
   // node of one LogicNetwork object is connected to the output node of
   // LogicNetwork object that comes before it.
   static void connectNodes(Node *currentNode, Node *previousNode, Value channel) {
-    currentNode->value = channel;
-    previousNode->value = channel;
+    currentNode->nodeMLIRValue = channel;
+    previousNode->nodeMLIRValue = channel;
 
     // Once Input/Output Nodes are connected, they should not be Input/Output in
     // the BLIF, but just become internal Nodes
@@ -165,6 +164,16 @@ struct NodePtrEqual {
   bool operator()(const Node *lhs, const Node *rhs) const {
     return lhs->name == rhs->name;
   }
+};
+
+struct NodePairHash {
+    std::size_t operator()(const std::pair<Node*, Node*>& p) const {
+        auto h1 = NodePtrHash{}(p.first);
+        auto h2 = NodePtrHash{}(p.second);
+        
+        // Simple hash function using bit shifting and XOR
+        return h1 ^ (h2 << 1);
+    }
 };
 
 /// Manages a collection of interconnected nodes representing a

@@ -24,10 +24,8 @@
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 #include "experimental/Support/SubjectGraph.h"
-#include "gurobi_c.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <string>
 #include <unordered_map>
 
@@ -299,7 +297,7 @@ void MAPBUFBuffers::addCutSelectionConflicts(experimental::Node *root,
   path = getPath(root, leaf, leafToRootPaths, blifData);
   // Loop over edges in the path from the leaf to the root.
   for (auto &nodePath : path) {
-    if (nodePath->value) {
+    if (nodePath->nodeMLIRValue) {
       // Add the Cut Selection Conflict Constraints. An LUT cannot cover an edge
       // if it is cut by a buffer, as LUTs cannot cover multiple sequential
       // stages. This constraint ensures an edge is either covered by a LUT, or
@@ -454,7 +452,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
 
     // If the AIG node is a channel, match the Gurobi variables of the AIG
     // node with channel variables
-    if (Value nodeChannel = node->value) {
+    if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
       SignalType signalType =
           nodeName.find("ready") != std::string::npos   ? SignalType::READY

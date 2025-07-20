@@ -24,7 +24,6 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
-#include <boost/functional/hash/extensions.hpp>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -36,7 +35,7 @@ namespace mapbuf {
 using pathMap = std::unordered_map<
     std::pair<experimental::Node *, experimental::Node *>,
     std::vector<experimental::Node *>,
-    boost::hash<std::pair<experimental::Node *, experimental::Node *>>>;
+    experimental::NodePairHash>;
 
 /// Holds the state and logic for MapBuf smart buffer placement.
 class MAPBUFBuffers : public BufferPlacementMILP {
