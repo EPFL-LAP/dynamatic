@@ -798,6 +798,27 @@
     ]
   },
   {
+    "name": "memref.alloca",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "CONSTANT_VALUES", "type": "string" }
+    ],
+    "generator": "\"python3\" \"$DYNAMATIC/tools/backend/ram-generator/ram_generator.py\" \"$MODULE_NAME\" vhdl \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $DATA_WIDTH $ADDR_WIDTH $SIZE $CONSTANT_VALUES",
+    "hdl": "vhdl"
+  },
+  {
+    "name": "memref.alloca",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SIZE", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/support/ram_1w1r.vhd",
+    "hdl": "vhdl"
+  },
+  {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/join.vhd",

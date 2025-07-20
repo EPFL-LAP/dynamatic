@@ -24,6 +24,7 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
+
 //===----------------------------------------------------------------------===//
 // Attribute classes 
 //===----------------------------------------------------------------------===//
@@ -476,5 +477,15 @@ def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
 }
 // and then we pass that "fake" attribute to this, which is the real attribute
 def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
+
+//===----------------------------------------------------------------------===//
+// MemInitialValueAttr
+//===----------------------------------------------------------------------===//
+
+// Used to represent the constant/initial value of the ROM/RAM
+def MemoryInitalValueAttr : Handshake_Attr<"MemoryInitialValue", "init_value"> {
+  let parameters = (ins "DenseElementsAttr":$constant);
+  let assemblyFormat = "`[` $constant `]`";
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

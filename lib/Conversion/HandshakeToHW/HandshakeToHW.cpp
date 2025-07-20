@@ -21,6 +21,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -48,6 +49,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <utility>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -210,6 +212,31 @@ struct MemLoweringState {
   void connectWithCircuit(ModuleBuilder &modBuilder);
 };
 
+/// \brief: utility struct that holds useful information for converting memory
+/// interfaces (i.e., mem_controller and lsqs) that are connected to an allocaOp
+/// (i.e., instantiated as interal BRAMs).
+struct InternalMemLoweringState {
+  /// The placeholder operation for memory instance
+  memref::AllocaOp allocaOp;
+  handshake::MemoryOpInterface memInterface;
+  FuncMemoryPorts ports;
+
+  handshake::PortNamer portNames;
+
+  /// Needed because we use the class as a value type in a map, which needs to
+  /// be default-constructible.
+  InternalMemLoweringState()
+      : allocaOp(nullptr), memInterface(nullptr), ports(nullptr),
+        portNames(nullptr) {
+    llvm_unreachable("object should never be default-constructed");
+  }
+
+  InternalMemLoweringState(memref::AllocaOp allocaOp,
+                           handshake::MemoryOpInterface memInterface)
+      : allocaOp(allocaOp), memInterface(memInterface),
+        ports(getMemoryPorts(memInterface)), portNames(memInterface){};
+};
+
 /// Summarizes information to convert a Handshake function into a
 /// `hw::HWModuleOp`.
 struct ModuleLoweringState {
@@ -218,6 +245,11 @@ struct ModuleLoweringState {
   llvm::MapVector<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
   /// Number of distinct memories in the function's arguments.
   unsigned numMemories = 0;
+
+  /// Memory interfaces connected to the internal BRAMs (represented using an
+  /// AllocaOp).
+  llvm::MapVector<handshake::MemoryOpInterface, InternalMemLoweringState>
+      internalMemInterfaces;
 
   /// Default constructor required because we use the class as a map's value,
   /// which must be default constructible.
@@ -339,6 +371,8 @@ public:
   /// Same role as the construction which takes an opaque operation but
   /// specialized for memory interfaces, passed through their port information.
   ModuleDiscriminator(FuncMemoryPorts &ports);
+
+  ModuleDiscriminator(memref::AllocaOp *op, FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
   /// with different parameter values will never receive the same name.
@@ -691,6 +725,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<memref::AllocaOp>([&](memref::AllocaOp allocaOp) {
+        // No parameters needed for these operations
+        addUnsigned("DATA_WIDTH",
+                    allocaOp.getMemref().getType().getElementTypeBitWidth());
+        addUnsigned("SIZE", allocaOp.getMemref().getType().getNumElements());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -718,6 +758,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // There can be at most one of those, and it is a load/store port
         unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+
         Type dataType = IntegerType::get(ctx, ports.dataWidth);
         Type addrType = IntegerType::get(ctx, ports.addrWidth);
 
@@ -794,6 +835,33 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         op->emitError() << "Unsupported memory interface type.";
         unsupported = true;
       });
+}
+
+ModuleDiscriminator::ModuleDiscriminator(memref::AllocaOp *op,
+                                         FuncMemoryPorts &ports) {
+  init(op->getOperation());
+  addUnsigned("DATA_WIDTH", ports.dataWidth);
+  addUnsigned("ADDR_WIDTH", ports.addrWidth);
+  addUnsigned("SIZE", op->getMemref().getType().getNumElements());
+
+  if (auto initialValueAttr =
+          getDialectAttr<MemoryInitialValueAttr>(op->getOperation())) {
+    Type elemType = initialValueAttr.getConstant().getElementType();
+    std::vector<std::string> strValues;
+    strValues.reserve(initialValueAttr.getConstant().getNumElements());
+    if (isa<IntegerType>(elemType)) {
+      for (auto val : initialValueAttr.getConstant().getValues<int32_t>()) {
+        strValues.push_back(std::to_string(val));
+      }
+    } else if (isa<Float32Type>(elemType)) {
+      for (auto val : initialValueAttr.getConstant().getValues<float>()) {
+        strValues.push_back(std::to_string(val));
+      }
+    } else {
+      assert(false && "Unsupported constant type!");
+    }
+    addString("CONSTANT_VALUES", llvm::join(strValues, ","));
+  }
 }
 
 void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
@@ -927,6 +995,32 @@ public:
     // memory interface
     ValueRange toModOutput = instOp->getResults().drop_front(numResults);
     for (auto [backedge, res] : llvm::zip_equal(state.backedges, toModOutput))
+      backedge.setValue(res);
+    return instOp;
+  }
+
+  hw::InstanceOp
+  convertToInstance(InternalMemLoweringState &state,
+                    ConversionPatternRewriter &rewriter,
+                    SmallVector<Backedge> &memInterfaceToBRAMChannels) {
+    handshake::MemoryOpInterface memOp = state.memInterface;
+    ModuleDiscriminator discriminator(state.ports);
+    StringRef name = getUniqueName(memOp);
+    Location loc = memOp.getLoc();
+    hw::InstanceOp instOp = createInstance(discriminator, name, loc, rewriter);
+    if (!instOp)
+      return nullptr;
+
+    assert(instOp->getNumResults() - memOp->getNumResults() ==
+           memInterfaceToBRAMChannels.size());
+    size_t numResults = memOp->getNumResults();
+    rewriter.replaceOp(memOp, instOp->getResults().take_front(numResults));
+
+    // Resolve backedges in the module's terminator that are coming from the
+    // memory interface
+    ValueRange toModOutput = instOp->getResults().drop_front(numResults);
+    for (auto [backedge, res] :
+         llvm::zip_equal(memInterfaceToBRAMChannels, toModOutput))
       backedge.setValue(res);
     return instOp;
   }
@@ -1125,6 +1219,16 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   ModuleLoweringState state(funcOp);
   hw::ModulePortInfo modInfo = getFuncPortInfo(funcOp, state);
 
+  // Register all the memory interfaces that are connect to an allocaOp
+  for (auto allocaOp : funcOp.getOps<memref::AllocaOp>()) {
+    for (auto memInterface : funcOp.getOps<handshake::MemoryOpInterface>()) {
+      if (allocaOp.getMemref() == memInterface.getMemRef()) {
+        InternalMemLoweringState memLowingState(allocaOp, memInterface);
+        state.internalMemInterfaces.insert({memInterface, memLowingState});
+      }
+    }
+  }
+
   // Create non-external HW module to replace the function with
   rewriter.setInsertionPoint(funcOp);
   auto modOp = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), name, modInfo);
@@ -1239,6 +1343,18 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   hw::HWModuleOp parentModOp = memOp->getParentOfType<hw::HWModuleOp>();
   ModuleLoweringState &modState = lowerState.modState[parentModOp];
+
+  if (!modState.memInterfaces.contains(memOp)) {
+    // The memory interface is not in the set of memInterfaces, this means:
+    // - The memory interface is connected to an internal array (assert below).
+    // - The IR is malformed.
+
+    assert(modState.internalMemInterfaces.contains(memOp) &&
+           "The memory interface op is not registered as an internal one nor "
+           "external one!");
+    return failure();
+  }
+
   MemLoweringState &memState = modState.memInterfaces[memOp];
   HWMemConverter converter(getContext());
 
@@ -1277,6 +1393,144 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
 
   hw::InstanceOp instOp = converter.convertToInstance(memState, rewriter);
   return instOp ? success() : failure();
+}
+
+namespace {
+
+class ConvertMemInterfaceForIntenalArray
+    : public OpInterfaceConversionPattern<handshake::MemoryOpInterface> {
+public:
+  ConvertMemInterfaceForIntenalArray(ChannelTypeConverter &typeConverter,
+                                     MLIRContext *ctx,
+                                     LoweringState &lowerState)
+      : OpInterfaceConversionPattern<handshake::MemoryOpInterface>(
+            typeConverter, ctx),
+        lowerState(lowerState) {}
+
+  LogicalResult
+  matchAndRewrite(handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override;
+
+private:
+  /// Shared lowering state.
+  LoweringState &lowerState;
+};
+
+} // namespace
+
+// Steps:
+// 1. Materialize the AllocaOp as a RAM module (here we assume that it is
+// instantiated as a dual-port, single cycle latency BRAM).
+// 2. Replace the memory interface op.
+// 3. Erase the old memory interface op and the allocaOp.
+LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
+    handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) const {
+
+  hw::HWModuleOp parentModOp = memOp->getParentOfType<hw::HWModuleOp>();
+  ModuleLoweringState &modState = lowerState.modState[parentModOp];
+
+  if (!modState.internalMemInterfaces.contains(memOp)) {
+    // The memory interface is not in the set of memInterfaces, this means:
+    // - The memory interface is connected to an internal array (assert below).
+    // - The IR is malformed.
+    assert(modState.memInterfaces.contains(memOp) &&
+           "The memory interface op is not registered as an internal one nor "
+           "external one!");
+    return failure();
+  }
+
+  InternalMemLoweringState &memState = modState.internalMemInterfaces[memOp];
+
+  // Converter of the interface (LSQ/MC)
+  HWMemConverter memInterfaceConverter(getContext());
+
+  MLIRContext *ctx = memOp.getContext();
+
+  auto addrType = IntegerType::get(ctx, memState.ports.addrWidth);
+  auto dataType = IntegerType::get(ctx, memState.ports.dataWidth);
+  Type i1Type = IntegerType::get(ctx, 1);
+
+  SmallVector<Backedge> memInterfaceToBRAMChannels;
+
+  // We need this because at the time when we build the BRAM, the input
+  // signals to it are not (fully) available yet.
+  BackedgeBuilder edgeBuilder(rewriter, memOp->getLoc());
+
+  if (memOp.isMasterInterface()) {
+    // Materialize the allocaOp as a hardware BRAM module:
+    // NOTE: This is only needed if the memory interface is not an LSQ -> MC
+    HWBuilder bramBuilder(getContext());
+
+    // Signals of a dual port RAM with the direction:
+    // - [circuit -> mem] loadEn (1-bit)
+    auto loadEn = edgeBuilder.get(i1Type);
+    bramBuilder.addInput("loadEn", loadEn);
+    // - [circuit -> mem] loadAddr (address width)
+    auto loadAddr = edgeBuilder.get(addrType);
+    bramBuilder.addInput("loadAddr", loadAddr);
+    // - [circuit -> mem] storeEn (1-bit)
+    auto storeEn = edgeBuilder.get(i1Type);
+    bramBuilder.addInput("storeEn", storeEn);
+    // - [circuit -> mem] storeAddr (address width)
+    auto storeAddr = edgeBuilder.get(addrType);
+    bramBuilder.addInput("storeAddr", storeAddr);
+    // - [circuit -> mem] storeData (data width)
+    auto storeData = edgeBuilder.get(dataType);
+    bramBuilder.addInput("storeData", storeData);
+    // We need to create backedges for all the signals above.
+    // - [mem -> circuit] loadData (data width)
+    bramBuilder.addOutput("loadData", dataType);
+    // This signal feeds the memory op interface.
+    bramBuilder.addClkAndRst(parentModOp);
+
+    // These backedges are passed to the convertToInstance to resolve the
+    // missing drivers
+    memInterfaceToBRAMChannels = {loadEn, loadAddr, storeEn, storeAddr,
+                                  storeData};
+
+    // Query the parameters of allocaOp (used to generate external module op).
+    ModuleDiscriminator bramDiscriminator(&memState.allocaOp, memState.ports);
+
+    auto bramInstanceOp = bramBuilder.createInstance(
+        bramDiscriminator, getUniqueName(memState.allocaOp), memOp->getLoc(),
+        rewriter);
+
+    // Create new input connections that are not present in the handshake op (in
+    // this case, only the load data). NOTE: not needed if we have LSQ -> MC
+    memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
+  }
+
+  // Add the ports from handshake op (here we use the port namer to name the
+  // ports that are directly converted from handshake op), except for the memref
+  // type.
+  for (auto [i, oprd] : llvm::enumerate(operands)) {
+    if (!isa<MemRefType>(oprd.getType()))
+      memInterfaceConverter.addInput(memState.portNames.getInputName(i), oprd);
+  }
+  memInterfaceConverter.addClkAndRst(parentModOp);
+
+  for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
+    memInterfaceConverter.addOutput(memState.portNames.getOutputName(idx),
+                                    lowerType(res.getType()));
+  }
+
+  if (memOp.isMasterInterface()) {
+    // Create new output connections that are not present in the handshake IR
+    // (in this case, the loadEn, loadAddr, storeEn, storeAddr, storeData).
+    // memInterfaceConverter.addOutput("loadEn");
+    memInterfaceConverter.addOutput("loadEn", i1Type);
+    memInterfaceConverter.addOutput("loadAddr", addrType);
+    memInterfaceConverter.addOutput("storeEn", i1Type);
+    memInterfaceConverter.addOutput("storeAddr", addrType);
+    memInterfaceConverter.addOutput("storeData", dataType);
+  }
+
+  memInterfaceConverter.convertToInstance(memState, rewriter,
+                                          memInterfaceToBRAMChannels);
+
+  rewriter.eraseOp(memState.allocaOp);
+  return success();
 }
 
 namespace {
@@ -1812,8 +2066,9 @@ public:
 
     // Create pattern set
     RewritePatternSet patterns(ctx);
-    patterns.insert<ConvertFunc, ConvertMemInterface>(typeConverter, ctx,
-                                                      lowerState);
+    patterns.insert<ConvertFunc, ConvertMemInterface,
+                    ConvertMemInterfaceForIntenalArray>(typeConverter, ctx,
+                                                        lowerState);
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
                     ConvertToHWInstance<handshake::NDWireOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,

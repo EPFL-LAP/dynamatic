@@ -3,36 +3,39 @@ set -e
 
 DYNAMATIC_PATH=$1
 
-DYNAMATIC_BINS=$DYNAMATIC_PATH/build/bin
-
-LLVM=$DYNAMATIC_PATH/polygeist/llvm-project
-
-LLVM_BINS=$LLVM/build/bin
-
 # Example: "dynamatic/integration-test/fir/fir.c"
 F_SRC=$2
 
 # Example: "fir"
 FUNC_NAME=$3
 
+DYNAMATIC_BINS=$DYNAMATIC_PATH/build/bin
+
+LLVM=$DYNAMATIC_PATH/polygeist/llvm-project
+
+LLVM_BINS=$LLVM/build/bin
+
 [ -f "$F_SRC" ] || { echo "$F_SRC is not a file!"; exit 1;}
 
 # Will be change to standard path in the future (i.e., out/comp).
-OUT=/tmp/dhls-frontend-output
+OUT="/tmp/dhls-frontend-output"
 rm -rf $OUT
 mkdir -p $OUT
 
+# ------------------------------------------------------------------------------
 # NOTE:
 # - ffp-contract will prevent clang from adding "fused add mul" into the IR
 # We need to check out the clang language extensions carefully for more
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
+# ------------------------------------------------------------------------------
 $LLVM_BINS/clang -O0 -S -emit-llvm $F_SRC \
   -I "$DYNAMATIC_PATH/include"  \
   -Xclang \
   -ffp-contract=off \
   -o $OUT/clang.ll
 
+# ------------------------------------------------------------------------------
 # NOTE:
 # - When calling clang with "-ffp-contract=off", clang will bypass the
 # "-disable-O0-optnone" flag and still adds "optnone" to the IR. This is a hacky
@@ -40,6 +43,7 @@ $LLVM_BINS/clang -O0 -S -emit-llvm $F_SRC \
 # - Please aware that there might be other attributes that need to be stripped:
 # for example, noinline, nounwind, and uwtable ("noinline" seems like something
 # we also need to strip).
+# ------------------------------------------------------------------------------
 sed -i "s/optnone//g" $OUT/clang.ll
 
 # Strip information that we don't care (and mlir-translate also doesn't know how
@@ -47,6 +51,7 @@ sed -i "s/optnone//g" $OUT/clang.ll
 sed -i "s/^target datalayout = .*$//g" $OUT/clang.ll
 sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 
+# ------------------------------------------------------------------------------
 # NOTE:
 # Here is a brief summary of what each llvm pass does:
 # - mem2reg: Suppresses allocas (allocate memory on the heap) into regs
@@ -57,12 +62,14 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
+# ------------------------------------------------------------------------------
 $LLVM_BINS/opt -S \
   -passes="mem2reg,instcombine,loop-rotate,consthoist,simplifycfg" \
   -strip-debug \
   $OUT/clang.ll \
   > $OUT/clang_optimized.ll
 
+# ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
 #
@@ -70,13 +77,14 @@ $LLVM_BINS/opt -S \
 # ======== histogram.ll =========
 #  %2 = load float, ptr %arrayidx4, align 4, !handshake.name !5
 #  ...
-#  store float %add, ptr %arrayidx6, align 4, !handshake.name !6 !dest.ops !7 
+#  store float %add, ptr %arrayidx6, align 4, !handshake.name !6 !dest.ops !7
 #  ...
 # !5 = !{!"load1"}
 # !6 = !{!"store!"}
 # !7 = !{!5, !"1"} ; this means that the store must happen before the load, with
 # a loop depth of 1
 # ===============================
+# ------------------------------------------------------------------------------
 $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
@@ -89,7 +97,7 @@ $LLVM_BINS/mlir-translate \
 # The llvm -> mlir translation does not carry the dependency information (and
 # any meta data in general), therefore, the "--llvm-mark-memory-dependencies"
 # post-processes the converted mlir file and put the dependency information
-# there 
+# there
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/clang_optimized_translated.mlir \
   --remove-polygeist-attributes \
@@ -113,7 +121,6 @@ $DYNAMATIC_BINS/dynamatic-opt \
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/cf.mlir \
   --func-set-arg-names="source=$F_SRC" \
-  --mark-memory-dependencies \
   --flatten-memref-row-major \
   --canonicalize \
   --push-constants \
@@ -124,3 +131,65 @@ $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/cf_transformed.mlir \
   --lower-cf-to-handshake \
   > $OUT/handshake.mlir
+
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/handshake.mlir \
+  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+  --handshake-materialize --handshake-infer-basic-blocks \
+  > $OUT/handshake_transformed.mlir
+
+"$LLVM_BINS/clang++" "$F_SRC" \
+  -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
+  -Wno-deprecated -o "$OUT/profiler_bin.exe"
+
+"$OUT/profiler_bin.exe" \
+  > "$OUT/profiler.txt"
+
+"$DYNAMATIC_BINS/exp-frequency-profiler" \
+  "$OUT/cf_transformed.mlir" \
+  --top-level-function="$FUNC_NAME" \
+  --input-args-file="$OUT/profiler.txt" \
+  > "$OUT/frequencies.csv"
+
+# ------------------------------------------------------------------------------
+# Run simple buffer placement
+# ------------------------------------------------------------------------------
+# $DYNAMATIC_BINS/dynamatic-opt \
+#   $OUT/handshake_transformed.mlir \
+#   --handshake-mark-fpu-impl="impl=flopoco" \
+#   --handshake-set-buffering-properties="version=fpga20" \
+#   --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
+#   > $OUT/handshake_buffered.mlir
+
+# ------------------------------------------------------------------------------
+# Run throughput-driven buffer placement (needs a valid Gurobi license)
+# ------------------------------------------------------------------------------
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/handshake_transformed.mlir \
+  --handshake-mark-fpu-impl="impl=flopoco" \
+  --handshake-set-buffering-properties="version=fpga20" \
+  --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=300" \
+  > $OUT/handshake_buffered.mlir
+
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/handshake_buffered.mlir \
+  --handshake-canonicalize \
+  --handshake-hoist-ext-instances \
+  > $OUT/handshake_export.mlir
+
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/handshake_export.mlir \
+  --lower-handshake-to-hw \
+  > $OUT/hw.mlir
+
+"$DYNAMATIC_BINS/export-rtl" \
+  "$OUT/hw.mlir" "$OUT/hdl" "$DYNAMATIC_PATH/data/rtl-config-vhdl.json" \
+  --dynamatic-path "$DYNAMATIC_PATH" --hdl vhdl
+
+bash "$DYNAMATIC_PATH/tools/frontend/cosim.sh" \
+  "$DYNAMATIC_PATH" \
+  "$F_SRC" \
+  "$FUNC_NAME" \
+  "$OUT" \
+  "$OUT/sim"

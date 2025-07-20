@@ -1,4 +1,5 @@
 #include "dynamatic/Conversion/LLVMToControlFlow.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -19,6 +20,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
@@ -28,6 +30,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/Casting.h"
+
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 
 #include "clang-c/Index.h"
 #include "llvm/Support/Process.h"
@@ -376,6 +380,96 @@ struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
   }
 };
 
+/// \brief: Maps all the LLVM::AllocaOps to memref::allocaOps. We map the
+/// multidimension array shape in LLVM to memref.
+struct ConvertAllocaOps : public OpConversionPattern<LLVM::AllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  std::pair<SmallVector<int64_t>, Type>
+  getLLVMAllocaShapeAndType(Type type) const {
+    SmallVector<int64_t> shape;
+    while (auto arrayType = llvm::dyn_cast_or_null<LLVM::LLVMArrayType>(type)) {
+      shape.push_back(arrayType.getNumElements());
+      type = arrayType.getElementType();
+    }
+    return std::make_pair(shape, type);
+  }
+
+  LogicalResult
+  matchAndRewrite(LLVM::AllocaOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    // Get the shape:
+    auto allocaShapeAndType = op.getElemType();
+    if (!allocaShapeAndType.has_value())
+      return failure();
+
+    auto [allocaShape, elemType] =
+        getLLVMAllocaShapeAndType(allocaShapeAndType.value());
+
+    // NOTE: There is a memref::AllocaOp and memref::AllocOp. AllocaOp allocates
+    // on the stack, which is semanticaly equivalent to the internal array in
+    // HLS circuits.
+    auto newOp = rewriter.replaceOpWithNewOp<memref::AllocaOp>(
+        op, MemRefType::get(allocaShape, elemType));
+
+    op->replaceAllUsesWith(newOp);
+
+    return success();
+  }
+};
+
+struct ConvertAddressOfOps : public OpConversionPattern<LLVM::AddressOfOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  // Convert global constant to memref::global
+  LogicalResult
+  matchAndRewrite(LLVM::AddressOfOp op, OpAdaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    // clang-format off
+    // Example:
+    //  llvm.mlir.global external constant @internal_array(...) {...} : !llvm.array<3 x array<3 x i32>>
+    //  ....
+    //  %4 = llvm.mlir.addressof @internal_array {...} : !llvm.ptr
+    //
+    // In this case, we remove the global constant and rewrite the addressof
+    // node into a alloca op (and we put an attribute to describe its constant
+    // value).
+    // clang-format on
+
+    SymbolTableCollection symbolTableCollection;
+
+    auto globalOp = op.getGlobal(symbolTableCollection);
+
+    if (!globalOp)
+      return failure();
+
+    auto valueAttr = globalOp.getValue().value();
+    auto denseAttr = valueAttr.dyn_cast<DenseElementsAttr>();
+    // TODO: handle global scalar constant? I don't think it is ever needed
+    // though...
+    assert(denseAttr &&
+           "Unhandled case! The global constant must be a dense array!");
+    auto shape = denseAttr.getType().getShape();
+    // Cast it to
+    auto memrefType = MemRefType::get(shape, denseAttr.getElementType());
+
+    rewriter.setInsertionPoint(op);
+
+    // NOTE: I am not sure why "replaceOpWithNewOp" didn't work here.
+    auto allocaOp = rewriter.create<memref::AllocaOp>(op->getLoc(), memrefType);
+    setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+        allocaOp, op.getContext(), denseAttr);
+    rewriter.replaceAllUsesWith(op->getResult(0), allocaOp.getResult());
+    rewriter.eraseOp(op);
+    // I don't think the globalOp has any uses
+    rewriter.eraseOp(globalOp);
+
+    return success();
+  }
+};
+
 /// \brief: This struct rewrites all the pattern that connects GEP -> {Load1,
 /// Load2, ..., Store1, Store2, ...}.
 ///
@@ -441,20 +535,32 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
       }
     }
 
+    if (Operation *op = gepBasePtr.getDefiningOp();
+        isa_and_nonnull<memref::AllocaOp>(op)) {
+      // NOTE: If GEP calculates value from a memory allocation (which is a
+      // global value), an extra zero index value is required at the beginning
+      // to calculate the address.
+      //
+      // Reference:
+      // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
+      //
+      // Therefore, we drop the first element in this case
+      indexValues.erase(indexValues.begin());
+    }
+
     // NOTE: GEPOp has the following syntax (some details omitted):
     // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
     // When you iterate through the indices, it also returns indices from left
     // to right. However, the following two syntaxes are equivalent in LLVM:
     // - (1) GEPop %basePtr, %firstDim, 0, 0
     // - (2) GEPop %basePtr, %firstDim
-    // Notice that, in the second example, the trailing constant 0s are omitted.
-    // Source:
+    // Notice that, in the second example, the trailing constant 0s are
+    // omitted. Source:
     // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
     //
     // However, memref::LoadOp and memref::StoreOp must have their indices
     // match the memref. So here we need to fill in the constant zeros.
-    int remainingConstZeros =
-        memrefType.getShape().size() - op.getIndices().size();
+    int remainingConstZeros = memrefType.getShape().size() - indexValues.size();
     assert(remainingConstZeros >= 0 &&
            "GEP should only omit indices, but shouldn't have more indices than "
            "the original memref type extracted from the function argument!");
@@ -818,6 +924,8 @@ void LLVMToControlFlowPass::runOnOperation() {
   RewritePatternSet rewriteLoadStoreOperations(ctx);
   rewriteLoadStoreOperations.add<
       // clang-format off
+      ConvertAddressOfOps,
+      ConvertAllocaOps,
       GEPToMemRefLoadAndStore,
       LLVMLoadWithConstantIndex,
       LLVMStoreWithConstantIndex
