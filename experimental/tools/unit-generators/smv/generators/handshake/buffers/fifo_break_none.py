@@ -12,7 +12,7 @@ def generate_fifo_break_none(name, params):
             return _generate_fifo_break_none_dataless(name, slots)
     else:
         if slots == 1:
-            return _generate_one_slot_break_none(name)
+            return _generate_one_slot_break_none(name, data_type)
         else:
             return _generate_fifo_break_none(name, slots, data_type)
 
@@ -57,8 +57,10 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
 def _generate_fifo_break_none_dataless(name, slots):
     # fifo generated as chain of fully transparent slots for faster model checking
-    slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
-    slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
+    slots_valid = ["ins_valid"] + \
+        [f"b{i}.outs_valid" for i in range(slots - 1)]
+    slots_ready = [
+        f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
 MODULE {name}(ins_valid, outs_ready)
     {"\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
@@ -73,8 +75,10 @@ MODULE {name}(ins_valid, outs_ready)
 def _generate_fifo_break_none(name, slots, data_type):
     # fifo generated as chain of fully transparent slots for faster model checking
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
-    slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
-    slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
+    slots_valid = ["ins_valid"] + \
+        [f"b{i}.outs_valid" for i in range(slots - 1)]
+    slots_ready = [
+        f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
     {"\n    ".join([f"VAR b{n} : {name}_tslot({data}, {valid}, {ready});" for n, (data, valid, ready) in enumerate(zip(slots_data, slots_valid, slots_ready))])}

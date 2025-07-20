@@ -1,6 +1,7 @@
 from generators.support.utils import *
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
+from generators.support.buffer_counter import generate_buffer_counter
 
 
 def generate_ofifo(name, params):
@@ -19,6 +20,7 @@ MODULE {name} (ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(ins_valid, inner_elastic_fifo.ins_ready);
   inner_elastic_fifo : {name}__elastic_fifo_inner_dataless(inner_tehb.outs_valid, outs_ready);
+  inner_counter : {name}__buffer_counter(ins_valid, ins_ready, outs_valid, outs_ready);
 
   -- output
   DEFINE
@@ -27,6 +29,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 {generate_one_slot_break_r(f"{name}__tehb_dataless", {ATTR_BITWIDTH: 0})}
 {generate_fifo_break_dv(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_BITWIDTH: 0})}
+{generate_buffer_counter(f"{name}__buffer_counter", slots)}
 """
 
 
@@ -36,6 +39,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb(ins, ins_valid, inner_elastic_fifo.ins_ready);
   inner_elastic_fifo : {name}__elastic_fifo_inner(inner_tehb.outs, inner_tehb.outs_valid, outs_ready);
+  inner_counter : {name}__buffer_counter(ins_valid, ins_ready, outs_valid, outs_ready);
 
   -- output
   DEFINE
@@ -45,4 +49,5 @@ MODULE {name} (ins, ins_valid, outs_ready)
 
 {generate_one_slot_break_r(f"{name}__tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
 {generate_fifo_break_dv(f"{name}__elastic_fifo_inner", {ATTR_SLOTS: slots, ATTR_BITWIDTH: data_type.bitwidth})}
+{generate_buffer_counter(f"{name}__buffer_counter", slots)}
 """

@@ -1,4 +1,5 @@
 from generators.support.utils import *
+from generators.support.buffer_counter import generate_buffer_counter
 
 
 def generate_one_slot_break_dv(name, params):
@@ -11,10 +12,12 @@ def generate_one_slot_break_dv(name, params):
 
 
 def _generate_one_slot_break_dv_dataless(name):
+    counter_name = f"{name}__counter"
     return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   outs_valid_i : boolean;
+  inner_counter : {counter_name}(ins_valid, ins_ready, outs_valid, outs_ready);
 
   ASSIGN
   init(outs_valid_i) := FALSE;
@@ -24,15 +27,19 @@ MODULE {name} (ins_valid, outs_ready)
   DEFINE
   ins_ready := !outs_valid_i | outs_ready;
   outs_valid := outs_valid_i;
+
+{generate_buffer_counter(counter_name, 1)}
 """
 
 
 def _generate_one_slot_break_dv(name, data_type):
+    counter_name = f"{name}__counter"
     return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(ins_valid, outs_ready);
   data : {data_type};
+  inner_counter : {counter_name}(ins_valid, ins_ready, outs_valid, outs_ready);
 
   ASSIGN
   init(data) := {data_type.format_constant(0)};
@@ -48,4 +55,5 @@ MODULE {name} (ins, ins_valid, outs_ready)
   outs := data;
 
 {_generate_one_slot_break_dv_dataless(f"{name}__one_slot_break_dv_dataless")}
+{generate_buffer_counter(counter_name, 1)}
 """
