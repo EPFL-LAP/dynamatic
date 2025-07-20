@@ -11,13 +11,16 @@ Each operator in a hardware circuit is characterized by two fundamental timing p
 
 We classify combinational delays into two categories:
 
-- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator.
+- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator. 
 
 - **Port2Reg delays**: Combinational delays either from an input port to the first register stage, or from the last register stage to an output port. These capture the logic surrounding the sequential boundaries of an operator.
 
+- **Reg2Reg delay** :Combinational delays from one register stage to the next register stage within a single pipelined operation, representing the longest logic path between these sequential elements.
+
 This difference is a key distinction between **pipelined** and **non-pipelined** operations. Consider the following graph :
 
-![image](https://github.com/user-attachments/assets/1b980703-40e6-4331-9932-24d624bbbbb9)
+![image](https://github.com/user-attachments/assets/c6d2961c-f4ba-47ed-a7a0-6201314f9530)
+
 
 
 In the pipelined case (i.e., when latency > 0), registers are placed along the paths between input and output ports. As a result, these paths no longer have any intra-port delays, since there are no purely combinational routes connecting inputs directly to outputs. However, port2reg delays still exist on these paths — capturing the combinational delays between an input port and the first register stage, and between the last register stage and an output port. In the figure, the inport and outport delays illustrate these port2reg delays.
@@ -48,7 +51,9 @@ All timing information lives in the [components JSON file](https://github.com/EP
 {
   "handshake.addi": {
     "latency": {
-      "64": 0.0
+      "64":{
+        "2.3": 8,
+        "4.2": 4
     },
     "delay": {
       "data": {
@@ -74,7 +79,7 @@ All timing information lives in the [components JSON file](https://github.com/EP
 ```
 
 The JSON object encodes the following timing information:
-- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth.
+- `latency`: A dictionary mapping bitwidths to timing features of multiple implementation of the component available for that bitwidth. This is done as a map listing all existing implementations, providing their internal combinational delay as key and their latency as value.
 - `delays`: A dictionary describing intra-port delays — i.e., combinational delays between input and output ports with no intervening registers (in nanoseconds).
 - `inport`: A dictionary specifying port2reg delays from an input port to the first register stage (in nanoseconds).
 - `outport`: A dictionary specifying port2reg delays from the last register stage to an output port (in nanoseconds).
@@ -95,6 +100,8 @@ The latest version of these delays has been computed using Vivado 2019.1.
 ## How Timing Information is Used
 
 Timing data is primarily used during **buffer placement**, which inserts buffers in the dataflow circuit. While basic buffer placement (i.e., `on-merges`) ignores timing, the advanced MILP algorithms (fpga20 and flp22) rely heavily on this information to optimize circuit performance and area.
+
+Timing information (especially reg2reg delays) is also used in the **backend**, in order to generate appropriate RTL units which meet speed requirements. 
 
 # Implementation Overview
 
@@ -122,9 +129,13 @@ The timing system uses the following core data structures:
   - This structure contains three fields : data, valid and ready delays. The first one is represented using the `BitwidthDepMetric` structure.
 
 - **[BitwidthDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
-  - Maps bitwidths to timing values (e.g., for latency 32-bit → 9 cycles)
+  - Maps bitwidths to timing information. This information can for instance be integers, or complex structures, like maps.
   - Supports queries like `getCeilMetric(bitwidth)` to return the timing value for the closest equal or greater supported bitwidth.
 
+
+- **[DelayDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
+  - Maps delays to timing values (e.g., for delay 3.5ns → 9 cycles)
+  - Supports queries like `getDelayMetric(targetCP)` to return the timing value for the highest listed delay that remains smaller than the targetCP.
 
 
 ## Loading Timing Data from JSON
@@ -174,7 +185,7 @@ The TimingDatabase provides several core methods:
 
 4.  **[LogicalResult getLatency(Operation *op, SignalType signalType, double &latency)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L114)**: queries the latency of a certain operation `op` for output port of type `signalType` and it saves the latency as unsigned cycle count in the `latency` variable.
 
-5. **[LogicalResult getInternalDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L143)**: queries the internal delay of a certain operation `op` for output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
+5. **[LogicalResult getInternalDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L143)**: queries the reg2reg internal delay of a certain operation `op` for output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
 
 6. **[LogicalResult getPortDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L161)**: queries the port2reg delay of a certain operation `op` for input/output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
 
@@ -206,3 +217,91 @@ The LogicalResult or boolean types of these functions represent the successful o
 The main function of BitwidthDepMetric is the following:
 
 1. **[LogicalResult getCeilMetric(unsigned bitwidth, M &metric)]()**: queries the metric with the smallest key among the ones with a key bigger than `bitwidth` and saves the metric in the variable `metric`.
+
+### DelayDepMetric
+
+The functions of BitwidthDepMetric are the following:  
+
+1. **LogicalResult [getDelayCeilMetric(double targetPeriod, M &metric)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L109)**: finds the highest delay that does not exceed the targetPeriod and returns the corresponding metric value. This selects the fastest implementation that still meets timing constraints. If no suitable delay is found, falls back to the lowest available delay with a critical warning.
+
+2. **LogicalResult [getDelayCeilValue(double targetPeriod, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L142)**: similar to getDelayCeilMetric but returns the delay value itself rather than the associated metric. Finds the highest delay that is less than or equal to targetPeriod, or falls back to the minimum delay if no suitable option exists.w
+
+
+# Timing Information in the IRs
+
+Timing information is generally used immediately upon being obtained, for instance latency is obtained for the MILP solver during the buffer placement stage. However, the reg2eg internal delay must be made available in the backend to select the correct implementation to instantiate, but depends on targetCP which isn't known in the backend. 
+
+Therefore, internal delay is added as an attribute to arithmetic ops in the IR at the end of the buffer placement stage, and is represented in the hardware IR. The value given is chosen using getDelayCeilValue, ensuring the choice passed into the IR is the same one that was made at any other point with getDelayCeilMetric. 
+
+Sample code of the attribute :
+
+in handhsake IR :
+
+```
+    %57 = addf %56, %54 {...
+internal_delay = "3_649333"} : <f32>
+```
+
+in hardware IR : 
+
+```
+hw.module.extern @handshake_addf_0(... INTERNAL_DELAY = "3_649333"}}
+
+```
+
+
+
+
+
+# Timing Information in FloPoCo units - Current architecture naming standard
+
+FloPoCo units are identified by the triplet **{operator name, bitwidth, measured internal delay}** which serves to uniquely identify them. The "measured internal delay" refers to the reg2reg delay obtained from Vivado's post-place-and-route timing analysis, which provides the actual achieved delay rather than the target specification
+
+We use different VHDL architectures to differentiate between different implementations of the same operator. Each floating point wrapper file (addf.vhd, mulf.vhd, etc.) contains a separate architecture for each FloPoCo implementation, identified by a bitwidth-delay pair added as a suffix to "arch" to form a unique name. The legacy Dynamatic backend supports this approach by allowing an "arch-name" to be specified, which we leverage to select the appropriate architecture for each operator implementation
+
+Both the operator specific wrappers and the shared flopoco reference file are generated by the [seperate unit module generator](https://github.com/ETHZ-DYNAMO/flopoco-to-dataflow-converter). See its own documentation for further details.
+
+Consider the following example from [addf.vhd](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/data/vhdl/arith/flopoco/addf.vhd), which shows how all architectures are present inside the file, but distinguished by architecture name:
+
+```
+architecture arch_64_5_091333 of addf is
+    
+...
+
+        operator : entity work.FloatingPointAdder_64_5_091333(arch)
+        port map (
+            clk   => clk,
+            ce_1 => oehb_ready,
+            ce_2 => oehb_ready,
+            ce_3 => oehb_ready,
+            ce_4 => oehb_ready,
+            ce_5 => oehb_ready,
+            ce_6 => oehb_ready,
+            ce_7 => oehb_ready,
+            X     => ip_lhs,
+            Y     => ip_rhs,
+            R     => ip_result
+        );
+end architecture;
+
+architecture arch_64_9_068000 of addf is
+
+...
+        operator : entity work.FloatingPointAdder_64_9_068000(arch)
+        port map (
+            clk   => clk,
+            ce_1 => oehb_ready,
+            ce_2 => oehb_ready,
+            X     => ip_lhs,
+            Y     => ip_rhs,
+            R     => ip_result
+        );
+end architecture;
+```
+
+
+
+Therefore, the desired version of the operator is used, based on the timing information passed through the hardware IR's INTERNAL_DELAY field and the operation bitwidth.
+
+**Note :  usage of the dedicated flopco unit module is reccomended to ensure consistent data between the json used for timing information and the backend**.
+
