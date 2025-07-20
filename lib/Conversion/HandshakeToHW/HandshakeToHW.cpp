@@ -315,12 +315,12 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name){
+                                          StringRef name) {
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -681,11 +681,26 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
+      .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
+        // No parameters needed for these operations
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
+
+  if (auto internalDelayInterface =
+          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+    auto delayAttr = internalDelayInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    auto impl = fpuImplInterface.getFPUImpl();
+    addString("FPU_IMPL", stringifyEnum(impl));
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
@@ -1336,12 +1351,22 @@ ConvertInstance::matchAndRewrite(handshake::InstanceOp instOp,
 
 /// Returns the module's input ports.
 static ArrayRef<hw::ModulePort> getModInputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumInputPorts() == 0) {
+    // When there are no input ports, getPortIdForInputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForInputId(0),
                                                   modOp.getNumInputPorts());
 }
 
 /// Returns the module's output ports.
 static ArrayRef<hw::ModulePort> getModOutputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumOutputPorts() == 0) {
+    // When there are no output ports, getPortIdForOutputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForOutputId(0),
                                                   modOp.getNumOutputPorts());
 }
@@ -1478,8 +1503,7 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2),
-                         IOMapping(8, state.inputIdx, 1)) {};
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1800,6 +1824,8 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
+                    ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
                     // Arith operations

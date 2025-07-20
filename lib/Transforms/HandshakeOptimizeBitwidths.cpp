@@ -291,9 +291,11 @@ static bool isOperandInCycle(Value val, Value res,
   // Recursively explore data operands of merge-like operations to find cycles
   if (auto mergeLikeOp = dyn_cast<handshake::MergeLikeOpInterface>(defOp))
     return recurseMergeLike(mergeLikeOp.getDataOperands());
-  if (auto selectOp = dyn_cast<handshake::SelectOp>(defOp))
-    return recurseMergeLike(
-        ValueRange{selectOp.getTrueValue(), selectOp.getFalseValue()});
+  if (auto selectOp = dyn_cast<handshake::SelectOp>(defOp)) {
+    llvm::SmallVector<Value> vals = {selectOp.getTrueValue(),
+                                     selectOp.getFalseValue()};
+    return recurseMergeLike(vals);
+  }
 
   return false;
 }
@@ -331,7 +333,8 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
   Value newLhs = modBitWidth(lhs, optWidth, rewriter);
   Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
-  auto newOp = rewriter.create<Op>(op.getLoc(), newLhs, newRhs);
+  auto newOp =
+      rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs, newRhs);
   Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   namer.replaceOp(op, newOp);
   inheritBB(op, newOp);
@@ -1180,7 +1183,8 @@ struct ArithShift : public OpRewritePattern<Op> {
       Value newShifyBy =
           modBitWidth({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift, newShifyBy);
+      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift.getType(),
+                                       newToShift, newShifyBy);
       ChannelVal newRes = newOp.getResult();
       if (isRightShift)
         // In the case of a right shift, we first truncate the result of the

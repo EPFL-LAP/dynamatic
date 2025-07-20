@@ -1,6 +1,7 @@
 from generators.handshake.fork import generate_fork
 from generators.handshake.tehb import generate_tehb
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_spec_units_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
 def generate_speculator(name, params):
@@ -23,7 +24,8 @@ use ieee.numeric_std.all;
 -- Entity of specgenCore
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
@@ -135,7 +137,8 @@ begin
     end if;
   end process;
 
-  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
+  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec,
+           DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
   begin
     outs <= ins;
     outs_spec <= "0";
@@ -436,7 +439,8 @@ end entity;
 -- Architecture of decodeSC
 architecture arch of {name} is
 begin
-  process (control_in, control_in_valid, control_out0_ready, control_out1_ready)
+  process (control_in, control_in_valid,
+           control_out0_ready, control_out1_ready)
   begin
     if (control_in = "000" or control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
       control_in_ready <= control_out0_ready;
@@ -609,7 +613,8 @@ use ieee.numeric_std.all;
 -- Entity of predFifo
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     data_in : in std_logic_vector({bitwidth} - 1 downto 0);
     data_in_valid : in std_logic;
@@ -1040,9 +1045,9 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
 
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
         extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_spec_units_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -1051,7 +1056,7 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
             "bitwidth": 0,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -1076,6 +1081,7 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
             "bitwidth": 1,
             "extra_signals": {}
         }],
-        "extra_signals": extra_signals_without_spec,
-        "ignore_ports": ["ctrl_save", "ctrl_commit", "ctrl_sc_save", "ctrl_sc_commit", "ctrl_sc_branch"]
-    }, lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+        extra_signals_without_spec,
+        ["ctrl_save", "ctrl_commit", "ctrl_sc_save",
+         "ctrl_sc_commit", "ctrl_sc_branch"],
+        lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

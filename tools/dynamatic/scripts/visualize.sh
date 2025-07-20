@@ -15,14 +15,16 @@ KERNEL_NAME=$5
 
 # Generated directories/files
 VISUAL_DIR="$OUTPUT_DIR/visual"
+COMP_DIR="$OUTPUT_DIR/comp"
+SIM_DIR="$OUTPUT_DIR/sim"
+
+F_WLF="$SIM_DIR/HLS_VERIFY/vsim.wlf"
+F_LOG="$VISUAL_DIR/$KERNEL_NAME.log"
 F_CSV="$VISUAL_DIR/$KERNEL_NAME.csv"
 F_DOT_POS_TMP="$VISUAL_DIR/$KERNEL_NAME.tmp.dot"
 F_DOT_POS="$VISUAL_DIR/$KERNEL_NAME.dot"
 
 # Shortcuts
-COMP_DIR="$OUTPUT_DIR/comp"
-SIM_DIR="$OUTPUT_DIR/sim"
-WLF2CSV="$DYNAMATIC_DIR/visual-dataflow/wlf2csv.py"
 VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 
 # ============================================================================ #
@@ -32,9 +34,16 @@ VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 # Reset visualization directory
 rm -rf "$VISUAL_DIR" && mkdir -p "$VISUAL_DIR"
 
-# Convert the Modelsim waveform to a CSV for the visualizer 
-"$DYNAMATIC_DIR/bin/wlf2csv" "$COMP_DIR/handshake_export.mlir" \
-  $SIM_DIR/HLS_VERIFY/vsim.wlf $KERNEL_NAME > $F_CSV
+LEVEL="tb/duv_inst/"
+
+# Convert the Modelsim waveform to a plaintext log file
+# wlf2log is provided by the Modelsim installation
+wlf2log -l $LEVEL -o "$F_LOG" "$F_WLF"
+exit_on_fail "Failed to convert WLF file into LOG file" "Generated LOG file"
+
+# Convert the log file to a CSV for the visualizer
+"$DYNAMATIC_DIR/bin/log2csv" "$COMP_DIR/handshake_export.mlir" \
+  $LEVEL "$F_LOG" $KERNEL_NAME > $F_CSV
 exit_on_fail "Failed to generate channel changes from waveform" "Generated channel changes"
 
 # Generate a version of the DOT with positioning information

@@ -6,7 +6,7 @@ add_llvm_tool(elastic-miter
   elastic-miter.cpp
   GetSequenceLength.cpp
   FabricGeneration.cpp
-  CreateSmvFormalTestbench.cpp
+  ElasticMiterTestbench.cpp
   SmvUtils.cpp
   Constraints.cpp
 )
@@ -17,6 +17,7 @@ target_link_libraries(elastic-miter
   DynamaticHandshake
   DynamaticSupport
   DynamaticTransforms
+  DynamaticExperimentalSupport
 
   MLIRIR
   MLIRMemRefTransforms

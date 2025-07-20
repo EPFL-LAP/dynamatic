@@ -15,9 +15,11 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf
+  DynamaticLLVMToControlFlow
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
+  DynamaticRigidification
   DynamaticFormalPropertyAnnotation
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
