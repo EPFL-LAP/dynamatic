@@ -673,10 +673,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   unsigned bbIn = 0;
   size_t inputBufferSlots = disableDecoupling ? 1 : bufferSlots;
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
-    // if (i == 1)
-    //   inputBufferSlots = 1;
-    // else
-    //   inputBufferSlots = disableDecoupling ? 1 : bufferSlots;
     Value lhsArg = lhsFuncOp.getArgument(i);
     Value rhsArg = rhsFuncOp.getArgument(i);
     Value miterArg = newFuncOp.getArgument(i);
