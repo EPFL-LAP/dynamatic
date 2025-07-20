@@ -278,7 +278,7 @@ void MAPBUFBuffers::setup() {
     channelProperties.minSlots = std::max(channelProperties.minSlots, 1U);
     channelProperties.minTrans = std::max(channelProperties.minTrans, 1U);
     channelProperties.minOpaque = std::max(channelProperties.minOpaque, 1U);
-    
+
     addCustomChannelConstraints(result);
 
     Operation *producer = result.getDefiningOp();
@@ -294,6 +294,7 @@ void MAPBUFBuffers::setup() {
   // Generate cuts of the circuit.
   auto cuts = experimental::generateCuts(blifData, lutSize);
 
+  addNodeVars(blifData);
   addClockPeriodConstraintsNodes(blifData);
 
   for (auto &[rootNode, cutVector] : cuts) {

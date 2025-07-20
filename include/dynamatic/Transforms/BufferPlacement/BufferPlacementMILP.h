@@ -339,6 +339,11 @@ protected:
   // that needs to be buffered.
   std::vector<Value> findMinimumFeedbackArcSet();
 
+  /// Adds Gurobi variables to the MILP model for the provided Node.
+  /// For Nodes corresponding to Channels, sets their Gurobi variables to
+  /// Channel Variables. For other Nodes, creates new Gurobi Variables.
+  void addNodeVars(experimental::LogicNetwork *blifData);
+
   /// Returns an estimation of the number of times a token will be transfered on
   /// the input channel. The estimation is based on the Handshake function's
   /// extracted CFDFCs.

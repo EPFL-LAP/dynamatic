@@ -712,8 +712,7 @@ void BufferPlacementMILP::addCutSelectionConflicts(
   }
 }
 
-void BufferPlacementMILP::addClockPeriodConstraintsNodes(
-    experimental::LogicNetwork *blifData) {
+void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
     // Gurobi variables of the node
     GRBVar &nodeVarIn = node->gurobiVars->tIn;
@@ -736,6 +735,27 @@ void BufferPlacementMILP::addClockPeriodConstraintsNodes(
       nodeVarIn = signalVars.path.tIn;
       nodeVarOut = signalVars.path.tOut;
       bufVarSignal = signalVars.bufPresent;
+    } else {
+      // Create the timing variable for Subject Graph Node. These Nodes need
+      // only 1 timing variable, as no buffers can be placed between them.
+      nodeVarIn =
+          model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
+      nodeVarOut = nodeVarIn;
+    }
+  }
+}
+
+void BufferPlacementMILP::addClockPeriodConstraintsNodes(
+    experimental::LogicNetwork *blifData) {
+  for (auto *node : blifData->getNodesInTopologicalOrder()) {
+    // Gurobi variables of the node
+    GRBVar &nodeVarIn = node->gurobiVars->tIn;
+    GRBVar &nodeVarOut = node->gurobiVars->tOut;
+    GRBVar &bufVarSignal = node->gurobiVars->bufferVar;
+
+    // Add timing constraints for the node.
+    if (Value nodeChannel = node->nodeMLIRValue) {
+      std::string nodeName = node->str();
 
       // Add clock period constraints
       model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
@@ -743,13 +763,7 @@ void BufferPlacementMILP::addClockPeriodConstraintsNodes(
       model.addConstr(nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0,
                       "buf_delay");
     } else {
-      // Create the timing variable for Subject Graph Node. If the node is a
-      // Primary Input, the delay is 0. Also, there is only one timing variable
-      // is needed for these nodes, therefore nodeVarOut and nodeVarIn are the
-      // same.
-      nodeVarIn =
-          model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
-      nodeVarOut = nodeVarIn;
+      // If the node is a Primary Input, the delay is 0.
       model.addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
                       node->isPrimaryInput() ? "input_delay"
                                              : "clock_period_constraint");
