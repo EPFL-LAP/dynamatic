@@ -14,6 +14,7 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"

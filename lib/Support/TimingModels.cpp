@@ -96,19 +96,31 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
-  return models.insert(std::make_pair(OperationName(name, ctx), model)).second;
+void TimingDatabase::insertTimingModel(StringRef timingModelKey,
+                                       TimingModel &model) {
+  models.try_emplace(timingModelKey, model);
 }
 
-const TimingModel *TimingDatabase::getModel(OperationName opName) const {
-  auto it = models.find(opName);
+const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
+  auto it = models.find(timingModelKey);
   if (it == models.end())
     return nullptr;
   return &it->second;
 }
 
 const TimingModel *TimingDatabase::getModel(Operation *op) const {
-  return getModel(op->getName());
+  StringRef baseName = op->getName().getStringRef();
+  // if the operation is a floating point operation with multiple
+  // possible implementations
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    // include the implementation in the key
+    std::string timingModelKey =
+        (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    return getModel(timingModelKey);
+  }
+
+  return getModel(baseName);
 }
 
 LogicalResult TimingDatabase::getLatency(
@@ -466,14 +478,11 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
   if (!components)
     return false;
 
-  for (const auto &[opName, cmpInfo] : *components) {
+  for (const auto &[timingModelKey, cmpInfo] : *components) {
     TimingModel model;
-    ljson::Path opPath = path.field(opName);
-    fromJSON(cmpInfo, model, opPath);
-    if (!timingDB.insertTimingModel(opName, model)) {
-      opPath.report("Overriding existing timing model for operation");
-      return false;
-    }
+    ljson::Path keyPath = path.field(timingModelKey);
+    fromJSON(cmpInfo, model, keyPath);
+    timingDB.insertTimingModel(timingModelKey, model);
   }
   return true;
 }

@@ -82,18 +82,18 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-if [ "$VIVADO_FPU" = "false" ]; then
+if [ "$VIVADO_FPU" = "true" ]; then
   "$HLS_VERIFIER_BIN" \
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  --vivado-fpu \
   > "../report.txt" 2>&1
 else
   "$HLS_VERIFIER_BIN" \
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
-  --vivado-fpu \
   > "../report.txt" 2>&1
 fi
 exit_on_fail "Simulation failed" "Simulation succeeded"
