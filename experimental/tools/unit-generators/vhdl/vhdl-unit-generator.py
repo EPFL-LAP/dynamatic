@@ -63,7 +63,7 @@ def generate_code(name, mod_type, parameters):
             return constant.generate_constant(name, parameters)
         case "control_merge":
             return control_merge.generate_control_merge(name, parameters)
-        case "div_f":
+        case "divf":
             return divf.generate_divf(name, parameters)
         case "extsi":
             return extsi.generate_extsi(name, parameters)
