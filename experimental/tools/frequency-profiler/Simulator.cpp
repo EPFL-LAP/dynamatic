@@ -140,6 +140,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(memref::AllocOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(memref::AllocaOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::cf::BranchOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::cf::CondBranchOp, std::vector<Any> &,
@@ -679,6 +681,14 @@ LogicalResult StdExecuter::execute(mlir::memref::AllocOp op,
   return success();
 }
 
+LogicalResult StdExecuter::execute(memref::AllocaOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
+  unsigned ptr = any_cast<unsigned>(out[0]);
+  storeTimes[ptr] = time;
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::cf::BranchOp branchOp,
                                    std::vector<Any> &in, std::vector<Any> &) {
   mlir::Block *dest = branchOp.getDest();
@@ -813,8 +823,8 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
                   math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
                   math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
-                  memref::StoreOp>([&](auto op) {
+                  math::AbsFOp, memref::AllocOp, memref::AllocaOp,
+                  memref::LoadOp, memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })

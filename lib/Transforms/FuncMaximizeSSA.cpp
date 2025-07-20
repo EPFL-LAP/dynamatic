@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -75,7 +76,7 @@ bool dynamatic::SSAMaximizationStrategy::maximizeArgument(BlockArgument arg) {
   return true;
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeOp(Operation &op) {
-  return true;
+  return !isa<memref::AllocOp, memref::AllocaOp>(op);
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeResult(OpResult res) {
   return true;

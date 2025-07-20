@@ -19,11 +19,13 @@
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -183,7 +185,46 @@ struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
       return failure();
     MemRefType newType = MemRefType::get(
         SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
-    rewriter.replaceOpWithNewOp<memref::AllocOp>(op, newType);
+    auto newOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, newType);
+
+    // Flatten the memory initial value as a 1d vector
+    if (auto attr =
+            getDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(op)) {
+      auto denseAttr = attr.getConstant();
+
+      auto newType = RankedTensorType::get({denseAttr.getNumElements()},
+                                           denseAttr.getElementType());
+      setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+          newOp, op.getContext(), denseAttr.reshape(newType));
+    }
+    return success();
+  }
+};
+
+struct AllocaOpConversion : public OpConversionPattern<memref::AllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor /*adaptor*/,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+    MemRefType newType = MemRefType::get(
+        SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
+    auto newOp = rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, newType);
+
+    // Flatten the memory initial value as a 1d vector
+    if (auto attr =
+            getDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(op)) {
+      auto denseAttr = attr.getConstant();
+
+      auto newType = RankedTensorType::get({denseAttr.getNumElements()},
+                                           denseAttr.getElementType());
+      setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+          newOp, op.getContext(), denseAttr.reshape(newType));
+    }
+
     return success();
   }
 };
@@ -276,6 +317,8 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
   target.addLegalDialect<arith::ArithDialect>();
   target.addDynamicallyLegalOp<memref::AllocOp>(
       [](memref::AllocOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::AllocaOp>(
+      [](memref::AllocaOp op) { return isUniDimensional(op.getType()); });
   target.addDynamicallyLegalOp<memref::StoreOp>(
       [](memref::StoreOp op) { return op.getIndices().size() == 1; });
   target.addDynamicallyLegalOp<memref::LoadOp>(
@@ -325,7 +368,8 @@ public:
 
     RewritePatternSet patterns(ctx);
     SetVector<StringRef> rewrittenCallees;
-    patterns.add<AllocOpConversion, OperandConversionPattern<func::ReturnOp>,
+    patterns.add<AllocOpConversion, AllocaOpConversion,
+                 OperandConversionPattern<func::ReturnOp>,
                  OperandConversionPattern<memref::DeallocOp>,
                  CondBranchOpConversion,
                  OperandConversionPattern<memref::DeallocOp>,
