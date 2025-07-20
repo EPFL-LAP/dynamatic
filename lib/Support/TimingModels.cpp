@@ -96,6 +96,16 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
+// TimingDatabase *TimingDatabase::getOrCreate(mlir::MLIRContext *ctx) {
+//   return ctx->getOrInsertPrivateCopyOf<TimingDatabase>([] {
+//     auto *db = new TimingDatabase();
+//     std::string path =
+//     if (failed(TimingDatabase::readFromJSON(path, *db)))
+//       llvm::report_fatal_error("failed to load timing database");
+//     return db;
+//   });
+// }
+
 void TimingDatabase::insertTimingModel(StringRef timingModelKey,
                                        TimingModel &model) {
   models.try_emplace(timingModelKey, model);

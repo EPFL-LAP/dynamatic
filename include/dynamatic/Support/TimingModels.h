@@ -263,6 +263,8 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
 /// underlying timing models, which can also be retrieved in their entirety.
 class TimingDatabase {
 public:
+  static TimingDatabase *getOrCreate(mlir::MLIRContext *ctx);
+
   /// Inserts a timing model in the database with the provided key
   void insertTimingModel(StringRef timingModelKey, TimingModel &model);
 
@@ -308,6 +310,9 @@ public:
                                     TimingDatabase &timingDB);
 
 private:
+  // Prevent making a timing database manually
+  TimingDatabase() = default;
+
   /// Maps from an operation's timing key to their timing model.
   /// Timing keys are generated based on operation name and implementation
   llvm::StringMap<TimingModel> models;
