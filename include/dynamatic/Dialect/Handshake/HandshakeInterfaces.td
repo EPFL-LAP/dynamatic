@@ -268,7 +268,7 @@ InterfaceMethod<[{
     auto attr = $_op->getAttrOfType<mlir::IntegerAttr>("latency");
     assert(attr && "Missing 'latency' attribute");
     return attr.getInt();
-  }]>
+  }]>,
 
   InterfaceMethod<[{
   Sets the operation latency.
