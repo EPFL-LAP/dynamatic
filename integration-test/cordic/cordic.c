@@ -26,19 +26,19 @@ float cordic(in_float_t theta, out_float_t a[2], in_float_t cordic_phase[1000],
 int main(void) {
   in_float_t thetas;
   out_float_t results[2];
-  in_float_t cordic_phases[1000];
+  in_float_t cordic_phase[1000];
   in_float_t initial_cos = 1;
   in_float_t initial_sin = 0;
   // generate cordic_phases
   for (int i = 0; i < 1000; ++i) {
     double div = sqrtf(1 + powf(2, -2 * i));
-    cordic_phases[i] = 1 / div;
+    cordic_phase[i] = 1 / div;
   }
 
   thetas = 1;
   results[0] = 0;
   results[1] = 0;
 
-  CALL_KERNEL(cordic, thetas, results, cordic_phases, initial_cos, initial_sin);
+  CALL_KERNEL(cordic, thetas, results, cordic_phase, initial_cos, initial_sin);
   return 0;
 }
