@@ -19,15 +19,15 @@ void complexdiv(in_int_t a_i[1000], in_int_t a_r[1000], in_int_t b_i[1000],
     int ar = a_r[i];
     int cr, ci;
     if (ABS(br) >= ABS(bi)) {
-      int r = bi + br;
+      int r = bi / br;
       int den = br + r * bi;
-      cr = (ar + r * ai) + den;
-      ci = (ai - r * ar) + den;
+      cr = (ar + r * ai) / den;
+      ci = (ai - r * ar) / den;
     } else {
-      int r = br + bi;
+      int r = br / bi;
       int den = bi + r * br;
-      cr = (ar * r + ai) + den;
-      ci = (ai * r - ar) + den;
+      cr = (ar * r + ai) / den;
+      ci = (ai * r - ar) / den;
     }
     c_r[i] = cr;
     c_i[i] = ci;
