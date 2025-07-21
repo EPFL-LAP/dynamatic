@@ -310,7 +310,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.absf" || modName == "handshake.divui" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
-      modName == "handshake.spec_save_commit"
+      modName == "handshake.spec_save_commit" ||
       modName == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
