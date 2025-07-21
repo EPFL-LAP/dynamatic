@@ -270,17 +270,17 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 }
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
-  IsIntSizedChannel<"lhs", 32>,
-  IsIntSizedChannel<"rhs", 32>,
-  IsIntSizedChannel<"result", 32>
+  IsIntSizedChannel<32, "lhs">,
+  IsIntSizedChannel<32, "rhs">,
+  IsIntSizedChannel<32, "result">
 ]>{
   let summary = "Signed integer division.";
 }
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
-  IsIntSizedChannel<"lhs", 32>,
-  IsIntSizedChannel<"rhs", 32>,
-  IsIntSizedChannel<"result", 32>
+  IsIntSizedChannel<32, "lhs">,
+  IsIntSizedChannel<32, "rhs">,
+  IsIntSizedChannel<32, "result">
 ]>
 {
   let summary = "Unsigned integer division.";
