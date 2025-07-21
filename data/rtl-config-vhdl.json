@@ -261,11 +261,7 @@
   },
   {
     "name": "handshake.truncf",
-    "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/truncf.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t truncf -p extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.xori",
