@@ -12,6 +12,7 @@ import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.divf as divf
+import generators.handshake.negf as negf
 import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
@@ -69,6 +70,8 @@ def generate_code(name, mod_type, parameters):
             return control_merge.generate_control_merge(name, parameters)
         case "divf":
             return divf.generate_divf(name, parameters)
+        case "negf":
+            return negf.generate_negf(name, parameters)
         case "extsi":
             return extsi.generate_extsi(name, parameters)
         case "fork":
