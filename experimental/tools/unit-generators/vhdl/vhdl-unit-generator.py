@@ -32,6 +32,7 @@ import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
+import generators.handshake.truncf as truncf
 import generators.handshake.speculation.spec_commit as spec_commit
 import generators.handshake.speculation.spec_save_commit as spec_save_commit
 import generators.handshake.speculation.speculating_branch as speculating_branch
@@ -110,6 +111,8 @@ def generate_code(name, mod_type, parameters):
             return subi.generate_subi(name, parameters)
         case "trunci":
             return trunci.generate_trunci(name, parameters)
+        case "truncf":
+            return truncf.generate_truncf(name, parameters)
         case "spec_commit":
             return spec_commit.generate_spec_commit(name, parameters)
         case "spec_save_commit":
