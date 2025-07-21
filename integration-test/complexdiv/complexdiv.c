@@ -4,8 +4,7 @@
 // The default c++ abs function from stdlib
 // is lowered as an external function
 //
-// Although there is a maths.absi op
-// in MLIR
+// Although there is a maths.absi op in MLIR
 // I don't think Polygeist uses it
 #define ABS(x) ((x) >= 0 ? (x) : -(x))
 
