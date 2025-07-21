@@ -297,9 +297,9 @@ def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
   Commutative,
-  IsFloatSizedChannel<lhs, 32>,
-  IsFloatSizedChannel<rhs, 32>,
-  IsFloatSizedChannel<result, 32>
+  IsFloatSizedChannel<32, "lhs">,
+  IsFloatSizedChannel<32, "rhs">,
+  IsFloatSizedChannel<32, "result">
 ]> {
   let summary = "Floating-point maximum.";
   let hasVerifier = 1
@@ -307,9 +307,9 @@ def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
   Commutative,
-  IsFloatSizedChannel<lhs, 32>,
-  IsFloatSizedChannel<rhs, 32>,
-  IsFloatSizedChannel<result, 32>
+  IsFloatSizedChannel<32, "lhs">,
+  IsFloatSizedChannel<32, "rhs">,
+  IsFloatSizedChannel<32, "result">
 ]> {
   let summary = "Floating-point minimum.";
 }
