@@ -1,0 +1,27 @@
+#include "interpolatorForkSwap_rhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_long : bool_input_inf(interpolatorForkSwap_rhs.long_ready);
+  VAR seq_generator_short : bool_input_inf(interpolatorForkSwap_rhs.short_ready);
+
+  VAR interpolatorForkSwap_rhs : interpolatorForkSwap_rhs (seq_generator_long.outs, seq_generator_long.outs_valid, seq_generator_short.outs, seq_generator_short.outs_valid, sink_out1.ins_ready, sink_out2.ins_ready);
+
+  VAR sink_out1 : sink_main(interpolatorForkSwap_rhs.out1_valid);
+  VAR sink_out2 : sink_main(interpolatorForkSwap_rhs.out2_valid);
+

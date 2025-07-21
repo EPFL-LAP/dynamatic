@@ -8,6 +8,6 @@ module {
     %5 = passer %0[%4#0] {handshake.bb = 2 : ui32, handshake.name = "passer1"} : <i1>, <i1>
     %6 = passer %1[%4#1] {handshake.bb = 2 : ui32, handshake.name = "passer2"} : <i1>, <i1>
     %7 = andi %5, %6 {handshake.bb = 2 : ui32, handshake.name = "andi"} : <i1>
-    end {handshake.bb = 2 : ui32, handshake.name = "end0"} %3 : <i1>
+    end {handshake.bb = 3 : ui32, handshake.name = "end0"} %3 : <i1>
   }
 }

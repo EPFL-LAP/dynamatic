@@ -1,0 +1,35 @@
+#include "model.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_D : bool_input_exact(model.D_ready, 1);
+  VAR seq_generator_C : bool_input_exact(model.C_ready, 1);
+
+  VAR model : model (seq_generator_D.outs, seq_generator_D.outs_valid, seq_generator_C.outs, seq_generator_C.outs_valid, sink_T.ins_ready, sink_F.ins_ready);
+
+  VAR sink_T : sink_main(model.T_valid);
+  VAR sink_F : sink_main(model.F_valid);
+

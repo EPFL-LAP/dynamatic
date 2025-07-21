@@ -1,0 +1,68 @@
+#include "handshake_source_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_buffer_2.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_spec_v2_resolver_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_ndconstant_0.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+
+
+MODULE elastic_miter_introduceResolver_lhs_introduceResolver_rhs (loopContinue, loopContinue_valid, confirmSpec_backedge, confirmSpec_backedge_valid, EQ_confirmSpec_ready)
+
+
+-- input and output
+DEFINE EQ_confirmSpec := out_eq_confirmSpec.result;
+DEFINE EQ_confirmSpec_valid := out_eq_confirmSpec.result_valid;
+DEFINE out_eq_confirmSpec_result_ready := EQ_confirmSpec_ready;
+DEFINE ctx_fork_ins := loopContinue;
+DEFINE ctx_fork_ins_valid := loopContinue_valid;
+DEFINE loopContinue_ready := ctx_fork.ins_ready;
+DEFINE backedge_sink_start_confirmSpec_ins := confirmSpec_backedge;
+DEFINE backedge_sink_start_confirmSpec_ins_valid := confirmSpec_backedge_valid;
+DEFINE confirmSpec_backedge_ready := backedge_sink_start_confirmSpec.ins_ready;
+
+
+VAR backedge_source_confirmSpec : handshake_source_0(backedge_constant_confirmSpec.ctrl_ready);
+VAR backedge_constant_confirmSpec : handshake_ndconstant_0(backedge_source_confirmSpec.outs_valid, backedge_lf_start_confirmSpec.ins_ready);
+VAR backedge_lf_start_confirmSpec : handshake_fork_0(backedge_constant_confirmSpec.result, backedge_constant_confirmSpec.result_valid, ctx_fork_cs.ins_ready, backedge_eq_confirmSpec.lhs_ready);
+VAR backedge_sink_start_confirmSpec : handshake_sink_0(backedge_sink_start_confirmSpec_ins, backedge_sink_start_confirmSpec_ins_valid);
+VAR backedge_lf_end_confirmSpec : handshake_lazy_fork_0(lhs_out_bl_confirmSpec.outs, lhs_out_bl_confirmSpec.outs_valid, out_eq_confirmSpec.lhs_ready, backedge_eq_confirmSpec.rhs_ready);
+VAR backedge_eq_confirmSpec : handshake_cmpi_0(backedge_lf_start_confirmSpec.outs_1, backedge_lf_start_confirmSpec.outs_1_valid, backedge_lf_end_confirmSpec.outs_1, backedge_lf_end_confirmSpec.outs_1_valid, backedge_sink_end_confirmSpec.ins_ready);
+VAR backedge_sink_end_confirmSpec : handshake_sink_0(backedge_eq_confirmSpec.result, backedge_eq_confirmSpec.result_valid);
+VAR ctx_fork : handshake_fork_0(ctx_fork_ins, ctx_fork_ins_valid, ctx_passer.data_ready, in_fork_loopContinue.ins_ready);
+VAR ctx_fork_cs : handshake_fork_0(backedge_lf_start_confirmSpec.outs_0, backedge_lf_start_confirmSpec.outs_0_valid, ctx_passer.ctrl_ready, in_fork_confirmSpec_backedge.ins_ready);
+VAR ctx_passer : handshake_passer_0(ctx_fork.outs_0, ctx_fork.outs_0_valid, ctx_fork_cs.outs_0, ctx_fork_cs.outs_0_valid, ndspec.ins_ready);
+VAR ndspec : handshake_spec_v2_nd_speculator_0(ctx_passer.result, ctx_passer.result_valid, in_fork_specLoopContinue.ins_ready);
+VAR in_fork_loopContinue : handshake_lazy_fork_0(ctx_fork.outs_1, ctx_fork.outs_1_valid, lhs_in_buf_loopContinue.ins_ready, rhs_in_buf_loopContinue.ins_ready);
+VAR lhs_in_buf_loopContinue : handshake_buffer_0(in_fork_loopContinue.outs_0, in_fork_loopContinue.outs_0_valid, lhs_passer.data_ready);
+VAR rhs_in_buf_loopContinue : handshake_buffer_0(in_fork_loopContinue.outs_1, in_fork_loopContinue.outs_1_valid, rhs_resolver.actualCondition_ready);
+VAR in_fork_specLoopContinue : handshake_lazy_fork_0(ndspec.outs, ndspec.outs_valid, lhs_in_buf_specLoopContinue.ins_ready, rhs_in_buf_specLoopContinue.ins_ready);
+VAR lhs_in_buf_specLoopContinue : handshake_buffer_0(in_fork_specLoopContinue.outs_0, in_fork_specLoopContinue.outs_0_valid, lhs_interpolate.long_ready);
+VAR rhs_in_buf_specLoopContinue : handshake_buffer_0(in_fork_specLoopContinue.outs_1, in_fork_specLoopContinue.outs_1_valid, rhs_resolver.generatedCondition_ready);
+VAR in_fork_confirmSpec_backedge : handshake_lazy_fork_0(ctx_fork_cs.outs_1, ctx_fork_cs.outs_1_valid, lhs_in_buf_confirmSpec_backedge.ins_ready, rhs_vm_sink_2.ins_ready);
+VAR lhs_in_buf_confirmSpec_backedge : handshake_buffer_0(in_fork_confirmSpec_backedge.outs_0, in_fork_confirmSpec_backedge.outs_0_valid, lhs_passer.ctrl_ready);
+VAR out_nds_confirmSpec : handshake_ndsource_0(out_lf_confirmSpec.ins_ready);
+VAR out_lf_confirmSpec : handshake_lazy_fork_1(out_nds_confirmSpec.result_valid, out_buf_lhs_nds_confirmSpec.ins_ready, out_buf_rhs_nds_confirmSpec.ins_ready);
+VAR out_buf_lhs_nds_confirmSpec : handshake_buffer_1(out_lf_confirmSpec.outs_0_valid, lhs_out_bl_confirmSpec.ctrl_ready);
+VAR out_buf_rhs_nds_confirmSpec : handshake_buffer_1(out_lf_confirmSpec.outs_1_valid, rhs_out_bl_confirmSpec.ctrl_ready);
+VAR lhs_out_bl_confirmSpec : handshake_blocker_0(lhs_interpolate.result, lhs_interpolate.result_valid, out_buf_lhs_nds_confirmSpec.outs_valid, backedge_lf_end_confirmSpec.ins_ready);
+VAR rhs_out_bl_confirmSpec : handshake_blocker_0(rhs_resolver.confirmSpec, rhs_resolver.confirmSpec_valid, out_buf_rhs_nds_confirmSpec.outs_valid, out_eq_confirmSpec.rhs_ready);
+VAR out_eq_confirmSpec : handshake_cmpi_0(backedge_lf_end_confirmSpec.outs_0, backedge_lf_end_confirmSpec.outs_0_valid, rhs_out_bl_confirmSpec.outs, rhs_out_bl_confirmSpec.outs_valid, out_eq_confirmSpec_result_ready);
+VAR lhs_passer : handshake_passer_0(lhs_in_buf_loopContinue.outs, lhs_in_buf_loopContinue.outs_valid, lhs_in_buf_confirmSpec_backedge.outs, lhs_in_buf_confirmSpec_backedge.outs_valid, lhs_buffer.ins_ready);
+VAR lhs_buffer : handshake_buffer_2(lhs_passer.result, lhs_passer.result_valid, lhs_ri.ins_ready);
+VAR lhs_ri : handshake_spec_v2_repeating_init_0(lhs_buffer.outs, lhs_buffer.outs_valid, lhs_interpolate.short_ready);
+VAR lhs_interpolate : handshake_spec_v2_interpolator_0(lhs_ri.outs, lhs_ri.outs_valid, lhs_in_buf_specLoopContinue.outs, lhs_in_buf_specLoopContinue.outs_valid, lhs_out_bl_confirmSpec.ins_ready);
+VAR rhs_vm_sink_2 : handshake_sink_0(in_fork_confirmSpec_backedge.outs_1, in_fork_confirmSpec_backedge.outs_1_valid);
+VAR rhs_resolver : handshake_spec_v2_resolver_0(rhs_in_buf_loopContinue.outs, rhs_in_buf_loopContinue.outs_valid, rhs_in_buf_specLoopContinue.outs, rhs_in_buf_specLoopContinue.outs_valid, rhs_out_bl_confirmSpec.ins_ready);
+
+-- properties

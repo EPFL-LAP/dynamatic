@@ -11,6 +11,6 @@ module {
     %8 = spec_v2_repeating_init %7 {handshake.bb = 2 : ui32, handshake.name = "ri", initToken = 1 : ui1} : <i1>
     %9 = passer %1[%8] {handshake.bb = 2 : ui32, handshake.name = "passer1"} : <i1>, <i1>
     %10 = passer %9[%6] {handshake.bb = 2 : ui32, handshake.name = "passer2"} : <i1>, <i1>
-    end {handshake.bb = 2 : ui32, handshake.name = "end0"} %2 : <i1>
+    end {handshake.bb = 3 : ui32, handshake.name = "end0"} %2 : <i1>
   }
 }

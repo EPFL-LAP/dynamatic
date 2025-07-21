@@ -1,0 +1,30 @@
+-- handshake_ndwire_0 : ndwire(['bitwidth=1'])
+
+
+MODULE handshake_ndwire_0(ins, ins_valid, outs_ready)
+  VAR inner_ndwire : handshake_ndwire_0__ndwire_dataless(ins_valid, outs_ready);
+
+  -- output
+  DEFINE
+  outs := ins;
+  outs_valid :=  inner_ndwire.outs_valid;
+  ins_ready  :=  inner_ndwire.ins_ready;
+
+MODULE handshake_ndwire_0__ndwire_dataless(ins_valid, outs_ready)
+  VAR state : {SLEEPING, RUNNING};
+  ASSIGN
+  init(state) := {SLEEPING, RUNNING};
+  next(state) := case
+    state = SLEEPING : {SLEEPING, RUNNING};
+    ins_valid & outs_ready : {SLEEPING, RUNNING};
+    TRUE : state;
+  esac;
+
+  FAIRNESS state = RUNNING;
+
+  -- output
+  DEFINE  
+  outs_valid :=  ins_valid & (state = RUNNING);
+  ins_ready  :=  outs_ready & (state = RUNNING);
+
+

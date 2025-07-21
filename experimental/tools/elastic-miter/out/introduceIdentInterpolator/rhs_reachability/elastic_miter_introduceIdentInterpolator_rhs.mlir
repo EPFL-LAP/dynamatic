@@ -6,6 +6,6 @@ module {
     %3:2 = fork [2] %1 {handshake.bb = 1 : ui32, handshake.name = "vm_fork_1"} : <i1>
     %4 = spec_v2_interpolator %3#0, %3#1 {handshake.bb = 1 : ui32, handshake.name = "interpolate"} : <i1>
     %5 = passer %0[%4] {handshake.bb = 1 : ui32, handshake.name = "passer"} : <i1>, <i1>
-    end {handshake.bb = 1 : ui32, handshake.name = "end0"} %2 : <i1>
+    end {handshake.bb = 2 : ui32, handshake.name = "end0"} %2 : <i1>
   }
 }

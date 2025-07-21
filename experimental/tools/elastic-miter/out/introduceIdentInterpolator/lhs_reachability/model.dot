@@ -8,7 +8,7 @@ Digraph G {
   "val" -> "ndw_in_val" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="val", "to_idx"="0"]
   "ndw_in_A_in" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_in_val" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs", "to_idx"="1"]
-  "ndw_out_B_out" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_B_out" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "passer" -> "ndw_out_B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   subgraph cluster0 {
     graph ["label"="BB 0"]

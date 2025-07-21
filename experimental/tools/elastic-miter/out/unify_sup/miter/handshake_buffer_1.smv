@@ -1,9 +1,10 @@
--- handshake_buffer_1 : buffer(['num_slots=1', 'bitwidth=0', 'transparent=False', "timing='#handshake<timing {D: 1, V: 1, R: 0}>'"])
+-- handshake_buffer_1 : buffer(['num_slots=1', 'bitwidth=0', 'buffer_type="FIFO_BREAK_DV"'])
 
 
 MODULE handshake_buffer_1 (ins_valid, outs_ready)
   VAR
   outs_valid_i : boolean;
+  inner_counter : handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready);
 
   ASSIGN
   init(outs_valid_i) := FALSE;
@@ -13,4 +14,29 @@ MODULE handshake_buffer_1 (ins_valid, outs_ready)
   DEFINE
   ins_ready := !outs_valid_i | outs_ready;
   outs_valid := outs_valid_i;
+
+
+MODULE handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready)
+    VAR
+    counter : 0..1;
+    error : boolean;
+    DEFINE
+    write_en := ins_valid & ins_ready;
+    read_en := outs_valid & outs_ready;
+    ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+        write_en & read_en : counter;
+        write_en & (counter < 1) : counter + 1;
+        read_en & (counter > 0) : counter - 1;
+        TRUE : counter;
+    esac;
+    init(error) := FALSE;
+    next(error) := case
+        write_en & read_en : error;
+        write_en & (counter = 1) : TRUE;
+        read_en & (counter = 0) : TRUE;
+        TRUE : error;
+    esac;
+
 

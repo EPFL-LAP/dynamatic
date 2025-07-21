@@ -1,0 +1,27 @@
+#include "andForkSwap_rhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_in2 : bool_input_inf(andForkSwap_rhs.in2_ready);
+  VAR seq_generator_in1 : bool_input_inf(andForkSwap_rhs.in1_ready);
+
+  VAR andForkSwap_rhs : andForkSwap_rhs (seq_generator_in2.outs, seq_generator_in2.outs_valid, seq_generator_in1.outs, seq_generator_in1.outs_valid, sink_out1.ins_ready, sink_out2.ins_ready);
+
+  VAR sink_out1 : sink_main(andForkSwap_rhs.out1_valid);
+  VAR sink_out2 : sink_main(andForkSwap_rhs.out2_valid);
+

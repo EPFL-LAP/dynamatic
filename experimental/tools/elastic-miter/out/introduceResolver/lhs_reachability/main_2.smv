@@ -1,0 +1,35 @@
+#include "introduceResolver_lhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_loopContinue : bool_input_exact(introduceResolver_lhs.loopContinue_ready, 2);
+  VAR seq_generator_confirmSpec_backedge : bool_input_exact(introduceResolver_lhs.confirmSpec_backedge_ready, 2);
+
+  VAR introduceResolver_lhs : introduceResolver_lhs (seq_generator_loopContinue.outs, seq_generator_loopContinue.outs_valid, seq_generator_confirmSpec_backedge.outs, seq_generator_confirmSpec_backedge.outs_valid, sink_confirmSpec.ins_ready);
+
+  VAR sink_confirmSpec : sink_main(introduceResolver_lhs.confirmSpec_valid);
+
+INVAR introduceResolver_lhs.backedge_eq_confirmSpec.result_valid -> introduceResolver_lhs.backedge_eq_confirmSpec.result;

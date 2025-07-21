@@ -8,7 +8,7 @@ Digraph G {
   "A_in" -> "ndw_in_A_in" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="A_in", "to_idx"="0"]
   "ndw_in_short" -> "fork_short" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_in_A_in" -> "passer1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs", "to_idx"="0"]
-  "ndw_out_B_out" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_B_out" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "fork_short" -> "interpolate" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="short", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
   "nd_spec" -> "vm_fork_1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "passer2" -> "ndw_out_B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]

@@ -1,0 +1,32 @@
+#include "handshake_ndconstant_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE introduceResolver_lhs_wrapper (loopContinue, loopContinue_valid, confirmSpec_backedge, confirmSpec_backedge_valid, confirmSpec_ready)
+
+
+-- input and output
+DEFINE confirmSpec := introduceResolver_lhs_wrapped.confirmSpec;
+DEFINE confirmSpec_valid := introduceResolver_lhs_wrapped.confirmSpec_valid;
+DEFINE introduceResolver_lhs_wrapped_confirmSpec_ready := confirmSpec_ready;
+DEFINE introduceResolver_lhs_wrapped_loopContinue := loopContinue;
+DEFINE introduceResolver_lhs_wrapped_loopContinue_valid := loopContinue_valid;
+DEFINE loopContinue_ready := introduceResolver_lhs_wrapped.loopContinue_ready;
+DEFINE introduceResolver_lhs_wrapped_confirmSpec_backedge := confirmSpec_backedge;
+DEFINE introduceResolver_lhs_wrapped_confirmSpec_backedge_valid := confirmSpec_backedge_valid;
+DEFINE confirmSpec_backedge_ready := introduceResolver_lhs_wrapped.confirmSpec_backedge_ready;
+
+
+VAR introduceResolver_lhs_wrapped : introduceResolver_lhs(introduceResolver_lhs_wrapped_loopContinue, introduceResolver_lhs_wrapped_loopContinue_valid, introduceResolver_lhs_wrapped_confirmSpec_backedge, introduceResolver_lhs_wrapped_confirmSpec_backedge_valid, introduceResolver_lhs_wrapped_confirmSpec_ready);
+
+-- properties

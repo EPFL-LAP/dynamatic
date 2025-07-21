@@ -3,61 +3,20 @@
 
 MODULE handshake_buffer_1 (ins_valid, outs_ready)
   VAR
-  inner_tehb : handshake_buffer_1__tehb_dataless(ins_valid, inner_elastic_fifo.ins_ready);
-  inner_elastic_fifo : handshake_buffer_1__elastic_fifo_inner_dataless(inner_tehb.outs_valid, outs_ready);
-  inner_counter : handshake_buffer_1__buffer_counter(ins_valid, ins_ready, outs_valid, outs_ready);
-
-  -- output
-  DEFINE
-  ins_ready := inner_tehb.ins_ready;
-  outs_valid := inner_elastic_fifo.outs_valid;
-
-
-MODULE handshake_buffer_1__tehb_dataless(ins_valid, outs_ready)
-  VAR
-  full : boolean;
+  outs_valid_i : boolean;
+  inner_counter : handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready);
 
   ASSIGN
-  init(full) := FALSE;
-  next(full) := outs_valid & !outs_ready;
+  init(outs_valid_i) := FALSE;
+  next(outs_valid_i) := ins_valid | (outs_valid_i & !outs_ready);
 
   -- output
   DEFINE
-  ins_ready := !full;
-  outs_valid := ins_valid | full;
+  ins_ready := !outs_valid_i | outs_ready;
+  outs_valid := outs_valid_i;
 
 
-MODULE handshake_buffer_1__elastic_fifo_inner_dataless(ins_valid, outs_ready)
-  VAR
-  full : boolean;
-  empty : boolean;
-
-  DEFINE
-  read_en := outs_ready & !empty;
-  write_en := ins_valid & (!full | outs_ready);
-
-  ASSIGN
-  init(full) := FALSE;
-  next(full) := case
-    write_en & !read_en : TRUE;
-    !write_en & read_en : FALSE;
-    TRUE : full;
-  esac;
-
-  init(empty) := TRUE;
-  next(empty) := case
-    !write_en & read_en : TRUE;
-    write_en & !read_en : FALSE;
-    TRUE : empty;
-  esac;
-
-  -- output
-  DEFINE
-  ins_ready := !full | outs_ready;
-  outs_valid := !empty;
-
-
-MODULE handshake_buffer_1__buffer_counter(ins_valid, ins_ready, outs_valid, outs_ready)
+MODULE handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready)
     VAR
     counter : 0..1;
     error : boolean;

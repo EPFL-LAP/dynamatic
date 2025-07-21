@@ -1,0 +1,26 @@
+#include "handshake_andi_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
+
+
+MODULE andForkSwap_lhs_wrapper (in2, in2_valid, in1, in1_valid, out1_ready, out2_ready)
+
+
+-- input and output
+DEFINE out1 := andForkSwap_lhs_wrapped.out1;
+DEFINE out1_valid := andForkSwap_lhs_wrapped.out1_valid;
+DEFINE andForkSwap_lhs_wrapped_out1_ready := out1_ready;
+DEFINE out2 := andForkSwap_lhs_wrapped.out2;
+DEFINE out2_valid := andForkSwap_lhs_wrapped.out2_valid;
+DEFINE andForkSwap_lhs_wrapped_out2_ready := out2_ready;
+DEFINE andForkSwap_lhs_wrapped_in2 := in2;
+DEFINE andForkSwap_lhs_wrapped_in2_valid := in2_valid;
+DEFINE in2_ready := andForkSwap_lhs_wrapped.in2_ready;
+DEFINE andForkSwap_lhs_wrapped_in1 := in1;
+DEFINE andForkSwap_lhs_wrapped_in1_valid := in1_valid;
+DEFINE in1_ready := andForkSwap_lhs_wrapped.in1_ready;
+
+
+VAR andForkSwap_lhs_wrapped : andForkSwap_lhs(andForkSwap_lhs_wrapped_in2, andForkSwap_lhs_wrapped_in2_valid, andForkSwap_lhs_wrapped_in1, andForkSwap_lhs_wrapped_in1_valid, andForkSwap_lhs_wrapped_out1_ready, andForkSwap_lhs_wrapped_out2_ready);
+
+-- properties

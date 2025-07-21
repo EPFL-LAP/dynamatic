@@ -1,0 +1,30 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "D" ["style"="solid", "shape"="diamond", "label"="D", "mlir_op"="handshake.func"]
+  "C" ["style"="solid", "shape"="diamond", "label"="C", "mlir_op"="handshake.func"]
+  "T" ["style"="solid", "shape"="diamond", "label"="T", "mlir_op"="handshake.func"]
+  "F" ["style"="solid", "shape"="diamond", "label"="F", "mlir_op"="handshake.func"]
+  "D" -> "ndw_in_D" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="D", "to_idx"="0"]
+  "C" -> "ndw_in_C" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="C", "to_idx"="0"]
+  "ndw_in_D" -> "branch" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "ndw_in_C" -> "branch" ["dir"="both", "style"="solid", "arrowhead"="dot", "from_idx"="0", "to"="condition", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_T" -> "T" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="T", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_F" -> "F" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="F", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "branch" -> "ndw_out_T" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="trueOut", "to_idx"="0"]
+  "branch" -> "ndw_out_F" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="falseOut", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_D" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_C" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster3 {
+    graph ["label"="BB 3"]
+    "ndw_out_T" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_out_F" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "branch" ["style"="filled", "fillcolor"="tan2", "shape"="box", "label"="cbranch", "mlir_op"="handshake.cond_br"]
+  }
+}

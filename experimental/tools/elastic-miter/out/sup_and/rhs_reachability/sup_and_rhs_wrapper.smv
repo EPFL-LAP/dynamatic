@@ -1,0 +1,26 @@
+#include "handshake_passer_0.smv"
+#include "handshake_andi_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_and_rhs_wrapper (A_in, A_in_valid, B_in, B_in_valid, Cond, Cond_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := sup_and_rhs_wrapped.C_out;
+DEFINE C_out_valid := sup_and_rhs_wrapped.C_out_valid;
+DEFINE sup_and_rhs_wrapped_C_out_ready := C_out_ready;
+DEFINE sup_and_rhs_wrapped_A_in := A_in;
+DEFINE sup_and_rhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := sup_and_rhs_wrapped.A_in_ready;
+DEFINE sup_and_rhs_wrapped_B_in := B_in;
+DEFINE sup_and_rhs_wrapped_B_in_valid := B_in_valid;
+DEFINE B_in_ready := sup_and_rhs_wrapped.B_in_ready;
+DEFINE sup_and_rhs_wrapped_Cond := Cond;
+DEFINE sup_and_rhs_wrapped_Cond_valid := Cond_valid;
+DEFINE Cond_ready := sup_and_rhs_wrapped.Cond_ready;
+
+
+VAR sup_and_rhs_wrapped : sup_and_rhs(sup_and_rhs_wrapped_A_in, sup_and_rhs_wrapped_A_in_valid, sup_and_rhs_wrapped_B_in, sup_and_rhs_wrapped_B_in_valid, sup_and_rhs_wrapped_Cond, sup_and_rhs_wrapped_Cond_valid, sup_and_rhs_wrapped_C_out_ready);
+
+-- properties

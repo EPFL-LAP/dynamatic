@@ -1,0 +1,59 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "loopContinue" ["style"="solid", "shape"="diamond", "label"="loopContinue", "mlir_op"="handshake.func"]
+  "confirmSpec_backedge" ["style"="solid", "shape"="diamond", "label"="confirmSpec_backedge", "mlir_op"="handshake.func"]
+  "confirmSpec" ["style"="solid", "shape"="diamond", "label"="confirmSpec", "mlir_op"="handshake.func"]
+  "loopContinue" -> "ndw_in_loopContinue" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="loopContinue", "to_idx"="0"]
+  "confirmSpec_backedge" -> "backedge_sink_start_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="confirmSpec_backedge", "to_idx"="0"]
+  "backedge_lf_start_confirmSpec" -> "backedge_eq_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="lhs", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
+  "backedge_lf_end_confirmSpec" -> "confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="confirmSpec", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+  "ndw_in_loopContinue" -> "ctx_fork" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_confirmSpec_backedge" -> "ctx_fork_cs" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ctx_fork" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="data", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
+  "ctx_fork_cs" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ctrl", "arrowtail"="none", "from"="outs_1", "to_idx"="1"]
+  "ndspec" -> "interpolate" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="long", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "interpolate" -> "ndw_out_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "backedge_source_confirmSpec" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="source", "mlir_op"="handshake.source"]
+    "backedge_constant_confirmSpec" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndconstant", "mlir_op"="handshake.ndconstant"]
+    "backedge_lf_start_confirmSpec" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "backedge_sink_start_confirmSpec" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="sink", "mlir_op"="handshake.sink"]
+    "ndw_in_loopContinue" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_confirmSpec_backedge" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "backedge_source_confirmSpec" -> "backedge_constant_confirmSpec" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+    "backedge_constant_confirmSpec" -> "backedge_lf_start_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "backedge_lf_start_confirmSpec" -> "ndw_in_confirmSpec_backedge" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+  }
+  subgraph cluster3 {
+    graph ["label"="BB 3"]
+    "backedge_lf_end_confirmSpec" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
+    "backedge_eq_confirmSpec" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="==", "mlir_op"="handshake.cmpi=="]
+    "backedge_sink_end_confirmSpec" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="sink", "mlir_op"="handshake.sink"]
+    "ndw_out_confirmSpec" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "backedge_lf_end_confirmSpec" -> "backedge_eq_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="rhs", "arrowtail"="none", "from"="outs_1", "to_idx"="1"]
+    "backedge_eq_confirmSpec" -> "backedge_sink_end_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "ndw_out_confirmSpec" -> "backedge_lf_end_confirmSpec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "ctx_fork" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "ctx_fork_cs" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "ctx_passer" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "ndspec" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_nd_speculator", "mlir_op"="handshake.spec_v2_nd_speculator"]
+    "ctx_fork" -> "ctx_passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+    "ctx_fork_cs" -> "ctx_passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs_0", "to_idx"="1"]
+    "ctx_passer" -> "ndspec" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  }
+  subgraph cluster2 {
+    graph ["label"="BB 2"]
+    "passer" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "buffer" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_NONE [1]", "mlir_op"="handshake.buffer"]
+    "ri" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_repeating_init", "mlir_op"="handshake.spec_v2_repeating_init"]
+    "interpolate" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_interpolator", "mlir_op"="handshake.spec_v2_interpolator"]
+    "passer" -> "buffer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "buffer" -> "ri" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+    "ri" -> "interpolate" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="short", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  }
+}

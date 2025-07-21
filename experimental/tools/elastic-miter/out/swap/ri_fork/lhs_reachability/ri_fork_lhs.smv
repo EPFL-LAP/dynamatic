@@ -1,5 +1,6 @@
-#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_buffer_0.smv"
 #include "handshake_fork_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_ndwire_0.smv"
 
 
@@ -18,10 +19,11 @@ DEFINE ndw_in_A_in_ins_valid := A_in_valid;
 DEFINE A_in_ready := ndw_in_A_in.ins_ready;
 
 
-VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, ri.ins_ready);
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, buffer.ins_ready);
 VAR ndw_out_B_out : handshake_ndwire_0(fork.outs_0, fork.outs_0_valid, ndw_out_B_out_outs_ready);
 VAR ndw_out_C_out : handshake_ndwire_0(fork.outs_1, fork.outs_1_valid, ndw_out_C_out_outs_ready);
-VAR ri : handshake_spec_v2_repeating_init_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, fork.ins_ready);
+VAR buffer : handshake_buffer_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, ri.ins_ready);
+VAR ri : handshake_spec_v2_repeating_init_0(buffer.outs, buffer.outs_valid, fork.ins_ready);
 VAR fork : handshake_fork_0(ri.outs, ri.outs_valid, ndw_out_B_out.ins_ready, ndw_out_C_out.ins_ready);
 
 -- properties

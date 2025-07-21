@@ -9,6 +9,6 @@ module {
     %6 = buffer %5, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "buffer"} : <i1>
     %7 = spec_v2_interpolator %3#1, %6 {handshake.bb = 2 : ui32, handshake.name = "interpolate"} : <i1>
     %8 = passer %1[%7] {handshake.bb = 2 : ui32, handshake.name = "passer"} : <i1>, <i1>
-    end {handshake.bb = 2 : ui32, handshake.name = "end"} %2 : <i1>
+    end {handshake.bb = 3 : ui32, handshake.name = "end"} %2 : <i1>
   }
 }
