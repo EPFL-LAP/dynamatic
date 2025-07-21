@@ -44,33 +44,72 @@ static std::string stripString(const std::string &string) {
   return newString;
 }
 
+static bool isSeqGenerator(StringRef line) {
+  return line.startswith("seq_generator_");
+}
+
+static bool isSeqGeneratorOuts(StringRef line) {
+  if (!isSeqGenerator(line))
+    return false;
+  return line.split('.').second.starts_with("outs");
+}
+
+static bool isSeqGeneratorCounter(StringRef line) {
+  if (!isSeqGenerator(line))
+    return false;
+  return line.split('.').second.starts_with("counter");
+}
+
+static bool isSaturatedSeqGeneratorCounter(StringRef line,
+                                           unsigned nrOfTokens) {
+  if (!isSeqGeneratorCounter(line))
+    return false;
+  auto strValue = line.split('=').second.trim();
+  unsigned counterValue = std::stoi(strValue.str());
+
+  assert(counterValue <= nrOfTokens &&
+         "Counter value exceeds the number of tokens");
+  return counterValue == nrOfTokens;
+}
+
+static StringRef getSeqGeneratorName(StringRef line) {
+  return line.split('.').first;
+}
+
+static bool isModel(StringRef line, StringRef modelName) {
+  return line.starts_with(modelName.str() + ".");
+}
+
+static bool isNDWire(StringRef line, StringRef modelName) {
+  return line.starts_with(modelName.str() + ".ndw");
+}
+
 // Get the set of states given the path to file containing the output to the
 // nuXmv command "print_reachable_states -v;". A set element is defined by a
 // string which is the concatenation of the state values, as represented in the
 // output file.
 // Example:
 // State 1:
-//   seq_generator_C.outs = FALSE
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 2:
 //   seq_generator_C.outs = TRUE
-//   model.ndw_in_C.state = running
+//   model.ndw_in_C.state = sleeping
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 3:
 //   seq_generator_C.outs = TRUE
-//   model.ndw_in_C.state = sleeping
-//   model.fork_control.regBlock0.reg_value = TRUE
+//   model.ndw_in_C.state = running
+//   model.fork_control.regBlock0.reg_value = FALSE
 // State 4:
 //   seq_generator_C.outs = FALSE
 //   model.ndw_in_C.state = running
-//   model.fork_control.regBlock0.reg_value = FALSE
-// Here State 1, 2, and 3 are equivalent, since they only differ in variables
-// outside of the circuit being tested (the ND wire is not considered part of
-// the circuit).
-// State 4 is a new distict state, as the model.fork_control.regBlock0.reg_value
-// is different for the other three states.
-// So in this example we have two unique states.
+//   model.fork_control.regBlock0.reg_value = TRUE
+// Here State 1 and 2 are equivalent, since they only differ in the NDWire
+// state, which is not considered for optimization.
+// State 3 is a new distict state, as the model.fork_control.regBlock0.reg_value
+// is updated. State 4 is also a new distinct state, as the seq_generator_C.outs
+// is updated. So this example has three unique states.
 static FailureOr<llvm::StringSet<>>
 getStateSet(const std::filesystem::path &filePath, const std::string &modelName,
             unsigned nrOfTokens) {
@@ -99,57 +138,17 @@ getStateSet(const std::filesystem::path &filePath, const std::string &modelName,
     if (!recording)
       continue;
 
-    // For the sequence generator states, we only include
-    // - whether the sequence generator is emitting the value or not
-    // - if it's emitting, then the value of the generator.
-    if (line.find("seq_generator_", 0) == 0) {
-      size_t dotPos = line.find('.');
-      if (dotPos == std::string::npos) {
-        llvm::errs() << "Invalid state line: " << line << "\n";
-        return failure();
-      }
-      if (nrOfTokens == 0) {
-        // If the sequence generator emits infinite tokens, we always include
-        // the value.
-        if (line.find("outs", dotPos + 1) == dotPos + 1) {
-          // Include the value
-          currentState += line + "\n";
-        }
-      } else {
-        // Determine if the sequence generator is emitting a value or not from
-        // the counter value.
-        if (line.find("counter", dotPos + 1) == dotPos + 1) {
-          auto strValue = line.substr(dotPos + 10); // "counter = "
-          unsigned counterValue = std::stoi(strValue);
-          if (counterValue > nrOfTokens) {
-            llvm::errs() << "Counter value " << counterValue
-                         << " exceeds the number of tokens: " << nrOfTokens
-                         << "\n";
-            return failure();
-          }
-
-          if (counterValue == nrOfTokens) {
-            // The sequence generator is not emitting a value
-            // Include the current line to indicate the generator is not
-            // generating a token.
-            currentState += line + "\n";
-          } else {
-            // The sequence generator is emitting a value. Include the value.
-            if (line.find("outs", dotPos + 1) == dotPos + 1) {
-              // Include the value
-              currentState += line + "\n";
-            }
-          }
-        }
-      }
+    if (isSeqGeneratorOuts(line)) {
+      // Include the value the sequence generator is emitting
+      currentState += line + "\n";
+    } else if (nrOfTokens > 0 &&
+               isSaturatedSeqGeneratorCounter(line, nrOfTokens)) {
+      // If the sequence generator is no longer emitting, include the state
+      currentState += getSeqGeneratorName(line).str() + ".no_emission = TRUE\n";
+    } else if (isModel(line, modelName) && !isNDWire(line, modelName)) {
+      // Include the state except for the ND wires
+      currentState += line + "\n";
     }
-    // Skip if it doesn't start with "miter." or starts with "miter.ndw",
-    // indicating it is a ND wire
-    if (line.find(modelName + ".", 0) != 0 ||
-        line.find(modelName + ".ndw", 0) == 0) {
-      continue;
-    }
-    currentState += line + "\n";
   }
   file.close();
 
