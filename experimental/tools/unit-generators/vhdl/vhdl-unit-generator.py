@@ -4,9 +4,9 @@ import sys
 
 import importlib
 
-def gen(mod_path, func):
-    mod = importlib.import_module(f"generate.{mod_path}.{func}")
-    return getattr(mod, func)
+def gen(category, mod):
+    imported = importlib.import_module(f"generators.{category}.{mod}")
+    return getattr(imported, f"generate_{mod}")
 
 generators = {
     "absf": gen("handshake", "absf"),
