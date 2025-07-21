@@ -416,6 +416,41 @@ def NDSourceOp : Handshake_Op<"ndsource", [
   }];
 }
 
+def NDConstantOp : Handshake_Op<"ndconstant", [
+  IsIntSizedChannel<1, "result">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+
+  let arguments = (ins ControlType:$ctrl);
+  let results = (outs ChannelType:$result);
+
+  let builders = [OpBuilder<
+    (ins), [{
+      auto controlType = ::dynamatic::handshake::ControlType::get($_builder.getContext());
+      $_state.addTypes({controlType});
+  }]>];
+
+  let assemblyFormat = [{
+    $ctrl attr-dict `:` type($ctrl) `,` type($result)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "result";
+    }
+  }];
+}
+
 def BlockerOp : Handshake_Op<"blocker", [
   HasClock, AllTypesMatch<["ins", "outs"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>

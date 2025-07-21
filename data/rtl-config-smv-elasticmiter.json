@@ -308,6 +308,11 @@
     "hdl": "smv"
   },
   {
+    "name": "handshake.ndconstant",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ndconstant",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.blocker",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t blocker -p bitwidth=$BITWIDTH",
     "hdl": "smv"

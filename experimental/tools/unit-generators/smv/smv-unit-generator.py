@@ -56,6 +56,7 @@ import generators.arith.trunci as trunci
 import generators.arith.xori as xori
 import generators.handshake.init as init
 import generators.handshake.ndsource as ndsource
+import generators.handshake.ndconstant as ndconstant
 import generators.handshake.blocker as blocker
 
 import generators.memory.memory_controller as memory_controller
@@ -156,6 +157,8 @@ def generate_code(name, mod_type, parameters):
             return memory_controller.generate_memory_controller(name, parameters)
         case "ndsource":
             return ndsource.generate_ndsource(name, parameters)
+        case "ndconstant":
+            return ndconstant.generate_ndconstant(name, parameters)
         case "blocker":
             return blocker.generate_blocker(name, parameters)
         case "init":

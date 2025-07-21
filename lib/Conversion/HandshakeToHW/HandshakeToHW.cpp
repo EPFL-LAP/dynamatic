@@ -709,7 +709,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::SpecV2NDSpeculatorOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::NDSourceOp>([&](auto) {
+      .Case<handshake::NDSourceOp, handshake::NDConstantOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Default([&](auto) {
@@ -1832,6 +1832,7 @@ public:
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
                     ConvertToHWInstance<handshake::NDWireOp>,
                     ConvertToHWInstance<handshake::NDSourceOp>,
+                    ConvertToHWInstance<handshake::NDConstantOp>,
                     ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
