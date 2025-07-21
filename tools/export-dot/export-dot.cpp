@@ -397,7 +397,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     StringRef resName = portNames.at(funcOp).getOutputName(idx);
     DOTGraph::Node *node = builder.addNode(resName, *root);
     if (!node)
-      return funcOp.emitError() << "failed to create node for argument " << idx;
+      return funcOp.emitError() << "failed to create node for result " << idx;
     node->addAttr("label", resName);
     node->addAttr("mlir_op", funcOpName);
     node->addAttr("shape", "diamond");
