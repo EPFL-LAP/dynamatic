@@ -216,7 +216,12 @@ entity {name} is
     rhs_valid: in std_logic;
     result_ready: in std_logic;
     -- outputs
-    result: out std_logic_vector(64 - 1 downto 0);
+    unordered: out std_logic;
+    XltY: out std_logic;
+    XeqY: out std_logic;
+    XgtY: out std_logic;
+    XleY: out std_logic;
+    XgeY: out std_logic;
     result_valid: out std_logic;
     lhs_ready: out std_logic;
     rhs_ready: out std_logic
