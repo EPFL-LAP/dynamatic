@@ -302,7 +302,6 @@ def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
   IsFloatSizedChannel<32, "result">
 ]> {
   let summary = "Floating-point maximum.";
-  let hasVerifier = 1
 }
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
