@@ -112,7 +112,7 @@ def main():
     generate_code = generators[args.type]
 
     with open(args.output, "w") as file:
-        print(header + generate_code(args.name, args.type, parameters), file=file)
+        print(header + generate_code(args.name, parameters), file=file)
 
 
 if __name__ == "__main__":
