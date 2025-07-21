@@ -31,8 +31,7 @@ namespace dynamatic::experimental {
 // 3. At a certain point, and from then on, all input buffer pair store the same
 // number of tokens.
 static std::string createMiterProperties(const std::string &moduleName,
-                                         const ElasticMiterConfig &config,
-                                         size_t nrOfTokens) {
+                                         const ElasticMiterConfig &config) {
   std::ostringstream properties;
 
   // Create the property that every output data token will be TRUE. The outputs
@@ -58,6 +57,9 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[i, buffers] : llvm::enumerate(config.inputBuffers)) {
+    if (StringRef{config.inputForks[i]}.ends_with("_backedge"))
+      continue;
+
     const auto &[lhsBuffer, rhsBuffer] = buffers;
     if (lhsBuffer == "" && rhsBuffer == "") {
       auto inputFork = config.inputForks[i];
@@ -158,13 +160,20 @@ std::string createElasticMiterTestBench(
 
   wrapper << createSmvFormalTestbench(smvConfig);
   if (includeProperties) {
-    wrapper << createMiterProperties(modelSmvName, config, nrOfTokens);
+    wrapper << createMiterProperties(modelSmvName, config);
 
     if (sequenceConstraints) {
       for (const auto &constraint : *sequenceConstraints) {
         wrapper << constraint->createSmvConstraint(modelSmvName, config);
       }
     }
+  }
+
+  for (const auto &backedge : config.backedges) {
+    wrapper << llvm::formatv("INVAR {0}.backedge_eq_{1}.result_valid -> "
+                             "{0}.backedge_eq_{1}.result;\n",
+                             modelSmvName, backedge)
+                   .str();
   }
   return wrapper.str();
 }

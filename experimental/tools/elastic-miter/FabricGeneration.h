@@ -39,6 +39,7 @@ struct ElasticMiterConfig {
   SmallVector<std::pair<std::string, Type>> arguments;
   SmallVector<std::pair<std::string, Type>> results;
   SmallVector<std::string> eq;
+  SmallVector<std::string> backedges;
   std::string funcName;
   std::string lhsFuncName;
   std::string rhsFuncName;

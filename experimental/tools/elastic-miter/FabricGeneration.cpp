@@ -262,11 +262,15 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
   return success();
 }
 
-llvm::StringMap<Type> getAllInputValuesFromMiterContext(FuncOp contextFunc) {
-  auto endOps = contextFunc.getOps<EndOp>();
+EndOp getUniqueEndOp(FuncOp funcOp) {
+  auto endOps = funcOp.getOps<EndOp>();
   assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
-         "There should be exactly one EndOp in the context function");
-  EndOp endOp = *endOps.begin();
+         "There should be exactly one EndOp in the function");
+  return *endOps.begin();
+}
+
+llvm::StringMap<Type> getAllInputValuesFromMiterContext(FuncOp contextFunc) {
+  EndOp endOp = getUniqueEndOp(contextFunc);
 
   llvm::StringMap<Type> inputValues;
   for (auto [i, result] : llvm::enumerate(endOp.getOperands())) {
@@ -285,6 +289,18 @@ std::optional<BlockArgument> findArg(FuncOp funcOp, StringRef argName) {
     auto strAttr = attr.dyn_cast<StringAttr>();
     if (strAttr && strAttr.getValue() == argName) {
       return funcOp.getArgument(i);
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<Value> findRes(FuncOp funcOp, StringRef resName) {
+  EndOp endOp = getUniqueEndOp(funcOp);
+  for (auto [i, attr] : llvm::enumerate(funcOp.getResNames())) {
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    if (strAttr && strAttr.getValue() == resName) {
+      return endOp.getOperand(i);
     }
   }
 
@@ -363,10 +379,7 @@ std::pair<FuncOp, unsigned> fuseContext(FuncOp contextFuncOp, FuncOp funcOp) {
     oldArg.replaceAllUsesWith(newArg);
   }
 
-  auto endOps = contextFuncOp.getOps<EndOp>();
-  assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
-         "There should be exactly one EndOp in the context function");
-  EndOp endOp = *endOps.begin();
+  EndOp endOp = getUniqueEndOp(contextFuncOp);
 
   for (auto [i, oldArg] : llvm::enumerate(funcOp.getArguments())) {
     auto newResult = endOp->getOperand(i);
@@ -399,61 +412,68 @@ std::pair<FuncOp, unsigned> fuseContext(FuncOp contextFuncOp, FuncOp funcOp) {
   return std::make_pair(newFuncOp, maxBB);
 }
 
-// FuncOp addStartAndEndSignals(FuncOp funcOp) {
-//   OpBuilder builder(funcOp.getContext());
+void handleBackedge(FuncOp funcOp, OpBuilder &builder, Value arg,
+                    Value resValue, StringRef argName, unsigned endBB,
+                    ElasticMiterConfig &config) {
+  auto source = builder.create<SourceOp>(funcOp.getLoc());
+  setHandshakeAttributes(builder, source, 0,
+                         "backedge_source_" + argName.str());
+  auto constant = builder.create<NDConstantOp>(funcOp.getLoc(), arg.getType(),
+                                               source.getResult());
+  setHandshakeAttributes(builder, constant, 0,
+                         "backedge_constant_" + argName.str());
 
-//   llvm::SmallVector<Type> argTypes(funcOp.getArgumentTypes().begin(),
-//                                    funcOp.getArgumentTypes().end());
-//   argTypes.push_back(handshake::ControlType::get(builder.getContext()));
+  auto lazyForkStart =
+      builder.create<ForkOp>(funcOp.getLoc(), constant.getResult(), 2);
+  setHandshakeAttributes(builder, lazyForkStart, 0,
+                         "backedge_lf_start_" + argName.str());
 
-//   llvm::SmallVector<Type> resultTypes(funcOp.getResultTypes().begin(),
-//                                       funcOp.getResultTypes().end());
-//   resultTypes.push_back(handshake::ControlType::get(builder.getContext()));
+  auto sink = builder.create<SinkOp>(funcOp.getLoc(), arg);
+  setHandshakeAttributes(builder, sink, 0,
+                         "backedge_sink_start_" + argName.str());
+  arg.replaceAllUsesExcept(lazyForkStart.getResults()[0], sink);
 
-//   llvm::SmallVector<Attribute> argNames(funcOp.getArgNames().begin(),
-//                                         funcOp.getArgNames().end());
-//   argNames.push_back(builder.getStringAttr("start"));
+  auto lazyForkEnd = builder.create<LazyForkOp>(funcOp.getLoc(), resValue, 2);
+  setHandshakeAttributes(builder, lazyForkEnd, endBB,
+                         "backedge_lf_end_" + argName.str());
+  resValue.replaceAllUsesExcept(lazyForkEnd.getResults()[0], lazyForkEnd);
 
-//   llvm::SmallVector<Attribute> resNames(funcOp.getResNames().begin(),
-//                                         funcOp.getResNames().end());
-//   resNames.push_back(builder.getStringAttr("end"));
+  auto compOp = builder.create<CmpIOp>(funcOp.getLoc(), CmpIPredicate::eq,
+                                       lazyForkStart.getResults()[1],
+                                       lazyForkEnd.getResults()[1]);
+  setHandshakeAttributes(builder, compOp, endBB,
+                         "backedge_eq_" + argName.str());
 
-//   auto [newFuncOp, newBlock] = buildNewFuncWithBlock(
-//       funcOp.getName(), argTypes, resultTypes,
-//       builder.getArrayAttr(argNames), builder.getArrayAttr(resNames));
+  auto sinkOp = builder.create<SinkOp>(funcOp.getLoc(), compOp.getResult());
+  setHandshakeAttributes(builder, sinkOp, endBB,
+                         "backedge_sink_end_" + argName.str());
 
-//   funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
-//   builder.setInsertionPointToStart(newBlock);
+  config.backedges.push_back(argName.str());
+}
 
-//   for (auto [i, arg] : llvm::enumerate(funcOp.getArguments())) {
-//     // Replace the old argument with the new one
-//     arg.replaceAllUsesWith(newFuncOp.getArgument(i));
-//   }
+void setupBackedge(FuncOp funcOp, ElasticMiterConfig &config) {
+  OpBuilder builder(funcOp.getContext());
+  builder.setInsertionPointToStart(&funcOp.getBody().front());
 
-//   auto endOps = funcOp.getOps<EndOp>();
-//   assert(std::distance(endOps.begin(), endOps.end()) == 1 &&
-//          "There should be exactly one EndOp in the original function");
-//   EndOp endOp = *endOps.begin();
+  EndOp endOp = getUniqueEndOp(funcOp);
+  unsigned endBB = getLogicBB(endOp).value();
 
-//   llvm::SmallVector<Value> newEndOpOperands(endOp->getOperands());
-//   newEndOpOperands.push_back(
-//       newFuncOp.getArgument(newFuncOp.getNumArguments() - 1));
+  for (auto [i, argName] : llvm::enumerate(funcOp.getArgNames())) {
+    auto argNameStr = argName.cast<StringAttr>().getValue();
+    if (!argNameStr.ends_with("_backedge"))
+      continue;
 
-//   auto newEndOp = builder.create<EndOp>(funcOp.getLoc(), newEndOpOperands);
-//   inheritBB(endOp, newEndOp);
-//   newEndOp->setAttr(NameAnalysis::ATTR_NAME,
-//                     endOp->getAttrOfType<StringAttr>(NameAnalysis::ATTR_NAME));
-
-//   endOp->erase();
-
-//   for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-//     op.moveBefore(newEndOp);
-//   }
-
-//   funcOp->erase();
-
-//   return newFuncOp;
-// }
+    argNameStr = argNameStr.drop_back(strlen("_backedge"));
+    Value arg = funcOp.getArgument(i);
+    if (auto res = findRes(funcOp, argNameStr)) {
+      handleBackedge(funcOp, builder, arg, res.value(), argNameStr, endBB,
+                     config);
+    } else if (auto res = findRes(funcOp, "EQ_" + argNameStr.str())) {
+      Value resValue = res.value().getDefiningOp<CmpIOp>().getLhs();
+      handleBackedge(funcOp, builder, arg, resValue, argNameStr, endBB, config);
+    }
+  }
+}
 
 // Create the reachability circuit by putting ND wires at all the in- and
 // outputs
@@ -526,17 +546,8 @@ createReachabilityCircuit(MLIRContext &context,
         std::make_pair(strAttr.getValue().str(), arg.getType()));
   }
 
-  size_t endOpCount = std::distance(funcOp.getOps<EndOp>().begin(),
-                                    funcOp.getOps<EndOp>().end());
-
-  if (endOpCount != 1) {
-    llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
-                    "exactly one EndOp.\n";
-    return failure();
-  }
-
-  // GetEndOp, after checking there is only one EndOp
-  EndOp endOp = *funcOp.getOps<EndOp>().begin();
+  EndOp endOp = getUniqueEndOp(funcOp);
+  setBB(endOp, maxBB + 1);
 
   // Create the output side auxillary logic:
   // Every output of the LHS/RHS circuits is connected to a non-derministic
@@ -562,7 +573,7 @@ createReachabilityCircuit(MLIRContext &context,
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
 
-  // funcOp = addStartAndEndSignals(funcOp);
+  setupBackedge(funcOp, config);
 
   return std::make_pair(mod.release(), config);
 }
@@ -775,20 +786,9 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
         std::make_pair(attr.getValue().str(), arg.getType()));
   }
 
-  size_t lhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
-                                       lhsFuncOp.getOps<EndOp>().end());
-  size_t rhsEndOpCount = std::distance(rhsFuncOp.getOps<EndOp>().begin(),
-                                       rhsFuncOp.getOps<EndOp>().end());
-
-  if (lhsEndOpCount != 1 && rhsEndOpCount != 1) {
-    llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
-                    "exactly one EndOp.\n";
-    return failure();
-  }
-
   // Get lhs and rhs EndOp, after checking there is only one EndOp each
-  EndOp lhsEndOp = *lhsFuncOp.getOps<EndOp>().begin();
-  EndOp rhsEndOp = *rhsFuncOp.getOps<EndOp>().begin();
+  EndOp lhsEndOp = getUniqueEndOp(lhsFuncOp);
+  EndOp rhsEndOp = getUniqueEndOp(rhsFuncOp);
 
   // Create the output side auxillary logic:
   // Every output of the LHS/RHS circuits are connected to a non-derministic
@@ -937,6 +937,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   setHandshakeAttributes(builder, newEndOp, bbOut, "end");
 
   newFuncOp = fuseContext(contextFuncOp, newFuncOp).first;
+
+  setupBackedge(newFuncOp, config);
 
   return std::make_pair(miterModule, config);
 }
