@@ -259,7 +259,7 @@ InterfaceMethod<[{
       if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
         return attr;
       return StringAttr::get(op->getContext(), "0.0");
-    }]>
+    }]>,
 
   // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
   InterfaceMethod<[{
@@ -267,7 +267,7 @@ InterfaceMethod<[{
     }], "int64_t", "getLatency", (ins), [{
       Operation *op = $_op.getOperation();
       return op->getAttrOfType<IntegerAttr>("latency");
-    }]>
+    }]>,
 
   InterfaceMethod<[{
   Sets the operation latency.
