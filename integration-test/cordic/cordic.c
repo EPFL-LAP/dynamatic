@@ -3,10 +3,13 @@
 #include <math.h>
 #include <stdlib.h>
 
-float cordic(in_float_t theta, out_float_t a[2], in_float_t cordic_phase[1000],
-             in_float_t current_cos, in_float_t current_sin) {
+float cordic(in_float_t theta, out_float_t results[2], in_float_t cordic_phase[1000],
+             in_float_t initial_cos, in_float_t initial_sin) {
 
   float factor = 1.0;
+
+  float current_cos = initial_cos;
+  float current_sin = initial_sin;
 
   for (int i = 0; i < 1000; i++) {
     float sigma = (theta < 0) ? -1.0 : 1.0;
@@ -18,8 +21,8 @@ float cordic(in_float_t theta, out_float_t a[2], in_float_t cordic_phase[1000],
     theta = theta - sigma * cordic_phase[i];
     factor = factor / 2;
   }
-  a[0] = current_cos;
-  a[1] = current_sin;
+  results[0] = current_cos;
+  results[1] = current_sin;
   return theta;
 }
 
