@@ -206,4 +206,4 @@ reachable states: 32 (2^5) out of 32 (2^5)
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   -------------------------
 ######################################################################
-elapse: 0.01 seconds, total: 0.01 seconds
+elapse: 0.00 seconds, total: 0.00 seconds

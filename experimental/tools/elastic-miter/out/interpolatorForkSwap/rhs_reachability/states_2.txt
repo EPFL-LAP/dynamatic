@@ -8654,4 +8654,4 @@ reachable states: 576 (2^9.16993) out of 4.1943e+06 (2^22)
   interpolatorForkSwap_rhs.interpolator2.interpolate = TRUE
   -------------------------
 ######################################################################
-elapse: 0.13 seconds, total: 0.13 seconds
+elapse: 0.12 seconds, total: 0.12 seconds

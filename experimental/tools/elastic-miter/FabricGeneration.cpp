@@ -992,50 +992,31 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   return std::make_pair(outputDir / mlirFilename, config);
 }
 
-FailureOr<llvm::StringMap<Type>>
-analyzeInputValue(MLIRContext &context, const std::filesystem::path &path) {
-  OwningOpRef<ModuleOp> mod =
-      parseSourceFile<ModuleOp>(path.string(), &context);
-  if (!mod) {
-    llvm::errs() << "Failed to parse the provided MLIR file: " << path << "\n";
+LogicalResult
+generateDefaultMiterContext(MLIRContext &context,
+                            const std::filesystem::path &lhsFile,
+                            const std::filesystem::path &outputFile) {
+  OwningOpRef<ModuleOp> lhsMod =
+      parseSourceFile<ModuleOp>(lhsFile.string(), &context);
+  if (!lhsMod) {
+    llvm::errs() << "Failed to parse the provided MLIR file: " << lhsFile
+                 << "\n";
     return failure();
   }
 
-  auto funcOps = mod.get().getOps<FuncOp>();
-  assert(std::distance(funcOps.begin(), funcOps.end()) == 1 &&
+  auto lhsFuncOps = lhsMod.get().getOps<FuncOp>();
+  assert(std::distance(lhsFuncOps.begin(), lhsFuncOps.end()) == 1 &&
          "Expected a single function");
 
-  FuncOp funcOp = *funcOps.begin();
-  llvm::StringMap<Type> inputValues;
-  auto argNames = funcOp.getArgNames();
-  for (auto [i, blockArg] : llvm::enumerate(funcOp.getArguments())) {
-    inputValues.insert(
-        {argNames[i].cast<StringAttr>().getValue(), blockArg.getType()});
-  }
+  FuncOp lhsFuncOp = *lhsFuncOps.begin();
 
-  return inputValues;
-}
-
-LogicalResult
-generateDefaultMiterContext(MLIRContext &context,
-                            const llvm::StringMap<mlir::Type> &allInputValues,
-                            const std::filesystem::path &outputFile) {
   OpBuilder builder(&context);
   ModuleOp module = ModuleOp::create(builder.getUnknownLoc());
 
   // Create a new function with the input values as arguments
-  SmallVector<Attribute> argNames;
-  SmallVector<Type> argTypes;
-
-  for (const auto &pair : allInputValues) {
-    argNames.push_back(builder.getStringAttr(pair.first()));
-    argTypes.push_back(pair.second);
-  }
-
-  auto argAttr = builder.getArrayAttr(argNames);
-  auto resAttr = builder.getArrayAttr(argNames);
-  auto [funcOp, entryBlock] =
-      buildNewFuncWithBlock("context", argTypes, argTypes, argAttr, resAttr);
+  auto [funcOp, entryBlock] = buildNewFuncWithBlock(
+      "context", lhsFuncOp.getArgumentTypes(), lhsFuncOp.getArgumentTypes(),
+      lhsFuncOp.getArgNames(), lhsFuncOp.getArgNames());
   module.push_back(funcOp);
 
   builder.setInsertionPointToStart(entryBlock);

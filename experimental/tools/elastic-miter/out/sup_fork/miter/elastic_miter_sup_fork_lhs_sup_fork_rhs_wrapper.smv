@@ -1,12 +1,12 @@
 #include "handshake_buffer_1.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_lazy_fork_1.smv"
 #include "handshake_cmpi_0.smv"
 #include "handshake_buffer_0.smv"
 #include "handshake_fork_0.smv"
 #include "handshake_ndwire_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_lazy_fork_1.smv"
 #include "handshake_blocker_0.smv"
 
 

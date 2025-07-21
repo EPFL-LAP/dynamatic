@@ -1,13 +1,13 @@
-#include "handshake_ndsource_0.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_lazy_fork_0.smv"
-#include "handshake_blocker_0.smv"
+#include "handshake_ndsource_0.smv"
 #include "handshake_lazy_fork_1.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
 #include "handshake_buffer_1.smv"
 #include "handshake_andi_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_buffer_0.smv"
+#include "handshake_blocker_0.smv"
 
 
 MODULE elastic_miter_unify_sup_lhs_unify_sup_rhs_wrapper (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, EQ_B_out_ready)

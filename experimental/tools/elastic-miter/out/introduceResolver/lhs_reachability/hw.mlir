@@ -14,10 +14,12 @@ module {
     %ctx_fork_cs.outs_0, %ctx_fork_cs.outs_1 = hw.instance "ctx_fork_cs" @handshake_fork_0(ins: %ndw_in_confirmSpec_backedge.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %ctx_passer.result = hw.instance "ctx_passer" @handshake_passer_0(data: %ctx_fork.outs_0: !handshake.channel<i1>, ctrl: %ctx_fork_cs.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     %ndspec.outs = hw.instance "ndspec" @handshake_spec_v2_nd_speculator_0(ins: %ctx_passer.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %ctx_ri.outs = hw.instance "ctx_ri" @handshake_spec_v2_repeating_init_0(ins: %ndspec.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %ctx_buffer.outs = hw.instance "ctx_buffer" @handshake_buffer_0(ins: %ctx_ri.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %passer.result = hw.instance "passer" @handshake_passer_0(data: %ctx_fork.outs_1: !handshake.channel<i1>, ctrl: %ctx_fork_cs.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     %ri.outs = hw.instance "ri" @handshake_spec_v2_repeating_init_0(ins: %passer.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %buffer.outs = hw.instance "buffer" @handshake_buffer_0(ins: %ri.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
-    %interpolate.result = hw.instance "interpolate" @handshake_spec_v2_interpolator_0(short: %buffer.outs: !handshake.channel<i1>, long: %ndspec.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
+    %interpolate.result = hw.instance "interpolate" @handshake_spec_v2_interpolator_0(short: %buffer.outs: !handshake.channel<i1>, long: %ctx_buffer.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     hw.output %backedge_lf_end_confirmSpec.outs_0 : !handshake.channel<i1>
   }
   hw.module.extern @handshake_source_0(in %clk : i1, in %rst : i1, out outs : !handshake.control<>) attributes {hw.name = "handshake.source", hw.parameters = {}}

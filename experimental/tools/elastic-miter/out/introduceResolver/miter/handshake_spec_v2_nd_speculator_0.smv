@@ -4,9 +4,9 @@
 MODULE handshake_spec_v2_nd_speculator_0(ins, ins_valid, outs_ready)
   VAR interpolate : boolean;
   ASSIGN
-  init(interpolate) := TRUE;
+  init(interpolate) := {TRUE, FALSE};
   next(interpolate) := case
-    transfer : !interpolate;
+    transfer : {TRUE, FALSE};
     TRUE : interpolate;
   esac;
   DEFINE

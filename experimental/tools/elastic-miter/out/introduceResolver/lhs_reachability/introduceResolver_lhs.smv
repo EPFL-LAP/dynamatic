@@ -1,15 +1,15 @@
-#include "handshake_ndwire_0.smv"
-#include "handshake_source_0.smv"
 #include "handshake_ndconstant_0.smv"
-#include "handshake_spec_v2_repeating_init_0.smv"
-#include "handshake_spec_v2_interpolator_0.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_lazy_fork_0.smv"
-#include "handshake_spec_v2_nd_speculator_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_sink_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
 
 
 MODULE introduceResolver_lhs (loopContinue, loopContinue_valid, confirmSpec_backedge, confirmSpec_backedge_valid, confirmSpec_ready)
@@ -40,10 +40,12 @@ VAR ndw_out_confirmSpec : handshake_ndwire_0(interpolate.result, interpolate.res
 VAR ctx_fork : handshake_fork_0(ndw_in_loopContinue.outs, ndw_in_loopContinue.outs_valid, ctx_passer.data_ready, passer.data_ready);
 VAR ctx_fork_cs : handshake_fork_0(ndw_in_confirmSpec_backedge.outs, ndw_in_confirmSpec_backedge.outs_valid, ctx_passer.ctrl_ready, passer.ctrl_ready);
 VAR ctx_passer : handshake_passer_0(ctx_fork.outs_0, ctx_fork.outs_0_valid, ctx_fork_cs.outs_0, ctx_fork_cs.outs_0_valid, ndspec.ins_ready);
-VAR ndspec : handshake_spec_v2_nd_speculator_0(ctx_passer.result, ctx_passer.result_valid, interpolate.long_ready);
+VAR ndspec : handshake_spec_v2_nd_speculator_0(ctx_passer.result, ctx_passer.result_valid, ctx_ri.ins_ready);
+VAR ctx_ri : handshake_spec_v2_repeating_init_0(ndspec.outs, ndspec.outs_valid, ctx_buffer.ins_ready);
+VAR ctx_buffer : handshake_buffer_0(ctx_ri.outs, ctx_ri.outs_valid, interpolate.long_ready);
 VAR passer : handshake_passer_0(ctx_fork.outs_1, ctx_fork.outs_1_valid, ctx_fork_cs.outs_1, ctx_fork_cs.outs_1_valid, ri.ins_ready);
 VAR ri : handshake_spec_v2_repeating_init_0(passer.result, passer.result_valid, buffer.ins_ready);
 VAR buffer : handshake_buffer_0(ri.outs, ri.outs_valid, interpolate.short_ready);
-VAR interpolate : handshake_spec_v2_interpolator_0(buffer.outs, buffer.outs_valid, ndspec.outs, ndspec.outs_valid, ndw_out_confirmSpec.ins_ready);
+VAR interpolate : handshake_spec_v2_interpolator_0(buffer.outs, buffer.outs_valid, ctx_buffer.outs, ctx_buffer.outs_valid, ndw_out_confirmSpec.ins_ready);
 
 -- properties

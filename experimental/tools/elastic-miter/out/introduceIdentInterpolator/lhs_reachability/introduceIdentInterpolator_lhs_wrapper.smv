@@ -1,5 +1,5 @@
-#include "handshake_passer_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_passer_0.smv"
 
 
 MODULE introduceIdentInterpolator_lhs_wrapper (val, val_valid, A_in, A_in_valid, B_out_ready)

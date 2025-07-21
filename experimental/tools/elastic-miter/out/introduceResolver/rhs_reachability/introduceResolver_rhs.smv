@@ -1,13 +1,15 @@
-#include "handshake_spec_v2_nd_speculator_0.smv"
-#include "handshake_spec_v2_resolver_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_sink_0.smv"
-#include "handshake_ndconstant_0.smv"
-#include "handshake_ndwire_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_source_0.smv"
+#include "handshake_ndconstant_0.smv"
+#include "handshake_spec_v2_resolver_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_sink_0.smv"
 
 
 MODULE introduceResolver_rhs (loopContinue, loopContinue_valid, confirmSpec_backedge, confirmSpec_backedge_valid, confirmSpec_ready)
@@ -38,8 +40,10 @@ VAR ndw_out_confirmSpec : handshake_ndwire_0(resolver.confirmSpec, resolver.conf
 VAR ctx_fork : handshake_fork_0(ndw_in_loopContinue.outs, ndw_in_loopContinue.outs_valid, ctx_passer.data_ready, resolver.actualCondition_ready);
 VAR ctx_fork_cs : handshake_fork_0(ndw_in_confirmSpec_backedge.outs, ndw_in_confirmSpec_backedge.outs_valid, ctx_passer.ctrl_ready, vm_sink_2.ins_ready);
 VAR ctx_passer : handshake_passer_0(ctx_fork.outs_0, ctx_fork.outs_0_valid, ctx_fork_cs.outs_0, ctx_fork_cs.outs_0_valid, ndspec.ins_ready);
-VAR ndspec : handshake_spec_v2_nd_speculator_0(ctx_passer.result, ctx_passer.result_valid, resolver.generatedCondition_ready);
+VAR ndspec : handshake_spec_v2_nd_speculator_0(ctx_passer.result, ctx_passer.result_valid, ctx_ri.ins_ready);
+VAR ctx_ri : handshake_spec_v2_repeating_init_0(ndspec.outs, ndspec.outs_valid, ctx_buffer.ins_ready);
+VAR ctx_buffer : handshake_buffer_0(ctx_ri.outs, ctx_ri.outs_valid, resolver.generatedCondition_ready);
 VAR vm_sink_2 : handshake_sink_0(ctx_fork_cs.outs_1, ctx_fork_cs.outs_1_valid);
-VAR resolver : handshake_spec_v2_resolver_0(ctx_fork.outs_1, ctx_fork.outs_1_valid, ndspec.outs, ndspec.outs_valid, ndw_out_confirmSpec.ins_ready);
+VAR resolver : handshake_spec_v2_resolver_0(ctx_fork.outs_1, ctx_fork.outs_1_valid, ctx_buffer.outs, ctx_buffer.outs_valid, ndw_out_confirmSpec.ins_ready);
 
 -- properties

@@ -1,6 +1,6 @@
+#include "handshake_ndwire_0.smv"
 #include "handshake_fork_0.smv"
 #include "handshake_andi_0.smv"
-#include "handshake_ndwire_0.smv"
 
 
 MODULE andForkSwap_lhs_wrapper (in1, in1_valid, in2, in2_valid, out1_ready, out2_ready)

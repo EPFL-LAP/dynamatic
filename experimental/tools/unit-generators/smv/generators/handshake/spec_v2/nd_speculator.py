@@ -3,9 +3,9 @@ def generate_spec_v2_nd_speculator(name, _):
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR interpolate : boolean;
   ASSIGN
-  init(interpolate) := TRUE;
+  init(interpolate) := {{TRUE, FALSE}};
   next(interpolate) := case
-    transfer : !interpolate;
+    transfer : {{TRUE, FALSE}};
     TRUE : interpolate;
   esac;
   DEFINE

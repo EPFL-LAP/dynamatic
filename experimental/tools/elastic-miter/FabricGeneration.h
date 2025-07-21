@@ -106,12 +106,9 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   bool ndSpece, bool allowNonacceptance, bool disableNDWire,
                   bool disableDecoupling);
 
-FailureOr<llvm::StringMap<Type>>
-analyzeInputValue(MLIRContext &context, const std::filesystem::path &path);
-
 LogicalResult
 generateDefaultMiterContext(MLIRContext &context,
-                            const llvm::StringMap<mlir::Type> &allInputValues,
+                            const std::filesystem::path &lhsFile,
                             const std::filesystem::path &outputFile);
 
 // TODO: MaterializationUtil

@@ -200,35 +200,10 @@ static FailureOr<bool> checkEquivalence(
     const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
         &constraints) {
 
-  auto lhsInputValuesOrFailure = analyzeInputValue(context, lhsPath);
-  auto rhsInputValuesOrFailure = analyzeInputValue(context, rhsPath);
-
-  if (failed(lhsInputValuesOrFailure) || failed(rhsInputValuesOrFailure)) {
-    llvm::errs() << "Failed to analyze input values.\n";
-    return failure();
-  }
-
-  llvm::StringMap<mlir::Type> allInputValues;
-  for (const auto &pair : lhsInputValuesOrFailure.value()) {
-    allInputValues.insert({pair.first(), pair.second});
-  }
-  for (const auto &pair : rhsInputValuesOrFailure.value()) {
-    if (allInputValues.contains(pair.first())) {
-      if (allInputValues[pair.first()] != pair.second) {
-        llvm::errs() << "Input value '" << pair.first()
-                     << "' has different types in LHS and RHS.\n";
-        return failure();
-      }
-    } else {
-      allInputValues.insert({pair.first(), pair.second});
-    }
-  }
-
   std::filesystem::path contextFilePath = outputDir / "context.mlir";
   if (customContextPath.empty()) {
     // Create a default context if no custom context is provided
-    if (failed(generateDefaultMiterContext(context, allInputValues,
-                                           contextFilePath)))
+    if (failed(generateDefaultMiterContext(context, lhsPath, contextFilePath)))
       return failure();
   } else {
     // Copy the custom context file to the output directory

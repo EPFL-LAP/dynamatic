@@ -6670,4 +6670,4 @@ reachable states: 512 (2^9) out of 1.67772e+07 (2^24)
   unify_sup_lhs.vm_fork_2.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.14 seconds, total: 0.14 seconds
+elapse: 0.15 seconds, total: 0.15 seconds

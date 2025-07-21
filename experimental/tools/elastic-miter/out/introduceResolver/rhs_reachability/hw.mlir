@@ -14,8 +14,10 @@ module {
     %ctx_fork_cs.outs_0, %ctx_fork_cs.outs_1 = hw.instance "ctx_fork_cs" @handshake_fork_0(ins: %ndw_in_confirmSpec_backedge.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %ctx_passer.result = hw.instance "ctx_passer" @handshake_passer_0(data: %ctx_fork.outs_0: !handshake.channel<i1>, ctrl: %ctx_fork_cs.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     %ndspec.outs = hw.instance "ndspec" @handshake_spec_v2_nd_speculator_0(ins: %ctx_passer.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %ctx_ri.outs = hw.instance "ctx_ri" @handshake_spec_v2_repeating_init_0(ins: %ndspec.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %ctx_buffer.outs = hw.instance "ctx_buffer" @handshake_buffer_0(ins: %ctx_ri.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     hw.instance "vm_sink_2" @handshake_sink_0(ins: %ctx_fork_cs.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> ()
-    %resolver.confirmSpec = hw.instance "resolver" @handshake_spec_v2_resolver_0(actualCondition: %ctx_fork.outs_1: !handshake.channel<i1>, generatedCondition: %ndspec.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (confirmSpec: !handshake.channel<i1>)
+    %resolver.confirmSpec = hw.instance "resolver" @handshake_spec_v2_resolver_0(actualCondition: %ctx_fork.outs_1: !handshake.channel<i1>, generatedCondition: %ctx_buffer.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (confirmSpec: !handshake.channel<i1>)
     hw.output %backedge_lf_end_confirmSpec.outs_0 : !handshake.channel<i1>
   }
   hw.module.extern @handshake_source_0(in %clk : i1, in %rst : i1, out outs : !handshake.control<>) attributes {hw.name = "handshake.source", hw.parameters = {}}
@@ -27,6 +29,8 @@ module {
   hw.module.extern @handshake_ndwire_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.ndwire", hw.parameters = {DATA_TYPE = !handshake.channel<i1>}}
   hw.module.extern @handshake_passer_0(in %data : !handshake.channel<i1>, in %ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.passer", hw.parameters = {}}
   hw.module.extern @handshake_spec_v2_nd_speculator_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.spec_v2_nd_speculator", hw.parameters = {}}
+  hw.module.extern @handshake_spec_v2_repeating_init_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.spec_v2_repeating_init", hw.parameters = {INIT_TOKEN = 1 : ui32}}
+  hw.module.extern @handshake_buffer_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.buffer", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_NONE", DATA_TYPE = !handshake.channel<i1>, NUM_SLOTS = 1 : ui32}}
   hw.module.extern @handshake_spec_v2_resolver_0(in %actualCondition : !handshake.channel<i1>, in %generatedCondition : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out confirmSpec : !handshake.channel<i1>) attributes {hw.name = "handshake.spec_v2_resolver", hw.parameters = {}}
   hw.module @introduceResolver_rhs_wrapper(in %loopContinue : !handshake.channel<i1>, in %confirmSpec_backedge : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out confirmSpec : !handshake.channel<i1>) {
     %introduceResolver_rhs_wrapped.confirmSpec = hw.instance "introduceResolver_rhs_wrapped" @introduceResolver_rhs(loopContinue: %loopContinue: !handshake.channel<i1>, confirmSpec_backedge: %confirmSpec_backedge: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (confirmSpec: !handshake.channel<i1>)
