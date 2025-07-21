@@ -102,7 +102,7 @@ static bool isNDWire(StringRef line, StringRef modelName) {
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = FALSE
 // State 4:
-//   seq_generator_C.dataOut0 = FALSE
+//   seq_generator_C.outs = FALSE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = FALSE
 // Here State 1 and 2 are equivalent, since they only differ in the NDWire
