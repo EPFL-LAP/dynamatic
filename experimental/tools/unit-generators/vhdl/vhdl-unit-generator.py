@@ -23,8 +23,8 @@ import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.ori as ori
 import generators.handshake.xori as xori
+import generators.handshake.logical_not as logical_not
 import generators.handshake.select as select
-import generators.handshake.shrsi as shrsi
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
@@ -39,6 +39,7 @@ import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
+import generators.handshake.shrsi as shrsi
 import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
@@ -90,6 +91,8 @@ def generate_code(name, mod_type, parameters):
             return ori.generate_ori(name, parameters)
         case "xori":
             return xori.generate_xori(name, parameters)
+        case "not":
+            return logical_not.generate_not(name, parameters)
         case "select":
             return select.generate_select(name, parameters)
         case "sink":
