@@ -28,7 +28,7 @@ void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000]
   }
 }
 
-float main(void) {
+int main(void) {
   in_float_t a_i[1000];
   in_float_t a_r[1000];
   in_float_t b_i[1000];
