@@ -67,6 +67,11 @@ static cl::opt<bool>
                       cl::desc("Disables decoupling in the miter fabric"),
                       cl::init(false), cl::cat(generalCategory));
 
+static cl::opt<bool>
+    infiniteTokens("infinite_tokens",
+                   cl::desc("Enables infinite tokens in the miter fabric"),
+                   cl::init(false), cl::cat(generalCategory));
+
 // Specify a Sequence Length Relation constraint.
 // Can be used multiple times. E.g.: --seq_length="0+1=2" --seq_length="1<2"
 // It controls the relative length of the input sequences.
@@ -190,7 +195,7 @@ parseSequenceConstraints() {
 
 static FailureOr<bool> checkEquivalence(
     MLIRContext &context, const std::filesystem::path &lhsPath,
-    const std::filesystem::path &rhsPath, const std::string customContextPath,
+    const std::filesystem::path &rhsPath, const std::string &customContextPath,
     const std::filesystem::path &outputDir,
     const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
         &constraints) {
@@ -230,20 +235,21 @@ static FailureOr<bool> checkEquivalence(
     std::filesystem::copy(customContextPath, contextFilePath);
   }
 
-  // Find out needed number of tokens for the LHS
-  auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "lhs_reachability", lhsPath, contextFilePath);
-  if (failed(failOrLHSseqLen))
-    return failure();
+  size_t nrOfTokens = 0;
+  if (!infiniteTokens) {
+    // Find out needed number of tokens for the LHS
+    auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
+        context, outputDir / "lhs_reachability", lhsPath, contextFilePath);
+    if (failed(failOrLHSseqLen))
+      return failure();
 
-  // Find out needed number of tokens for the RHS
-  auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "rhs_reachability", rhsPath, contextFilePath);
-  if (failed(failOrRHSseqLen))
-    return failure();
-
-  size_t nrOfTokens =
-      std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
+    // Find out needed number of tokens for the RHS
+    auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
+        context, outputDir / "rhs_reachability", rhsPath, contextFilePath);
+    if (failed(failOrRHSseqLen))
+      return failure();
+    nrOfTokens = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
+  }
 
   std::filesystem::path miterDir = outputDir / "miter";
   // Create the miterDir if it doesn't exist
