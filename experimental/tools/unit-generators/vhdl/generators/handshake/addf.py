@@ -161,8 +161,3 @@ def _generate_addf_signal_manager(name, bitwidth, internal_delay, latency, extra
         extra_signals,
         lambda name: _generate_addf(name, bitwidth, internal_delay, latency),
         latency)
-
-"""
-
-
-"""

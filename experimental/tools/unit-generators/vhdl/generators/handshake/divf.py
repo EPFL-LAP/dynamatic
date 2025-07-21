@@ -163,8 +163,3 @@ def _generate_divf_signal_manager(name, bitwidth, internal_delay, latency, extra
         extra_signals,
         lambda name: _generate_divf(name, bitwidth, internal_delay, latency),
         latency)
-
-"""
-
-
-"""
