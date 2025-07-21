@@ -66,10 +66,14 @@ begin
       index := 0;
       file_open(file_status, file_ptr, TV_IN, READ_MODE);
 
-      if (not file_is_open(file_ptr)) then
-        report "ERROR: File not found: " & TV_IN severity failure;
-      elsif (file_status /= OPEN_OK) then
-        report "ERROR: Could not open file (status error): " & TV_IN severity failure;
+      if file_status = NAME_ERROR then
+        report "ERROR: File not found: " & TV_OUT severity failure;
+      elsif file_status = STATUS_ERROR then
+        report "ERROR: File already open: " & TV_OUT severity failure;
+      elsif file_status = MODE_ERROR then
+        report "ERROR: File mode error: " & TV_OUT severity failure;
+      elsif file_status /= OPEN_OK then
+        report "ERROR: Unknown file open error: " & TV_OUT severity failure;
       end if;
 
       -- Use read_token procedure to read tokens from the file
