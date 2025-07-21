@@ -263,11 +263,12 @@ InterfaceMethod<[{
 
   // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
   InterfaceMethod<[{
-      Gets the operation latency as an integer.
-    }], "int64_t", "getLatency", (ins), [{
-      Operation *op = $_op.getOperation();
-      return op->getAttrOfType<IntegerAttr>("latency");
-    }]>,
+    Gets the operation latency as an integer.
+  }], "int64_t", "getLatency", (ins), [{
+    auto attr = $_op->getAttrOfType<mlir::IntegerAttr>("latency");
+    assert(attr && "Missing 'latency' attribute");
+    return attr.getInt();
+  }]>
 
   InterfaceMethod<[{
   Sets the operation latency.
