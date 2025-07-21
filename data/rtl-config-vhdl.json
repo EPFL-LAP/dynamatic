@@ -84,14 +84,10 @@
   },
   {
     "name": "handshake.divf",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string", "generic": false},
-      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/divf.vhd",
-    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divf -p is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "flopoco_ip_cores"
+    ]
   },
   {
     "name": "handshake.divf",
@@ -261,7 +257,11 @@
   },
   {
     "name": "handshake.truncf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t truncf -p extra_signals=$EXTRA_SIGNALS"
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/truncf.vhd"
   },
   {
     "name": "handshake.xori",
