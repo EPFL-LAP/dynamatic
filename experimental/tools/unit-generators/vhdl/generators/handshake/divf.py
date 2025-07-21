@@ -55,7 +55,8 @@ entity {name} is
 end entity;
 """
 
-    clock_enables = f"ce_1 => oehb_ready," + "\n".join(
+    clock_enables = "\n".join(
+        [f"ce_1 => oehb_ready,"] +
         [f"        ce_{i} => oehb_ready," for i in range(2, latency)]
     )
 
