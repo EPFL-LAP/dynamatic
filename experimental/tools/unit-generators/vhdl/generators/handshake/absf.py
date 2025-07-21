@@ -38,8 +38,8 @@ end entity;
 -- Architecture of absf
 architecture arch of {name} is
 begin
-  outs(DATA_TYPE - 1)          <= '0';
-  outs(DATA_TYPE - 2 downto 0) <= ins({bitwidth} - 2 downto 0);
+  outs({bitwidth} - 1)          <= '0';
+  outs({bitwidth} - 2 downto 0) <= ins({bitwidth} - 2 downto 0);
   outs_valid                  <= ins_valid;
   ins_ready                   <= outs_ready;
 end architecture;

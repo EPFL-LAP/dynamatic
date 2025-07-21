@@ -201,7 +201,7 @@ begin
       ins_valid  => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready  => oehb_ready,
+      ins_ready  => oehb_ready
     );
 
   buff : entity work.{buff_name}(arch)
