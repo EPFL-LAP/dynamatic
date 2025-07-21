@@ -46,7 +46,7 @@
     "parameters": [
       {
         "name": "LATENCY",
-        "type": "int"
+        "type": "unsigned"
       },
       {
         "name": "INTERNAL_DELAY",
