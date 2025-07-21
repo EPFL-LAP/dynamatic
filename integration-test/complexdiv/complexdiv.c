@@ -4,7 +4,7 @@
 
 void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000],
                 in_float_t b_r[1000], out_float_t c_i[1000], out_float_t c_r[1000]) {
-  float i;
+  int i;
 
   for (i = 0; i < 1000; i++) {
     float bi = b_i[i];
