@@ -76,6 +76,14 @@
     ]
   },
   {
+    "name": "handshake.maximumf",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p extra_signals=$EXTRA_SIGNALS"
+  },
+  {
+    "name": "handshake.minimumf",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.muli",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },

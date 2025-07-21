@@ -269,11 +269,20 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
   let summary = "Floating-point division.";
 }
 
-def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"> {
+def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"> [
+  IsIntSizedChannel<"lhs", 32>,
+  IsIntSizedChannel<"rhs", 32>,
+  IsIntSizedChannel<"result", 32>
+  ]{
   let summary = "Signed integer division.";
 }
 
-def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> {
+def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> [
+  IsIntSizedChannel<"lhs", 32>,
+  IsIntSizedChannel<"rhs", 32>,
+  IsIntSizedChannel<"result", 32>
+]
+{
   let summary = "Unsigned integer division.";
 }
 
@@ -287,13 +296,20 @@ def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
-  Commutative
+  Commutative,
+  IsFloatSizedChannel<lhs, 32>,
+  IsFloatSizedChannel<rhs, 32>,
+  IsFloatSizedChannel<result, 32>
 ]> {
   let summary = "Floating-point maximum.";
+  let hasVerifier = 1
 }
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
-  Commutative
+  Commutative,
+  IsFloatSizedChannel<lhs, 32>,
+  IsFloatSizedChannel<rhs, 32>,
+  IsFloatSizedChannel<result, 32>
 ]> {
   let summary = "Floating-point minimum.";
 }
@@ -364,10 +380,12 @@ def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
   let hasCanonicalizer = 1;
 }
 
-def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf"> {
+def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf"> [
+  IsFloatSizedChannel<64, "in">,
+  IsFloatSizedChannel<32, "out">
+]{
   let summary = "Floating-point truncation.";
   // TODO: add canonicalizer
-  let hasVerifier = 1;
 }
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
@@ -382,10 +400,12 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
   let summary = "Converts a float to signed integer.";
 }
 
-def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> {
+def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> [
+  IsFloatSizedChannel<32, "in">,
+  IsFloatSizedChannel<64, "out">,
+]{
   let summary = "Floating point extension.";
   // TODO: add canonicalizer
-  let hasVerifier = 1;
 }
 
 def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {

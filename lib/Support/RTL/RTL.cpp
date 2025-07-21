@@ -310,7 +310,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.absf" || modname == "handshake.divui" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
-      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.spec_save_commit"
       modName == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
@@ -364,9 +364,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
              modName == "handshake.mulf" || modName == "handshake.subf" ||
-             modName == "handshake.divf" || modName == "handshake.negf" ||
-             modName == "handshake.maximumf" ||
-             modName == "handshake.minimumf") {
+             modName == "handshake.divf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.valid_merger") {
@@ -375,7 +373,8 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["RIGHT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.source" || modName == "mem_controller" ||
-             modName == "handshake.truncf" || modName == "handshake.extf") {
+             modName == "handshake.truncf" || modName == "handshake.extf" ||
+             modName == "handshake.maximumf" || modName == "handshake.minimumf") {
     // Skip
   } else{
     modOp->emitError("Failed to get bitwidth of operation");
@@ -432,6 +431,7 @@ LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modO
       modName == "handshake.negf" || modName == "handshake.truncf" ||
       modName == "handshake.divsi" || modName == "handshake.absf" ||
       modName == "handshake.divui" || modName == "handshake.extf" ||
+      modName == "handshake.maximumf" || modeName == "handshake.minimumf"
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

@@ -22,6 +22,8 @@ import generators.handshake.extf as extf
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.load as load
+import generators.handshake.maximumf as maximumf
+import generators.handshake.minimumf as minimumf
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
 import generators.handshake.mulf as mulf
@@ -93,6 +95,10 @@ def generate_code(name, mod_type, parameters):
             return lazy_fork.generate_lazy_fork(name, parameters)
         case "load":
             return load.generate_load(name, parameters)
+        case "maximumf":
+            return maximumf.generate_maximumf(name, parameters)
+        case "minimumf":
+            return minimumf.minimumf(name, parameters)
         case "mem_controller":
             return mem_controller.generate_mem_controller(name, parameters)
         case "merge":
