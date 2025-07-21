@@ -17,6 +17,8 @@ import generators.handshake.divui as divui
 import generators.handshake.divsi as divsi
 import generators.handshake.negf as negf
 import generators.handshake.extsi as extsi
+import generators.handshake.extui as extui
+import generators.handshake.extf as extf
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.load as load
@@ -42,7 +44,6 @@ import generators.handshake.speculation.speculating_branch as speculating_branch
 import generators.handshake.speculation.speculator as speculator
 import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
-import generators.handshake.extui as extui
 import generators.handshake.shli as shli
 import generators.handshake.shrsi as shrsi
 import generators.handshake.blocker as blocker
@@ -84,6 +85,8 @@ def generate_code(name, mod_type, parameters):
             return negf.generate_negf(name, parameters)
         case "extsi":
             return extsi.generate_extsi(name, parameters)
+        case "extf":
+            return extf.generate_extf(name, parameters)
         case "fork":
             return fork.generate_fork(name, parameters)
         case "lazy_fork":

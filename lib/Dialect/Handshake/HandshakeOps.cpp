@@ -2028,7 +2028,22 @@ LogicalResult TruncFOp::verify() {
 //===----------------------------------------------------------------------===//
 // ExtFOp
 //===----------------------------------------------------------------------===//
-LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
+LogicalResult ExtFOp::verify() {
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
+
+  if (srcType.getDataBitWidth() != 32) {
+    return emitError() << "input channel's data type "
+                          << srcType.getDataType()
+                          << " must be 32 bits";
+  }
+  if (srcType.getDataBitWidth() != 64) {
+    return emitError() << "output channel's data type "
+                          << dstType.getDataType()
+                          << " must be 64 bits";
+  }
+  return success();
+}
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"

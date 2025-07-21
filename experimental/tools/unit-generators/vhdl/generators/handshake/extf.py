@@ -1,40 +1,39 @@
 from generators.support.signal_manager import generate_default_signal_manager
 
 
-def generate_truncf(name, params):
+def generate_extf(name, params):
     extra_signals = params.get("extra_signals", None)
 
     if extra_signals:
-        return _generate_truncf_signal_manager(name, extra_signals)
+        return _generate_extf_signal_manager(name, extra_signals)
     else:
-        return _generate_truncf(name)
+        return _generate_extf(name)
 
-def _generate_double_to_single(name):
+def _generate_single_to_double(name):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.float_pkg.all;
 
--- Entity of double_to_single
+-- Entity of single_to_double
 entity {name} is
   port (
-    ins  : in std_logic_vector(64 - 1 downto 0);
-    outs : out std_logic_vector(32 - 1 downto 0)
+    ins  : in std_logic_vector(32 -1 downto 0);
+    outs : out std_logic_vector(64 - 1 downto 0)
   );
 end entity;
-
 """
     architecture = f"""
--- Architecture of double_to_single
-architecture arch of {name} is
-  signal float_value : float64;
-  signal float_truncated : float32;
 
+-- Architecture of single_to_double
+architecture arch of {name} is
+  signal float_value : float32;
+  signal float_extended : float64;
 begin
-  float_value <= to_float(ins, 11, 52);
-  float_truncated <= to_float32(float_value);
-  outs <= to_std_logic_vector(float_truncated);
+  float_value <= to_float(ins);
+  float_extended <= to_float64(float_value);
+  outs <= to_std_logic_vector(float_extended);
 end architecture;
 
 """
@@ -43,25 +42,25 @@ end architecture;
 
 
 
-def _generate_truncf(name):
-    double_to_single_name = f"{name}_double_to_single"
+def _generate_extf(name):
+    single_to_double_name = f"{name}_single_to_double"
 
-    dependencies = _generate_double_to_single(double_to_single_name)
+    dependencies = _generate_single_to_double(single_to_double_name)
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of truncf
+-- Entity of extf
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector(64 - 1 downto 0);
+    ins       : in  std_logic_vector(32 - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector(32 - 1 downto 0);
+    outs       : out std_logic_vector(64 - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
@@ -70,10 +69,10 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of truncf
-architecture arch of {name} is
+-- Architecture of extf
+architecture arch of extf is
 begin
-  converter: entity work.{double_to_single_name}(arch)
+  converter: entity work.{single_to_double_name}(arch)
     port map (
       ins => ins,
       outs => outs
@@ -87,7 +86,7 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_truncf_signal_manager(name, extra_signals):
+def _generate_extf_signal_manager(name, extra_signals):
     return generate_default_signal_manager(
         name,
         [{
@@ -101,4 +100,4 @@ def _generate_truncf_signal_manager(name, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_truncf(name))
+        lambda name: _generate_extf(name))

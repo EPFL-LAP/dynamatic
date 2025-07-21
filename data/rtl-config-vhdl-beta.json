@@ -65,6 +65,10 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extsi -p input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.extf",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extf -p extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.mulf",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
     "dependencies": [

@@ -375,7 +375,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["RIGHT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.source" || modName == "mem_controller" ||
-             modName == "handshake.truncf") {
+             modName == "handshake.truncf" || modName == "handshake.extf") {
     // Skip
   } else{
     modOp->emitError("Failed to get bitwidth of operation");
@@ -431,7 +431,7 @@ LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modO
       modName == "handshake.shrsi" || modName == "handshake.xori" ||
       modName == "handshake.negf" || modName == "handshake.truncf" ||
       modName == "handshake.divsi" || modName == "handshake.absf" ||
-      modName == "handshake.divui" ||
+      modName == "handshake.divui" || modName == "handshake.extf" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
