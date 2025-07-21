@@ -1,6 +1,6 @@
 #include "complexdiv.h"
 #include "dynamatic/Integration.h"
-#include <stdlib.h>
+#include <math.h>
 
 void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000],
                 in_float_t b_r[1000], out_float_t c_i[1000], out_float_t c_r[1000]) {
@@ -12,7 +12,7 @@ void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000]
     float ai = a_i[i];
     float ar = a_r[i];
     float cr, ci;
-    if (abs(br) >= abs(bi)) {
+    if (fabs(br) >= fabs(bi)) {
       float r = bi / br;
       float den = br + r * bi;
       cr = (ar + r * ai) / den;
