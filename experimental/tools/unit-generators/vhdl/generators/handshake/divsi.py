@@ -19,7 +19,7 @@ def _generate_divsi(name, bitwidth):
 
     dependencies = generate_join(join_name, {"size": 2}) + \
             generate_delay_buffer(
-        buff_name, {"slots": 35 - 1})
+        buff_name, {"slots": 36 - 1})
 
     entity = f"""
 library ieee;
