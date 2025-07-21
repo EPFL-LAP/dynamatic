@@ -2,6 +2,7 @@ import argparse
 import ast
 import sys
 
+import generators.handshake.absf as absf
 import generators.handshake.addf as addf
 import generators.handshake.addi as addi
 import generators.handshake.andi as andi
@@ -52,6 +53,8 @@ import generators.handshake.valid_merger as valid_merger
 
 def generate_code(name, mod_type, parameters):
     match mod_type:
+        case "absf":
+            return absf.generate_absf(name, parameters)
         case "addf":
             return addf.generate_addf(name, parameters)
         case "addi":
