@@ -13,6 +13,7 @@ import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.divf as divf
+import generators.handshake.divui as divui
 import generators.handshake.divsi as divsi
 import generators.handshake.negf as negf
 import generators.handshake.extsi as extsi
@@ -77,6 +78,8 @@ def generate_code(name, mod_type, parameters):
             return divf.generate_divf(name, parameters)
         case "divsi":
             return divsi.generate_divsi(name, parameters)
+        case "divui":
+            return divui.generate_divui(name, parameters)
         case "negf":
             return negf.generate_negf(name, parameters)
         case "extsi":
