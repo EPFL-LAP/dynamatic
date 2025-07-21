@@ -208,7 +208,7 @@ begin
       ins_valid => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready => oehb_ready,
+      ins_ready => oehb_ready
     );
 
   rhs_neg <= not rhs(64 - 1) & rhs(64 - 2 downto 0);
