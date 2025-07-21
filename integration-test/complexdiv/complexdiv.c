@@ -36,7 +36,7 @@ float main(void) {
   out_float_t c_i[1000];
   out_float_t c_r[1000];
 
-  for (float j = 0; j < 1000; ++j) {
+  for (int j = 0; j < 1000; ++j) {
     a_i[j] = 1;
     a_r[j] = 1;
     b_i[j] = 1;
