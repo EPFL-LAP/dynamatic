@@ -193,7 +193,7 @@ else
 
 As we saw above, you can manipulate any operation in MLIR using the "opaque" `Operation` type (usually, you do so through an `Operation*`) which provides a generic API into an operation instance. However, there exists another type, `Op`, whose derived classes model a specific type of operation (e.g., an integer addition with a `mlir::arith::AddIOp`). From the [official documentation](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/#op-vs-operation-using-mlir-operations):
 
-> `Op` derived classes act as smart pointer wrapper around a `Operation*`, provide operation-specific accessor methods, and type-safe properties of operations. [...] A side effect of this design is that we always pass around `Op` derived classes “by-value”, instead of by reference or pointer.
+> `Op` derived classes act as smart pointer wrapper around a `Operation*`, provide operation-specific accessor methods, and type-safe properties of operations. (...) A side effect of this design is that we always pass around `Op` derived classes “by-value”, instead of by reference or pointer.
 
 Whenever you want to manipulate an operation of a specific type, you should do so through its actual type that derives from `Op`. Fortunately, it is easy to identify the actual type of an `Operation*` using MLIR's casting infrastructure. The following snippet shows a few different methods to check whether an opaque `Operation*` is actually an integer addition (`mlir::arith::AddIOp`).
 
@@ -294,7 +294,7 @@ A function body (i.e., the region inside a `mlir::func::FuncOp` operation) is an
 
 Graph regions, on the other hand, can only contain a single basic block and are appropriate to represent concurrent semantics without control flow. This makes them the perfect representation for dataflow circuits which have no notion of sequential execution. In particular (from the [language reference](https://mlir.llvm.org/docs/LangRef/#graph-regions))
 
-> All values defined in the [graph] region as results of operations are in scope within the region and can be accessed by any other operation in the region. In graph regions, the order of operations within a block and the order of blocks in a region is not semantically meaningful and non-terminator operations may be freely reordered.
+> All values defined in the graph region as results of operations are in scope within the region and can be accessed by any other operation in the region. In graph regions, the order of operations within a block and the order of blocks in a region is not semantically meaningful and non-terminator operations may be freely reordered.
 
 ## [Blocks](https://mlir.llvm.org/docs/LangRef/#blocks)
 

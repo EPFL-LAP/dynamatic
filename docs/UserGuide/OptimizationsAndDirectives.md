@@ -90,7 +90,7 @@ Determining a correct order of accesses within a group can be done easily using 
 > [!WARNING]  
 > A significant area improvement can be achieved by disabling the use of LSQs but this must be used cautiously.
 
-The specifics of LSQ implementation are available in [the corresponding documentation folder.](../DeveloperGuide/DynamaticFeaturesAndOptimizations/LSQ) For more information on the concept itself, [see the original paper.](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2022/06/JosipovicTECS17_AnOutOfOrderLoadStoreQueueForSpatialComputing.pdf)  
+The specifics of LSQ implementation are available in [the corresponding documentation.](../DeveloperGuide/DynamaticFeaturesAndOptimizations/LSQ/LSQ.md) For more information on the concept itself, [see the original paper.](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2022/06/JosipovicTECS17_AnOutOfOrderLoadStoreQueueForSpatialComputing.pdf)  
 
 
 ### Resource Sharing of Functional Units: ASPLOS'25

@@ -19,7 +19,7 @@ For instance, here is a complete script used in Dynamatic's frontend that uses t
 set-dynamatic-path .
 set-fp-units-generator flopoco
 set-src integration-test/fir/fir.c
-compile 
+compile
 write-hdl
 simulate
 synthesize
@@ -38,7 +38,7 @@ To use the floating point units provided by Vivado, we need to compile them usin
 
 <img alt="Compile ModelSim simulation library for Vivado floating point IPs" src="./Figures/FloatingPointUnits/compile-modelsim-lib.png" width="300" />
 
-Please refer to [this link](https://adaptivesupport.amd.com/s/question/0D52E00007G0iKDSAZ/simulating-on-modelsim-with-vivado?language=en_US) for more information on how to compile the simulation library for ModelSim. 
+Please refer to [this link](https://adaptivesupport.amd.com/s/question/0D52E00007G0iKDSAZ/simulating-on-modelsim-with-vivado?language=en_US) for more information on how to compile the simulation library for ModelSim.
 
 
 Make sure that you have **compatible versions** of Vivado and ModelSim. The following link contains a list of compatible versions:
@@ -54,11 +54,11 @@ Additionally, the user has to provide the path to the Vivado installation folder
 
 ```
 set-dynamatic-path .
-# Installation path of Vivado 
+# Installation path of Vivado
 set-vivado-path /path/to/vivado/Vivado/2019.1
 set-fp-units-generator flopoco
 set-src integration-test/fir/fir.c
-compile 
+compile
 write-hdl
 simulate
 synthesize
@@ -68,7 +68,7 @@ exit
 The default value for the vivado path is `/tools/Xilinx/Vivado/2019.1/`. This information is essentially to correctly integrate necessary simulation files of Vivado.
 
 
-## RTL and Timing Information 
+## RTL and Timing Information
 
 This section describes the organization of RTL modules and the delay/latency information of the floating point units inside Dynamatic.
 
@@ -90,13 +90,13 @@ For more information related to timing information, please refer to [this markdo
 
 ## Performance comparison : FloPoCo vs Vivado
 
-This section presents some reference side-by-side comparisons of operating frequency and ressource usage for common 32-bit operators, between FloPoCo and Vivado.. All the data presented was obtained by perfoming a place and route in Vivado 2019.1 and using the provided timing and utilsiation reports. 
+This section presents some reference side-by-side comparisons of operating frequency and ressource usage for common 32-bit operators, between FloPoCo and Vivado.. All the data presented was obtained by perfoming a place and route in Vivado 2019.1 and using the provided timing and utilsiation reports.
 
 
 
-<img width="4459" height="2458" alt="comparison_srls_vs_frequency" src="https://github.com/user-attachments/assets/e784952a-eb40-4004-8343-30b100aae9c1" />
-<img width="4460" height="2458" alt="comparison_registers_vs_frequency" src="https://github.com/user-attachments/assets/62695bc4-72ef-49b1-a340-a9692015161c" />
-<img width="4459" height="2458" alt="comparison_luts_vs_frequency" src="https://github.com/user-attachments/assets/4ca20ecc-cb69-4cd6-891f-7a13e5fe35c1" />
-<img width="4467" height="2458" alt="comparison_dsps_vs_frequency" src="https://github.com/user-attachments/assets/4189efda-ce43-47f6-a331-649d6990de6c" />
+<img alt="comparison_srls_vs_frequency" src="./Figures/FloatingPointUnits/comparison_srls_vs_frequency.png" />
+<img alt="comparison_registers_vs_frequency" src="./Figures/FloatingPointUnits/comparison_registers_vs_frequency.png" />
+<img alt="comparison_luts_vs_frequency" src="./Figures/FloatingPointUnits/comparison_luts_vs_frequency.png" />
+<img alt="comparison_dsps_vs_frequency" src="./Figures/FloatingPointUnits/comparison_dsps_vs_frequency.png" />
 
 

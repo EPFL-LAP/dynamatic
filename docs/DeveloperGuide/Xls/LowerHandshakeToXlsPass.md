@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../../README.md)
-
 # Lower Handshake to XLS
 
 ## Overview

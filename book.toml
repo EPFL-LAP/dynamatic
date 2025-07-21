@@ -1,0 +1,38 @@
+[book]
+title = "Dynamatic"
+authors = ["Dynamatic Authors"]
+language = "en"
+multilingual = false
+src = "docs/"
+
+[build]
+build-dir = "build/mdbook"
+create-missing = false
+
+[preprocessor.alerts]
+renderers = ["html", "linkcheck"]
+
+[output.html]
+smart-punctuation = true
+mathjax-support = true
+site-url = "https://epfl-lap.github.io/dynamatic"
+git-repository-url = "https://github.com/EPFL-LAP/dynamatic"
+edit-url-template = "https://github.com/EPFL-LAP/dynamatic/edit/main/{path}"
+
+[output.html.search]
+limit-results = 40
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 2
+boost-paragraph = 1
+expand = true
+heading-split-level = 2
+
+[output.linkcheck]
+follow-web-links = false
+optional = true
+exclude = [
+    # Ignore links with anchors - not supported..
+    '''[^:\s]+\.md:[^:\s]+''',
+    '''[^:\s]+\.md#[^:\s]+''',
+]
