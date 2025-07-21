@@ -431,7 +431,7 @@ LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modO
       modName == "handshake.negf" || modName == "handshake.truncf" ||
       modName == "handshake.divsi" || modName == "handshake.absf" ||
       modName == "handshake.divui" || modName == "handshake.extf" ||
-      modName == "handshake.maximumf" || modeName == "handshake.minimumf"
+      modName == "handshake.maximumf" || modName == "handshake.minimumf"
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
