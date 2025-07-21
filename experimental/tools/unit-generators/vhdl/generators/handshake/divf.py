@@ -55,9 +55,9 @@ entity {name} is
 end entity;
 """
 
-    clock_enables = "\n".join(
-        [f"        ce_{i} => oehb_ready," for i in range(1, latency)]
-        )
+    clock_enables = f"ce_1 => oehb_ready," + "\n".join(
+        [f"        ce_{i} => oehb_ready," for i in range(2, latency)]
+    )
 
     architecture = f"""
 -- Architecture of divf
