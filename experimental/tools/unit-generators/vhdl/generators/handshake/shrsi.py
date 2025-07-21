@@ -48,7 +48,7 @@ end entity;
 
     architecture = f"""
 -- Architecture of shrsi
-architecture arch of shrsi is
+architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
