@@ -29,7 +29,7 @@ Required to run Scala/Chisel compilation. See official [documentation](https://d
 Dynamatic uses some third party tools to implement smart buffer placement, simulation, and interactive dataflow circuit visualization. Below is a list of the tools:
 
 ### Optimization & Scheduling: Gurobi
-[Gurobi](https://www.gurobi.com/) solves MILP (Mixed-Integer Linear Programming) problems used during buffer placement and optimization. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. See how to set up gurobi in the [advanced build section](docs/UserGuide/AdvancedBuild.md)
+[Gurobi](https://www.gurobi.com/) solves MILP (Mixed-Integer Linear Programming) problems used during buffer placement and optimization. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. See how to set up gurobi in the [advanced build section](../UserGuide/AdvancedBuild.md)
 
 ### Simulation Tool: ModelSim/Questa
 Dynamatic uses [ModelSim](https://www.intel.com/content/www/us/en/software-kit/750368/modelsim-intel-fpgas-standard-edition-software-version-18-1.html)/[Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) to perform simulations. See [installation](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) page on how to setup ModelSim/Questa.

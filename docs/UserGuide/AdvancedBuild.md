@@ -140,7 +140,7 @@ To reduce the build script's execution time when re-building the project regular
 
 The repository contains an optionally built tool that allows you to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at visual-dataflow/godot-cpp (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
 > [!NOTE]
-> Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in [`.gitmodules`](.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
+> Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in `.gitmodules`. The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
 >
 Due to these extra dependencies, building this tool is opt-in, meaning that
 
