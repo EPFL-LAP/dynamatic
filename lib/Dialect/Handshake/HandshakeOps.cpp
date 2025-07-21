@@ -1992,11 +1992,11 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
 }
 
 LogicalResult TruncIOp::verify() {
-  ChannelType srcType = op.getIn().getType();
-  ChannelType dstType = op.getOut().getType();
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return op.emitError() << "result channel's data type "
+    return emitError() << "result channel's data type "
                           << dstType.getDataType()
                           << " must be narrower than operand type "
                           << srcType.getDataType();
@@ -2009,16 +2009,16 @@ LogicalResult TruncIOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult TruncFOp::verify() {
-  ChannelType srcType = op.getIn().getType();
-  ChannelType dstType = op.getOut().getType();
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() != 64) {
-    return op.emitError() << "input channel's data type "
+    return emitError() << "input channel's data type "
                           << srcType.getDataType()
                           << " must be 64 bits";
   }
   if (srcType.getDataBitWidth() != 32) {
-    return op.emitError() << "output channel's data type "
+    return emitError() << "output channel's data type "
                           << dstType.getDataType()
                           << " must be 32 bits";
   }
