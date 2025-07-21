@@ -1990,10 +1990,8 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
     return getIn();
   return nullptr;
 }
-/// Extension operations can only extend to a channel with a wider data type and
-/// identical extra signals.
-template <typename Op>
-static LogicalResult verifyTruncOp(Op op) {
+
+LogicalResult TruncIOp::verify() {
   ChannelType srcType = op.getIn().getType();
   ChannelType dstType = op.getOut().getType();
 
@@ -2006,13 +2004,26 @@ static LogicalResult verifyTruncOp(Op op) {
   return success();
 }
 
-LogicalResult TruncIOp::verify() { return verifyTruncOp(*this); }
-
 //===----------------------------------------------------------------------===//
 // TruncFOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
+LogicalResult TruncFOp::verify() {
+  ChannelType srcType = op.getIn().getType();
+  ChannelType dstType = op.getOut().getType();
+
+  if (srcType.getDataBitWidth() != 64) {
+    return op.emitError() << "input channel's data type "
+                          << srcType.getDataType()
+                          << " must be 64 bits";
+  }
+  if (srcType.getDataBitWidth() != 32) {
+    return op.emitError() << "output channel's data type "
+                          << dstType.getDataType()
+                          << " must be 32 bits";
+  }
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // ExtFOp
