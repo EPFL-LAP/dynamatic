@@ -1,11 +1,11 @@
 module {
-  hw.module @elastic_miter_andForkSwap_lhs_andForkSwap_rhs(in %in2 : !handshake.channel<i1>, in %in1 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out EQ_out1 : !handshake.channel<i1>, out EQ_out2 : !handshake.channel<i1>) {
-    %in_fork_in2.outs_0, %in_fork_in2.outs_1 = hw.instance "in_fork_in2" @handshake_lazy_fork_0(ins: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
-    %lhs_in_buf_in2.outs = hw.instance "lhs_in_buf_in2" @handshake_buffer_0(ins: %in_fork_in2.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
-    %rhs_in_buf_in2.outs = hw.instance "rhs_in_buf_in2" @handshake_buffer_0(ins: %in_fork_in2.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+  hw.module @elastic_miter_andForkSwap_lhs_andForkSwap_rhs(in %in1 : !handshake.channel<i1>, in %in2 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out EQ_out1 : !handshake.channel<i1>, out EQ_out2 : !handshake.channel<i1>) {
     %in_fork_in1.outs_0, %in_fork_in1.outs_1 = hw.instance "in_fork_in1" @handshake_lazy_fork_0(ins: %in1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %lhs_in_buf_in1.outs = hw.instance "lhs_in_buf_in1" @handshake_buffer_0(ins: %in_fork_in1.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %rhs_in_buf_in1.outs = hw.instance "rhs_in_buf_in1" @handshake_buffer_0(ins: %in_fork_in1.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %in_fork_in2.outs_0, %in_fork_in2.outs_1 = hw.instance "in_fork_in2" @handshake_lazy_fork_0(ins: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
+    %lhs_in_buf_in2.outs = hw.instance "lhs_in_buf_in2" @handshake_buffer_0(ins: %in_fork_in2.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %rhs_in_buf_in2.outs = hw.instance "rhs_in_buf_in2" @handshake_buffer_0(ins: %in_fork_in2.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %out_nds_out1.result = hw.instance "out_nds_out1" @handshake_ndsource_0(clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.control<>)
     %out_lf_out1.outs_0, %out_lf_out1.outs_1 = hw.instance "out_lf_out1" @handshake_lazy_fork_1(ins: %out_nds_out1.result: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.control<>, outs_1: !handshake.control<>)
     %out_buf_lhs_nds_out1.outs = hw.instance "out_buf_lhs_nds_out1" @handshake_buffer_1(ins: %out_lf_out1.outs_0: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
@@ -37,8 +37,8 @@ module {
   hw.module.extern @handshake_cmpi_0(in %lhs : !handshake.channel<i1>, in %rhs : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.cmpi", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, INTERNAL_DELAY = "0.0", PREDICATE = "eq"}}
   hw.module.extern @handshake_andi_0(in %lhs : !handshake.channel<i1>, in %rhs : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.andi", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, INTERNAL_DELAY = "0.0"}}
   hw.module.extern @handshake_fork_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.channel<i1>, out outs_1 : !handshake.channel<i1>) attributes {hw.name = "handshake.fork", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
-  hw.module @elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapper(in %in2 : !handshake.channel<i1>, in %in1 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out EQ_out1 : !handshake.channel<i1>, out EQ_out2 : !handshake.channel<i1>) {
-    %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out1, %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out2 = hw.instance "elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped" @elastic_miter_andForkSwap_lhs_andForkSwap_rhs(in2: %in2: !handshake.channel<i1>, in1: %in1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (EQ_out1: !handshake.channel<i1>, EQ_out2: !handshake.channel<i1>)
+  hw.module @elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapper(in %in1 : !handshake.channel<i1>, in %in2 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out EQ_out1 : !handshake.channel<i1>, out EQ_out2 : !handshake.channel<i1>) {
+    %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out1, %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out2 = hw.instance "elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped" @elastic_miter_andForkSwap_lhs_andForkSwap_rhs(in1: %in1: !handshake.channel<i1>, in2: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (EQ_out1: !handshake.channel<i1>, EQ_out2: !handshake.channel<i1>)
     hw.output %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out1, %elastic_miter_andForkSwap_lhs_andForkSwap_rhs_wrapped.EQ_out2 : !handshake.channel<i1>, !handshake.channel<i1>
   }
 }

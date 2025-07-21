@@ -15,8 +15,8 @@ module {
     %10 = passer %8#0[%9#0] {handshake.bb = 1 : ui32, handshake.name = "ctx_passer"} : <i1>, <i1>
     %11 = spec_v2_nd_speculator %10 {handshake.bb = 1 : ui32, handshake.name = "ndspec"} : <i1>
     %12 = passer %8#1[%9#1] {handshake.bb = 2 : ui32, handshake.name = "passer"} : <i1>, <i1>
-    %13 = buffer %12, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "buffer"} : <i1>
-    %14 = spec_v2_repeating_init %13 {handshake.bb = 2 : ui32, handshake.name = "ri", initToken = 1 : ui1} : <i1>
+    %13 = spec_v2_repeating_init %12 {handshake.bb = 2 : ui32, handshake.name = "ri", initToken = 1 : ui1} : <i1>
+    %14 = buffer %13, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "buffer"} : <i1>
     %15 = spec_v2_interpolator %14, %11 {handshake.bb = 2 : ui32, handshake.name = "interpolate"} : <i1>
     end {handshake.bb = 3 : ui32, handshake.name = "end0"} %3#0 : <i1>
   }

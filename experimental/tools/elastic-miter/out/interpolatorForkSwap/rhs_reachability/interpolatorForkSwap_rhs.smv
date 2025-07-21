@@ -1,9 +1,9 @@
-#include "handshake_fork_0.smv"
 #include "handshake_spec_v2_interpolator_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
 
 
-MODULE interpolatorForkSwap_rhs (long, long_valid, short, short_valid, out1_ready, out2_ready)
+MODULE interpolatorForkSwap_rhs (short, short_valid, long, long_valid, out1_ready, out2_ready)
 
 
 -- input and output
@@ -13,16 +13,16 @@ DEFINE ndw_out_out1_outs_ready := out1_ready;
 DEFINE out2 := ndw_out_out2.outs;
 DEFINE out2_valid := ndw_out_out2.outs_valid;
 DEFINE ndw_out_out2_outs_ready := out2_ready;
-DEFINE ndw_in_long_ins := long;
-DEFINE ndw_in_long_ins_valid := long_valid;
-DEFINE long_ready := ndw_in_long.ins_ready;
 DEFINE ndw_in_short_ins := short;
 DEFINE ndw_in_short_ins_valid := short_valid;
 DEFINE short_ready := ndw_in_short.ins_ready;
+DEFINE ndw_in_long_ins := long;
+DEFINE ndw_in_long_ins_valid := long_valid;
+DEFINE long_ready := ndw_in_long.ins_ready;
 
 
-VAR ndw_in_long : handshake_ndwire_0(ndw_in_long_ins, ndw_in_long_ins_valid, fork_long.ins_ready);
 VAR ndw_in_short : handshake_ndwire_0(ndw_in_short_ins, ndw_in_short_ins_valid, fork_short.ins_ready);
+VAR ndw_in_long : handshake_ndwire_0(ndw_in_long_ins, ndw_in_long_ins_valid, fork_long.ins_ready);
 VAR ndw_out_out1 : handshake_ndwire_0(interpolator1.result, interpolator1.result_valid, ndw_out_out1_outs_ready);
 VAR ndw_out_out2 : handshake_ndwire_0(interpolator2.result, interpolator2.result_valid, ndw_out_out2_outs_ready);
 VAR fork_short : handshake_fork_0(ndw_in_short.outs, ndw_in_short.outs_valid, interpolator1.short_ready, interpolator2.short_ready);

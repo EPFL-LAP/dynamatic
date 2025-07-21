@@ -1,16 +1,16 @@
-#include "handshake_lazy_fork_1.smv"
+#include "handshake_blocker_0.smv"
 #include "handshake_spec_v2_nd_speculator_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_buffer_2.smv"
 #include "handshake_ndsource_0.smv"
-#include "handshake_buffer_1.smv"
-#include "handshake_spec_v2_interpolator_0.smv"
-#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_buffer_2.smv"
 #include "handshake_buffer_0.smv"
 #include "handshake_cmpi_0.smv"
 #include "handshake_fork_0.smv"
-#include "handshake_blocker_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
 
 
 MODULE elastic_miter_suppressorInduction_lhs_suppressorInduction_rhs (short, short_valid, A_in, A_in_valid, EQ_B_out_ready)
@@ -46,11 +46,11 @@ VAR out_buf_rhs_nds_B_out : handshake_buffer_1(out_lf_B_out.outs_1_valid, rhs_ou
 VAR lhs_out_bl_B_out : handshake_blocker_0(lhs_passer2.result, lhs_passer2.result_valid, out_buf_lhs_nds_B_out.outs_valid, out_eq_B_out.lhs_ready);
 VAR rhs_out_bl_B_out : handshake_blocker_0(rhs_passer.result, rhs_passer.result_valid, out_buf_rhs_nds_B_out.outs_valid, out_eq_B_out.rhs_ready);
 VAR out_eq_B_out : handshake_cmpi_0(lhs_out_bl_B_out.outs, lhs_out_bl_B_out.outs_valid, rhs_out_bl_B_out.outs, rhs_out_bl_B_out.outs_valid, out_eq_B_out_result_ready);
-VAR lhs_vm_fork_1 : handshake_fork_0(lhs_in_buf_oldLong.outs, lhs_in_buf_oldLong.outs_valid, lhs_interpolate.long_ready, lhs_buffer.ins_ready);
+VAR lhs_vm_fork_1 : handshake_fork_0(lhs_in_buf_oldLong.outs, lhs_in_buf_oldLong.outs_valid, lhs_interpolate.long_ready, lhs_ri.ins_ready);
 VAR lhs_interpolate : handshake_spec_v2_interpolator_0(lhs_in_buf_short.outs, lhs_in_buf_short.outs_valid, lhs_vm_fork_1.outs_0, lhs_vm_fork_1.outs_0_valid, lhs_passer2.ctrl_ready);
-VAR lhs_buffer : handshake_buffer_2(lhs_vm_fork_1.outs_1, lhs_vm_fork_1.outs_1_valid, lhs_ri.ins_ready);
-VAR lhs_ri : handshake_spec_v2_repeating_init_0(lhs_buffer.outs, lhs_buffer.outs_valid, lhs_passer1.ctrl_ready);
-VAR lhs_passer1 : handshake_passer_0(lhs_in_buf_A_in.outs, lhs_in_buf_A_in.outs_valid, lhs_ri.outs, lhs_ri.outs_valid, lhs_passer2.data_ready);
+VAR lhs_ri : handshake_spec_v2_repeating_init_0(lhs_vm_fork_1.outs_1, lhs_vm_fork_1.outs_1_valid, lhs_buffer.ins_ready);
+VAR lhs_buffer : handshake_buffer_2(lhs_ri.outs, lhs_ri.outs_valid, lhs_passer1.ctrl_ready);
+VAR lhs_passer1 : handshake_passer_0(lhs_in_buf_A_in.outs, lhs_in_buf_A_in.outs_valid, lhs_buffer.outs, lhs_buffer.outs_valid, lhs_passer2.data_ready);
 VAR lhs_passer2 : handshake_passer_0(lhs_passer1.result, lhs_passer1.result_valid, lhs_interpolate.result, lhs_interpolate.result_valid, lhs_out_bl_B_out.ins_ready);
 VAR rhs_ri : handshake_spec_v2_repeating_init_0(rhs_in_buf_oldLong.outs, rhs_in_buf_oldLong.outs_valid, rhs_buffer.ins_ready);
 VAR rhs_buffer : handshake_buffer_2(rhs_ri.outs, rhs_ri.outs_valid, rhs_interpolate.long_ready);

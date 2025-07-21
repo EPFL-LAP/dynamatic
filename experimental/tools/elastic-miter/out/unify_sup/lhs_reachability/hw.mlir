@@ -4,9 +4,9 @@ module {
     %ndw_in_Cond1.outs = hw.instance "ndw_in_Cond1" @handshake_ndwire_0(ins: %Cond1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_in_Cond2.outs = hw.instance "ndw_in_Cond2" @handshake_ndwire_0(ins: %Cond2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_out_B_out.outs = hw.instance "ndw_out_B_out" @handshake_ndwire_0(ins: %passer3.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
-    %fork_cond2.outs_0, %fork_cond2.outs_1 = hw.instance "fork_cond2" @handshake_fork_0(ins: %ndw_in_Cond2.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
-    %passer1.result = hw.instance "passer1" @handshake_passer_0(data: %ndw_in_Cond1.outs: !handshake.channel<i1>, ctrl: %fork_cond2.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
-    %passer2.result = hw.instance "passer2" @handshake_passer_0(data: %ndw_in_A_in.outs: !handshake.channel<i1>, ctrl: %fork_cond2.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
+    %vm_fork_2.outs_0, %vm_fork_2.outs_1 = hw.instance "vm_fork_2" @handshake_fork_0(ins: %ndw_in_Cond2.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
+    %passer1.result = hw.instance "passer1" @handshake_passer_0(data: %ndw_in_Cond1.outs: !handshake.channel<i1>, ctrl: %vm_fork_2.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
+    %passer2.result = hw.instance "passer2" @handshake_passer_0(data: %ndw_in_A_in.outs: !handshake.channel<i1>, ctrl: %vm_fork_2.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     %passer3.result = hw.instance "passer3" @handshake_passer_0(data: %passer2.result: !handshake.channel<i1>, ctrl: %passer1.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
     hw.output %ndw_out_B_out.outs : !handshake.channel<i1>
   }

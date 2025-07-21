@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_loopContinue : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.loopContinue_ready, 2);
-  VAR seq_generator_confirmSpec_backedge : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.confirmSpec_backedge_ready, 2);
+  VAR seq_generator_loopContinue : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.loopContinue_ready, 3);
+  VAR seq_generator_confirmSpec_backedge : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.confirmSpec_backedge_ready, 3);
 
   VAR elastic_miter_introduceResolver_lhs_introduceResolver_rhs : elastic_miter_introduceResolver_lhs_introduceResolver_rhs (seq_generator_loopContinue.outs, seq_generator_loopContinue.outs_valid, seq_generator_confirmSpec_backedge.outs, seq_generator_confirmSpec_backedge.outs_valid, sink_EQ_confirmSpec.ins_ready);
 
@@ -38,3 +38,10 @@ CTLSPEC AF (AG ((elastic_miter_introduceResolver_lhs_introduceResolver_rhs.lhs_i
 
 INVAR  seq_generator_loopContinue.exact_tokens = elastic_miter_introduceResolver_lhs_introduceResolver_rhs.out_nds_confirmSpec.exact_tokens ;
 INVAR elastic_miter_introduceResolver_lhs_introduceResolver_rhs.backedge_eq_confirmSpec.result_valid -> elastic_miter_introduceResolver_lhs_introduceResolver_rhs.backedge_eq_confirmSpec.result;
+VAR last_token_confirmSpec : boolean;
+ASSIGN init(last_token_confirmSpec) := TRUE;
+ASSIGN next(last_token_confirmSpec) := case
+  elastic_miter_introduceResolver_lhs_introduceResolver_rhs.backedge_constant_confirmSpec.result_valid : elastic_miter_introduceResolver_lhs_introduceResolver_rhs.backedge_constant_confirmSpec.result;
+  TRUE : last_token_confirmSpec;
+esac;
+FAIRNESS !last_token_confirmSpec;

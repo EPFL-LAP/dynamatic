@@ -16,7 +16,7 @@ module {
     %13 = blocker %19[%11] {handshake.bb = 5 : ui32, handshake.name = "lhs_out_bl_B_out"} : <i1>, <>
     %14 = blocker %21[%12] {handshake.bb = 5 : ui32, handshake.name = "rhs_out_bl_B_out"} : <i1>, <>
     %15 = cmpi eq, %13, %14 {handshake.bb = 5 : ui32, handshake.name = "out_eq_B_out"} : <i1>
-    %16:2 = fork [2] %7 {handshake.bb = 2 : ui32, handshake.name = "lhs_fork_cond2"} : <i1>
+    %16:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "lhs_vm_fork_2"} : <i1>
     %17 = passer %4[%16#0] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer1"} : <i1>, <i1>
     %18 = passer %1[%16#1] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer2"} : <i1>, <i1>
     %19 = passer %18[%17] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer3"} : <i1>, <i1>

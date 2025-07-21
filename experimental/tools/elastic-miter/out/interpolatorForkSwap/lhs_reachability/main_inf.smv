@@ -17,10 +17,10 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_long : bool_input_inf(interpolatorForkSwap_lhs.long_ready);
   VAR seq_generator_short : bool_input_inf(interpolatorForkSwap_lhs.short_ready);
+  VAR seq_generator_long : bool_input_inf(interpolatorForkSwap_lhs.long_ready);
 
-  VAR interpolatorForkSwap_lhs : interpolatorForkSwap_lhs (seq_generator_long.outs, seq_generator_long.outs_valid, seq_generator_short.outs, seq_generator_short.outs_valid, sink_out1.ins_ready, sink_out2.ins_ready);
+  VAR interpolatorForkSwap_lhs : interpolatorForkSwap_lhs (seq_generator_short.outs, seq_generator_short.outs_valid, seq_generator_long.outs, seq_generator_long.outs_valid, sink_out1.ins_ready, sink_out2.ins_ready);
 
   VAR sink_out1 : sink_main(interpolatorForkSwap_lhs.out1_valid);
   VAR sink_out2 : sink_main(interpolatorForkSwap_lhs.out2_valid);

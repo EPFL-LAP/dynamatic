@@ -1,19 +1,19 @@
-#include "handshake_init_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_blocker_0.smv"
-#include "handshake_mux_0.smv"
-#include "handshake_lazy_fork_1.smv"
 #include "handshake_lazy_fork_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_buffer_2.smv"
+#include "handshake_init_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_lazy_fork_1.smv"
 #include "handshake_buffer_1.smv"
 #include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_buffer_2.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
 
 
-MODULE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapper (loopLiveIn, loopLiveIn_valid, oldContinue, oldContinue_valid, iterLiveOut, iterLiveOut_valid, EQ_iterLiveIn_ready)
+MODULE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapper (loopLiveIn, loopLiveIn_valid, iterLiveOut, iterLiveOut_valid, oldContinue, oldContinue_valid, EQ_iterLiveIn_ready)
 
 
 -- input and output
@@ -23,14 +23,14 @@ DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_iterLiveIn_ready := EQ_i
 DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn := loopLiveIn;
 DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn_valid := loopLiveIn_valid;
 DEFINE loopLiveIn_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.loopLiveIn_ready;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue := oldContinue;
-DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid := oldContinue_valid;
-DEFINE oldContinue_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.oldContinue_ready;
 DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut := iterLiveOut;
 DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut_valid := iterLiveOut_valid;
 DEFINE iterLiveOut_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.iterLiveOut_ready;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue := oldContinue;
+DEFINE elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid := oldContinue_valid;
+DEFINE oldContinue_ready := elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped.oldContinue_ready;
 
 
-VAR elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped : elastic_miter_sup_mux_lhs_sup_mux_rhs(elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_iterLiveIn_ready);
+VAR elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped : elastic_miter_sup_mux_lhs_sup_mux_rhs(elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_loopLiveIn_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_iterLiveOut_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_oldContinue_valid, elastic_miter_sup_mux_lhs_sup_mux_rhs_wrapped_EQ_iterLiveIn_ready);
 
 -- properties

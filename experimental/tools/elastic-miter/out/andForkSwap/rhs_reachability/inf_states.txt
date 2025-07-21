@@ -13,10 +13,10 @@
 system diameter: 2
 reachable states: 96 (2^6.58496) out of 1024 (2^10)
   ------- State    1 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -24,10 +24,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    2 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -35,10 +35,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    3 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -46,10 +46,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    4 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -57,10 +57,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    5 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -68,10 +68,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    6 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -79,10 +79,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    7 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -90,10 +90,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    8 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -101,10 +101,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State    9 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -112,10 +112,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   10 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -123,10 +123,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   11 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -134,10 +134,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   12 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -145,10 +145,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   13 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -156,10 +156,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   14 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -167,10 +167,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   15 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -178,10 +178,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   16 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -189,10 +189,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   17 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -200,10 +200,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   18 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -211,10 +211,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   19 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -222,10 +222,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   20 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -233,10 +233,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   21 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -244,10 +244,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   22 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -255,10 +255,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   23 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -266,10 +266,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   24 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -277,10 +277,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   25 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -288,10 +288,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   26 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -299,10 +299,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   27 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -310,10 +310,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   28 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -321,10 +321,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   29 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -332,10 +332,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   30 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -343,10 +343,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   31 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -354,10 +354,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   32 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -365,10 +365,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   33 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -376,10 +376,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   34 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -387,10 +387,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   35 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -398,10 +398,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   36 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -409,10 +409,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   37 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -420,10 +420,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   38 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -431,10 +431,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   39 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -442,10 +442,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   40 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -453,10 +453,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   41 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -464,10 +464,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   42 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -475,10 +475,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   43 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -486,10 +486,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   44 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -497,10 +497,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   45 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -508,10 +508,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   46 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -519,10 +519,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   47 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -530,10 +530,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   48 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
-  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = SLEEPING
+  seq_generator_in2.outs = FALSE
+  andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -541,10 +541,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   49 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -552,10 +552,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   50 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -563,10 +563,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   51 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -574,10 +574,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   52 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -585,10 +585,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   53 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -596,10 +596,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   54 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -607,10 +607,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   55 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -618,10 +618,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   56 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -629,10 +629,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   57 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -640,10 +640,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   58 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -651,10 +651,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   59 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -662,10 +662,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   60 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -673,10 +673,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   61 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -684,10 +684,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   62 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -695,10 +695,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   63 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -706,10 +706,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   64 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = FALSE
@@ -717,10 +717,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = FALSE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   65 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -728,10 +728,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   66 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -739,10 +739,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   67 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -750,10 +750,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   68 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -761,10 +761,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   69 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -772,10 +772,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   70 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -783,10 +783,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   71 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -794,10 +794,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   72 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -805,10 +805,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   73 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -816,10 +816,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   74 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -827,10 +827,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   75 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -838,10 +838,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   76 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -849,10 +849,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   77 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -860,10 +860,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   78 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -871,10 +871,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   79 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -882,10 +882,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   80 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -893,10 +893,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = FALSE
   ------- State   81 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -904,10 +904,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   82 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -915,10 +915,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   83 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -926,10 +926,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   84 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -937,10 +937,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   85 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -948,10 +948,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   86 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -959,10 +959,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   87 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -970,10 +970,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   88 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -981,10 +981,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   89 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -992,10 +992,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   90 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1003,10 +1003,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   91 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1014,10 +1014,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   92 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1025,10 +1025,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   93 ------
-  seq_generator_in2.outs = TRUE
   seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1036,10 +1036,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   94 ------
-  seq_generator_in2.outs = FALSE
-  seq_generator_in1.outs = TRUE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = FALSE
+  seq_generator_in2.outs = TRUE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1047,10 +1047,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   95 ------
-  seq_generator_in2.outs = TRUE
-  seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in1.outs = TRUE
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE
@@ -1058,10 +1058,10 @@ reachable states: 96 (2^6.58496) out of 1024 (2^10)
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_0.reg_value = TRUE
   andForkSwap_rhs.fork2.inner_fork.inner_reg_block_1.reg_value = TRUE
   ------- State   96 ------
-  seq_generator_in2.outs = FALSE
   seq_generator_in1.outs = FALSE
-  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
+  seq_generator_in2.outs = FALSE
   andForkSwap_rhs.ndw_in_in1.inner_ndwire.state = RUNNING
+  andForkSwap_rhs.ndw_in_in2.inner_ndwire.state = RUNNING
   andForkSwap_rhs.ndw_out_out1.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.ndw_out_out2.inner_ndwire.state = SLEEPING
   andForkSwap_rhs.fork1.inner_fork.inner_reg_block_0.reg_value = TRUE

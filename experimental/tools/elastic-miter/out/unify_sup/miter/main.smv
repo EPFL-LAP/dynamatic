@@ -37,3 +37,4 @@ MODULE main
 INVARSPEC (elastic_miter_unify_sup_lhs_unify_sup_rhs.EQ_B_out_valid -> elastic_miter_unify_sup_lhs_unify_sup_rhs.EQ_B_out);
 CTLSPEC AF (AG ((elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_A_in.inner_counter.counter = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_A_in.inner_counter.counter) & (elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_Cond1.inner_counter.counter = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_Cond1.inner_counter.counter) & (elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_Cond2.inner_counter.counter = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_Cond2.inner_counter.counter) & (!elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_out_bl_B_out.outs_valid) & (!elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_out_bl_B_out.outs_valid)));
 
+INVAR  seq_generator_A_in.exact_tokens = seq_generator_Cond1.exact_tokens ;

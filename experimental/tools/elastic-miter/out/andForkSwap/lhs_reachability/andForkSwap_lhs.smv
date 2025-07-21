@@ -1,9 +1,9 @@
+#include "handshake_fork_0.smv"
 #include "handshake_andi_0.smv"
 #include "handshake_ndwire_0.smv"
-#include "handshake_fork_0.smv"
 
 
-MODULE andForkSwap_lhs (in2, in2_valid, in1, in1_valid, out1_ready, out2_ready)
+MODULE andForkSwap_lhs (in1, in1_valid, in2, in2_valid, out1_ready, out2_ready)
 
 
 -- input and output
@@ -13,16 +13,16 @@ DEFINE ndw_out_out1_outs_ready := out1_ready;
 DEFINE out2 := ndw_out_out2.outs;
 DEFINE out2_valid := ndw_out_out2.outs_valid;
 DEFINE ndw_out_out2_outs_ready := out2_ready;
-DEFINE ndw_in_in2_ins := in2;
-DEFINE ndw_in_in2_ins_valid := in2_valid;
-DEFINE in2_ready := ndw_in_in2.ins_ready;
 DEFINE ndw_in_in1_ins := in1;
 DEFINE ndw_in_in1_ins_valid := in1_valid;
 DEFINE in1_ready := ndw_in_in1.ins_ready;
+DEFINE ndw_in_in2_ins := in2;
+DEFINE ndw_in_in2_ins_valid := in2_valid;
+DEFINE in2_ready := ndw_in_in2.ins_ready;
 
 
-VAR ndw_in_in2 : handshake_ndwire_0(ndw_in_in2_ins, ndw_in_in2_ins_valid, and.rhs_ready);
 VAR ndw_in_in1 : handshake_ndwire_0(ndw_in_in1_ins, ndw_in_in1_ins_valid, and.lhs_ready);
+VAR ndw_in_in2 : handshake_ndwire_0(ndw_in_in2_ins, ndw_in_in2_ins_valid, and.rhs_ready);
 VAR ndw_out_out1 : handshake_ndwire_0(fork.outs_0, fork.outs_0_valid, ndw_out_out1_outs_ready);
 VAR ndw_out_out2 : handshake_ndwire_0(fork.outs_1, fork.outs_1_valid, ndw_out_out2_outs_ready);
 VAR and : handshake_andi_0(ndw_in_in1.outs, ndw_in_in1.outs_valid, ndw_in_in2.outs, ndw_in_in2.outs_valid, fork.ins_ready);

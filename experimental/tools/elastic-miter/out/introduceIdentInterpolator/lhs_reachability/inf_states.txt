@@ -13,196 +13,196 @@
 system diameter: 1
 reachable states: 32 (2^5) out of 32 (2^5)
   ------- State    1 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    2 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    3 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    4 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    5 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    6 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    7 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    8 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State    9 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   10 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   11 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   12 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   13 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   14 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   15 ------
-  seq_generator_A_in.outs = TRUE
   seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   16 ------
-  seq_generator_A_in.outs = TRUE
-  seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = TRUE
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   17 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   18 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   19 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   20 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   21 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   22 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   23 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   24 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = RUNNING
   ------- State   25 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   26 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   27 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   28 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   29 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   30 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = RUNNING
-  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = FALSE
+  introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = RUNNING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   31 ------
-  seq_generator_A_in.outs = FALSE
-  seq_generator_val.outs = TRUE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_val.outs = FALSE
+  seq_generator_A_in.outs = TRUE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   ------- State   32 ------
-  seq_generator_A_in.outs = FALSE
   seq_generator_val.outs = FALSE
-  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
+  seq_generator_A_in.outs = FALSE
   introduceIdentInterpolator_lhs.ndw_in_val.inner_ndwire.state = SLEEPING
+  introduceIdentInterpolator_lhs.ndw_in_A_in.inner_ndwire.state = SLEEPING
   introduceIdentInterpolator_lhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   -------------------------
 ######################################################################

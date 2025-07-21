@@ -11,7 +11,7 @@
 
 ######################################################################
 system diameter: 3
-reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
+reachable states: 288 (2^8.16993) out of 3.35544e+07 (2^25)
   ------- State    1 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -29,6 +29,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    2 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -46,6 +47,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    3 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -63,6 +65,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    4 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -80,6 +83,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    5 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -97,6 +101,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    6 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -114,6 +119,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    7 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -131,6 +137,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    8 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -148,6 +155,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State    9 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -165,6 +173,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   10 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -182,6 +191,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   11 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -199,6 +209,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   12 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -216,6 +227,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   13 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -233,6 +245,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   14 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -250,6 +263,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   15 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -267,6 +281,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   16 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -284,6 +299,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   17 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -301,6 +317,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   18 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -318,6 +335,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   19 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -335,6 +353,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   20 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -352,6 +371,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   21 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -369,6 +389,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   22 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -386,6 +407,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   23 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -403,6 +425,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   24 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -420,6 +443,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   25 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -437,6 +461,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   26 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -454,6 +479,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   27 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -471,6 +497,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   28 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -488,6 +515,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   29 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -505,6 +533,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   30 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -522,6 +551,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   31 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -539,6 +569,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   32 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -556,6 +587,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   33 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -573,6 +605,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   34 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -590,6 +623,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   35 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -607,6 +641,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   36 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -624,6 +659,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   37 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -641,6 +677,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   38 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -658,6 +695,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   39 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -675,6 +713,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   40 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -692,6 +731,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   41 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -709,6 +749,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   42 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -726,6 +767,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   43 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -743,6 +785,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   44 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -760,6 +803,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   45 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -777,6 +821,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   46 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -794,6 +839,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   47 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -811,6 +857,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   48 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -828,6 +875,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   49 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -845,6 +893,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   50 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -862,6 +911,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   51 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -879,6 +929,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   52 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -896,6 +947,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   53 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -913,6 +965,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   54 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -930,6 +983,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   55 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -947,6 +1001,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   56 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -964,6 +1019,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   57 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -981,6 +1037,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   58 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -998,6 +1055,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   59 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1015,6 +1073,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   60 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1032,6 +1091,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   61 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1049,6 +1109,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   62 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1066,6 +1127,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State   63 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1083,6 +1145,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   64 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1100,6 +1163,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   65 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1117,6 +1181,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   66 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1134,6 +1199,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   67 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1151,6 +1217,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   68 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1168,6 +1235,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   69 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1185,6 +1253,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   70 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1202,6 +1271,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   71 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1219,6 +1289,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   72 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1236,6 +1307,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   73 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1253,6 +1325,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   74 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1270,6 +1343,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   75 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1287,6 +1361,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   76 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1304,6 +1379,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   77 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1321,6 +1397,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   78 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1338,6 +1415,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   79 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1355,6 +1433,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   80 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1372,6 +1451,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   81 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1389,6 +1469,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   82 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1406,6 +1487,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   83 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1423,6 +1505,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   84 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1440,6 +1523,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   85 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1457,6 +1541,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   86 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1474,6 +1559,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State   87 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1491,6 +1577,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   88 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1508,6 +1595,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   89 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1525,6 +1613,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   90 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1542,6 +1631,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   91 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1559,6 +1649,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   92 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1576,6 +1667,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   93 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1593,6 +1685,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   94 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1610,6 +1703,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   95 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1627,6 +1721,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   96 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1644,6 +1739,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   97 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1661,6 +1757,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   98 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1678,6 +1775,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State   99 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1695,6 +1793,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  100 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1712,6 +1811,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  101 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1729,6 +1829,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  102 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1746,6 +1847,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  103 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1763,6 +1865,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  104 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1780,6 +1883,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  105 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1797,6 +1901,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  106 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1814,6 +1919,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  107 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1831,6 +1937,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  108 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1848,6 +1955,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  109 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1865,6 +1973,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  110 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1882,6 +1991,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  111 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1899,6 +2009,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  112 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1916,6 +2027,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  113 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1933,6 +2045,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  114 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1950,6 +2063,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  115 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1967,6 +2081,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  116 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -1984,6 +2099,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  117 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2001,6 +2117,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  118 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2018,6 +2135,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  119 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2035,6 +2153,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  120 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2052,6 +2171,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = FALSE
+  last_token_confirmSpec = TRUE
   ------- State  121 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2069,6 +2189,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  122 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2086,6 +2207,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  123 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2103,6 +2225,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  124 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2120,6 +2243,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  125 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2137,6 +2261,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  126 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2154,6 +2279,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  127 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2171,6 +2297,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  128 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2188,6 +2315,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  129 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2205,6 +2333,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  130 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2222,6 +2351,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  131 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2239,6 +2369,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  132 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2256,6 +2387,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  133 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2273,6 +2405,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  134 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2290,6 +2423,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  135 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2307,6 +2441,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  136 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2324,6 +2459,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  137 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2341,6 +2477,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  138 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2358,6 +2495,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  139 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2375,6 +2513,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  140 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2392,6 +2531,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  141 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2409,6 +2549,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  142 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2426,6 +2567,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  143 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2443,6 +2585,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  144 ------
   seq_generator_loopContinue.outs = FALSE
   seq_generator_loopContinue.counter = 0
@@ -2460,6 +2603,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  145 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2477,6 +2621,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  146 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2494,6 +2639,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  147 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2511,6 +2657,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  148 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2528,6 +2675,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  149 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2545,6 +2693,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  150 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2562,6 +2711,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  151 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2579,6 +2729,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  152 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2596,6 +2747,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  153 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2613,6 +2765,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  154 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2630,6 +2783,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  155 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2647,6 +2801,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  156 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2664,6 +2819,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  157 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2681,6 +2837,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  158 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2698,6 +2855,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  159 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2715,6 +2873,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  160 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2732,6 +2891,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  161 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2749,6 +2909,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  162 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2766,6 +2927,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  163 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2783,6 +2945,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  164 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2800,6 +2963,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  165 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2817,6 +2981,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  166 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2834,6 +2999,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  167 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2851,6 +3017,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  168 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2868,6 +3035,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  169 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2885,6 +3053,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  170 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2902,6 +3071,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  171 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2919,6 +3089,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  172 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2936,6 +3107,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  173 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2953,6 +3125,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  174 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2970,6 +3143,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  175 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -2987,6 +3161,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  176 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3004,6 +3179,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  177 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3021,6 +3197,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  178 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3038,6 +3215,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  179 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3055,6 +3233,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  180 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3072,6 +3251,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  181 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3089,6 +3269,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  182 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3106,6 +3287,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  183 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3123,6 +3305,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  184 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3140,6 +3323,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  185 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3157,6 +3341,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  186 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3174,6 +3359,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  187 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3191,6 +3377,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  188 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3208,6 +3395,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  189 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3225,6 +3413,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  190 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3242,6 +3431,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  191 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3259,6 +3449,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  192 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3276,6 +3467,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  193 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3293,6 +3485,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  194 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3310,6 +3503,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  195 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3327,6 +3521,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  196 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3344,6 +3539,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  197 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3361,6 +3557,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  198 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3378,6 +3575,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  199 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3395,6 +3593,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  200 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3412,6 +3611,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  201 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3429,6 +3629,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  202 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3446,6 +3647,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  203 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3463,6 +3665,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  204 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3480,6 +3683,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  205 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3497,6 +3701,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  206 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3514,6 +3719,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  207 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3531,6 +3737,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  208 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3548,6 +3755,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  209 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3565,6 +3773,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  210 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3582,6 +3791,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  211 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3599,6 +3809,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  212 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3616,6 +3827,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  213 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3633,6 +3845,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  214 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3650,6 +3863,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  215 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3667,6 +3881,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  216 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3684,6 +3899,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  217 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3701,6 +3917,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  218 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3718,6 +3935,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  219 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3735,6 +3953,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  220 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3752,6 +3971,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  221 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3769,6 +3989,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  222 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3786,6 +4007,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  223 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3803,6 +4025,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  224 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3820,6 +4043,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  225 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3837,6 +4061,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  226 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3854,6 +4079,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  227 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3871,6 +4097,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  228 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3888,6 +4115,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  229 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3905,6 +4133,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  230 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3922,6 +4151,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  231 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3939,6 +4169,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  232 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3956,6 +4187,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  233 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3973,6 +4205,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  234 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -3990,6 +4223,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  235 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4007,6 +4241,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  236 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4024,6 +4259,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  237 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4041,6 +4277,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  238 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4058,6 +4295,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  239 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4075,6 +4313,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  240 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4092,6 +4331,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  241 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4109,6 +4349,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  242 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4126,6 +4367,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  243 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4143,6 +4385,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  244 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4160,6 +4403,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  245 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4177,6 +4421,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  246 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4194,6 +4439,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  247 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4211,6 +4457,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  248 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4228,6 +4475,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  249 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4245,6 +4493,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  250 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4262,6 +4511,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  251 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4279,6 +4529,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  252 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4296,6 +4547,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = FALSE
   ------- State  253 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4313,6 +4565,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  254 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4330,6 +4583,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  255 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4347,6 +4601,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  256 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4364,6 +4619,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  257 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4381,6 +4637,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  258 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4398,6 +4655,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  259 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4415,6 +4673,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  260 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4432,6 +4691,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  261 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4449,6 +4709,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  262 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4466,6 +4727,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  263 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4483,6 +4745,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  264 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4500,6 +4763,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = FALSE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  265 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4517,6 +4781,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  266 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4534,6 +4799,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  267 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4551,6 +4817,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  268 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4568,6 +4835,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  269 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4585,6 +4853,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  270 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4602,6 +4871,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  271 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4619,6 +4889,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  272 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4636,6 +4907,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  273 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4653,6 +4925,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  274 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4670,6 +4943,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  275 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4687,6 +4961,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  276 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4704,6 +4979,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  277 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4721,6 +4997,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  278 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4738,6 +5015,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  279 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4755,6 +5033,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  280 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4772,6 +5051,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = TRUE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  281 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4789,6 +5069,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  282 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4806,6 +5087,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  283 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4823,6 +5105,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  284 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4840,6 +5123,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  285 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4857,6 +5141,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  286 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4874,6 +5159,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  287 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4891,6 +5177,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   ------- State  288 ------
   seq_generator_loopContinue.outs = TRUE
   seq_generator_loopContinue.counter = 0
@@ -4908,6 +5195,7 @@ reachable states: 288 (2^8.16993) out of 1.67772e+07 (2^24)
   introduceResolver_rhs.ctx_fork_cs.inner_fork.inner_reg_block_1.reg_value = FALSE
   introduceResolver_rhs.ndspec.interpolate = TRUE
   introduceResolver_rhs.resolver.idle = TRUE
+  last_token_confirmSpec = TRUE
   -------------------------
 ######################################################################
-elapse: 0.07 seconds, total: 0.07 seconds
+elapse: 0.06 seconds, total: 0.06 seconds

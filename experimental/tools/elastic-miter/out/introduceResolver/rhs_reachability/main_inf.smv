@@ -25,3 +25,10 @@ MODULE main
   VAR sink_confirmSpec : sink_main(introduceResolver_rhs.confirmSpec_valid);
 
 INVAR introduceResolver_rhs.backedge_eq_confirmSpec.result_valid -> introduceResolver_rhs.backedge_eq_confirmSpec.result;
+VAR last_token_confirmSpec : boolean;
+ASSIGN init(last_token_confirmSpec) := TRUE;
+ASSIGN next(last_token_confirmSpec) := case
+  introduceResolver_rhs.backedge_constant_confirmSpec.result_valid : introduceResolver_rhs.backedge_constant_confirmSpec.result;
+  TRUE : last_token_confirmSpec;
+esac;
+FAIRNESS !last_token_confirmSpec;

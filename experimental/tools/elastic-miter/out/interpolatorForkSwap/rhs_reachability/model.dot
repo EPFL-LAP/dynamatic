@@ -1,22 +1,22 @@
 Digraph G {
   splines=spline
   compound=true
-  "long" ["style"="solid", "shape"="diamond", "label"="long", "mlir_op"="handshake.func"]
   "short" ["style"="solid", "shape"="diamond", "label"="short", "mlir_op"="handshake.func"]
+  "long" ["style"="solid", "shape"="diamond", "label"="long", "mlir_op"="handshake.func"]
   "out1" ["style"="solid", "shape"="diamond", "label"="out1", "mlir_op"="handshake.func"]
   "out2" ["style"="solid", "shape"="diamond", "label"="out2", "mlir_op"="handshake.func"]
-  "long" -> "ndw_in_long" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="long", "to_idx"="0"]
-  "short" -> "ndw_in_short" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="short", "to_idx"="0"]
-  "ndw_in_long" -> "fork_long" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "short" -> "ndw_in_short" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="short", "to_idx"="0"]
+  "long" -> "ndw_in_long" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="long", "to_idx"="0"]
   "ndw_in_short" -> "fork_short" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_long" -> "fork_long" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_out_out1" -> "out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="out1", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_out_out2" -> "out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="out2", "arrowtail"="none", "from"="outs", "to_idx"="1"]
   "interpolator1" -> "ndw_out_out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   "interpolator2" -> "ndw_out_out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   subgraph cluster0 {
     graph ["label"="BB 0"]
-    "ndw_in_long" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
     "ndw_in_short" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_long" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
   }
   subgraph cluster2 {
     graph ["label"="BB 2"]

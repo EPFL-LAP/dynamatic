@@ -27,8 +27,8 @@ module {
     %22 = blocker %28[%20] {handshake.bb = 4 : ui32, handshake.name = "rhs_out_bl_confirmSpec"} : <i1>, <>
     %23 = cmpi eq, %3#0, %22 {handshake.bb = 4 : ui32, handshake.name = "out_eq_confirmSpec"} : <i1>
     %24 = passer %10[%16] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer"} : <i1>, <i1>
-    %25 = buffer %24, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
-    %26 = spec_v2_repeating_init %25 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
+    %25 = spec_v2_repeating_init %24 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
+    %26 = buffer %25, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
     %27 = spec_v2_interpolator %26, %13 {handshake.bb = 2 : ui32, handshake.name = "lhs_interpolate"} : <i1>
     sink %15#1 {handshake.bb = 3 : ui32, handshake.name = "rhs_vm_sink_2"} : <i1>
     %28 = spec_v2_resolver %11, %14 {handshake.bb = 3 : ui32, handshake.name = "rhs_resolver"} : <i1>

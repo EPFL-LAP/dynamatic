@@ -1,7 +1,7 @@
 module {
-  hw.module @andForkSwap_rhs(in %in2 : !handshake.channel<i1>, in %in1 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out out1 : !handshake.channel<i1>, out out2 : !handshake.channel<i1>) {
-    %ndw_in_in2.outs = hw.instance "ndw_in_in2" @handshake_ndwire_0(ins: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+  hw.module @andForkSwap_rhs(in %in1 : !handshake.channel<i1>, in %in2 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out out1 : !handshake.channel<i1>, out out2 : !handshake.channel<i1>) {
     %ndw_in_in1.outs = hw.instance "ndw_in_in1" @handshake_ndwire_0(ins: %in1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %ndw_in_in2.outs = hw.instance "ndw_in_in2" @handshake_ndwire_0(ins: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_out_out1.outs = hw.instance "ndw_out_out1" @handshake_ndwire_0(ins: %and1.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_out_out2.outs = hw.instance "ndw_out_out2" @handshake_ndwire_0(ins: %and2.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %fork1.outs_0, %fork1.outs_1 = hw.instance "fork1" @handshake_fork_0(ins: %ndw_in_in1.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
@@ -13,8 +13,8 @@ module {
   hw.module.extern @handshake_ndwire_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.ndwire", hw.parameters = {DATA_TYPE = !handshake.channel<i1>}}
   hw.module.extern @handshake_fork_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.channel<i1>, out outs_1 : !handshake.channel<i1>) attributes {hw.name = "handshake.fork", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
   hw.module.extern @handshake_andi_0(in %lhs : !handshake.channel<i1>, in %rhs : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.andi", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, INTERNAL_DELAY = "0.0"}}
-  hw.module @andForkSwap_rhs_wrapper(in %in2 : !handshake.channel<i1>, in %in1 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out out1 : !handshake.channel<i1>, out out2 : !handshake.channel<i1>) {
-    %andForkSwap_rhs_wrapped.out1, %andForkSwap_rhs_wrapped.out2 = hw.instance "andForkSwap_rhs_wrapped" @andForkSwap_rhs(in2: %in2: !handshake.channel<i1>, in1: %in1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (out1: !handshake.channel<i1>, out2: !handshake.channel<i1>)
+  hw.module @andForkSwap_rhs_wrapper(in %in1 : !handshake.channel<i1>, in %in2 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out out1 : !handshake.channel<i1>, out out2 : !handshake.channel<i1>) {
+    %andForkSwap_rhs_wrapped.out1, %andForkSwap_rhs_wrapped.out2 = hw.instance "andForkSwap_rhs_wrapped" @andForkSwap_rhs(in1: %in1: !handshake.channel<i1>, in2: %in2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (out1: !handshake.channel<i1>, out2: !handshake.channel<i1>)
     hw.output %andForkSwap_rhs_wrapped.out1, %andForkSwap_rhs_wrapped.out2 : !handshake.channel<i1>, !handshake.channel<i1>
   }
 }

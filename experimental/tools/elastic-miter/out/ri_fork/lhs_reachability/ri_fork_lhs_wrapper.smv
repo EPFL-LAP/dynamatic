@@ -1,0 +1,24 @@
+#include "handshake_ndwire_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+
+
+MODULE ri_fork_lhs_wrapper (A_in, A_in_valid, B_out_ready, C_out_ready)
+
+
+-- input and output
+DEFINE B_out := ri_fork_lhs_wrapped.B_out;
+DEFINE B_out_valid := ri_fork_lhs_wrapped.B_out_valid;
+DEFINE ri_fork_lhs_wrapped_B_out_ready := B_out_ready;
+DEFINE C_out := ri_fork_lhs_wrapped.C_out;
+DEFINE C_out_valid := ri_fork_lhs_wrapped.C_out_valid;
+DEFINE ri_fork_lhs_wrapped_C_out_ready := C_out_ready;
+DEFINE ri_fork_lhs_wrapped_A_in := A_in;
+DEFINE ri_fork_lhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := ri_fork_lhs_wrapped.A_in_ready;
+
+
+VAR ri_fork_lhs_wrapped : ri_fork_lhs(ri_fork_lhs_wrapped_A_in, ri_fork_lhs_wrapped_A_in_valid, ri_fork_lhs_wrapped_B_out_ready, ri_fork_lhs_wrapped_C_out_ready);
+
+-- properties

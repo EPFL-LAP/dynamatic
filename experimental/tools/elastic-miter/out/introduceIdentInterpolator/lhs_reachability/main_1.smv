@@ -25,10 +25,10 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_A_in : bool_input_exact(introduceIdentInterpolator_lhs.A_in_ready, 1);
   VAR seq_generator_val : bool_input_exact(introduceIdentInterpolator_lhs.val_ready, 1);
+  VAR seq_generator_A_in : bool_input_exact(introduceIdentInterpolator_lhs.A_in_ready, 1);
 
-  VAR introduceIdentInterpolator_lhs : introduceIdentInterpolator_lhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_val.outs, seq_generator_val.outs_valid, sink_B_out.ins_ready);
+  VAR introduceIdentInterpolator_lhs : introduceIdentInterpolator_lhs (seq_generator_val.outs, seq_generator_val.outs_valid, seq_generator_A_in.outs, seq_generator_A_in.outs_valid, sink_B_out.ins_ready);
 
   VAR sink_B_out : sink_main(introduceIdentInterpolator_lhs.B_out_valid);
 

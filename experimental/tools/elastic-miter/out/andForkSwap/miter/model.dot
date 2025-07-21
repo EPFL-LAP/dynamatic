@@ -1,16 +1,16 @@
 Digraph G {
   splines=spline
   compound=true
-  "in2" ["style"="solid", "shape"="diamond", "label"="in2", "mlir_op"="handshake.func"]
   "in1" ["style"="solid", "shape"="diamond", "label"="in1", "mlir_op"="handshake.func"]
+  "in2" ["style"="solid", "shape"="diamond", "label"="in2", "mlir_op"="handshake.func"]
   "EQ_out1" ["style"="solid", "shape"="diamond", "label"="EQ_out1", "mlir_op"="handshake.func"]
   "EQ_out2" ["style"="solid", "shape"="diamond", "label"="EQ_out2", "mlir_op"="handshake.func"]
-  "in2" -> "in_fork_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="in2", "to_idx"="0"]
-  "in1" -> "in_fork_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="in1", "to_idx"="0"]
-  "lhs_in_buf_in2" -> "lhs_and" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="rhs", "arrowtail"="none", "from"="outs", "to_idx"="1"]
-  "rhs_in_buf_in2" -> "rhs_fork2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "in1" -> "in_fork_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="in1", "to_idx"="0"]
+  "in2" -> "in_fork_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="in2", "to_idx"="0"]
   "lhs_in_buf_in1" -> "lhs_and" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "rhs_in_buf_in1" -> "rhs_fork1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "lhs_in_buf_in2" -> "lhs_and" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="rhs", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "rhs_in_buf_in2" -> "rhs_fork2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "out_eq_out1" -> "EQ_out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="EQ_out1", "arrowtail"="none", "from"="result", "to_idx"="0"]
   "out_eq_out2" -> "EQ_out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="EQ_out2", "arrowtail"="none", "from"="result", "to_idx"="1"]
   "lhs_fork" -> "lhs_out_bl_out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
@@ -19,16 +19,16 @@ Digraph G {
   "rhs_and2" -> "rhs_out_bl_out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   subgraph cluster0 {
     graph ["label"="BB 0"]
-    "in_fork_in2" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
-    "lhs_in_buf_in2" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
-    "rhs_in_buf_in2" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "in_fork_in1" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
     "lhs_in_buf_in1" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "rhs_in_buf_in1" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
-    "in_fork_in2" -> "lhs_in_buf_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
-    "in_fork_in2" -> "rhs_in_buf_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
+    "in_fork_in2" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
+    "lhs_in_buf_in2" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
+    "rhs_in_buf_in2" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "in_fork_in1" -> "lhs_in_buf_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
     "in_fork_in1" -> "rhs_in_buf_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
+    "in_fork_in2" -> "lhs_in_buf_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+    "in_fork_in2" -> "rhs_in_buf_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
   }
   subgraph cluster3 {
     graph ["label"="BB 3"]

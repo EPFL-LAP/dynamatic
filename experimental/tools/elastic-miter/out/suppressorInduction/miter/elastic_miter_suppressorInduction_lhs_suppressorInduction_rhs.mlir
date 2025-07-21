@@ -20,8 +20,8 @@ module {
     %17 = cmpi eq, %15, %16 {handshake.bb = 4 : ui32, handshake.name = "out_eq_B_out"} : <i1>
     %18:2 = fork [2] %6 {handshake.bb = 2 : ui32, handshake.name = "lhs_vm_fork_1"} : <i1>
     %19 = spec_v2_interpolator %3, %18#0 {handshake.bb = 2 : ui32, handshake.name = "lhs_interpolate"} : <i1>
-    %20 = buffer %18#1, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
-    %21 = spec_v2_repeating_init %20 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
+    %20 = spec_v2_repeating_init %18#1 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
+    %21 = buffer %20, bufferType = FIFO_BREAK_NONE, numSlots = 1 {handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
     %22 = passer %9[%21] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer1"} : <i1>, <i1>
     %23 = passer %22[%19] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer2"} : <i1>, <i1>
     %24 = spec_v2_repeating_init %7 {handshake.bb = 3 : ui32, handshake.name = "rhs_ri", initToken = 1 : ui1} : <i1>

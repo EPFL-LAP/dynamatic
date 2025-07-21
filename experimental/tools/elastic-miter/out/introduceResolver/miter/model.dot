@@ -78,12 +78,12 @@ Digraph G {
   subgraph cluster2 {
     graph ["label"="BB 2"]
     "lhs_passer" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
-    "lhs_buffer" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_NONE [1]", "mlir_op"="handshake.buffer"]
     "lhs_ri" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_repeating_init", "mlir_op"="handshake.spec_v2_repeating_init"]
+    "lhs_buffer" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_NONE [1]", "mlir_op"="handshake.buffer"]
     "lhs_interpolate" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_interpolator", "mlir_op"="handshake.spec_v2_interpolator"]
-    "lhs_passer" -> "lhs_buffer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
-    "lhs_buffer" -> "lhs_ri" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
-    "lhs_ri" -> "lhs_interpolate" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="short", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+    "lhs_passer" -> "lhs_ri" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "lhs_ri" -> "lhs_buffer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+    "lhs_buffer" -> "lhs_interpolate" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="short", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   }
   subgraph cluster3 {
     graph ["label"="BB 3"]

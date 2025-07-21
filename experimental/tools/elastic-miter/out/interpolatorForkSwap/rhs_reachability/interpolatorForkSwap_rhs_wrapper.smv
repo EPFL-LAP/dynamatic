@@ -1,9 +1,9 @@
-#include "handshake_fork_0.smv"
 #include "handshake_spec_v2_interpolator_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
 
 
-MODULE interpolatorForkSwap_rhs_wrapper (long, long_valid, short, short_valid, out1_ready, out2_ready)
+MODULE interpolatorForkSwap_rhs_wrapper (short, short_valid, long, long_valid, out1_ready, out2_ready)
 
 
 -- input and output
@@ -13,14 +13,14 @@ DEFINE interpolatorForkSwap_rhs_wrapped_out1_ready := out1_ready;
 DEFINE out2 := interpolatorForkSwap_rhs_wrapped.out2;
 DEFINE out2_valid := interpolatorForkSwap_rhs_wrapped.out2_valid;
 DEFINE interpolatorForkSwap_rhs_wrapped_out2_ready := out2_ready;
-DEFINE interpolatorForkSwap_rhs_wrapped_long := long;
-DEFINE interpolatorForkSwap_rhs_wrapped_long_valid := long_valid;
-DEFINE long_ready := interpolatorForkSwap_rhs_wrapped.long_ready;
 DEFINE interpolatorForkSwap_rhs_wrapped_short := short;
 DEFINE interpolatorForkSwap_rhs_wrapped_short_valid := short_valid;
 DEFINE short_ready := interpolatorForkSwap_rhs_wrapped.short_ready;
+DEFINE interpolatorForkSwap_rhs_wrapped_long := long;
+DEFINE interpolatorForkSwap_rhs_wrapped_long_valid := long_valid;
+DEFINE long_ready := interpolatorForkSwap_rhs_wrapped.long_ready;
 
 
-VAR interpolatorForkSwap_rhs_wrapped : interpolatorForkSwap_rhs(interpolatorForkSwap_rhs_wrapped_long, interpolatorForkSwap_rhs_wrapped_long_valid, interpolatorForkSwap_rhs_wrapped_short, interpolatorForkSwap_rhs_wrapped_short_valid, interpolatorForkSwap_rhs_wrapped_out1_ready, interpolatorForkSwap_rhs_wrapped_out2_ready);
+VAR interpolatorForkSwap_rhs_wrapped : interpolatorForkSwap_rhs(interpolatorForkSwap_rhs_wrapped_short, interpolatorForkSwap_rhs_wrapped_short_valid, interpolatorForkSwap_rhs_wrapped_long, interpolatorForkSwap_rhs_wrapped_long_valid, interpolatorForkSwap_rhs_wrapped_out1_ready, interpolatorForkSwap_rhs_wrapped_out2_ready);
 
 -- properties

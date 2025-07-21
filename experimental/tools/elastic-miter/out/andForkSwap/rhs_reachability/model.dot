@@ -1,22 +1,22 @@
 Digraph G {
   splines=spline
   compound=true
-  "in2" ["style"="solid", "shape"="diamond", "label"="in2", "mlir_op"="handshake.func"]
   "in1" ["style"="solid", "shape"="diamond", "label"="in1", "mlir_op"="handshake.func"]
+  "in2" ["style"="solid", "shape"="diamond", "label"="in2", "mlir_op"="handshake.func"]
   "out1" ["style"="solid", "shape"="diamond", "label"="out1", "mlir_op"="handshake.func"]
   "out2" ["style"="solid", "shape"="diamond", "label"="out2", "mlir_op"="handshake.func"]
-  "in2" -> "ndw_in_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="in2", "to_idx"="0"]
-  "in1" -> "ndw_in_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="in1", "to_idx"="0"]
-  "ndw_in_in2" -> "fork2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "in1" -> "ndw_in_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="in1", "to_idx"="0"]
+  "in2" -> "ndw_in_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="in2", "to_idx"="0"]
   "ndw_in_in1" -> "fork1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_in2" -> "fork2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_out_out1" -> "out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="out1", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "ndw_out_out2" -> "out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="out2", "arrowtail"="none", "from"="outs", "to_idx"="1"]
   "and1" -> "ndw_out_out1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   "and2" -> "ndw_out_out2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   subgraph cluster0 {
     graph ["label"="BB 0"]
-    "ndw_in_in2" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
     "ndw_in_in1" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_in2" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
   }
   subgraph cluster2 {
     graph ["label"="BB 2"]
