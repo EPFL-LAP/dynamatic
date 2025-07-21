@@ -27,7 +27,7 @@ float cordic(in_float_t theta, out_float_t results[2], in_float_t cordic_phase[1
 }
 
 int main(void) {
-  in_float_t thetas;
+  in_float_t theta;
   out_float_t results[2];
   in_float_t cordic_phase[1000];
   in_float_t initial_cos = 1;
@@ -38,10 +38,10 @@ int main(void) {
     cordic_phase[i] = 1 / div;
   }
 
-  thetas = 1;
+  theta = 1;
   results[0] = 0;
   results[1] = 0;
 
-  CALL_KERNEL(cordic, thetas, results, cordic_phase, initial_cos, initial_sin);
+  CALL_KERNEL(cordic, theta, results, cordic_phase, initial_cos, initial_sin);
   return 0;
 }
