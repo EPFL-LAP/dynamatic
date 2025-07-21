@@ -70,7 +70,7 @@ end entity;
 
     architecture = f"""
 -- Architecture of extf
-architecture arch of extf is
+architecture arch of {name} is
 begin
   converter: entity work.{single_to_double_name}(arch)
     port map (
