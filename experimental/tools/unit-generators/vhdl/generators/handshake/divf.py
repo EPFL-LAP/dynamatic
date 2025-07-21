@@ -57,7 +57,7 @@ end entity;
 
     clock_enables = "\n".join(
         [f"ce_1 => oehb_ready,"] +
-        [f"        ce_{i} => oehb_ready," for i in range(2, latency)]
+        [f"        ce_{i} => oehb_ready," for i in range(2, latency+1)]
     )
 
     architecture = f"""
