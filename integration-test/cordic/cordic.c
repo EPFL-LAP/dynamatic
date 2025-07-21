@@ -3,8 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-float cordic(in_float_t theta, out_float_t results[2], in_float_t cordic_phases[1000],
-             in_float_t initial_cos, in_float_t initial_sin) {
+float cordic(in_float_t theta, out_float_t results[2],
+             in_float_t cordic_phases[1000], in_float_t initial_cos,
+             in_float_t initial_sin) {
 
   float factor = 1.0;
 
