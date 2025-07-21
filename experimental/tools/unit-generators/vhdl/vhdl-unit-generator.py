@@ -23,6 +23,7 @@ import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.ori as ori
 import generators.handshake.select as select
+import generators.handshake.shrsi as shrsi
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
@@ -116,6 +117,8 @@ def generate_code(name, mod_type, parameters):
             return extui.generate_extui(name, parameters)
         case "shli":
             return shli.generate_shli(name, parameters)
+        case "shrsi":
+            return shrsi.generate_shrsi(name, parameters)
         case "blocker":
             return blocker.generate_blocker(name, parameters)
         case "sitofp":
