@@ -45,7 +45,7 @@ end entity;
 -- Architecture of xori
 architecture arch of {name} is
 begin
-  join_inputs : entity work.{join_name}(arch) generic
+  join_inputs : entity work.{join_name}(arch)
     port map(
       -- inputs
       ins_valid(0) => lhs_valid,
