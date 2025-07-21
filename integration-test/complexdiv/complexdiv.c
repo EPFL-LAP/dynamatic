@@ -2,24 +2,24 @@
 #include "dynamatic/Integration.h"
 #include <math.h>
 
-void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000],
-                in_float_t b_r[1000], out_float_t c_i[1000], out_float_t c_r[1000]) {
+void complexdiv(in_int_t a_i[1000], in_int_t a_r[1000], in_int_t b_i[1000],
+                in_int_t b_r[1000], out_int_t c_i[1000], out_int_t c_r[1000]) {
   int i;
 
   for (i = 0; i < 1000; i++) {
-    float bi = b_i[i];
-    float br = b_r[i];
-    float ai = a_i[i];
-    float ar = a_r[i];
-    float cr, ci;
-    if (fabs(br) >= fabs(bi)) {
-      float r = bi / br;
-      float den = br + r * bi;
+    int bi = b_i[i];
+    int br = b_r[i];
+    int ai = a_i[i];
+    int ar = a_r[i];
+    int cr, ci;
+    if (abs(br) >= abs(bi)) {
+      int r = bi / br;
+      int den = br + r * bi;
       cr = (ar + r * ai) / den;
       ci = (ai - r * ar) / den;
     } else {
-      float r = br / bi;
-      float den = bi + r * br;
+      int r = br / bi;
+      int den = bi + r * br;
       cr = (ar * r + ai) / den;
       ci = (ai * r - ar) / den;
     }
@@ -29,12 +29,12 @@ void complexdiv(in_float_t a_i[1000], in_float_t a_r[1000], in_float_t b_i[1000]
 }
 
 int main(void) {
-  in_float_t a_i[1000];
-  in_float_t a_r[1000];
-  in_float_t b_i[1000];
-  in_float_t b_r[1000];
-  out_float_t c_i[1000];
-  out_float_t c_r[1000];
+  in_int_t a_i[1000];
+  in_int_t a_r[1000];
+  in_int_t b_i[1000];
+  in_int_t b_r[1000];
+  out_int_t c_i[1000];
+  out_int_t c_r[1000];
 
   for (int j = 0; j < 1000; ++j) {
     a_i[j] = 1;
