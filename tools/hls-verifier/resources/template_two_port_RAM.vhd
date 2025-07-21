@@ -66,8 +66,10 @@ begin
       index := 0;
       file_open(file_status, file_ptr, TV_IN, READ_MODE);
 
-      if (file_status /= OPEN_OK) then
-        assert false report "ERROR: Could not open file: " & TV_IN severity failure;
+      if (not file_is_open(file_ptr)) then
+        report "ERROR: File not found: " & TV_IN severity failure;
+      elsif (file_status /= OPEN_OK) then
+        report "ERROR: Could not open file (status error): " & TV_IN severity failure;
       end if;
 
       -- Use read_token procedure to read tokens from the file
