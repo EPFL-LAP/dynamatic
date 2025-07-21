@@ -76,14 +76,14 @@ architecture arch of {name} is
 
   begin
     join_inputs : entity work.{join_name}(arch)
-      port map( 
-        -- inputs 
+      port map(
+        -- inputs
         ins_valid(0) => lhs_valid,
         ins_valid(1) => rhs_valid,
         outs_ready   => oehb_ready,
-        -- outputs 
-        outs_valid   => join_valid, 
-        ins_ready(0) => lhs_ready, 
+        -- outputs
+        outs_valid   => join_valid,
+        ins_ready(0) => lhs_ready,
         ins_ready(1) => rhs_ready
     );
 
