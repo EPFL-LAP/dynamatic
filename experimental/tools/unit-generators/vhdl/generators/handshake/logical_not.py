@@ -1,6 +1,6 @@
 from generators.support.signal_manager import generate_default_signal_manager
 
-def generate_not(name, params):
+def generate_logical_not(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
 
