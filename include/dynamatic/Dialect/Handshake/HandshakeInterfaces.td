@@ -217,42 +217,10 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
 def HasClock : NativeOpTrait<"HasClock">;
 
-
-def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-     Handshake operations which have a variable internal delay
-     used in frequency regulation.
-  }];
-
-  let methods = [
-    InterfaceMethod<[{
-      Sets the internal delay as a StringAttr named "internal_delay".
-    }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
-      Operation *op = $_op.getOperation();
-      op->setAttr("internal_delay",
-                   StringAttr::get(op->getContext(), value));
-    }]>,
-    
-    // Return StringAttr instead of StringRef to ensure proper memory allocation.
-    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
-    InterfaceMethod<[{
-      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
-    }], "StringAttr", "getInternalDelay", (ins), [{
-      Operation *op = $_op.getOperation();
-      if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
-        return attr;
-      return StringAttr::get(op->getContext(), "0.0");
-    }]>
-  ];
-}
-
-
 def FPUImplInterface : OpInterface<"FPUImplInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-     Specifies which "vendor" of floating point units
-     to use
+     Allows specification of attributes which affect FPU RTL.
   }];
 
   let methods = [
@@ -272,6 +240,39 @@ InterfaceMethod<[{
         return attr.getValue();
       }
       return FPUImpl::FLOPOCO;
+    }]>,
+
+  InterfaceMethod<[{
+      Sets the internal delay as a StringAttr named "internal_delay".
+    }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("internal_delay",
+                   StringAttr::get(op->getContext(), value));
+    }]>,
+    
+  // Return StringAttr instead of StringRef to ensure proper memory allocation.
+  // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+  InterfaceMethod<[{
+      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
+    }], "StringAttr", "getInternalDelay", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
+        return attr;
+      return StringAttr::get(op->getContext(), "0.0");
+    }]>
+
+  // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+  InterfaceMethod<[{
+      Gets the operation latency as an integer.
+    }], "int64_t", "getLatency", (ins), [{
+      Operation *op = $_op.getOperation();
+      return op->getAttrOfType<IntegerAttr>("latency");
+    }]>
+
+  InterfaceMethod<[{
+  Sets the operation latency.
+    }], "void", "setLatency", (ins "int64_t":$latency), [{
+      $_op->setAttr("latency", IntegerAttr::get(IntegerType::get($_op->getContext(), 64), latency));
     }]>
   ];
 }
