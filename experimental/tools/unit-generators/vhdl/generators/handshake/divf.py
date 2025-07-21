@@ -69,10 +69,10 @@ architecture arch of {name} is
   signal oehb_dataOut, oehb_datain : std_logic_vector(0 downto 0);
 
   --intermediate input signals for float conversion
-  signal ip_lhs, ip_rhs : std_logic_vector(65 downto 0);
+  signal ip_lhs, ip_rhs : std_logic_vector({bitwidth + 2} - 1 downto 0);
 
   --intermidiate output signal(s) for float conversion
-  signal ip_result : std_logic_vector(65 downto 0);
+  signal ip_result : std_logic_vector({bitwidth + 2} - 1 downto 0);
 
   begin
     join_inputs : entity work.{join_name}(arch)
@@ -105,7 +105,7 @@ architecture arch of {name} is
         ins_ready  => oehb_ready
       );
 
-    ieee2nfloat_0: entity work.InputIEEE_64bit(arch)
+    ieee2nfloat_0: entity work.InputIEEE_{bitwidth}bit(arch)
             port map (
                 --input
                 X =>lhs,
@@ -113,7 +113,7 @@ architecture arch of {name} is
                 R => ip_lhs
             );
 
-    ieee2nfloat_1: entity work.InputIEEE_64bit(arch)
+    ieee2nfloat_1: entity work.InputIEEE_{bitwidth}bit(arch)
             port map (
                 --input
                 X => rhs,
@@ -121,7 +121,7 @@ architecture arch of {name} is
                 R => ip_rhs
             );
 
-    nfloat2ieee : entity work.OutputIEEE_64bit(arch)
+    nfloat2ieee : entity work.OutputIEEE_{bitwidth}bit(arch)
             port map (
                 --input
                 X => ip_result,
@@ -143,8 +143,7 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_divf_signal_manager(name, is_double, internal_delay, latency, extra_signals):
-    bitwidth = 64 if is_double else 32
+def _generate_divf_signal_manager(name, bitwidth, internal_delay, latency, extra_signals):
     return generate_buffered_signal_manager(
         name,
         [{
@@ -162,8 +161,8 @@ def _generate_divf_signal_manager(name, is_double, internal_delay, latency, extr
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_divf(name, is_double),
-          internal_delay, latency)
+        lambda name: _generate_divf(name, bitwidth, internal_delay, latency),
+        latency)
 
 """
 
