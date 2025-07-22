@@ -36,7 +36,7 @@ jobs:
           echo "Running autopep8..."
           git fetch origin main --no-recurse-submodules
           git reset FETCH_HEAD
-          FILES=$(git ls-files '*.py' --modified)
+          FILES=$(comm -23 <(git ls-files '*.py' --modified | sort) <(git ls-files '*.py' --deleted | sort))
           STATUS=$?
           if [[ $FILES ]]; then
             exec 3>&1
