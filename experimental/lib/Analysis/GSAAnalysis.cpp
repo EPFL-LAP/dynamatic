@@ -78,7 +78,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
     gatesPerBlock[block].push_back(newPhi);
   }
 
-  convertPhiToMu(region);
+  /*convertPhiToMu(region,bi);
   convertPhiToGamma(region, bi);
 
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
@@ -86,6 +86,23 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   // remove all the phis.
   removePhiGates();
   printAllGates();
+*/
+llvm::errs() << "\n\n\t\tconvertSSAToGSAMerges:\n\n";
+  llvm::errs() << "\n\nInitial phi\n\n";
+  printAllGates();
+  convertPhiToMu(region,bi);
+llvm::errs() << "\n\nAfter Mu Placement\n\n";
+  printAllGates();
+  convertPhiToGamma(region, bi);
+llvm::errs() << "\n\nAfter Gamma Placement\n\n";
+  printAllGates();
+  // After the conversion is done, `gatesPerBlock` will contain some phis, some
+  // MUs and some GAMMAs. Since we are only interested in the last two, we can
+  // remove all the phis.
+  removePhiGates();
+llvm::errs() << "\n\nAfter deleting phis\n\n";
+  printAllGates();
+  llvm::errs() << "convertSSAToGSA is finished" <<"\n\n";
 }
 
 experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
@@ -108,6 +125,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
       // Analyze the function
       if (!functionsCovered) {
         inputOp = &funcOp.getRegion();
+        llvm::errs() << "module\n";
         convertSSAToGSA(*inputOp);
         functionsCovered++;
       } else {
@@ -115,6 +133,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
       }
     }
   } else if (func::FuncOp fOp = dyn_cast<func::FuncOp>(operation); fOp) {
+    llvm::errs() << "function\n";
     convertSSAToGSA(fOp.getRegion());
     functionsCovered = 1;
   }
@@ -183,6 +202,18 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
       conditionsFalseExpressions.emplace_back(exprFalse, expression.second);
   }
 
+
+  llvm:: errs() << "In gamma tree\ncondition  " <<conditionToUse ;
+for (std::pair<BoolExpression *, GateInput *> expression_ : conditionsTrueExpressions){
+  llvm::errs() <<"\n\tOperand BB" <<bi.getIndexFromBlock(expression_.second->getBlock())<< "\t condition: " ;
+  expression_.first->print();
+}
+
+llvm:: errs() << "\ncondition  ~" <<conditionToUse ;
+for (std::pair<BoolExpression *, GateInput *> expression_ : conditionsFalseExpressions){
+  llvm::errs() <<"\n\tOperand BB" <<bi.getIndexFromBlock(expression_.second->getBlock())<< "\t condition: " ;
+  expression_.first->print();
+}
   SmallVector<GateInput *> operandsGamma(2);
 
   // If the number of non-null expressions obtained with cofactor = X is greater
@@ -207,10 +238,10 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
       gateInputList.push_back(operandsGamma[input]);
     }
   };
-
+llvm:: errs() << "\ni survied\n\n ~" <<conditionToUse ;
   setGammaOperand(1, conditionsTrueExpressions);
   setGammaOperand(0, conditionsFalseExpressions);
-
+llvm:: errs() << "\ni survied22\n\n ~" <<conditionToUse ;
   // Create a new gamma and add it to the list of phis for the original basic
   // block.
 
@@ -225,7 +256,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
 }
 
 void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
-
+llvm::errs() << "convertSSAToGSA is called" <<"\n";
   if (region.getBlocks().size() == 1)
     return;
 
@@ -267,19 +298,23 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
     // Create an empty list for the phi functions corresponding to the block
     gatesPerBlock.insert({&block, llvm::SmallVector<Gate *>()});
 
+    //llvm::errs() << "BB" << bi.getIndexFromBlock(&block) << " has " <<block.getArguments().size() <<" args\n";
     // For each block argument
     for (BlockArgument &arg : block.getArguments()) {
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<GateInput *> operands;
+      SmallVector<BlockArgument > operands_missphi;
       DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
       // providing the inputs of the phi functions
       for (Block *pred : block.getPredecessors()) {
-
+        //llvm::errs() << argNumber<<" checking BB" << bi.getIndexFromBlock(&block) << " pred BB" << bi.getIndexFromBlock(pred)<<": "; 
         // Make sure that a predecessor is covered only once
-        if (coveredPredecessors.contains(pred))
-          continue;
+        if (coveredPredecessors.contains(pred)){
+          //llvm::errs() << "already exist\n" ;
+          continue;}
+        //llvm::errs() << "is new\n" ;
         coveredPredecessors.insert(pred);
 
         // Get the branch terminator
@@ -289,11 +324,30 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
 
         // Check if the input value "c" of type Value is already present among
         // the operands of the phi function
-        auto isAlreadyPresent = [&](Value c) -> bool {
+        /* auto isAlreadyPresent = [&](Value c) -> bool {
           return std::any_of(operands.begin(), operands.end(),
                              [c](GateInput *in) {
                                return in->isTypeValue() && in->getValue() == c;
                              });
+        };*/
+
+
+        auto isAlreadyPresent = [&](Value c) -> bool {
+          // Check for concrete values already present
+          for (GateInput *in : operands) {
+            if (in->isTypeValue() && in->getValue() == c)
+              return true;
+          }
+
+          // Check for duplicate missing phis
+          if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
+            for ( BlockArgument barg : operands_missphi) {
+              if(barg.getParentBlock()== blockArgC.getParentBlock())
+                return true;
+            }
+          }
+
+          return false;
         };
 
         // For each alternative in the branch terminator
@@ -315,15 +369,24 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
           /// of missing phis. Otherwise, the input is a value, and it can be
           /// safely added directly.
           if (BlockArgument blockArg = dyn_cast<BlockArgument>(producer);
-              blockArg && !producer.getParentBlock()->hasNoPredecessors()) {
+              blockArg && !producer.getParentBlock()->hasNoPredecessors() && !isAlreadyPresent(dyn_cast<Value>(producer))) {
             gateInput = new GateInput((Gate *)nullptr);
             phisToConnect.push_back(MissingPhi(gateInput, blockArg));
             gateInputList.push_back(gateInput);
+            operands_missphi.push_back(blockArg);
+            llvm::errs() <<"missphi:    from BB" << bi.getIndexFromBlock(producer.getParentBlock())
+              << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
+
           } else {
             if (!isAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
               gateInputList.push_back(gateInput);
+              llvm::errs() <<"normalpath: from BB" << bi.getIndexFromBlock(producer.getParentBlock())
+               << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
+              //llvm::errs() <<"meow: BB" << bi.getIndexFromBlock(gateInput->getBlock()) << "\n";
             }
+            else llvm::errs() <<"repeated: from BB" << bi.getIndexFromBlock(producer.getParentBlock())
+               << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
           }
 
           // Insert the value among the inputs of the phi
@@ -357,15 +420,21 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
     assert(foundGate != list.end() && "[GSA] Not found phi to reconnect");
     missing.pi->input = *foundGate;
   }
-
-  convertPhiToMu(region);
+llvm::errs() << "\n\nInitial phi\n\n";
+  printAllGates();
+  convertPhiToMu(region,bi);
+llvm::errs() << "\n\nAfter Mu Placement\n\n";
+  printAllGates();
   convertPhiToGamma(region, bi);
-
+llvm::errs() << "\n\nAfter Gamma Placement\n\n";
+  printAllGates();
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
   // MUs and some GAMMAs. Since we are only interested in the last two, we can
   // remove all the phis.
   removePhiGates();
+llvm::errs() << "\n\nAfter deleting phis\n\n";
   printAllGates();
+  llvm::errs() << "convertSSAToGSA is finished" <<"\n\n";
 }
 
 void experimental::gsa::GSAAnalysis::convertPhiToGamma(
@@ -392,6 +461,12 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
                    return domInfo.dominates(a->getBlock(), b->getBlock());
                  });
 
+      llvm::errs() << "phi "<< phi->index << ",  operand Size= "<< phiOperands.size() << ":\nOperands from:\t";
+      for (GateInput *op : phiOperands) {
+          llvm::errs() << "BB" <<bi.getIndexFromBlock(op->getBlock()) <<",\t";
+      }
+      llvm::errs() << "\n";
+
       // Find the nearest common dominator among all the blocks involved
       // in the phi inputs. Also add all the blocks to the list of 'blocks to
       // avoid'
@@ -403,6 +478,8 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
             domInfo.findNearestCommonDominator(bb, commonDominator);
         blocksToAvoid.push_back(bb);
       }
+
+llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::errs());llvm::errs() << "    \n";
 
       // When traversing a path, some blocks have a condition which steers the
       // control flow execution. This set stores the list of the blocks
@@ -423,6 +500,14 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
         // through operand's block but not through any of the "blocksToAvoid"
         auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
+//PRINT ALL PATHS
+      llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) << ":\n";
+      for (std::vector<Block *> path : paths) {
+          for (Block * b: path) {
+          llvm::errs() << bi.getIndexFromBlock(b)<<" , ";
+        }
+        llvm::errs() <<"\n";
+      }
 
         BoolExpression *phiInputCondition = BoolExpression::boolZero();
 
@@ -433,6 +518,15 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
           phiInputCondition =
               BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();
+/*         llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) <<":\n";
+          for (Block * b: path) {
+          llvm::errs() << bi.getIndexFromBlock(b)<<" , ";
+          }
+          llvm::errs() << "\t path condition = " ;
+          condition->print() ;
+          llvm::errs() << "\n total cond: " ;
+          phiInputCondition->print() ;
+          llvm::errs() <<"\n";*/ 
         }
 
         // Associate the expression to the phi operand
@@ -449,10 +543,24 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       for (unsigned &index : conditionsToOrder)
         conditionsOrdered.push(index);
 
+llvm::errs() << "shallalalllallallal" <<"\n";
+//print what we have for a phi
+llvm::errs() << "[PHI_ID] = " << phi->index;
+for (std::pair<BoolExpression *, GateInput *> expression_ : expressionsList){
+  llvm::errs() <<"\n\tOperand BB" <<bi.getIndexFromBlock(expression_.second->getBlock())<< "\t condition: " ;
+  expression_.first->print();
+}
+ llvm::errs() <<"\nAll Conditions: " << conditionsOrdered.size()<< "\t";
+ for (unsigned &index : conditionsToOrder){
+    llvm:: errs()<< index << ", ";
+ }
+ llvm::errs() <<"\n" ;
       // Expand the expressions to get the tree of gammas
       Gate *gammaRoot =
           expandGammaTree(expressionsList, conditionsOrdered, phi, bi);
       gammaRoot->isRoot = true;
+
+llvm::errs() << "shallalalllallallal2" <<"\n";
 
       // Once that a phi has been converted into a tree of gammas, all the
       // gates which used the original phi as input must be connected to the
@@ -467,9 +575,10 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       }
     }
   }
+  llvm::errs() << "finfifnfinfnfifnifnfnfinffifnfif" <<"\n";
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
+void experimental::gsa::GSAAnalysis::convertPhiToMu_(Region &region) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
@@ -515,6 +624,157 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
     }
   }
 }
+bool experimental::gsa::GSAAnalysis::areEqualGateInputs(GateInput *a, GateInput *b) {
+  if (!a || !b) return a == b;
+
+  // Type mismatch: one is value, other is gate
+  if (a->isTypeValue() != b->isTypeValue())
+    return false;
+
+  // Compare value type
+  if (a->isTypeValue())
+    return a->getValue() == b->getValue() &&
+           a->getBlock() == b->getBlock();
+
+  // Compare gate type
+  if (a->isTypeGate())
+    return a->getGate() == b->getGate() &&
+           a->getBlock() == b->getBlock();
+
+  return false;
+}
+
+void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIndexing &bi) {
+
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+
+  // For each phi
+  for (const std::pair<Block *, SmallVector<Gate *>> &entry : gatesPerBlock) {
+    Block *phiBlock = entry.first;
+    llvm::errs()<<"BB"<< bi.getIndexFromBlock(phiBlock)<<"\n";
+    SmallVector<Gate *> phis = entry.second;
+    for (Gate *phi : phis) {
+
+      // A phi might be a MU iff it is inside a for loop and has exactly
+      // two operands
+      llvm::errs()<<"\narg_num="<<phi->getArgumentNumber()<<"\t";
+      llvm::errs() << "number of my operands = " << phi->operands.size() <<"\t ";
+      /*if (!loopInfo.getLoopFor(phiBlock) || phi->operands.size() != 2){
+        continue;
+      }*/
+
+      if (!loopInfo.getLoopFor(phiBlock) ){
+        llvm::errs() << "I wasn't in loop" <<"\n";
+        continue;
+      }
+      else if (phi->operands.size() < 2){
+        llvm::errs() << " < 1 operands, move on" << "\n";
+        continue;
+      }
+
+      if(loopInfo.getLoopFor(phiBlock)->getHeader() != phiBlock){
+        llvm::errs() << "Not a header" << "\n";
+        continue;
+      }
+
+      
+      SmallVector<GateInput*> initialInputs, loopInputs;
+
+      if (phi->operands.size() > 1){
+        llvm::errs() << " > 1 operands\nOperands from:\t" ;
+        for(GateInput* operand : phi->operands)
+          llvm::errs() <<"BB" << bi.getIndexFromBlock(operand->getBlock()) << "\t";
+        
+        // seperate initial inputs from loop inputs
+      
+        auto *phiLoop = loopInfo.getLoopFor(phiBlock);
+
+        for (GateInput *input : phi->operands) {
+          auto *inputLoop = loopInfo.getLoopFor(input->getBlock());
+          if (inputLoop != phiLoop)
+            initialInputs.push_back(input);
+          else
+            loopInputs.push_back(input);
+        }
+
+      }
+      
+      GateInput *operandInit = nullptr, *operandLoop = nullptr;
+
+      if (initialInputs.size()<1){
+        continue;
+      }
+      else if(initialInputs.size()>1){
+
+        Gate *initialPhi =
+            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex); 
+        gatesPerBlock[phiBlock].push_back(initialPhi);
+
+        operandInit = new GateInput(initialPhi);
+        gateInputList.push_back(operandInit);
+        llvm::errs() << initialInputs.size()<<" initial operands\t"<< "initialPhi id= "<< initialPhi->index<< "\n";
+      }
+      else{
+        operandInit = initialInputs[0];
+        llvm::errs() << "one init operand"<< "\n";
+      }
+
+      //loop value      
+      if (loopInputs.size()<1){
+        continue;
+      }
+      else if(loopInputs.size()>1){
+
+        Gate *loopPhi =
+            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex);
+        gatesPerBlock[phiBlock].push_back(loopPhi);
+
+        operandLoop = new GateInput(loopPhi);
+        gateInputList.push_back(operandLoop);
+        llvm::errs() << loopInputs.size()<<" loop operands\t"<< "loopPhi id= "<< loopPhi->index<< "\n";
+      }
+      else{
+        operandLoop = loopInputs[0];
+        llvm::errs() << "one loop operand"<< "\n";
+      }
+
+      //Block *op0Block = phi->operands[0]->getBlock(),
+      //      *op1Block = phi->operands[1]->getBlock();
+      /*
+      // Checks whether the block of the merge is a loop header
+      bool isBlockHeader =
+          loopInfo.getLoopFor(phiBlock)->getHeader() == phiBlock;
+
+      // Checks whether the two operands come from different loops (in
+      // this case, one of the values is the initial definition)
+      bool operandFromOutsideLoop =
+          loopInfo.getLoopFor(op0Block) != loopInfo.getLoopFor(op1Block);
+
+      // If both the conditions hold, then we have a MU gate
+      if (!(isBlockHeader && operandFromOutsideLoop)){
+        llvm::errs() << "I dieed here" << "\n";
+        continue;
+      }*/
+      
+      phi->gsaGateFunction = GateType::MuGate;
+      phi->operands = {operandInit, operandLoop};
+
+      /*
+      // Use the initial value of MU as first input of the gate
+      if (domInfo.dominates(op1Block, phiBlock))
+        std::swap(phi->operands[0], phi->operands[1]);
+      */
+
+      // The block determining the MU condition is the exiting block of the
+      // innermost loop the MU is in
+      phi->conditionBlock =
+          loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
+      phi->isRoot = true;
+    }
+  }
+  
+}
 
 void experimental::gsa::GSAAnalysis::removePhiGates() {
   for (auto const &[block, gates] : gatesPerBlock) {
@@ -556,6 +816,51 @@ experimental::gsa::GSAAnalysis::~GSAAnalysis() {
   }
 }
 
+void experimental::gsa::Gate::print() {
+  auto getPhiName = [](Gate *p) -> std::string {
+    switch (p->gsaGateFunction) {
+    case GammaGate:
+      return "GAMMA";
+    case MuGate:
+      return "MU";
+    default:
+      return "PHI";
+    }
+  };
+
+  llvm::errs() << "[GSA] Block ";
+  getBlock()->printAsOperand(llvm::errs());
+  llvm::errs() << " arg " << getArgumentNumber() << " type "
+               << getPhiName(this) << "_" << index;
+
+  if (gsaGateFunction == GammaGate || gsaGateFunction == MuGate) {
+    llvm::errs() << " condition ";
+    conditionBlock->printAsOperand(llvm::errs());
+  }
+
+  llvm::errs() << "\n";
+
+  for (GateInput *&op : operands) {
+    if (op->isTypeValue()) {
+      llvm::errs() << "[GSA]\t VALUE\t: ";
+      op->getValue().print(llvm::errs());
+    } else if (op->isTypeEmpty()) {
+      llvm::errs() << "[GSA]\t EMPTY";
+    } else {
+      llvm::errs() << "[GSA]\t GATE\t: " << getPhiName(op->getGate()) << "_"
+                   << op->getGate()->index;
+    }
+
+    if (!op->isTypeEmpty()) {
+      llvm::errs() << "\t(";
+      op->getBlock()->printAsOperand(llvm::errs());
+      llvm::errs() << ")";
+    }
+    llvm::errs() << "\n";
+  }
+}
+
+/*
 void experimental::gsa::Gate::print() {
 
   LLVM_DEBUG(
@@ -601,7 +906,7 @@ void experimental::gsa::Gate::print() {
         llvm::dbgs() << "\n";
       });
 }
-
+*/
 Block *experimental::gsa::GateInput::getBlock() {
   if (isTypeEmpty())
     return nullptr;

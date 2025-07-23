@@ -155,6 +155,7 @@ public:
   /// pointers are created
   GSAAnalysis(GSAAnalysis &gsa) {
     this->inputOp = gsa.inputOp;
+            llvm::errs() << "copy const\n";
     this->convertSSAToGSA(*this->inputOp);
   }
 
@@ -200,7 +201,9 @@ private:
   void printAllGates();
 
   /// Mark as mu all the phi gates which correspond to loop variables.
-  void convertPhiToMu(Region &region);
+  void convertPhiToMu(Region &region,const experimental::ftd::BlockIndexing &bi);
+  void convertPhiToMu_(Region &region);
+  bool areEqualGateInputs(GateInput *a, GateInput *b);
 
   /// Convert some phi gates to trees of gamma gates.
   void convertPhiToGamma(Region &region,
