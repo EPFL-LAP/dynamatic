@@ -72,7 +72,7 @@ public:
     /// interface.
     Value memStart;
 
-    MemAccesses(Value memStart);
+    MemAccesses(Value memStart) : memStart(memStart) {}
   };
 
   /// Stores a mapping between memory regions (identified by the function
@@ -147,7 +147,9 @@ public:
       const DenseMap<BlockArgument, OpResult> &blockArgReplacements) const;
 
   /// Returns the value representing the block's control signal.
-  virtual Value getBlockControl(Block *block) const;
+  virtual Value getBlockControl(Block *block) const {
+    return block->getArguments().back();
+  }
 
 protected:
   /// Groups information to "rewire the IR" around a particular merge-like

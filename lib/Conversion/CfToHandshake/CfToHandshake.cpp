@@ -454,7 +454,7 @@ static Value getMergeOperand(BlockArgument blockArg, Block *predBlock,
 /// Determines the list of predecessors of the block by iterating over all block
 /// terminators in the parent function. If the terminator is a conditional
 /// branch whose branches both point to the target block, then the owning block
-/// is added twice to the list and the branhc's "false destination" is
+/// is added twice to the list and the branch's "false destination" is
 /// associated with a false boolean value; in all other situatuions predecessor
 /// blocks are associated a true boolean value.
 static SmallVector<std::pair<Block *, bool>>
@@ -662,9 +662,6 @@ void LowerFuncToHandshake::addBranchOps(
     }
   }
 }
-
-LowerFuncToHandshake::MemAccesses::MemAccesses(Value memStart)
-    : memStart(memStart) {}
 
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
@@ -985,10 +982,6 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
   auto endOp = rewriter.create<handshake::EndOp>(lastOp->getLoc(), endOprds);
   endOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
   return success();
-}
-
-Value LowerFuncToHandshake::getBlockControl(Block *block) const {
-  return block->getArguments().back();
 }
 
 //===-----------------------------------------------------------------------==//
@@ -1429,41 +1422,46 @@ struct CfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
-                 ConvertUndefinedValues,
-                 ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-                 ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-                 OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-                 OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-                 OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-                 OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-                 OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-                 OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
-                 OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-                 OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-                 OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-                 OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-                 OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-                 OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-                 OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-                 OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-                 OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-                 OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-                 OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-                 OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-                 OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-                 OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
-        getAnalysis<NameAnalysis>(), converter, ctx);
+    patterns.add<
+        // clang-format off
+        LowerFuncToHandshake,
+        ConvertConstants,
+        ConvertCalls,
+        ConvertUndefinedValues,
+        ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+        OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+        OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+        OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+        OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+        OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+        OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+        OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+        OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+        OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+        OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+        OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+        OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+        OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+        OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+        OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+        OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+        OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+        OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+        OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+        OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+        OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+        OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+        OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+        OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+        OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+        OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+        OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>
+        // clang-format on
+        >(getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
