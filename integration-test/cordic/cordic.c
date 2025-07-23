@@ -3,10 +3,14 @@
 #include <math.h>
 #include <stdlib.h>
 
-float cordic(in_float_t theta, out_float_t a[2], in_float_t cordic_phase[1000],
-             in_float_t current_cos, in_float_t current_sin) {
+float cordic(in_float_t theta, out_float_t results[2],
+             in_float_t cordic_phases[1000], in_float_t initial_cos,
+             in_float_t initial_sin) {
 
   float factor = 1.0;
+
+  float current_cos = initial_cos;
+  float current_sin = initial_sin;
 
   for (int i = 0; i < 1000; i++) {
     float sigma = (theta < 0) ? -1.0 : 1.0;
@@ -15,16 +19,16 @@ float cordic(in_float_t theta, out_float_t a[2], in_float_t cordic_phase[1000],
     current_cos = current_cos - current_sin * sigma * factor;
     current_sin = tmp_cos * sigma * factor + current_sin;
 
-    theta = theta - sigma * cordic_phase[i];
+    theta = theta - sigma * cordic_phases[i];
     factor = factor / 2;
   }
-  a[0] = current_cos;
-  a[1] = current_sin;
+  results[0] = current_cos;
+  results[1] = current_sin;
   return theta;
 }
 
 int main(void) {
-  in_float_t thetas;
+  in_float_t theta;
   out_float_t results[2];
   in_float_t cordic_phases[1000];
   in_float_t initial_cos = 1;
@@ -35,10 +39,10 @@ int main(void) {
     cordic_phases[i] = 1 / div;
   }
 
-  thetas = 1;
+  theta = 1;
   results[0] = 0;
   results[1] = 0;
 
-  CALL_KERNEL(cordic, thetas, results, cordic_phases, initial_cos, initial_sin);
+  CALL_KERNEL(cordic, theta, results, cordic_phases, initial_cos, initial_sin);
   return 0;
 }
