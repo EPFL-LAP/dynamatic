@@ -59,14 +59,14 @@ public:
         lsqPorts;
     /// Function argument corresponding to the memory start signal for that
     /// interface.
-    BlockArgument memStart;
+    Value memStart;
 
-    MemAccesses(BlockArgument memStart);
+    MemAccesses(Value memStart);
   };
 
   /// Stores a mapping between memory regions (identified by the function
-  /// argument they correspond to) and the set of memory operations referencing
-  /// them.
+  /// argument they correspond to or the result of an memref.AllocOp) and the
+  /// set of memory operations referencing them.
   using MemInterfacesInfo = llvm::MapVector<Value, MemAccesses>;
 
   /// Creates a Handshake-level equivalent to the matched func-level function,
@@ -98,10 +98,10 @@ public:
   /// counterparts, and fills `memInfo` with information about which operations
   /// use which interface. The backedge builder is used to create temporary
   /// values for the data input to converted load ports.
-  virtual LogicalResult convertMemoryOps(
-      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-      const DenseMap<Value, unsigned> &memrefIndices,
-      BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo) const;
+  virtual LogicalResult convertMemoryOps(handshake::FuncOp funcOp,
+                                         ConversionPatternRewriter &rewriter,
+                                         BackedgeBuilder &edgeBuilder,
+                                         MemInterfacesInfo &memInfo) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group
