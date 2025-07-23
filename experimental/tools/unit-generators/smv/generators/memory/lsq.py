@@ -1,5 +1,5 @@
 from generators.support.utils import *
-from generators.support.ofifo import generate_ofifo
+from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.mc_control import generate_mc_control
 from generators.handshake.ndwire import generate_ndwire
 from generators.handshake.join import generate_join
@@ -214,7 +214,7 @@ def _generate_nd_load_access(name, fifo_depth, addr_type, data_type):
     return f"""
 MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid, inner_fifo.ins_ready);
-  VAR inner_fifo : {name}__ofifo(inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
+  VAR inner_fifo : {name}__fifo_break_dv(inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
   VAR inner_output_ndw : {name}__out_ndwire(data_from_mem, inner_fifo.outs_valid, ldData_ready);
 
   -- output
@@ -224,7 +224,7 @@ MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   ldData_valid := inner_output_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__in_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_ofifo(f"{name}__ofifo", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
+  {generate_fifo_break_dv(f"{name}__fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__out_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
 
@@ -234,9 +234,9 @@ def _generate_nd_store_access(name, fifo_depth, addr_type, data_type):
     return f"""
 MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
   VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_fifo.ins_ready);
-  VAR inner_addr_fifo : {name}__addr_ofifo(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
+  VAR inner_addr_fifo : {name}__addr_fifo_break_dv(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
   VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, inner_data_fifo.ins_ready);
-  VAR inner_data_fifo : {name}__data_ofifo(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
+  VAR inner_data_fifo : {name}__data_fifo_break_dv(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
   VAR inner_join : {name}__join(inner_addr_fifo.outs_valid, inner_data_fifo.outs_valid, inner_sink_ndw.ins_valid);
   VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, inner_sink.ins_ready);
   VAR inner_sink : {name}__sink(inner_data_ndw.outs, inner_sink_ndw.outs_valid);
@@ -248,9 +248,9 @@ MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
   memData_valid := inner_sink_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__addr_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_ofifo(f"{name}__addr_ofifo", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
+  {generate_fifo_break_dv(f"{name}__addr_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__data_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
-  {generate_ofifo(f"{name}__data_ofifo", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
+  {generate_fifo_break_dv(f"{name}__data_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
   {generate_join(f"{name}__join", {"size": 2})}
   {generate_sink(f"{name}__sink", {ATTR_BITWIDTH: data_type.bitwidth})}
 """

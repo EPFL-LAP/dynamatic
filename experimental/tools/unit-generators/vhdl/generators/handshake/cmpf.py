@@ -1,4 +1,3 @@
-from generators.support.signal_manager import generate_arith2_signal_manager
 from generators.support.arith2 import generate_arith2
 
 
@@ -114,7 +113,6 @@ def _get_flopoco(is_double, predicate):
 #                      Vivado
 ##################################################
 
-
 def _get_vivado_code_from_predicate(predicate):
   codes = {
       "oeq": "00001",
@@ -130,8 +128,10 @@ def _get_vivado_code_from_predicate(predicate):
 
   return f"\"{codes[predicate]}\""
 
+
 def _vivado_latency():
    return 2
+
 
 def _get_vivado(is_double, predicate):
     if is_double:

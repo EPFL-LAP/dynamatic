@@ -36,7 +36,7 @@ jobs:
           echo "Running autopep8..."
           git fetch origin main --no-recurse-submodules
           git reset FETCH_HEAD
-          FILES=$(git ls-files '*.py' --modified)
+          FILES=$(comm -23 <(git ls-files '*.py' --modified | sort) <(git ls-files '*.py' --deleted | sort))
           STATUS=$?
           if [[ $FILES ]]; then
             exec 3>&1
@@ -68,15 +68,14 @@ jobs:
 
       - name: integration-test
         if: success() || failure()
-        run: | 
-          cd tools/integration
-          python3 run_integration.py --ignore ignored_tests.txt
+        run: ninja -C build run-ci-integration-tests
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with: 
           name: integration-report
           path: |
-            integration-test/*/out/sim/report.txt
-            integration-test/*/out/dynamatic_*.txt
+            integration-test/*/out*/comp
+            integration-test/*/out*/sim/report.txt
+            integration-test/*/out/dynamatic_out.txt
 

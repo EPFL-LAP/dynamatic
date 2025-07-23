@@ -286,8 +286,8 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
+
   LogicalResult gotBitwidth = registerBitwidthParameter(modOp, modName, modType);
-  registerTransparentParameter(modOp, modName, modType);
   LogicalResult gotExtraSignals = registerExtraSignalParameters(modOp, modName, modType);
   return success(gotBitwidth.succeeded() && gotExtraSignals.succeeded());
 }
@@ -383,30 +383,6 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     return failure();
   }
   return success();
-}
-
-void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
-                                            llvm::StringRef modName,
-                                            hw::ModuleType &modType) {
-  if (modName == "handshake.buffer") {
-    auto params =
-        modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-      auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::break_r() ||
-          info == handshake::TimingInfo::break_none()) {
-        serializedParams["TRANSPARENT"] = "True";
-      } else if (info == handshake::TimingInfo::break_dv() ||
-                 info == handshake::TimingInfo::break_dvr()) {
-        serializedParams["TRANSPARENT"] = "False";
-      } else {
-        llvm_unreachable("Unknown timing info");
-      }
-    } else {
-      llvm_unreachable("Unknown timing attr");
-    }
-  }
 }
 
 LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,

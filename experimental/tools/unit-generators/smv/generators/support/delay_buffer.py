@@ -1,4 +1,4 @@
-from generators.support.oehb import generate_oehb
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 from generators.support.utils import *
 
 
@@ -26,33 +26,33 @@ MODULE {name}(ins_valid, outs_ready)
 def _generate_single_delay_buffer(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
-  VAR inner_oehb : {name}__oehb_dataless(ins, ins_valid, outs_ready);
+  VAR inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(ins, ins_valid, outs_ready);
 
   -- output
-  DEFINE ins_ready := inner_oehb.ins_ready;
-  DEFINE outs_valid := inner_oehb.outs_valid;
+  DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
+  DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
 
-{generate_oehb(f"{name}__oehb_dataless", {ATTR_BITWIDTH: 0})}
+{generate_one_slot_break_dv(f"{name}__one_slot_break_dv_dataless", {ATTR_BITWIDTH: 0})}
 """
 
 
 def _generate_delay_buffer(name, latency):
-    no_oehb_latency = latency - 1
+    no_one_slot_break_dv_latency = latency - 1
     return f"""
 MODULE {name}(ins_valid, outs_ready)
-  VAR inner_oehb : {name}__oehb_dataless(v{no_oehb_latency - 1}, outs_ready);
-  {"\n  ".join([f"VAR v{n} : boolean;" for n in range(no_oehb_latency)])}
+  VAR inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(v{no_one_slot_break_dv_latency - 1}, outs_ready);
+  {"\n  ".join([f"VAR v{n} : boolean;" for n in range(no_one_slot_break_dv_latency)])}
 
   ASSIGN init(v0) := FALSE;
   ASSIGN next(v0) := ins_valid;
 
   {"\n  ".join([f"""ASSIGN init(v{n + 1}) := FALSE;
-  ASSIGN next(v{n + 1}) := inner_oehb.ins_ready ? v{n} : v{n + 1};
-""" for n in range(no_oehb_latency - 1)])}
+  ASSIGN next(v{n + 1}) := inner_one_slot_break_dv.ins_ready ? v{n} : v{n + 1};
+""" for n in range(no_one_slot_break_dv_latency - 1)])}
 
   -- output
-  DEFINE ins_ready := inner_oehb.ins_ready;
-  DEFINE outs_valid := inner_oehb.outs_valid;
+  DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
+  DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
 
-{generate_oehb(f"{name}__oehb_dataless", {ATTR_BITWIDTH: 0})}
+{generate_one_slot_break_dv(f"{name}__one_slot_break_dv_dataless", {ATTR_BITWIDTH: 0})}
 """

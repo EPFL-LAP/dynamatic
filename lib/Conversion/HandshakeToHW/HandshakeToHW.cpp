@@ -541,10 +541,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
-            handshake::NDWireOp>([&](auto) {
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
+          [&](auto) {
+            // Bitwidth
+            addType("DATA_TYPE", op->getOperand(0));
+          })
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
-        addType("DATA_TYPE", op->getOperand(0));
+        addType("DATA_TYPE", bufferOp.getOperand());
+
+        addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
