@@ -1420,52 +1420,23 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
     return failure();
   }
 
-  auto params = bufOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-  if (!params) {
-    bufOp.emitError() << "underdefined buffer (params)";
-    return failure();
-  }
+  uint64_t depth = bufOp.getNumSlots();
 
-  auto numSlotsAttr = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-  if (!numSlotsAttr) {
-    bufOp.emitError() << "underdefined buffer (numSlots)";
-    return failure();
-  }
-  auto numSlots = dyn_cast<IntegerAttr>(numSlotsAttr->getValue());
-  if (!numSlots) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  if (!numSlots.getType().isUnsignedInteger()) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  uint64_t depth = numSlots.getUInt();
-
-  auto timingAttr = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-  if (!timingAttr) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  auto timing = dyn_cast<TimingAttr>(timingAttr->getValue());
-  if (!timing) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  TimingInfo info = timing.getInfo();
-
-  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
-      (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
+  switch (bufferOp.getBufferType()) {
+  case BufferType::ONE_SLOT_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+  case BufferType::ONE_SLOT_BREAK_R:
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::FIFO_BREAK_NONE:
+    break;
+  case BufferType::SHIFT_REG_BREAK_DV:
     bufOp.emitError() << "unknown buffer";
     return failure();
   }
 
-  bool bypass = info == TimingInfo::break_r();
   auto newFifoConfig =
       xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
-                               /*bypass=*/bypass,
+                               /*bypass=*/bufferOp.isBypassDV(),
                                /*register_push_outputs=*/false,
                                /*register_pop_outputs=*/false);
   ch.setFifoConfigAttr(newFifoConfig);

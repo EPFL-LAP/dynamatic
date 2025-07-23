@@ -1,5 +1,5 @@
 from generators.handshake.fork import generate_fork
-from generators.handshake.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.support.signal_manager import generate_spec_units_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
@@ -494,8 +494,8 @@ entity {name} is
     control_in_valid : in std_logic;
     control_in_ready : out std_logic;
 
-    tehb_outs : in std_logic_vector({bitwidth} - 1 downto 0);
-    tehb_outs_spec : in std_logic_vector(0 downto 0);
+    one_slot_break_r_outs : in std_logic_vector({bitwidth} - 1 downto 0);
+    one_slot_break_r_outs_spec : in std_logic_vector(0 downto 0);
 
     outs : out std_logic_vector({bitwidth} - 1 downto 0);
     outs_spec : out std_logic_vector(0 downto 0);
@@ -510,8 +510,8 @@ end entity;
 architecture arch of {name} is
 begin
   -- Forward outs data and spec bit
-  outs <= tehb_outs;
-  outs_spec <= tehb_outs_spec;
+  outs <= one_slot_break_r_outs;
+  outs_spec <= one_slot_break_r_outs_spec;
 
   process (control_in, control_in_valid, outs_ready)
   begin
@@ -766,7 +766,7 @@ def _generate_speculator(name, bitwidth, fifo_depth):
     decodeSC_name = f"{name}_decodeSC"
     decodeOutput_name = f"{name}_decodeOutput"
     decodeBranch_name = f"{name}_decodeBranch"
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
     dependencies = \
         generate_fork(data_fork_name, {
@@ -786,7 +786,7 @@ def _generate_speculator(name, bitwidth, fifo_depth):
         _generate_decodeSC(decodeSC_name) + \
         _generate_decodeOutput(decodeOutput_name, bitwidth) + \
         _generate_decodeBranch(decodeBranch_name) + \
-        generate_tehb(tehb_name, {
+        generate_one_slot_break_r(one_slot_break_r_name, {
             "bitwidth": bitwidth,
             "extra_signals": {"internal_ctrl": 3, "spec": 1}
         })
@@ -857,11 +857,11 @@ architecture arch of {name} is
   signal specgenCore_control_outs_valid : std_logic;
   signal specgenCore_control_outs_ready : std_logic;
 
-  signal tehb_outs : std_logic_vector({bitwidth} - 1 downto 0);
-  signal tehb_outs_spec : std_logic_vector(0 downto 0);
-  signal tehb_control_outs : std_logic_vector(2 downto 0);
-  signal tehb_control_outs_valid : std_logic;
-  signal tehb_control_outs_ready : std_logic;
+  signal one_slot_break_r_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal one_slot_break_r_outs_spec : std_logic_vector(0 downto 0);
+  signal one_slot_break_r_control_outs : std_logic_vector(2 downto 0);
+  signal one_slot_break_r_control_outs_valid : std_logic;
+  signal one_slot_break_r_control_outs_ready : std_logic;
 
   signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
   signal predFifo_data_out_valid : std_logic;
@@ -950,7 +950,7 @@ begin
       data_out_ready => predFifo_data_out_ready
     );
 
-  tehb: entity work.{tehb_name}(arch)
+  one_slot_break_r: entity work.{one_slot_break_r_name}(arch)
     port map (
       clk => clk,
       rst => rst,
@@ -959,20 +959,20 @@ begin
       ins_internal_ctrl => specgenCore_control_outs,
       ins_valid => specgenCore_control_outs_valid,
       ins_ready => specgenCore_control_outs_ready,
-      outs => tehb_outs,
-      outs_spec => tehb_outs_spec,
-      outs_internal_ctrl => tehb_control_outs,
-      outs_valid => tehb_control_outs_valid,
-      outs_ready => tehb_control_outs_ready
+      outs => one_slot_break_r_outs,
+      outs_spec => one_slot_break_r_outs_spec,
+      outs_internal_ctrl => one_slot_break_r_control_outs,
+      outs_valid => one_slot_break_r_control_outs_valid,
+      outs_ready => one_slot_break_r_control_outs_ready
     );
 
   fork0: entity work.{control_fork_name}(arch)
     port map (
       clk => clk,
       rst => rst,
-      ins => tehb_control_outs,
-      ins_valid => tehb_control_outs_valid,
-      ins_ready => tehb_control_outs_ready,
+      ins => one_slot_break_r_control_outs,
+      ins_valid => one_slot_break_r_control_outs_valid,
+      ins_ready => one_slot_break_r_control_outs_ready,
       outs => fork_control_outs,
       outs_valid => fork_control_outs_valid,
       outs_ready => fork_control_outs_ready
@@ -1016,8 +1016,8 @@ begin
       control_in => fork_control_outs(4),
       control_in_valid => fork_control_outs_valid(4),
       control_in_ready => fork_control_outs_ready(4),
-      tehb_outs => tehb_outs,
-      tehb_outs_spec => tehb_outs_spec,
+      one_slot_break_r_outs => one_slot_break_r_outs,
+      one_slot_break_r_outs_spec => one_slot_break_r_outs_spec,
       outs => outs,
       outs_spec => outs_spec,
       outs_valid => outs_valid,

@@ -1,8 +1,10 @@
-import re
+from enum import Enum
+from typing import Type, Union
 
 ATTR_SIZE = "size"
 ATTR_SLOTS = "num_slots"
 ATTR_TRANSPARENT = "transparent"
+ATTR_BUFFER_TYPE = "buffer_type"
 ATTR_VALUE = "value"
 ATTR_LATENCY = "latency"
 ATTR_PREDICATE = "predicate"
@@ -42,3 +44,10 @@ class SmvScalarType:
 
     def __str__(self):
         return f"{self.smv_type}"
+
+
+def try_enum_cast(value: str, enum_class: Type[Enum]) -> Union[Enum, str]:
+    try:
+        return enum_class(value)
+    except ValueError:
+        return value

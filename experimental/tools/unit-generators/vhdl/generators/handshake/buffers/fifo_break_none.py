@@ -1,35 +1,36 @@
-from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
+from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
-def generate_tfifo(name, params):
+def generate_fifo_break_none(name, params):
     bitwidth = params["bitwidth"]
     num_slots = params["num_slots"]
     extra_signals = params.get("extra_signals", None)
 
     if extra_signals:
-        return _generate_tfifo_signal_manager(name, num_slots, bitwidth, extra_signals)
+        return _generate_fifo_break_none_signal_manager(name, num_slots, bitwidth, extra_signals)
     elif bitwidth == 0:
-        return _generate_tfifo_dataless(name, num_slots)
+        return _generate_fifo_break_none_dataless(name, num_slots)
     else:
-        return _generate_tfifo(name, num_slots, bitwidth)
+        return _generate_fifo_break_none(name, num_slots, bitwidth)
 
 
-def _generate_tfifo(name, size, bitwidth):
+def _generate_fifo_break_none(name, num_slots, bitwidth):
     fifo_inner_name = f"{name}_fifo"
     dependencies = \
-        generate_elastic_fifo_inner(fifo_inner_name, {
-            "size": size,
-            "bitwidth": bitwidth,
-        })
+        generate_fifo_break_dv(fifo_inner_name,
+                               {
+                                   "num_slots": num_slots,
+                                   "bitwidth": bitwidth,
+                               })
 
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of tfifo
+-- Entity of fifo_break_none
 entity {name} is
   port (
     clk : in std_logic;
@@ -47,7 +48,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of tfifo
+-- Architecture of fifo_break_none
 architecture arch of {name} is
   signal mux_sel                  : std_logic;
   signal fifo_valid, fifo_ready   : std_logic;
@@ -91,16 +92,19 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_tfifo_dataless(name, size):
+def _generate_fifo_break_none_dataless(name, num_slots):
     fifo_inner_name = f"{name}_fifo"
-    dependencies = generate_elastic_fifo_inner(fifo_inner_name, {"size": size})
+    dependencies = generate_fifo_break_dv(
+        fifo_inner_name,
+        {"num_slots": num_slots,
+         "bitwdith": 0})
 
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of tfifo_dataless
+-- Entity of fifo_break_none_dataless
 entity {name} is
   port (
     clk : in std_logic;
@@ -116,7 +120,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of tfifo_dataless
+-- Architecture of fifo_break_none_dataless
 architecture arch of {name} is
   signal mux_sel                  : std_logic;
   signal fifo_valid, fifo_ready   : std_logic;
@@ -145,7 +149,7 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
+def _generate_fifo_break_none_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -160,4 +164,4 @@ def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_tfifo(name, size, bitwidth + extra_signals_bitwidth))
+        lambda name: _generate_fifo_break_none(name, size, bitwidth + extra_signals_bitwidth))
