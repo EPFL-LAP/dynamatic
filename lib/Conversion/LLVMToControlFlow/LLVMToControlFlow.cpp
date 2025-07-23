@@ -471,12 +471,14 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
     for (Operation *op : op->getUsers()) {
       rewriter.setInsertionPoint(op);
       if (auto loadOp = dyn_cast<LLVM::LoadOp>(op)) {
-        rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        auto newLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
             loadOp, loadOp.getResult().getType(), gepBasePtr,
             ValueRange(indexValues));
+        newLoadOp->setAttrs(op->getAttrDictionary().getValue());
       } else if (auto storeOp = dyn_cast<LLVM::StoreOp>(op)) {
-        rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        auto newStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
             storeOp, storeOp.getValue(), gepBasePtr, ValueRange(indexValues));
+        newStoreOp->setAttrs(op->getAttrDictionary().getValue());
       } else {
         op->emitError("Unhandled child operation of GEP!");
         assert(false &&
@@ -512,8 +514,9 @@ struct LLVMLoadWithConstantIndex : OpConversionPattern<LLVM::LoadOp> {
           rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
       indexValues.push_back(constZeroOp);
     }
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(
+    auto newOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, op.getResult().getType(), address, ValueRange(indexValues));
+    newOp->setAttrs(op->getAttrDictionary().getValue());
     return success();
   }
 };
@@ -541,8 +544,9 @@ struct LLVMStoreWithConstantIndex : OpConversionPattern<LLVM::StoreOp> {
           rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
       indexValues.push_back(constZeroOp);
     }
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(
+    auto newOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, adapter.getValue(), address, ValueRange(indexValues));
+    newOp->setAttrs(op->getAttrDictionary().getValue());
     return success();
   }
 };
