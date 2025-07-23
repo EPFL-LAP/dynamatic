@@ -1,6 +1,7 @@
-from generators.support.fpu_wrapper import generate_fpu_wrapper
+from generators.support.fpu import generate_fpu_wrapper
+
 
 def generate_divf(name, params):
-    params["core_unit"] = "Divider"
-
-    return generate_fpu_wrapper(name, params)
+    core_unit = "Divider"
+    mod_type = "divf"
+    return generate_fpu_wrapper(name, params, core_unit, mod_type)

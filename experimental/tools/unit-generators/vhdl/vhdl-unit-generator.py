@@ -17,6 +17,7 @@ generators = {
     "cmpi": gen("handshake", "cmpi"),
     "cmpf": gen("handshake", "cmpf"),
     "cond_br": gen("handshake", "cond_br"),
+    "br": gen("handshake", "br"),
     "constant": gen("handshake", "constant"),
     "control_merge": gen("handshake", "control_merge"),
     "divf": gen("handshake", "divf"),
@@ -35,6 +36,7 @@ generators = {
     "mulf": gen("handshake", "mulf"),
     "muli": gen("handshake", "muli"),
     "mux": gen("handshake", "mux"),
+    "ndwire": gen("handshake", "ndwire"),
     "ori": gen("handshake", "ori"),
     "xori": gen("handshake", "xori"),
     "not": gen("handshake", "logical_not"),
@@ -61,6 +63,7 @@ generators = {
     "fptosi": gen("handshake", "fptosi"),
     "ready_remover": gen("handshake", "ready_remover"),
     "valid_merger": gen("handshake", "valid_merger"),
+    "top_join": gen("handshake", "top_join")
 }
 
 

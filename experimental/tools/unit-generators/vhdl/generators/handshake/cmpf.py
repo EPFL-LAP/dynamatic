@@ -1,20 +1,39 @@
-from generators.support.signal_manager import generate_buffered_signal_manager
-from generators.handshake.join import generate_join
-from generators.handshake.oehb import generate_oehb
+from generators.support.signal_manager import generate_arith2_signal_manager
+from generators.support.arith2 import generate_arith2
 
 
 def generate_cmpf(name, params):
+    impl = params["impl"]
     is_double = params["is_double"]
     extra_signals = params["extra_signals"]
     predicate = params["predicate"]
 
-    if extra_signals:
-        return _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals)
-    else:
-        return _generate_cmpf(name, is_double, predicate)
+    modType = "cmpf"
 
+    if impl == "flopoco":
+        signals, body, bitwidth, latency = _get_flopoco(is_double, predicate)
+    elif impl == "vivado":
+       signals, body, bitwidth, latency = _get_vivado(is_double, predicate)
 
-_expression_from_predicate = {
+    dependencies = ""
+    return generate_arith2(
+          name,
+          modType,
+          bitwidth,
+          signals,
+          body,
+          latency,
+          dependencies,
+          extra_signals
+      )
+    
+
+##################################################
+#                 Flopoco
+##################################################
+
+def _get_flopoco_expression_from_predicate(predicate):
+  expressions = {
     "oeq": "not unordered and XeqY",
     "ogt": "not unordered and XgtY",
     "oge": "not unordered and XgeY",
@@ -28,139 +47,38 @@ _expression_from_predicate = {
     "ule": "unordered or XleY",
     "une": "unordered or not XeqY",
     "uno": "unordered"
-}
+  }
+  if predicate not in expressions:
+    raise ValueError(f"Unsupported flopoco predicate: {predicate}")
+
+  return f"\"{expressions[predicate]}\""
+
+def _flopoco_latency(is_double):
+    return 1 if is_double else 0
+
+def _bitwidth(is_double):
+    return 64 if is_double else 32
 
 
-def _generate_cmpf(name, is_double, predicate):
-    inner_name = f"{name}_inner"
-    bitwidth = 64 if is_double else 32
-    if is_double:
-        dependencies = _generate_cmpf_double_precision(inner_name)
-    else:
-        dependencies = _generate_cmpf_single_precision(inner_name)
+def _get_flopoco(is_double, predicate):
+    latency = _flopoco_latency(is_double)
+    expression = _get_flopoco_expression_from_predicate(predicate)
 
-    entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+    bitwidth = _bitwidth(is_double)
 
--- Entity of cmpf
-entity {name} is
-  port (
-    -- inputs
-    clk          : in std_logic;
-    rst          : in std_logic;
-    lhs          : in std_logic_vector({bitwidth} - 1 downto 0);
-    lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector({bitwidth} - 1 downto 0);
-    rhs_valid    : in std_logic;
-    result_ready : in std_logic;
-    -- outputs
-    result       : out std_logic_vector(0 downto 0);
-    result_valid : out std_logic;
-    lhs_ready    : out std_logic;
-    rhs_ready    : out std_logic
-  );
-end entity;
-"""
-
-    architecture = f"""
--- Architecture of cmpf
-architecture arch of {name} is
+    signals = f"""
   signal unordered : std_logic;
   signal XltY : std_logic;
   signal XeqY : std_logic;
   signal XgtY : std_logic;
   signal XleY : std_logic;
   signal XgeY : std_logic;
-begin
-  operator : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      lhs => lhs,
-      lhs_valid => lhs_valid,
-      rhs => rhs,
-      rhs_valid => rhs_valid,
-      result_ready => result_ready,
-      unordered => unordered,
-      XltY => XltY,
-      XeqY => XeqY,
-      XgtY => XgtY,
-      XleY => XleY,
-      XgeY => XgeY,
-      result_valid => result_valid,
-      lhs_ready => lhs_ready,
-      rhs_ready => rhs_ready
-    );
-
-  result(0) <= {_expression_from_predicate[predicate]};
-end architecture;
-"""
-
-    return dependencies + entity + architecture
-
-
-def _get_latency(is_double):
-    return 1  # todo
-
-
-def _generate_cmpf_single_precision(name):
-    join_name = f"{name}_join"
-
-    dependencies = generate_join(join_name, {"size": 2})
-
-    entity = f"""
-
-
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of cmpf_single_precision
-entity {name} is
-  port(
-    -- inputs
-    clk: in std_logic;
-    rst: in std_logic;
-    lhs: in std_logic_vector(32 - 1 downto 0);
-    lhs_valid: in std_logic;
-    rhs: in std_logic_vector(32 - 1 downto 0);
-    rhs_valid: in std_logic;
-    result_ready: in std_logic;
-    -- outputs
-    unordered: out std_logic;
-    XltY: out std_logic;
-    XeqY: out std_logic;
-    XgtY: out std_logic;
-    XleY: out std_logic;
-    XgeY: out std_logic;
-    result_valid: out std_logic;
-    lhs_ready: out std_logic;
-    rhs_ready: out std_logic
-  );
-end entity;
-"""
-
-    architecture = f"""
--- Architecture of cmpf_single_precision
-architecture arch of {name} is
-  signal ip_lhs: std_logic_vector(32 + 1 downto 0);
-  signal ip_rhs: std_logic_vector(32 + 1 downto 0);
-begin
-  join_inputs: entity work.{join_name}(arch)
-    port map(
-      -- inputs
-      ins_valid(0)=> lhs_valid,
-      ins_valid(1)=> rhs_valid,
-      outs_ready=> result_ready,
-      -- outputs
-      outs_valid=> result_valid,
-      ins_ready(0)=> lhs_ready,
-      ins_ready(1)=> rhs_ready
-    );
-
-  ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
+  signal ip_lhs: std_logic_vector({bitwidth + 2} - 1 downto 0);
+  signal ip_rhs: std_logic_vector({bitwidth + 2} - 1 downto 0);
+  """
+      
+    body = f"""
+  ieee2nfloat_0: entity work.InputIEEE_{bitwidth}bit(arch)
     port map(
         --input
         X=> lhs,
@@ -168,14 +86,14 @@ begin
         R=> ip_lhs
     );
 
-  ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
+  ieee2nfloat_1: entity work.InputIEEE_{bitwidth}bit(arch)
     port map(
         --input
         X=> rhs,
         --output
         R=> ip_rhs
     );
-  operator: entity work.FPComparator_32bit(arch)
+  operator: entity work.FPComparator_{bitwidth}bit(arch)
   port map (clk=> clk,
         ce=> '1',
         X=> ip_lhs,
@@ -186,130 +104,84 @@ begin
         XgtY=> XgtY,
         XleY=> XleY,
         XgeY=> XgeY);
-end architecture;
+  
+  result(0) <= {expression};
 """
 
-    return dependencies + entity + architecture
+    return signals, body, bitwidth, latency
+
+##################################################
+#                      Vivado
+##################################################
 
 
-def _generate_cmpf_double_precision(name):
-    join_name = f"{name}_join"
-    oehb_name = f"{name}_oehb"
+def _get_vivado_code_from_predicate(predicate):
+  codes = {
+      "oeq": "00001",
+      "ogt": "00010",
+      "oge": "00011",
+      "olt": "00100",
+      "ole": "00101",
+      "one": "00110",
+      "uno": "01000",
+  }
+  if predicate not in codes:
+      raise ValueError(f"Unsupported vivado predicate: {predicate}")
 
-    dependencies = generate_join(join_name, {"size": 2}) + \
-        generate_oehb(oehb_name, {"bitwidth": 0})
+  return f"\"{codes[predicate]}\""
 
-    entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+def _vivado_latency():
+   return 2
 
--- Entity of cmpf_double_precision
-entity {name} is
-  port(
-    -- inputs
-    clk: in std_logic;
-    rst: in std_logic;
-    lhs: in std_logic_vector(64 - 1 downto 0);
-    lhs_valid: in std_logic;
-    rhs: in std_logic_vector(64 - 1 downto 0);
-    rhs_valid: in std_logic;
-    result_ready: in std_logic;
-    -- outputs
-    unordered: out std_logic;
-    XltY: out std_logic;
-    XeqY: out std_logic;
-    XgtY: out std_logic;
-    XleY: out std_logic;
-    XgeY: out std_logic;
-    result_valid: out std_logic;
-    lhs_ready: out std_logic;
-    rhs_ready: out std_logic
-  );
-end entity;
+def _get_vivado(is_double, predicate):
+    if is_double:
+        raise ValueError(f"Vivado cmpf does not support 64 bits")
+        
+    bitwidth = 32
+    latency = _vivado_latency()
+    predicate_code = _get_vivado_code_from_predicate(predicate)
+
+    signals = f"""
+  component cmpf_vitis_hls_wrapper is
+    generic (
+      ID         : integer := 1;
+      NUM_STAGE  : integer := 2;
+      din0_WIDTH : integer := 32;
+      din1_WIDTH : integer := 32;
+      dout_WIDTH : integer := 1
+    );
+    port (
+      clk    : in  std_logic;
+      reset  : in  std_logic;
+      ce     : in  std_logic;
+      din0   : in  std_logic_vector(din0_WIDTH - 1 downto 0);
+      din1   : in  std_logic_vector(din1_WIDTH - 1 downto 0);
+      opcode : in  std_logic_vector(4 downto 0);
+      dout   : out std_logic_vector(dout_WIDTH - 1 downto 0)
+    );
+  end component;
+
+  signal alu_opcode : std_logic_vector(4 downto 0);
 """
-
-    architecture = f"""
--- Architecture of cmpf_double_precision
-architecture arch of {name} is
-  signal join_valid: std_logic;
-	signal buff_valid, oehb_valid, oehb_ready : std_logic;
-	signal oehb_dataOut, oehb_datain : std_logic_vector(0 downto 0);
-  signal ip_lhs : std_logic_vector(64 + 1 downto 0);
-  signal ip_rhs : std_logic_vector(64 + 1 downto 0);
-begin
-
- oehb : entity work.{oehb_name}(arch)
-  port map(
-    clk        => clk,
-    rst        => rst,
-    ins_valid  => buff_valid,
-    outs_ready => result_ready,
-    outs_valid => result_valid,
-    ins_ready  => oehb_ready
-  );
-  join_inputs : entity work.{join_name}(arch)
+        
+    body = f"""
+  -- Predicate: {predicate}
+  alu_opcode <= {predicate_code};
+  array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component cmpf_vitis_hls_wrapper
+    generic map(
+      ID         => 1,
+      NUM_STAGE  => 2,
+      din0_WIDTH => 32,
+      din1_WIDTH => 32,
+      dout_WIDTH => 1)
     port map(
-      -- inputs
-      ins_valid(0) => lhs_valid,
-      ins_valid(1) => rhs_valid,
-      outs_ready   => oehb_ready,
-      -- outputs
-      outs_valid   => buff_valid,
-      ins_ready(0) => lhs_ready,
-      ins_ready(1) => rhs_ready
+      clk     => clk,
+      reset   => rst,
+      din0    => lhs,
+      din1    => rhs,
+      ce      => oehb_ready,
+      opcode  => alu_opcode,
+      dout(0) => result(0)
     );
-
-  ieee2nfloat_0: entity work.InputIEEE_64bit(arch)
-    port map (
-        --input
-        X => lhs,
-        --output
-        R => ip_lhs
-    );
-
-  ieee2nfloat_1: entity work.InputIEEE_64bit(arch)
-    port map (
-        --input
-        X => rhs,
-        --output
-        R => ip_rhs
-    );
-  operator : entity work.FPComparator_64bit(arch)
-  port map (clk => clk,
-        ce => oehb_ready,
-        X => ip_lhs,
-        Y => ip_rhs,
-        unordered => unordered,
-        XltY => XltY,
-        XeqY => XeqY,
-        XgtY => XgtY,
-        XleY => XleY,
-        XgeY => XgeY);
-end architecture;
 """
-
-    return dependencies + entity + architecture
-
-
-def _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals):
-    bitwidth = 64 if is_double else 32
-    return generate_buffered_signal_manager(
-        name,
-        [{
-            "name": "lhs",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals
-        }, {
-            "name": "rhs",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals
-        }],
-        [{
-            "name": "result",
-            "bitwidth": 1,
-            "extra_signals": extra_signals
-        }],
-        extra_signals,
-        lambda name: _generate_cmpf(name, is_double, predicate),
-        _get_latency(is_double))
+    return signals, body, bitwidth, latency
