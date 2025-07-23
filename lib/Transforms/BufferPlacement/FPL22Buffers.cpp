@@ -109,9 +109,9 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
       model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
     // Restrict the maximum number of slots allowed
     model.addConstr(chVars.bufNumSlots <=
-              maxSlots - *props.maxOpaque * (1 - bufData) -
-              *props.maxTrans * (1 - bufReady),
-              "custom_maxSlots")
+		    maxSlots - *props.maxOpaque * (1 - bufData) -
+		    *props.maxTrans * (1 - bufReady),
+		    "custom_maxSlots");
   }
 
   // Forbid placement of some buffer type based on maximum number of allowed
