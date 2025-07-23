@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity divsi is
+entity remsi is
   generic (
     DATA_TYPE : integer
   );
@@ -23,9 +23,9 @@ entity divsi is
   );
 end entity;
 
-architecture arch of divsi is
+architecture arch of remsi is
 
-  component sdiv_32ns_32ns_32_36_seq_1 IS
+  component srem_32ns_32ns_32_36_seq_1 IS
     generic (
         ID : INTEGER;
         NUM_STAGE : INTEGER;
@@ -59,8 +59,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-
-  sdiv_32ns_32ns_32_36_seq_1_U1 : component sdiv_32ns_32ns_32_36_seq_1
+  srem_32ns_32ns_32_36_seq_1_U1 : component srem_32ns_32ns_32_36_seq_1
     generic map (
         ID => 1,
         NUM_STAGE => 36,
@@ -98,7 +97,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity sdiv_32ns_32ns_32_36_seq_1_divseq is
+entity srem_32ns_32ns_32_36_seq_1_divseq is
     generic (
         in0_WIDTH   : INTEGER :=32;
         in1_WIDTH   : INTEGER :=32;
@@ -125,7 +124,7 @@ entity sdiv_32ns_32ns_32_36_seq_1_divseq is
 
 end entity;
 
-architecture rtl of sdiv_32ns_32ns_32_36_seq_1_divseq is
+architecture rtl of srem_32ns_32ns_32_36_seq_1_divseq is
     constant cal_WIDTH      : INTEGER := max(in0_WIDTH, in1_WIDTH);
 
     signal dividend0        : UNSIGNED(in0_WIDTH-1 downto 0);
@@ -196,7 +195,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity sdiv_32ns_32ns_32_36_seq_1 is
+entity srem_32ns_32ns_32_36_seq_1 is
     generic (
         ID   : INTEGER :=1;
         NUM_STAGE   : INTEGER :=2;
@@ -214,8 +213,8 @@ entity sdiv_32ns_32ns_32_36_seq_1 is
         dout        : out STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0));
 end entity;
 
-architecture rtl of sdiv_32ns_32ns_32_36_seq_1 is
-    component sdiv_32ns_32ns_32_36_seq_1_divseq is
+architecture rtl of srem_32ns_32ns_32_36_seq_1 is
+    component srem_32ns_32ns_32_36_seq_1_divseq is
         generic (
             in0_WIDTH   : INTEGER :=32;
             in1_WIDTH   : INTEGER :=32;
@@ -247,7 +246,7 @@ architecture rtl of sdiv_32ns_32ns_32_36_seq_1 is
     signal sign_i     : STD_LOGIC_VECTOR(1 downto 0);
     signal sign_o     : STD_LOGIC_VECTOR(1 downto 0);
 begin
-    sdiv_32ns_32ns_32_36_seq_1_divseq_u : sdiv_32ns_32ns_32_36_seq_1_divseq
+    srem_32ns_32ns_32_36_seq_1_divseq_u : srem_32ns_32ns_32_36_seq_1_divseq
         generic map(
             in0_WIDTH   => din0_WIDTH,
             in1_WIDTH   => din1_WIDTH,
@@ -313,7 +312,7 @@ begin
     end if;
 end process;
 
-dout <= quot;
+dout <= remd;
 
 end architecture;
 

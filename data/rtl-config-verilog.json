@@ -59,6 +59,15 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.remsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/remsi.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
