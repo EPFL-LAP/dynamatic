@@ -19,10 +19,11 @@ def generate_fifo_break_none(name, params):
 def _generate_fifo_break_none(name, num_slots, bitwidth):
     fifo_inner_name = f"{name}_fifo"
     dependencies = \
-        generate_fifo_break_dv(fifo_inner_name, {
-            "num_slots": num_slots,
-            "bitwidth": bitwidth,
-        })
+        generate_fifo_break_dv(fifo_inner_name,
+                               {
+                                   "num_slots": num_slots,
+                                   "bitwidth": bitwidth,
+                               })
 
     entity = f"""
 library ieee;
@@ -93,7 +94,10 @@ end architecture;
 
 def _generate_fifo_break_none_dataless(name, num_slots):
     fifo_inner_name = f"{name}_fifo"
-    dependencies = generate_fifo_break_dv(fifo_inner_name, {"num_slots": num_slots})
+    dependencies = generate_fifo_break_dv(
+        fifo_inner_name,
+        {"num_slots": num_slots,
+         "bitwdith": 0})
 
     entity = f"""
 library ieee;
