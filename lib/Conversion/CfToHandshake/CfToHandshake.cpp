@@ -360,10 +360,21 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   Block *entryBlock = &newFuncOp.getBody().front();
 
   // ---------------------------------------------------------------------------
-  // Update the block arguments of first
+  // Update the block arguments of the first BB (which has to match the function
+  // argument)
   // ---------------------------------------------------------------------------
   for (auto arg : entryBlock->getArguments()) {
     // Channelify (e.g., convert i32 to channel<i32>) the argument types.
+    //
+    // NOTE: in-place type mutate is considered unsafe (see the remarks in the
+    // "setType" class method). However, it is safe in CfToHandshake conversion
+    // since all the BB arguments will feed the newly created Mux/Merge/CMerge
+    // ops, which will not result in an invalid IR.
+    //
+    // The only exception is the memref type produced by alloca, but this is not
+    // a problem because:
+    // - The memref type produced by alloca should not be a argument of any BBs.
+    // - The channelifyType simpliy bypasses the memref type
     arg.setType(channelifyType(arg.getType()));
   }
   for (unsigned i = 0; i < numMemories + 1; i++) {
@@ -378,6 +389,17 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   for (Block &block : llvm::drop_begin(newFuncOp)) {
     for (auto arg : block.getArguments()) {
       // Channelify (e.g., convert i32 to channel<i32>) the argument types.
+      //
+      // NOTE: in-place type mutate is considered unsafe (see the remarks in the
+      // "setType" class method). However, it is safe in CfToHandshake
+      // conversion since all the function arguments will feed the newly created
+      // Mux/Merge/CMerge ops, which will not result in an invalid IR.
+      //
+      // The only exception is memref type produced by alloca, but this is not a
+      // problem because:
+      // - The memref type produced by alloca should not be a argument of any
+      // BBs.
+      // - The channelifyType simpliy bypasses the memref type
       arg.setType(channelifyType(arg.getType()));
     }
     // Add 1 control-only signal.
