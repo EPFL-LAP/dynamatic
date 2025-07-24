@@ -54,7 +54,7 @@ return mergedBlif;
 
 ```
 
-The process of constructing a unified circuit graph begins with invoking the connectInputNodes() function for each SubjectGraph. This function establishes connections between adjacent graphs by merging their input and output nodes.
+The process of constructing a unified circuit graph begins with invoking the `connectInputNodes()` function for each SubjectGraph. This function establishes connections between adjacent graphs by merging their input and output nodes.
 
 Next, a new LogicNetwork object—referred to as mergedBlif—is instantiated to serve as the container for the complete circuit. All nodes from the individual SubjectGraphs are then added to this new LogicNetwork. Because each node already encapsulates its connection information, simply aggregating them into a single network is sufficient to produce a fully connected representation of the circuit.
 
@@ -118,7 +118,7 @@ Represents arithmetic operations in the Handshake dialect, which consists of Add
 ### Variables
 1) unsigned int dataWidth: Bit width of the data signals (DATA_TYPE parameter in the HDL)
 Corresponds to the DATA_TYPE parameter in the HDL implementation. 
-2) std::unordered_map<unsigned int, ChannelSignals> inputNodes: Maps lhs and rhs inputs to their corresponding Channel Signals. lhs goes to inputNodes[0] and rhs goes to inputNodes[1].
+2) `std::unordered_map<unsigned int, ChannelSignals> inputNodes`: Maps lhs and rhs inputs to their corresponding Channel Signals. lhs goes to `inputNodes[0]` and rhs goes to `inputNodes[1]`.
 3) ChannelSignals outputNodes: Output Channel Signals of the module.
 
 ### Functions
