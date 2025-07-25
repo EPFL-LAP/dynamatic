@@ -40,8 +40,7 @@ def generate_fptosi(name, params):
     return generate_arith1(
         name=name,
         modType="fptosi",
-        input_bitwidth=32,
-        output_bitwidth=64,
+        bitwidth=32,
         signals=signals,
         body=body,
         extra_signals=params.get("extra_signals", None),
