@@ -1,10 +1,28 @@
 from generators.handshake.addf import generate_addf
-from generators.support.arith2 import generate_arith2
+from generators.support.signal_manager import generate_arith2_signal_manager
 
 
 def generate_subf(name, params):
-    impl = params["fpu_impl"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
     latency = params["latency"]
+
+    generate_inner = lambda name : _generate_subf(name, params)
+    generate = lambda : generate_inner(name)
+
+    if extra_signals:
+        return generate_arith2_signal_manager(
+            name=name,
+            bitwidth=bitwidth,
+            extra_signals=extra_signals,
+            generate_inner=generate_inner,
+            latency=latency
+        )
+    else:
+        return generate()
+
+def _generate_subf(name, params):
+    impl = params["fpu_impl"]
 
     # only used by flopoco
     is_double = params.get("is_double", None)
@@ -22,12 +40,35 @@ def generate_subf(name, params):
     addf_params = {k: v for k, v in params.items() if k != "extra_signals"}
     dependencies = generate_addf(addf_name, addf_params)
 
-    signals = f"""
+    entity = f"""
+-- Entity of subf
+entity {name} is
+  port(
+    clk: in std_logic;
+    rst: in std_logic;
+    -- input channel lhs
+    lhs: in std_logic_vector({bitwidth} - 1 downto 0);
+    lhs_valid: in std_logic;
+    lhs_ready: out std_logic;
+    -- input channel rhs
+    rhs: in std_logic_vector({bitwidth} - 1 downto 0);
+    rhs_valid: in std_logic;
+    rhs_ready: out std_logic;
+    -- output channel result
+    result : out std_logic_vector({bitwidth} - 1 downto 0);
+    result_valid: out std_logic;
+    result_ready: in std_logic
+  );
+end entity;
+"""
+
+    architecture = f"""
+-- Architecture of subf
+architecture arch of {name} is
   -- subf is the same as addf, but we flip the sign bit of rhs
   signal rhs_neg : std_logic_vector({bitwidth} - 1 downto 0);
-    """
+begin
 
-    body = f"""
   rhs_neg <= not rhs({bitwidth} - 1) & rhs({bitwidth} - 2 downto 0);
 
   FloatingPointAdder_U1: entity work.{addf_name}
@@ -47,15 +88,8 @@ def generate_subf(name, params):
     result_valid => result_valid,
     result_ready => result_ready
   );
-    """
 
-    return generate_arith2(
-        name=name,
-        modType="subf",
-        dependencies=dependencies,
-        signals=signals,
-        body=body,
-        bitwidth=bitwidth,
-        latency=latency,
-        extra_signals=params.get("extra_signals", None)
-    )
+end architecture;
+"""
+
+    return dependencies + entity + architecture
