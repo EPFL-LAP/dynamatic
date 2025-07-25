@@ -181,7 +181,7 @@ begin
       valid_in  => ins_valid,
       -- output channel to one_slot_break_dv
       valid_out => buff_valid,
-      read_in   => one_slot_break_dv_ready
+      ready_in   => one_slot_break_dv_ready
     );
 
 
