@@ -261,7 +261,6 @@ InterfaceMethod<[{
       return StringAttr::get(op->getContext(), "0.0");
     }]>,
 
-  // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
   InterfaceMethod<[{
     Gets the operation latency as an integer.
   }], "int64_t", "getLatency", (ins), [{
