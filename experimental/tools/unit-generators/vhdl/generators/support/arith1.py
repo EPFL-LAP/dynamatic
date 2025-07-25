@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_unary_signal_manager
 from generators.support.utils import ExtraSignals
-
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+from generators.support.delay_buffer import generate_delay_buffer
 
 def generate_arith1(
     name: str,
@@ -133,6 +134,9 @@ end architecture;
 """
     elif latency == 1:
         one_slot_break_dv_name = f"{name}_one_slot_break_dv"
+
+        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
+
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
@@ -157,6 +161,11 @@ end architecture;
     else:
         one_slot_break_dv_name = f"{name}_one_slot_break_dv"
         buff_name = f"{name}_buff"
+
+        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
+        dependencies += generate_delay_buffer(
+            buff_name,
+            {"slots": latency - 1})
 
         architecture = f"""
 -- Architecture of {modType}
