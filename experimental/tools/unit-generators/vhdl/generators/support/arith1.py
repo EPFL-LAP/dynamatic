@@ -141,6 +141,7 @@ end architecture;
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
+	signal join_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
   {signals}
 begin
   one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
@@ -171,6 +172,8 @@ end architecture;
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
+  signal join_valid                         : std_logic;
+  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
   {signals}
 begin
   buff : entity work.{buff_name}(arch)
