@@ -147,11 +147,11 @@ begin
 
   join_inputs : entity work.{join_name}(arch)
     port map(
-      -- input channel from "lhs"
+      -- input valids
       ins_valid(0) => lhs_valid,
-      ins_ready(0) => lhs_ready,
-      -- input channel from "rhs"
       ins_valid(1) => rhs_valid,
+      -- output readys
+      ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready,
       -- output channel to one_slot_break_dv
       outs_valid   => join_valid,
@@ -215,7 +215,7 @@ begin
       valid_in  => join_valid,
       -- output channel to one_slot_break_dv
       valid_out => buff_valid,
-      read_in   => one_slot_break_dv_ready
+      ready_in   => one_slot_break_dv_ready
     );
 
   one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
