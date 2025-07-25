@@ -85,19 +85,20 @@ use ieee.float_pkg.all;
 -- Entity of {modType}
 entity {name} is
   port(
-    -- inputs
     clk: in std_logic;
     rst: in std_logic;
+    -- input channel lhs
     lhs: in std_logic_vector({lhs_bitwidth} - 1 downto 0);
     lhs_valid: in std_logic;
+    lhs_ready: out std_logic;
+    -- input channel rhs
     rhs: in std_logic_vector({rhs_bitwidth} - 1 downto 0);
     rhs_valid: in std_logic;
-    result_ready: in std_logic;
-    -- outputs
-    result : out std_loigc_vector({output_bitwidth} - 1 downto 0);
+    rhs_ready: out std_logic;
+    -- output channel result
+    result : out std_logic_vector({output_bitwidth} - 1 downto 0);
     result_valid: out std_logic;
-    lhs_ready: out std_logic;
-    rhs_ready: out std_logic
+    result_ready: in std_logic
   );
 end entity;
 """
