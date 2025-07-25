@@ -3,9 +3,19 @@ from generators.support.signal_manager import generate_arith2_signal_manager
 
 
 def generate_subf(name, params):
-    bitwidth = params["bitwidth"]
-    extra_signals = params.get("extra_signals", None)
     latency = params["latency"]
+
+    fpu_impl = params["fpu_impl"]
+
+    extra_signals = params.get("extra_signals", None)
+
+    # flopoco only
+    is_double = params.get("is_double", None)
+
+    if fpu_impl == "vivado":
+        bitwidth = 32
+    elif fpu_impl == "flopoco":
+        bitwidth = 64 if is_double else 32
 
     generate_inner = lambda name : _generate_subf(name, params)
     generate = lambda : generate_inner(name)
