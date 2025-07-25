@@ -51,7 +51,7 @@ def _get_flopoco_signals(bitwidth):
 
 def _get_flopoco_body(core_unit, bitwidth, internal_delay, latency):
     clock_enables = "\n".join(
-        [f"        ce_{i} => oehb_ready," for i in range(1, latency + 1)]
+        [f"        ce_{i} => one_slot_break_dv_ready," for i in range(1, latency + 1)]
     )
     clock_enables = clock_enables.lstrip()
 
@@ -101,7 +101,7 @@ def _get_vivado_body(mod_type):
     port map(
       clk   => clk,
       reset => rst,
-      ce    => oehb_ready,
+      ce    => one_slot_break_dv_ready,
       din0  => lhs,
       din1  => rhs,
       dout  => result
