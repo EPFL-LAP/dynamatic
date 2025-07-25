@@ -1,7 +1,7 @@
 from generators.support.arith1 import generate_arith1
 
 
-def generate_extsi(name, params):
+def generate_extui(name, params):
     input_bitwidth = params["input_bitwidth"]
     output_bitwidth = params["output_bitwidth"]
 
@@ -12,7 +12,7 @@ def generate_extsi(name, params):
 
     return generate_arith1(
         name=name,
-        modType="extsi",
+        modType="extui",
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,
