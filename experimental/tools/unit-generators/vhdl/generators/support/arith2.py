@@ -117,11 +117,11 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
-      -- input channel from "lhs"
+      -- input valids from "lhs"
       ins_valid(0) => lhs_valid,
-      ins_ready(0) => lhs_ready,
-      -- input channel from "rhs"
       ins_valid(1) => rhs_valid,
+      -- input readys from "rhs"
+      ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready,
       -- output channel to "result"
       outs_valid   => result_valid,
@@ -150,7 +150,7 @@ begin
       -- input valids
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      -- output readys
+      -- input readys
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready,
       -- output channel to one_slot_break_dv
@@ -199,7 +199,7 @@ begin
       -- input valids
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      --output readys
+      --input readys
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready,
       -- output channel to buffer, using one_slot_break_dv ready
