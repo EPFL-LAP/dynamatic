@@ -63,7 +63,7 @@ generators = {
     "blocker": gen("handshake", "blocker"),
     "sitofp": gen("handshake", "sitofp"),
     "fptosi": gen("handshake", "fptosi"),
-    "ready_remover": gen("handshake", "ready_remover"),
+    "rigidifier": gen("handshake", "rigidifier"),
     "valid_merger": gen("handshake", "valid_merger"),
     "top_join": gen("handshake", "top_join")
 }
