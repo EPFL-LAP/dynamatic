@@ -51,6 +51,9 @@ def _generate_subf(name, params):
     dependencies = generate_addf(addf_name, addf_params)
 
     entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+
 -- Entity of subf
 entity {name} is
   port(
