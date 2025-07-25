@@ -2,10 +2,7 @@ from generators.support.fpu import generate_fpu_wrapper
 
 
 def generate_divsi(name, params):
-    fpu_impl = params["fpu_impl"]
-
-    if fpu_impl != "vivado":
-        raise ValueError(f"Invalid divsi implementation: {fpu_impl}")
+    params["fpu_impl"] = "vivado"
 
     mod_type = "divsi"
 
