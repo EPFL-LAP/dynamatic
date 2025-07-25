@@ -109,7 +109,7 @@ def _get_flopoco_expression_from_predicate(predicate):
     if predicate not in expressions:
         raise ValueError(f"Unsupported flopoco predicate: {predicate}")
 
-    return f"\"{expressions[predicate]}\""
+    return f"{expressions[predicate]}"
 
 
 ##################################################
