@@ -149,7 +149,7 @@ def InstanceOp : Handshake_Op<"instance", [
     and returns a control output as its last result.
 
     Example:
-    
+
     ```mlir
     %2:2 = handshake.instance @my_add(%0, %1, %ctrl) : (f32, f32, !handshake.control) -> (f32, !handshake.control)
     ```
@@ -220,10 +220,10 @@ def BufferOp : Handshake_Op<"buffer", [
   let summary = "buffer operation";
   let description = [{
     Represents an arbitrary buffer whose properties (e.g., type, latency, and number of
-    slots) are dictated by HW parameters. 
+    slots) are dictated by HW parameters.
   }];
-  
-  let arguments = (ins HandshakeType:$operand, 
+
+  let arguments = (ins HandshakeType:$operand,
                         Handshake_BufferTypeAttr:$bufferType,
                         ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
                         );
@@ -262,7 +262,7 @@ def BufferOp : Handshake_Op<"buffer", [
     }
   }];
 
-  
+
   let builders = [
     OpBuilder<(
       ins
@@ -293,7 +293,7 @@ def InitOp : Handshake_Op<"init", [
     A single-slot buffer which contains a token in its reset state.
     Similar to a buffer, its timing behavior is configurable.
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
@@ -314,7 +314,7 @@ def NDWireOp : Handshake_Op<"ndwire", [
   let description = [{
     Represents a wire that non-determinastically stalls the propagation of a signal.
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
@@ -323,7 +323,7 @@ def NDWireOp : Handshake_Op<"ndwire", [
   }];
 }
 
-class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
+class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [
     Pure, HasClock, SameOperandsAndResultType
 ]> {
@@ -338,7 +338,7 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     }]>
   ];
 
-  let assemblyFormat = [{ 
+  let assemblyFormat = [{
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
   }];
@@ -398,7 +398,7 @@ def MergeOp : Handshake_Op<"merge", [
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
-  
+
   let assemblyFormat = [{
     $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
   }];
@@ -461,26 +461,26 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
     Example:
     ```
-    %res, %idx = control_merge %a, %b, %c : 
+    %res, %idx = control_merge %a, %b, %c :
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result, ChannelType:$index);
-  
+
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
       assert(!operands.empty() && "cmerge needs at least one operand");
       $_state.addOperands(operands);
-      
+
       // Optimize the size of the index result based on the number of operands
       auto dataType = ::dynamatic::handshake::getOptimizedIndexValType(
           $_builder, operands.size());
       auto idxType = ::dynamatic::handshake::ChannelType::get(dataType);
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
-  
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
@@ -503,7 +503,7 @@ def BranchOp : Handshake_Op<"br", [
   }];
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
-  
+
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
   }];
@@ -535,7 +535,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
                        HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
-  
+
   let assemblyFormat = [{
     $conditionOperand `,` $dataOperand attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
@@ -558,7 +558,7 @@ def SinkOp : Handshake_Op<"sink"> {
     sink %data : !handshake.channel<i32>
     ```
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
@@ -619,7 +619,7 @@ def BlockerOp : Handshake_Op<"blocker", [
 ]> {
   let summary = "blocker operation";
   let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
+    A data synchronizer. Blocks handshakes until all inputs are valid,
     then forwards the first input.
 
     Example:
@@ -669,8 +669,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -683,7 +683,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -691,7 +691,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     The order of memory inputs is
     1. For each basic block:
       a. If there is at least one store in the block, a control signal fed
-         through a constant indicating the number of store operations in the 
+         through a constant indicating the number of store operations in the
          block.
       b. Load/Store access requests from within the block, in program order.
     2. If an LSQ references the same memory region:
@@ -700,7 +700,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -717,7 +717,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
 
@@ -737,7 +737,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     }
 
     /// Returns a convenient data-structure to go over the controls and memory
-    /// accesses that are connected to the memory controller. 
+    /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
   }];
 }
@@ -760,13 +760,13 @@ def LSQOp : Handshake_Op<"lsq", [
       clearly program-orderable, and stored in the LSQ's inputs in that order.
       Additionally, two groups connected to the same LSQ cannot share the same
       control signal, which are determined by the program location of the first
-      memory access of each group). 
+      memory access of each group).
     - Control signals are not fed through a constant and are instead data-less
       signals simply indicating that a new group has started.
     - To ensure proper identification of groups when analyzing the operation's
       operands, the `groupSizes` attribute contains the numberf of load/store
-      ports in each LSQ group, in operand order.  
-    
+      ports in each LSQ group, in operand order.
+
     In the absence of an MC on the same memory region, the LSQ talks directly to
     the external memory and its first memory input will be the Handhsake
     function's memref argument that it interfaces in the circuit. In the
@@ -786,18 +786,18 @@ def LSQOp : Handshake_Op<"lsq", [
     1. Load results, in program order (i.e., in load accesses order).
     2. If an MC references the same memory region, a single address operand for
        load accesses and a single pair of address/data operands for store
-       accesses going to the external memory through the MC. 
+       accesses going to the external memory through the MC.
     3. Control signal indicating completion.
   }];
-  
+
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
   let builders = [
-    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
+    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs,
                    "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
-    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
-                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
+    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp,
+                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes,
                    "unsigned":$numLoads)>,
   ];
   let hasVerifier = 1;
@@ -813,10 +813,10 @@ def LSQOp : Handshake_Op<"lsq", [
     }
 
     /// Returns a convenient data-structure to go over the controls and memory
-    /// accesses that are connected to the LSQ. 
+    /// accesses that are connected to the LSQ.
     dynamatic::LSQPorts getPorts();
-    
-    /// Determines whether the LSQ is connected to an MC. 
+
+    /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
       return !isa<mlir::MemRefType>(getInputs().front().getType());
     }
@@ -1017,12 +1017,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
     The speculator produces speculative tokens when real data has
-    not yet arrived. The speculator is also responsible for deciding 
+    not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
     It needs to send control tokens to save units and commit units
     ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while 
+    signals are needed. $SCSaveCtrl is connected directly, while
     $SCCommitCtrl replicates the branches that $dataOut
     follows and might not reach a save-commit. $SCIsMisspec is needed
     in the replicated branches to discard the latter signal.
@@ -1040,9 +1040,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        ControlType:$trigger,
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
-                      ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
+                      ChannelType:$saveCtrl, ChannelType:$commitCtrl,
                       ChannelType:$SCSaveCtrl,
-                      ChannelType:$SCCommitCtrl, 
+                      ChannelType:$SCCommitCtrl,
                       ChannelType:$SCIsMisspec);
 
   let assemblyFormat = [{
@@ -1100,13 +1100,13 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
-    Save units are used to mark the beginning of the speculation region. 
-    Whenever a speculative token can interact with a non-speculative token, 
+    Save units are used to mark the beginning of the speculation region.
+    Whenever a speculative token can interact with a non-speculative token,
     the non-speculative token needs to be saved. In case of correct speculation
     or no speculation, the saved token can be dropped.
 
-    On the other hand, if the speculation was incorrect, the saved tokens 
-    need to be reinserted into the circuit to repeat the previously 
+    On the other hand, if the speculation was incorrect, the saved tokens
+    need to be reinserted into the circuit to repeat the previously
     miscalculated computations.
 
     Example:
@@ -1146,14 +1146,14 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
-    Commit units are used to mark the end of the speculation region. 
-    Commit units are used to stall speculative tokens until they receive 
-    the decision from the speculator. In case the speculation is correct, 
-    the speculative tokens are converted into non-speculative tokens and 
-    passed on to the rest of the circuit. 
-    Otherwise, the speculative tokens are discarded. 
+    Commit units are used to mark the end of the speculation region.
+    Commit units are used to stall speculative tokens until they receive
+    the decision from the speculator. In case the speculation is correct,
+    the speculative tokens are converted into non-speculative tokens and
+    passed on to the rest of the circuit.
+    Otherwise, the speculative tokens are discarded.
 
-    Any non-speculative token can pass through the commit units 
+    Any non-speculative token can pass through the commit units
     without any stall.
 
     Example:
@@ -1197,7 +1197,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     To increase loop parallelism, the save-commit unit will let both
     speculative and non-speculative tokens pass as well as save
     a copy of them.
- 
+
     Example:
 
     ```mlir
@@ -1238,10 +1238,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let description = [{
     The speculating branch operation represents a conditional
     branch that decides the condition based on if a token Value is
-    speculative or not. 
+    speculative or not.
 
     The $tagFromOperand field is the condition. Depending on wether the data
-    is speculative or not, $dataOperand will be send to $trueResult or 
+    is speculative or not, $dataOperand will be send to $trueResult or
     $falseResult. The speculative tag is a fictious attribute.
 
     Example:
@@ -1255,7 +1255,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
-    `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
+    `[` $tagFromOperand `]` $dataOperand attr-dict `:`
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
   }];
@@ -1318,15 +1318,15 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-  SameOperandsAndResultType, 
+  SameOperandsAndResultType,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
 
   let summary = "sharing wrapper operation";
   let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic 
+    The sharing_wrapper operation represents the selecting & distributing logic
     that manages access to a shared unit.
-    
+
     The sharing wrapper interfaces with the shared unit and the rest of the
     circuit.
 
@@ -1336,18 +1336,18 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
       operation that share the unit.
     - $numSharedOperands: the number of operands of the shared unit.
     - $latency: the execution latency of the shared unit.
-    
+
     The convention for the input operands:
     - the first "numSharedOperands * len(credits)" operands are the operands
       from the circuit
     - the last operand is the result computed by the shared unit
-    
+
     The convention for the output results:
     - the first "len(credits)" results are results dispatched to the rest of the
       circuit
     - the last "numSharedOperands" result is the selected operands that will be
       delivered to the shared unit.
-    
+
     Future improvement:
     - Add the number of operations that share the unit (now it is assumed to be
       the size of the DenseI64ArrayAttr credits).
@@ -1385,7 +1385,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     that combining individual signals into a `handshake::ChannelType` is a
     two-step process.
     1. First, bundle a `i1` value, which produces a `!handshake.control` and
-       `i1` (representing the upstream ready signal) as results. 
+       `i1` (representing the upstream ready signal) as results.
     2. Then, bundle the `!handshake.control` along with a value representing the
        data signal (of a compatible signal type e.g., `i32`), which produces
        a `!handshake.channel<i32>`.
@@ -1395,12 +1395,12 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     ```mlir
     // Bundling into a channel with a downstream extra signal
     %channel = bundle %ctrl, %data, %extra : _ to <i32, [extra: i1]>
-    
+
     // -----
-    
+
     // Bundling into a channel with an upstream extra signal
     %channel, %extra = bundle %ctrl, %data : _ to <i32, [extra: i1 (U)]>
-    
+
     // -----
 
     // Bundling into a control-only channel
@@ -1432,7 +1432,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     >
   ];
 
-  let hasCustomAssemblyFormat = 1; 
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
@@ -1453,16 +1453,16 @@ def UnbundleOp : Handshake_Op<"unbundle", [
        "downstream bundle").
     2. Then, unbundle the `!handshake.control` along with an `i1` value
        representing the ready signal, which produces an `i1` result representing
-       the valid signal. 
+       the valid signal.
 
     Example:
 
     ```mlir
     // Unbundling a channel with a downstream extra signal
     %ctrl, %data, %extra = unbundle %channel : <i32, [extra: i2]> to _
-    
+
     // -----
-    
+
     // Unbundling a channel with an upstream extra signal
     %ctrl, %data = unbundle %channel [%extra] : <i32, [extra: i2 (U)]> to _
 

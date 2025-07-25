@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file define Handshake equivalent of operations from the `arith` dialect
-// in tablegen. 
+// in tablegen.
 //
 //===----------------------------------------------------------------------===//
 
@@ -103,7 +103,7 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
 > {
   let arguments = (ins ChannelType:$in);
   let results = (outs ChannelType:$out);
-  
+
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   let hasFolder = 1;
@@ -117,7 +117,7 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
 > {
   let arguments = (ins ChannelType:$in);
   let results = (outs ChannelType:$out);
-  
+
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
@@ -130,7 +130,7 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
 > {
   let arguments = (ins ChannelType:$in);
   let results = (outs ChannelType:$out);
-  
+
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
@@ -143,7 +143,7 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
 > {
   let arguments = (ins ChannelType:$in);
   let results = (outs ChannelType:$out);
-  
+
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
@@ -198,8 +198,8 @@ def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
   FPUImplInterface
 ]> {
   let summary = "Floating-point comparison.";
- 
-  let arguments = (ins Handshake_CmpFPredicateAttr:$predicate, 
+
+  let arguments = (ins Handshake_CmpFPredicateAttr:$predicate,
                        ChannelType:$lhs, ChannelType:$rhs);
 }
 
@@ -226,7 +226,7 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
   IsIntChannel<"rhs">
 ]> {
   let summary = "Integer comparison.";
- 
+
   let arguments = (ins Handshake_CmpIPredicateAttr:$predicate, ChannelType:$lhs,
                        ChannelType:$rhs);
 }
@@ -336,7 +336,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
- 
+
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
@@ -390,9 +390,10 @@ def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
   let summary = "Converts a signed integer to float.";
 }
 
-def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
+def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
   IsFloatSizedChannel<32, "in">,
-  IsIntSizedChannel<64, out>
+  IsIntSizedChannel<32, "out">
+]> {
   let summary = "Converts a float to signed integer.";
 }
 
