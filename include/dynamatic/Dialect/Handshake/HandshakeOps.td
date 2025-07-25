@@ -1530,8 +1530,8 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
-  AllTypesMatch<["lhsIn", "lhsOuts"]>,
-  AllTypesMatch<["rhsIn", "rhsOuts"]>,
+  AllTypesMatch<["lhsIn", "lhsOut"]>,
+  AllTypesMatch<["rhsIn", "rhsOut"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = [{
@@ -1544,7 +1544,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 
   let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
-  let results = (outs HandshakeType:$lhsOuts, HandshakeType:$rhsOuts);
+  let results = (outs HandshakeType:$lhsOut, HandshakeType:$rhsOut);
 
   let assemblyFormat = [{
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
