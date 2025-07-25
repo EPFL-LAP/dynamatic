@@ -25,10 +25,11 @@ def generate_arith2(
                 output_bitwidth is not None:
             raise RuntimeError("If bitwidth is specified, lhs, rhs, and output bitwidth must not be specified")
 
-        input_bitwidth = bitwidth
+        lhs_bitwidth = bitwidth
+        rhs_bitwidth = bitwidth
         output_bitwidth = bitwidth
 
-    elif input_bitwidth is None or output_bitwidth is None:
+    elif lhs_bitwidth is None or rhs_bitwidth is None or output_bitwidth is None:
         raise RuntimeError("If bitwidth is not specified, lhs, rhs, and output bitwidth must all be specified")
 
     def generate_inner(name): return _generate_arith2(
