@@ -29,7 +29,7 @@ mkdir -p $OUT
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
 # ------------------------------------------------------------------------------
-$LLVM_BINS/clang -O0 -S -emit-llvm $F_SRC \
+$LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm $F_SRC \
   -I "$DYNAMATIC_PATH/include"  \
   -Xclang \
   -ffp-contract=off \
@@ -63,10 +63,21 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
 # ------------------------------------------------------------------------------
+
 $LLVM_BINS/opt -S \
-  -passes="mem2reg,instcombine,loop-rotate,consthoist,simplifycfg" \
-  -strip-debug \
+ -passes="mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
   $OUT/clang.ll \
+  > $OUT/clang_loop_canonicalized.ll
+
+$LLVM_BINS/opt -S \
+  -passes="loop-unroll" \
+  $OUT/clang_loop_canonicalized.ll \
+  > $OUT/clang_unrolled.ll
+
+$LLVM_BINS/opt -S \
+  -passes="loop-simplify,simplifycfg" \
+  -strip-debug \
+  $OUT/clang_unrolled.ll \
   > $OUT/clang_optimized.ll
 
 # ------------------------------------------------------------------------------
@@ -140,38 +151,39 @@ $DYNAMATIC_BINS/dynamatic-opt \
   --handshake-materialize --handshake-infer-basic-blocks \
   > $OUT/handshake_transformed.mlir
 
-"$LLVM_BINS/clang++" "$F_SRC" \
-  -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
-  -Wno-deprecated -o "$OUT/profiler_bin.exe"
-
-"$OUT/profiler_bin.exe" \
-  > "$OUT/profiler.txt"
-
-"$DYNAMATIC_BINS/exp-frequency-profiler" \
-  "$OUT/cf_transformed.mlir" \
-  --top-level-function="$FUNC_NAME" \
-  --input-args-file="$OUT/profiler.txt" \
-  > "$OUT/frequencies.csv"
-
 # ------------------------------------------------------------------------------
 # Run simple buffer placement
-# ------------------------------------------------------------------------------
-# $DYNAMATIC_BINS/dynamatic-opt \
-#   $OUT/handshake_transformed.mlir \
-#   --handshake-mark-fpu-impl="impl=flopoco" \
-#   --handshake-set-buffering-properties="version=fpga20" \
-#   --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
-#   > $OUT/handshake_buffered.mlir
-
-# ------------------------------------------------------------------------------
-# Run throughput-driven buffer placement (needs a valid Gurobi license)
 # ------------------------------------------------------------------------------
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/handshake_transformed.mlir \
   --handshake-mark-fpu-impl="impl=flopoco" \
   --handshake-set-buffering-properties="version=fpga20" \
-  --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=300" \
+  --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
   > $OUT/handshake_buffered.mlir
+
+# ------------------------------------------------------------------------------
+# Run throughput-driven buffer placement (needs a valid Gurobi license)
+# ------------------------------------------------------------------------------
+
+# "$LLVM_BINS/clang++" "$F_SRC" \
+#   -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
+#   -Wno-deprecated -o "$OUT/profiler_bin.exe"
+
+# "$OUT/profiler_bin.exe" \
+#   > "$OUT/profiler.txt"
+
+# "$DYNAMATIC_BINS/exp-frequency-profiler" \
+#   "$OUT/cf_transformed.mlir" \
+#   --top-level-function="$FUNC_NAME" \
+#   --input-args-file="$OUT/profiler.txt" \
+#   > "$OUT/frequencies.csv"
+
+# $DYNAMATIC_BINS/dynamatic-opt \
+#   $OUT/handshake_transformed.mlir \
+#   --handshake-mark-fpu-impl="impl=flopoco" \
+#   --handshake-set-buffering-properties="version=fpga20" \
+#   --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=300" \
+#   > $OUT/handshake_buffered.mlir
 
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/handshake_buffered.mlir \
