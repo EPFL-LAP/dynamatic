@@ -122,10 +122,10 @@ begin
       ins_ready(0) => lhs_ready,
       -- input channel from "rhs"
       ins_valid(1) => rhs_valid,
-      ins_ready(1) => rhs_ready
+      ins_ready(1) => rhs_ready,
       -- output channel to "result"
       outs_valid   => result_valid,
-      outs_ready   => result_ready,
+      outs_ready   => result_ready
     );
 
   {body}
@@ -152,10 +152,10 @@ begin
       ins_ready(0) => lhs_ready,
       -- input channel from "rhs"
       ins_valid(1) => rhs_valid,
-      ins_ready(1) => rhs_ready
+      ins_ready(1) => rhs_ready,
       -- output channel to one_slot_break_dv
       outs_valid   => join_valid,
-      outs_ready   => one_slot_break_dv_ready,
+      outs_ready   => one_slot_break_dv_ready
     );
 
   one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
@@ -164,10 +164,10 @@ begin
       rst        => rst,
       -- input channel from join
       ins_valid  => join_valid,
-      ins_ready  => one_slot_break_dv_ready
+      ins_ready  => one_slot_break_dv_ready,
       -- output channel to "result"
       outs_ready => result_ready,
-      outs_valid => result_valid,
+      outs_valid => result_valid
     );
 
   {body}
