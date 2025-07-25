@@ -2,7 +2,7 @@ from generators.support.arith2 import generate_arith2
 
 
 def generate_cmpf(name, params):
-    impl = params["impl"]
+    impl = params["fpu_impl"]
     is_double = params["is_double"]
     predicate = params["predicate"]
 
@@ -14,7 +14,7 @@ def generate_cmpf(name, params):
     elif impl == "vivado":
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
-        bitwidth = _get_vivado_bitwidth(is_double)
+        bitwidth = 32
         latency = _get_vivado_latency()
 
     return generate_arith2(
@@ -185,8 +185,3 @@ def _get_vivado_code_from_predicate(predicate):
 def _get_vivado_latency():
     return 2
 
-
-def _get_vivado_bitwidth(is_double):
-    if is_double:
-        raise ValueError(f"Vivado cmpf does not support 64 bits")
-    return 32
