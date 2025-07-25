@@ -126,8 +126,8 @@ begin
   {body}
 
   -- combinatorial unit forwards handshaking
-  outs_valid <= ins_valid
-  ins_ready <= outs_ready
+  outs_valid <= ins_valid;
+  ins_ready <= outs_ready;
 
 end architecture;
 """
