@@ -82,48 +82,46 @@ def _generate_valid_merger_signal_manager(name,
                                           rhs_bitwidth,
                                           generate_inner,
                                           lhs_extra_signals,
-                                          rhs_extra_signals)
+                                          rhs_extra_signals):
+    inner_name = f"{name}_inner"
+    inner = generate_inner(inner_name)
 
-
-inner_name = f"{name}_inner"
-inner = generate_inner(inner_name)
-
-in_channels = [
-    {
-         "name": "lhs_in",
-          "bitwidth": lhs_bitwidth,
-         "extra_signals": lhs_extra_signals
-         },
-     {
-         "name": "rhs_in",
-         "bitwidth": rhs_bitwidth,
-         "extra_signals": rhs_extra_signals
-         }
+    in_channels = [
+        {
+            "name": "lhs_in",
+            "bitwidth": lhs_bitwidth,
+            "extra_signals": lhs_extra_signals
+        },
+        {
+            "name": "rhs_in",
+            "bitwidth": rhs_bitwidth,
+            "extra_signals": rhs_extra_signals
+        }
     ]
 
-out_channels = [
-     {
-          "name": "lhs_out",
-          "bitwidth": lhs_bitwidth,
+    out_channels = [
+        {
+            "name": "lhs_out",
+            "bitwidth": lhs_bitwidth,
             "extra_signals": lhs_extra_signals
-          },
-     {
-           "name": "rhs_out",
-          "bitwidth": rhs_bitwidth,
+        },
+        {
+            "name": "rhs_out",
+            "bitwidth": rhs_bitwidth,
             "extra_signals": rhs_extra_signals
-       }
-     ]
+        }
+    ]
 
- entity = generate_entity(
-      name,
-      in_channels,
-      out_channels
-      )
+    entity = generate_entity(
+        name,
+        in_channels,
+        out_channels
+    )
 
-  extra_signal_assignments = []
-   # directly pass extra signals through the valid merger
-   # regardless of how they're normally forwarded
-   for extra_signal_name in lhs_extra_signals:
+    extra_signal_assignments = []
+    # directly pass extra signals through the valid merger
+    # regardless of how they're normally forwarded
+    for extra_signal_name in lhs_extra_signals:
         extra_signal_assignments.append(
             f"lhs_out_{extra_signal_name} <= lhs_in_{extra_signal_name};"
         )
@@ -140,15 +138,15 @@ out_channels = [
 -- Architecture of signal manager (default)
 architecture arch of {name} is
 begin
-  -- Forward extra signals to output channels
-  {"\n  ".join(extra_signal_assignments)}
+-- Forward extra signals to output channels
+{"\n  ".join(extra_signal_assignments)}
 
-  inner : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      {mappings}
-    );
+inner : entity work.{inner_name}(arch)
+  port map(
+    clk => clk,
+    rst => rst,
+    {mappings}
+  );
 end architecture;
 """
 
