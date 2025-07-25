@@ -97,6 +97,7 @@ def _generate_arith1(
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use ieee.float_pkg.all;
 
 -- Entity of {modType}
 entity {name} is
