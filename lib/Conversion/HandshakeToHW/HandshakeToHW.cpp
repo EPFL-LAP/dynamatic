@@ -1831,7 +1831,7 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
+                    ConvertToHWInstance<handshake::RigidiferOp>,
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
