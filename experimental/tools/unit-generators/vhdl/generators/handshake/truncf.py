@@ -9,7 +9,7 @@ def generate_truncf(name, params):
     """
 
     body = f"""
-  float_value <= to_float64(ins);
+  float_value <= to_float(ins, 11, 52);
   float_truncated <= to_float32(float_value);
   outs <= to_std_logic_vector(float_truncated);
     """
