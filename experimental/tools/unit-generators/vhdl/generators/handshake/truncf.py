@@ -17,8 +17,8 @@ def generate_truncf(name, params):
     return generate_arith1(
         name=name,
         modType="truncf",
-        input_bitwidth=32,
-        output_bitwidth=64,
+        input_bitwidth=64,
+        output_bitwidth=32,
         signals=signals,
         body=body,
         extra_signals=params.get("extra_signals", None),
