@@ -144,10 +144,10 @@ begin
       rst        => rst,
       -- input channel from "ins"
       ins_valid  => ins_valid,
-      ins_ready  => one_slot_break_dv_ready
+      ins_ready  => one_slot_break_dv_ready,
       -- output channel to "outs"
       outs_ready => outs_ready,
-      outs_valid => outs_valid,
+      outs_valid => outs_valid
   );
 
   {body}
@@ -182,10 +182,10 @@ begin
       rst        => rst,
       -- input channel from buffer
       ins_valid  => buff_valid,
-      ins_ready  => one_slot_break_dv_ready
+      ins_ready  => one_slot_break_dv_ready,
       -- output channel to "outs"
       outs_ready => outs_ready,
-      outs_valid => outs_valid,
+      outs_valid => outs_valid
   );
 
   -- input channel from "ins" to one_slot_break_dv
