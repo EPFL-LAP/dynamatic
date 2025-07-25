@@ -1,7 +1,7 @@
 from generators.support.arith1 import generate_arith1
 
 
-def generate_fptosi(name, params):
+def generate_sitofp(name, params):
     signals = f"""
   signal converted : std_logic_vector(32 - 1 downto 0);
   signal q0 : std_logic_vector(32 - 1 downto 0);
