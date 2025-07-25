@@ -80,6 +80,16 @@ $LLVM_BINS/opt -S \
   $OUT/clang_unrolled.ll \
   > $OUT/clang_optimized.ll
 
+$LLVM_BINS/opt -S \
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
+  -passes="array-partition" \
+  $OUT/clang_optimized.ll \
+  > $OUT/clang_array_partitioned.ll
+
+echo "return code $?"
+
+exit
+
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
