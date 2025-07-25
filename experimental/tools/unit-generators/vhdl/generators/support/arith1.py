@@ -105,7 +105,7 @@ entity {name} is
     -- input channel
     ins: in std_logic_vector({input_bitwidth} - 1 downto 0);
     ins_valid: in std_logic;
-    ins_ready: out std_logic
+    ins_ready: out std_logic;
     -- output channel
     outs: out std_logic_vector({output_bitwidth} - 1 downto 0);
     outs_valid: out std_logic;

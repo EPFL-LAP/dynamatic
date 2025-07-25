@@ -10,8 +10,6 @@ def generate_trunci(name, params):
 
     body = f"""
   outs       <= ins({output_bitwidth} - 1 downto 0);
-  outs_valid <= ins_valid;
-  ins_ready  <= not ins_valid or (ins_valid and outs_ready);
     """
 
     return generate_arith1(
