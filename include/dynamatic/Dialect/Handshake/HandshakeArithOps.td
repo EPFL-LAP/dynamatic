@@ -62,13 +62,13 @@ class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     SameOperandsAndResultType,
-    IsFloatChannel<"operand">,
-    IsFloatChannel<"result">,
+    IsFloatChannel<"ins">,
+    IsFloatChannel<"outs">,
 ]> {
-  let arguments = (ins ChannelType:$operand);
-  let results = (outs ChannelType:$result);
+  let arguments = (ins ChannelType:$ins);
+  let results = (outs ChannelType:$outs);
 
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
+  let assemblyFormat = "$ins attr-dict `:` type($outs)";
 }
 
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
@@ -391,6 +391,8 @@ def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
 }
 
 def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
+  IsFloatSizedChannel<32, "in">,
+  IsIntSizedChannel<64, out>
   let summary = "Converts a float to signed integer.";
 }
 

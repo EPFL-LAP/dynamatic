@@ -44,7 +44,6 @@ entity {name} is
 end entity;
 """
 
-
     architecture = f"""
 -- Architecture of lazy_fork_dataless
 architecture arch of {name} is

@@ -1,34 +1,29 @@
 from generators.support.arith2 import generate_arith2
 
+
 def generate_cmpi(name, params):
+
     bitwidth = params["bitwidth"]
+
     predicate = params["predicate"]
-    extra_signals = params.get("extra_signals", None)
 
     modifier = _get_sign_from_predicate(predicate)
     comparator = _get_symbol_from_predicate(predicate)
-
-    modType = "cmpi"
-
-    signals = ""
 
     body = f"""
   result(0) <= '1' when ({modifier}(lhs) {comparator} {modifier}(rhs)) else '0';
 """
 
-    dependencies = ""
-    latency = 0
-
     return generate_arith2(
-        name,
-        modType,
-        bitwidth,
-        signals,
-        body,
-        latency,
-        dependencies,
-        extra_signals
+        name=name,
+        modType="cmpi",
+        lhs_bitwidth=bitwidth,
+        rhs_bitwidth=bitwidth,
+        output_bitwidth=1,
+        body=body,
+        extra_signals=params.get("extra_signals", None)
     )
+
 
 def _get_symbol_from_predicate(pred):
     match pred:
