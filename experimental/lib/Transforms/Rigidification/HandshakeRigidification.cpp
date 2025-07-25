@@ -56,7 +56,7 @@ struct HandshakeRigidificationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult insertReadyRemover(AbsenceOfBackpressure prop);
+  LogicalResult insertRigidifier(AbsenceOfBackpressure prop);
   LogicalResult insertValidMerger(ValidEquivalence prop);
 };
 } // namespace
@@ -71,7 +71,7 @@ void HandshakeRigidificationPass::runDynamaticPass() {
         property->getCheck() != std::nullopt && *property->getCheck()) {
 
       if (auto *p = dyn_cast<AbsenceOfBackpressure>(property.get())) {
-        if (failed(insertReadyRemover(*p)))
+        if (failed(insertRigidifier(*p)))
           return signalPassFailure();
 
       } else if (auto *p = dyn_cast<ValidEquivalence>(property.get())) {
@@ -83,7 +83,7 @@ void HandshakeRigidificationPass::runDynamaticPass() {
 }
 
 LogicalResult
-HandshakeRigidificationPass::insertReadyRemover(AbsenceOfBackpressure prop) {
+HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
@@ -93,7 +93,7 @@ HandshakeRigidificationPass::insertReadyRemover(AbsenceOfBackpressure prop) {
   builder.setInsertionPointAfter(ownerOp);
   auto loc = channel.getLoc();
 
-  auto newOp = builder.create<handshake::ReadyRemoverOp>(loc, channel);
+  auto newOp = builder.create<handshake::RigidifierOp>(loc, channel);
   channel.replaceAllUsesExcept(newOp.getResult(), newOp);
 
   return success();
