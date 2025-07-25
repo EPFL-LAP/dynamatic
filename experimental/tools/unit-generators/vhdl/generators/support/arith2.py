@@ -115,7 +115,6 @@ end entity;
 architecture arch of {name} is
   {signals}
 begin
-  join_inputs: entity work.{join_name}(arch)
   join_inputs : entity work.{join_name}(arch)
     port map(
       -- input channel from "lhs"
