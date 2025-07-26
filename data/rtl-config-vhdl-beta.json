@@ -42,9 +42,13 @@
       {
         "name": "FPU_IMPL",
         "type": "string"
+      },
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' extra_signals=$EXTRA_SIGNALS predicate=\"'$PREDICATE'\"",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS predicate=\"'$PREDICATE'\"",
     "dependencies": [
       "flopoco_ip_cores", "vivado_ip_wrappers"
     ]
