@@ -22,11 +22,11 @@ architecture arch of addf_vitis_hls_wrapper is
     signal aclk      : std_logic;
     signal aclken    : std_logic;
     signal a_tvalid  : std_logic;
-    signal a_tdata   : std_logic_vector(32 downto 0);
+    signal a_tdata   : std_logic_vector(32 - 1 downto 0);
     signal b_tvalid  : std_logic;
-    signal b_tdata   : std_logic_vector(32 downto 0);
+    signal b_tdata   : std_logic_vector(32 - 1 downto 0);
     signal r_tvalid  : std_logic;
-    signal r_tdata   : std_logic_vector(32 downto 0);
+    signal r_tdata   : std_logic_vector(33 - 1 downto 0);
     signal din0_buf1 : std_logic_vector(32 - 1 downto 0);
     signal din1_buf1 : std_logic_vector(32 - 1 downto 0);
     signal ce_r      : std_logic;
