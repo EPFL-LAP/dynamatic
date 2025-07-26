@@ -134,7 +134,6 @@ namespace {
 
 struct AccessInfo {
   std::map<Instruction *, isl::set> accessMaps;
-  std::map<Instruction *, Value *> instToBase;
 
   std::map<Instruction *, unsigned> instToScopId;
 
@@ -281,23 +280,13 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         }
 
         if (isDependent) {
-          llvm::errs() << "Dependency found between: " << *inst1 << " and "
-                       << *inst2 << "\n";
-          info.instToBase[inst1] = base;
-          info.instToBase[inst2] = base;
-        } else {
-          llvm::errs() << "No dependency between: " << *inst1 << " and "
-                       << *inst2 << "\n";
-        }
 
-        if (isDependent) {
           auto v1 = instToVertex[inst1];
           auto v2 = instToVertex[inst2];
           boost::add_edge(v1, v2, g);
         }
       }
     }
-
     // Find the connected components in the graph:
     std::vector<int> nodeToComponentId(boost::num_vertices(g),
                                        /* -1 : not assigned (error) */ -1);
@@ -320,11 +309,10 @@ PreservedAnalyses ArrayPartition::run(Function &f,
       llvm::errs() << "\n";
     }
   }
-
   return PreservedAnalyses::all();
 }
 
-} // end anonymous namespace
+} // namespace
 
 // Register the pass for opt-style loading
 // Important note: you need to enable shared libarary in LLVM to load pass
