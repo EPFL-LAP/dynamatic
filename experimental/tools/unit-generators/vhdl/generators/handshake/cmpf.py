@@ -10,10 +10,12 @@ def generate_cmpf(name, params):
         bitwidth = _get_flopoco_bitwidth(is_double)
         signals = _get_flopoco_signals(bitwidth)
         body = _get_flopoco_body(bitwidth, predicate)
+        latency = 0
     elif impl == "vivado":
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
         bitwidth = 32
+        latency = 1
     else:
         raise ValueError(f"Invalid fpu implementation on cmpf: {impl}")
 
@@ -25,6 +27,7 @@ def generate_cmpf(name, params):
         output_bitwidth=1,
         signals=signals,
         body=body,
+        latency=latency,
         extra_signals=params.get("extra_signals", None)
     )
 
@@ -156,8 +159,3 @@ def _get_vivado_code_from_predicate(predicate):
         raise ValueError(f"Unsupported vivado predicate: {predicate}")
 
     return f"\"{codes[predicate]}\""
-
-
-def _get_vivado_latency():
-    return 2
-
