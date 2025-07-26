@@ -297,9 +297,7 @@ public:
   LogicalResult registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                  llvm::StringRef modName,
                                  hw::ModuleType &modType);
-  void registerTransparentParameter(hw::HWModuleExternOp &modOp,
-                                    llvm::StringRef modName,
-                                    hw::ModuleType &modType);
+
   LogicalResult registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                      llvm::StringRef modName,
                                      hw::ModuleType &modType);
