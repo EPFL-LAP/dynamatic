@@ -114,25 +114,6 @@ def _get_flopoco_expression_from_predicate(predicate):
 
 def _get_vivado_signals():
     return f"""
-  component cmpf_vitis_hls_wrapper is
-    generic (
-      ID         : integer := 1;
-      NUM_STAGE  : integer := 2;
-      din0_WIDTH : integer := 32;
-      din1_WIDTH : integer := 32;
-      dout_WIDTH : integer := 1
-    );
-    port (
-      clk    : in  std_logic;
-      reset  : in  std_logic;
-      ce     : in  std_logic;
-      din0   : in  std_logic_vector(din0_WIDTH - 1 downto 0);
-      din1   : in  std_logic_vector(din1_WIDTH - 1 downto 0);
-      opcode : in  std_logic_vector(4 downto 0);
-      dout   : out std_logic_vector(dout_WIDTH - 1 downto 0)
-    );
-  end component;
-
   signal alu_opcode : std_logic_vector(4 downto 0);
 """
 
@@ -142,7 +123,7 @@ def _get_vivado_body(predicate):
     return f"""
       -- Predicate: {predicate}
       alu_opcode <= {predicate_code};
-      array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component cmpf_vitis_hls_wrapper
+      array_RAM_fcmp_32ns_32ns_1_2_1_u1 : entity work.cmpf_vitis_hls_wrapper
         generic map(
           ID         => 1,
           NUM_STAGE  => 2,
