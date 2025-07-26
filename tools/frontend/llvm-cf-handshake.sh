@@ -116,10 +116,20 @@ $LLVM_BINS/opt -S \
 # cannot find two insts in these two sets that access the same array element.
 # ------------------------------------------------------------------------------
 
+# Somehow here we need to canonicalized again, otherwise, Polly cannot recognize
+# some Scops in some cases
+$LLVM_BINS/opt -S \
+  -mem2reg \
+  -loop-simplify \
+  -simplifycfg \
+  -polly-canonicalize \
+  $OUT/clang_optimized.ll \
+  > $OUT/clang_optimized_polly_canonicalized.ll
+
 $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
   -passes="array-partition" \
-  $OUT/clang_optimized.ll \
+  $OUT/clang_optimized_polly_canonicalized.ll \
   > $OUT/clang_array_partitioned.ll
 
 # ------------------------------------------------------------------------------
