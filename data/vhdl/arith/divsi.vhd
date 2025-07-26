@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of divsi is
 
-component array_RAM_sdiv_32ns_32ns_32_36_1 is
+  component array_RAM_sdiv_32ns_32ns_32_36_1 is
     generic (
       ID         : integer;
       NUM_STAGE  : integer;
