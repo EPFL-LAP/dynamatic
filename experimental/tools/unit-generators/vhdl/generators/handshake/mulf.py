@@ -3,14 +3,14 @@ from generators.support.arith_ip import generate_flopoco_ip_wrapper, generate_vi
 
 def generate_mulf(name, params):
     impl = params["fpu_impl"]
-
     latency = params["latency"]
+
+    extra_signals = params.get("extra_signals", None)
 
     # only used for flopoco
     is_double = params.get("is_double", None)
     internal_delay = params.get("internal_delay", None)
 
-    extra_signals = params.get("extra_signals", None)
 
     mod_type = "mulf"
 

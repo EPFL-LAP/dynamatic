@@ -2,20 +2,21 @@ from generators.support.arith2 import generate_arith2
 
 
 def generate_cmpf(name, params):
-    impl = params["fpu_impl"]
-    is_double = params["is_double"]
     predicate = params["predicate"]
+    impl = params["fpu_impl"]
+    latency = params["latency"]
+
+    # only used by flopoco
+    is_double = params.get("is_double", None)
 
     if impl == "flopoco":
-        bitwidth = _get_flopoco_bitwidth(is_double)
+        bitwidth = 64 if is_double else 32
         signals = _get_flopoco_signals(bitwidth)
         body = _get_flopoco_body(bitwidth, predicate)
-        latency = 0
     elif impl == "vivado":
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
         bitwidth = 32
-        latency = 1
     else:
         raise ValueError(f"Invalid fpu implementation on cmpf: {impl}")
 
@@ -36,9 +37,6 @@ def generate_cmpf(name, params):
 #                 Flopoco
 ##################################################
 
-
-def _get_flopoco_bitwidth(is_double):
-    return 64 if is_double else 32
 
 
 def _get_flopoco_signals(bitwidth):

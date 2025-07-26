@@ -6,11 +6,12 @@ def generate_addf(name, params):
 
     latency = params["latency"]
 
+    extra_signals = params.get("extra_signals", None)
+
     # only used for flopoco
     is_double = params.get("is_double", None)
     internal_delay = params.get("internal_delay", None)
 
-    extra_signals = params.get("extra_signals", None)
 
     mod_type = "addf"
 
