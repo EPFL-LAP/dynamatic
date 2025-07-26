@@ -86,10 +86,6 @@ $LLVM_BINS/opt -S \
   $OUT/clang_optimized.ll \
   > $OUT/clang_array_partitioned.ll
 
-echo "return code $?"
-
-exit
-
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
@@ -106,9 +102,10 @@ exit
 # a loop depth of 1
 # ===============================
 # ------------------------------------------------------------------------------
-$LLVM_BINS/opt $OUT/clang_optimized.ll -S \
+$LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
+  $OUT/clang_array_partitioned.ll \
   > $OUT/clang_optimized_dep_marked.ll
 
 $LLVM_BINS/mlir-translate \
