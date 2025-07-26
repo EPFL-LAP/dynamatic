@@ -11,6 +11,9 @@ class Generators():
     def __getitem__(self, key):
         return self._data[key]
 
+    def __contains__(self, key):
+        return key in self._data
+
     def add(self, category, mod):
         imported = importlib.import_module(f"generators.{category}.{mod}")
         self._data[mod] = getattr(imported, f"generate_{mod}")
