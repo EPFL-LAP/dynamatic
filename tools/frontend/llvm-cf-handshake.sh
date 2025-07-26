@@ -69,6 +69,28 @@ $LLVM_BINS/opt -S \
   $OUT/clang.ll \
   > $OUT/clang_loop_canonicalized.ll
 
+# ------------------------------------------------------------------------------
+# Example (how to unroll loops):
+#
+#// void test_unrolling(const int A[N], const int B[N], const int C[N], int result[N]) {
+#//   // NOTE: The "array-partition" pass replicate this array to allow 2 concurrent accesses
+#//   int intermediate[N];
+#// #pragma clang loop unroll_count(2)
+#//   for (int i = 0; i < N; i++) {
+#//     intermediate[i] = A[i] * B[i];
+#//   }
+#// #pragma clang loop unroll_count(2)
+#//   for (int i = 0; i < N; i++) {
+#//     result[i] = intermediate[i] * C[i];
+#//   }
+#// }
+#
+# We use the clang pragma to tell the compiler to unroll the loop.
+# 
+# TODO: maybe some llvm passes can prove that some array locations are allocated
+# by never used, so it automatically reshapes the array (and the accesses)?
+# ------------------------------------------------------------------------------
+
 $LLVM_BINS/opt -S \
   -passes="loop-unroll" \
   $OUT/clang_loop_canonicalized.ll \
@@ -79,6 +101,20 @@ $LLVM_BINS/opt -S \
   -strip-debug \
   $OUT/clang_unrolled.ll \
   > $OUT/clang_optimized.ll
+
+# ------------------------------------------------------------------------------
+# This pass computes the set of disjoint accesses to the same baseptr, and
+# replicate the arrays if disjoint sets can be found.
+# Example: consider A[10] and loadA, loadB, loadC, loadD interact with it.
+#
+# - loadA:  accesses 0, 2, 4, 6, 8
+# - loadB:  accesses 1, 3, 5, 7, 9
+# - storeA: accesses 0, 2, 4, 6, 8
+# - storeB: accesses 1, 3, 5, 7, 9
+#
+# We can parition it into {loadA, storeA} and {loadB, storeB}, such that you
+# cannot find two insts in these two sets that access the same array element.
+# ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
