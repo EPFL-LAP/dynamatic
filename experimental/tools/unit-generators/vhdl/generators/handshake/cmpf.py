@@ -51,10 +51,6 @@ def _get_flopoco_signals(bitwidth):
   """
 
 
-def _get_flopoco_latency(is_double):
-    return 1 if is_double else 0
-
-
 def _get_flopoco_body(bitwidth, predicate):
     expression = _get_flopoco_expression_from_predicate(predicate)
     return f"""
