@@ -135,7 +135,7 @@ def _generate_valid_merger_signal_manager(name,
     mappings = generate_default_mappings(in_channels + out_channels)
 
     architecture = f"""
--- Architecture of signal manager (default)
+-- Architecture of signal manager (valid merger)
 architecture arch of {name} is
 begin
 -- Forward extra signals to output channels
