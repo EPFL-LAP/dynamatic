@@ -1,4 +1,3 @@
-from generators.support.signal_manager import generate_arith2_signal_manager
 from generators.support.arith2 import generate_arith2
 
 

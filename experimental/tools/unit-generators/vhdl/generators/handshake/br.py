@@ -1,8 +1,5 @@
 from generators.support.signal_manager import generate_default_signal_manager
 
-from generators.support.signal_manager import generate_default_signal_manager
-from generators.handshake.join import generate_join
-
 
 def generate_br(name, params):
     bitwidth = params["bitwidth"]

@@ -10,12 +10,10 @@ def generate_cmpf(name, params):
         bitwidth = _get_flopoco_bitwidth(is_double)
         signals = _get_flopoco_signals(bitwidth)
         body = _get_flopoco_body(bitwidth, predicate)
-        latency = _get_flopoco_latency(is_double)
     elif impl == "vivado":
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
         bitwidth = 32
-        latency = _get_vivado_latency()
 
     return generate_arith2(
         name=name,
@@ -25,7 +23,6 @@ def generate_cmpf(name, params):
         output_bitwidth=1,
         signals=signals,
         body=body,
-        latency=latency,
         extra_signals=params.get("extra_signals", None)
     )
 
@@ -85,7 +82,7 @@ def _get_flopoco_body(bitwidth, predicate):
         XgtY=> XgtY,
         XleY=> XleY,
         XgeY=> XgeY);
-  
+
   result(0) <= {expression};
   """
 
