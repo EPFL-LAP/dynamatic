@@ -1,12 +1,15 @@
-from generators.support.fpu import generate_fpu_wrapper
+from generators.support.arith_ip import generate_vivado_ip_wrapper
 
 
-def generate_divsi(name, params):
-    params["fpu_impl"] = "vivado"
+def generate_divf(name, params):
 
-    mod_type = "divsi"
+    latency = params["latency"]
 
-    # only applies to flopoco
-    core_unit = ""
+    extra_signals = params.get("extra_signals", None)
 
-    return generate_fpu_wrapper(name, params, core_unit, mod_type)
+    return generate_vivado_ip_wrapper(
+        name=name,
+        mod_type="divsi",
+        latency=latency,
+        extra_signals=extra_signals
+    )

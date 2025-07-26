@@ -1,15 +1,15 @@
-from generators.support.fpu import generate_fpu_wrapper
+from generators.support.arith_ip import generate_vivado_ip_wrapper
 
 
-def generate_divui(name, params):
-    fpu_impl = params["fpu_impl"]
+def generate_divf(name, params):
 
-    if fpu_impl != "vivado":
-        raise ValueError(f"Invalid divui implementation: {fpu_impl}")
+    latency = params["latency"]
 
-    mod_type = "divui"
+    extra_signals = params.get("extra_signals", None)
 
-    # only applies to flopoco
-    core_unit = ""
-
-    return generate_fpu_wrapper(name, params, core_unit, mod_type)
+    return generate_vivado_ip_wrapper(
+        name=name,
+        mod_type="divui",
+        latency=latency,
+        extra_signals=extra_signals
+    )

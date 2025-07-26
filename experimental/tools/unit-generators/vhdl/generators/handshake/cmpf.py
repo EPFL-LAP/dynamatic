@@ -14,6 +14,8 @@ def generate_cmpf(name, params):
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
         bitwidth = 32
+    else:
+        raise ValueError(f"Invalid fpu implementation on cmpf: {impl}")
 
     return generate_arith2(
         name=name,
