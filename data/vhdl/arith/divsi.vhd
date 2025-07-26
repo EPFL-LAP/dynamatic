@@ -25,7 +25,22 @@ end entity;
 
 architecture arch of divsi is
 
+component array_RAM_sdiv_32ns_32ns_32_36_1 is
 
+    generic (
+      ID         : integer;
+      NUM_STAGE  : integer;
+      din0_TYPE : integer;
+      din1_TYPE : integer;
+      dout_TYPE : integer);
+    port (
+      clk   : in  std_logic;
+      reset : in  std_logic;
+      ce    : in  std_logic;
+      din0  : in  std_logic_vector(din0_TYPE - 1 downto 0);
+      din1  : in  std_logic_vector(din1_TYPE - 1 downto 0);
+      dout  : out std_logic_vector(dout_TYPE - 1 downto 0));
+  end component;
 
   signal join_valid : std_logic;
 
