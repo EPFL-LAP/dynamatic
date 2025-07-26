@@ -4,69 +4,75 @@ import sys
 
 import importlib
 
+class Generators():
+    def __init__(self):
+        self._data = {}
 
-def gen(category, mod):
-    imported = importlib.import_module(f"generators.{category}.{mod}")
-    return getattr(imported, f"generate_{mod}")
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def add(self, category, mod):
+        imported = importlib.import_module(f"generators.{category}.{mod}")
+        self._data[mod] = getattr(imported, f"generate_{mod}")
 
 
-generators = {
-    "absf": gen("handshake", "absf"),
-    "addf": gen("handshake", "addf"),
-    "addi": gen("handshake", "addi"),
-    "andi": gen("handshake", "andi"),
-    "buffer": gen("handshake", "buffer"),
-    "cmpi": gen("handshake", "cmpi"),
-    "cmpf": gen("handshake", "cmpf"),
-    "cond_br": gen("handshake", "cond_br"),
-    "br": gen("handshake", "br"),
-    "constant": gen("handshake", "constant"),
-    "control_merge": gen("handshake", "control_merge"),
-    "divf": gen("handshake", "divf"),
-    "divsi": gen("handshake", "divsi"),
-    "divui": gen("handshake", "divui"),
-    "negf": gen("handshake", "negf"),
-    "extsi": gen("handshake", "extsi"),
-    "extf": gen("handshake", "extf"),
-    "fork": gen("handshake", "fork"),
-    "lazy_fork": gen("handshake", "lazy_fork"),
-    "load": gen("handshake", "load"),
-    "maximumf": gen("handshake", "maximumf"),
-    "minimumf": gen("handshake", "minimumf"),
-    "mem_controller": gen("handshake", "mem_controller"),
-    "merge": gen("handshake", "merge"),
-    "mulf": gen("handshake", "mulf"),
-    "muli": gen("handshake", "muli"),
-    "mux": gen("handshake", "mux"),
-    "ndwire": gen("handshake", "ndwire"),
-    "ori": gen("handshake", "ori"),
-    "xori": gen("handshake", "xori"),
-    "not": gen("handshake", "logical_not"),
-    "select": gen("handshake", "select"),
-    "sink": gen("handshake", "sink"),
-    "source": gen("handshake", "source"),
-    "store": gen("handshake", "store"),
-    "subf": gen("handshake", "subf"),
-    "subi": gen("handshake", "subi"),
-    "trunci": gen("handshake", "trunci"),
-    "truncf": gen("handshake", "truncf"),
-    "spec_commit": gen("handshake.speculation", "spec_commit"),
-    "spec_save_commit": gen("handshake.speculation", "spec_save_commit"),
-    "speculating_branch": gen("handshake.speculation", "speculating_branch"),
-    "speculator": gen("handshake.speculation", "speculator"),
-    "non_spec": gen("handshake.speculation", "non_spec"),
-    "mem_to_bram": gen("support", "mem_to_bram"),
-    "extui": gen("handshake", "extui"),
-    "shli": gen("handshake", "shli"),
-    "shrsi": gen("handshake", "shrsi"),
-    "shrui": gen("handshake", "shrui"),
-    "blocker": gen("handshake", "blocker"),
-    "sitofp": gen("handshake", "sitofp"),
-    "fptosi": gen("handshake", "fptosi"),
-    "rigidifier": gen("handshake", "rigidifier"),
-    "valid_merger": gen("handshake", "valid_merger"),
-    "top_join": gen("handshake", "top_join")
-}
+generators = Generators()
+generators.add("handshake", "absf")
+generators.add("handshake", "addf")
+generators.add("handshake", "addi")
+generators.add("handshake", "andi")
+generators.add("handshake", "buffer")
+generators.add("handshake", "cmpi")
+generators.add("handshake", "cmpf")
+generators.add("handshake", "cond_br")
+generators.add("handshake", "br")
+generators.add("handshake", "constant")
+generators.add("handshake", "control_merge")
+generators.add("handshake", "divf")
+generators.add("handshake", "divsi")
+generators.add("handshake", "divui")
+generators.add("handshake", "negf")
+generators.add("handshake", "extsi")
+generators.add("handshake", "extf")
+generators.add("handshake", "fork")
+generators.add("handshake", "lazy_fork")
+generators.add("handshake", "load")
+generators.add("handshake", "maximumf")
+generators.add("handshake", "minimumf")
+generators.add("handshake", "mem_controller")
+generators.add("handshake", "merge")
+generators.add("handshake", "mulf")
+generators.add("handshake", "muli")
+generators.add("handshake", "mux")
+generators.add("handshake", "ndwire")
+generators.add("handshake", "ori")
+generators.add("handshake", "xori")
+generators.add("handshake", "logical_not")
+generators.add("handshake", "select")
+generators.add("handshake", "sink")
+generators.add("handshake", "source")
+generators.add("handshake", "store")
+generators.add("handshake", "subf")
+generators.add("handshake", "subi")
+generators.add("handshake", "trunci")
+generators.add("handshake", "truncf")
+generators.add("handshake.speculation", "spec_commit")
+generators.add("handshake.speculation", "spec_save_commit")
+generators.add("handshake.speculation", "speculating_branch")
+generators.add("handshake.speculation", "speculator")
+generators.add("handshake.speculation", "non_spec")
+generators.add("support", "mem_to_bram")
+generators.add("handshake", "extui")
+generators.add("handshake", "shli")
+generators.add("handshake", "shrsi")
+generators.add("handshake", "shrui")
+generators.add("handshake", "blocker")
+generators.add("handshake", "sitofp")
+generators.add("handshake", "fptosi")
+generators.add("handshake", "rigidifier")
+generators.add("handshake", "valid_merger")
+generators.add("handshake", "top_join")
+
 
 
 def parse_parameters(param_list):
