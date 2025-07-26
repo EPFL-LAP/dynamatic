@@ -15,6 +15,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include <boost/graph/connected_components.hpp>
 #include <stdexcept>
 #include <stdlib.h>
 #include <utility>
@@ -24,6 +25,9 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/detail/adjacency_list.hpp>
+
+#include <boost/throw_exception.hpp>
+void boost::throw_exception(std::exception const &e) { std::abort(); }
 
 using namespace llvm;
 using namespace polly;
@@ -79,6 +83,53 @@ Value *findBase(Instruction *inst) {
   return findBaseInternal(addr);
 }
 
+Instruction *findBaseGEPInternal(Value *addr, Instruction *last) {
+  if (!isa<GetElementPtrInst>(addr)) {
+    return last;
+  }
+  auto *gep = cast<GetElementPtrInst>(addr);
+  return findBaseGEPInternal(gep->getPointerOperand(), gep);
+}
+
+Instruction *findBaseGEP(Instruction *inst) {
+  Value *addr;
+  if (auto *loadInst = dyn_cast<LoadInst>(inst)) {
+    addr = loadInst->getPointerOperand();
+  } else if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
+    addr = storeInst->getPointerOperand();
+  } else {
+    llvm_unreachable("Instruction is not a memory access");
+  }
+
+  return findBaseGEPInternal(addr, inst);
+}
+
+// FIXME: for now, we only duplicate the alloca instruction. We could optimize
+// away certain locations that are never used.
+AllocaInst *cloneAllocaAfter(AllocaInst *origAlloca) {
+  Instruction *insertPoint = origAlloca->getNextNode();
+  IRBuilder<> builder(insertPoint);
+
+  Type *allocatedType = origAlloca->getAllocatedType();
+  Value *arraySize = origAlloca->getArraySize();
+  Align alignment = origAlloca->getAlign();
+
+  // Create new alloca and let LLVM assign a unique name
+  AllocaInst *newAlloca = builder.CreateAlloca(allocatedType, arraySize);
+  newAlloca->setName(origAlloca->getName() + ".cloned");
+  newAlloca->setAlignment(alignment);
+
+  return newAlloca;
+}
+
+void changeGEPBasePtr(Instruction *gepInst, Value *newBasePtr) {
+  auto *gep = cast<GetElementPtrInst>(gepInst);
+  if (gep->getPointerOperand() != newBasePtr) {
+    // Change the base pointer of the GEP instruction
+    gep->setOperand(0, newBasePtr);
+  }
+}
+
 namespace {
 
 struct AccessInfo {
@@ -117,17 +168,17 @@ void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
 PreservedAnalyses ArrayPartition::run(Function &f,
                                       FunctionAnalysisManager &fam) {
 
-  llvm::LLVMContext &ctx = f.getContext();
+  if (f.getName() == "main") {
+    llvm::errs()
+        << "Skipping main function for automatic array partitioning!\n";
+    return PreservedAnalyses::all();
+  }
 
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
 
   auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
 
-  auto &loopAnalysis = fam.getResult<LoopAnalysis>(f);
-
   auto &aliasAnalysis = fam.getResult<AAManager>(f);
-
-  llvm::errs() << "Hello!\n";
 
   AccessInfo info;
 
@@ -180,7 +231,26 @@ PreservedAnalyses ArrayPartition::run(Function &f,
 
   for (auto [base, insts] : info.baseToInsts) {
 
-    // TODO: create graph
+    if (!isa<Instruction>(base)) {
+      continue;
+    }
+
+    auto *baseAlloca = cast<AllocaInst>(base);
+    if (!baseAlloca) {
+      continue;
+    }
+
+    llvm::errs() << "Base alloca: " << *baseAlloca << "\n";
+
+    std::map<Instruction *, Vertex> instToVertex;
+    std::map<Vertex, Instruction *> vertexToInst;
+    Graph g;
+
+    for (Instruction *inst : insts) {
+      Vertex v = boost::add_vertex(g);
+      instToVertex[inst] = v;
+      vertexToInst[v] = inst;
+    }
 
     for (Instruction *inst1 : insts) {
       for (Instruction *inst2 : insts) {
@@ -219,7 +289,35 @@ PreservedAnalyses ArrayPartition::run(Function &f,
           llvm::errs() << "No dependency between: " << *inst1 << " and "
                        << *inst2 << "\n";
         }
+
+        if (isDependent) {
+          auto v1 = instToVertex[inst1];
+          auto v2 = instToVertex[inst2];
+          boost::add_edge(v1, v2, g);
+        }
       }
+    }
+
+    // Find the connected components in the graph:
+    std::vector<int> nodeToComponentId(boost::num_vertices(g),
+                                       /* -1 : not assigned (error) */ -1);
+    size_t numComponents =
+        boost::connected_components(g, &nodeToComponentId[0]);
+
+    for (size_t i = 1; i < numComponents; i++) {
+      llvm::errs() << "Creating new alloca to improve parallelism...\b";
+      // Make a new alloca
+      // FIXME: we can optimize this by squashing the unused locations in this
+      // memory
+      auto *newAlloca = cloneAllocaAfter(baseAlloca);
+
+      for (size_t j = 0; j < nodeToComponentId.size(); j++) {
+        if (nodeToComponentId[j] == static_cast<int>(i)) {
+          changeGEPBasePtr(findBaseGEP(vertexToInst[boost::vertex(j, g)]),
+                           newAlloca);
+        }
+      }
+      llvm::errs() << "\n";
     }
   }
 

@@ -10,6 +10,7 @@ target_link_libraries(ArrayPartition
 
   MLIRIR
   MLIRSupport
+
 )
 
 # Required for plugins using new PassManager
