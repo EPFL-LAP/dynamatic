@@ -271,7 +271,8 @@ def run_test(c_file, n, variable):
             DYNAMATIC_OPT_BIN, handshake,
             "--handshake-analyze-lsq-usage", "--handshake-replace-memory-interfaces",
             "--handshake-minimize-cst-width", "--handshake-optimize-bitwidths",
-            "--handshake-materialize", "--handshake-infer-basic-blocks"
+            "--handshake-materialize", "--handshake-infer-basic-blocks",
+            "--handshake-canonicalize"
         ],
             stdout=f,
             stderr=sys.stdout
