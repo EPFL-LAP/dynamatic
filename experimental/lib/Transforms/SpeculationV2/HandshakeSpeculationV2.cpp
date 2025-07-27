@@ -27,6 +27,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
@@ -62,13 +63,13 @@ struct HandshakeSpeculationV2Pass
 /// Returns whether the loop condition is inverted (i.e., false continues the
 /// loop).
 static FailureOr<bool> isLoopConditionInverted(FuncOp &funcOp,
-                                               unsigned loopHeadBB,
-                                               unsigned loopTailBB) {
-  // Find ConditionBranchOp in the loop tail BB
+                                               ArrayRef<unsigned> loopBBs,
+                                               unsigned loopExitBB) {
+  // Find ConditionBranchOp in the loop exit BB
   ConditionalBranchOp condBrOp = nullptr;
   for (auto condBrCandidate : funcOp.getOps<ConditionalBranchOp>()) {
     auto condBB = getLogicBB(condBrCandidate);
-    if (condBB && *condBB == loopTailBB) {
+    if (condBB && *condBB == loopExitBB) {
       condBrOp = condBrCandidate;
       break;
     }
@@ -82,16 +83,29 @@ static FailureOr<bool> isLoopConditionInverted(FuncOp &funcOp,
       getLogicBB(getUniqueUser(condBrOp.getTrueResult()));
   std::optional<unsigned> falseResultBB =
       getLogicBB(getUniqueUser(condBrOp.getFalseResult()));
-  if (trueResultBB && *trueResultBB == loopHeadBB) {
+  if (trueResultBB && llvm::any_of(loopBBs, [&](unsigned loopBB) {
+        return loopBB == *trueResultBB;
+      })) {
     // The condition is not inverted.
     return false;
   }
-  if (falseResultBB && *falseResultBB == loopHeadBB) {
+  if (falseResultBB && llvm::any_of(loopBBs, [&](unsigned loopBB) {
+        return loopBB == *falseResultBB;
+      })) {
     // The condition is inverted.
     return true;
   }
   return funcOp.emitError("Either true or false result of ConditionalBranchOp "
                           "is not the loop backedge.");
+}
+
+static bool hasBranch(FuncOp &funcOp, unsigned bb) {
+  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+    auto brBB = getLogicBB(branch);
+    if (brBB && *brBB == bb)
+      return true;
+  }
+  return false;
 }
 
 /// Replaces all branches in the specified BB with passers, and returns the
@@ -816,8 +830,11 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
   return merge;
 }
 
-static FailureOr<std::pair<unsigned, unsigned>>
-readFromJSON(const std::string &jsonPath) {
+struct SpecSpecification {
+  SmallVector<unsigned> loopBBs;
+};
+
+static FailureOr<SpecSpecification> readFromJSON(const std::string &jsonPath) {
   // Open the speculation file
   std::ifstream inputFile(jsonPath);
   if (!inputFile.is_open()) {
@@ -845,22 +862,31 @@ readFromJSON(const std::string &jsonPath) {
     return failure();
   }
 
+  SmallVector<unsigned> loopBBsVec;
+
   std::optional<int64_t> headBB = jsonObject->getInteger("spec-head-bb");
-  if (!headBB) {
-    llvm::errs() << "Expected 'spec-head-bb' field in the kernel information "
-                    "file for speculation\n";
-    return failure();
+  if (headBB) {
+    loopBBsVec.push_back(static_cast<unsigned>(headBB.value()));
   }
 
   std::optional<int64_t> tailBB = jsonObject->getInteger("spec-tail-bb");
-  if (!tailBB) {
-    llvm::errs() << "Expected 'spec-tail-bb' field in the kernel information "
-                    "file for speculation\n";
-    return failure();
+  if (tailBB) {
+    loopBBsVec.push_back(static_cast<unsigned>(tailBB.value()));
   }
 
-  return std::pair<unsigned, unsigned>{static_cast<unsigned>(headBB.value()),
-                                       static_cast<unsigned>(tailBB.value())};
+  llvm::json::Array *loopBBs = jsonObject->getArray("spec-loop-bbs");
+  if (loopBBs) {
+    for (const auto &loopBB : *loopBBs) {
+      std::optional<int64_t> loopBBInt = loopBB.getAsInteger();
+      if (!loopBBInt) {
+        llvm::errs() << "Expected 'spec-loop-bbs' to contain integers\n";
+        return failure();
+      }
+      loopBBsVec.push_back(static_cast<unsigned>(loopBBInt.value()));
+    }
+  }
+
+  return SpecSpecification{loopBBsVec};
 }
 
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
@@ -869,7 +895,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   if (failed(bbOrFailure))
     return signalPassFailure();
 
-  auto [headBB, tailBB] = bbOrFailure.value();
+  auto [loopBBs] = bbOrFailure.value();
 
   ModuleOp modOp = getOperation();
 
@@ -881,21 +907,30 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
   OpBuilder builder(funcOp->getContext());
 
-  // Determines whether the loop condition is inverted (i.e., the loop continues
-  // when false).
-  auto isInvertedOrFailure = isLoopConditionInverted(funcOp, headBB, tailBB);
-  if (failed(isInvertedOrFailure))
-    return signalPassFailure();
-
   // Replace branches with passers
-  auto loopConditionsOrFailure = replaceBranchesWithPassers(funcOp, tailBB);
-  if (failed(loopConditionsOrFailure))
-    return signalPassFailure();
-  auto [loopCondition, invertedCondition] = loopConditionsOrFailure.value();
+  Value loopCondition, invertedCondition;
+  bool isInverted;
+  for (unsigned exitBB : loopBBs) {
+    if (!hasBranch(funcOp, exitBB))
+      continue;
+
+    // Determines whether the loop condition is inverted (i.e., the loop
+    // continues when false).
+    auto isInvertedOrFailure = isLoopConditionInverted(funcOp, loopBBs, exitBB);
+    if (failed(isInvertedOrFailure))
+      return signalPassFailure();
+    isInverted = isInvertedOrFailure.value();
+
+    auto loopConditionsOrFailure = replaceBranchesWithPassers(funcOp, exitBB);
+    if (failed(loopConditionsOrFailure))
+      return signalPassFailure();
+    loopCondition = loopConditionsOrFailure.value().first;
+    invertedCondition = loopConditionsOrFailure.value().second;
+  }
 
   // Define loopContinue and loopExit based on the polarity of the condition.
   Value loopContinue, loopExit;
-  if (isInvertedOrFailure.value()) {
+  if (isInverted) {
     loopContinue = invertedCondition;
     loopExit = loopCondition;
   } else {
@@ -905,7 +940,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
   // Update the loop header (CMerge -> Init)
   auto selectorOrFailure =
-      updateLoopHeader(funcOp, headBB, tailBB, loopContinue);
+      updateLoopHeader(funcOp, loopBBs.front(), loopBBs.back(), loopContinue);
   if (failed(selectorOrFailure))
     return signalPassFailure();
   // The output of the init unit
@@ -930,7 +965,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     // Perform MuxPasserSwap for each Mux
     for (auto muxOp :
          llvm::make_early_inc_range(funcOp.getOps<handshake::MuxOp>())) {
-      if (getLogicBB(muxOp) != headBB)
+      if (getLogicBB(muxOp) != loopBBs.front())
         continue;
 
       if (!isEligibleForMuxPasserSwap(muxOp, newSelector,
