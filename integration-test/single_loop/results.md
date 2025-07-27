@@ -6,4 +6,4 @@ The result matched that of Haoran's thesis.
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 6                | 1                 |
 | II                   | 6                | 1                 |
-| Cycles (Test Bench)  | 3013 (End: 3011) | 516 (End: 511)    |
+| Cycles (Test Bench)  | 3013 (End: 3011) | 514 (End: 511)    |

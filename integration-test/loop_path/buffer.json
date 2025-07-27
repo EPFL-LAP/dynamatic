@@ -7,20 +7,6 @@
     "comment": "To avoid deadlock"
   },
   {
-    "pred": "cmpi2",
-    "outid": 0,
-    "slots": 2,
-    "type": "fifo_break_none",
-    "comment": "To achieve better II"
-  },
-  {
-    "pred": "fork3",
-    "outid": 0,
-    "slots": 2,
-    "type": "fifo_break_none",
-    "comment": "To achieve better II"
-  },
-  {
     "pred": "spec_commit4",
     "outid": 0,
     "slots": 2,

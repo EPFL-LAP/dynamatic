@@ -5,13 +5,12 @@
 
 int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
   int i = 0;
-  bool cond_break = false;
-  do {
-    float dd = d1[i] + d2[i + 1];
+  for (i = 0; i < N_DEC; i++) {
+    float dd = d1[i] + d2[i];
     float x = 0.001;
-    i++;
-    cond_break = (e[i]) <= x * dd;
-  } while (i < N_DEC && !cond_break);
+    if ((e[i]) <= x * dd)
+      break;
+  }
   return i;
 }
 

@@ -1,6 +1,6 @@
 {
   "speculator": {
-    "operation-name": "select0",
+    "operation-name": "select1",
     "operand-idx": 0,
     "fifo-depth": 7
   },

@@ -13,6 +13,7 @@ DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
 POLYGEIST_CLANG_BIN = DYNAMATIC_ROOT / "bin" / "cgeist"
+LLVM_BINS = DYNAMATIC_ROOT / "polygeist" / "llvm-project" / "build" / "bin"
 CLANGXX_BIN = DYNAMATIC_ROOT / "bin" / "clang++"
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
 DYNAMATIC_PROFILER_BIN = DYNAMATIC_ROOT / "bin" / "exp-frequency-profiler"
@@ -80,84 +81,144 @@ def run_test(c_file, n, variable):
     Path(comp_out_dir).mkdir()
 
     # Custom compilation flow
-    # # source -> affine
-    # affine = os.path.join(comp_out_dir, "affine.mlir")
-    # with open(affine, "w") as f:
-    #     result = subprocess.run([
-    #         POLYGEIST_CLANG_BIN, c_file,
-    #         "--function=" + kernel_name,
-    #         "-I", str(DYNAMATIC_ROOT / "polygeist" /
-    #                   "llvm-project" / "clang" / "lib" / "Headers"),
-    #         "-I", str(DYNAMATIC_ROOT / "include"),
-    #         "-S", "-O3", "--memref-fullrank", "--raise-scf-to-affine"
-    #     ],
-    #         stdout=f,
-    #         stderr=sys.stdout
-    #     )
-    #     if result.returncode == 0:
-    #         print("Compiled source to affine")
-    #     else:
-    #         return fail(id, "Failed to compile source to affine")
+    clang_file = os.path.join(comp_out_dir, f"clang.ll")
+    with open(clang_file, "w") as f:
+        result = subprocess.run([
+            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", c_file,
+            "-I", DYNAMATIC_ROOT / "include",
+            "-Xclang", "-ffp-contract=off",
+            "-o", clang_file
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Compiled C file to LLVM IR")
+        else:
+            color_print("Failed to compile C file to LLVM IR", TermColors.FAIL)
+            return False
 
-    # # affine-level -> pre-processing and memory analysis
-    # affine_mem = os.path.join(comp_out_dir, "affine_mem.mlir")
-    # with open(affine_mem, "w") as f:
-    #     result = subprocess.run([
-    #         DYNAMATIC_OPT_BIN, affine,
-    #         "--allow-unregistered-dialect",
-    #         "--remove-polygeist-attributes",
-    #         f"--func-set-arg-names=source={c_file}",
-    #         "--mark-memory-dependencies"
-    #     ],
-    #         stdout=f,
-    #         stderr=sys.stdout
-    #     )
-    #     if result.returncode == 0:
-    #         print("Ran memory analysis")
-    #     else:
-    #         return fail(id, "Failed to run memory analysis")
+    clang_optnone_removed = os.path.join(
+        comp_out_dir, "clang_optnone_removed.ll")
+    with open(clang_optnone_removed, "w") as f:
+        result = subprocess.run([
+            "sed", "s/optnone//g", clang_file
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Removed optnone flgas")
+        else:
+            color_print(
+                "Failed to remove optnone flags", TermColors.FAIL)
+            return False
 
-    # scf = os.path.join(comp_out_dir, "scf.mlir")
-    # with open(scf, "w") as f:
-    #     result = subprocess.run([
-    #         DYNAMATIC_OPT_BIN, affine_mem,
-    #         "--lower-affine-to-scf",
-    #         "--flatten-memref-row-major",
-    #         "--scf-simple-if-to-select",
-    #         "--scf-rotate-for-loops"
-    #     ],
-    #         stdout=f,
-    #         stderr=sys.stdout
-    #     )
-    #     if result.returncode == 0:
-    #         print("Compiled affine to scf")
-    #     else:
-    #         return fail(id, "Failed to compile affine to scf")
+    clang_optimized = os.path.join(comp_out_dir, "clang_optimized.ll")
+    with open(clang_optimized, "w") as f:
+        result = subprocess.run([
+            LLVM_BINS / "opt", "-S",
+            "-passes=mem2reg,instcombine,loop-rotate,consthoist,simplifycfg",
+            "-strip-debug",
+            clang_optnone_removed
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Optimized LLVM IR")
+        else:
+            color_print("Failed to optimize LLVM IR", TermColors.FAIL)
+            return False
 
-    # cf = os.path.join(comp_out_dir, "cf.mlir")
-    # with open(cf, "w") as f:
-    #     result = subprocess.run([
-    #         DYNAMATIC_OPT_BIN, scf,
-    #         "--lower-scf-to-cf"
-    #     ],
-    #         stdout=f,
-    #         stderr=sys.stdout
-    #     )
-    #     if result.returncode == 0:
-    #         print("Compiled scf to cf")
-    #     else:
-    #         return fail(id, "Failed to compile scf to cf")
+    mlir_file = os.path.join(comp_out_dir, "translated.mlir")
+    with open(mlir_file, "w") as f:
+        result = subprocess.run([
+            LLVM_BINS / "mlir-translate",
+            "--import-llvm",
+            clang_optimized
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Translated LLVM IR to MLIR")
+        else:
+            color_print("Failed to translate LLVM IR to MLIR", TermColors.FAIL)
+            return False
 
-    # Start with copying the .cf file to the out_dir
-    cf_file_base = os.path.join(c_file_dir, "cf.mlir")
+    dropped_funcs = os.path.join(comp_out_dir, "dropped_funcs.mlir")
+    with open(dropped_funcs, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_ROOT / "build" / "bin" / "drop-functions", mlir_file,
+            "--func=main",
+            "--func=rand",
+            "--func=srand",
+            f"-o={dropped_funcs}"
+        ])
+        if result.returncode == 0:
+            print("Dropped functions")
+        else:
+            color_print("Failed to drop functions", TermColors.FAIL)
+            return False
+
+    remove_polygeist_attr = os.path.join(
+        comp_out_dir, "removed_polygeist_attr.mlir")
+    with open(remove_polygeist_attr, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, dropped_funcs,
+            "--remove-polygeist-attributes",
+            "--allow-unregistered-dialect"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Removed polygeist attrs")
+        else:
+            color_print("Failed to remove polygeist attrs", TermColors.FAIL)
+            return False
+
     cf_file = os.path.join(comp_out_dir, "cf.mlir")
-    shutil.copy(cf_file_base, cf_file)
+    with open(cf_file, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, remove_polygeist_attr,
+            f"--convert-llvm-to-cf=source={c_file} dynamatic-path={DYNAMATIC_ROOT}",
+            "--remove-polygeist-attributes"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Removed polygeist attrs")
+        else:
+            color_print("Failed to remove polygeist attrs", TermColors.FAIL)
+            return False
+
+    cf_file_2 = os.path.join(comp_out_dir, "cf_2.mlir")
+    with open(cf_file_2, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, cf_file,
+            f"--func-set-arg-names=source={c_file}",
+            "--mark-memory-dependencies",
+            "--flatten-memref-row-major",
+            "--mark-memory-interfaces"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Applied standard transformations to cf")
+        else:
+            color_print(
+                "Failed to apply standard transformations to cf", TermColors.FAIL)
+            return False
 
     # cf transformations (standard)
     cf_transformed = os.path.join(comp_out_dir, "cf_transformed.mlir")
     with open(cf_transformed, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, cf_file,
+            DYNAMATIC_OPT_BIN, cf_file_2,
             "--canonicalize", "--cse", "--sccp", "--symbol-dce",
             "--control-flow-sink", "--loop-invariant-code-motion", "--canonicalize"],
             stdout=f,
@@ -166,7 +227,9 @@ def run_test(c_file, n, variable):
         if result.returncode == 0:
             print("Applied standard transformations to cf")
         else:
-            return fail(id, "Failed to apply standard transformations to cf")
+            color_print(
+                "Failed to apply standard transformations to cf", TermColors.FAIL)
+            return False
 
     # cf transformations (dynamatic)
     cf_dyn_transformed = os.path.join(comp_out_dir, "cf_dyn_transformed.mlir")

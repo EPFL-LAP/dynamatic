@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn_valid -> elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn)  is true
 -- specification AF (AG ((((elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_loopLiveIn.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_loopLiveIn.inner_counter.counter & elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_iterLiveOut.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_iterLiveOut.inner_counter.counter) & elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_oldContinue.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_oldContinue.inner_counter.counter) & !elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_out_bl_iterLiveIn.outs_valid) & !elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_out_bl_iterLiveIn.outs_valid))  is true
-elapse: 0.90 seconds, total: 0.90 seconds
+elapse: 15.52 seconds, total: 15.52 seconds

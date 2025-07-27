@@ -7,11 +7,11 @@ void nested_loop(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
     int i = 0;
     int bound = 1000;
     int sum = 0;
-    do {
+    while (sum < bound) {
       sum = a[i] * b[i];
       c[i + j * 400] = sum;
       i++;
-    } while (sum < bound);
+    }
   }
 }
 

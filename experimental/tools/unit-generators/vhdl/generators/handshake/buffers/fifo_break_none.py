@@ -93,7 +93,8 @@ end architecture;
 
 def _generate_fifo_break_none_dataless(name, num_slots):
     fifo_inner_name = f"{name}_fifo"
-    dependencies = generate_fifo_break_dv(fifo_inner_name, {"num_slots": num_slots})
+    dependencies = generate_fifo_break_dv(
+        fifo_inner_name, {"num_slots": num_slots, "bitwidth": 0})
 
     entity = f"""
 library ieee;

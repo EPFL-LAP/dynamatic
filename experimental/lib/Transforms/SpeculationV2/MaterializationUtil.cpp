@@ -142,6 +142,19 @@ void assertMaterialization(Value val) {
   llvm_unreachable("MaterializationUtil failed");
 }
 
+void iterateOverForkResults(Value result,
+                            llvm::SmallVector<Operation *> &users) {
+  for (Operation *user : result.getUsers()) {
+    if (auto forkOp = dyn_cast<ForkOp>(user)) {
+      for (Value forkResult : forkOp.getResults()) {
+        iterateOverForkResults(forkResult, users);
+      }
+    } else {
+      users.push_back(user);
+    }
+  }
+}
+
 llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result) {
   if (auto forkOp = dyn_cast<ForkOp>(result.getDefiningOp())) {
     // If the result is from a ForkOp, start iteration from the top of the fork.
@@ -149,23 +162,8 @@ llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result) {
   }
 
   llvm::SmallVector<Operation *> users;
-  for (Operation *user : result.getUsers()) {
-    if (auto forkUser = dyn_cast<ForkOp>(user)) {
-      // If the user is a ForkOp, we need to iterate over its results
-      for (Value forkResult : forkUser.getResults()) {
-        for (Operation *forkUser : forkResult.getUsers()) {
-          // Fork is not nested.
-          if (isa<ForkOp>(forkUser)) {
-            forkUser->emitError("Nested fork is not supported.");
-            llvm_unreachable("MaterializationUtil failed");
-          }
-          users.push_back(forkUser);
-        }
-      }
-    } else {
-      users.push_back(user);
-    }
-  }
+  iterateOverForkResults(result, users);
+
   return users;
 }
 

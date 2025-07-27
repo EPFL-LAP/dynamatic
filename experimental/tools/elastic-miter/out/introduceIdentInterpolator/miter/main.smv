@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_val : bool_input(elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs.val_ready, 1);
-  VAR seq_generator_A_in : bool_input(elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs.A_in_ready, 1);
+  VAR seq_generator_val : bool_input(elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs.val_ready, 31);
+  VAR seq_generator_A_in : bool_input(elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs.A_in_ready, 31);
 
   VAR elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs : elastic_miter_introduceIdentInterpolator_lhs_introduceIdentInterpolator_rhs (seq_generator_val.outs, seq_generator_val.outs_valid, seq_generator_A_in.outs, seq_generator_A_in.outs_valid, sink_EQ_B_out.ins_ready);
 

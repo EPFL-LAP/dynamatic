@@ -7,11 +7,11 @@ float fixed(in_float_t y) {
   float x1 = 0.0f;
   float x0 = 1.0f;
   float a = 0.00000001f;
-  do {
+  while (c >= a) {
     x1 = x0 * y;
     c = x0 - x1;
     x0 = x1;
-  } while (c >= a);
+  }
   return x1;
 }
 

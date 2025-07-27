@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_loopContinue : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.loopContinue_ready, 4);
-  VAR seq_generator_confirmSpec_backedge : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.confirmSpec_backedge_ready, 4);
+  VAR seq_generator_loopContinue : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.loopContinue_ready, 31);
+  VAR seq_generator_confirmSpec_backedge : bool_input(elastic_miter_introduceResolver_lhs_introduceResolver_rhs.confirmSpec_backedge_ready, 31);
 
   VAR elastic_miter_introduceResolver_lhs_introduceResolver_rhs : elastic_miter_introduceResolver_lhs_introduceResolver_rhs (seq_generator_loopContinue.outs, seq_generator_loopContinue.outs_valid, seq_generator_confirmSpec_backedge.outs, seq_generator_confirmSpec_backedge.outs_valid, sink_EQ_confirmSpec.ins_ready);
 

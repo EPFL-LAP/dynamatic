@@ -1,6 +1,6 @@
 #include "handshake_fork_0.smv"
-#include "handshake_ndwire_0.smv"
 #include "handshake_passer_0.smv"
+#include "handshake_ndwire_0.smv"
 
 
 MODULE unify_sup_lhs (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, B_out_ready)

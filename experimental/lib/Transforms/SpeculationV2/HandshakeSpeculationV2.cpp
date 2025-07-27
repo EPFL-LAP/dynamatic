@@ -81,7 +81,7 @@ static FailureOr<bool> isLoopConditionInverted(FuncOp &funcOp,
   std::optional<unsigned> trueResultBB =
       getLogicBB(getUniqueUser(condBrOp.getTrueResult()));
   std::optional<unsigned> falseResultBB =
-      getLogicBB(getUniqueUser(condBrOp.getTrueResult()));
+      getLogicBB(getUniqueUser(condBrOp.getFalseResult()));
   if (trueResultBB && *trueResultBB == loopHeadBB) {
     // The condition is not inverted.
     return false;

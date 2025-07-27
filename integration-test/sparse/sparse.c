@@ -6,11 +6,11 @@ float sparse(in_float_t a[N], in_float_t x[N]) {
   float sum = 0.0f;
   int i = 0;
   float mul;
-  do {
+  while (sum >= 0.0f) {
     mul = a[i] * x[i];
     sum += mul;
     i++;
-  } while (sum >= 0.0f);
+  };
   return sum;
 }
 

@@ -2830,4 +2830,4 @@ reachable states: 256 (2^8) out of 4.1943e+06 (2^22)
   unify_sup_rhs.ndw_out_B_out.inner_ndwire.state = SLEEPING
   -------------------------
 ######################################################################
-elapse: 0.06 seconds, total: 0.06 seconds
+elapse: 0.05 seconds, total: 0.05 seconds

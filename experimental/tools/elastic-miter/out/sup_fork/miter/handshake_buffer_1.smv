@@ -1,10 +1,75 @@
--- handshake_buffer_1 : buffer(['num_slots=1', 'bitwidth=0', 'buffer_type="FIFO_BREAK_DV"'])
+-- handshake_buffer_1 : buffer(['num_slots=31', 'bitwidth=0', 'buffer_type="FIFO_BREAK_DV"'])
 
 
-MODULE handshake_buffer_1 (ins_valid, outs_ready)
+MODULE handshake_buffer_1(ins_valid, outs_ready)
+  VAR
+    fifo : handshake_buffer_1__fifo(ins_valid, break_dv_ready);
+    break_dv   : handshake_buffer_1__dv(fifo_valid, outs_ready);
+    inner_counter : handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready);
+
+  DEFINE
+    fifo_valid := fifo.outs_valid;
+    break_dv_ready := break_dv.ins_ready;
+
+    ins_ready := fifo.ins_ready;
+    outs_valid := break_dv.outs_valid;
+    
+
+MODULE handshake_buffer_1__fifo(ins_valid, outs_ready)
+    VAR b0 : handshake_buffer_1__fifo_tslot(ins_valid, b1.ins_ready);
+    VAR b1 : handshake_buffer_1__fifo_tslot(b0.outs_valid, b2.ins_ready);
+    VAR b2 : handshake_buffer_1__fifo_tslot(b1.outs_valid, b3.ins_ready);
+    VAR b3 : handshake_buffer_1__fifo_tslot(b2.outs_valid, b4.ins_ready);
+    VAR b4 : handshake_buffer_1__fifo_tslot(b3.outs_valid, b5.ins_ready);
+    VAR b5 : handshake_buffer_1__fifo_tslot(b4.outs_valid, b6.ins_ready);
+    VAR b6 : handshake_buffer_1__fifo_tslot(b5.outs_valid, b7.ins_ready);
+    VAR b7 : handshake_buffer_1__fifo_tslot(b6.outs_valid, b8.ins_ready);
+    VAR b8 : handshake_buffer_1__fifo_tslot(b7.outs_valid, b9.ins_ready);
+    VAR b9 : handshake_buffer_1__fifo_tslot(b8.outs_valid, b10.ins_ready);
+    VAR b10 : handshake_buffer_1__fifo_tslot(b9.outs_valid, b11.ins_ready);
+    VAR b11 : handshake_buffer_1__fifo_tslot(b10.outs_valid, b12.ins_ready);
+    VAR b12 : handshake_buffer_1__fifo_tslot(b11.outs_valid, b13.ins_ready);
+    VAR b13 : handshake_buffer_1__fifo_tslot(b12.outs_valid, b14.ins_ready);
+    VAR b14 : handshake_buffer_1__fifo_tslot(b13.outs_valid, b15.ins_ready);
+    VAR b15 : handshake_buffer_1__fifo_tslot(b14.outs_valid, b16.ins_ready);
+    VAR b16 : handshake_buffer_1__fifo_tslot(b15.outs_valid, b17.ins_ready);
+    VAR b17 : handshake_buffer_1__fifo_tslot(b16.outs_valid, b18.ins_ready);
+    VAR b18 : handshake_buffer_1__fifo_tslot(b17.outs_valid, b19.ins_ready);
+    VAR b19 : handshake_buffer_1__fifo_tslot(b18.outs_valid, b20.ins_ready);
+    VAR b20 : handshake_buffer_1__fifo_tslot(b19.outs_valid, b21.ins_ready);
+    VAR b21 : handshake_buffer_1__fifo_tslot(b20.outs_valid, b22.ins_ready);
+    VAR b22 : handshake_buffer_1__fifo_tslot(b21.outs_valid, b23.ins_ready);
+    VAR b23 : handshake_buffer_1__fifo_tslot(b22.outs_valid, b24.ins_ready);
+    VAR b24 : handshake_buffer_1__fifo_tslot(b23.outs_valid, b25.ins_ready);
+    VAR b25 : handshake_buffer_1__fifo_tslot(b24.outs_valid, b26.ins_ready);
+    VAR b26 : handshake_buffer_1__fifo_tslot(b25.outs_valid, b27.ins_ready);
+    VAR b27 : handshake_buffer_1__fifo_tslot(b26.outs_valid, b28.ins_ready);
+    VAR b28 : handshake_buffer_1__fifo_tslot(b27.outs_valid, b29.ins_ready);
+    VAR b29 : handshake_buffer_1__fifo_tslot(b28.outs_valid, outs_ready);
+
+    -- outputs
+		DEFINE outs_valid := b29.outs_valid;
+		DEFINE ins_ready := b0.ins_ready;
+
+MODULE handshake_buffer_1__fifo_tslot(ins_valid, outs_ready)
+    VAR 
+    full : boolean;
+
+    ASSIGN
+    init(full) := FALSE;
+    next(full) := (full <-> outs_ready) ? ins_valid : full;
+
+    -- outputs
+    DEFINE
+    outs_valid := full | ins_valid;
+    ins_ready := (!full) | outs_ready;
+
+
+
+MODULE handshake_buffer_1__dv (ins_valid, outs_ready)
   VAR
   outs_valid_i : boolean;
-  inner_counter : handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready);
+  inner_counter : handshake_buffer_1__dv__counter(ins_valid, ins_ready, outs_valid, outs_ready);
 
   ASSIGN
   init(outs_valid_i) := FALSE;
@@ -16,7 +81,7 @@ MODULE handshake_buffer_1 (ins_valid, outs_ready)
   outs_valid := outs_valid_i;
 
 
-MODULE handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready)
+MODULE handshake_buffer_1__dv__counter(ins_valid, ins_ready, outs_valid, outs_ready)
     VAR
     counter : 0..1;
     error : boolean;
@@ -35,6 +100,31 @@ MODULE handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready)
     next(error) := case
         write_en & read_en : error;
         write_en & (counter = 1) : TRUE;
+        read_en & (counter = 0) : TRUE;
+        TRUE : error;
+    esac;
+
+
+
+MODULE handshake_buffer_1__counter(ins_valid, ins_ready, outs_valid, outs_ready)
+    VAR
+    counter : 0..31;
+    error : boolean;
+    DEFINE
+    write_en := ins_valid & ins_ready;
+    read_en := outs_valid & outs_ready;
+    ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+        write_en & read_en : counter;
+        write_en & (counter < 31) : counter + 1;
+        read_en & (counter > 0) : counter - 1;
+        TRUE : counter;
+    esac;
+    init(error) := FALSE;
+    next(error) := case
+        write_en & read_en : error;
+        write_en & (counter = 31) : TRUE;
         read_en & (counter = 0) : TRUE;
         TRUE : error;
     esac;

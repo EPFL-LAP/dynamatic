@@ -26,6 +26,7 @@ run() {
 # run unify_sup --seq_length="0=1" --allow_nonacceptance --disable_ndwire --disable_decoupling
 # run interpolatorForkSwap --allow_nonacceptance --disable_ndwire --disable_decoupling
 # run andForkSwap --allow_nonacceptance --disable_ndwire --disable_decoupling
+# run sup_gamma --allow_nonacceptance --disable_ndwire --disable_decoupling
 
 # run sup_source --disable_ndwire --disable_decoupling --allow_nonacceptance --seq_length_enhanced="{in:0}={out:0}"
 # run mux_add_suppress --disable_ndwire --disable_decoupling --allow_nonacceptance
