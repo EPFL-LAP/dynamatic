@@ -95,7 +95,6 @@ export_cfg() {
 
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
-cp "$SRC_DIR/cf.mlir" "$COMP_DIR/cf.mlir"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \

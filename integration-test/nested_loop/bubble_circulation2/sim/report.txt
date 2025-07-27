@@ -1,0 +1,3344 @@
+[INFO  HLS_VERIFIER] Executing modelsim: [vsim -c -do simulation.do]
+Reading pref.tcl
+
+# 2020.1
+
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:35 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(83): (vcom-1246) Range 1 to 0 is null.
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(93): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(93): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(96): VHDL Compiler exiting
+# End time: 11:17:35 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:35 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_4_inner
+# -- Compiling architecture arch of handshake_buffer_4_inner
+# -- Compiling entity handshake_buffer_4
+# -- Compiling architecture arch of handshake_buffer_4
+# -- Loading entity handshake_buffer_4_inner
+# End time: 11:17:35 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:35 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd(113): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd(113): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd(116): VHDL Compiler exiting
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:01
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_muli_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_1_join_and_n
+# -- Compiling architecture arch of handshake_muli_1_join_and_n
+# -- Compiling entity handshake_muli_1_join
+# -- Compiling architecture arch of handshake_muli_1_join
+# -- Loading entity handshake_muli_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_1_mul_4_stage
+# -- Compiling architecture behav of handshake_muli_1_mul_4_stage
+# -- Compiling entity handshake_muli_1_buff
+# -- Compiling architecture arch of handshake_muli_1_buff
+# -- Compiling entity handshake_muli_1_oehb_inner
+# -- Compiling architecture arch of handshake_muli_1_oehb_inner
+# -- Compiling entity handshake_muli_1_oehb
+# -- Compiling architecture arch of handshake_muli_1_oehb
+# -- Loading entity handshake_muli_1_oehb_inner
+# -- Compiling entity handshake_muli_1
+# -- Compiling architecture arch of handshake_muli_1
+# -- Loading entity handshake_muli_1_join
+# -- Loading entity handshake_muli_1_mul_4_stage
+# -- Loading entity handshake_muli_1_buff
+# -- Loading entity handshake_muli_1_oehb
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_muli_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_store_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_store_0
+# -- Compiling architecture arch of handshake_store_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_store_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_15.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_15_fifo
+# -- Compiling architecture arch of handshake_buffer_15_fifo
+# -- Compiling entity handshake_buffer_15
+# -- Compiling architecture arch of handshake_buffer_15
+# -- Loading entity handshake_buffer_15_fifo
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_15.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_9.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_9_fifo
+# -- Compiling architecture arch of handshake_buffer_9_fifo
+# -- Compiling entity handshake_buffer_9
+# -- Compiling architecture arch of handshake_buffer_9
+# -- Loading entity handshake_buffer_9_fifo
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_9.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_2
+# -- Compiling architecture arch of handshake_extsi_2
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_6
+# -- Compiling architecture arch of handshake_buffer_6
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_6.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_2_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_2_inner_join_and_n
+# -- Compiling entity handshake_passer_2_inner_join
+# -- Compiling architecture arch of handshake_passer_2_inner_join
+# -- Loading entity handshake_passer_2_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_2_inner
+# -- Compiling architecture arch of handshake_passer_2_inner
+# -- Loading entity handshake_passer_2_inner_join
+# -- Compiling entity handshake_passer_2
+# -- Compiling architecture arch of handshake_passer_2
+# -- Loading entity handshake_passer_2_inner
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_2_join_and_n
+# -- Compiling architecture arch of handshake_addi_2_join_and_n
+# -- Compiling entity handshake_addi_2_join
+# -- Compiling architecture arch of handshake_addi_2_join
+# -- Loading entity handshake_addi_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_2
+# -- Compiling architecture arch of handshake_addi_2
+# -- Loading entity handshake_addi_2_join
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/types.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of types.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_0
+# -- Compiling architecture arch of handshake_trunci_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_trunci_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_0
+# -- Compiling architecture arch of handshake_extsi_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_11.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_11_dataless
+# -- Compiling architecture arch of handshake_buffer_11_dataless
+# -- Compiling entity handshake_buffer_11
+# -- Compiling architecture arch of handshake_buffer_11
+# -- Loading entity handshake_buffer_11_dataless
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_11.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_1
+# -- Compiling architecture arch of handshake_trunci_1
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_trunci_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_0
+# -- Compiling architecture arch of handshake_mux_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_5
+# -- Compiling architecture arch of handshake_extsi_5
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_2
+# -- Compiling architecture arch of handshake_mux_2
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_source_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_source_0
+# -- Compiling architecture arch of handshake_source_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_source_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_1
+# -- Compiling architecture arch of handshake_buffer_1
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_17.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_17_fifo
+# -- Compiling architecture arch of handshake_buffer_17_fifo
+# -- Compiling entity handshake_buffer_17
+# -- Compiling architecture arch of handshake_buffer_17
+# -- Loading entity handshake_buffer_17_fifo
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_17.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_merge_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity handshake_merge_0
+# -- Compiling architecture arch of handshake_merge_0
+# End time: 11:17:36 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_merge_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:36 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_10_dataless
+# -- Compiling architecture arch of handshake_buffer_10_dataless
+# -- Compiling entity handshake_buffer_10
+# -- Compiling architecture arch of handshake_buffer_10
+# -- Loading entity handshake_buffer_10_dataless
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_10.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_9.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_9_inner_or_n
+# -- Compiling architecture arch of handshake_fork_9_inner_or_n
+# -- Compiling entity handshake_fork_9_inner_regblock
+# -- Compiling architecture arch of handshake_fork_9_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_9_inner
+# -- Compiling architecture arch of handshake_fork_9_inner
+# -- Loading entity handshake_fork_9_inner_or_n
+# -- Loading entity handshake_fork_9_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_9
+# -- Compiling architecture arch of handshake_fork_9
+# -- Loading entity handshake_fork_9_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_9.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cond_br_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join_and_n
+# -- Compiling entity handshake_cond_br_0_inner_join
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join
+# -- Loading entity handshake_cond_br_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_0_inner
+# -- Compiling architecture arch of handshake_cond_br_0_inner
+# -- Loading entity handshake_cond_br_0_inner_join
+# -- Compiling entity handshake_cond_br_0
+# -- Compiling architecture arch of handshake_cond_br_0
+# -- Loading entity handshake_cond_br_0_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cond_br_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_init_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_init_0
+# -- Compiling architecture arch of handshake_init_0
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_init_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_8.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_8_dataless
+# -- Compiling architecture arch of handshake_buffer_8_dataless
+# -- Compiling entity handshake_buffer_8
+# -- Compiling architecture arch of handshake_buffer_8
+# -- Loading entity handshake_buffer_8_dataless
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_8.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_3
+# -- Compiling architecture arch of handshake_extsi_3
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_3_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_3_inner_join_and_n
+# -- Compiling entity handshake_passer_3_inner_join
+# -- Compiling architecture arch of handshake_passer_3_inner_join
+# -- Loading entity handshake_passer_3_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_3_inner
+# -- Compiling architecture arch of handshake_passer_3_inner
+# -- Loading entity handshake_passer_3_inner_join
+# -- Compiling entity handshake_passer_3
+# -- Compiling architecture arch of handshake_passer_3
+# -- Loading entity handshake_passer_3_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_2_or_n
+# -- Compiling architecture arch of handshake_fork_2_or_n
+# -- Compiling entity handshake_fork_2_regblock
+# -- Compiling architecture arch of handshake_fork_2_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_2
+# -- Compiling architecture arch of handshake_fork_2
+# -- Loading entity handshake_fork_2_or_n
+# -- Loading entity handshake_fork_2_regblock
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_muli_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_0_join_and_n
+# -- Compiling architecture arch of handshake_muli_0_join_and_n
+# -- Compiling entity handshake_muli_0_join
+# -- Compiling architecture arch of handshake_muli_0_join
+# -- Loading entity handshake_muli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_0_mul_4_stage
+# -- Compiling architecture behav of handshake_muli_0_mul_4_stage
+# -- Compiling entity handshake_muli_0_buff
+# -- Compiling architecture arch of handshake_muli_0_buff
+# -- Compiling entity handshake_muli_0_oehb_inner
+# -- Compiling architecture arch of handshake_muli_0_oehb_inner
+# -- Compiling entity handshake_muli_0_oehb
+# -- Compiling architecture arch of handshake_muli_0_oehb
+# -- Loading entity handshake_muli_0_oehb_inner
+# -- Compiling entity handshake_muli_0
+# -- Compiling architecture arch of handshake_muli_0
+# -- Loading entity handshake_muli_0_join
+# -- Loading entity handshake_muli_0_mul_4_stage
+# -- Loading entity handshake_muli_0_buff
+# -- Loading entity handshake_muli_0_oehb
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_muli_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_0_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_0_join_and_n
+# -- Compiling entity handshake_cmpi_0_join
+# -- Compiling architecture arch of handshake_cmpi_0_join
+# -- Loading entity handshake_cmpi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity handshake_cmpi_0_join
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_0_dataless
+# -- Compiling architecture arch of handshake_buffer_0_dataless
+# -- Compiling entity handshake_buffer_0
+# -- Compiling architecture arch of handshake_buffer_0
+# -- Loading entity handshake_buffer_0_dataless
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_3_dataless
+# -- Compiling architecture arch of handshake_buffer_3_dataless
+# -- Compiling entity handshake_buffer_3
+# -- Compiling architecture arch of handshake_buffer_3
+# -- Loading entity handshake_buffer_3_dataless
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_1_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_1_inner_join_and_n
+# -- Compiling entity handshake_passer_1_inner_join
+# -- Compiling architecture arch of handshake_passer_1_inner_join
+# -- Loading entity handshake_passer_1_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_1_inner
+# -- Compiling architecture arch of handshake_passer_1_inner
+# -- Loading entity handshake_passer_1_inner_join
+# -- Compiling entity handshake_passer_1
+# -- Compiling architecture arch of handshake_passer_1
+# -- Loading entity handshake_passer_1_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_0_control
+# -- Compiling architecture arch of handshake_mem_controller_0_control
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(87): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0_write_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_write_arbiter_priority
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0
+# -- Compiling architecture arch of handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_control
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_6
+# -- Compiling architecture arch of handshake_extsi_6
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_6.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity handshake_mux_3
+# -- Compiling architecture arch of handshake_mux_3
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cond_br_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_1_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_1_join_and_n
+# -- Compiling entity handshake_cond_br_1_join
+# -- Compiling architecture arch of handshake_cond_br_1_join
+# -- Loading entity handshake_cond_br_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_1
+# -- Compiling architecture arch of handshake_cond_br_1
+# -- Loading entity handshake_cond_br_1_join
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cond_br_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_andi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_andi_0_join_and_n
+# -- Compiling architecture arch of handshake_andi_0_join_and_n
+# -- Compiling entity handshake_andi_0_join
+# -- Compiling architecture arch of handshake_andi_0_join
+# -- Loading entity handshake_andi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_andi_0
+# -- Compiling architecture arch of handshake_andi_0
+# -- Loading entity handshake_andi_0_join
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_andi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop
+# -- Compiling architecture behavioral of nested_loop
+# ** Error: (vcom-11) Could not find work.handshake_fork_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(486): (vcom-1195) Cannot find expanded name "work.handshake_fork_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(486): Unknown expanded name.
+# -- Loading package types
+# -- Loading entity handshake_mem_controller_0
+# ** Error: (vcom-11) Could not find work.handshake_mem_controller_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(527): (vcom-1195) Cannot find expanded name "work.handshake_mem_controller_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(527): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_mem_controller_2.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(551): (vcom-1195) Cannot find expanded name "work.handshake_mem_controller_2".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(551): Unknown expanded name.
+# -- Loading entity handshake_constant_0
+# -- Loading entity handshake_extsi_0
+# -- Loading package MATH_REAL
+# -- Loading entity handshake_mux_0
+# -- Loading entity handshake_buffer_0
+# ** Error: (vcom-11) Could not find work.handshake_fork_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(628): (vcom-1195) Cannot find expanded name "work.handshake_fork_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(628): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_extsi_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(643): (vcom-1195) Cannot find expanded name "work.handshake_extsi_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(643): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_control_merge_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(655): (vcom-1195) Cannot find expanded name "work.handshake_control_merge_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(655): Unknown expanded name.
+# -- Loading entity handshake_buffer_1
+# -- Loading entity handshake_fork_2
+# -- Loading entity handshake_source_0
+# ** Error: (vcom-11) Could not find work.handshake_constant_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(700): (vcom-1195) Cannot find expanded name "work.handshake_constant_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(700): Unknown expanded name.
+# -- Loading entity handshake_extsi_2
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_extsi_3
+# ** Error: (vcom-11) Could not find work.handshake_mux_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(761): (vcom-1195) Cannot find expanded name "work.handshake_mux_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(761): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_buffer_2.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(779): (vcom-1195) Cannot find expanded name "work.handshake_buffer_2".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(779): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_3.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(791): (vcom-1195) Cannot find expanded name "work.handshake_fork_3".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(791): Unknown expanded name.
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_buffer_3
+# -- Loading entity handshake_mux_2
+# -- Loading entity handshake_buffer_4
+# ** Error: (vcom-11) Could not find work.handshake_buffer_5.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(908): (vcom-1195) Cannot find expanded name "work.handshake_buffer_5".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(908): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_4.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(920): (vcom-1195) Cannot find expanded name "work.handshake_fork_4".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(920): Unknown expanded name.
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_mux_3
+# -- Loading entity handshake_buffer_6
+# ** Error: (vcom-11) Could not find work.handshake_buffer_7.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(972): (vcom-1195) Cannot find expanded name "work.handshake_buffer_7".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(972): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(982): (vcom-1195) Cannot find expanded name "work.handshake_fork_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(982): Unknown expanded name.
+# -- Loading entity handshake_constant_2
+# ** Error: (vcom-11) Could not find work.handshake_extsi_4.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1007): (vcom-1195) Cannot find expanded name "work.handshake_extsi_4".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1007): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_extsi_4.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1038): (vcom-1195) Cannot find expanded name "work.handshake_extsi_4".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1038): Unknown expanded name.
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_extsi_5
+# ** Error: (vcom-11) Could not find work.handshake_load_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1081): (vcom-1195) Cannot find expanded name "work.handshake_load_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1081): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_load_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1099): (vcom-1195) Cannot find expanded name "work.handshake_load_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1099): Unknown expanded name.
+# -- Loading entity handshake_muli_1
+# ** Error: (vcom-11) Could not find work.handshake_fork_5.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1132): (vcom-1195) Cannot find expanded name "work.handshake_fork_5".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1132): Unknown expanded name.
+# -- Loading entity handshake_buffer_8
+# ** Error: (vcom-11) Could not find work.handshake_addi_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1159): (vcom-1195) Cannot find expanded name "work.handshake_addi_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1159): Unknown expanded name.
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# -- Loading entity handshake_init_0
+# ** Error: (vcom-11) Could not find work.handshake_fork_6.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1231): (vcom-1195) Cannot find expanded name "work.handshake_fork_6".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1231): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_4.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1260): (vcom-1195) Cannot find expanded name "work.handshake_constant_4".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1260): Unknown expanded name.
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_merge_0
+# -- Loading entity handshake_buffer_11
+# ** Error: (vcom-11) Could not find work.handshake_fork_7.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1322): (vcom-1195) Cannot find expanded name "work.handshake_fork_7".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1322): Unknown expanded name.
+# -- Loading entity handshake_andi_0
+# ** Error: (vcom-11) Could not find work.handshake_fork_8.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1364): (vcom-1195) Cannot find expanded name "work.handshake_fork_8".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1364): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_buffer_12.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1382): (vcom-1195) Cannot find expanded name "work.handshake_buffer_12".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1382): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_spec_v2_resolver_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1394): (vcom-1195) Cannot find expanded name "work.handshake_spec_v2_resolver_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1394): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_6.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1409): (vcom-1195) Cannot find expanded name "work.handshake_fork_6".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1409): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_passer_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1430): (vcom-1195) Cannot find expanded name "work.handshake_passer_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1430): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_8.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1445): (vcom-1195) Cannot find expanded name "work.handshake_fork_8".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1445): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_buffer_13.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1463): (vcom-1195) Cannot find expanded name "work.handshake_buffer_13".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1463): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_addi_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1475): (vcom-1195) Cannot find expanded name "work.handshake_addi_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1475): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_not_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1490): (vcom-1195) Cannot find expanded name "work.handshake_not_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1490): Unknown expanded name.
+# -- Loading entity handshake_passer_1
+# ** Error: (vcom-11) Could not find work.handshake_buffer_14.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1532): (vcom-1195) Cannot find expanded name "work.handshake_buffer_14".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1532): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1556): (vcom-1195) Cannot find expanded name "work.handshake_fork_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1556): Unknown expanded name.
+# -- Loading entity handshake_passer_2
+# ** Error: (vcom-11) Could not find work.handshake_buffer_14.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1586): (vcom-1195) Cannot find expanded name "work.handshake_buffer_14".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1586): Unknown expanded name.
+# -- Loading entity handshake_buffer_15
+# ** Error: (vcom-11) Could not find work.handshake_buffer_16.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1625): (vcom-1195) Cannot find expanded name "work.handshake_buffer_16".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1625): Unknown expanded name.
+# -- Loading entity handshake_passer_3
+# ** Error: (vcom-11) Could not find work.handshake_passer_4.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1652): (vcom-1195) Cannot find expanded name "work.handshake_passer_4".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1652): Unknown expanded name.
+# -- Loading entity handshake_buffer_17
+# ** Error: (vcom-11) Could not find work.handshake_passer_5.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1694): (vcom-1195) Cannot find expanded name "work.handshake_passer_5".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1694): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_buffer_18.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1707): (vcom-1195) Cannot find expanded name "work.handshake_buffer_18".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1707): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_passer_5.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1717): (vcom-1195) Cannot find expanded name "work.handshake_passer_5".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1717): Unknown expanded name.
+# -- Loading entity handshake_extsi_6
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_addi_2
+# -- Loading entity handshake_fork_9
+# ** Error: (vcom-11) Could not find work.handshake_trunci_2.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1822): (vcom-1195) Cannot find expanded name "work.handshake_trunci_2".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1822): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_cmpi_1.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1834): (vcom-1195) Cannot find expanded name "work.handshake_cmpi_1".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1834): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_10.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1849): (vcom-1195) Cannot find expanded name "work.handshake_fork_10".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1849): Unknown expanded name.
+# -- Loading entity handshake_cond_br_0
+# ** Error: (vcom-11) Could not find work.handshake_sink_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1882): (vcom-1195) Cannot find expanded name "work.handshake_sink_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1882): Unknown expanded name.
+# -- Loading entity handshake_cond_br_1
+# ** Error: (vcom-11) Could not find work.handshake_fork_0.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1906): (vcom-1195) Cannot find expanded name "work.handshake_fork_0".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1906): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd(1920): VHDL Compiler exiting
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 135, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cmpi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_1_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_1_join_and_n
+# -- Compiling entity handshake_cmpi_1_join
+# -- Compiling architecture arch of handshake_cmpi_1_join
+# -- Loading entity handshake_cmpi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity handshake_cmpi_1_join
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_2_dataless
+# -- Compiling architecture arch of handshake_buffer_2_dataless
+# -- Compiling entity handshake_buffer_2
+# -- Compiling architecture arch of handshake_buffer_2
+# -- Loading entity handshake_buffer_2_dataless
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_0_join_and_n
+# -- Compiling architecture arch of handshake_addi_0_join_and_n
+# -- Compiling entity handshake_addi_0_join
+# -- Compiling architecture arch of handshake_addi_0_join
+# -- Loading entity handshake_addi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_0
+# -- Compiling architecture arch of handshake_addi_0
+# -- Loading entity handshake_addi_0_join
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_7_inner_or_n
+# -- Compiling architecture arch of handshake_fork_7_inner_or_n
+# -- Compiling entity handshake_fork_7_inner_regblock
+# -- Compiling architecture arch of handshake_fork_7_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_7_inner
+# -- Compiling architecture arch of handshake_fork_7_inner
+# -- Loading entity handshake_fork_7_inner_or_n
+# -- Loading entity handshake_fork_7_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_7
+# -- Compiling architecture arch of handshake_fork_7
+# -- Loading entity handshake_fork_7_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_7.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_13.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_13_inner
+# -- Compiling architecture arch of handshake_buffer_13_inner
+# -- Compiling entity handshake_buffer_13
+# -- Compiling architecture arch of handshake_buffer_13
+# -- Loading entity handshake_buffer_13_inner
+# End time: 11:17:37 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_13.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:37 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_spec_v2_resolver_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_spec_v2_resolver_0_join_and_n
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0_join_and_n
+# -- Compiling entity handshake_spec_v2_resolver_0_join
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0_join
+# -- Loading entity handshake_spec_v2_resolver_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_spec_v2_resolver_0
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0
+# -- Loading entity handshake_spec_v2_resolver_0_join
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_spec_v2_resolver_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_5_inner_or_n
+# -- Compiling architecture arch of handshake_fork_5_inner_or_n
+# -- Compiling entity handshake_fork_5_inner_regblock
+# -- Compiling architecture arch of handshake_fork_5_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_5_inner
+# -- Compiling architecture arch of handshake_fork_5_inner
+# -- Loading entity handshake_fork_5_inner_or_n
+# -- Loading entity handshake_fork_5_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_5
+# -- Compiling architecture arch of handshake_fork_5
+# -- Loading entity handshake_fork_5_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_8.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_8_inner_or_n
+# -- Compiling architecture arch of handshake_fork_8_inner_or_n
+# -- Compiling entity handshake_fork_8_inner_regblock
+# -- Compiling architecture arch of handshake_fork_8_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_8_inner
+# -- Compiling architecture arch of handshake_fork_8_inner
+# -- Loading entity handshake_fork_8_inner_or_n
+# -- Loading entity handshake_fork_8_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_8
+# -- Compiling architecture arch of handshake_fork_8
+# -- Loading entity handshake_fork_8_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_8.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_0_inner_join_and_n
+# -- Compiling entity handshake_passer_0_inner_join
+# -- Compiling architecture arch of handshake_passer_0_inner_join
+# -- Loading entity handshake_passer_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_0_inner
+# -- Compiling architecture arch of handshake_passer_0_inner
+# -- Loading entity handshake_passer_0_inner_join
+# -- Compiling entity handshake_passer_0
+# -- Compiling architecture arch of handshake_passer_0
+# -- Loading entity handshake_passer_0_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_5_join_and_n
+# -- Compiling architecture arch of handshake_passer_5_join_and_n
+# -- Compiling entity handshake_passer_5_join
+# -- Compiling architecture arch of handshake_passer_5_join
+# -- Loading entity handshake_passer_5_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_5
+# -- Compiling architecture arch of handshake_passer_5
+# -- Loading entity handshake_passer_5_join
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_0_or_n
+# -- Compiling architecture arch of handshake_fork_0_or_n
+# -- Compiling entity handshake_fork_0_regblock
+# -- Compiling architecture arch of handshake_fork_0_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_0
+# -- Compiling architecture arch of handshake_fork_0
+# -- Loading entity handshake_fork_0_or_n
+# -- Loading entity handshake_fork_0_regblock
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_1
+# -- Compiling architecture arch of handshake_mux_1
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_12.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_12_fifo
+# -- Compiling architecture arch of handshake_buffer_12_fifo
+# -- Compiling entity handshake_buffer_12
+# -- Compiling architecture arch of handshake_buffer_12
+# -- Loading entity handshake_buffer_12_fifo
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_12.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_1_join_and_n
+# -- Compiling architecture arch of handshake_addi_1_join_and_n
+# -- Compiling entity handshake_addi_1_join
+# -- Compiling architecture arch of handshake_addi_1_join
+# -- Loading entity handshake_addi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_1
+# -- Compiling architecture arch of handshake_addi_1
+# -- Loading entity handshake_addi_1_join
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_2
+# -- Compiling architecture arch of handshake_trunci_2
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_trunci_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_7
+# -- Compiling architecture arch of handshake_buffer_7
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_7.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop_wrapper
+# -- Compiling architecture behavioral of nested_loop_wrapper
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_10.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(146): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_10".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(146): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_10.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(166): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_10".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(166): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_10.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(186): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_10".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(186): Unknown expanded name.
+# -- Loading entity nested_loop
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd(246): VHDL Compiler exiting
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 9, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd(9): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd(9): Unknown expanded name.
+# ** Note: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd(10): VHDL Compiler exiting
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_4_inner_or_n
+# -- Compiling architecture arch of handshake_fork_4_inner_or_n
+# -- Compiling entity handshake_fork_4_inner_regblock
+# -- Compiling architecture arch of handshake_fork_4_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_4_inner
+# -- Compiling architecture arch of handshake_fork_4_inner
+# -- Loading entity handshake_fork_4_inner_or_n
+# -- Loading entity handshake_fork_4_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_4
+# -- Compiling architecture arch of handshake_fork_4
+# -- Loading entity handshake_fork_4_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_6_inner_or_n
+# -- Compiling architecture arch of handshake_fork_6_inner_or_n
+# -- Compiling entity handshake_fork_6_inner_regblock
+# -- Compiling architecture arch of handshake_fork_6_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_6_inner
+# -- Compiling architecture arch of handshake_fork_6_inner
+# -- Loading entity handshake_fork_6_inner_or_n
+# -- Loading entity handshake_fork_6_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_6
+# -- Compiling architecture arch of handshake_fork_6
+# -- Loading entity handshake_fork_6_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_6.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_5_dataless
+# -- Compiling architecture arch of handshake_buffer_5_dataless
+# -- Compiling entity handshake_buffer_5
+# -- Compiling architecture arch of handshake_buffer_5
+# -- Loading entity handshake_buffer_5_dataless
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_16.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_16_fifo
+# -- Compiling architecture arch of handshake_buffer_16_fifo
+# -- Compiling entity handshake_buffer_16
+# -- Compiling architecture arch of handshake_buffer_16
+# -- Loading entity handshake_buffer_16_fifo
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_16.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_14.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_14_inner
+# -- Compiling architecture arch of handshake_buffer_14_inner
+# -- Compiling entity handshake_buffer_14
+# -- Compiling architecture arch of handshake_buffer_14
+# -- Loading entity handshake_buffer_14_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_14.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_2_control
+# -- Compiling architecture arch of handshake_mem_controller_2_control
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(83): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2
+# -- Compiling architecture arch of handshake_mem_controller_2
+# -- Loading entity handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_control
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_control_merge_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_control_merge_0_merge
+# -- Compiling architecture arch of handshake_control_merge_0_merge
+# -- Compiling entity handshake_control_merge_0_tehb_dataless
+# -- Compiling architecture arch of handshake_control_merge_0_tehb_dataless
+# -- Compiling entity handshake_control_merge_0_tehb
+# -- Compiling architecture arch of handshake_control_merge_0_tehb
+# -- Loading entity handshake_control_merge_0_tehb_dataless
+# -- Compiling entity handshake_control_merge_0_fork_or_n
+# -- Compiling architecture arch of handshake_control_merge_0_fork_or_n
+# -- Compiling entity handshake_control_merge_0_fork_regblock
+# -- Compiling architecture arch of handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0_fork
+# -- Compiling architecture arch of handshake_control_merge_0_fork
+# -- Loading entity handshake_control_merge_0_fork_or_n
+# -- Loading entity handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0
+# -- Compiling architecture arch of handshake_control_merge_0
+# -- Loading entity handshake_control_merge_0_merge
+# -- Loading entity handshake_control_merge_0_tehb
+# -- Loading entity handshake_control_merge_0_fork
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_control_merge_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_load_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_0_addr_tehb_dataless
+# -- Compiling architecture arch of handshake_load_0_addr_tehb_dataless
+# -- Compiling entity handshake_load_0_addr_tehb
+# -- Compiling architecture arch of handshake_load_0_addr_tehb
+# -- Loading entity handshake_load_0_addr_tehb_dataless
+# -- Compiling entity handshake_load_0_data_tehb_dataless
+# -- Compiling architecture arch of handshake_load_0_data_tehb_dataless
+# -- Compiling entity handshake_load_0_data_tehb
+# -- Compiling architecture arch of handshake_load_0_data_tehb
+# -- Loading entity handshake_load_0_data_tehb_dataless
+# -- Compiling entity handshake_load_0
+# -- Compiling architecture arch of handshake_load_0
+# -- Loading entity handshake_load_0_addr_tehb
+# -- Loading entity handshake_load_0_data_tehb
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_load_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_18.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_18_fifo
+# -- Compiling architecture arch of handshake_buffer_18_fifo
+# -- Compiling entity handshake_buffer_18
+# -- Compiling architecture arch of handshake_buffer_18
+# -- Loading entity handshake_buffer_18_fifo
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_18.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_10_inner_or_n
+# -- Compiling architecture arch of handshake_fork_10_inner_or_n
+# -- Compiling entity handshake_fork_10_inner_regblock
+# -- Compiling architecture arch of handshake_fork_10_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_10_inner
+# -- Compiling architecture arch of handshake_fork_10_inner
+# -- Loading entity handshake_fork_10_inner_or_n
+# -- Loading entity handshake_fork_10_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_10
+# -- Compiling architecture arch of handshake_fork_10
+# -- Loading entity handshake_fork_10_inner
+# End time: 11:17:38 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_10.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:38 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_4
+# -- Compiling architecture arch of handshake_extsi_4
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_1_inner_or_n
+# -- Compiling architecture arch of handshake_fork_1_inner_or_n
+# -- Compiling entity handshake_fork_1_inner_regblock
+# -- Compiling architecture arch of handshake_fork_1_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_1_inner
+# -- Compiling architecture arch of handshake_fork_1_inner
+# -- Loading entity handshake_fork_1_inner_or_n
+# -- Loading entity handshake_fork_1_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_1
+# -- Compiling architecture arch of handshake_fork_1
+# -- Loading entity handshake_fork_1_inner
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_1
+# -- Compiling architecture arch of handshake_extsi_1
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extsi_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/mem_to_bram_32_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_10
+# -- Compiling architecture arch of mem_to_bram_32_10
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram_32_10.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_4_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_4_inner_join_and_n
+# -- Compiling entity handshake_passer_4_inner_join
+# -- Compiling architecture arch of handshake_passer_4_inner_join
+# -- Loading entity handshake_passer_4_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_4_inner
+# -- Compiling architecture arch of handshake_passer_4_inner
+# -- Loading entity handshake_passer_4_inner_join
+# -- Compiling entity handshake_passer_4
+# -- Compiling architecture arch of handshake_passer_4
+# -- Loading entity handshake_passer_4_inner
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_passer_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_not_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_not_0
+# -- Compiling architecture arch of handshake_not_0
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_not_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_sink_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_0
+# -- Compiling architecture arch of handshake_sink_0
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_sink_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(83): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1
+# -- Compiling architecture arch of handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_control
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_3
+# -- Compiling architecture arch of handshake_fork_3
+# -- Loading entity handshake_fork_3_inner
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop
+# -- Compiling architecture behavioral of nested_loop
+# -- Loading entity handshake_fork_0
+# -- Loading package types
+# -- Loading entity handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_2
+# -- Loading entity handshake_constant_0
+# -- Loading entity handshake_extsi_0
+# -- Loading package MATH_REAL
+# -- Loading entity handshake_mux_0
+# -- Loading entity handshake_buffer_0
+# -- Loading entity handshake_fork_1
+# -- Loading entity handshake_extsi_1
+# -- Loading entity handshake_control_merge_0
+# -- Loading entity handshake_buffer_1
+# -- Loading entity handshake_fork_2
+# -- Loading entity handshake_source_0
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_extsi_2
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_extsi_3
+# -- Loading entity handshake_mux_1
+# -- Loading entity handshake_buffer_2
+# -- Loading entity handshake_fork_3
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_buffer_3
+# -- Loading entity handshake_mux_2
+# -- Loading entity handshake_buffer_4
+# -- Loading entity handshake_buffer_5
+# -- Loading entity handshake_fork_4
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_mux_3
+# -- Loading entity handshake_buffer_6
+# -- Loading entity handshake_buffer_7
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_extsi_4
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_extsi_5
+# -- Loading entity handshake_load_0
+# -- Loading entity handshake_muli_1
+# -- Loading entity handshake_fork_5
+# -- Loading entity handshake_buffer_8
+# -- Loading entity handshake_addi_0
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# -- Loading entity handshake_init_0
+# -- Loading entity handshake_fork_6
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_merge_0
+# -- Loading entity handshake_buffer_11
+# -- Loading entity handshake_fork_7
+# -- Loading entity handshake_andi_0
+# -- Loading entity handshake_fork_8
+# -- Loading entity handshake_buffer_12
+# -- Loading entity handshake_spec_v2_resolver_0
+# -- Loading entity handshake_passer_0
+# -- Loading entity handshake_buffer_13
+# -- Loading entity handshake_addi_1
+# -- Loading entity handshake_not_0
+# -- Loading entity handshake_passer_1
+# -- Loading entity handshake_buffer_14
+# -- Loading entity handshake_passer_2
+# -- Loading entity handshake_buffer_15
+# -- Loading entity handshake_buffer_16
+# -- Loading entity handshake_passer_3
+# -- Loading entity handshake_passer_4
+# -- Loading entity handshake_buffer_17
+# -- Loading entity handshake_passer_5
+# -- Loading entity handshake_buffer_18
+# -- Loading entity handshake_extsi_6
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_addi_2
+# -- Loading entity handshake_fork_9
+# -- Loading entity handshake_trunci_2
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity handshake_fork_10
+# -- Loading entity handshake_cond_br_0
+# -- Loading entity handshake_sink_0
+# -- Loading entity handshake_cond_br_1
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of nested_loop.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop_wrapper
+# -- Compiling architecture behavioral of nested_loop_wrapper
+# -- Loading entity mem_to_bram_32_10
+# -- Loading entity nested_loop
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of nested_loop_wrapper.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 11:17:39 on Jul 14,2025
+# vcom -work work -2008 -explicit /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd(81): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity nested_loop
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+# End time: 11:17:39 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of tb_nested_loop.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_4_inner
+# -- Compiling architecture arch of handshake_buffer_4_inner
+# -- Compiling entity handshake_buffer_4
+# -- Compiling architecture arch of handshake_buffer_4
+# -- Loading entity handshake_buffer_4_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_muli_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_1_join_and_n
+# -- Compiling architecture arch of handshake_muli_1_join_and_n
+# -- Compiling entity handshake_muli_1_join
+# -- Compiling architecture arch of handshake_muli_1_join
+# -- Loading entity handshake_muli_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_1_mul_4_stage
+# -- Compiling architecture behav of handshake_muli_1_mul_4_stage
+# -- Compiling entity handshake_muli_1_buff
+# -- Compiling architecture arch of handshake_muli_1_buff
+# -- Compiling entity handshake_muli_1_oehb_inner
+# -- Compiling architecture arch of handshake_muli_1_oehb_inner
+# -- Compiling entity handshake_muli_1_oehb
+# -- Compiling architecture arch of handshake_muli_1_oehb
+# -- Loading entity handshake_muli_1_oehb_inner
+# -- Compiling entity handshake_muli_1
+# -- Compiling architecture arch of handshake_muli_1
+# -- Loading entity handshake_muli_1_join
+# -- Loading entity handshake_muli_1_mul_4_stage
+# -- Loading entity handshake_muli_1_buff
+# -- Loading entity handshake_muli_1_oehb
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_store_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_store_0
+# -- Compiling architecture arch of handshake_store_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_15.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_15_fifo
+# -- Compiling architecture arch of handshake_buffer_15_fifo
+# -- Compiling entity handshake_buffer_15
+# -- Compiling architecture arch of handshake_buffer_15
+# -- Loading entity handshake_buffer_15_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_9.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_9_fifo
+# -- Compiling architecture arch of handshake_buffer_9_fifo
+# -- Compiling entity handshake_buffer_9
+# -- Compiling architecture arch of handshake_buffer_9
+# -- Loading entity handshake_buffer_9_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_2
+# -- Compiling architecture arch of handshake_extsi_2
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_6.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_6
+# -- Compiling architecture arch of handshake_buffer_6
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_2_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_2_inner_join_and_n
+# -- Compiling entity handshake_passer_2_inner_join
+# -- Compiling architecture arch of handshake_passer_2_inner_join
+# -- Loading entity handshake_passer_2_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_2_inner
+# -- Compiling architecture arch of handshake_passer_2_inner
+# -- Loading entity handshake_passer_2_inner_join
+# -- Compiling entity handshake_passer_2
+# -- Compiling architecture arch of handshake_passer_2
+# -- Loading entity handshake_passer_2_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_2_join_and_n
+# -- Compiling architecture arch of handshake_addi_2_join_and_n
+# -- Compiling entity handshake_addi_2_join
+# -- Compiling architecture arch of handshake_addi_2_join
+# -- Loading entity handshake_addi_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_2
+# -- Compiling architecture arch of handshake_addi_2
+# -- Loading entity handshake_addi_2_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/types.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_0
+# -- Compiling architecture arch of handshake_trunci_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_0
+# -- Compiling architecture arch of handshake_extsi_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_11.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_11_dataless
+# -- Compiling architecture arch of handshake_buffer_11_dataless
+# -- Compiling entity handshake_buffer_11
+# -- Compiling architecture arch of handshake_buffer_11
+# -- Loading entity handshake_buffer_11_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_1
+# -- Compiling architecture arch of handshake_trunci_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_0
+# -- Compiling architecture arch of handshake_mux_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_5
+# -- Compiling architecture arch of handshake_extsi_5
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_2
+# -- Compiling architecture arch of handshake_mux_2
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_source_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_source_0
+# -- Compiling architecture arch of handshake_source_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_1
+# -- Compiling architecture arch of handshake_buffer_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_17.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_17_fifo
+# -- Compiling architecture arch of handshake_buffer_17_fifo
+# -- Compiling entity handshake_buffer_17
+# -- Compiling architecture arch of handshake_buffer_17
+# -- Loading entity handshake_buffer_17_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_merge_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity handshake_merge_0
+# -- Compiling architecture arch of handshake_merge_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_10.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_10_dataless
+# -- Compiling architecture arch of handshake_buffer_10_dataless
+# -- Compiling entity handshake_buffer_10
+# -- Compiling architecture arch of handshake_buffer_10
+# -- Loading entity handshake_buffer_10_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_9.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_9_inner_or_n
+# -- Compiling architecture arch of handshake_fork_9_inner_or_n
+# -- Compiling entity handshake_fork_9_inner_regblock
+# -- Compiling architecture arch of handshake_fork_9_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_9_inner
+# -- Compiling architecture arch of handshake_fork_9_inner
+# -- Loading entity handshake_fork_9_inner_or_n
+# -- Loading entity handshake_fork_9_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_9
+# -- Compiling architecture arch of handshake_fork_9
+# -- Loading entity handshake_fork_9_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cond_br_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join_and_n
+# -- Compiling entity handshake_cond_br_0_inner_join
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join
+# -- Loading entity handshake_cond_br_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_0_inner
+# -- Compiling architecture arch of handshake_cond_br_0_inner
+# -- Loading entity handshake_cond_br_0_inner_join
+# -- Compiling entity handshake_cond_br_0
+# -- Compiling architecture arch of handshake_cond_br_0
+# -- Loading entity handshake_cond_br_0_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_init_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_init_0
+# -- Compiling architecture arch of handshake_init_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_8.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_8_dataless
+# -- Compiling architecture arch of handshake_buffer_8_dataless
+# -- Compiling entity handshake_buffer_8
+# -- Compiling architecture arch of handshake_buffer_8
+# -- Loading entity handshake_buffer_8_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_3
+# -- Compiling architecture arch of handshake_extsi_3
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_3_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_3_inner_join_and_n
+# -- Compiling entity handshake_passer_3_inner_join
+# -- Compiling architecture arch of handshake_passer_3_inner_join
+# -- Loading entity handshake_passer_3_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_3_inner
+# -- Compiling architecture arch of handshake_passer_3_inner
+# -- Loading entity handshake_passer_3_inner_join
+# -- Compiling entity handshake_passer_3
+# -- Compiling architecture arch of handshake_passer_3
+# -- Loading entity handshake_passer_3_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_2_or_n
+# -- Compiling architecture arch of handshake_fork_2_or_n
+# -- Compiling entity handshake_fork_2_regblock
+# -- Compiling architecture arch of handshake_fork_2_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_2
+# -- Compiling architecture arch of handshake_fork_2
+# -- Loading entity handshake_fork_2_or_n
+# -- Loading entity handshake_fork_2_regblock
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_muli_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_0_join_and_n
+# -- Compiling architecture arch of handshake_muli_0_join_and_n
+# -- Compiling entity handshake_muli_0_join
+# -- Compiling architecture arch of handshake_muli_0_join
+# -- Loading entity handshake_muli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_0_mul_4_stage
+# -- Compiling architecture behav of handshake_muli_0_mul_4_stage
+# -- Compiling entity handshake_muli_0_buff
+# -- Compiling architecture arch of handshake_muli_0_buff
+# -- Compiling entity handshake_muli_0_oehb_inner
+# -- Compiling architecture arch of handshake_muli_0_oehb_inner
+# -- Compiling entity handshake_muli_0_oehb
+# -- Compiling architecture arch of handshake_muli_0_oehb
+# -- Loading entity handshake_muli_0_oehb_inner
+# -- Compiling entity handshake_muli_0
+# -- Compiling architecture arch of handshake_muli_0
+# -- Loading entity handshake_muli_0_join
+# -- Loading entity handshake_muli_0_mul_4_stage
+# -- Loading entity handshake_muli_0_buff
+# -- Loading entity handshake_muli_0_oehb
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cmpi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_0_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_0_join_and_n
+# -- Compiling entity handshake_cmpi_0_join
+# -- Compiling architecture arch of handshake_cmpi_0_join
+# -- Loading entity handshake_cmpi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity handshake_cmpi_0_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_0_dataless
+# -- Compiling architecture arch of handshake_buffer_0_dataless
+# -- Compiling entity handshake_buffer_0
+# -- Compiling architecture arch of handshake_buffer_0
+# -- Loading entity handshake_buffer_0_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_3_dataless
+# -- Compiling architecture arch of handshake_buffer_3_dataless
+# -- Compiling entity handshake_buffer_3
+# -- Compiling architecture arch of handshake_buffer_3
+# -- Loading entity handshake_buffer_3_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_1_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_1_inner_join_and_n
+# -- Compiling entity handshake_passer_1_inner_join
+# -- Compiling architecture arch of handshake_passer_1_inner_join
+# -- Loading entity handshake_passer_1_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_1_inner
+# -- Compiling architecture arch of handshake_passer_1_inner
+# -- Loading entity handshake_passer_1_inner_join
+# -- Compiling entity handshake_passer_1
+# -- Compiling architecture arch of handshake_passer_1
+# -- Loading entity handshake_passer_1_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_0_control
+# -- Compiling architecture arch of handshake_mem_controller_0_control
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(87): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0_write_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_write_arbiter_priority
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0
+# -- Compiling architecture arch of handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_6.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_6
+# -- Compiling architecture arch of handshake_extsi_6
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity handshake_mux_3
+# -- Compiling architecture arch of handshake_mux_3
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cond_br_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_1_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_1_join_and_n
+# -- Compiling entity handshake_cond_br_1_join
+# -- Compiling architecture arch of handshake_cond_br_1_join
+# -- Loading entity handshake_cond_br_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_1
+# -- Compiling architecture arch of handshake_cond_br_1
+# -- Loading entity handshake_cond_br_1_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_andi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_andi_0_join_and_n
+# -- Compiling architecture arch of handshake_andi_0_join_and_n
+# -- Compiling entity handshake_andi_0_join
+# -- Compiling architecture arch of handshake_andi_0_join
+# -- Loading entity handshake_andi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_andi_0
+# -- Compiling architecture arch of handshake_andi_0
+# -- Loading entity handshake_andi_0_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_cmpi_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_1_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_1_join_and_n
+# -- Compiling entity handshake_cmpi_1_join
+# -- Compiling architecture arch of handshake_cmpi_1_join
+# -- Loading entity handshake_cmpi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity handshake_cmpi_1_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_2_dataless
+# -- Compiling architecture arch of handshake_buffer_2_dataless
+# -- Compiling entity handshake_buffer_2
+# -- Compiling architecture arch of handshake_buffer_2
+# -- Loading entity handshake_buffer_2_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_0_join_and_n
+# -- Compiling architecture arch of handshake_addi_0_join_and_n
+# -- Compiling entity handshake_addi_0_join
+# -- Compiling architecture arch of handshake_addi_0_join
+# -- Loading entity handshake_addi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_0
+# -- Compiling architecture arch of handshake_addi_0
+# -- Loading entity handshake_addi_0_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_7.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_7_inner_or_n
+# -- Compiling architecture arch of handshake_fork_7_inner_or_n
+# -- Compiling entity handshake_fork_7_inner_regblock
+# -- Compiling architecture arch of handshake_fork_7_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_7_inner
+# -- Compiling architecture arch of handshake_fork_7_inner
+# -- Loading entity handshake_fork_7_inner_or_n
+# -- Loading entity handshake_fork_7_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_7
+# -- Compiling architecture arch of handshake_fork_7
+# -- Loading entity handshake_fork_7_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_13.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_13_inner
+# -- Compiling architecture arch of handshake_buffer_13_inner
+# -- Compiling entity handshake_buffer_13
+# -- Compiling architecture arch of handshake_buffer_13
+# -- Loading entity handshake_buffer_13_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_spec_v2_resolver_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_spec_v2_resolver_0_join_and_n
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0_join_and_n
+# -- Compiling entity handshake_spec_v2_resolver_0_join
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0_join
+# -- Loading entity handshake_spec_v2_resolver_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_spec_v2_resolver_0
+# -- Compiling architecture arch of handshake_spec_v2_resolver_0
+# -- Loading entity handshake_spec_v2_resolver_0_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_5_inner_or_n
+# -- Compiling architecture arch of handshake_fork_5_inner_or_n
+# -- Compiling entity handshake_fork_5_inner_regblock
+# -- Compiling architecture arch of handshake_fork_5_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_5_inner
+# -- Compiling architecture arch of handshake_fork_5_inner
+# -- Loading entity handshake_fork_5_inner_or_n
+# -- Loading entity handshake_fork_5_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_5
+# -- Compiling architecture arch of handshake_fork_5
+# -- Loading entity handshake_fork_5_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_8.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_8_inner_or_n
+# -- Compiling architecture arch of handshake_fork_8_inner_or_n
+# -- Compiling entity handshake_fork_8_inner_regblock
+# -- Compiling architecture arch of handshake_fork_8_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_8_inner
+# -- Compiling architecture arch of handshake_fork_8_inner
+# -- Loading entity handshake_fork_8_inner_or_n
+# -- Loading entity handshake_fork_8_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_8
+# -- Compiling architecture arch of handshake_fork_8
+# -- Loading entity handshake_fork_8_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_0_inner_join_and_n
+# -- Compiling entity handshake_passer_0_inner_join
+# -- Compiling architecture arch of handshake_passer_0_inner_join
+# -- Loading entity handshake_passer_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_0_inner
+# -- Compiling architecture arch of handshake_passer_0_inner
+# -- Loading entity handshake_passer_0_inner_join
+# -- Compiling entity handshake_passer_0
+# -- Compiling architecture arch of handshake_passer_0
+# -- Loading entity handshake_passer_0_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_5_join_and_n
+# -- Compiling architecture arch of handshake_passer_5_join_and_n
+# -- Compiling entity handshake_passer_5_join
+# -- Compiling architecture arch of handshake_passer_5_join
+# -- Loading entity handshake_passer_5_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_5
+# -- Compiling architecture arch of handshake_passer_5
+# -- Loading entity handshake_passer_5_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_0_or_n
+# -- Compiling architecture arch of handshake_fork_0_or_n
+# -- Compiling entity handshake_fork_0_regblock
+# -- Compiling architecture arch of handshake_fork_0_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_0
+# -- Compiling architecture arch of handshake_fork_0
+# -- Loading entity handshake_fork_0_or_n
+# -- Loading entity handshake_fork_0_regblock
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mux_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_1
+# -- Compiling architecture arch of handshake_mux_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_12.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_12_fifo
+# -- Compiling architecture arch of handshake_buffer_12_fifo
+# -- Compiling entity handshake_buffer_12
+# -- Compiling architecture arch of handshake_buffer_12
+# -- Loading entity handshake_buffer_12_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_addi_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_1_join_and_n
+# -- Compiling architecture arch of handshake_addi_1_join_and_n
+# -- Compiling entity handshake_addi_1_join
+# -- Compiling architecture arch of handshake_addi_1_join
+# -- Loading entity handshake_addi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_addi_1
+# -- Compiling architecture arch of handshake_addi_1
+# -- Loading entity handshake_addi_1_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_trunci_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_trunci_2
+# -- Compiling architecture arch of handshake_trunci_2
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_7.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_7
+# -- Compiling architecture arch of handshake_buffer_7
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_4_inner_or_n
+# -- Compiling architecture arch of handshake_fork_4_inner_or_n
+# -- Compiling entity handshake_fork_4_inner_regblock
+# -- Compiling architecture arch of handshake_fork_4_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_4_inner
+# -- Compiling architecture arch of handshake_fork_4_inner
+# -- Loading entity handshake_fork_4_inner_or_n
+# -- Loading entity handshake_fork_4_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_4
+# -- Compiling architecture arch of handshake_fork_4
+# -- Loading entity handshake_fork_4_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_6.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_6_inner_or_n
+# -- Compiling architecture arch of handshake_fork_6_inner_or_n
+# -- Compiling entity handshake_fork_6_inner_regblock
+# -- Compiling architecture arch of handshake_fork_6_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_6_inner
+# -- Compiling architecture arch of handshake_fork_6_inner
+# -- Loading entity handshake_fork_6_inner_or_n
+# -- Loading entity handshake_fork_6_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_6
+# -- Compiling architecture arch of handshake_fork_6
+# -- Loading entity handshake_fork_6_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_5_dataless
+# -- Compiling architecture arch of handshake_buffer_5_dataless
+# -- Compiling entity handshake_buffer_5
+# -- Compiling architecture arch of handshake_buffer_5
+# -- Loading entity handshake_buffer_5_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_16.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_16_fifo
+# -- Compiling architecture arch of handshake_buffer_16_fifo
+# -- Compiling entity handshake_buffer_16
+# -- Compiling architecture arch of handshake_buffer_16
+# -- Loading entity handshake_buffer_16_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_14.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_14_inner
+# -- Compiling architecture arch of handshake_buffer_14_inner
+# -- Compiling entity handshake_buffer_14
+# -- Compiling architecture arch of handshake_buffer_14
+# -- Loading entity handshake_buffer_14_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_2_control
+# -- Compiling architecture arch of handshake_mem_controller_2_control
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(83): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2
+# -- Compiling architecture arch of handshake_mem_controller_2
+# -- Loading entity handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_constant_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_control_merge_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_control_merge_0_merge
+# -- Compiling architecture arch of handshake_control_merge_0_merge
+# -- Compiling entity handshake_control_merge_0_tehb_dataless
+# -- Compiling architecture arch of handshake_control_merge_0_tehb_dataless
+# -- Compiling entity handshake_control_merge_0_tehb
+# -- Compiling architecture arch of handshake_control_merge_0_tehb
+# -- Loading entity handshake_control_merge_0_tehb_dataless
+# -- Compiling entity handshake_control_merge_0_fork_or_n
+# -- Compiling architecture arch of handshake_control_merge_0_fork_or_n
+# -- Compiling entity handshake_control_merge_0_fork_regblock
+# -- Compiling architecture arch of handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0_fork
+# -- Compiling architecture arch of handshake_control_merge_0_fork
+# -- Loading entity handshake_control_merge_0_fork_or_n
+# -- Loading entity handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0
+# -- Compiling architecture arch of handshake_control_merge_0
+# -- Loading entity handshake_control_merge_0_merge
+# -- Loading entity handshake_control_merge_0_tehb
+# -- Loading entity handshake_control_merge_0_fork
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_load_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_0_addr_tehb_dataless
+# -- Compiling architecture arch of handshake_load_0_addr_tehb_dataless
+# -- Compiling entity handshake_load_0_addr_tehb
+# -- Compiling architecture arch of handshake_load_0_addr_tehb
+# -- Loading entity handshake_load_0_addr_tehb_dataless
+# -- Compiling entity handshake_load_0_data_tehb_dataless
+# -- Compiling architecture arch of handshake_load_0_data_tehb_dataless
+# -- Compiling entity handshake_load_0_data_tehb
+# -- Compiling architecture arch of handshake_load_0_data_tehb
+# -- Loading entity handshake_load_0_data_tehb_dataless
+# -- Compiling entity handshake_load_0
+# -- Compiling architecture arch of handshake_load_0
+# -- Loading entity handshake_load_0_addr_tehb
+# -- Loading entity handshake_load_0_data_tehb
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_buffer_18.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_18_fifo
+# -- Compiling architecture arch of handshake_buffer_18_fifo
+# -- Compiling entity handshake_buffer_18
+# -- Compiling architecture arch of handshake_buffer_18
+# -- Loading entity handshake_buffer_18_fifo
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_10.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_10_inner_or_n
+# -- Compiling architecture arch of handshake_fork_10_inner_or_n
+# -- Compiling entity handshake_fork_10_inner_regblock
+# -- Compiling architecture arch of handshake_fork_10_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_10_inner
+# -- Compiling architecture arch of handshake_fork_10_inner
+# -- Loading entity handshake_fork_10_inner_or_n
+# -- Loading entity handshake_fork_10_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_10
+# -- Compiling architecture arch of handshake_fork_10
+# -- Loading entity handshake_fork_10_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_4
+# -- Compiling architecture arch of handshake_extsi_4
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_1_inner_or_n
+# -- Compiling architecture arch of handshake_fork_1_inner_or_n
+# -- Compiling entity handshake_fork_1_inner_regblock
+# -- Compiling architecture arch of handshake_fork_1_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_1_inner
+# -- Compiling architecture arch of handshake_fork_1_inner
+# -- Loading entity handshake_fork_1_inner_or_n
+# -- Loading entity handshake_fork_1_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_1
+# -- Compiling architecture arch of handshake_fork_1
+# -- Loading entity handshake_fork_1_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_extsi_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_extsi_1
+# -- Compiling architecture arch of handshake_extsi_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/mem_to_bram_32_10.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_10
+# -- Compiling architecture arch of mem_to_bram_32_10
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_passer_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_passer_4_inner_join_and_n
+# -- Compiling architecture arch of handshake_passer_4_inner_join_and_n
+# -- Compiling entity handshake_passer_4_inner_join
+# -- Compiling architecture arch of handshake_passer_4_inner_join
+# -- Loading entity handshake_passer_4_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_passer_4_inner
+# -- Compiling architecture arch of handshake_passer_4_inner
+# -- Loading entity handshake_passer_4_inner_join
+# -- Compiling entity handshake_passer_4
+# -- Compiling architecture arch of handshake_passer_4
+# -- Loading entity handshake_passer_4_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_not_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_not_0
+# -- Compiling architecture arch of handshake_not_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_sink_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_0
+# -- Compiling architecture arch of handshake_sink_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(83): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1
+# -- Compiling architecture arch of handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/handshake_fork_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_3
+# -- Compiling architecture arch of handshake_fork_3
+# -- Loading entity handshake_fork_3_inner
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop
+# -- Compiling architecture behavioral of nested_loop
+# -- Loading entity handshake_fork_0
+# -- Loading package types
+# -- Loading entity handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_2
+# -- Loading entity handshake_constant_0
+# -- Loading entity handshake_extsi_0
+# -- Loading package MATH_REAL
+# -- Loading entity handshake_mux_0
+# -- Loading entity handshake_buffer_0
+# -- Loading entity handshake_fork_1
+# -- Loading entity handshake_extsi_1
+# -- Loading entity handshake_control_merge_0
+# -- Loading entity handshake_buffer_1
+# -- Loading entity handshake_fork_2
+# -- Loading entity handshake_source_0
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_extsi_2
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_extsi_3
+# -- Loading entity handshake_mux_1
+# -- Loading entity handshake_buffer_2
+# -- Loading entity handshake_fork_3
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_buffer_3
+# -- Loading entity handshake_mux_2
+# -- Loading entity handshake_buffer_4
+# -- Loading entity handshake_buffer_5
+# -- Loading entity handshake_fork_4
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_mux_3
+# -- Loading entity handshake_buffer_6
+# -- Loading entity handshake_buffer_7
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_extsi_4
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_extsi_5
+# -- Loading entity handshake_load_0
+# -- Loading entity handshake_muli_1
+# -- Loading entity handshake_fork_5
+# -- Loading entity handshake_buffer_8
+# -- Loading entity handshake_addi_0
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# -- Loading entity handshake_init_0
+# -- Loading entity handshake_fork_6
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_merge_0
+# -- Loading entity handshake_buffer_11
+# -- Loading entity handshake_fork_7
+# -- Loading entity handshake_andi_0
+# -- Loading entity handshake_fork_8
+# -- Loading entity handshake_buffer_12
+# -- Loading entity handshake_spec_v2_resolver_0
+# -- Loading entity handshake_passer_0
+# -- Loading entity handshake_buffer_13
+# -- Loading entity handshake_addi_1
+# -- Loading entity handshake_not_0
+# -- Loading entity handshake_passer_1
+# -- Loading entity handshake_buffer_14
+# -- Loading entity handshake_passer_2
+# -- Loading entity handshake_buffer_15
+# -- Loading entity handshake_buffer_16
+# -- Loading entity handshake_passer_3
+# -- Loading entity handshake_passer_4
+# -- Loading entity handshake_buffer_17
+# -- Loading entity handshake_passer_5
+# -- Loading entity handshake_buffer_18
+# -- Loading entity handshake_extsi_6
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_addi_2
+# -- Loading entity handshake_fork_9
+# -- Loading entity handshake_trunci_2
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity handshake_fork_10
+# -- Loading entity handshake_cond_br_0
+# -- Loading entity handshake_sink_0
+# -- Loading entity handshake_cond_br_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/nested_loop_wrapper.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity nested_loop_wrapper
+# -- Compiling architecture behavioral of nested_loop_wrapper
+# -- Loading entity mem_to_bram_32_10
+# -- Loading entity nested_loop
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd(81): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity nested_loop
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+ModelSim> # 87 compiles, 0 failed with no errors.
+# vsim tb 
+# Start time: 11:17:43 on Jul 14,2025
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.tb(behavior)
+# Loading work.types
+# Loading ieee.math_real(body)
+# Loading work.nested_loop(behavioral)
+# Loading work.handshake_fork_0(arch)
+# Loading work.handshake_fork_0_or_n(arch)
+# Loading work.handshake_fork_0_regblock(arch)
+# Loading work.handshake_mem_controller_0(arch)
+# Loading work.handshake_mem_controller_0_write_arbiter(arch)
+# Loading work.handshake_mem_controller_0_write_arbiter_priority(arch)
+# Loading work.handshake_mem_controller_0_write_arbiter_addressing(arch)
+# Loading work.handshake_mem_controller_0_write_arbiter_addressready(arch)
+# Loading work.handshake_mem_controller_0_write_arbiter_data(arch)
+# Loading work.handshake_mem_controller_0_control(arch)
+# Loading work.handshake_mem_controller_1(arch)
+# Loading work.handshake_mem_controller_1_read_arbiter(arch)
+# Loading work.handshake_mem_controller_1_read_arbiter_priority(arch)
+# Loading work.handshake_mem_controller_1_read_arbiter_addressing(arch)
+# Loading work.handshake_mem_controller_1_read_arbiter_addressready(arch)
+# Loading work.handshake_mem_controller_1_read_arbiter_data(arch)
+# Loading work.handshake_mem_controller_1_control(arch)
+# Loading work.handshake_mem_controller_2(arch)
+# Loading work.handshake_mem_controller_2_read_arbiter(arch)
+# Loading work.handshake_mem_controller_2_read_arbiter_priority(arch)
+# Loading work.handshake_mem_controller_2_read_arbiter_addressing(arch)
+# Loading work.handshake_mem_controller_2_read_arbiter_addressready(arch)
+# Loading work.handshake_mem_controller_2_read_arbiter_data(arch)
+# Loading work.handshake_mem_controller_2_control(arch)
+# Loading work.handshake_constant_0(arch)
+# Loading work.handshake_extsi_0(arch)
+# Loading work.handshake_mux_0(arch)
+# Loading work.handshake_buffer_0(arch)
+# Loading work.handshake_buffer_0_dataless(arch)
+# Loading work.handshake_fork_1(arch)
+# Loading work.handshake_fork_1_inner(arch)
+# Loading work.handshake_fork_1_inner_or_n(arch)
+# Loading work.handshake_fork_1_inner_regblock(arch)
+# Loading work.handshake_extsi_1(arch)
+# Loading work.handshake_control_merge_0(arch)
+# Loading work.handshake_control_merge_0_merge(arch)
+# Loading work.handshake_control_merge_0_tehb(arch)
+# Loading work.handshake_control_merge_0_tehb_dataless(arch)
+# Loading work.handshake_control_merge_0_fork(arch)
+# Loading work.handshake_control_merge_0_fork_or_n(arch)
+# Loading work.handshake_control_merge_0_fork_regblock(arch)
+# Loading work.handshake_buffer_1(arch)
+# Loading work.handshake_fork_2(arch)
+# Loading work.handshake_fork_2_or_n(arch)
+# Loading work.handshake_fork_2_regblock(arch)
+# Loading work.handshake_source_0(arch)
+# Loading work.handshake_constant_1(arch)
+# Loading work.handshake_extsi_2(arch)
+# Loading work.handshake_muli_0(arch)
+# Loading work.handshake_muli_0_join(arch)
+# Loading work.handshake_muli_0_join_and_n(arch)
+# Loading work.handshake_muli_0_mul_4_stage(behav)
+# Loading work.handshake_muli_0_buff(arch)
+# Loading work.handshake_muli_0_oehb(arch)
+# Loading work.handshake_muli_0_oehb_inner(arch)
+# Loading work.handshake_extsi_3(arch)
+# Loading work.handshake_mux_1(arch)
+# Loading work.handshake_buffer_2(arch)
+# Loading work.handshake_buffer_2_dataless(arch)
+# Loading work.handshake_fork_3(arch)
+# Loading work.handshake_fork_3_inner(arch)
+# Loading work.handshake_fork_3_inner_or_n(arch)
+# Loading work.handshake_fork_3_inner_regblock(arch)
+# Loading work.handshake_trunci_0(arch)
+# Loading work.handshake_buffer_3(arch)
+# Loading work.handshake_buffer_3_dataless(arch)
+# Loading work.handshake_mux_2(arch)
+# Loading work.handshake_buffer_4(arch)
+# Loading work.handshake_buffer_4_inner(arch)
+# Loading work.handshake_buffer_5(arch)
+# Loading work.handshake_buffer_5_dataless(arch)
+# Loading work.handshake_fork_4(arch)
+# Loading work.handshake_fork_4_inner(arch)
+# Loading work.handshake_fork_4_inner_or_n(arch)
+# Loading work.handshake_fork_4_inner_regblock(arch)
+# Loading work.handshake_trunci_1(arch)
+# Loading work.handshake_mux_3(arch)
+# Loading work.handshake_buffer_6(arch)
+# Loading work.handshake_buffer_7(arch)
+# Loading work.handshake_constant_2(arch)
+# Loading work.handshake_extsi_4(arch)
+# Loading work.handshake_constant_3(arch)
+# Loading work.handshake_extsi_5(arch)
+# Loading work.handshake_load_0(arch)
+# Loading work.handshake_load_0_addr_tehb(arch)
+# Loading work.handshake_load_0_addr_tehb_dataless(arch)
+# Loading work.handshake_load_0_data_tehb(arch)
+# Loading work.handshake_load_0_data_tehb_dataless(arch)
+# Loading work.handshake_muli_1(arch)
+# Loading work.handshake_muli_1_join(arch)
+# Loading work.handshake_muli_1_join_and_n(arch)
+# Loading work.handshake_muli_1_mul_4_stage(behav)
+# Loading work.handshake_muli_1_buff(arch)
+# Loading work.handshake_muli_1_oehb(arch)
+# Loading work.handshake_muli_1_oehb_inner(arch)
+# Loading work.handshake_fork_5(arch)
+# Loading work.handshake_fork_5_inner(arch)
+# Loading work.handshake_fork_5_inner_or_n(arch)
+# Loading work.handshake_fork_5_inner_regblock(arch)
+# Loading work.handshake_buffer_8(arch)
+# Loading work.handshake_buffer_8_dataless(arch)
+# Loading work.handshake_addi_0(arch)
+# Loading work.handshake_addi_0_join(arch)
+# Loading work.handshake_addi_0_join_and_n(arch)
+# Loading work.handshake_store_0(arch)
+# Loading work.handshake_cmpi_0(arch)
+# Loading work.handshake_cmpi_0_join(arch)
+# Loading work.handshake_cmpi_0_join_and_n(arch)
+# Loading work.handshake_buffer_9(arch)
+# Loading work.handshake_buffer_9_fifo(arch)
+# Loading work.handshake_init_0(arch)
+# Loading work.handshake_fork_6(arch)
+# Loading work.handshake_fork_6_inner(arch)
+# Loading work.handshake_fork_6_inner_or_n(arch)
+# Loading work.handshake_fork_6_inner_regblock(arch)
+# Loading work.handshake_constant_4(arch)
+# Loading work.handshake_buffer_10(arch)
+# Loading work.handshake_buffer_10_dataless(arch)
+# Loading work.handshake_merge_0(arch)
+# Loading work.handshake_buffer_11(arch)
+# Loading work.handshake_buffer_11_dataless(arch)
+# Loading work.handshake_fork_7(arch)
+# Loading work.handshake_fork_7_inner(arch)
+# Loading work.handshake_fork_7_inner_or_n(arch)
+# Loading work.handshake_fork_7_inner_regblock(arch)
+# Loading work.handshake_andi_0(arch)
+# Loading work.handshake_andi_0_join(arch)
+# Loading work.handshake_andi_0_join_and_n(arch)
+# Loading work.handshake_fork_8(arch)
+# Loading work.handshake_fork_8_inner(arch)
+# Loading work.handshake_fork_8_inner_or_n(arch)
+# Loading work.handshake_fork_8_inner_regblock(arch)
+# Loading work.handshake_buffer_12(arch)
+# Loading work.handshake_buffer_12_fifo(arch)
+# Loading work.handshake_spec_v2_resolver_0(arch)
+# Loading work.handshake_spec_v2_resolver_0_join(arch)
+# Loading work.handshake_spec_v2_resolver_0_join_and_n(arch)
+# Loading work.handshake_passer_0(arch)
+# Loading work.handshake_passer_0_inner(arch)
+# Loading work.handshake_passer_0_inner_join(arch)
+# Loading work.handshake_passer_0_inner_join_and_n(arch)
+# Loading work.handshake_buffer_13(arch)
+# Loading work.handshake_buffer_13_inner(arch)
+# Loading work.handshake_addi_1(arch)
+# Loading work.handshake_addi_1_join(arch)
+# Loading work.handshake_addi_1_join_and_n(arch)
+# Loading work.handshake_not_0(arch)
+# Loading work.handshake_passer_1(arch)
+# Loading work.handshake_passer_1_inner(arch)
+# Loading work.handshake_passer_1_inner_join(arch)
+# Loading work.handshake_passer_1_inner_join_and_n(arch)
+# Loading work.handshake_buffer_14(arch)
+# Loading work.handshake_buffer_14_inner(arch)
+# Loading work.handshake_passer_2(arch)
+# Loading work.handshake_passer_2_inner(arch)
+# Loading work.handshake_passer_2_inner_join(arch)
+# Loading work.handshake_passer_2_inner_join_and_n(arch)
+# Loading work.handshake_buffer_15(arch)
+# Loading work.handshake_buffer_15_fifo(arch)
+# Loading work.handshake_buffer_16(arch)
+# Loading work.handshake_buffer_16_fifo(arch)
+# Loading work.handshake_passer_3(arch)
+# Loading work.handshake_passer_3_inner(arch)
+# Loading work.handshake_passer_3_inner_join(arch)
+# Loading work.handshake_passer_3_inner_join_and_n(arch)
+# Loading work.handshake_passer_4(arch)
+# Loading work.handshake_passer_4_inner(arch)
+# Loading work.handshake_passer_4_inner_join(arch)
+# Loading work.handshake_passer_4_inner_join_and_n(arch)
+# Loading work.handshake_buffer_17(arch)
+# Loading work.handshake_buffer_17_fifo(arch)
+# Loading work.handshake_passer_5(arch)
+# Loading work.handshake_passer_5_join(arch)
+# Loading work.handshake_passer_5_join_and_n(arch)
+# Loading work.handshake_buffer_18(arch)
+# Loading work.handshake_buffer_18_fifo(arch)
+# Loading work.handshake_extsi_6(arch)
+# Loading work.handshake_constant_5(arch)
+# Loading work.handshake_addi_2(arch)
+# Loading work.handshake_addi_2_join(arch)
+# Loading work.handshake_addi_2_join_and_n(arch)
+# Loading work.handshake_fork_9(arch)
+# Loading work.handshake_fork_9_inner(arch)
+# Loading work.handshake_fork_9_inner_or_n(arch)
+# Loading work.handshake_fork_9_inner_regblock(arch)
+# Loading work.handshake_trunci_2(arch)
+# Loading work.handshake_cmpi_1(arch)
+# Loading work.handshake_cmpi_1_join(arch)
+# Loading work.handshake_cmpi_1_join_and_n(arch)
+# Loading work.handshake_fork_10(arch)
+# Loading work.handshake_fork_10_inner(arch)
+# Loading work.handshake_fork_10_inner_or_n(arch)
+# Loading work.handshake_fork_10_inner_regblock(arch)
+# Loading work.handshake_cond_br_0(arch)
+# Loading work.handshake_cond_br_0_inner(arch)
+# Loading work.handshake_cond_br_0_inner_join(arch)
+# Loading work.handshake_cond_br_0_inner_join_and_n(arch)
+# Loading work.handshake_sink_0(arch)
+# Loading work.handshake_cond_br_1(arch)
+# Loading work.handshake_cond_br_1_join(arch)
+# Loading work.handshake_cond_br_1_join_and_n(arch)
+# Loading work.two_port_ram(behav)
+# Loading work.tb_join(arch)
+# ** Warning: Design size of 17416 statements exceeds ModelSim-Intel FPGA Starter Edition recommended capacity.
+# Expect performance to be adversely affected.
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 14 ns  Iteration: 4  Instance: /tb/duv_inst/cmpi0
+# ** Note: Simulation done! Latency = 560 cycles
+#    Time: 2250 ns  Iteration: 1  Instance: /tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 2250 ns  Iteration: 1  Process: /tb/generate_sim_done_proc File: /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd
+# Break in Process generate_sim_done_proc at /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd line 317
+# Stopped at /home/shundroid/dynamatic/integration-test/nested_loop/out/sim/HDL_SRC/tb_nested_loop.vhd line 317
+# End time: 11:17:43 on Jul 14,2025, Elapsed time: 0:00:00
+# Errors: 1, Warnings: 130
+Comparison of [a] : Pass
+Comparison of [b] : Pass
+Comparison of [c] : Pass
+[INFO  HLS_VERIFIER] C and VHDL outputs match
