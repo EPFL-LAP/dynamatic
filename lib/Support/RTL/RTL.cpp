@@ -296,14 +296,15 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
   if (
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
-      modName == "handshake.buffer" || modName == "handshake.cmpi" ||
-      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
-      modName == "handshake.merge" || modName == "handshake.muli" ||
-      modName == "handshake.not" || modName == "handshake.sink" ||
-      modName == "handshake.subi" || modName == "handshake.shli" ||
-      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
-      modName == "handshake.fptosi" || modName == "handshake.ndwire" ||
-      modName == "handshake.blocker" || modName == "handshake.ready_remover" ||
+      modName == "handshake.ori" || modName == "handshake.buffer" ||
+      modName == "handshake.cmpi" || modName == "handshake.fork" ||
+      modName == "handshake.lazy_fork" || modName == "handshake.merge" ||
+      modName == "handshake.muli" || modName == "handshake.not" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.shli" || modName == "handshake.blocker" ||
+      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
+      modName == "handshake.ndwire" || modName == "handshake.blocker" ||
+      modName == "handshake.ready_remover" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
