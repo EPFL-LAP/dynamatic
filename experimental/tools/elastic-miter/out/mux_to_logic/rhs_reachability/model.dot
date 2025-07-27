@@ -1,0 +1,39 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "in1" ["style"="solid", "shape"="diamond", "label"="in1", "mlir_op"="handshake.func"]
+  "in2" ["style"="solid", "shape"="diamond", "label"="in2", "mlir_op"="handshake.func"]
+  "sel" ["style"="solid", "shape"="diamond", "label"="sel", "mlir_op"="handshake.func"]
+  "out" ["style"="solid", "shape"="diamond", "label"="out", "mlir_op"="handshake.func"]
+  "in1" -> "ndw_in_in1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="in1", "to_idx"="0"]
+  "in2" -> "ndw_in_in2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="in2", "to_idx"="0"]
+  "sel" -> "ndw_in_sel" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="2", "to"="ins", "arrowtail"="none", "from"="sel", "to_idx"="0"]
+  "ndw_in_in1" -> "and1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_in2" -> "and2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_sel" -> "vm_fork_2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_out" -> "out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "or" -> "ndw_out_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_in1" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_in2" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_sel" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster2 {
+    graph ["label"="BB 2"]
+    "ndw_out_out" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "vm_fork_2" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "not" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="not", "mlir_op"="handshake.not"]
+    "and1" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="&", "mlir_op"="handshake.andi"]
+    "and2" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="&", "mlir_op"="handshake.andi"]
+    "or" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="|", "mlir_op"="handshake.ori"]
+    "vm_fork_2" -> "not" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+    "vm_fork_2" -> "and1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="rhs", "arrowtail"="none", "from"="outs_1", "to_idx"="1"]
+    "not" -> "and2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="rhs", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+    "and1" -> "or" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "and2" -> "or" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="rhs", "arrowtail"="none", "from"="result", "to_idx"="1"]
+  }
+}

@@ -1,0 +1,23 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "ctrl" ["style"="solid", "shape"="diamond", "label"="ctrl", "mlir_op"="handshake.func"]
+  "result" ["style"="dotted", "shape"="diamond", "label"="result", "mlir_op"="handshake.func"]
+  "ctrl" -> "ndw_in_ctrl" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="ctrl", "to_idx"="0"]
+  "ndw_in_ctrl" -> "sink" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_result" -> "result" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="result", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "source" -> "ndw_out_result" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_ctrl" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster2 {
+    graph ["label"="BB 2"]
+    "ndw_out_result" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "sink" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="sink", "mlir_op"="handshake.sink"]
+    "source" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="source", "mlir_op"="handshake.source"]
+  }
+}

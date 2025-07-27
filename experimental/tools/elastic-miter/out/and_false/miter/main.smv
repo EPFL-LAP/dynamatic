@@ -1,0 +1,38 @@
+#include "elastic_miter_and_false_lhs_and_false_rhs.smv"
+
+
+MODULE bool_input(nReady0, max_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_ins : bool_input(elastic_miter_and_false_lhs_and_false_rhs.ins_ready, 1);
+
+  VAR elastic_miter_and_false_lhs_and_false_rhs : elastic_miter_and_false_lhs_and_false_rhs (seq_generator_ins.outs, seq_generator_ins.outs_valid, sink_EQ_out.ins_ready);
+
+  VAR sink_EQ_out : sink_main(elastic_miter_and_false_lhs_and_false_rhs.EQ_out_valid);
+
+INVARSPEC (elastic_miter_and_false_lhs_and_false_rhs.EQ_out_valid -> elastic_miter_and_false_lhs_and_false_rhs.EQ_out);
+CTLSPEC AF (AG ((!elastic_miter_and_false_lhs_and_false_rhs.lhs_in_buf_ins.outs_valid) & (!elastic_miter_and_false_lhs_and_false_rhs.lhs_out_bl_out.outs_valid) & (!elastic_miter_and_false_lhs_and_false_rhs.rhs_out_bl_out.outs_valid)));
+
+INVAR  seq_generator_ins.exact_tokens = elastic_miter_and_false_lhs_and_false_rhs.out_nds_out.exact_tokens ;

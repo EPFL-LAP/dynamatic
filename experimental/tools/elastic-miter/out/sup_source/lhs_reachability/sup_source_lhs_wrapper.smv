@@ -1,0 +1,20 @@
+#include "handshake_ndwire_1.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_source_lhs_wrapper (ctrl, ctrl_valid, result_ready)
+
+
+-- input and output
+DEFINE result_valid := sup_source_lhs_wrapped.result_valid;
+DEFINE sup_source_lhs_wrapped_result_ready := result_ready;
+DEFINE sup_source_lhs_wrapped_ctrl := ctrl;
+DEFINE sup_source_lhs_wrapped_ctrl_valid := ctrl_valid;
+DEFINE ctrl_ready := sup_source_lhs_wrapped.ctrl_ready;
+
+
+VAR sup_source_lhs_wrapped : sup_source_lhs(sup_source_lhs_wrapped_ctrl, sup_source_lhs_wrapped_ctrl_valid, sup_source_lhs_wrapped_result_ready);
+
+-- properties

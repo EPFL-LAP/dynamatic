@@ -1,0 +1,33 @@
+#include "and_false_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_ins : bool_input_exact(and_false_rhs.ins_ready, 1);
+
+  VAR and_false_rhs : and_false_rhs (seq_generator_ins.outs, seq_generator_ins.outs_valid, sink_out.ins_ready);
+
+  VAR sink_out : sink_main(and_false_rhs.out_valid);
+

@@ -1,0 +1,11 @@
+-- handshake_constant_0 : constant(['value=0b0', 'bitwidth=1'])
+
+
+MODULE handshake_constant_0(ctrl_valid, outs_ready)
+
+  -- output
+  DEFINE
+  ctrl_ready := outs_ready;
+  outs_valid := ctrl_valid;
+  outs := FALSE;
+

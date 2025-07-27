@@ -1,0 +1,28 @@
+#include "handshake_passer_0.smv"
+#include "handshake_not_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE mux_to_logic_lhs_wrapper (in1, in1_valid, in2, in2_valid, sel, sel_valid, out_ready)
+
+
+-- input and output
+DEFINE out := mux_to_logic_lhs_wrapped.out;
+DEFINE out_valid := mux_to_logic_lhs_wrapped.out_valid;
+DEFINE mux_to_logic_lhs_wrapped_out_ready := out_ready;
+DEFINE mux_to_logic_lhs_wrapped_in1 := in1;
+DEFINE mux_to_logic_lhs_wrapped_in1_valid := in1_valid;
+DEFINE in1_ready := mux_to_logic_lhs_wrapped.in1_ready;
+DEFINE mux_to_logic_lhs_wrapped_in2 := in2;
+DEFINE mux_to_logic_lhs_wrapped_in2_valid := in2_valid;
+DEFINE in2_ready := mux_to_logic_lhs_wrapped.in2_ready;
+DEFINE mux_to_logic_lhs_wrapped_sel := sel;
+DEFINE mux_to_logic_lhs_wrapped_sel_valid := sel_valid;
+DEFINE sel_ready := mux_to_logic_lhs_wrapped.sel_ready;
+
+
+VAR mux_to_logic_lhs_wrapped : mux_to_logic_lhs(mux_to_logic_lhs_wrapped_in1, mux_to_logic_lhs_wrapped_in1_valid, mux_to_logic_lhs_wrapped_in2, mux_to_logic_lhs_wrapped_in2_valid, mux_to_logic_lhs_wrapped_sel, mux_to_logic_lhs_wrapped_sel_valid, mux_to_logic_lhs_wrapped_out_ready);
+
+-- properties

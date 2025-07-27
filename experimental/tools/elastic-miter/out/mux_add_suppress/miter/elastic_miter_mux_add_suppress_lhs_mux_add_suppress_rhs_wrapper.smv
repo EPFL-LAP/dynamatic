@@ -1,0 +1,32 @@
+#include "handshake_ndsource_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_cmpi_0.smv"
+
+
+MODULE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapper (ins, ins_valid, sel, sel_valid, EQ_out_ready)
+
+
+-- input and output
+DEFINE EQ_out := elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped.EQ_out;
+DEFINE EQ_out_valid := elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped.EQ_out_valid;
+DEFINE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_EQ_out_ready := EQ_out_ready;
+DEFINE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_ins := ins;
+DEFINE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_ins_valid := ins_valid;
+DEFINE ins_ready := elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped.ins_ready;
+DEFINE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_sel := sel;
+DEFINE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_sel_valid := sel_valid;
+DEFINE sel_ready := elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped.sel_ready;
+
+
+VAR elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped : elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs(elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_ins, elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_ins_valid, elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_sel, elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_sel_valid, elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapped_EQ_out_ready);
+
+-- properties

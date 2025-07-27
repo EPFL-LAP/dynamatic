@@ -1,0 +1,26 @@
+#include "handshake_buffer_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_join_0.smv"
+#include "handshake_lazy_fork_1.smv"
+
+
+MODULE elastic_miter_sup_source_lhs_sup_source_rhs_wrapper (ctrl, ctrl_valid, EQ_result_ready)
+
+
+-- input and output
+DEFINE EQ_result_valid := elastic_miter_sup_source_lhs_sup_source_rhs_wrapped.EQ_result_valid;
+DEFINE elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_EQ_result_ready := EQ_result_ready;
+DEFINE elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_ctrl := ctrl;
+DEFINE elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_ctrl_valid := ctrl_valid;
+DEFINE ctrl_ready := elastic_miter_sup_source_lhs_sup_source_rhs_wrapped.ctrl_ready;
+
+
+VAR elastic_miter_sup_source_lhs_sup_source_rhs_wrapped : elastic_miter_sup_source_lhs_sup_source_rhs(elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_ctrl, elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_ctrl_valid, elastic_miter_sup_source_lhs_sup_source_rhs_wrapped_EQ_result_ready);
+
+-- properties
