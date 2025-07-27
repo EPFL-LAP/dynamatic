@@ -402,14 +402,16 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
-    /// TODO: The legacy implementation does not add any constraints here for
-    /// the input channel to select operations that is less frequently
-    /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
-    /// the least executed one
-    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
-        continue;
+    // /// TODO: The legacy implementation does not add any constraints here for
+    // /// the input channel to select operations that is less frequently
+    // /// executed. Temporarily, emulate the same behavior obtained from
+    // passing
+    // /// our DOTs to the old buffer pass by assuming the "true" input is
+    // always
+    // /// the least executed one
+    // if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+    //   if (channel == selOp.getTrueValue())
+    //     continue;
 
     // Retrieve the MILP variables we need
     GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
@@ -430,17 +432,19 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
-    Operation *dstOp = *channel.getUsers().begin();
+    // // Get the ports the channels connect and their retiming MILP variables
+    // Operation *dstOp = *channel.getUsers().begin();
 
-    /// TODO: The legacy implementation does not add any constraints here for
-    /// the input channel to select operations that is less frequently
-    /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
-    /// the least executed one
-    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
-        continue;
+    // /// TODO: The legacy implementation does not add any constraints here for
+    // /// the input channel to select operations that is less frequently
+    // /// executed. Temporarily, emulate the same behavior obtained from
+    // passing
+    // /// our DOTs to the old buffer pass by assuming the "true" input is
+    // always
+    // /// the least executed one
+    // if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+    //   if (channel == selOp.getTrueValue())
+    //     continue;
 
     // The channel must have variables for the data signal
     ChannelVars &chVars = vars.channelVars[channel];
@@ -509,17 +513,19 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
-    Operation *dstOp = *channel.getUsers().begin();
+    // // Get the ports the channels connect and their retiming MILP variables
+    // Operation *dstOp = *channel.getUsers().begin();
 
-    /// TODO: The legacy implementation does not add any constraints here for
-    /// the input channel to select operations that is less frequently
-    /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
-    /// the least executed one
-    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
-        continue;
+    // /// TODO: The legacy implementation does not add any constraints here for
+    // /// the input channel to select operations that is less frequently
+    // /// executed. Temporarily, emulate the same behavior obtained from
+    // passing
+    // /// our DOTs to the old buffer pass by assuming the "true" input is
+    // always
+    // /// the least executed one
+    // if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+    //   if (channel == selOp.getTrueValue())
+    //     continue;
 
     // The channel must have variables for the data and ready signals
     ChannelVars &chVars = vars.channelVars[channel];
