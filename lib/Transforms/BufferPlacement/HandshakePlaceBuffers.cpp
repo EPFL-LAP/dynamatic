@@ -177,13 +177,15 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
         op->emitError("Failed to get internal delay from timing model");
         return signalPassFailure();
       }
-
+    }
+    if (auto latencyInterface =
+            llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
       double latency;
       if (!failed(timingDB.getLatency(op, SignalType::DATA,
                                       latency, targetCP))) {
 
         int64_t latency_int = static_cast<int64_t>(latency);
-        fpuImplInterface.setLatency(latency_int);
+        latencyInterface.setLatency(latency_int);
       } else {
         op->emitError("Failed to get latency from timing model");
         return signalPassFailure();
