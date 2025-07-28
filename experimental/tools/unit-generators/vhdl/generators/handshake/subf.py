@@ -15,6 +15,8 @@ def generate_subf(name, params):
     if fpu_impl == "vivado":
         bitwidth = 32
     elif fpu_impl == "flopoco":
+        if is_double is None:
+            raise ValueError("is_double was missing for generating a flopoco subf")
         bitwidth = 64 if is_double else 32
 
     generate_inner = lambda name : _generate_subf(name, params)
@@ -40,8 +42,7 @@ def _generate_subf(name, params):
     if impl == "vivado":
         bitwidth = 32
     elif impl == "flopoco":
-        if is_double is None:
-            raise ValueError("is_double was missing for generating a flopoco subf")
+
         bitwidth = 64 if is_double else 32
     else:
         raise ValueError(f"Invalid FPU implementation: {impl}")
