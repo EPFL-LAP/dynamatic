@@ -92,7 +92,10 @@
         "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "vivado_ip_wrappers"
+    ]
   },
   {
     "name": "handshake.divui",
@@ -102,7 +105,10 @@
         "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "vivado_ip_wrappers"
+    ]
   },
   {
     "name": "handshake.negf",
