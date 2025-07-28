@@ -198,12 +198,16 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   if (mcOp) {
     if (lsqOp) {
       // In case of a master MC and slave LSQ situation, the second to last
-      // result of the MC is a load data signal going to the LSQ. It needs to be
-      // temporarily replaced with a backedge to allow us to remove the MC
-      // before the LSQ. The backedge will lose its use automatically when the
-      // LSQ is deleted, so we do not need to replace it manually after
+      // result of the MC is a store done signal going to the LSQ, Also the
+      // third to last result of the MC is a load data signal going to the LSQ
+      // It needs to be temporarily replaced with a backedge to allow us to
+      // remove the MC before the LSQ. The backedge will lose its use
+      // automatically when the LSQ is deleted, so we do not need to replace it
+      // manually after
       builder.setInsertionPoint(mcOp);
-      Value dataToLSQ = mcOp.getResult(mcOp.getNumResults() - 2);
+      Value doneToLSQ = mcOp.getResult(mcOp.getNumResults() - 2);
+      doneToLSQ.replaceAllUsesWith(backedgeBuilder.get(doneToLSQ.getType()));
+      Value dataToLSQ = mcOp.getResult(mcOp.getNumResults() - 3);
       dataToLSQ.replaceAllUsesWith(backedgeBuilder.get(dataToLSQ.getType()));
     }
     mcOp.erase();

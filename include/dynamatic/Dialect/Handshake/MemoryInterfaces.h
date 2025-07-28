@@ -165,12 +165,14 @@ private:
 
   /// Memory access ports for the MC.
   InterfacePorts mcPorts;
-  /// Number of loads to the MC.
-  unsigned mcNumLoads = 0;
+  /// Load and store ports order and number for the MC.
+  /// A true shows a load port, a false shows a store port.
+  SmallVector<bool> mcLoadAndStorePorts;
   /// Memory access ports for the LSQ.
   InterfacePorts lsqPorts;
-  /// Number of loads to the LSQ.
-  unsigned lsqNumLoads = 0;
+  /// Load and store ports order and number for the LSQ.
+  /// A true shows a load port, a false shows a store port.
+  SmallVector<bool> lsqLoadAndStorePorts;
 
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the
@@ -186,12 +188,14 @@ private:
   Value getCtrl(unsigned block);
 
   using FConnectLoad = std::function<void(handshake::LoadOp, Value)>;
+  using FConnectStore = std::function<void(handshake::StoreOp, Value)>;
 
   /// For a provided memory interface and its memory ports, invoke the load
   /// connection callback for all load-like operations with successive results
   /// of the memory interface.
-  void reconnectLoads(InterfacePorts &ports, Operation *memIfaceOp,
-                      const FConnectLoad &connect);
+  void reconnectMemoryPorts(InterfacePorts &ports, Operation *memIfaceOp,
+                            const FConnectLoad &connectLoad,
+                            const FConnectStore &connectStore);
 
   /// Internal implementation of the interface instantiation logic, taking an
   /// additional edge builder argument that was either created using a basic
@@ -199,7 +203,8 @@ private:
   /// to connect the data input of loads to the newly created memory interfaces.
   LogicalResult instantiateInterfaces(OpBuilder &builder,
                                       BackedgeBuilder &edgeBuilder,
-                                      const FConnectLoad &connect,
+                                      const FConnectLoad &connectLoad,
+                                      const FConnectStore &connectStore,
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 };
