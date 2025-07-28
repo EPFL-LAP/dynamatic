@@ -708,6 +708,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
     auto latency = fpuImplInterface.getLatency();
     addUnsigned("LATENCY", latency);
   }
+
+    if (auto latencyInterface =
+          llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
+    auto latency = latencyInterface.getLatency();
+    addUnsigned("LATENCY", latency);
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {

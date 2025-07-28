@@ -86,11 +86,23 @@
   },
   {
     "name": "handshake.divsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p bitwidth=$BITWIDTH latency=$LATENCY, extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.divui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.negf",
@@ -135,7 +147,13 @@
   },
   {
     "name": "handshake.muli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.select",
