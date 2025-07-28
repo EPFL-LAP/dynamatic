@@ -541,10 +541,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
-            handshake::NDWireOp>([&](auto) {
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
+          [&](auto) {
+            // Bitwidth
+            addType("DATA_TYPE", op->getOperand(0));
+          })
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
-        addType("DATA_TYPE", op->getOperand(0));
+        addType("DATA_TYPE", bufferOp.getOperand());
+
+        addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
@@ -640,13 +647,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", bitwidth);
       })
       .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
-            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
-            handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
-            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
-            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp>([&](auto) {
+            handshake::DivFOp, handshake::RemSIOp, handshake::DivSIOp,
+            handshake::DivUIOp, handshake::MaximumFOp, handshake::MinimumFOp,
+            handshake::MulFOp, handshake::MulIOp, handshake::NegFOp,
+            handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
+            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
+            handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
+            handshake::FPToSIOp, handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -694,6 +701,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
     auto delayAttr = internalDelayInterface.getInternalDelay();
     addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    auto impl = fpuImplInterface.getFPUImpl();
+    addString("FPU_IMPL", stringifyEnum(impl));
   }
 }
 
@@ -1345,12 +1358,22 @@ ConvertInstance::matchAndRewrite(handshake::InstanceOp instOp,
 
 /// Returns the module's input ports.
 static ArrayRef<hw::ModulePort> getModInputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumInputPorts() == 0) {
+    // When there are no input ports, getPortIdForInputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForInputId(0),
                                                   modOp.getNumInputPorts());
 }
 
 /// Returns the module's output ports.
 static ArrayRef<hw::ModulePort> getModOutputs(hw::HWModuleLike modOp) {
+  if (modOp.getNumOutputPorts() == 0) {
+    // When there are no output ports, getPortIdForOutputId(0) fails.
+    return {};
+  }
+
   return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForOutputId(0),
                                                   modOp.getNumOutputPorts());
 }
@@ -1821,6 +1844,7 @@ public:
                     ConvertToHWInstance<handshake::DivFOp>,
                     ConvertToHWInstance<handshake::DivSIOp>,
                     ConvertToHWInstance<handshake::DivUIOp>,
+                    ConvertToHWInstance<handshake::RemSIOp>,
                     ConvertToHWInstance<handshake::ExtSIOp>,
                     ConvertToHWInstance<handshake::ExtUIOp>,
                     ConvertToHWInstance<handshake::MulFOp>,

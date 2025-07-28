@@ -277,6 +277,22 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+
+def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
+  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+  let description = [{
+    This pass takes a single floating point unit 'vendor' as input and
+    marks every floating point arithmetic operation. This is later used
+    to decide how to generate the RTL of these units.
+    Defaults to vivado.
+  }];
+  let options = [
+    Option<"impl", "impl", "::std::string",
+      "\"VIVADO\"",
+      "Which FPU impl to use.">
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
@@ -417,6 +433,28 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
     --allow-unregistered-dialect flag to all optimizer invokations).
   }];
   let constructor = "dynamatic::createRemovePolygeistAttributes()";
+}
+
+// Remark: this is an example where the implicit name analysis in DynamaticPass
+// creates a problem (still need to investigate why). If you switch this to
+// DynamaticPass instead of Pass, somehow it deletes the listed operation from
+// the module in the end.
+def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
+  let summary = "Remove all unlisted functions from a given module.";
+  let description = [{The output from Clang + opt + mlir-translate contains
+  functions that we cannot synthesize (e.g., main(), rand(), srand()...). This
+  function is useful for dropping them. This pass scans the LLVMFuncOp and
+  func::FuncOps and remove the unlisted ones.}];
+
+  let options =
+    [
+      ListOption<"function_names", "function-names", "std::string",
+            "A list of (comma-separated) function names to keep. For example: function-names=fir,wrapper">,
+    ];
+  let dependentDialects = [
+  "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
+  "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
+  "mlir::LLVM::LLVMDialect"];
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

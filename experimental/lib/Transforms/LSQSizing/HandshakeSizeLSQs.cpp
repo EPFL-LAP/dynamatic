@@ -143,7 +143,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     signalPassFailure();
 
@@ -514,24 +514,9 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
 
       // If the node is a buffer, check if it is a tehb buffer and if so,
       // check the latency of the nodes connected to the buffer
-      if (isa<handshake::BufferOp>(succedingOp)) {
-        auto params = succedingOp->getAttrOfType<DictionaryAttr>(
-            RTL_PARAMETERS_ATTR_NAME);
+      if (BufferOp bufferOp = dyn_cast<handshake::BufferOp>(succedingOp)) {
 
-        if (!params)
-          continue;
-
-        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-        if (!optTiming)
-          continue;
-
-        auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue());
-        if (!timing)
-          continue;
-
-        handshake::TimingInfo info = timing.getInfo();
-
-        if (info == TimingInfo::break_r() || info == TimingInfo::break_none()) {
+        if (bufferOp.isBypassDV()) {
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
             // -1 because buffer can get the load result 1 cycle earlier
             // Maybe it could also be earlier for a buffer with multiple slots
