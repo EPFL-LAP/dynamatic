@@ -704,9 +704,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
     auto delayAttr = fpuImplInterface.getInternalDelay();
     addParam("INTERNAL_DELAY", delayAttr);
-
-    auto latency = fpuImplInterface.getLatency();
-    addUnsigned("LATENCY", latency);
   }
 
     if (auto latencyInterface =
