@@ -661,7 +661,7 @@ CommandResult SetCP::execute(CommandArguments &args) {
               
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
-  llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
+  lvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
                << " is illegal.\n";
   return CommandResult::FAIL;
 }
