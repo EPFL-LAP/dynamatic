@@ -19,6 +19,7 @@ def generate_arith2(
     output_bitwidth: int = None,
 ):
 
+    print(latency)
     if bitwidth is not None:
         if lhs_bitwidth is not None or \
                 rhs_bitwidth is not None or \
