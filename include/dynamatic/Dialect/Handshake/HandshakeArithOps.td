@@ -269,6 +269,10 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
   let summary = "Floating-point division.";
 }
 
+def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi"> {
+  let summary = "Signed integer remainder.";
+}
+
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"> {
   let summary = "Signed integer division.";
 }

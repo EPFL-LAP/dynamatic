@@ -2,7 +2,7 @@ from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding
 from generators.support.signal_manager.utils.internal_signal import create_internal_channel_decl
-from generators.handshake.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.support.signal_manager.utils.types import ExtraSignals
 
 
@@ -25,9 +25,9 @@ def generate_mux(name, params):
 
 
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
-    dependencies = generate_tehb(tehb_name, {"bitwidth": data_bitwidth})
+    dependencies = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": data_bitwidth})
 
     entity = f"""
 library ieee;
@@ -60,10 +60,10 @@ end entity;
     architecture = f"""
 -- Architecture of mux
 architecture arch of {name} is
-  signal tehb_ins                       : std_logic_vector({data_bitwidth} - 1 downto 0);
-  signal tehb_ins_valid, tehb_ins_ready : std_logic;
+  signal one_slot_break_r_ins                       : std_logic_vector({data_bitwidth} - 1 downto 0);
+  signal one_slot_break_r_ins_valid, one_slot_break_r_ins_ready : std_logic;
 begin
-  process (ins, ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
+  process (ins, ins_valid, outs_ready, index, index_valid, one_slot_break_r_ins_ready)
     variable selectedData                   : std_logic_vector({data_bitwidth} - 1 downto 0);
     variable selectedData_valid, indexEqual : std_logic;
   begin
@@ -80,22 +80,22 @@ begin
         selectedData       := ins(i);
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and one_slot_break_r_ins_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins       <= selectedData;
-    tehb_ins_valid <= selectedData_valid;
+    index_ready    <= (not index_valid) or (selectedData_valid and one_slot_break_r_ins_ready);
+    one_slot_break_r_ins       <= selectedData;
+    one_slot_break_r_ins_valid <= selectedData_valid;
   end process;
 
-  tehb : entity work.{tehb_name}(arch)
+  one_slot_break_r : entity work.{one_slot_break_r_name}(arch)
     port map(
       clk => clk,
       rst => rst,
       -- input channel
-      ins       => tehb_ins,
-      ins_valid => tehb_ins_valid,
-      ins_ready => tehb_ins_ready,
+      ins       => one_slot_break_r_ins,
+      ins_valid => one_slot_break_r_ins_valid,
+      ins_ready => one_slot_break_r_ins_ready,
       -- output channel
       outs       => outs,
       outs_valid => outs_valid,
@@ -108,9 +108,9 @@ end architecture;
 
 
 def _generate_mux_dataless(name, size, index_bitwidth):
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
-    dependencies = generate_tehb(tehb_name, {"bitwidth": 0})
+    dependencies = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": 0})
 
     entity = f"""
 library ieee;
@@ -140,9 +140,9 @@ end entity;
     architecture = f"""
 -- Architecture of mux_dataless
 architecture arch of {name} is
-  signal tehb_ins_valid, tehb_ins_ready : std_logic;
+  signal one_slot_break_r_ins_valid, one_slot_break_r_ins_ready : std_logic;
 begin
-  process (ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
+  process (ins_valid, outs_ready, index, index_valid, one_slot_break_r_ins_ready)
     variable selectedData_valid, indexEqual : std_logic;
   begin
     selectedData_valid := '0';
@@ -157,20 +157,20 @@ begin
       if indexEqual and index_valid and ins_valid(i) then
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and one_slot_break_r_ins_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins_valid <= selectedData_valid;
+    index_ready    <= (not index_valid) or (selectedData_valid and one_slot_break_r_ins_ready);
+    one_slot_break_r_ins_valid <= selectedData_valid;
   end process;
 
-  tehb : entity work.{tehb_name}(arch)
+  one_slot_break_r : entity work.{one_slot_break_r_name}(arch)
     port map(
       clk => clk,
       rst => rst,
       -- input channel
-      ins_valid => tehb_ins_valid,
-      ins_ready => tehb_ins_ready,
+      ins_valid => one_slot_break_r_ins_valid,
+      ins_ready => one_slot_break_r_ins_ready,
       -- output channel
       outs_valid => outs_valid,
       outs_ready => outs_ready
