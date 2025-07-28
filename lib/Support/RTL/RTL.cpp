@@ -304,7 +304,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.sink" || modName == "handshake.subi" ||
       modName == "handshake.shli" || modName == "handshake.blocker" ||
       modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
-      modName == "handshake.ready_remover" || modName == "handshake.ori" ||
+      modName == "handshake.rigidifier" || modName == "handshake.ori" ||
       modName == "handshake.shrsi" || modName == "handshake.xori"||
       modName == "handshake.negf" || modName == "handshake.divsi" ||
       modName == "handshake.absf" || modName == "handshake.divui" ||
