@@ -1,5 +1,5 @@
 from generators.support.arith2 import generate_arith2
-
+from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 def generate_cmpf(name, params):
     predicate = params["predicate"]
@@ -9,11 +9,11 @@ def generate_cmpf(name, params):
     # only used by flopoco
     is_double = params.get("is_double", None)
 
-    if impl == "flopoco":
+    if impl == FLOPOCO_IMPL:
         bitwidth = 64 if is_double else 32
         signals = _get_flopoco_signals(bitwidth)
         body = _get_flopoco_body(bitwidth, predicate)
-    elif impl == "vivado":
+    elif impl == VIVADO_IMPL:
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
         bitwidth = 32

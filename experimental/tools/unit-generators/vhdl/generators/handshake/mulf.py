@@ -1,5 +1,5 @@
 from generators.support.arith_ip import generate_flopoco_ip_wrapper, generate_vivado_ip_wrapper
-
+from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 def generate_mulf(name, params):
     impl = params["fpu_impl"]
@@ -14,7 +14,7 @@ def generate_mulf(name, params):
 
     mod_type = "mulf"
 
-    if impl == "flopoco":
+    if impl == FLOPOCO_IMPL:
         if is_double is None:
             raise ValueError(f"is_double was missing for generating a flopoco {mod_type}")
         if internal_delay is None:
@@ -29,7 +29,7 @@ def generate_mulf(name, params):
             internal_delay=internal_delay,
             extra_signals=extra_signals
         )
-    elif impl == "vivado":
+    elif impl == VIVADO_IMPL:
         return generate_vivado_ip_wrapper(
             name=name,
             mod_type=mod_type,

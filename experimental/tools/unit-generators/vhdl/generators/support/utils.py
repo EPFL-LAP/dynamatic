@@ -15,3 +15,7 @@ def try_enum_cast(value: str, enum_class: Type[Enum]) -> Union[Enum, str]:
         return enum_class(value)
     except ValueError:
         return value
+
+
+VIVADO_IMPL = "vivado"
+FLOPOCO_IMPL = "flopoco"

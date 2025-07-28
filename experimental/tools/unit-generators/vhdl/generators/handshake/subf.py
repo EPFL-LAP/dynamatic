@@ -1,6 +1,6 @@
 from generators.handshake.addf import generate_addf
 from generators.support.signal_manager import generate_arith2_signal_manager
-
+from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 def generate_subf(name, params):
     latency = params["latency"]
@@ -12,14 +12,14 @@ def generate_subf(name, params):
     # flopoco only
     is_double = params.get("is_double", None)
 
-    if fpu_impl == "vivado":
+    if fpu_impl == VIVADO_IMPL:
         bitwidth = 32
-    elif fpu_impl == "flopoco":
+    elif fpu_impl == FLOPOCO_IMPL:
         if is_double is None:
             raise ValueError("is_double was missing for generating a flopoco subf")
         bitwidth = 64 if is_double else 32
 
-    generate_inner = lambda name : _generate_subf(name, params)
+    generate_inner = lambda name : _generate_subf(name, params, bitwidth)
     generate = lambda : generate_inner(name)
 
     if extra_signals:
@@ -33,19 +33,7 @@ def generate_subf(name, params):
     else:
         return generate()
 
-def _generate_subf(name, params):
-    impl = params["fpu_impl"]
-
-    # only used by flopoco
-    is_double = params.get("is_double", None)
-
-    if impl == "vivado":
-        bitwidth = 32
-    elif impl == "flopoco":
-
-        bitwidth = 64 if is_double else 32
-    else:
-        raise ValueError(f"Invalid FPU implementation: {impl}")
+def _generate_subf(name, params, bitwidth):
 
     addf_name = f"{name}_addf"
     addf_params = {k: v for k, v in params.items() if k != "extra_signals"}
