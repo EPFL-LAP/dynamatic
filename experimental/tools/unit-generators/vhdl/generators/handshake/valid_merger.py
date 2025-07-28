@@ -10,8 +10,8 @@ def generate_valid_merger(name, params):
     lhs_extra_signals = params.get("lhs_extra_signals", None)
     rhs_extra_signals = params.get("rhs_extra_signals", None)
 
-    def generate_inner(name): return _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth)
-    def generate(): return generate_inner(name)
+    generate_inner = lambda name : _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth)
+    generate = lambda : generate_inner(name)
 
     if lhs_extra_signals or rhs_extra_signals:
         return _generate_valid_merger_signal_manager(
@@ -62,7 +62,7 @@ entity {name} is
   );
 end entity;
 """
-    f"""
+    architecture = f"""
 -- Architecture of valid_merger
 architecture arch of {name} is
 begin
@@ -75,6 +75,7 @@ begin
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
+    return entity + architecture
 
 
 def _generate_valid_merger_signal_manager(name,

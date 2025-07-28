@@ -13,5 +13,5 @@ def generate_shrui(name, params):
         modType="shrui",
         bitwidth=bitwidth,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

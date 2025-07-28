@@ -14,5 +14,5 @@ def generate_negf(name, params):
         modType="negf",
         bitwidth=bitwidth,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

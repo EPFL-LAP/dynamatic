@@ -21,5 +21,5 @@ def generate_truncf(name, params):
         output_bitwidth=32,
         signals=signals,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

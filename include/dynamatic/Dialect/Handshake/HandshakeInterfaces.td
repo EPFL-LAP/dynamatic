@@ -217,6 +217,33 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
 def HasClock : NativeOpTrait<"HasClock">;
 
+def LatencyInterface : OpInterface<"LatencyInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     We must know the exact latency of multi-cycle operations,
+     in order to correctly buffer the circuit, 
+     as well as and generate valid-signal shift registers in their RTL.
+     This interface lets us store the latency on the operation,
+     allowing the components.json to act as a single-source-of-truth.
+  }];
+
+ let methods = [
+  InterfaceMethod<[{
+    Gets the operation latency as an integer.
+  }], "int64_t", "getLatency", (ins), [{
+    Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<mlir::IntegerAttr>("latency");
+    assert(attr && "Missing 'latency' attribute");
+    return attr.getInt();
+  }]>,
+
+  InterfaceMethod<[{
+  Sets the operation latency.
+    }], "void", "setLatency", (ins "int64_t":$latency), [{
+      $_op->setAttr("latency", IntegerAttr::get(IntegerType::get($_op->getContext(), 64), latency));
+    }]>
+  ];
+}
 def FPUImplInterface : OpInterface<"FPUImplInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
@@ -259,23 +286,8 @@ InterfaceMethod<[{
       if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
         return attr;
       return StringAttr::get(op->getContext(), "0.0");
-    }]>,
-
-  InterfaceMethod<[{
-    Gets the operation latency as an integer.
-  }], "int64_t", "getLatency", (ins), [{
-    Operation *op = $_op.getOperation();
-    auto attr = op->getAttrOfType<mlir::IntegerAttr>("latency");
-    assert(attr && "Missing 'latency' attribute");
-    return attr.getInt();
-  }]>,
-
-  InterfaceMethod<[{
-  Sets the operation latency.
-    }], "void", "setLatency", (ins "int64_t":$latency), [{
-      $_op->setAttr("latency", IntegerAttr::get(IntegerType::get($_op->getContext(), 64), latency));
     }]>
-  ];
+  ]
 }
 
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

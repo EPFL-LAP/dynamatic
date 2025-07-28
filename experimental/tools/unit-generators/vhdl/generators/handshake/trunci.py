@@ -18,5 +18,5 @@ def generate_trunci(name, params):
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,
-        extra_signals=extra_signals,
+        extra_signals=extra_signals
     )

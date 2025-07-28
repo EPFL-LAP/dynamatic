@@ -13,5 +13,5 @@ def generate_ori(name, params):
         modType="ori",
         bitwidth=bitwidth,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

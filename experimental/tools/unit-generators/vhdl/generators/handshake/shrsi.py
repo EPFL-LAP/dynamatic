@@ -13,5 +13,5 @@ def generate_shrsi(name, params):
         modType="shrsi",
         bitwidth=bitwidth,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

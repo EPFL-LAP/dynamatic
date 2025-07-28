@@ -14,5 +14,5 @@ def generate_subi(name, params):
         modType="subi",
         bitwidth=bitwidth,
         body=body,
-        extra_signals=params.get("extra_signals", None),
+        extra_signals=params.get("extra_signals", None)
     )

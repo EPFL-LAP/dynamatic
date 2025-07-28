@@ -3,6 +3,7 @@ from generators.support.arith2 import generate_arith2
 
 def generate_muli(name, params):
     bitwidth = params["bitwidth"]
+    latency = params["latency"]
 
     signals = f"""
   signal a_reg : std_logic_vector({bitwidth} - 1 downto 0);
@@ -39,5 +40,5 @@ def generate_muli(name, params):
         signals=signals,
         body=body,
         extra_signals=params.get("extra_signals", None),
-        latency=4
+        latency=latency
     )
