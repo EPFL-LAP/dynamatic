@@ -1,12 +1,6 @@
 #include "complexdiv.h"
 #include "dynamatic/Integration.h"
-
-// The default c++ abs function from stdlib
-// is lowered as an external function
-//
-// Although there is a maths.absi op in MLIR
-// I don't think Polygeist uses it
-#define ABS(x) ((x) >= 0 ? (x) : -(x))
+#include <stdlib.h>
 
 void complexdiv(in_int_t a_i[1000], in_int_t a_r[1000], in_int_t b_i[1000],
                 in_int_t b_r[1000], out_int_t c_i[1000], out_int_t c_r[1000]) {
@@ -18,7 +12,7 @@ void complexdiv(in_int_t a_i[1000], in_int_t a_r[1000], in_int_t b_i[1000],
     int ai = a_i[i];
     int ar = a_r[i];
     int cr, ci;
-    if (ABS(br) >= ABS(bi)) {
+    if (abs(br) >= abs(bi)) {
       int r = bi / br;
       int den = br + r * bi;
       cr = (ar + r * ai) / den;
