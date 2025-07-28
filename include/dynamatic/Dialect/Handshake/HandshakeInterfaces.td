@@ -287,7 +287,7 @@ InterfaceMethod<[{
         return attr;
       return StringAttr::get(op->getContext(), "0.0");
     }]>
-  ]
+  ];
 }
 
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
