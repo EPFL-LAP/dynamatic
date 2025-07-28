@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module divsi #(
+module remsi #(
   parameter DATA_TYPE = 32
 )(
   // inputs
@@ -30,13 +30,13 @@ module divsi #(
     .outs_valid (join_valid             )
   );
 
-  sdiv_32ns_32ns_32_36_seq_1 #(
-      .ID( 1 ),
-      .NUM_STAGE( 36 ),
-      .din0_WIDTH( 32 ),
-      .din1_WIDTH( 32 ),
-      .dout_WIDTH( 32 ))
-  sdiv_32ns_32ns_32_36_seq_1_U1(
+  srem_32ns_32ns_32_36_seq_1 #(
+    .ID( 1 ),
+    .NUM_STAGE( 36 ),
+    .din0_WIDTH( 32 ),
+    .din1_WIDTH( 32 ),
+    .dout_WIDTH( 32 ))
+  srem_32ns_32ns_32_36_seq_1_U1(
       .clk(clk),
       .reset(rst),
       .start(join_valid),
@@ -67,7 +67,7 @@ endmodule
 // ==============================================================
 `timescale 1 ns / 1 ps
 
-module sdiv_32ns_32ns_32_36_seq_1_divseq
+module srem_32ns_32ns_32_36_seq_1_divseq
 #(parameter
     in0_WIDTH = 32,
     in1_WIDTH = 32,
@@ -147,7 +147,7 @@ end
 
 endmodule
 
-module sdiv_32ns_32ns_32_36_seq_1
+module srem_32ns_32ns_32_36_seq_1 
 #(parameter
         ID   = 1,
         NUM_STAGE   = 2,
@@ -179,11 +179,11 @@ reg     [dout_WIDTH-1:0] remd;
 wire    [1:0]   sign_i;
 wire    [1:0]   sign_o;
 //------------------------Instantiation------------------
-sdiv_32ns_32ns_32_36_seq_1_divseq #(
+srem_32ns_32ns_32_36_seq_1_divseq #(
     .in0_WIDTH      ( din0_WIDTH ),
     .in1_WIDTH      ( din1_WIDTH ),
     .out_WIDTH      ( dout_WIDTH )
-) sdiv_32ns_32ns_32_36_seq_1_divseq_u (
+) srem_32ns_32ns_32_36_seq_1_divseq_u (
     .clk      ( clk ),
     .reset    ( reset ),
     .ce       ( ce ),
@@ -237,7 +237,7 @@ begin
     end
 end
 
-assign dout = quot;
+assign dout = remd;
 
 endmodule
 

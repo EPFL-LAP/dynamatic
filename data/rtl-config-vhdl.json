@@ -83,6 +83,14 @@
     "dependencies": ["join"]
   },
   {
+    "name": "handshake.remsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/remsi.vhd",
+    "dependencies": ["join", "delay_buffer"]
+  },
+  {
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
