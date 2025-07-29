@@ -301,7 +301,8 @@ def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
   Commutative,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
-  IsFloatSizedChannel<32, "result">
+  IsFloatSizedChannel<32, "result">,
+  LatencyInterface
 ]> {
   let summary = "Floating-point maximum.";
 }
@@ -310,7 +311,8 @@ def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
   Commutative,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
-  IsFloatSizedChannel<32, "result">
+  IsFloatSizedChannel<32, "result">,
+  LatencyInterface
 ]> {
   let summary = "Floating-point minimum.";
 }
@@ -396,7 +398,9 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
 
-def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"[
+  LatencyInterface
+]> {
   let summary = "Converts a signed integer to float.";
 }
 
