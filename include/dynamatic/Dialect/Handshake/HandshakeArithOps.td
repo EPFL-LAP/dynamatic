@@ -408,7 +408,8 @@ def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
 
 def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
   IsFloatSizedChannel<32, "in">,
-  IsIntSizedChannel<32, "out">
+  IsIntSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   let summary = "Converts a float to signed integer.";
 }
