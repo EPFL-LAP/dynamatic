@@ -18,19 +18,6 @@ entity addf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of addf_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-    component addf_vitis_hls_single_precision_lat_8 is
-        port (
-            aclk                 : in  std_logic;
-            aclken               : in  std_logic;
-            s_axis_a_tvalid      : in  std_logic;
-            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
-            s_axis_b_tvalid      : in  std_logic;
-            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
-            m_axis_result_tvalid : out std_logic;
-            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
-        );
-    end component;
     --------------------- Local signal ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
@@ -47,7 +34,7 @@ architecture arch of addf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(32 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    addf_vitis_hls_single_precision_lat_8_u : component addf_vitis_hls_single_precision_lat_8
+    addf_vitis_hls_single_precision_lat_8_u : entity work.addf_vitis_hls_single_precision_lat_8
     port map (
         aclk                 => aclk,
         aclken               => aclken,
