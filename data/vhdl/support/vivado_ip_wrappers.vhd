@@ -2011,7 +2011,7 @@ architecture arch of divsi_vitis_hls_wrapper is
   end component;
 begin
     --------------------- Instantiation -----------------
-  array_RAM_sdiv_32ns_32ns_32_36_1_U1 : entity work.array_RAM_sdiv_32ns_32ns_32_36_1
+  array_RAM_sdiv_32ns_32ns_32_36_1_U1 : component array_RAM_sdiv_32ns_32ns_32_36_1
     generic map(
       ID        => 1,
       NUM_STAGE => 36,
@@ -2049,7 +2049,7 @@ end entity;
 architecture arch of divui_vitis_hls_wrapper is
 begin
     --------------------- Instantiation -----------------
-  array_RAM_udiv_32ns_32ns_32_36_1_U1 : entity work.array_RAM_udiv_32ns_32ns_32_36_1
+  array_RAM_udiv_32ns_32ns_32_36_1_U1 : component array_RAM_udiv_32ns_32ns_32_36_1
     generic map(
       ID        => 1,
       NUM_STAGE => 36,
