@@ -399,7 +399,8 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
 }
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
-  LatencyInterface
+  IsIntSizedChannel<32, "in">,
+  IsFloatSizedChannel<32, "out">
 ]> {
   let summary = "Converts a signed integer to float.";
 }
@@ -413,7 +414,7 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
 
 def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
   IsFloatSizedChannel<32, "in">,
-  IsFloatSizedChannel<64, "out">,
+  IsFloatSizedChannel<64, "out">
 ]>{
   let summary = "Floating point extension.";
   // TODO: add canonicalizer
