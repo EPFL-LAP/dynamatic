@@ -18,6 +18,19 @@ entity addf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of addf_vitis_hls_wrapper is
+    --------------------- Component ---------------------
+    component addf_vitis_hls_single_precision_lat_8 is
+        port (
+            aclk                 : in  std_logic;
+            aclken               : in  std_logic;
+            s_axis_a_tvalid      : in  std_logic;
+            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
+            s_axis_b_tvalid      : in  std_logic;
+            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
+            m_axis_result_tvalid : out std_logic;
+            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
+        );
+    end component;
     --------------------- Local signal ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
@@ -407,6 +420,19 @@ entity cmpf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of cmpf_vitis_hls_wrapper is
+    --------------------- Component ---------------------
+    component cmpf_vitis_hls_single_precision_lat_0 is
+        port (
+            s_axis_a_tvalid         : in  std_logic;
+            s_axis_a_tdata          : in  std_logic_vector(31 downto 0);
+            s_axis_b_tvalid         : in  std_logic;
+            s_axis_b_tdata          : in  std_logic_vector(31 downto 0);
+            s_axis_operation_tvalid : in  std_logic;
+            s_axis_operation_tdata  : in  std_logic_vector(7 downto 0);
+            m_axis_result_tvalid    : out std_logic;
+            m_axis_result_tdata     : out std_logic_vector(7 downto 0)
+        );
+    end component;
     --------------------- Constant ----------------------
     -- AutoESL opcode
     constant AP_OEQ : std_logic_vector(4 downto 0) := "00001";
@@ -827,6 +853,19 @@ entity divf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of divf_vitis_hls_wrapper is
+    --------------------- Component ---------------------
+    component divf_vitis_hls_single_precision_lat_28 is
+        port (
+            aclk                 : in  std_logic;
+            aclken               : in  std_logic;
+            s_axis_a_tvalid      : in  std_logic;
+            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
+            s_axis_b_tvalid      : in  std_logic;
+            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
+            m_axis_result_tvalid : out std_logic;
+            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
+        );
+    end component;
     --------------------- Local signals ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
@@ -1217,6 +1256,19 @@ entity mulf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of mulf_vitis_hls_wrapper is
+    --------------------- Component ---------------------
+    component mulf_vitis_hls_single_precision_lat_4 is
+        port (
+            aclk                 : in  std_logic;
+            aclken               : in  std_logic;
+            s_axis_a_tvalid      : in  std_logic;
+            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
+            s_axis_b_tvalid      : in  std_logic;
+            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
+            m_axis_result_tvalid : out std_logic;
+            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
+        );
+    end component;
     --------------------- Local signals ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
@@ -1607,6 +1659,19 @@ entity subf_vitis_hls_wrapper is
 end entity;
 
 architecture arch of subf_vitis_hls_wrapper is
+    --------------------- Component ---------------------
+    component subf_vitis_hls_single_precision_lat_8 is
+        port (
+            aclk                 : in  std_logic;
+            aclken               : in  std_logic;
+            s_axis_a_tvalid      : in  std_logic;
+            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
+            s_axis_b_tvalid      : in  std_logic;
+            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
+            m_axis_result_tvalid : out std_logic;
+            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
+        );
+    end component;
     --------------------- Local signals ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
