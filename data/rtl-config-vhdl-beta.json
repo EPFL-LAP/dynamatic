@@ -145,11 +145,11 @@
   },
   {
     "name": "handshake.maximumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.minimumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p latency=$LATENCY extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.muli",
@@ -415,11 +415,11 @@
   },
   {
     "name": "handshake.fptosi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p latency=$LATENCY bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.ready_remover",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ready_remover -p bitwidth=$BITWIDTH"
+    "name": "handshake.rigidifier",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t rigidifier -p bitwidth=$BITWIDTH"
   },
   {
     "name": "handshake.valid_merger",
