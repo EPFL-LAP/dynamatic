@@ -1981,7 +1981,7 @@
       }
     }
   },
-  "handshake.sitopf": {
+  "handshake.sitofp": {
     "latency": {
       "64": {
         "1.190": 6.0
