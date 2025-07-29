@@ -16,6 +16,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include <boost/graph/connected_components.hpp>
+#include <iostream>
 #include <stdexcept>
 #include <stdlib.h>
 #include <utility>
@@ -294,6 +295,21 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         boost::connected_components(g, &nodeToComponentId[0]);
 
     for (size_t i = 1; i < numComponents; i++) {
+      // Calculate the range of indices
+      isl::set range;
+      for (size_t j = 0; j < nodeToComponentId.size(); j++) {
+        if (nodeToComponentId[j] == static_cast<int>(i)) {
+          auto *inst = vertexToInst[boost::vertex(j, g)];
+          auto instRange = info.accessMaps[inst];
+          range = range.unite(instRange);
+        }
+      }
+      // Enumerate points
+      range.foreach_point([](isl::point p) {
+        // std::cout << p.to_str() << std::endl;
+        return isl::stat::ok();
+      });
+
       llvm::errs() << "Creating new alloca to improve parallelism...\b";
       // Make a new alloca
       // FIXME: we can optimize this by squashing the unused locations in this
