@@ -400,7 +400,8 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
   IsIntSizedChannel<32, "in">,
-  IsFloatSizedChannel<32, "out">
+  IsFloatSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   let summary = "Converts a signed integer to float.";
 }
