@@ -854,6 +854,10 @@ using AndConversion       = LLVMToArithBinaryOpConversion<LLVM::AndOp, arith::An
 using OrConversion        = LLVMToArithBinaryOpConversion<LLVM::OrOp, arith::OrIOp>;
 using XorConversion       = LLVMToArithBinaryOpConversion<LLVM::XOrOp, arith::XOrIOp>;
 
+using ShlOpConversion     = LLVMToArithBinaryOpConversion<LLVM::ShlOp, arith::ShLIOp>;
+using LShrOpConversion    = LLVMToArithBinaryOpConversion<LLVM::LShrOp, arith::ShRUIOp>;
+using AShrOpConversion    = LLVMToArithBinaryOpConversion<LLVM::AShrOp, arith::ShRSIOp>;
+
 // Floating point arithmetic
 using AddFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FAddOp, arith::AddFOp>;
 using SubFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FSubOp, arith::SubFOp>;
@@ -864,6 +868,7 @@ using RemFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FRemOp, arith::R
 // Unary cast arithmetic
 using SExtOpConversion    = LLVMToArithUnaryOpPattern<LLVM::SExtOp, arith::ExtSIOp>;
 using ZExtOpConversion    = LLVMToArithUnaryOpPattern<LLVM::ZExtOp, arith::ExtUIOp>;
+
 using FPExtOpConversion   = LLVMToArithUnaryOpPattern<LLVM::FPExtOp, arith::ExtFOp>;
 using TruncIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::TruncOp, arith::TruncIOp>;
 using FPTruncOpConversion = LLVMToArithUnaryOpPattern<LLVM::FPTruncOp, arith::TruncFOp>;
@@ -979,6 +984,10 @@ void LLVMToControlFlowPass::runOnOperation() {
       MulFOpConversion,
       DivFOpConversion,
       RemFOpConversion,
+
+      ShlOpConversion,
+      LShrOpConversion,
+      AShrOpConversion,
 
       // Binary predicate comparisons:
       LLVMICmpToArithICmp,
