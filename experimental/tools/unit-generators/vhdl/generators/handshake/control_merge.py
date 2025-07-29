@@ -3,7 +3,7 @@ from generators.support.signal_manager.utils.forwarding import get_default_extra
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake
 from generators.support.signal_manager.utils.types import ExtraSignals
-from generators.handshake.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
 
@@ -28,11 +28,11 @@ def generate_control_merge(name, params):
 
 def _generate_control_merge_dataless(name, size, index_bitwidth):
     merge_name = f"{name}_merge"
-    tehb_name = f"{name}_tehb"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
     fork_name = f"{name}_fork"
 
     dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
-        generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
+        generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_bitwidth}) + \
         generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
     entity = f"""
@@ -62,15 +62,15 @@ end entity;
     architecture = f"""
 -- Architecture of control_merge_dataless
 architecture arch of {name} is
-  signal index_tehb                                               : std_logic_vector ({index_bitwidth} - 1 downto 0);
-  signal dataAvailable, readyToFork, tehbOut_valid, tehbOut_ready : std_logic;
+  signal index_one_slot_break_r                                               : std_logic_vector ({index_bitwidth} - 1 downto 0);
+  signal dataAvailable, readyToFork, one_slot_break_rOut_valid, one_slot_break_rOut_ready : std_logic;
 begin
   process (ins_valid)
   begin
-    index_tehb <= ({index_bitwidth} - 1 downto 0 => '0');
+    index_one_slot_break_r <= ({index_bitwidth} - 1 downto 0 => '0');
     for i in 0 to ({size} - 1) loop
       if (ins_valid(i) = '1') then
-        index_tehb <= std_logic_vector(to_unsigned(i, {index_bitwidth}));
+        index_one_slot_break_r <= std_logic_vector(to_unsigned(i, {index_bitwidth}));
         exit;
       end if;
     end loop;
@@ -81,20 +81,20 @@ begin
       clk        => clk,
       rst        => rst,
       ins_valid  => ins_valid,
-      outs_ready => tehbOut_ready,
+      outs_ready => one_slot_break_rOut_ready,
       ins_ready  => ins_ready,
       outs_valid => dataAvailable
     );
 
-  tehb : entity work.{tehb_name}(arch)
+  one_slot_break_r : entity work.{one_slot_break_r_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
       ins_valid  => dataAvailable,
       outs_ready => readyToFork,
-      outs_valid => tehbOut_valid,
-      ins_ready  => tehbOut_ready,
-      ins        => index_tehb,
+      outs_valid => one_slot_break_rOut_valid,
+      ins_ready  => one_slot_break_rOut_ready,
+      ins        => index_one_slot_break_r,
       outs       => index
     );
 
@@ -102,7 +102,7 @@ begin
     port map(
       clk           => clk,
       rst           => rst,
-      ins_valid     => tehbOut_valid,
+      ins_valid     => one_slot_break_rOut_valid,
       outs_ready(0) => outs_ready,
       outs_ready(1) => index_ready,
       ins_ready     => readyToFork,

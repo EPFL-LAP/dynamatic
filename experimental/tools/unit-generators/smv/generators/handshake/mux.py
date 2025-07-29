@@ -1,4 +1,3 @@
-from generators.support.tehb import generate_tehb
 from generators.support.utils import *
 
 

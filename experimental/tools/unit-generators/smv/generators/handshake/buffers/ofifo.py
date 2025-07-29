@@ -1,6 +1,6 @@
 from generators.support.utils import *
-from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
-from generators.support.tehb import generate_tehb
+from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 
 
 def generate_ofifo(name, params):
@@ -25,8 +25,8 @@ MODULE {name} (ins_valid, outs_ready)
   ins_ready := inner_tehb.ins_ready;
   outs_valid := inner_elastic_fifo.outs_valid;
 
-{generate_tehb(f"{name}__tehb_dataless", {ATTR_BITWIDTH: 0})}
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_BITWIDTH: 0})}
+{generate_one_slot_break_r(f"{name}__tehb_dataless", {ATTR_BITWIDTH: 0})}
+{generate_fifo_break_dv(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_BITWIDTH: 0})}
 """
 
 
@@ -43,6 +43,6 @@ MODULE {name} (ins, ins_valid, outs_ready)
   outs_valid := inner_elastic_fifo.outs_valid;
   outs := inner_elastic_fifo.outs;
 
-{generate_tehb(f"{name}__tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner", {ATTR_SLOTS: slots, ATTR_BITWIDTH: data_type.bitwidth})}
+{generate_one_slot_break_r(f"{name}__tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
+{generate_fifo_break_dv(f"{name}__elastic_fifo_inner", {ATTR_SLOTS: slots, ATTR_BITWIDTH: data_type.bitwidth})}
 """

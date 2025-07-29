@@ -75,32 +75,22 @@ struct HandshakePlaceBuffersCustomPass
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
-    handshake::TimingInfo timing;
-    StringRef bufferType;
-    if (type == "one_slot_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
-    } else if (type == "one_slot_break_r") {
-      timing = handshake::TimingInfo::break_r();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
-    } else if (type == "fifo_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::FIFO_BREAK_DV;
-    } else if (type == "fifo_break_none") {
-      timing = handshake::TimingInfo::break_none();
-      bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
-    } else if (type == "one_slot_break_dvr") {
-      timing = handshake::TimingInfo::break_dvr();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
-    } else if (type == "shift_reg_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::SHIFT_REG_BREAK_DV;
-    } else {
+
+    transform(type.begin(), type.end(), type.begin(), ::toupper);
+
+    // returns optional wrapper around buffer type enum
+    auto bufferTypeOpt = handshake::symbolizeBufferType(type);
+
+    if (!bufferTypeOpt.has_value()) {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
+
+    // pull the enum itself from the optional
+    auto bufferType = bufferTypeOpt.value();
+
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots, bufferType);
+                                                     slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
