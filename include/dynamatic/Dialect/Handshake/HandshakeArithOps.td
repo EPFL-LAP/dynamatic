@@ -398,7 +398,7 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
 
-def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"[
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
   LatencyInterface
 ]> {
   let summary = "Converts a signed integer to float.";
