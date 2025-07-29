@@ -415,7 +415,7 @@ entity cmpf_vitis_hls_wrapper is
         din0   : in  std_logic_vector(32 - 1 downto 0);
         din1   : in  std_logic_vector(32 - 1 downto 0);
         opcode : in  std_logic_vector(4 downto 0);
-        dout   : out std_logic_vector(32 - 1 downto 0)
+        dout   : out std_logic_vector(1 - 1 downto 0)
     );
 end entity;
 
