@@ -303,7 +303,6 @@ BEGIN
     );
 END addf_vitis_hls_single_precision_lat_8_arch;
 
-
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
@@ -387,134 +386,6 @@ begin
     dout <= dout_i when ce_r = '1' else dout_r;
 end architecture;
 
--- ==============================================================
--- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
--- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
--- ==============================================================
-Library ieee;
-use ieee.std_logic_1164.all;
-
-entity cmpf_vitis_hls_wrapper is
-    port (
-        clk    : in  std_logic;
-        reset  : in  std_logic;
-        ce     : in  std_logic;
-        din0   : in  std_logic_vector(32 - 1 downto 0);
-        din1   : in  std_logic_vector(32 - 1 downto 0);
-        opcode : in  std_logic_vector(4 downto 0);
-        dout   : out std_logic_vector(1 - 1 downto 0)
-    );
-end entity;
-
-architecture arch of cmpf_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-    component cmpf_vitis_hls_single_precision_lat_0 is
-        port (
-            s_axis_a_tvalid         : in  std_logic;
-            s_axis_a_tdata          : in  std_logic_vector(31 downto 0);
-            s_axis_b_tvalid         : in  std_logic;
-            s_axis_b_tdata          : in  std_logic_vector(31 downto 0);
-            s_axis_operation_tvalid : in  std_logic;
-            s_axis_operation_tdata  : in  std_logic_vector(7 downto 0);
-            m_axis_result_tvalid    : out std_logic;
-            m_axis_result_tdata     : out std_logic_vector(7 downto 0)
-        );
-    end component;
-    --------------------- Constant ----------------------
-    -- AutoESL opcode
-    constant AP_OEQ : std_logic_vector(4 downto 0) := "00001";
-    constant AP_OGT : std_logic_vector(4 downto 0) := "00010";
-    constant AP_OGE : std_logic_vector(4 downto 0) := "00011";
-    constant AP_OLT : std_logic_vector(4 downto 0) := "00100";
-    constant AP_OLE : std_logic_vector(4 downto 0) := "00101";
-    constant AP_ONE : std_logic_vector(4 downto 0) := "00110";
-    constant AP_UNO : std_logic_vector(4 downto 0) := "01000";
-    -- FPV6 opcode
-    constant OP_EQ  : std_logic_vector(7 downto 0) := "00010100";
-    constant OP_GT  : std_logic_vector(7 downto 0) := "00100100";
-    constant OP_GE  : std_logic_vector(7 downto 0) := "00110100";
-    constant OP_LT  : std_logic_vector(7 downto 0) := "00001100";
-    constant OP_LE  : std_logic_vector(7 downto 0) := "00011100";
-    constant OP_NE  : std_logic_vector(7 downto 0) := "00101100";
-    constant OP_UO  : std_logic_vector(7 downto 0) := "00000100";
-    --------------------- Local signal ------------------
-    signal a_tvalid    : std_logic;
-    signal a_tdata     : std_logic_vector(31 downto 0);
-    signal b_tvalid    : std_logic;
-    signal b_tdata     : std_logic_vector(31 downto 0);
-    signal op_tvalid   : std_logic;
-    signal op_tdata    : std_logic_vector(7 downto 0);
-    signal r_tvalid    : std_logic;
-    signal r_tdata     : std_logic_vector(7 downto 0);
-    signal din0_buf1   : std_logic_vector(32 - 1 downto 0);
-    signal din1_buf1   : std_logic_vector(32 - 1 downto 0);
-    signal opcode_buf1 : std_logic_vector(4 downto 0);
-    signal ce_r      : std_logic;
-    signal dout_i    : std_logic_vector(1 - 1 downto 0);
-    signal dout_r    : std_logic_vector(1 - 1 downto 0);
-begin
-    --------------------- Instantiation -----------------
-    cmpf_vitis_hls_single_precision_lat_0_u : component cmpf_vitis_hls_single_precision_lat_0
-    port map (
-        s_axis_a_tvalid         => a_tvalid,
-        s_axis_a_tdata          => a_tdata,
-        s_axis_b_tvalid         => b_tvalid,
-        s_axis_b_tdata          => b_tdata,
-        s_axis_operation_tvalid => op_tvalid,
-        s_axis_operation_tdata  => op_tdata,
-        m_axis_result_tvalid    => r_tvalid,
-        m_axis_result_tdata     => r_tdata
-    );
-
-    --------------------- Assignment --------------------
-    a_tvalid  <= '1';
-    a_tdata   <= din0_buf1;
-    b_tvalid  <= '1';
-    b_tdata   <= din1_buf1;
-    op_tvalid <= '1';
-    dout_i    <= r_tdata(0 downto 0);
-
-    --------------------- Opcode ------------------------
-    process (opcode_buf1) begin
-        case (opcode_buf1) is
-            when AP_OEQ => op_tdata <= OP_EQ;
-            when AP_OGT => op_tdata <= OP_GT;
-            when AP_OGE => op_tdata <= OP_GE;
-            when AP_OLT => op_tdata <= OP_LT;
-            when AP_OLE => op_tdata <= OP_LE;
-            when AP_ONE => op_tdata <= OP_NE;
-            when AP_UNO => op_tdata <= OP_UO;
-            when others => op_tdata <= OP_EQ;
-        end case;
-    end process;
-
-    --------------------- Input buffer ------------------
-    process (clk) begin
-        if clk'event and clk = '1' then
-            if ce = '1' then
-                din0_buf1   <= din0;
-                din1_buf1   <= din1;
-                opcode_buf1 <= opcode;
-            end if;
-        end if;
-    end process;
-
-    process (clk) begin
-        if clk'event and clk = '1' then
-            ce_r <= ce;
-        end if;
-    end process;
-
-    process (clk) begin
-        if clk'event and clk = '1' then
-            if ce_r = '1' then
-                dout_r <= dout_i;
-            end if;
-        end if;
-    end process;
-
-    dout <= dout_i when ce_r = '1' else dout_r;
-end architecture;
 
 -- (c) Copyright 1995-2019 Xilinx, Inc. All rights reserved.
 -- 
@@ -820,82 +691,101 @@ BEGIN
     );
 END cmpf_vitis_hls_single_precision_lat_0_arch;
 
-
 -- ==============================================================
--- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.1 (64-bit)
+-- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
 -- ==============================================================
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity divf_vitis_hls_wrapper is
+entity cmpf_vitis_hls_wrapper is
     port (
-        clk   : in  std_logic;
-        reset : in  std_logic;
-        ce    : in  std_logic;
-        din0  : in  std_logic_vector(32 - 1 downto 0);
-        din1  : in  std_logic_vector(32 - 1 downto 0);
-        dout  : out std_logic_vector(32 - 1 downto 0)
+        clk    : in  std_logic;
+        reset  : in  std_logic;
+        ce     : in  std_logic;
+        din0   : in  std_logic_vector(32 - 1 downto 0);
+        din1   : in  std_logic_vector(32 - 1 downto 0);
+        opcode : in  std_logic_vector(4 downto 0);
+        dout   : out std_logic_vector(1 - 1 downto 0)
     );
 end entity;
 
-architecture arch of divf_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-    component divf_vitis_hls_single_precision_lat_28 is
-        port (
-            aclk                 : in  std_logic;
-            aclken               : in  std_logic;
-            s_axis_a_tvalid      : in  std_logic;
-            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
-            s_axis_b_tvalid      : in  std_logic;
-            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
-            m_axis_result_tvalid : out std_logic;
-            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
-        );
-    end component;
-    --------------------- Local signals ------------------
-    signal aclk      : std_logic;
-    signal aclken    : std_logic;
-    signal a_tvalid  : std_logic;
-    signal a_tdata   : std_logic_vector(32 - 1 downto 0);
-    signal b_tvalid  : std_logic;
-    signal b_tdata   : std_logic_vector(32 - 1 downto 0);
-    signal r_tvalid  : std_logic;
-    signal r_tdata   : std_logic_vector(32 - 1 downto 0);
-    signal din0_buf1 : std_logic_vector(32 - 1 downto 0);
-    signal din1_buf1 : std_logic_vector(32 - 1 downto 0);
+architecture arch of cmpf_vitis_hls_wrapper is
+    --------------------- Constant ----------------------
+    -- AutoESL opcode
+    constant AP_OEQ : std_logic_vector(4 downto 0) := "00001";
+    constant AP_OGT : std_logic_vector(4 downto 0) := "00010";
+    constant AP_OGE : std_logic_vector(4 downto 0) := "00011";
+    constant AP_OLT : std_logic_vector(4 downto 0) := "00100";
+    constant AP_OLE : std_logic_vector(4 downto 0) := "00101";
+    constant AP_ONE : std_logic_vector(4 downto 0) := "00110";
+    constant AP_UNO : std_logic_vector(4 downto 0) := "01000";
+    -- FPV6 opcode
+    constant OP_EQ  : std_logic_vector(7 downto 0) := "00010100";
+    constant OP_GT  : std_logic_vector(7 downto 0) := "00100100";
+    constant OP_GE  : std_logic_vector(7 downto 0) := "00110100";
+    constant OP_LT  : std_logic_vector(7 downto 0) := "00001100";
+    constant OP_LE  : std_logic_vector(7 downto 0) := "00011100";
+    constant OP_NE  : std_logic_vector(7 downto 0) := "00101100";
+    constant OP_UO  : std_logic_vector(7 downto 0) := "00000100";
+    --------------------- Local signal ------------------
+    signal a_tvalid    : std_logic;
+    signal a_tdata     : std_logic_vector(31 downto 0);
+    signal b_tvalid    : std_logic;
+    signal b_tdata     : std_logic_vector(31 downto 0);
+    signal op_tvalid   : std_logic;
+    signal op_tdata    : std_logic_vector(7 downto 0);
+    signal r_tvalid    : std_logic;
+    signal r_tdata     : std_logic_vector(7 downto 0);
+    signal din0_buf1   : std_logic_vector(32 - 1 downto 0);
+    signal din1_buf1   : std_logic_vector(32 - 1 downto 0);
+    signal opcode_buf1 : std_logic_vector(4 downto 0);
     signal ce_r      : std_logic;
-    signal dout_i    : std_logic_vector(32 - 1 downto 0);
-    signal dout_r    : std_logic_vector(32 - 1 downto 0);
+    signal dout_i    : std_logic_vector(1 - 1 downto 0);
+    signal dout_r    : std_logic_vector(1 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    divf_vitis_hls_single_precision_lat_28_u : component divf_vitis_hls_single_precision_lat_28
+    cmpf_vitis_hls_single_precision_lat_0_u : entity work.cmpf_vitis_hls_single_precision_lat_0
     port map (
-        aclk                 => aclk,
-        aclken               => aclken,
-        s_axis_a_tvalid      => a_tvalid,
-        s_axis_a_tdata       => a_tdata,
-        s_axis_b_tvalid      => b_tvalid,
-        s_axis_b_tdata       => b_tdata,
-        m_axis_result_tvalid => r_tvalid,
-        m_axis_result_tdata  => r_tdata
+        s_axis_a_tvalid         => a_tvalid,
+        s_axis_a_tdata          => a_tdata,
+        s_axis_b_tvalid         => b_tvalid,
+        s_axis_b_tdata          => b_tdata,
+        s_axis_operation_tvalid => op_tvalid,
+        s_axis_operation_tdata  => op_tdata,
+        m_axis_result_tvalid    => r_tvalid,
+        m_axis_result_tdata     => r_tdata
     );
 
     --------------------- Assignment --------------------
-    aclk     <= clk;
-    aclken   <= ce_r;
-    a_tvalid <= '1';
-    a_tdata  <= din0_buf1;
-    b_tvalid <= '1';
-    b_tdata  <= din1_buf1;
-    dout_i   <= r_tdata;
+    a_tvalid  <= '1';
+    a_tdata   <= din0_buf1;
+    b_tvalid  <= '1';
+    b_tdata   <= din1_buf1;
+    op_tvalid <= '1';
+    dout_i    <= r_tdata(0 downto 0);
+
+    --------------------- Opcode ------------------------
+    process (opcode_buf1) begin
+        case (opcode_buf1) is
+            when AP_OEQ => op_tdata <= OP_EQ;
+            when AP_OGT => op_tdata <= OP_GT;
+            when AP_OGE => op_tdata <= OP_GE;
+            when AP_OLT => op_tdata <= OP_LT;
+            when AP_OLE => op_tdata <= OP_LE;
+            when AP_ONE => op_tdata <= OP_NE;
+            when AP_UNO => op_tdata <= OP_UO;
+            when others => op_tdata <= OP_EQ;
+        end case;
+    end process;
 
     --------------------- Input buffer ------------------
     process (clk) begin
         if clk'event and clk = '1' then
             if ce = '1' then
-                din0_buf1 <= din0;
-                din1_buf1 <= din1;
+                din0_buf1   <= din0;
+                din1_buf1   <= din1;
+                opcode_buf1 <= opcode;
             end if;
         end if;
     end process;
@@ -916,7 +806,6 @@ begin
 
     dout <= dout_i when ce_r = '1' else dout_r;
 end architecture;
-
 
 -- (c) Copyright 1995-2019 Xilinx, Inc. All rights reserved.
 -- 
@@ -1225,44 +1114,31 @@ END divf_vitis_hls_single_precision_lat_28_arch;
 
 
 -- ==============================================================
--- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
+-- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.1 (64-bit)
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
 -- ==============================================================
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity mulf_vitis_hls_wrapper is
+entity divf_vitis_hls_wrapper is
     port (
         clk   : in  std_logic;
         reset : in  std_logic;
         ce    : in  std_logic;
-        din0  : in  std_logic_vector(32 -1 downto 0);
-        din1  : in  std_logic_vector(32 -1 downto 0);
-        dout  : out std_logic_vector(32 -1 downto 0)
+        din0  : in  std_logic_vector(32 - 1 downto 0);
+        din1  : in  std_logic_vector(32 - 1 downto 0);
+        dout  : out std_logic_vector(32 - 1 downto 0)
     );
 end entity;
 
-architecture arch of mulf_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-    component mulf_vitis_hls_single_precision_lat_4 is
-        port (
-            aclk                 : in  std_logic;
-            aclken               : in  std_logic;
-            s_axis_a_tvalid      : in  std_logic;
-            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
-            s_axis_b_tvalid      : in  std_logic;
-            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
-            m_axis_result_tvalid : out std_logic;
-            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
-        );
-    end component;
+architecture arch of divf_vitis_hls_wrapper is
     --------------------- Local signals ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
     signal a_tvalid  : std_logic;
     signal a_tdata   : std_logic_vector(32 - 1 downto 0);
     signal b_tvalid  : std_logic;
-    signal b_tdata   : std_logic_vector(32 - 1downto 0);
+    signal b_tdata   : std_logic_vector(32 - 1 downto 0);
     signal r_tvalid  : std_logic;
     signal r_tdata   : std_logic_vector(32 - 1 downto 0);
     signal din0_buf1 : std_logic_vector(32 - 1 downto 0);
@@ -1272,7 +1148,7 @@ architecture arch of mulf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(32 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    mulf_vitis_hls_single_precision_lat_4_u : component mulf_vitis_hls_single_precision_lat_4
+    divf_vitis_hls_single_precision_lat_28_u : entity work.divf_vitis_hls_single_precision_lat_28
     port map (
         aclk                 => aclk,
         aclken               => aclken,
@@ -1626,7 +1502,6 @@ BEGIN
     );
 END mulf_vitis_hls_single_precision_lat_4_arch;
 
-
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
@@ -1634,40 +1509,27 @@ END mulf_vitis_hls_single_precision_lat_4_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity subf_vitis_hls_wrapper is
+entity mulf_vitis_hls_wrapper is
     port (
         clk   : in  std_logic;
         reset : in  std_logic;
         ce    : in  std_logic;
-        din0  : in  std_logic_vector(32 - 1 downto 0);
-        din1  : in  std_logic_vector(32 - 1 downto 0);
-        dout  : out std_logic_vector(32 - 1 downto 0)
+        din0  : in  std_logic_vector(32 -1 downto 0);
+        din1  : in  std_logic_vector(32 -1 downto 0);
+        dout  : out std_logic_vector(32 -1 downto 0)
     );
 end entity;
 
-architecture arch of subf_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-    component subf_vitis_hls_single_precision_lat_8 is
-        port (
-            aclk                 : in  std_logic;
-            aclken               : in  std_logic;
-            s_axis_a_tvalid      : in  std_logic;
-            s_axis_a_tdata       : in  std_logic_vector(31 downto 0);
-            s_axis_b_tvalid      : in  std_logic;
-            s_axis_b_tdata       : in  std_logic_vector(31 downto 0);
-            m_axis_result_tvalid : out std_logic;
-            m_axis_result_tdata  : out std_logic_vector(31 downto 0)
-        );
-    end component;
+architecture arch of mulf_vitis_hls_wrapper is
     --------------------- Local signals ------------------
     signal aclk      : std_logic;
     signal aclken    : std_logic;
     signal a_tvalid  : std_logic;
     signal a_tdata   : std_logic_vector(32 - 1 downto 0);
     signal b_tvalid  : std_logic;
-    signal b_tdata   : std_logic_vector(32 - 1 downto 0);
+    signal b_tdata   : std_logic_vector(32 - 1downto 0);
     signal r_tvalid  : std_logic;
-    signal r_tdata   : std_logic_vector(32 - 1  downto 0);
+    signal r_tdata   : std_logic_vector(32 - 1 downto 0);
     signal din0_buf1 : std_logic_vector(32 - 1 downto 0);
     signal din1_buf1 : std_logic_vector(32 - 1 downto 0);
     signal ce_r      : std_logic;
@@ -1675,7 +1537,7 @@ architecture arch of subf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(32 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    subf_vitis_hls_single_precision_lat_8_u : component subf_vitis_hls_single_precision_lat_8
+    mulf_vitis_hls_single_precision_lat_4_u : entity work.mulf_vitis_hls_single_precision_lat_4
     port map (
         aclk                 => aclk,
         aclken               => aclken,
@@ -1722,7 +1584,6 @@ begin
 
     dout <= dout_i when ce_r = '1' else dout_r;
 end architecture;
-
 
 -- (c) Copyright 1995-2019 Xilinx, Inc. All rights reserved.
 -- 
@@ -2037,6 +1898,89 @@ END subf_vitis_hls_single_precision_lat_8_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
+entity subf_vitis_hls_wrapper is
+    port (
+        clk   : in  std_logic;
+        reset : in  std_logic;
+        ce    : in  std_logic;
+        din0  : in  std_logic_vector(32 - 1 downto 0);
+        din1  : in  std_logic_vector(32 - 1 downto 0);
+        dout  : out std_logic_vector(32 - 1 downto 0)
+    );
+end entity;
+
+architecture arch of subf_vitis_hls_wrapper is
+    --------------------- Local signals ------------------
+    signal aclk      : std_logic;
+    signal aclken    : std_logic;
+    signal a_tvalid  : std_logic;
+    signal a_tdata   : std_logic_vector(32 - 1 downto 0);
+    signal b_tvalid  : std_logic;
+    signal b_tdata   : std_logic_vector(32 - 1 downto 0);
+    signal r_tvalid  : std_logic;
+    signal r_tdata   : std_logic_vector(32 - 1  downto 0);
+    signal din0_buf1 : std_logic_vector(32 - 1 downto 0);
+    signal din1_buf1 : std_logic_vector(32 - 1 downto 0);
+    signal ce_r      : std_logic;
+    signal dout_i    : std_logic_vector(32 - 1 downto 0);
+    signal dout_r    : std_logic_vector(32 - 1 downto 0);
+begin
+    --------------------- Instantiation -----------------
+    subf_vitis_hls_single_precision_lat_8_u : entity work.subf_vitis_hls_single_precision_lat_8
+    port map (
+        aclk                 => aclk,
+        aclken               => aclken,
+        s_axis_a_tvalid      => a_tvalid,
+        s_axis_a_tdata       => a_tdata,
+        s_axis_b_tvalid      => b_tvalid,
+        s_axis_b_tdata       => b_tdata,
+        m_axis_result_tvalid => r_tvalid,
+        m_axis_result_tdata  => r_tdata
+    );
+
+    --------------------- Assignment --------------------
+    aclk     <= clk;
+    aclken   <= ce_r;
+    a_tvalid <= '1';
+    a_tdata  <= din0_buf1;
+    b_tvalid <= '1';
+    b_tdata  <= din1_buf1;
+    dout_i   <= r_tdata;
+
+    --------------------- Input buffer ------------------
+    process (clk) begin
+        if clk'event and clk = '1' then
+            if ce = '1' then
+                din0_buf1 <= din0;
+                din1_buf1 <= din1;
+            end if;
+        end if;
+    end process;
+
+    process (clk) begin
+        if clk'event and clk = '1' then
+            ce_r <= ce;
+        end if;
+    end process;
+
+    process (clk) begin
+        if clk'event and clk = '1' then
+            if ce_r = '1' then
+                dout_r <= dout_i;
+            end if;
+        end if;
+    end process;
+
+    dout <= dout_i when ce_r = '1' else dout_r;
+end architecture;
+
+-- ==============================================================
+-- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
+-- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
+-- ==============================================================
+Library ieee;
+use ieee.std_logic_1164.all;
+
 entity divsi_vitis_hls_wrapper is
     port (
         clk   : in  std_logic;
@@ -2067,7 +2011,7 @@ architecture arch of divsi_vitis_hls_wrapper is
   end component;
 begin
     --------------------- Instantiation -----------------
-  array_RAM_sdiv_32ns_32ns_32_36_1_U1 : component array_RAM_sdiv_32ns_32ns_32_36_1
+  array_RAM_sdiv_32ns_32ns_32_36_1_U1 : entity work.array_RAM_sdiv_32ns_32ns_32_36_1
     generic map(
       ID        => 1,
       NUM_STAGE => 36,
@@ -2103,25 +2047,9 @@ entity divui_vitis_hls_wrapper is
 end entity;
 
 architecture arch of divui_vitis_hls_wrapper is
-    --------------------- Component ---------------------
-  component array_RAM_udiv_32ns_32ns_32_36_1 is
-    generic (
-      ID        : integer;
-      NUM_STAGE : integer;
-      din0_TYPE : integer;
-      din1_TYPE : integer;
-      dout_TYPE : integer);
-    port (
-      clk   : in  std_logic;
-      reset : in  std_logic;
-      ce    : in  std_logic;
-      din0  : in  std_logic_vector(32 - 1 downto 0);
-      din1  : in  std_logic_vector(32 - 1 downto 0);
-      dout  : out std_logic_vector(32 - 1 downto 0));
-  end component;
 begin
     --------------------- Instantiation -----------------
-  array_RAM_udiv_32ns_32ns_32_36_1_U1 : component array_RAM_udiv_32ns_32ns_32_36_1
+  array_RAM_udiv_32ns_32ns_32_36_1_U1 : entity work.array_RAM_udiv_32ns_32ns_32_36_1
     generic map(
       ID        => 1,
       NUM_STAGE => 36,
