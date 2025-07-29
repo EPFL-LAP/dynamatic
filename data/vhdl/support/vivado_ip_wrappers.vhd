@@ -467,7 +467,7 @@ architecture arch of cmpf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(1 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    cmpf_vitis_hls_single_precision_lat_0_u : entity work.cmpf_vitis_hls_single_precision_lat_0
+    cmpf_vitis_hls_single_precision_lat_0_u : component cmpf_vitis_hls_single_precision_lat_0
     port map (
         s_axis_a_tvalid         => a_tvalid,
         s_axis_a_tdata          => a_tdata,
@@ -1285,7 +1285,7 @@ architecture arch of mulf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(32 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    mulf_vitis_hls_single_precision_lat_4_u : entity work.mulf_vitis_hls_single_precision_lat_4
+    mulf_vitis_hls_single_precision_lat_4_u : component mulf_vitis_hls_single_precision_lat_4
     port map (
         aclk                 => aclk,
         aclken               => aclken,
@@ -1688,7 +1688,7 @@ architecture arch of subf_vitis_hls_wrapper is
     signal dout_r    : std_logic_vector(32 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    subf_vitis_hls_single_precision_lat_8_u : entity work.subf_vitis_hls_single_precision_lat_8
+    subf_vitis_hls_single_precision_lat_8_u : component subf_vitis_hls_single_precision_lat_8
     port map (
         aclk                 => aclk,
         aclken               => aclken,
