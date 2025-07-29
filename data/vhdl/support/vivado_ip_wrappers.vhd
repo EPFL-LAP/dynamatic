@@ -463,8 +463,8 @@ architecture arch of cmpf_vitis_hls_wrapper is
     signal din1_buf1   : std_logic_vector(32 - 1 downto 0);
     signal opcode_buf1 : std_logic_vector(4 downto 0);
     signal ce_r      : std_logic;
-    signal dout_i    : std_logic_vector(32 - 1 downto 0);
-    signal dout_r    : std_logic_vector(32 - 1 downto 0);
+    signal dout_i    : std_logic_vector(1 - 1 downto 0);
+    signal dout_r    : std_logic_vector(1 - 1 downto 0);
 begin
     --------------------- Instantiation -----------------
     cmpf_vitis_hls_single_precision_lat_0_u : entity work.cmpf_vitis_hls_single_precision_lat_0
