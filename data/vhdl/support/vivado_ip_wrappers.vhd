@@ -2024,7 +2024,7 @@ begin
       dout_TYPE => 32)
     port map(
       clk   => clk,
-      reset => rst,
+      reset => reset,
       ce    => ce,
       din0  => din0,
       din1  => din1,
@@ -2078,7 +2078,7 @@ begin
       dout_TYPE => 32)
     port map(
       clk   => clk,
-      reset => rst,
+      reset => reset,
       ce    => ce,
       din0  => din0,
       din1  => din1,
