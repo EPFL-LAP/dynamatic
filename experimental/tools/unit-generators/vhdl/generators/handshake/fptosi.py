@@ -2,6 +2,8 @@ from generators.support.arith1 import generate_arith1
 
 
 def generate_fptosi(name, params):
+    latency = params["latency"]
+
     signals = f"""
   signal converted : std_logic_vector(32 - 1 downto 0);
   signal q0 : std_logic_vector(32 - 1 downto 0);
@@ -44,5 +46,5 @@ def generate_fptosi(name, params):
         signals=signals,
         body=body,
         extra_signals=params.get("extra_signals", None),
-        latency=5
+        latency=latency
     )

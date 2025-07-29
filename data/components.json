@@ -2040,6 +2040,65 @@
       }
     }
   },
+  "handshake.fptosi": {
+    "latency": {
+      "64": {
+        "1.190": 6.0
+      }
+    },
+    "delay": {
+      "data": {
+        "64": 0.0
+      },
+      "valid": {
+        "1": 0.0
+      },
+      "ready": {
+        "1": 1.121
+      },
+      "VR": 0,
+      "CV": 0,
+      "CR": 0,
+      "VC": 0,
+      "VD": 0
+    },
+    "inport": {
+      "delay": {
+        "data": {
+          "64": 0
+        },
+        "valid": {
+          "1": 0
+        },
+        "ready": {
+          "1": 0
+        },
+        "VR": 0,
+        "CV": 0,
+        "CR": 0,
+        "VC": 0,
+        "VD": 0
+      }
+    },
+    "outport": {
+      "delay": {
+        "data": {
+          "64": 0
+        },
+        "valid": {
+          "1": 0
+        },
+        "ready": {
+          "1": 0
+        },
+        "VR": 0,
+        "CV": 0,
+        "CR": 0,
+        "VC": 0,
+        "VD": 0
+      }
+    }
+  },
   "handshake.maximumf.flopoco": {
     "latency": {
       "64": {
