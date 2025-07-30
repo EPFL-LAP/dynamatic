@@ -171,10 +171,13 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // Try to find a matching component
     RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
-      extOp->emitError("Failed to find matching RTL component for external module");
-      llvm::errs() << extOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME) << "\n";
-      llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME) << "\n";
-      return failure();
+      extOp->emitError(
+          "Failed to find matching RTL component for external module");
+      llvm::errs() << extOp->getAttrOfType<DictionaryAttr>(
+                          RTL_PARAMETERS_ATTR_NAME)
+                   << "\n";
+      llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME)
+                   << "\n";
     }
     // If match is not external, it must be freed when function returns
     // we don't like this solution, feel free to propose a better one

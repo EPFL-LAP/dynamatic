@@ -286,7 +286,6 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-
   LogicalResult gotBitwidth =
       registerBitwidthParameter(modOp, modName, modType);
   LogicalResult gotExtraSignals =
@@ -379,7 +378,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.source" || modName == "mem_controller" ||
              modName == "handshake.truncf" || modName == "handshake.extf" ||
-             modName == "handshake.maximumf" || 
+             modName == "handshake.maximumf" ||
              modName == "handshake.minimumf" || modName == "handshake.join") {
     // Skip
   } else {
@@ -389,7 +388,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
   return success();
 }
 
-LogicalResult 
+LogicalResult
 RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                              llvm::StringRef modName,
                                              hw::ModuleType &modType) {

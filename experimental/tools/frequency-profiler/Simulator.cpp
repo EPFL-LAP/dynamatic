@@ -492,7 +492,6 @@ LogicalResult StdExecuter::execute(mlir::arith::NegFOp, std::vector<Any> &in,
   return success();
 }
 
-
 LogicalResult StdExecuter::execute(mlir::arith::RemFOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = any_cast<APFloat>(in[0]).mod(any_cast<APFloat>(in[1]));
