@@ -2042,7 +2042,9 @@
   },
   "handshake.fptosi": {
     "latency": {
-      "64": 5.0
+      "64": {
+        "1.190": 5.0
+      }
     },
     "delay": {
       "data": {
