@@ -232,6 +232,7 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
     Gets the operation latency as an integer.
   }], "FailureOr<int64_t>", "getLatency", (ins), [{
     Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<IntegerAttr>("latency");
     if (!attr)
       return failure();
     return attr.getInt();
