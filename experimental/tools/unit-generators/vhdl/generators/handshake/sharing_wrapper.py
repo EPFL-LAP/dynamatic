@@ -132,8 +132,8 @@ def _generate_sharing_wrapper(name,
     ENDREPLICATE i:group_size
 
     REPLICATE i:group_size
-      signal credit[i]_out1_valid : std_logic;
-      signal credit[i]_out1_ready : std_logic;
+      signal credit[i]_out0_valid : std_logic;
+      signal credit[i]_out0_ready : std_logic;
     ENDREPLICATE i:group_size
 
 
