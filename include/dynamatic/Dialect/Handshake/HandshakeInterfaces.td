@@ -233,7 +233,8 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
   }], "int64_t", "getLatency", (ins), [{
     Operation *op = $_op.getOperation();
     auto attr = op->getAttrOfType<mlir::IntegerAttr>("latency");
-    assert(attr && "Missing 'latency' attribute");
+    if (!attr)
+      return op->emitError() << "Missing required 'latency' attribute";
     return attr.getInt();
   }]>,
 
