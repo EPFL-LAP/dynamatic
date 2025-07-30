@@ -280,11 +280,20 @@
   },
   {
     "name": "handshake.sharing_wrapper",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper",
   },
     {
     "name": "handshake.lazy_fork",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t lazy_fork"
+    "parameters": [
+      {
+        "name": "SIZE",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t lazy_fork -p size=$SIZE bitwidth=$BITWIDTH",
+    "dependencies": [
+      "types"
+    ]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
