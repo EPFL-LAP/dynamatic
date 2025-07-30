@@ -132,6 +132,12 @@ $LLVM_BINS/opt -S \
   $OUT/clang_optimized_polly_canonicalized.ll \
   > $OUT/clang_array_partitioned.ll
 
+# Clean up the index calculation logic inserted by the array-partition pass
+$LLVM_BINS/opt -S \
+  -passes="instcombine" \
+  $OUT/clang_array_partitioned.ll \
+  > $OUT/clang_array_partitioned_cleaned.ll
+
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
@@ -152,7 +158,7 @@ $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
   -polly-process-unprofitable \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
-  $OUT/clang_array_partitioned.ll \
+  $OUT/clang_array_partitioned_cleaned.ll \
   > $OUT/clang_optimized_dep_marked.ll
 
 $LLVM_BINS/mlir-translate \
