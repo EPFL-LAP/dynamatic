@@ -3,6 +3,7 @@ from generators.support.utils import ExtraSignals
 from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 from generators.support.delay_buffer import generate_delay_buffer
 
+
 def generate_unary(
     name: str,
     modType: str,

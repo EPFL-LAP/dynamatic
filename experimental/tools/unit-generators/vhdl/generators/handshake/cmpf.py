@@ -1,6 +1,7 @@
 from generators.support.arith2 import generate_arith2
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
+
 def generate_cmpf(name, params):
     predicate = params["predicate"]
     impl = params["fpu_impl"]
@@ -36,7 +37,6 @@ def generate_cmpf(name, params):
 ##################################################
 #                 Flopoco
 ##################################################
-
 
 
 def _get_flopoco_signals(bitwidth):

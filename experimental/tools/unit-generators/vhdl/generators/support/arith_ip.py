@@ -1,5 +1,6 @@
 from generators.support.arith2 import generate_arith2
 
+
 def generate_flopoco_ip_wrapper(name,
                                 mod_type,
                                 core_unit,
@@ -65,12 +66,13 @@ def generate_flopoco_ip_wrapper(name,
         body=body,
         latency=latency,
         extra_signals=extra_signals
-        )
+    )
+
 
 def generate_vivado_ip_wrapper(name,
-                                mod_type,
-                                latency,
-                                extra_signals):
+                               mod_type,
+                               latency,
+                               extra_signals):
 
     body = f"""
   {mod_type}_vitis_hls_wrapper_U1 : entity work.{mod_type}_vitis_hls_wrapper
@@ -91,4 +93,4 @@ def generate_vivado_ip_wrapper(name,
         body=body,
         latency=latency,
         extra_signals=extra_signals
-        )
+    )

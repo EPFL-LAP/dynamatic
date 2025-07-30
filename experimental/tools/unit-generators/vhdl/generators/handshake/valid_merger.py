@@ -10,8 +10,8 @@ def generate_valid_merger(name, params):
     lhs_extra_signals = params.get("lhs_extra_signals", None)
     rhs_extra_signals = params.get("rhs_extra_signals", None)
 
-    generate_inner = lambda name : _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth)
-    generate = lambda : generate_inner(name)
+    def generate_inner(name): return _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth)
+    def generate(): return generate_inner(name)
 
     if lhs_extra_signals or rhs_extra_signals:
         return _generate_valid_merger_signal_manager(

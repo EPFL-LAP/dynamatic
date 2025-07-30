@@ -2,6 +2,7 @@ from generators.handshake.cmpf import generate_cmpf
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 from generators.support.signal_manager import generate_arith2_signal_manager
 
+
 def generate_minimumf(name, params):
     latency = params["latency"]
 
@@ -19,8 +20,8 @@ def generate_minimumf(name, params):
             raise ValueError("is_double was missing for generating a flopoco minimumf")
         bitwidth = 64 if is_double else 32
 
-    generate_inner = lambda name : _generate_minimumf(name, params, bitwidth)
-    generate = lambda : generate_inner(name)
+    def generate_inner(name): return _generate_minimumf(name, params, bitwidth)
+    def generate(): return generate_inner(name)
 
     if extra_signals:
         return generate_arith2_signal_manager(

@@ -4,6 +4,7 @@ import sys
 
 import importlib
 
+
 class Generators():
     def __init__(self):
         self._data = {}
@@ -76,7 +77,6 @@ generators.add("handshake", "rigidifier")
 generators.add("handshake", "valid_merger")
 generators.add("handshake", "top_join")
 generators.add("handshake", "remsi")
-
 
 
 def parse_parameters(param_list):

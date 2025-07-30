@@ -1,6 +1,7 @@
 from generators.support.arith_ip import generate_flopoco_ip_wrapper, generate_vivado_ip_wrapper
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
+
 def generate_divf(name, params):
     impl = params["fpu_impl"]
     latency = params["latency"]
@@ -10,7 +11,6 @@ def generate_divf(name, params):
     # only used for flopoco
     is_double = params.get("is_double", None)
     internal_delay = params.get("internal_delay", None)
-
 
     mod_type = "divf"
 
