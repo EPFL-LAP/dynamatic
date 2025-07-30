@@ -75,6 +75,7 @@ generators.add("handshake", "fptosi")
 generators.add("handshake", "rigidifier")
 generators.add("handshake", "valid_merger")
 generators.add("handshake", "top_join")
+generators.add("handshake", "remsi")
 
 
 
