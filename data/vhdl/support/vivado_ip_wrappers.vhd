@@ -1989,7 +1989,6 @@ entity sdiv_32ns_32ns_32_36_seq_1_divseq is
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
-        start       : in  STD_LOGIC;
         dividend    : in  STD_LOGIC_VECTOR(32-1 downto 0);
         divisor     : in  STD_LOGIC_VECTOR(32-1 downto 0);
         sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
@@ -2026,11 +2025,9 @@ begin
   tran0_proc : process (clk)
   begin
       if (clk'event and clk='1') then
-          if (start = '1') then
-              dividend0 <= UNSIGNED(dividend);
-              divisor0  <= UNSIGNED(divisor);
-              sign0     <= UNSIGNED(sign_i);
-          end if;
+        dividend0 <= UNSIGNED(dividend);
+        divisor0  <= UNSIGNED(divisor);
+        sign0     <= UNSIGNED(sign_i);
       end if;
   end process;
 
@@ -2042,7 +2039,7 @@ begin
           if reset = '1' then
               r_stage <= (others => '0'); 
           elsif (ce = '1') then
-              r_stage <= r_stage(32-1 downto 0) & start;
+              r_stage <= r_stage(32-1 downto 0);
           end if;
       end if;
   end process;
@@ -2081,7 +2078,6 @@ entity divsi_vitis_hls_wrapper is
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
-        start       : in  STD_LOGIC;
         done        : out STD_LOGIC;
         din0        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
         din1        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
@@ -2094,7 +2090,6 @@ architecture arch of divsi_vitis_hls_wrapper is
             reset       : in  STD_LOGIC;
             clk         : in  STD_LOGIC;
             ce          : in  STD_LOGIC;
-            start       : in  STD_LOGIC;
             done        : out STD_LOGIC;
             dividend    : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
             divisor     : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
@@ -2104,7 +2099,6 @@ architecture arch of divsi_vitis_hls_wrapper is
             remd        : out STD_LOGIC_VECTOR(32 - 1 downto 0));
     end component;
 
-    signal start0     : STD_LOGIC := '0';
     signal done0      : STD_LOGIC;
     signal dividend0  : STD_LOGIC_VECTOR(32 - 1 downto 0);
     signal divisor0   : STD_LOGIC_VECTOR(32 - 1 downto 0);
@@ -2122,7 +2116,6 @@ begin
             clk         => clk,
             reset       => reset,
             ce          => ce,
-            start       => start0,
             done        => done0,
             dividend    => dividend_u,
             divisor     => divisor_u,
@@ -2141,7 +2134,6 @@ begin
         if (ce = '1') then
             dividend0 <= din0;
             divisor0 <= din1;
-            start0 <= start;
         end if;
     end if;
 end process;
@@ -2252,7 +2244,6 @@ entity srem_32ns_32ns_32_36_seq_1_divseq is
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
-        start       : in  STD_LOGIC;
         dividend    : in  STD_LOGIC_VECTOR(32-1 downto 0);
         divisor     : in  STD_LOGIC_VECTOR(32-1 downto 0);
         sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
@@ -2289,11 +2280,9 @@ begin
   tran0_proc : process (clk)
   begin
       if (clk'event and clk='1') then
-          if (start = '1') then
-              dividend0 <= UNSIGNED(dividend);
-              divisor0  <= UNSIGNED(divisor);
-              sign0     <= UNSIGNED(sign_i);
-          end if;
+            dividend0 <= UNSIGNED(dividend);
+            divisor0  <= UNSIGNED(divisor);
+            sign0     <= UNSIGNED(sign_i);
       end if;
   end process;
 
@@ -2305,7 +2294,7 @@ begin
           if reset = '1' then
               r_stage <= (others => '0'); 
           elsif (ce = '1') then
-              r_stage <= r_stage(32-1 downto 0) & start;
+              r_stage <= r_stage(32-1 downto 0);
           end if;
       end if;
   end process;
@@ -2344,7 +2333,6 @@ entity remsi_vitis_hls_wrapper is
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
-        start       : in  STD_LOGIC;
         done        : out STD_LOGIC;
         din0        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
         din1        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
@@ -2352,7 +2340,6 @@ entity remsi_vitis_hls_wrapper is
 end entity;
 
 architecture arch of remsi_vitis_hls_wrapper is
-    signal start0     : STD_LOGIC := '0';
     signal done0      : STD_LOGIC;
     signal dividend0  : STD_LOGIC_VECTOR(32 - 1 downto 0);
     signal divisor0   : STD_LOGIC_VECTOR(32 - 1 downto 0);
@@ -2370,7 +2357,6 @@ begin
             clk         => clk,
             reset       => reset,
             ce          => ce,
-            start       => start0,
             done        => done0,
             dividend    => dividend_u,
             divisor     => divisor_u,
@@ -2389,7 +2375,6 @@ begin
         if (ce = '1') then
             dividend0 <= din0;
             divisor0 <= din1;
-            start0 <= start;
         end if;
     end if;
 end process;
