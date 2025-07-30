@@ -21,7 +21,6 @@ def generate_sharing_wrapper(name, params):
 def _generate_sharing_wrapper(name,
                               bitwidth,
                               num_shared_operands,
-                              group_size,
                               latency,
                               list_of_credits
                               ):
