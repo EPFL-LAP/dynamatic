@@ -266,7 +266,7 @@ ENDREPLICATE i:group_size
           outs(1) => out_fork[i]_out1_data,
           outs_valid(0) => out_fork[i]_out0_valid,
           outs_valid(1) => out_fork[i]_out1_valid,
-          outs_ready(0) => op[i]_out0_ready,
+          outs_ready(0) => op[i]out0_ready,
           outs_ready(1) => out_fork[i]_out1_ready
         );
 
