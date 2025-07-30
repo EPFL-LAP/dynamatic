@@ -7,20 +7,20 @@ from generators.handshake.lazy_fork import generate_lazy_fork
 
 def generate_sharing_wrapper(name, params):
     bitwidth = params["bitwidth"]
-    num_input_operands = params["num_input_operands"]
+    num_shared_operands = params["num_shared_operands"]
     latency = params["latency"]
     list_of_credits = params["credits"]
 
     return _generate_sharing_wrapper(name,
                                       bitwidth,
-                                      num_input_operands,
+                                      num_shared_operands,
                                       latency,
                                       list_of_credits)
 
 
 def _generate_sharing_wrapper(name,
                               bitwidth,
-                              num_input_operands,
+                              num_shared_operands,
                               group_size,
                               latency,
                               list_of_credits
@@ -32,9 +32,9 @@ def _generate_sharing_wrapper(name,
     group_size = len(list_of_credits)
 
     replication_factors = {}
-    replication_factors["num_input_operands"] = num_input_operands
+    replication_factors["num_shared_operands"] = num_shared_operands
     replication_factors["group_size"] = group_size
-    replication_factors["num_input_operands_1"] = num_input_operands + 1
+    replication_factors["num_shared_operands_1"] = num_shared_operands + 1
 
 
     or_name = f"{name}_or"
@@ -62,11 +62,11 @@ def _generate_sharing_wrapper(name,
         rst        : in std_logic;
 
     REPLICATE i:num_credits
-    REPLICATE j:num_input_operands
+    REPLICATE j:num_shared_operands
         op[i]in[j]       : in std_logic_vector({bitwidth} - 1 downto 0);
         op[i]in[j]_valid : in std_logic;
         op[i]in[j]_ready : out std_logic;
-    ENDREPLICATE j:num_input_operands
+    ENDREPLICATE j:num_shared_operands
     ENDREPLICATE i:num_credits
         fromSharedUnitOut0 : in std_logic_vector({bitwidth} - 1 downto 0);
         fromSharedUnitOut0_valid : in std_logic;
@@ -78,11 +78,11 @@ def _generate_sharing_wrapper(name,
         op[i]out0_ready : in std_logic;
     ENDREPLICATE i:num_credits
 
-    REPLICATE i:num_input_operands
+    REPLICATE i:num_shared_operands
         toSharedUnitIn[i] : out std_logic_vector({bitwidth} - 1 downto 0);
         toSharedUnitIn[i]_valid : out std_logic;
         toSharedUnitIn[i]_ready : out std_logic;
-    ENDREPLICATE i:num_input_operands
+    ENDREPLICATE i:num_shared_operands
 
 
     end entity;
@@ -94,15 +94,15 @@ def _generate_sharing_wrapper(name,
     architecture = f"""
     architecture arch of {name} is
     REPLICATE i:group_size
-    REPLICATE j:num_input_operands
+    REPLICATE j:num_shared_operands
       signal sync[i]_out[j]_data : std_logic_vector({bitwidth} - 1 downto 0);
-    ENDREPLICATE j:num_input_operands
+    ENDREPLICATE j:num_shared_operands
       signal sync[i]_out0_valid : std_logic;
     ENDREPLICATE i:group_size
 
-    REPLICATE i:num_input_operands
+    REPLICATE i:num_shared_operands
       signal mux[i]_out0_data : std_logic_vector({bitwidth} - 1 downto 0);
-    ENDREPLICATE i:num_input_operands
+    ENDREPLICATE i:num_shared_operands
 
     REPLICATE i:group_size
       signal branch0_out[i]_data : std_logic_vector({bitwidth} - 1 downto 0);
@@ -143,32 +143,32 @@ def _generate_sharing_wrapper(name,
     REPLICATE i:group_size
       sync[i] : entity work.crush_sync(arch)
         generic map(
-          NUM_OPERANDS => {num_input_operands + 1},
+          NUM_OPERANDS => {num_shared_operands + 1},
           DATA_WIDTH   => {bitwidth}
         )
         port map(
-    REPLICATE j:num_input_operands
+    REPLICATE j:num_shared_operands
           ins([j]) => op[i]in[j],
-    ENDREPLICATE j:num_input_operands
-          ins({num_input_operands}) => (others => '0'),
-    REPLICATE j:num_input_operands
+    ENDREPLICATE j:num_shared_operands
+          ins({num_shared_operands}) => (others => '0'),
+    REPLICATE j:num_shared_operands
           ins_valid([j]) => op[i]in[j]_valid,
-    ENDREPLICATE j:num_input_operands
-          ins_valid({num_input_operands}) => credit[i]_out0_valid,
-    REPLICATE j:num_input_operands
+    ENDREPLICATE j:num_shared_operands
+          ins_valid({num_shared_operands}) => credit[i]_out0_valid,
+    REPLICATE j:num_shared_operands
           ins_ready([j]) => op[i]in[j]_ready,
-    ENDREPLICATE j:num_input_operands
-          ins_ready({num_input_operands}) => credit[i]_out0_ready,
-    REPLICATE j:num_input_operands_1
+    ENDREPLICATE j:num_shared_operands
+          ins_ready({num_shared_operands}) => credit[i]_out0_ready,
+    REPLICATE j:num_shared_operands_1
           outs([j]) => sync[i]_out[j]_data,
-    ENDREPLICATE j:num_input_operands_1
+    ENDREPLICATE j:num_shared_operands_1
           outs_valid => sync[i]_out0_valid,
           outs_ready => arbiter_out([i])
         );
 
     ENDREPLICATE i:group_size
 
-    REPLICATE i:num_input_operands
+    REPLICATE i:num_shared_operands
       mux[i] : entity work.crush_oh_mux(arch)
         generic map(
           MUX_WIDTH  => {group_size},
@@ -182,7 +182,7 @@ def _generate_sharing_wrapper(name,
           outs => mux[i]_out0_data
         );
 
-    ENDREPLICATE i:num_input_operands
+    ENDREPLICATE i:num_shared_operands
 
       arbiter : entity work.bitscan(arch)
         generic map(
@@ -203,11 +203,11 @@ def _generate_sharing_wrapper(name,
           outs => arbiter_out_valid
         );
 
-    REPLICATE i:num_input_operands
+    REPLICATE i:num_shared_operands
       toSharedUnitIn[i] <= mux[i]_out0_data;
       toSharedUnitIn[i]_valid <= arbiter_out_valid;
 
-    ENDREPLICATE i:num_input_operands
+    ENDREPLICATE i:num_shared_operands
       cond_buffer : entity work.{buff_name}(arch)
         port map(
           clk => clk,
