@@ -119,11 +119,15 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
   path.push_back(start);
   // The current block has been visited
   visited.insert(start);
-
+  llvm::errs() <<"\nDFS from :"; start->printAsOperand(llvm::errs());
+llvm::errs() <<"\nblockToTraverse:";
+if (blockToTraverse)blockToTraverse->printAsOperand(llvm::errs());
+llvm::errs() <<"\n";
   bool blockFound = (!blockToTraverse || start == blockToTraverse);
 
   // If we are at the end of the path, then add it to the list of paths
-  if (start == end && (blockFound || blockToTraverseFound)) {
+  if (start == end && path.size() > 1 && (blockFound || blockToTraverseFound)) {
+    llvm::errs() <<"\neshgh\n";
     allPaths.push_back(path);
   } else {
     // Else, for each successor which was not visited, run DFS again
@@ -141,7 +145,8 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       if (incorrectPath)
         continue;
 
-      if (!visited.count(successor)) {
+      if (!visited.count(successor) || successor== end ) {
+        llvm::errs() <<"\nsuccessor :"; successor->printAsOperand(llvm::errs());
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
                     blocksToAvoid, bi, blockFound || blockToTraverseFound);
       }
