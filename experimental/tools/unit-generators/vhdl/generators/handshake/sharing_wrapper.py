@@ -226,11 +226,15 @@ def _generate_sharing_wrapper(name,
           ins => fromSharedUnitOut0,
           ins_valid => fromSharedUnitOut0_valid,
           ins_ready => fromSharedUnitOut0_ready,
-    REPLICATE i:group_size
+REPLICATE i:group_size
           outs([i]) => branch0_out[i]_data,
+ENDREPLICATE i:group_size
+REPLICATE i:group_size
           outs_valid([i]) => branch0_out[i]_valid,
+ENDREPLICATE i:group_size
+REPLICATE i:group_size
           outs_ready([i]) => branch0_out[i]_ready,
-    ENDREPLICATE i:group_size
+ENDREPLICATE i:group_size
           sel => cond_buffer_out0_data,
           sel_valid => cond_buffer_out0_valid,
           sel_ready => cond_buffer_out0_ready
