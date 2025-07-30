@@ -283,7 +283,7 @@
     "parameters":[
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH, num_shared_operands=$NUM_SHARED_OPERANDS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH, num_input_operands=$NUM_SHARED_OPERANDS"
   },
     {
     "name": "handshake.lazy_fork",
