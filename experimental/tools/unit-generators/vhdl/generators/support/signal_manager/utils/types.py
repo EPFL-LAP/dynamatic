@@ -1,7 +1,5 @@
 from typing import TypedDict, NotRequired
-
-# Define the type for extra signals, which are stored as a dictionary with signal names and their bitwidths.
-ExtraSignals = dict[str, int]
+from generators.support.utils import ExtraSignals
 
 
 class Channel(TypedDict):
