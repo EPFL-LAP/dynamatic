@@ -88,7 +88,6 @@ def _generate_sharing_wrapper(name,
     """
 
     expanded_entity = expand_replications(entity, replication_factors)
-    print(expanded_entity)
 
     architecture = f"""
     architecture arch of {name} is
