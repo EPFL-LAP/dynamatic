@@ -178,7 +178,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
                    << "\n";
       llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME)
                    << "\n";
-      return failed()
+      return failure();
     }
     // If match is not external, it must be freed when function returns
     // we don't like this solution, feel free to propose a better one
