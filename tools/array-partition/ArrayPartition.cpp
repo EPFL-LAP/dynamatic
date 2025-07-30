@@ -1,6 +1,6 @@
-#include "polly/DependenceInfo.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
+#include "polly/Support/ISLTools.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -174,6 +174,8 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     return PreservedAnalyses::all();
   }
 
+  auto islCtx = isl::ctx(isl_ctx_alloc());
+
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
 
   auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
@@ -295,8 +297,9 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         boost::connected_components(g, &nodeToComponentId[0]);
 
     for (size_t i = 1; i < numComponents; i++) {
-      // Calculate the range of indices
-      isl::set range;
+      // Make an empty set (note: somehow if you just do "isl::union_set range;"
+      // it wouldn't work)
+      isl::union_set range = isl::union_set::empty(islCtx);
       for (size_t j = 0; j < nodeToComponentId.size(); j++) {
         if (nodeToComponentId[j] == static_cast<int>(i)) {
           auto *inst = vertexToInst[boost::vertex(j, g)];
@@ -305,8 +308,11 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         }
       }
       // Enumerate points
+
+      llvm::errs() << "Enumerating points! with num dims\n";
+      dumpPw(range);
       range.foreach_point([](isl::point p) {
-        // std::cout << p.to_str() << std::endl;
+        llvm::errs() << "A point!\n";
         return isl::stat::ok();
       });
 
