@@ -712,7 +712,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
     if(failed(latency)){
       op->emitError() << "Missing required latency value on operation";
       unsupported = true;
-      return
+      return;
     }
     addUnsigned("LATENCY", latency.value());
   }
