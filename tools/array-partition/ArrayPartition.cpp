@@ -167,8 +167,6 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
     gep->setOperand(0, newBasePtr);
   }
 
-  Instruction *insertPoint = gep->getPrevNode();
-  IRBuilder<> builder(insertPoint);
   gep->setSourceElementType(newArrayType);
 
   // NOTE:
@@ -178,9 +176,14 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
   // Example: A[3][4][5]
   // - Info goes from 5 -> 4 -> 3
   // - GEP indices go from 3 -> 4 -> 5
+  llvm::errs() << "Changing GEP operands for " << *gep << "\n";
   for (unsigned i = 0; i < info.size(); i++) {
     auto [firstIndex, step, elems] = info[info.size() - i - 1];
-    auto *indexOprd = gep->idx_begin() + i;
+
+    llvm::errs() << "i " << i << " firstIndex " << firstIndex << " step "
+                 << step << " elems " << elems << "\n";
+
+    auto *indexOprd = gep->idx_begin() + i + 1;
     if (i < gep->getNumOperands() - 1) {
       // If we have enough indices, change the index
       auto *index = (*indexOprd).get();
@@ -189,6 +192,8 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
         int64_t newIdx = (oldIdx - firstIndex) / step;
         *indexOprd = ConstantInt::get(constInt->getType(), newIdx);
       } else if (auto *gepIndex = dyn_cast<Value>(index)) {
+
+        IRBuilder<> builder(gep);
         auto *subOutput = builder.CreateSub(
             gepIndex, ConstantInt::get(gepIndex->getType(), firstIndex));
         auto *divOutput = builder.CreateUDiv(
@@ -251,6 +256,8 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
       return isl::stat::ok();
     });
     llvm::errs() << "Number of indices! " << reachableIndices.size() << "\n";
+
+    llvm::errs() << "Dim " << i << " has " << reachableIndices.size() << "\n";
 
     assert(reachableIndices.size() <= originalDimSize &&
            "The number of reachable indices should not exceed the original "
