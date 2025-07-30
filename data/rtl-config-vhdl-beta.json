@@ -309,5 +309,8 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
   }
 ]
