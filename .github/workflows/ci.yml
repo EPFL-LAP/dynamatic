@@ -56,7 +56,7 @@ jobs:
 
       - name: build
         if: success() || failure()
-        run: ./build.sh --release
+        run: ./build.sh --release --force
 
       - name: check-dynamatic
         if: success() || failure()

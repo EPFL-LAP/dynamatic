@@ -1,5 +1,6 @@
 # Dynamatic's High Level Synthesis Flow
-> Flow script [compile.sh](../../../tools/dynamatic/scripts/compile.sh)
+
+> Flow script [compile.sh](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials/Introduction)
 
 ## Diagram of the Overall Compilation Flow
 ![HLS Flow Diagram](Figures/Compilation_flow.svg)

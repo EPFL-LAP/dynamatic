@@ -6,7 +6,7 @@ There are currently two ways to setup and use Dynamatic
 We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [Build instructions](#build-instructions) below. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distributions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 **2. Use the Provided Virtual Machine**  
-We provide an [Ubuntu-based Virtual Machine](VMSetup.md) (VM) that already has Dynamatic and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md)) or as a starting point to use/[modify](../DeveloperGuide/CreatingPasses/CreatingPasses.md) Dynamatic in general.  
+We provide an [Ubuntu-based Virtual Machine](./VMSetup.md) (VM) that already has Dynamatic and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md)) or as a starting point to use/[modify](../DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/CreatingPassesTutorial.md) Dynamatic in general.  
 
 ### Build Instructions
 The following instructions can be used to setup Dynamatic from source.  
@@ -70,7 +70,7 @@ You can now launch the Dynamatic front-end from Dynamatic's top level directory 
 ```sh
 ./bin/dynamatic
 ```
-With Dynamatic correctly installed, you can browse the [using dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md) tutorial to learn how to use the basic [commands and features](../UserGuide/CommandReference.md#dynamatic-shell-commands) in Dynamatic to convert your C code into RTL.  
+With Dynamatic correctly installed, you can browse the [using dynamatic](../GettingStarted/Tutorials/Introduction/Introduction.md) tutorial to learn how to use the basic commands and features in Dynamatic to convert your C code into RTL.  
 You can also explore the [Advanced build](../UserGuide/AdvancedBuild.md) options.
 
 [Go to top of the page](#setting-up-dynamatic)

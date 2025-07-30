@@ -647,13 +647,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", bitwidth);
       })
       .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
-            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
-            handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
-            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
-            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp>([&](auto) {
+            handshake::DivFOp, handshake::RemSIOp, handshake::DivSIOp,
+            handshake::DivUIOp, handshake::MaximumFOp, handshake::MinimumFOp,
+            handshake::MulFOp, handshake::MulIOp, handshake::NegFOp,
+            handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
+            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
+            handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
+            handshake::FPToSIOp, handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -1847,6 +1847,7 @@ public:
                     ConvertToHWInstance<handshake::DivFOp>,
                     ConvertToHWInstance<handshake::DivSIOp>,
                     ConvertToHWInstance<handshake::DivUIOp>,
+                    ConvertToHWInstance<handshake::RemSIOp>,
                     ConvertToHWInstance<handshake::ExtSIOp>,
                     ConvertToHWInstance<handshake::ExtUIOp>,
                     ConvertToHWInstance<handshake::MulFOp>,
