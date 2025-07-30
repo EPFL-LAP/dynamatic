@@ -230,11 +230,10 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
  let methods = [
   InterfaceMethod<[{
     Gets the operation latency as an integer.
-  }], "int64_t", "getLatency", (ins), [{
+  }], "FailureOr<int64_t>", "getLatency", (ins), [{
     Operation *op = $_op.getOperation();
-    auto attr = op->getAttrOfType<mlir::IntegerAttr>("latency");
     if (!attr)
-      return op->emitError() << "Missing required 'latency' attribute";
+      return failure();
     return attr.getInt();
   }]>,
 
