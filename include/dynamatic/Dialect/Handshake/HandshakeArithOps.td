@@ -278,7 +278,12 @@ def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
     let summary = "Signed integer division.";
 }
 
-def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi"> {
+def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
+  IsIntSizedChannel<32, "lhs">,
+  IsIntSizedChannel<32, "rhs">,
+  IsIntSizedChannel<32, "result">,
+  LatencyInterface
+]> {
   let summary = "Signed integer remainder.";
 }
 
