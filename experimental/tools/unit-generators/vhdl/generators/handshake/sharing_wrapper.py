@@ -45,7 +45,7 @@ def _generate_sharing_wrapper(name,
                   generate_lazy_fork(lazy_fork_name, {"size": 2, "bitwidth": bitwidth})
 
     for i, num_credits in enumerate(list_of_credits):
-        dependencies += generate_fifo_break_none(f"{name}_fifo_break_none_{i}", {"slots": num_credits, "bitwidth": bitwidth})
+        dependencies += generate_fifo_break_none(f"{name}_fifo_break_none_{i}", {"num_slots": num_credits, "bitwidth": bitwidth})
 
 
     entity = f"""
