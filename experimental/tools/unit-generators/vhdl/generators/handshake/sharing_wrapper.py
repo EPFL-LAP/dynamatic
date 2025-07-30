@@ -9,7 +9,7 @@ def generate_sharing_wrapper(name, params):
     bitwidth = params["bitwidth"]
     num_shared_operands = params["num_shared_operands"]
     latency = params["latency"]
-    list_of_credits = params["credits"]
+    list_of_credits = params["credits"].split()
 
     return _generate_sharing_wrapper(name,
                                       bitwidth,
