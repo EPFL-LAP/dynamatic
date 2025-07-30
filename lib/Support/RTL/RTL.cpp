@@ -390,8 +390,9 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
 
 LogicalResult
 RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
-                                             llvm::StringRef modName,
-                                             hw::ModuleType &modType) {
+                                        llvm::StringRef modName,
+                                        hw::ModuleType &modType) {
+
   if (
       // default (AllExtraSignalsMatch)
       modName == "handshake.addf" || modName == "handshake.addi" ||

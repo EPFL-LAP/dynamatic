@@ -202,8 +202,10 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // Parameter analysis
     // TODO: Do this at the HW-level analysis
     if (extOp)
-      if(match->registerParameters(extOp).failed()){
-        llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME) << "\n";
+      if (match->registerParameters(extOp).failed()) {
+        llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME)
+                     << "\n";
+
         return failure();
       }
 

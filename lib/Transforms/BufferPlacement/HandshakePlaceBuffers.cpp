@@ -182,7 +182,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
             llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
       double latency;
       if (!failed(
-        timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
+              timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
 
         int64_t latency_int = static_cast<int64_t>(latency);
         latencyInterface.setLatency(latency_int);
@@ -190,7 +190,6 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
         op->emitError("Failed to get latency from timing model");
         return signalPassFailure();
       }
-
     }
   });
 }
