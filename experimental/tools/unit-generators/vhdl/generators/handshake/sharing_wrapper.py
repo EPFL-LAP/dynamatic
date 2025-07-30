@@ -92,9 +92,9 @@ def _generate_sharing_wrapper(name,
     architecture = f"""
     architecture arch of {name} is
     REPLICATE i:group_size
-    REPLICATE j:num_shared_operands
+    REPLICATE j:num_shared_operands_1
       signal sync[i]_out[j]_data : std_logic_vector({bitwidth} - 1 downto 0);
-    ENDREPLICATE j:num_shared_operands
+    ENDREPLICATE j:num_shared_operands_1
       signal sync[i]_out0_valid : std_logic;
     ENDREPLICATE i:group_size
 
