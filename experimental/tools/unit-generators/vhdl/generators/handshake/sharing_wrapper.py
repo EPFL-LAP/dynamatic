@@ -108,7 +108,7 @@ def _generate_sharing_wrapper(name,
       signal branch0_out[i]_ready : std_logic;
     ENDREPLICATE i:group_size
 
-      signal arbiter_out : std_logic_vector({bitwidth} - 1 downto 0);
+      signal arbiter_out : std_logic_vector({group_size} - 1 downto 0);
       signal arbiter_out_valid : std_logic;
 
       signal cond_buffer_out0_data : std_logic_vector({group_size} - 1 downto 0);
