@@ -241,7 +241,7 @@ ENDREPLICATE i:group_size
         );
 
     REPLICATE i:group_size
-      out_buffer[i] : entity work.{name}_one_slot_break_r_[i](arch)
+      out_buffer[i] : entity work.{name}_fifo_break_none_[i](arch)
         port map(
           clk => clk,
           rst => rst,
