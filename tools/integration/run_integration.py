@@ -70,7 +70,7 @@ SCRIPT_CONTENT = (
     + """
 set-src {src_path}
 compile
-write-hdl --hdl vhdl
+write-hdl
 simulate
 exit
 """
