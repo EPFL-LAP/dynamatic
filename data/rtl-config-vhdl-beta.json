@@ -283,9 +283,9 @@
     "parameters":[
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"},
       { "name": "LATENCY", "type": "unsigned"},
-      { "name": "CREDITS", "type": "string", "eq": "hello"}
+      { "name": "CREDITS", "type": "string"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH, num_shared_operands=$NUM_SHARED_OPERANDS latency=$LATENCY"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH, num_shared_operands=$NUM_SHARED_OPERANDS latency=$LATENCY credits=$CREDITS"
   },
     {
     "name": "handshake.lazy_fork",
