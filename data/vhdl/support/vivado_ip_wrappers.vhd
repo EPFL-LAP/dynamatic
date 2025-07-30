@@ -2106,7 +2106,7 @@ begin
         else
             quot <= quot_u;
             remd <= remd_u;
-        endif
+        end if;
     end if;
 end process;
 
@@ -2243,7 +2243,7 @@ begin
         else
             quot <= quot_u;
             remd <= remd_u;
-        endif
+        end if;
     end if;
 end process;
 
