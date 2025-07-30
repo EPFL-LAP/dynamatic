@@ -1985,17 +1985,13 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity sdiv_32ns_32ns_32_36_seq_1_divseq is
-    generic (
-        in0_WIDTH   : INTEGER :=32;
-        in1_WIDTH   : INTEGER :=32;
-        out_WIDTH   : INTEGER :=32);
     port (
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
         start       : in  STD_LOGIC;
-        dividend    : in  STD_LOGIC_VECTOR(in0_WIDTH-1 downto 0);
-        divisor     : in  STD_LOGIC_VECTOR(in1_WIDTH-1 downto 0);
+        dividend    : in  STD_LOGIC_VECTOR(32-1 downto 0);
+        divisor     : in  STD_LOGIC_VECTOR(32-1 downto 0);
         sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
         sign_o      : out STD_LOGIC_VECTOR(1 downto 0);
         done        : out STD_LOGIC;
@@ -2012,18 +2008,16 @@ entity sdiv_32ns_32ns_32_36_seq_1_divseq is
 end entity;
 
 architecture arch of sdiv_32ns_32ns_32_36_seq_1_divseq is
-    constant cal_WIDTH      : INTEGER := max(in0_WIDTH, in1_WIDTH);
-
-    signal dividend0        : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal divisor0         : UNSIGNED(in1_WIDTH-1 downto 0);
+    signal dividend0        : UNSIGNED(32-1 downto 0);
+    signal divisor0         : UNSIGNED(32-1 downto 0);
     signal sign0            : UNSIGNED(1 downto 0);
-    signal dividend_tmp     : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal remd_tmp         : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal dividend_tmp_mux : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal remd_tmp_mux     : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal comb_tmp         : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal cal_tmp          : UNSIGNED(cal_WIDTH downto 0);
-    signal r_stage          : UNSIGNED(in0_WIDTH downto 0);
+    signal dividend_tmp     : UNSIGNED(32-1 downto 0);
+    signal remd_tmp         : UNSIGNED(32-1 downto 0);
+    signal dividend_tmp_mux : UNSIGNED(32-1 downto 0);
+    signal remd_tmp_mux     : UNSIGNED(32-1 downto 0);
+    signal comb_tmp         : UNSIGNED(32-1 downto 0);
+    signal cal_tmp          : UNSIGNED(32 downto 0);
+    signal r_stage          : UNSIGNED(32 downto 0);
 begin
   quot     <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp, out_WIDTH));
   remd     <= STD_LOGIC_VECTOR(RESIZE(remd_tmp, out_WIDTH));
@@ -2083,61 +2077,47 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity divsi_vitis_hls_wrapper is
-    generic (
-        ID   : INTEGER :=1;
-        NUM_STAGE   : INTEGER :=2;
-        din0_WIDTH   : INTEGER :=32;
-        din1_WIDTH   : INTEGER :=32;
-        dout_WIDTH   : INTEGER :=32);
     port (
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
         start       : in  STD_LOGIC;
         done        : out STD_LOGIC;
-        din0        : in  STD_LOGIC_VECTOR(din0_WIDTH-1 downto 0);
-        din1        : in  STD_LOGIC_VECTOR(din1_WIDTH-1 downto 0);
-        dout        : out STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0));
+        din0        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
+        din1        : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
+        dout        : out STD_LOGIC_VECTOR(32 - 1 downto 0));
 end entity;
 
 architecture arch of divsi_vitis_hls_wrapper is
     component sdiv_32ns_32ns_32_36_seq_1_divseq is
-        generic (
-            in0_WIDTH   : INTEGER :=32;
-            in1_WIDTH   : INTEGER :=32;
-            out_WIDTH   : INTEGER :=32);
         port (
             reset       : in  STD_LOGIC;
             clk         : in  STD_LOGIC;
             ce          : in  STD_LOGIC;
             start       : in  STD_LOGIC;
             done        : out STD_LOGIC;
-            dividend    : in  STD_LOGIC_VECTOR(in0_WIDTH-1 downto 0);
-            divisor     : in  STD_LOGIC_VECTOR(in1_WIDTH-1 downto 0);
+            dividend    : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
+            divisor     : in  STD_LOGIC_VECTOR(32 - 1 downto 0);
             sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
             sign_o      : out STD_LOGIC_VECTOR(1 downto 0);
-            quot        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0);
-            remd        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0));
+            quot        : out STD_LOGIC_VECTOR(32 - 1 downto 0);
+            remd        : out STD_LOGIC_VECTOR(32 - 1 downto 0));
     end component;
 
     signal start0     : STD_LOGIC := '0';
     signal done0      : STD_LOGIC;
-    signal dividend0  : STD_LOGIC_VECTOR(din0_WIDTH-1 downto 0);
-    signal divisor0   : STD_LOGIC_VECTOR(din1_WIDTH-1 downto 0);
-    signal dividend_u : STD_LOGIC_VECTOR(din0_WIDTH-1 downto 0);
-    signal divisor_u  : STD_LOGIC_VECTOR(din1_WIDTH-1 downto 0);
-    signal quot_u     : STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0);
-    signal remd_u     : STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0);
-    signal quot       : STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0);
-    signal remd       : STD_LOGIC_VECTOR(dout_WIDTH-1 downto 0);
+    signal dividend0  : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal divisor0   : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal dividend_u : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal divisor_u  : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal quot_u     : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal remd_u     : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal quot       : STD_LOGIC_VECTOR(32 - 1 downto 0);
+    signal remd       : STD_LOGIC_VECTOR(32 - 1 downto 0);
     signal sign_i     : STD_LOGIC_VECTOR(1 downto 0);
     signal sign_o     : STD_LOGIC_VECTOR(1 downto 0);
 begin
-    sdiv_32ns_32ns_32_36_seq_1_divseq_u : sdiv_32ns_32ns_32_36_seq_1_divseq
-        generic map(
-            in0_WIDTH   => din0_WIDTH,
-            in1_WIDTH   => din1_WIDTH,
-            out_WIDTH   => dout_WIDTH)
+    sdiv_32ns_32ns_32_36_seq_1_divseq_u : entity work.sdiv_32ns_32ns_32_36_seq_1_divseq
         port map(
             clk         => clk,
             reset       => reset,
@@ -2151,9 +2131,9 @@ begin
             quot        => quot_u,
             remd        => remd_u);
 
-    sign_i      <= (dividend0(din0_WIDTH-1) xor divisor0(din1_WIDTH-1)) & dividend0(din0_WIDTH-1);
-    dividend_u  <= STD_LOGIC_VECTOR(UNSIGNED(not dividend0) + 1) when dividend0(din0_WIDTH-1) = '1' else dividend0;
-    divisor_u   <= STD_LOGIC_VECTOR(UNSIGNED(not divisor0) + 1) when divisor0(din1_WIDTH-1) = '1' else divisor0;
+    sign_i      <= (dividend0(32-1) xor divisor0(32-1)) & dividend0(32-1);
+    dividend_u  <= STD_LOGIC_VECTOR(UNSIGNED(not dividend0) + 1) when dividend0(32-1) = '1' else dividend0;
+    divisor_u   <= STD_LOGIC_VECTOR(UNSIGNED(not divisor0) + 1) when divisor0(32-1) = '1' else divisor0;
 
 process (clk)
 begin
@@ -2223,6 +2203,21 @@ entity divui_vitis_hls_wrapper is
 end entity;
 
 architecture arch of divui_vitis_hls_wrapper is
+    component array_RAM_udiv_32ns_32ns_32_36_1 is
+        generic (
+        ID         : integer;
+        NUM_STAGE  : integer;
+        din0_TYPE : integer;
+        din1_TYPE : integer;
+        dout_TYPE : integer);
+        port (
+        clk   : in  std_logic;
+        reset : in  std_logic;
+        ce    : in  std_logic;
+        din0  : in  std_logic_vector(din0_TYPE - 1 downto 0);
+        din1  : in  std_logic_vector(din1_TYPE - 1 downto 0);
+        dout  : out std_logic_vector(dout_TYPE - 1 downto 0));
+    end component;
 begin
     --------------------- Instantiation -----------------
   array_RAM_udiv_32ns_32ns_32_36_1_U1 : component array_RAM_udiv_32ns_32ns_32_36_1
