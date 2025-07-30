@@ -1995,8 +1995,8 @@ entity sdiv_32ns_32ns_32_36_seq_1_divseq is
         sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
         sign_o      : out STD_LOGIC_VECTOR(1 downto 0);
         done        : out STD_LOGIC;
-        quot        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0);
-        remd        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0));
+        quot        : out STD_LOGIC_VECTOR(32-1 downto 0);
+        remd        : out STD_LOGIC_VECTOR(32-1 downto 0));
 
     function max (left, right : INTEGER) return INTEGER is
     begin
@@ -2019,8 +2019,8 @@ architecture arch of sdiv_32ns_32ns_32_36_seq_1_divseq is
     signal cal_tmp          : UNSIGNED(32 downto 0);
     signal r_stage          : UNSIGNED(32 downto 0);
 begin
-  quot     <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp, out_WIDTH));
-  remd     <= STD_LOGIC_VECTOR(RESIZE(remd_tmp, out_WIDTH));
+  quot     <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp, 32));
+  remd     <= STD_LOGIC_VECTOR(RESIZE(remd_tmp, 32));
   sign_o   <= STD_LOGIC_VECTOR(sign0);
 
   tran0_proc : process (clk)
@@ -2035,14 +2035,14 @@ begin
   end process;
 
   -- r_stage(0)=1:accept input; r_stage(in0_WIDTH)=1:done
-  done <= r_stage(in0_WIDTH);
+  done <= r_stage(32);
   one_hot : process (clk)
   begin
       if clk'event and clk = '1' then
           if reset = '1' then
               r_stage <= (others => '0'); 
           elsif (ce = '1') then
-              r_stage <= r_stage(in0_WIDTH-1 downto 0) & start;
+              r_stage <= r_stage(32-1 downto 0) & start;
           end if;
       end if;
   end process;
@@ -2053,18 +2053,18 @@ begin
   remd_tmp_mux      <=  remd_tmp when (r_stage(0) = '0') else
                         (others => '0');
 
-  comb_tmp <= remd_tmp_mux(in0_WIDTH-2 downto 0) & dividend_tmp_mux(in0_WIDTH-1);
+  comb_tmp <= remd_tmp_mux(32-2 downto 0) & dividend_tmp_mux(32-1);
   cal_tmp  <= ('0' & comb_tmp) - ('0' & divisor0);
 
   process (clk)
   begin
       if (clk'event and clk='1') then
           if (ce = '1') then
-              dividend_tmp <= dividend_tmp_mux(in0_WIDTH-2 downto 0) & (not cal_tmp(cal_WIDTH));
-              if cal_tmp(cal_WIDTH) = '1' then
+              dividend_tmp <= dividend_tmp_mux(32-2 downto 0) & (not cal_tmp(32));
+              if cal_tmp(32) = '1' then
                   remd_tmp <= comb_tmp;
               else
-                  remd_tmp <= cal_tmp(in0_WIDTH-1 downto 0);
+                  remd_tmp <= cal_tmp(32-1 downto 0);
               end if;
           end if;
       end if;
@@ -2248,22 +2248,18 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity srem_32ns_32ns_32_36_seq_1_divseq is
-    generic (
-        in0_WIDTH   : INTEGER :=32;
-        in1_WIDTH   : INTEGER :=32;
-        out_WIDTH   : INTEGER :=32);
     port (
         clk         : in  STD_LOGIC;
         reset       : in  STD_LOGIC;
         ce          : in  STD_LOGIC;
         start       : in  STD_LOGIC;
-        dividend    : in  STD_LOGIC_VECTOR(in0_WIDTH-1 downto 0);
-        divisor     : in  STD_LOGIC_VECTOR(in1_WIDTH-1 downto 0);
+        dividend    : in  STD_LOGIC_VECTOR(32-1 downto 0);
+        divisor     : in  STD_LOGIC_VECTOR(32-1 downto 0);
         sign_i      : in  STD_LOGIC_VECTOR(1 downto 0);
         sign_o      : out STD_LOGIC_VECTOR(1 downto 0);
         done        : out STD_LOGIC;
-        quot        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0);
-        remd        : out STD_LOGIC_VECTOR(out_WIDTH-1 downto 0));
+        quot        : out STD_LOGIC_VECTOR(32-1 downto 0);
+        remd        : out STD_LOGIC_VECTOR(32-1 downto 0));
 
     function max (left, right : INTEGER) return INTEGER is
     begin
@@ -2275,21 +2271,19 @@ entity srem_32ns_32ns_32_36_seq_1_divseq is
 end entity;
 
 architecture arch of srem_32ns_32ns_32_36_seq_1_divseq is
-    constant cal_WIDTH      : INTEGER := max(in0_WIDTH, in1_WIDTH);
-
-    signal dividend0        : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal divisor0         : UNSIGNED(in1_WIDTH-1 downto 0);
+    signal dividend0        : UNSIGNED(32-1 downto 0);
+    signal divisor0         : UNSIGNED(32-1 downto 0);
     signal sign0            : UNSIGNED(1 downto 0);
-    signal dividend_tmp     : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal remd_tmp         : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal dividend_tmp_mux : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal remd_tmp_mux     : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal comb_tmp         : UNSIGNED(in0_WIDTH-1 downto 0);
-    signal cal_tmp          : UNSIGNED(cal_WIDTH downto 0);
-    signal r_stage          : UNSIGNED(in0_WIDTH downto 0);
+    signal dividend_tmp     : UNSIGNED(32-1 downto 0);
+    signal remd_tmp         : UNSIGNED(32-1 downto 0);
+    signal dividend_tmp_mux : UNSIGNED(32-1 downto 0);
+    signal remd_tmp_mux     : UNSIGNED(32-1 downto 0);
+    signal comb_tmp         : UNSIGNED(32-1 downto 0);
+    signal cal_tmp          : UNSIGNED(32 downto 0);
+    signal r_stage          : UNSIGNED(32 downto 0);
 begin
-  quot     <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp, out_WIDTH));
-  remd     <= STD_LOGIC_VECTOR(RESIZE(remd_tmp, out_WIDTH));
+  quot     <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp, 32));
+  remd     <= STD_LOGIC_VECTOR(RESIZE(remd_tmp, 32));
   sign_o   <= STD_LOGIC_VECTOR(sign0);
 
   tran0_proc : process (clk)
@@ -2303,15 +2297,15 @@ begin
       end if;
   end process;
 
-  -- r_stage(0)=1:accept input; r_stage(in0_WIDTH)=1:done
-  done <= r_stage(in0_WIDTH);
+  -- r_stage(0)=1:accept input; r_stage(32)=1:done
+  done <= r_stage(32);
   one_hot : process (clk)
   begin
       if clk'event and clk = '1' then
           if reset = '1' then
               r_stage <= (others => '0'); 
           elsif (ce = '1') then
-              r_stage <= r_stage(in0_WIDTH-1 downto 0) & start;
+              r_stage <= r_stage(32-1 downto 0) & start;
           end if;
       end if;
   end process;
@@ -2322,18 +2316,18 @@ begin
   remd_tmp_mux      <=  remd_tmp when (r_stage(0) = '0') else
                         (others => '0');
 
-  comb_tmp <= remd_tmp_mux(in0_WIDTH-2 downto 0) & dividend_tmp_mux(in0_WIDTH-1);
+  comb_tmp <= remd_tmp_mux(32-2 downto 0) & dividend_tmp_mux(32-1);
   cal_tmp  <= ('0' & comb_tmp) - ('0' & divisor0);
 
   process (clk)
   begin
       if (clk'event and clk='1') then
           if (ce = '1') then
-              dividend_tmp <= dividend_tmp_mux(in0_WIDTH-2 downto 0) & (not cal_tmp(cal_WIDTH));
-              if cal_tmp(cal_WIDTH) = '1' then
+              dividend_tmp <= dividend_tmp_mux(32-2 downto 0) & (not cal_tmp(32));
+              if cal_tmp(32) = '1' then
                   remd_tmp <= comb_tmp;
               else
-                  remd_tmp <= cal_tmp(in0_WIDTH-1 downto 0);
+                  remd_tmp <= cal_tmp(32-1 downto 0);
               end if;
           end if;
       end if;
@@ -2372,10 +2366,6 @@ architecture arch of remsi_vitis_hls_wrapper is
     signal sign_o     : STD_LOGIC_VECTOR(1 downto 0);
 begin
     srem_32ns_32ns_32_36_seq_1_divseq_u : entity work.srem_32ns_32ns_32_36_seq_1_divseq
-        generic map(
-            in0_WIDTH   => 32,
-            in1_WIDTH   => 32,
-            out_WIDTH   => 32)
         port map(
             clk         => clk,
             reset       => reset,
