@@ -41,7 +41,7 @@ def _generate_sharing_wrapper(name,
     lazy_fork_name = f"{name}_lazy_fork"
 
     dependencies = generate_or_n(or_name, {"size": group_size}) + \
-                  generate_fifo_break_dv(buff_name, {"slots": latency, "bitwidth": group_size}) + \
+                  generate_fifo_break_dv(buff_name, {"num_slots": latency, "bitwidth": group_size}) + \
                   generate_lazy_fork(lazy_fork_name, {"size": 2, "bitwidth": bitwidth})
 
     for i, num_credits in enumerate(list_of_credits):
