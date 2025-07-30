@@ -296,6 +296,8 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
       return isl::stat::ok();
     });
 
+    llvm::errs() << "Dim " << i << " has " << reachableIndices.size() << "\n";
+
     assert(reachableIndices.size() <= originalDimSize &&
            "The number of reachable indices should not exceed the original "
            "array size!");
