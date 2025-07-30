@@ -714,7 +714,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       unsupported = true;
       return
     }
-    addUnsigned("LATENCY", latency);
+    addUnsigned("LATENCY", latency.value());
   }
 }
 
