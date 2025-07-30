@@ -171,9 +171,15 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
   IRBuilder<> builder(insertPoint);
   gep->setSourceElementType(newArrayType);
 
+  // NOTE:
+  // - the info stores incresing dimensions
+  // - when you iterate through gep index, you get decreasing dimensions
   //
+  // Example: A[3][4][5]
+  // - Info goes from 5 -> 4 -> 3
+  // - GEP indices go from 3 -> 4 -> 5
   for (unsigned i = 0; i < info.size(); i++) {
-    auto [firstIndex, step, elems] = info[i];
+    auto [firstIndex, step, elems] = info[info.size() - i - 1];
     auto *indexOprd = gep->idx_begin() + i;
     if (i < gep->getNumOperands() - 1) {
       // If we have enough indices, change the index
@@ -216,7 +222,8 @@ struct AccessInfo {
   }
 };
 
-ArraySquashingInfo extractDimInfo(const isl::set &range) {
+ArraySquashingInfo extractDimInfo(const isl::set &range,
+                                  llvm::Type *allocaElemType) {
   ArraySquashingInfo info;
 
   llvm::errs() << "Enumerating points! with num dims\n";
@@ -225,12 +232,15 @@ ArraySquashingInfo extractDimInfo(const isl::set &range) {
   auto numDims = unsignedFromIslSize(range.as_set().dim(isl::dim::set));
 
   for (unsigned i = 0; i < numDims; i++) {
+
+    auto originalDimSize = allocaElemType->getArrayNumElements();
+
     auto dim0 = range.as_set().project_out(
         isl::dim::set, /*starting from which dimension? */ i,
         /* how many dimensions? */ 1);
 
     std::vector<int> reachableIndices;
-    dim0.foreach_point([&reachableIndices](isl::point p) {
+    dim0.foreach_point([&reachableIndices](const isl::point &p) {
       auto val = p.coordinate_val(
           isl::dim::set,
           /* dim only has one dimension so the position of the dim is 0 */
@@ -241,6 +251,10 @@ ArraySquashingInfo extractDimInfo(const isl::set &range) {
       return isl::stat::ok();
     });
     llvm::errs() << "Number of indices! " << reachableIndices.size() << "\n";
+
+    assert(reachableIndices.size() <= originalDimSize &&
+           "The number of reachable indices should not exceed the original "
+           "array size!");
     std::sort(reachableIndices.begin(), reachableIndices.end());
     std::set<int> diffs;
     for (size_t i = 0; i + 1 < reachableIndices.size(); ++i) {
@@ -249,14 +263,15 @@ ArraySquashingInfo extractDimInfo(const isl::set &range) {
     }
 
     if (diffs.size() != 1) {
-      info.emplace_back(reachableIndices.front(),
+      info.emplace_back(0,
                         /* step = 1 indicates that we can't squash the array
                            into a smaller one currently */
-                        1, reachableIndices.size());
+                        1, originalDimSize);
     } else {
       info.emplace_back(reachableIndices.front(), abs(*diffs.begin()),
                         reachableIndices.size());
     }
+    allocaElemType = allocaElemType->getArrayElementType();
   }
 
   return info;
@@ -268,11 +283,11 @@ ArraySquashingInfo extractDimInfo(const isl::set &range) {
 /// - suppose that you declared A[3][4][5], then dims should be {5, 4, 3}
 llvm::Type *getAllocaElemType(Type *baseElementType,
                               const ArraySquashingInfo &dims) {
-  Type *ElemTy = baseElementType;
+  Type *elemTy = baseElementType;
   for (auto [init, step, elems] : dims) {
-    ElemTy = ArrayType::get(ElemTy, elems);
+    elemTy = ArrayType::get(elemTy, elems);
   }
-  return ElemTy;
+  return elemTy;
 }
 
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
@@ -281,6 +296,29 @@ struct ArrayPartition : PassInfoMixin<ArrayPartition> {
 
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
 };
+
+AllocaInst *createAlloca(AllocaInst *origAlloca,
+                         const ArraySquashingInfo &info) {
+  Instruction *insertPoint = origAlloca->getNextNode();
+  IRBuilder<> builder(insertPoint);
+
+  Type *baseElementType = origAlloca->getAllocatedType();
+
+  while (baseElementType->isArrayTy()) {
+    baseElementType = baseElementType->getArrayElementType();
+  }
+
+  Type *allocatedType = getAllocaElemType(baseElementType, info);
+  Value *arraySize = origAlloca->getArraySize();
+  Align alignment = origAlloca->getAlign();
+
+  // Create new alloca and let LLVM assign a unique name
+  AllocaInst *newAlloca =
+      builder.CreateAlloca(allocatedType, arraySize, origAlloca->getName());
+  newAlloca->setAlignment(alignment);
+
+  return newAlloca;
+}
 
 void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
   rq.push_back(&r);
@@ -419,7 +457,13 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     size_t numComponents =
         boost::connected_components(g, &nodeToComponentId[0]);
 
-    for (size_t i = 1; i < numComponents; i++) {
+    if (numComponents == 1) {
+      // Cannot partition the array: every memory instruction is conflicting
+      // with another one
+      continue;
+    }
+
+    for (size_t i = 0; i < numComponents; i++) {
       // Make an empty set (note: somehow if you just do "isl::union_set
       // range;" it wouldn't work)
       isl::union_set range = isl::union_set::empty(islCtx);
@@ -434,18 +478,18 @@ PreservedAnalyses ArrayPartition::run(Function &f,
 
       llvm::errs() << "Enumerating points! with num dims\n";
 
-      auto dimInfo = extractDimInfo(range.as_set());
+      auto dimInfo =
+          extractDimInfo(range.as_set(), baseAlloca->getAllocatedType());
 
       llvm::errs() << "Creating new alloca to improve parallelism...\b";
-      // Make a new alloca
-      // FIXME: we can optimize this by squashing the unused locations in this
-      // memory
-      auto *newAlloca = cloneAllocaAfter(baseAlloca);
+
+      auto *newAlloca = createAlloca(baseAlloca, dimInfo);
 
       for (size_t j = 0; j < nodeToComponentId.size(); j++) {
         if (nodeToComponentId[j] == static_cast<int>(i)) {
-          changeGEPBasePtr(findBaseGEP(vertexToInst[boost::vertex(j, g)]),
-                           newAlloca);
+
+          changeGEPOperands(findBaseGEP(vertexToInst[boost::vertex(j, g)]),
+                            newAlloca, newAlloca->getAllocatedType(), dimInfo);
         }
       }
       llvm::errs() << "\n";
