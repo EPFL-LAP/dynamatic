@@ -32,14 +32,14 @@ always@(posedge clk) begin
   if (loadEn) begin
     load_data_reg <= ram[loadAddr];
   end
-end 
+end
 
 // NOTE: ROM should not be written
 // always@(posedge clk) begin
 //   if (storeEn) begin
 //     ram[storeAddr] <= storeData;
 //   end
-// end 
+// end
 assign loadData = load_data_reg;
 endmodule
 """
@@ -68,7 +68,7 @@ architecture arch of MODULE_NAME is
   type ram_type is array (SIZE - 1 downto 0) of std_logic_vector(DATA_WIDTH - 1 downto 0);
   INITIAL_BLOCK
 begin
-  read_proc : process(clk) 
+  read_proc : process(clk)
   begin
     if (rising_edge(clk)) then
       if (loadEn = '1') then
@@ -89,6 +89,16 @@ end architecture;
 """
 
 
+# Returns the 2's complement binary representation of integer `n` with the given
+# `bitwidth`.
+def to_twos_complement(n, bitwidth):
+    if n < 0:
+        n = (1 << bitwidth) + n
+    if n >= (1 << bitwidth) or n < 0:
+        raise ValueError(f"Value {n} doesn't fit in {bitwidth} bits")
+    return format(n, f'0{bitwidth}b')
+
+
 def gen_ram(
     module_name: str,
     hdl: str,
@@ -105,18 +115,19 @@ def gen_ram(
     if hdl == "verilog":
         for id, val in enumerate(init_vals):
             init_strings.append(
-                "ram[" + str(id) + "] = " + data_width + "'d" + val + ";")
+                "ram[" + str(id) + "] = " + data_width + "'b" + to_twos_complement(int(val), int(data_width)) + ";")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - init_vals):
                 init_strings.append(
-                    "ram[" + str(id) + "] = " + data_width + "'d0;")
+                    "ram[" + str(id) + "] = " + data_width + "'b0;")
         init_str = "\n".join(init_strings)
     elif hdl == "vhdl":
         init_strings = ["signal ram : ram_type := ("]
         init_items = []
         for id, val in enumerate(init_vals):
-            init_items.append("\"" + f"{int(val):0{data_width}b}" + "\"")
+            init_items.append(
+                "\"" + f"{to_twos_complement(int(val), int(data_width))}" + "\"")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - init_vals):
