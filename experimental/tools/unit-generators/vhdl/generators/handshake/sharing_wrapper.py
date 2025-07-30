@@ -79,6 +79,7 @@ def _generate_sharing_wrapper(name,
         toSharedUnitIn[i]_valid : out std_logic;
         toSharedUnitIn[i]_ready : out std_logic;
     ENDREPLICATE i:num_shared_operands
+
         fromSharedUnitOut0 : in std_logic_vector({bitwidth} - 1 downto 0);
         fromSharedUnitOut0_valid : in std_logic;
         fromSharedUnitOut0_ready : out std_logic
