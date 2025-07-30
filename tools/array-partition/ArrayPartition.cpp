@@ -183,7 +183,12 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
     llvm::errs() << "i " << i << " firstIndex " << firstIndex << " step "
                  << step << " elems " << elems << "\n";
 
-    auto *indexOprd = gep->idx_begin() + i + 1;
+    // The GEP indices have an extra preceeding zero index, here we skip it if
+    // it is the case (i.e., gep->getNumIndices() == info.size() + 1)
+    // Source:
+    // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
+    auto *indexOprd =
+        gep->idx_begin() + i + (gep->getNumIndices() - info.size());
     if (i < gep->getNumOperands() - 1) {
       // If we have enough indices, change the index
       auto *index = (*indexOprd).get();
