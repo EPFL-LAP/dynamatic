@@ -158,10 +158,41 @@ void changeGEPBasePtr(Instruction *gepInst, Value *newBasePtr) {
 ///
 /// Note: this pass assumes that the GEPs are already instcombined. So one GEP
 /// manages the indexing of all dimensions.
-void changeGEPOperands(Instruction *gep, Value *newArrayType,
-                       const ArraySquashingInfo &info) {
+void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
+                       Type *newArrayType, const ArraySquashingInfo &info) {
+  // Change the baseptr
+  auto *gep = cast<GetElementPtrInst>(gepInst);
+  if (gep->getPointerOperand() != newBasePtr) {
+    // Change the base pointer of the GEP instruction
+    gep->setOperand(0, newBasePtr);
+  }
+
+  Instruction *insertPoint = gep->getPrevNode();
+  IRBuilder<> builder(insertPoint);
+  gep->setSourceElementType(newArrayType);
 
   //
+  for (unsigned i = 0; i < info.size(); i++) {
+    auto [firstIndex, step, elems] = info[i];
+    auto *indexOprd = gep->idx_begin() + i;
+    if (i < gep->getNumOperands() - 1) {
+      // If we have enough indices, change the index
+      auto *index = (*indexOprd).get();
+      if (auto *constInt = dyn_cast<ConstantInt>(index)) {
+        int64_t oldIdx = constInt->getSExtValue();
+        int64_t newIdx = (oldIdx - firstIndex) / step;
+        *indexOprd = ConstantInt::get(constInt->getType(), newIdx);
+      } else if (auto *gepIndex = dyn_cast<Value>(index)) {
+        auto *subOutput = builder.CreateSub(
+            gepIndex, ConstantInt::get(gepIndex->getType(), firstIndex));
+        auto *divOutput = builder.CreateUDiv(
+            subOutput, ConstantInt::get(gepIndex->getType(), step));
+        *indexOprd = divOutput;
+      } else {
+        llvm_unreachable("GEP index is not a constant integer");
+      }
+    }
+  }
 }
 
 namespace {
@@ -185,7 +216,7 @@ struct AccessInfo {
   }
 };
 
-ArraySquashingInfo extractDimInfo(isl::set range) {
+ArraySquashingInfo extractDimInfo(const isl::set &range) {
   ArraySquashingInfo info;
 
   llvm::errs() << "Enumerating points! with num dims\n";
