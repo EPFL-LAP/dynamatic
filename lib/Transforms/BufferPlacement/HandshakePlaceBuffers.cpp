@@ -181,8 +181,8 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
     if (auto latencyInterface =
             llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
       double latency;
-      if (!failed(timingDB.getLatency(op, SignalType::DATA,
-                                      latency, targetCP))) {
+      if (!failed(
+        timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
 
         int64_t latency_int = static_cast<int64_t>(latency);
         latencyInterface.setLatency(latency_int);

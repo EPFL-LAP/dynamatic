@@ -709,7 +709,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
   if (auto latencyInterface =
           llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
     auto latency = latencyInterface.getLatency();
-    if(failed(latency)){
+    if (failed(latency)) {
       op->emitError() << "Missing required latency value on operation";
       unsupported = true;
       return;

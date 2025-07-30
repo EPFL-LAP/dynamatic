@@ -820,10 +820,9 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
                   arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
                   arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
-                  arith::NegFOp,
-                  math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
-                  math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
+                  arith::NegFOp, math::SqrtOp, math::CosOp, math::ExpOp,
+                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
+                  math::SqrtOp, math::AbsFOp, memref::AllocOp, memref::LoadOp,
                   memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);

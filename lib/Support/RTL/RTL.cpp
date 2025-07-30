@@ -287,14 +287,18 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   auto modType = modOp.getModuleType();
 
 
-  LogicalResult gotBitwidth = registerBitwidthParameter(modOp, modName, modType);
-  LogicalResult gotExtraSignals = registerExtraSignalParameters(modOp, modName, modType);
+  LogicalResult gotBitwidth =
+      registerBitwidthParameter(modOp, modName, modType);
+  LogicalResult gotExtraSignals =
+      registerExtraSignalParameters(modOp, modName, modType);
+
   return success(gotBitwidth.succeeded() && gotExtraSignals.succeeded());
 }
 
 LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
-                                         llvm::StringRef modName,
-                                         hw::ModuleType &modType) {
+                                                  llvm::StringRef modName,
+                                                  hw::ModuleType &modType) {
+
   if (
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
@@ -305,7 +309,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.shli" || modName == "handshake.blocker" ||
       modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
       modName == "handshake.rigidifier" || modName == "handshake.ori" ||
-      modName == "handshake.shrsi" || modName == "handshake.xori"||
+      modName == "handshake.shrsi" || modName == "handshake.xori" ||
       modName == "handshake.negf" || modName == "handshake.divsi" ||
       modName == "handshake.absf" || modName == "handshake.divui" ||
       modName == "handshake.shrui" || modName == "handshake.remsi" ||
@@ -375,17 +379,18 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.source" || modName == "mem_controller" ||
              modName == "handshake.truncf" || modName == "handshake.extf" ||
-             modName == "handshake.maximumf" || modName == "handshake.minimumf" ||
-             modName == "handshake.join") {
+             modName == "handshake.maximumf" || 
+             modName == "handshake.minimumf" || modName == "handshake.join") {
     // Skip
-  } else{
+  } else {
     modOp->emitError("Failed to get bitwidth of operation");
     return failure();
   }
   return success();
 }
 
-LogicalResult RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+LogicalResult 
+RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                              llvm::StringRef modName,
                                              hw::ModuleType &modType) {
   if (

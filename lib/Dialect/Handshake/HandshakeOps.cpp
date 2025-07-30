@@ -1957,10 +1957,9 @@ LogicalResult TruncIOp::verify() {
   ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return emitError() << "result channel's data type "
-                          << dstType.getDataType()
-                          << " must be narrower than operand type "
-                          << srcType.getDataType();
+    return emitError() << "result channel's data type " << dstType.getDataType()
+                       << " must be narrower than operand type "
+                       << srcType.getDataType();
   }
   return success();
 }

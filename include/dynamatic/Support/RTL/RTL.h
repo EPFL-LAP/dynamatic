@@ -295,12 +295,12 @@ public:
   LogicalResult registerParameters(hw::HWModuleExternOp &modOp);
 
   LogicalResult registerBitwidthParameter(hw::HWModuleExternOp &modOp,
-                                 llvm::StringRef modName,
-                                 hw::ModuleType &modType);
+                                          llvm::StringRef modName,
+                                          hw::ModuleType &modType);
 
   LogicalResult registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
-                                     llvm::StringRef modName,
-                                     hw::ModuleType &modType);
+                                              llvm::StringRef modName,
+                                              hw::ModuleType &modType);
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
