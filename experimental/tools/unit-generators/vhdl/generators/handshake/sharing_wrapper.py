@@ -60,22 +60,22 @@ def _generate_sharing_wrapper(name,
         clk        : in std_logic;
         rst        : in std_logic;
 
-    REPLICATE i:num_credits
+    REPLICATE i:group_size
     REPLICATE j:num_shared_operands
         op[i]in[j]       : in std_logic_vector({bitwidth} - 1 downto 0);
         op[i]in[j]_valid : in std_logic;
         op[i]in[j]_ready : out std_logic;
     ENDREPLICATE j:num_shared_operands
-    ENDREPLICATE i:num_credits
+    ENDREPLICATE i:group_size
         fromSharedUnitOut0 : in std_logic_vector({bitwidth} - 1 downto 0);
         fromSharedUnitOut0_valid : in std_logic;
         fromSharedUnitOut0_ready : out std_logic
         );
-    REPLICATE i:num_credits
+    REPLICATE i:group_size
         op[i]out0 : out std_logic_vector({bitwidth} - 1 downto 0);
         op[i]out0_valid : out std_logic;
         op[i]out0_ready : in std_logic;
-    ENDREPLICATE i:num_credits
+    ENDREPLICATE i:group_size
 
     REPLICATE i:num_shared_operands
         toSharedUnitIn[i] : out std_logic_vector({bitwidth} - 1 downto 0);
