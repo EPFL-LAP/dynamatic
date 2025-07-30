@@ -282,7 +282,7 @@
     "name": "handshake.sharing_wrapper",
     "parameters": [
       { "name": "CREDITS", "type": "string" },
-      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned" }
+      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned" },
       { "name": "LATENCY", "type": "unsigned"}
     ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper credits=\"$CREDITS\" num_shared_operands=$NUM_SHARED_OPERANDS latency=$LATENCY",
