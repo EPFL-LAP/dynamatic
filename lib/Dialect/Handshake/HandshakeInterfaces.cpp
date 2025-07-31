@@ -42,10 +42,6 @@ PortNamer::PortNamer(Operation *op) {
 }
 
 void PortNamer::inferFromInterface(Operation *op) {
-  
-  
-
-
   IdxToStrF inF, outF;
   if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
     inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
@@ -92,10 +88,6 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
 }
 
-std::string handshake::MuxOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-  return idx == 0 ? "index" : "ins_" + std::to_string(idx - 1);
-}
 
 std::string handshake::ControlMergeOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
