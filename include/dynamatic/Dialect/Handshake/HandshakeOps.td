@@ -442,7 +442,7 @@ def MuxOp : Handshake_Op<"mux", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "index" : detail::simpleInputPortName(idx - 1);
     }
 
@@ -499,7 +499,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return detail::simpleInputPortName(idx);
     }
 
@@ -577,7 +577,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "condition" : "data";
     }
 
@@ -774,7 +774,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-    //   assert(idx < getNumOperands() && "index too high");
+    //   assert(idx < getOperation()->getNumOperands() && "index too high");
 
     //   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
     //     return name.str();
@@ -930,7 +930,7 @@ def LSQOp : Handshake_Op<"lsq", [
 
     // std::string getOperandName(unsigned idx) {
 
-    //   assert(idx < getNumOperands() && "index too high");
+    //   assert(idx < getOperation()->getNumOperands() && "index too high");
 
     //   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
     //     return name.str();
@@ -1049,7 +1049,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
 
   let extraClassDeclaration= [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
@@ -1126,7 +1126,7 @@ def EndOp : Handshake_Op<"end", [
     std::string getOperandName(unsigned idx);
 
     // {
-    //   assert(idx < getNumOperands() && "index too high");
+    //   assert(idx < getOperation()->getNumOperands() && "index too high");
     //   handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
     //   assert(funcOp && "end must be child of handshake function");
 
@@ -1220,7 +1220,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "trigger";
     }
 
@@ -1369,7 +1369,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
@@ -1417,7 +1417,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
@@ -1457,7 +1457,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return "dataIn";
     }
 
@@ -1521,7 +1521,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
         return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
               std::to_string(idx % getNumSharedOperands());
@@ -1727,12 +1727,12 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
+    assert(idx < getOperation()->getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
     std::string getResultName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
+    assert(idx < getOperation()->getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
   }];
