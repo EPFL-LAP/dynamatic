@@ -29,8 +29,6 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
-
 namespace dynamatic {
 namespace handshake {
 
@@ -69,6 +67,11 @@ private:
 };
 
 class ControlType;
+
+class MemoryOpInterface;
+class FuncMemoryPorts;
+class GroupMemoryPorts;
+class LoadPort;
 
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
@@ -154,5 +157,7 @@ inline std::string simpleOutputPortName(unsigned idx) {
 } // end namespace detail
 } // end namespace handshake
 } // end namespace dynamatic
+
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
