@@ -98,7 +98,7 @@ static std::string getResultName(Operation *op, size_t resIdx) {
   std::string oprName;
   auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
   op->emitError("missing named io interface");
-  assert(namedIO)
+  assert(namedIO);
   return namedIO.getResultName(resIdx);
 }
 
