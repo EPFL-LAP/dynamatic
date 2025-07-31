@@ -68,6 +68,17 @@ private:
 
 class ControlType;
 
+namespace detail {
+
+inline std::string simpleInputPortName(unsigned idx) {
+  return "ins_" + std::to_string(idx);
+}
+
+inline std::string simpleOutputPortName(unsigned idx) {
+  return "outs_" + std::to_string(idx);
+}
+
+} // end namespace detail
 } // end namespace handshake
 } // end namespace dynamatic
 

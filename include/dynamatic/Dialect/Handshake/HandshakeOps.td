@@ -443,12 +443,12 @@ def MuxOp : Handshake_Op<"mux", [
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "index" : simpleInputPortName(idx - 1);
+      return idx == 0 ? "index" : detail::simpleInputPortName(idx - 1);
     }
 
     std::string getResultName(unsigned idx) {
       assert(idx < 1 && "index too high");
-      return simpleOutputPortName(idx);
+      return detail::simpleOutputPortName(idx);
     }
   }];
 
@@ -500,7 +500,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   let extraClassDefinition = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return simpleInputPortName(idx);
+      return detail::simpleInputPortName(idx);
     }
 
     std::string getResultName(unsigned idx) {
