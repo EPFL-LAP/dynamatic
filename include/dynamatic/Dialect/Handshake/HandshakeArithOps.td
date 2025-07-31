@@ -24,8 +24,7 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    SameOperandsAndResultType,
-    ArithNamedIOInterface,
+    SameOperandsAndResultType
   ]> {
   let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);
   let results = (outs ChannelType:$result);
@@ -144,16 +143,23 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
 def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [
   Commutative,
   FPUImplInterface,
-  InternalDelayInterface
+  InternalDelayInterface,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point addition.";
 }
 
-def Handshake_AddIOp : Handshake_Arith_IntBinaryOp<"addi", [Commutative]> {
+def Handshake_AddIOp : Handshake_Arith_IntBinaryOp<"addi", [
+  Commutative,
+  ArithNamedIOInterface
+]> {
   let summary = "Integer addition.";
 }
 
-def Handshake_AndIOp : Handshake_Arith_IntBinaryOp<"andi", [Commutative]> {
+def Handshake_AndIOp : Handshake_Arith_IntBinaryOp<"andi", [
+  Commutative,
+  ArithNamedIOInterface
+]> {
   let summary = "Bitwise conjunction.";
 }
 
@@ -185,11 +191,12 @@ def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
   IsFloatChannel<"lhs">,
   IsFloatChannel<"rhs">,
   FPUImplInterface,
-  InternalDelayInterface
+  InternalDelayInterface,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point comparison.";
- 
-  let arguments = (ins Handshake_CmpFPredicateAttr:$predicate, 
+
+  let arguments = (ins Handshake_CmpFPredicateAttr:$predicate,
                        ChannelType:$lhs, ChannelType:$rhs);
 }
 
@@ -213,7 +220,8 @@ def Handshake_CmpIPredicateAttr : I64EnumAttr<
 
 def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
   IsIntChannel<"lhs">,
-  IsIntChannel<"rhs">
+  IsIntChannel<"rhs">,
+  ArithNamedIOInterface
 ]> {
   let summary = "Integer comparison.";
  
@@ -252,40 +260,53 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 
 def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
   FPUImplInterface,
-  InternalDelayInterface
+  InternalDelayInterface,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point division.";
 }
 
-def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi"> {
+def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi"[
+  ArithNamedIOInterface
+]> {
   let summary = "Signed integer remainder.";
 }
 
-def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"> {
+def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"[
+  ArithNamedIOInterface
+]> {
   let summary = "Signed integer division.";
 }
 
-def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> {
+def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"[
+  ArithNamedIOInterface
+]> {
   let summary = "Unsigned integer division.";
 }
 
-def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
+def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"[
+  ArithNamedIOInterface
+]> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
 }
 
-def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
+def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"[
+  ArithNamedIOInterface
+]> {
   let summary = "Integer signed width extension.";
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
-  Commutative
+  Commutative,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point maximum.";
 }
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
-  Commutative
+  Commutative,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point minimum.";
 }
@@ -293,20 +314,28 @@ def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
 def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [
   Commutative,
   FPUImplInterface,
-  InternalDelayInterface
+  InternalDelayInterface,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point multiplication.";
 }
 
-def Handshake_MulIOp : Handshake_Arith_IntBinaryOp<"muli", [Commutative]> {
+def Handshake_MulIOp : Handshake_Arith_IntBinaryOp<"muli", [
+  Commutative,
+  ArithNamedIOInterface]> {
   let summary = "Integer multiplication.";
 }
 
-def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf"> {
+def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Floating-point sign negation.";
 }
 
-def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
+def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [
+  Commutative,
+  ArithNamedIOInterface
+]> {
   let summary = "Bitwise union.";
 }
 
@@ -317,7 +346,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   CustomNamedIOInterface
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
- 
+
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
@@ -328,59 +357,83 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   }];
 }
 
-def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli"> {
+def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
+  ArithNamedIOInterface
+]> {
   let summary = "Logical left shift.";
 }
 
-def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi"> {
+def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi", [
+  ArithNamedIOInterface
+]> {
   let summary = "Arithmetic right shift.";
 }
 
-def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
+def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui", [
+  ArithNamedIOInterface
+]> {
   let summary = "Logical right shift.";
 }
 
 def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf", [
   FPUImplInterface,
-  InternalDelayInterface
+  InternalDelayInterface,
+  ArithNamedIOInterface
 ]> {
   let summary = "Floating-point subtraction.";
 }
 
-def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi"> {
+def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi", [
+  ArithNamedIOInterface
+]> {
   let summary = "Integer subtraction.";
 }
 
-def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
+def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Integer truncation.";
   let hasCanonicalizer = 1;
 }
 
-def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf"> {
+def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Floating-point truncation.";
   // TODO: add canonicalizer
   let hasVerifier = 1;
 }
 
-def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
+def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [
+  Commutative,
+  ArithNamedIOInterface
+]> {
   let summary = "Bitwise exclusive union.";
 }
 
-def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Converts a signed integer to float.";
 }
 
-def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
+def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Converts a float to signed integer.";
 }
 
-def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> {
+def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
+  SimpleNamedIOInterface
+]> {
   let summary = "Floating point extension.";
   // TODO: add canonicalizer
   let hasVerifier = 1;
 }
 
-def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {
+def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf", [
+  SimpleNamedIOInterface
+]> {
   let summary = "floating point absolute-value operation";
   // TODO: add folder
 }
