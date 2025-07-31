@@ -447,6 +447,7 @@ def MuxOp : Handshake_Op<"mux", [
     }
 
     std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
       return detail::simpleOutputPortName(idx);
     }
   }];
@@ -476,32 +477,46 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
     Example:
     ```
-    %res, %idx = control_merge %a, %b, %c : 
+    %res, %idx = control_merge %a, %b, %c :
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result, ChannelType:$index);
-  
+
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
       assert(!operands.empty() && "cmerge needs at least one operand");
       $_state.addOperands(operands);
-      
+
       // Optimize the size of the index result based on the number of operands
       auto dataType = ::dynamatic::handshake::getOptimizedIndexValType(
           $_builder, operands.size());
       auto idxType = ::dynamatic::handshake::ChannelType::get(dataType);
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
-  
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return detail::simpleInputPortName(idx);
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return idx == 0 ? "outs" : "index";
+    }
+  }];
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
 def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType
+  Pure,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "branch operation";
   let description = [{
@@ -518,7 +533,7 @@ def BranchOp : Handshake_Op<"br", [
   }];
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
-  
+
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
   }];
@@ -550,7 +565,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
                        HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
-  
+
   let assemblyFormat = [{
     $conditionOperand `,` $dataOperand attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
@@ -558,10 +573,22 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return idx == 0 ? "condition" : "data";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return idx == ConditionalBranchOp::trueIndex ? "trueOut" : "falseOut";
+    }
   }];
 }
 
-def SinkOp : Handshake_Op<"sink"> {
+def SinkOp : Handshake_Op<"sink", [
+  SimpleNamedIOInterface
+]> {
   let summary = "sink operation";
   let description = [{
     The sink operation discards any data that arrives at its
@@ -573,14 +600,17 @@ def SinkOp : Handshake_Op<"sink"> {
     sink %data : !handshake.channel<i32>
     ```
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
 }
 
-def SourceOp : Handshake_Op<"source", [Pure]> {
+def SourceOp : Handshake_Op<"source", [
+  Pure,
+  SimpleNamedIOInterface
+  ]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
@@ -608,7 +638,8 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  SimpleNamedIOInterface
 ]> {
   let summary = "join operation";
   let description = [{
@@ -630,11 +661,12 @@ def JoinOp : Handshake_Op<"join", [
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "blocker operation";
   let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
+    A data synchronizer. Blocks handshakes until all inputs are valid,
     then forwards the first input.
 
     Example:
@@ -649,7 +681,11 @@ def BlockerOp : Handshake_Op<"blocker", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotOp : Handshake_Op<"not", [
+  Pure,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
+]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -683,8 +719,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -697,7 +733,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -705,7 +741,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     The order of memory inputs is
     1. For each basic block:
       a. If there is at least one store in the block, a control signal fed
-         through a constant indicating the number of store operations in the 
+         through a constant indicating the number of store operations in the
          block.
       b. Load/Store access requests from within the block, in program order.
     2. If an LSQ references the same memory region:
@@ -714,7 +750,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -731,8 +767,50 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+
+      if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+        return name.str();
+
+      // Try to get the operand name from the regular ports
+      MCPorts mcPorts = getPorts();
+      if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
+        return name;
+
+      // Get the operand name from a port to an LSQ
+      assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+      LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+      if (lsqPort.getLoadAddrInputIndex() == idx)
+        return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
+      if (lsqPort.getStoreAddrInputIndex() == idx)
+        return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
+      assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
+      return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+
+      if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+        return name.str();
+
+      // Try to get the operand name from the regular ports
+      MCPorts mcPorts = getPorts();
+      if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
+        return name;
+
+      // Get the operand name from a port to an LSQ
+      assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+      LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+      assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
+      return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+    }
+  }];
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
