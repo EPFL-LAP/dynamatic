@@ -97,7 +97,7 @@ static bool tryToGetBlockArgName(BlockArgument arg, StringRef parentOpName,
 static std::string getResultName(Operation *op, size_t resIdx) {
   std::string oprName;
   auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
-  op->emitError("missing named io interface";)
+  op->emitError("missing named io interface");
   assert(namedIO)
   return namedIO.getResultName(resIdx);
 }
