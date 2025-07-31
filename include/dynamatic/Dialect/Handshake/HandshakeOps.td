@@ -497,7 +497,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return detail::simpleInputPortName(idx);
@@ -575,7 +575,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     enum { trueIndex = 0, falseIndex = 1 };
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "condition" : "data";
@@ -772,45 +772,45 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+    //   assert(idx < getNumOperands() && "index too high");
 
-      if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
-        return name.str();
+    //   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    //     return name.str();
 
-      // Try to get the operand name from the regular ports
-      MCPorts mcPorts = getPorts();
-      if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
-        return name;
+    //   // Try to get the operand name from the regular ports
+    //   MCPorts mcPorts = getPorts();
+    //   if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
+    //     return name;
 
-      // Get the operand name from a port to an LSQ
-      assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
-      LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-      if (lsqPort.getLoadAddrInputIndex() == idx)
-        return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
-      if (lsqPort.getStoreAddrInputIndex() == idx)
-        return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
-      assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
-      return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
-    }
+    //   // Get the operand name from a port to an LSQ
+    //   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+    //   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+    //   if (lsqPort.getLoadAddrInputIndex() == idx)
+    //     return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
+    //   if (lsqPort.getStoreAddrInputIndex() == idx)
+    //     return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
+    //   assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
+    //   return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
+    // }
 
-    std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    // std::string getResultName(unsigned idx) {
+    //   assert(idx < getNumResults() && "index too high");
 
-      if (StringRef name = getIfControlRes(*this, idx); !name.empty())
-        return name.str();
+    //   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    //     return name.str();
 
-      // Try to get the operand name from the regular ports
-      MCPorts mcPorts = getPorts();
-      if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
-        return name;
+    //   // Try to get the operand name from the regular ports
+    //   MCPorts mcPorts = getPorts();
+    //   if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
+    //     return name;
 
-      // Get the operand name from a port to an LSQ
-      assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
-      LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-      assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
-      return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+    //   // Get the operand name from a port to an LSQ
+    //   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+    //   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+    //   assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
+    //   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
     }
   }];
   let hasVerifier = 1;
@@ -1047,7 +1047,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration= [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
@@ -1089,7 +1089,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned int idx) {
       return (idx == 0) ? "addrIn" : "dataIn";
     }
@@ -1218,7 +1218,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       wideControlType, ctrlType});
   }]>];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "trigger";
@@ -1277,7 +1277,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
@@ -1325,7 +1325,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
@@ -1367,14 +1367,14 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      assert(idx < getNumResults() && "index too high");
       return "outs";
     }
   }];
@@ -1455,14 +1455,14 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      assert(idx < getNumOperands() && "index too high");
       return "dataIn";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      assert(idx < getNumResults() && "index too high");
       return "dataOut";
     }
   }];
@@ -1519,7 +1519,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
@@ -1690,12 +1690,14 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
 
-  let extraClassDefinition = [{
-    std::string getOperandName(unsigned idx = 0) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx){
+      assert(idx < 1 && "index too high");
       return "ins";
     }
 
-    std::string getResultName(unsigned idx = 0) {
+    std::string getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
       return "outs";
     }
   }];
@@ -1723,7 +1725,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
     assert(idx < getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_ins" : "rhs_ins";
