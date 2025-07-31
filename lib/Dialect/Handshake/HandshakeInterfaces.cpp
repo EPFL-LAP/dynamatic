@@ -69,7 +69,7 @@ void PortNamer::inferFromInterface(Operation *op) {
     assert(funcOp && "end must be child of handshake function");
     size_t numResults = funcOp.getFunctionType().getNumResults();
     for (size_t idx = 0, e = numResults; idx < e; ++idx)
-      outputs.push_back(endOp.getDefaultResultName(idx));
+      outputs.push_back(detail::simpleOutputPortName(idx));
   }
 }
 
