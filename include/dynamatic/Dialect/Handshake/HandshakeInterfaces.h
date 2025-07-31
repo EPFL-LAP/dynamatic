@@ -32,7 +32,6 @@
 namespace dynamatic {
 namespace handshake {
 
-class NamedIOInterface;
 class FuncOp;
 
 /// Provides an opaque interface for generating the port names of an operation;
