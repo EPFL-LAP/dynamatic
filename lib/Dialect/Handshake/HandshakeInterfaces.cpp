@@ -42,16 +42,20 @@ PortNamer::PortNamer(Operation *op) {
 }
 
 void PortNamer::inferFromInterface(Operation *op) {
-  auto customNamedOpInterface = dyn_cast<handshake::CustomNamedIOInterface>(op);
-  auto simpleNamedOpInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op);
+  
+  
+
 
   IdxToStrF inF, outF;
-  if(customNamedOpInterface){
-    inF = [&](unsigned idx) { return customNamedOpInterface.getOperandName(idx); };
-    outF = [&](unsigned idx) { return customNamedOpInterface.getResultName(idx); };
-  } else if (simpleNamedOpInterface) {
-    inF = [&](unsigned idx) { return simpleNamedOpInterface.getOperandName(idx); };
-    outF = [&](unsigned idx) { return simpleNamedOpInterface.getResultName(idx); };
+  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
+    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
+    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
+  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
+    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
+  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
+    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
   } else {
     op->emitError("all normal operations must specify port names");
     assert(false);

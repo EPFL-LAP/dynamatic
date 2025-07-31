@@ -190,6 +190,31 @@ def SimpleNamedIOInterface : OpInterface<"SimpleIOInterface"> {
   ];
 }
 
+def ArithNamedIOInterface : OpInterface<"SimpleIOInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description =
+      [{"Provides detailed names for the operands and results of an operation."}];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx),
+      "",
+      [{
+        assert(idx < 2 && "index too high");
+        return (idx == 0) ? "lhs" : "rhs";
+      }]>,
+    InterfaceMethod<
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx),
+      "",
+      [{
+        assert(idx < 1 && "index too high");
+        return "result";
+      }]>
+  ];
+}
+
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =

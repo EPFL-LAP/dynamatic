@@ -25,24 +25,12 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     SameOperandsAndResultType,
-    CustomNamedIOInterface,
+    ArithNamedIOInterface,
   ]> {
   let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < 2 && "index too high");
-      return (idx == 0) ? "lhs" : "rhs";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < 1 && "index too high");
-      return "result";
-    }
-  }];
 }
 
 class Handshake_Arith_IntBinaryOp<string mnemonic, list<Trait> traits = []> :
