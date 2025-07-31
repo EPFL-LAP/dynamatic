@@ -272,26 +272,26 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   let summary = "Signed integer remainder.";
 }
 
-def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi"[
+def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
   ArithNamedIOInterface
 ]> {
   let summary = "Signed integer division.";
 }
 
-def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"[
+def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   ArithNamedIOInterface
 ]> {
   let summary = "Unsigned integer division.";
 }
 
-def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"[
+def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi", [
   ArithNamedIOInterface
 ]> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
 }
 
-def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"[
+def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui", [
   ArithNamedIOInterface
 ]> {
   let summary = "Integer signed width extension.";
