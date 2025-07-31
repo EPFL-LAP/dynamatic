@@ -570,12 +570,11 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     $conditionOperand `,` $dataOperand attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
+
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
-  }];
 
-  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "condition" : "data";
@@ -583,7 +582,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
     std::string getResultName(unsigned idx) {
       assert(idx < 2 && "index too high");
-      return idx == ConditionalBranchOp::trueIndex ? "trueOut" : "falseOut";
+      return idx == trueIndex ? "trueOut" : "falseOut";
     }
   }];
 }
