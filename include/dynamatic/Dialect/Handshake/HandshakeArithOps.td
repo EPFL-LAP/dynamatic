@@ -252,6 +252,19 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
   let results = (outs ChannelType:$result);
 
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "ctrl";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return idx == 0 ? "outs" : "index";
+    }
+  }];
+
   // The type of the control also needs to be specified in the IR.
   // It may have extra bits, which could affect the result's type and token.
   let assemblyFormat = "$ctrl attr-dict `:` type($ctrl) `,` type($result)";
@@ -350,6 +363,20 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      if (idx == 0)
+        return "condition";
+      return (idx == 1) ? "trueValue" : "falseValue";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "result";
+    }
+  }];
 
   let assemblyFormat = [{
     $condition `[` $trueValue `,` $falseValue `]` attr-dict

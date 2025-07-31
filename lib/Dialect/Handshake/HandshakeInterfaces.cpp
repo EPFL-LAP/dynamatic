@@ -88,36 +88,6 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
 }
 
-
-
-std::string handshake::ConstantOp::getOperandName(unsigned idx) {
-  assert(idx == 0 && "index too high");
-  return "ctrl";
-}
-
-std::string handshake::EndOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-  handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "end must be child of handshake function");
-
-  unsigned numResults = funcOp.getFunctionType().getNumResults();
-  if (idx < numResults)
-    return "ins_" + std::to_string(idx);
-  return "memDone_" + std::to_string(idx - numResults);
-}
-
-std::string handshake::SelectOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-  if (idx == 0)
-    return "condition";
-  return (idx == 1) ? "trueValue" : "falseValue";
-}
-
-std::string handshake::SelectOp::getResultName(unsigned idx) {
-  assert(idx == 0 && "index too high");
-  return "result";
-}
-
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
@@ -190,62 +160,6 @@ static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
 }
 
 
-
-std::string handshake::LSQOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-
-  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
-    return name.str();
-
-  // Try to get the operand name from the regular ports
-  LSQPorts lsqPorts = getPorts();
-  if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
-    return name;
-
-  // Get the operand name from a port to a memory controller
-  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
-         "unknown LSQ/MC operand");
-  return "ldDataFromMC";
-}
-
-std::string handshake::LSQOp::getResultName(unsigned idx) {
-  assert(idx < getNumResults() && "index too high");
-
-  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
-    return name.str();
-
-  // Try to get the operand name from the regular ports
-  LSQPorts lsqPorts = getPorts();
-  if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
-    return name;
-
-  // Get the operand name from a port to a memory controller
-  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-  MCLoadStorePort mcPort = lsqPorts.getMCPort();
-  if (mcPort.getLoadAddrOutputIndex() == idx)
-    return "ldAddrToMC";
-  if (mcPort.getStoreAddrOutputIndex() == idx)
-    return "stAddrToMC";
-  assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
-  return "stDataToMC";
-}
-
-std::string handshake::SharingWrapperOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-  if (idx < getNumSharedOperands() * getNumSharedOperations()) {
-    return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
-           std::to_string(idx % getNumSharedOperands());
-  }
-  return "fromSharedUnitOut0";
-}
-
-std::string handshake::SharingWrapperOp::getResultName(unsigned idx) {
-  assert(idx < getNumResults() && "index too high");
-  if (idx < getNumSharedOperations())
-    return "op" + std::to_string(idx) + "out0";
-  return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
-}
 
 //===----------------------------------------------------------------------===//
 // MemoryOpInterface

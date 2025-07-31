@@ -880,15 +880,15 @@ def LSQOp : Handshake_Op<"lsq", [
        accesses going to the external memory through the MC. 
     3. Control signal indicating completion.
   }];
-  
+
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
   let builders = [
-    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
+    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs,
                    "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
-    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
-                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
+    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp,
+                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes,
                    "unsigned":$numLoads)>,
   ];
   let hasVerifier = 1;
@@ -904,10 +904,10 @@ def LSQOp : Handshake_Op<"lsq", [
     }
 
     /// Returns a convenient data-structure to go over the controls and memory
-    /// accesses that are connected to the LSQ. 
+    /// accesses that are connected to the LSQ.
     dynamatic::LSQPorts getPorts();
-    
-    /// Determines whether the LSQ is connected to an MC. 
+
+    /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
       return !isa<mlir::MemRefType>(getInputs().front().getType());
     }
@@ -925,6 +925,46 @@ def LSQOp : Handshake_Op<"lsq", [
     /// materialized when called. The returned values are guaranteed to be in
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
+
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+
+      if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+        return name.str();
+
+      // Try to get the operand name from the regular ports
+      LSQPorts lsqPorts = getPorts();
+      if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
+        return name;
+
+      // Get the operand name from a port to a memory controller
+      assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+      assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
+            "unknown LSQ/MC operand");
+      return "ldDataFromMC";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+
+      if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+        return name.str();
+
+      // Try to get the operand name from the regular ports
+      LSQPorts lsqPorts = getPorts();
+      if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
+        return name;
+
+      // Get the operand name from a port to a memory controller
+      assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+      MCLoadStorePort mcPort = lsqPorts.getMCPort();
+      if (mcPort.getLoadAddrOutputIndex() == idx)
+        return "ldAddrToMC";
+      if (mcPort.getStoreAddrOutputIndex() == idx)
+        return "stAddrToMC";
+      assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
+      return "stDataToMC";
+    }
   }];
 }
 
@@ -966,7 +1006,8 @@ def LoadOp : Handshake_MemPortOp<"load", [
   AllExtraSignalsMatch<["address", "dataResult"]>,
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"data">
+  IsSimpleHandshake<"data">,
+  CustomNamedIOInterface
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
@@ -1004,12 +1045,12 @@ def LoadOp : Handshake_MemPortOp<"load", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
@@ -1020,7 +1061,8 @@ def StoreOp : Handshake_MemPortOp<"store", [
   AllExtraSignalsMatch<["address", "data"]>,
   // In StoreOp, addressResult and dataResult are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"dataResult">
+  IsSimpleHandshake<"dataResult">,
+  CustomNamedIOInterface
 ], []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
@@ -1045,11 +1087,11 @@ def StoreOp : Handshake_MemPortOp<"store", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
+    std::string getOperandName(unsigned int idx) {
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned int idx) {
+    std::string getResultName(unsigned int idx) {
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
@@ -1076,6 +1118,23 @@ def EndOp : Handshake_Op<"end", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$inputs);
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+      assert(funcOp && "end must be child of handshake function");
+
+      unsigned numResults = funcOp.getFunctionType().getNumResults();
+      if (idx < numResults)
+        return "ins_" + std::to_string(idx);
+      return "memDone_" + std::to_string(idx - numResults);
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(false && "index too high");
+    }
+  }];
 
   let assemblyFormat = [{
     attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
@@ -1155,12 +1214,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }]>];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "trigger";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       switch (idx) {
       case 0:
@@ -1214,12 +1273,12 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1262,12 +1321,12 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1304,12 +1363,12 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1352,12 +1411,12 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
     }
@@ -1392,12 +1451,12 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
     }
@@ -1409,15 +1468,15 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-  SameOperandsAndResultType, 
+  SameOperandsAndResultType,
   CustomNamedIOInterface,
 ]> {
 
   let summary = "sharing wrapper operation";
   let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic 
+    The sharing_wrapper operation represents the selecting & distributing logic
     that manages access to a shared unit.
-    
+
     The sharing wrapper interfaces with the shared unit and the rest of the
     circuit.
 
@@ -1427,18 +1486,18 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
       operation that share the unit.
     - $numSharedOperands: the number of operands of the shared unit.
     - $latency: the execution latency of the shared unit.
-    
+
     The convention for the input operands:
     - the first "numSharedOperands * len(credits)" operands are the operands
       from the circuit
     - the last operand is the result computed by the shared unit
-    
+
     The convention for the output results:
     - the first "len(credits)" results are results dispatched to the rest of the
       circuit
     - the last "numSharedOperands" result is the selected operands that will be
       delivered to the shared unit.
-    
+
     Future improvement:
     - Add the number of operations that share the unit (now it is assumed to be
       the size of the DenseI64ArrayAttr credits).
@@ -1454,6 +1513,24 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
+
+  let extraClassDefinition = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      if (idx < getNumSharedOperands() * getNumSharedOperations()) {
+        return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
+              std::to_string(idx % getNumSharedOperands());
+      }
+      return "fromSharedUnitOut0";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      if (idx < getNumSharedOperations())
+        return "op" + std::to_string(idx) + "out0";
+      return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
+    }
+  }];
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
@@ -1476,7 +1553,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     that combining individual signals into a `handshake::ChannelType` is a
     two-step process.
     1. First, bundle a `i1` value, which produces a `!handshake.control` and
-       `i1` (representing the upstream ready signal) as results. 
+       `i1` (representing the upstream ready signal) as results.
     2. Then, bundle the `!handshake.control` along with a value representing the
        data signal (of a compatible signal type e.g., `i32`), which produces
        a `!handshake.channel<i32>`.
@@ -1486,12 +1563,12 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     ```mlir
     // Bundling into a channel with a downstream extra signal
     %channel = bundle %ctrl, %data, %extra : _ to <i32, [extra: i1]>
-    
+
     // -----
-    
+
     // Bundling into a channel with an upstream extra signal
     %channel, %extra = bundle %ctrl, %data : _ to <i32, [extra: i1 (U)]>
-    
+
     // -----
 
     // Bundling into a control-only channel
@@ -1523,7 +1600,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     >
   ];
 
-  let hasCustomAssemblyFormat = 1; 
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
@@ -1544,16 +1621,16 @@ def UnbundleOp : Handshake_Op<"unbundle", [
        "downstream bundle").
     2. Then, unbundle the `!handshake.control` along with an `i1` value
        representing the ready signal, which produces an `i1` result representing
-       the valid signal. 
+       the valid signal.
 
     Example:
 
     ```mlir
     // Unbundling a channel with a downstream extra signal
     %ctrl, %data, %extra = unbundle %channel : <i32, [extra: i2]> to _
-    
+
     // -----
-    
+
     // Unbundling a channel with an upstream extra signal
     %ctrl, %data = unbundle %channel [%extra] : <i32, [extra: i2 (U)]> to _
 
@@ -1609,11 +1686,11 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx = 0) {
+    std::string getOperandName(unsigned idx = 0) {
       return "ins";
     }
 
-    std::string $cppClass::getResultName(unsigned idx = 0) {
+    std::string getResultName(unsigned idx = 0) {
       return "outs";
     }
   }];
@@ -1642,12 +1719,12 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
     assert(idx < getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
     assert(idx < getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
