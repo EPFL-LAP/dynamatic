@@ -17,6 +17,7 @@
 #include "llvm/IR/Instructions.h"
 #include "isl/point.h"
 #include <boost/graph/connected_components.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
@@ -66,8 +67,11 @@ Value *findBaseInternal(Value *addr) {
     return addr;
   }
 
-  if (isa<Constant>(addr))
-    llvm_unreachable("Cannot determine base address of Constant");
+  if (isa<Constant>(addr)) {
+    // Example: This can be a global constant array:
+    // @w0 = dso_local constant [64 x [16 x i32]] ... (values)
+    return addr;
+  }
 
   if (auto *inst = dyn_cast_or_null<Instruction>(addr)) {
     if (isa<AllocaInst>(inst))
@@ -221,7 +225,7 @@ struct AccessInfo {
   // Base to the set of instructions storing to this base
   std::map<Value *, std::set<Instruction *>> baseToInsts;
 
-  bool sameScop(Instruction *i, Instruction *j) {
+  bool sameScop(Instruction *i, Instruction *j) const {
     if (!instToScopId.count(i))
       return false;
 
@@ -338,6 +342,78 @@ void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
     getAllRegions(*e, rq);
 }
 
+/// The memory accesses are grouped together. Between the groups there are no
+/// overlapping accesses.
+///
+/// \example: InstsPerGroup groups;
+/// groups[1] returns all the instructions in group 1
+using InstsPerGroup = std::vector<std::set<Instruction *>>;
+
+InstsPerGroup computeInstsPerGroup(const std::set<Instruction *> &setOfInsts,
+                                   AccessInfo &info,
+                                   AAManager::Result &aliasAnalysis) {
+
+  std::vector<Instruction *> insts(setOfInsts.begin(), setOfInsts.end());
+
+  std::map<Instruction *, Vertex> instToVertex;
+  std::map<Vertex, Instruction *> vertexToInst;
+  Graph g;
+
+  for (Instruction *inst : insts) {
+    Vertex v = boost::add_vertex(g);
+    instToVertex[inst] = v;
+    vertexToInst[v] = inst;
+  }
+
+  for (Instruction *inst1 : insts) {
+    for (Instruction *inst2 : insts) {
+
+      if (inst1 == inst2)
+        continue;
+
+      bool isDependent = true;
+
+      // If their are in the same scop
+      if (info.sameScop(inst1, inst2)) {
+
+        auto inst1Map = info.accessMaps[inst1];
+        auto inst2Map = info.accessMaps[inst2];
+
+        // If the two instructions might access the same index:
+        isl::set intersect = inst1Map.intersect(inst2Map);
+
+        isDependent = intersect.is_empty().is_false();
+      } else {
+        // Use the result from alias analysis to determine if the
+        // intructions are dependent: Otherwise, use results from alias
+        // analysis:
+        AliasResult aliasResult = aliasAnalysis.alias(
+            MemoryLocation::get(inst1), MemoryLocation::get(inst2));
+
+        isDependent = aliasResult != AliasResult::NoAlias;
+      }
+
+      if (isDependent) {
+
+        auto v1 = instToVertex[inst1];
+        auto v2 = instToVertex[inst2];
+        boost::add_edge(v1, v2, g);
+      }
+    }
+  }
+  // Find the connected components in the graph:
+  std::vector<int> nodeToComponentId(boost::num_vertices(g),
+                                     /* -1 : not assigned (error) */ -1);
+  size_t numComponents = boost::connected_components(g, &nodeToComponentId[0]);
+  InstsPerGroup groups(numComponents);
+  for (size_t i = 0; i < insts.size(); ++i) {
+    size_t compId = nodeToComponentId[i];
+    groups[compId].insert(insts[i]);
+  }
+
+  return groups;
+}
+
 PreservedAnalyses ArrayPartition::run(Function &f,
                                       FunctionAnalysisManager &fam) {
 
@@ -417,92 +493,33 @@ PreservedAnalyses ArrayPartition::run(Function &f,
 
     llvm::errs() << "Base alloca: " << *baseAlloca << "\n";
 
-    std::map<Instruction *, Vertex> instToVertex;
-    std::map<Vertex, Instruction *> vertexToInst;
-    Graph g;
+    auto groups = computeInstsPerGroup(insts, info, aliasAnalysis);
 
-    for (Instruction *inst : insts) {
-      Vertex v = boost::add_vertex(g);
-      instToVertex[inst] = v;
-      vertexToInst[v] = inst;
-    }
-
-    for (Instruction *inst1 : insts) {
-      for (Instruction *inst2 : insts) {
-
-        if (inst1 == inst2)
-          continue;
-
-        bool isDependent = true;
-
-        // If their are in the same scop
-        if (info.sameScop(inst1, inst2)) {
-
-          auto inst1Map = info.accessMaps[inst1];
-          auto inst2Map = info.accessMaps[inst2];
-
-          // If the two instructions might access the same index:
-          isl::set intersect = inst1Map.intersect(inst2Map);
-
-          isDependent = intersect.is_empty().is_false();
-        } else {
-          // Use the result from alias analysis to determine if the
-          // intructions are dependent: Otherwise, use results from alias
-          // analysis:
-          AliasResult aliasResult = aliasAnalysis.alias(
-              MemoryLocation::get(inst1), MemoryLocation::get(inst2));
-
-          isDependent = aliasResult != AliasResult::NoAlias;
-        }
-
-        if (isDependent) {
-
-          auto v1 = instToVertex[inst1];
-          auto v2 = instToVertex[inst2];
-          boost::add_edge(v1, v2, g);
-        }
-      }
-    }
-    // Find the connected components in the graph:
-    std::vector<int> nodeToComponentId(boost::num_vertices(g),
-                                       /* -1 : not assigned (error) */ -1);
-    size_t numComponents =
-        boost::connected_components(g, &nodeToComponentId[0]);
-
-    if (numComponents == 1) {
+    if (groups.size() == 1) {
       // Cannot partition the array: every memory instruction is conflicting
       // with another one
       continue;
     }
 
-    for (size_t i = 0; i < numComponents; i++) {
+    for (auto &group : groups) {
       // Make an empty set (note: somehow if you just do "isl::union_set
       // range;" it wouldn't work)
       isl::union_set range = isl::union_set::empty(islCtx);
-      for (size_t j = 0; j < nodeToComponentId.size(); j++) {
-        if (nodeToComponentId[j] == static_cast<int>(i)) {
-          auto *inst = vertexToInst[boost::vertex(j, g)];
-          auto instRange = info.accessMaps[inst];
-          range = range.unite(instRange);
-        }
-      }
-      // Enumerate points
 
-      llvm::errs() << "Enumerating points! with num dims\n";
+      // This computes the union of all memory access indices in the group
+      for (auto *inst : group) {
+        auto instRange = info.accessMaps[inst];
+        range = range.unite(instRange);
+      }
 
       auto dimInfo =
           extractDimInfo(range.as_set(), baseAlloca->getAllocatedType());
 
-      llvm::errs() << "Creating new alloca to improve parallelism...\b";
-
       auto *newAlloca = createAlloca(baseAlloca, dimInfo);
 
-      for (size_t j = 0; j < nodeToComponentId.size(); j++) {
-        if (nodeToComponentId[j] == static_cast<int>(i)) {
-
-          changeGEPOperands(findBaseGEP(vertexToInst[boost::vertex(j, g)]),
-                            newAlloca, newAlloca->getAllocatedType(), dimInfo);
-        }
+      for (auto *inst : group) {
+        changeGEPOperands(findBaseGEP(inst), newAlloca,
+                          newAlloca->getAllocatedType(), dimInfo);
       }
       llvm::errs() << "\n";
     }
