@@ -447,7 +447,7 @@ def MuxOp : Handshake_Op<"mux", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < 1 && "index too high");
       return detail::simpleOutputPortName(idx);
     }
   }];
@@ -504,7 +504,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < 2 && "index too high");
       return idx == 0 ? "outs" : "index";
     }
   }];
@@ -580,7 +580,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < 2 && "index too high");
       return idx == ConditionalBranchOp::trueIndex ? "trueOut" : "falseOut";
     }
   }];
@@ -1346,7 +1346,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
-    `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
+    `[` $tagFromOperand `]` $dataOperand attr-dict `:`
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
   }];
@@ -1358,7 +1358,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < 2 && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
     }
   }];
