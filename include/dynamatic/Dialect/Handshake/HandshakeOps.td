@@ -796,7 +796,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     // }
 
     // std::string getResultName(unsigned idx) {
-    //   assert(idx < getNumResults() && "index too high");
+    //   assert(idx < getOperation()->getNumResults() && "index too high");
 
     //   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
     //     return name.str();
@@ -948,7 +948,7 @@ def LSQOp : Handshake_Op<"lsq", [
     // }
 
     // std::string getResultName(unsigned idx) {
-    //   assert(idx < getNumResults() && "index too high");
+    //   assert(idx < getOperation()->getNumResults() && "index too high");
 
     //   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
     //     return name.str();
@@ -1054,7 +1054,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < getOperation()->getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
@@ -1225,7 +1225,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < getOperation()->getNumResults() && "index too high");
       switch (idx) {
       case 0:
         return "outs";
@@ -1374,7 +1374,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
   }];
@@ -1462,7 +1462,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
     }
   }];
@@ -1530,7 +1530,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+      assert(idx < getOperation()->getNumResults() && "index too high");
       if (idx < getNumSharedOperations())
         return "op" + std::to_string(idx) + "out0";
       return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
