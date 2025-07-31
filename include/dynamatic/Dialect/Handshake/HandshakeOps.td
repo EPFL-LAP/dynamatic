@@ -1414,7 +1414,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($trueResult) `,` type($falseResult)
   }];
 
-  let extraClassDefinition = [{
+  let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "spec_tag_data" : "data";

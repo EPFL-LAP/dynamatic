@@ -1994,7 +1994,7 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
 }
 
-inline static StringRef getIfControlOprd(handshake::MemoryOpInterface memOp, unsigned idx) {
+inline static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
   if (!memOp.isMasterInterface())
     return "";
   switch (idx) {
@@ -2007,7 +2007,7 @@ inline static StringRef getIfControlOprd(handshake::MemoryOpInterface memOp, uns
   }
 }
 
-static StringRef getIfControlRes(handshake::MemoryOpInterface memOp, unsigned idx) {
+static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
   if (memOp.isMasterInterface() && idx == memOp->getNumResults() - 1)
     return MEM_END;
   return "";
