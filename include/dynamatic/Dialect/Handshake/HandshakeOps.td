@@ -414,7 +414,7 @@ def MuxOp : Handshake_Op<"mux", [
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -451,7 +451,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -517,7 +517,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -666,8 +666,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   IsSimpleHandshakeVariadic<"inputs">,
   IsSimpleHandshakeVariadic<"outputs">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
@@ -746,8 +745,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
 def LSQOp : Handshake_Op<"lsq", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "load-store queue  (dynamatic)";
   let description = [{
@@ -849,7 +847,7 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+    CustomNamedIOInterface,
     IsIntChannel<"address">,
     IsIntChannel<"addressResult">
   ]
@@ -971,7 +969,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
 //===----------------------------------------------------------------------===//
 
 def EndOp : Handshake_Op<"end", [
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  CustomNamedIOInterface,
   Terminator
 ]> {
   let summary = "function endpoint (dynamatic)";
@@ -1014,7 +1012,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCIsMisspec">,
   IsIntSizedChannel<1, "SCIsMisspec">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1098,7 +1096,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1144,7 +1142,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1191,7 +1189,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1234,7 +1232,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1280,7 +1278,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Adds a non-speculative spec bit.";
   let description = [{
@@ -1321,7 +1319,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   SameOperandsAndResultType, 
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  CustomNamedIOInterface,
 ]> {
 
   let summary = "sharing wrapper operation";
@@ -1502,7 +1500,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1534,7 +1532,7 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
 def ValidMergerOp : Handshake_Op<"valid_merger",[
   AllTypesMatch<["lhsIn", "lhs"]>,
   AllTypesMatch<["rhsIn", "rhs"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = [{
     Merges the valid signals of two channels.
