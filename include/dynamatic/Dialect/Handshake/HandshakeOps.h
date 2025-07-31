@@ -582,7 +582,7 @@ static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
     LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
 
-inline static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
+inline static StringRef getIfControlOprd(handshake::MemoryOpInterface memOp, unsigned idx) {
   if (!memOp.isMasterInterface())
     return "";
   switch (idx) {
@@ -595,7 +595,7 @@ inline static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) 
   }
 }
 
-static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
+static StringRef getIfControlRes(handshake::MemoryOpInterface memOp, unsigned idx) {
   if (memOp.isMasterInterface() && idx == memOp->getNumResults() - 1)
     return MEM_END;
   return "";
