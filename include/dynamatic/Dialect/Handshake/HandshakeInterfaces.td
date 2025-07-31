@@ -159,7 +159,7 @@ def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   ];
 }
 
-def SimpleNamedIOInterface : OpInterface<"SimpleIOInterface"> {
+def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
       [{"Provides detailed names for the operands and results of an operation."}];
