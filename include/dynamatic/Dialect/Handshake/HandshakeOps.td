@@ -443,12 +443,12 @@ def MuxOp : Handshake_Op<"mux", [
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "index" : detail::simpleInputPortName(idx - 1);
+      return idx == 0 ? "index" : simpleInputPortName(idx - 1);
     }
 
     std::string getResultName(unsigned idx) {
       assert(idx < 1 && "index too high");
-      return detail::simpleOutputPortName(idx);
+      return simpleOutputPortName(idx);
     }
   }];
 
@@ -497,10 +497,10 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
-  let extraClassDeclaration = [{
+  let extraClassDefinition = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return detail::simpleInputPortName(idx);
+      return simpleInputPortName(idx);
     }
 
     std::string getResultName(unsigned idx) {
@@ -573,7 +573,9 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+  }];
 
+  let extraClassDefinition = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return idx == 0 ? "condition" : "data";
@@ -770,7 +772,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
 
-  let extraClassDeclaration = [{
+  let extraClassDefinition = [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
 
