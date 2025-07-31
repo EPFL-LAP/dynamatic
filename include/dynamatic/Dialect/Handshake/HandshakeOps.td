@@ -1120,16 +1120,18 @@ def EndOp : Handshake_Op<"end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
-      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
-      assert(funcOp && "end must be child of handshake function");
+    std::string getOperandName(unsigned idx);
 
-      unsigned numResults = funcOp.getFunctionType().getNumResults();
-      if (idx < numResults)
-        return "ins_" + std::to_string(idx);
-      return "memDone_" + std::to_string(idx - numResults);
-    }
+    // {
+    //   assert(idx < getNumOperands() && "index too high");
+    //   handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+    //   assert(funcOp && "end must be child of handshake function");
+
+    //   unsigned numResults = funcOp.getFunctionType().getNumResults();
+    //   if (idx < numResults)
+    //     return "ins_" + std::to_string(idx);
+    //   return "memDone_" + std::to_string(idx - numResults);
+    // }
 
     std::string getResultName(unsigned idx) {
       assert(false && "index too high");
