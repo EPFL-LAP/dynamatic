@@ -96,9 +96,10 @@ static bool tryToGetBlockArgName(BlockArgument arg, StringRef parentOpName,
 /// handshake::NamedIOInterface interface or, failing that, is its index.
 static std::string getResultName(Operation *op, size_t resIdx) {
   std::string oprName;
-  if (auto namedIO = dyn_cast<handshake::NamedIOInterface>(op))
-    return namedIO.getResultName(resIdx);
-  return std::to_string(resIdx);
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
+  op->emitError("missing named io interface";)
+  assert(namedIO)
+  return namedIO.getResultName(resIdx);
 }
 
 /// Returns the name of an operand which is either provided by the
