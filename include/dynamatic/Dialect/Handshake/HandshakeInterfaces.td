@@ -143,7 +143,7 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
-def NamedIOInterface : OpInterface<"NamedIOInterface"> {
+def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
       [{"Provides detailed names for the operands and results of an operation."}];
@@ -156,6 +156,37 @@ def NamedIOInterface : OpInterface<"NamedIOInterface"> {
       "Returns the name of a specific result.",
       "std::string", "getResultName", (ins "unsigned" : $idx)
     >
+  ];
+}
+
+def SimpleNamedIOInterface : OpInterface<"SimpleIOInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description =
+      [{"Provides detailed names for the operands and results of an operation."}];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+
+        // Simple input name
+        assert(idx < concreteOp->getNumOperands() && "index too high");
+        return simpleInputPortName(idx);
+      }]>,
+    InterfaceMethod<
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+
+        // Generic output name
+        assert(idx < concreteOp->getNumResults() && "index too high");
+        return simpleOutputPortName(idx);
+      }]>
   ];
 }
 

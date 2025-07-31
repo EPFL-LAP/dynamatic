@@ -368,4 +368,14 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
+namespace{
+  std::string simpleInputPortName(int idx){
+    return "ins_" + std::to_string(idx);
+  }
+
+  std::string simpleOutputPortName(int idx){
+    return "outs_" + std::to_string(idx);
+  }
+}
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

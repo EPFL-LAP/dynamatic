@@ -30,7 +30,6 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         DeclareOpInterfaceMethods<NamedIOInterface>,
          DeclareOpInterfaceMethods<ControlInterface>]> {
 }
 
@@ -323,9 +322,12 @@ def NDWireOp : Handshake_Op<"ndwire", [
   }];
 }
 
-class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
+class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [
-    Pure, HasClock, SameOperandsAndResultType
+    Pure,
+    HasClock,
+    SameOperandsAndResultType,
+    SimpleNamedIOInterface
 ]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
@@ -338,7 +340,7 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     }]>
   ];
 
-  let assemblyFormat = [{ 
+  let assemblyFormat = [{
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
   }];
