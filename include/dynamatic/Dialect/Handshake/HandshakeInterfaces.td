@@ -190,7 +190,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleIOInterface"> {
   ];
 }
 
-def ArithNamedIOInterface : OpInterface<"SimpleIOInterface"> {
+def ArithNamedIOInterface : OpInterface<"ArithNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
       [{"Provides detailed names for the operands and results of an operation."}];
