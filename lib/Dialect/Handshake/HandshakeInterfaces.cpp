@@ -123,7 +123,7 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
 
 std::string handshake::MuxOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
-  return idx == 0 ? "index" : "ins_" + std::string(idx - 1);
+  return idx == 0 ? "index" : "ins_" + std::to_string(idx - 1);
 }
 
 std::string handshake::ControlMergeOp::getResultName(unsigned idx) {
