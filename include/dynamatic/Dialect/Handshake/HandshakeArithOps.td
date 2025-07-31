@@ -266,7 +266,7 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
   let summary = "Floating-point division.";
 }
 
-def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi"[
+def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   ArithNamedIOInterface
 ]> {
   let summary = "Signed integer remainder.";
