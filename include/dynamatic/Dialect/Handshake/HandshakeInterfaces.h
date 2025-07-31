@@ -68,16 +68,6 @@ private:
 
 class ControlType;
 
-namespace detail {
-
-inline std::string simpleInputPortName(unsigned idx) {
-  return "ins_" + std::to_string(idx);
-}
-
-inline std::string simpleOutputPortName(unsigned idx) {
-  return "outs_" + std::to_string(idx);
-}
-
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
@@ -147,6 +137,16 @@ inline static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx)
     }
   }
   return "";
+}
+
+namespace detail {
+
+inline std::string simpleInputPortName(unsigned idx) {
+  return "ins_" + std::to_string(idx);
+}
+
+inline std::string simpleOutputPortName(unsigned idx) {
+  return "outs_" + std::to_string(idx);
 }
 
 } // end namespace detail
