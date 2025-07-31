@@ -877,7 +877,7 @@ def LSQOp : Handshake_Op<"lsq", [
     1. Load results, in program order (i.e., in load accesses order).
     2. If an MC references the same memory region, a single address operand for
        load accesses and a single pair of address/data operands for store
-       accesses going to the external memory through the MC. 
+       accesses going to the external memory through the MC.
     3. Control signal indicating completion.
   }];
 
