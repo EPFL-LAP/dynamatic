@@ -81,15 +81,6 @@ void PortNamer::inferFromFuncOp(handshake::FuncOp funcOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// NamedIOInterface (getOperandName/getResultName)
-//===----------------------------------------------------------------------===//
-
-static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
-  return name.str() + "_" + std::to_string(idx);
-}
-
-
-//===----------------------------------------------------------------------===//
 // MemoryOpInterface
 //===----------------------------------------------------------------------===//
 

@@ -582,6 +582,10 @@ static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
     LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
 
+static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
+  return name.str() + "_" + std::to_string(idx);
+}
+
 inline static StringRef getIfControlOprd(handshake::MemoryOpInterface memOp, unsigned idx) {
   if (!memOp.isMasterInterface())
     return "";
