@@ -97,11 +97,11 @@ static bool tryToGetBlockArgName(BlockArgument arg, StringRef parentOpName,
 static std::string getResultName(Operation *op, size_t resIdx) {
 
   if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
-    return nameInterface.getResultName(idx);
+    return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
-    return nameInterface.getResultName(idx);
+    return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
-    return nameInterface.getResultName(idx);
+    return nameInterface.getResultName(resIdx);
   };
 
   op->emitError("all operations must specify result names");
@@ -113,11 +113,11 @@ static std::string getResultName(Operation *op, size_t resIdx) {
 static std::string getOperandName(Operation *op, size_t oprdIdx) {
 
   if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
-    return nameInterface.getOperandName(idx);
+    return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
-    return nameInterface.getOperandName(idx);
+    return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
-    return nameInterface.getOperandName(idx);
+    return nameInterface.getOperandName(oprdIdx);
   };
 
   op->emitError("all operations must specify operand names");
