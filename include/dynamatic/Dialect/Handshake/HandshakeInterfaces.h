@@ -29,6 +29,8 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
+
 namespace dynamatic {
 namespace handshake {
 
@@ -152,7 +154,5 @@ inline std::string simpleOutputPortName(unsigned idx) {
 } // end namespace detail
 } // end namespace handshake
 } // end namespace dynamatic
-
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
