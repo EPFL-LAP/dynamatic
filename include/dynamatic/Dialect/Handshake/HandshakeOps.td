@@ -928,45 +928,46 @@ def LSQOp : Handshake_Op<"lsq", [
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
 
-    std::string getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+    // std::string getOperandName(unsigned idx) {
 
-      if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
-        return name.str();
+    //   assert(idx < getNumOperands() && "index too high");
 
-      // Try to get the operand name from the regular ports
-      LSQPorts lsqPorts = getPorts();
-      if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
-        return name;
+    //   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    //     return name.str();
 
-      // Get the operand name from a port to a memory controller
-      assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-      assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
-            "unknown LSQ/MC operand");
-      return "ldDataFromMC";
-    }
+    //   // Try to get the operand name from the regular ports
+    //   LSQPorts lsqPorts = getPorts();
+    //   if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
+    //     return name;
 
-    std::string getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    //   // Get the operand name from a port to a memory controller
+    //   assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+    //   assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
+    //         "unknown LSQ/MC operand");
+    //   return "ldDataFromMC";
+    // }
 
-      if (StringRef name = getIfControlRes(*this, idx); !name.empty())
-        return name.str();
+    // std::string getResultName(unsigned idx) {
+    //   assert(idx < getNumResults() && "index too high");
 
-      // Try to get the operand name from the regular ports
-      LSQPorts lsqPorts = getPorts();
-      if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
-        return name;
+    //   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    //     return name.str();
 
-      // Get the operand name from a port to a memory controller
-      assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-      MCLoadStorePort mcPort = lsqPorts.getMCPort();
-      if (mcPort.getLoadAddrOutputIndex() == idx)
-        return "ldAddrToMC";
-      if (mcPort.getStoreAddrOutputIndex() == idx)
-        return "stAddrToMC";
-      assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
-      return "stDataToMC";
-    }
+    //   // Try to get the operand name from the regular ports
+    //   LSQPorts lsqPorts = getPorts();
+    //   if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
+    //     return name;
+
+    //   // Get the operand name from a port to a memory controller
+    //   assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+    //   MCLoadStorePort mcPort = lsqPorts.getMCPort();
+    //   if (mcPort.getLoadAddrOutputIndex() == idx)
+    //     return "ldAddrToMC";
+    //   if (mcPort.getStoreAddrOutputIndex() == idx)
+    //     return "stAddrToMC";
+    //   assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
+    //   return "stDataToMC";
+    // }
   }];
 }
 
