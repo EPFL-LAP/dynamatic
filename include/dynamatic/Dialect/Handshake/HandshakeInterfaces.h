@@ -56,15 +56,7 @@ private:
   /// Maps the index of an input or output to its port name.
   using IdxToStrF = const std::function<std::string(unsigned)> &;
 
-  /// Infers port names for the operation using the provided callbacks.
-  void infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF);
-
-  /// Infers default port names when nothing better can be achieved.
-  void inferDefault(Operation *op);
-
-  /// Infers port names for an operation implementing the
-  /// `handshake::NamedIOInterface` interface.
-  void inferFromNamedOpInterface(NamedIOInterface namedIO);
+  void inferFromInterface(Operation *op);
 
   /// Infers port names for a Handshake function.
   void inferFromFuncOp(FuncOp funcOp);

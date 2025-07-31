@@ -36,74 +36,41 @@ PortNamer::PortNamer(Operation *op) {
   assert(op && "cannot generate port names for null operation");
   if (auto funcOp = dyn_cast<handshake::FuncOp>(op)){
     inferFromFuncOp(funcOp);
-    return;
+  } else {
+    inferFromInterface(op);
   }
+}
 
-  auto namedOpInterface = dyn_cast<handshake::NamedIOInterface>(op);
-  if (!namedOpInterface){
+void PortNamer::inferFromInterface(Operation *op) {
+  auto customNamedOpInterface = dyn_cast<handshake::CustomNamedIOInterface>(op);
+  auto simpleNamedOpInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op);
+
+  IdxToStrF inF, outF;
+  if(customNamedOpInterface){
+    inF = [&](unsigned idx) { return customNamedOpInterface.getOperandName(idx); };
+    outF = [&](unsigned idx) { return customNamedOpInterface.getResultName(idx); };
+  } else if (simpleNamedOpInterface) {
+    inF = [&](unsigned idx) { return simpleNamedOpInterface.getOperandName(idx); };
+    outF = [&](unsigned idx) { return simpleNamedOpInterface.getResultName(idx); };
+  } else {
     op->emitError("all normal operations must specify port names");
     assert(false);
   }
-  inferFromNamedOpInterface(namedOpInterface);
-}
 
-// void PortNamer::infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF) {
-//   for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
-//     inputs.push_back(inF(idx));
-//   for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
-//     outputs.push_back(outF(idx));
+  for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
+    inputs.push_back(inF(idx));
+  for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
+    outputs.push_back(outF(idx));
 
-//   // The Handshake terminator forwards its non-memory inputs to its outputs, so
-//   // it needs port names for them
-//   if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
-//     handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
-//     assert(funcOp && "end must be child of handshake function");
-//     size_t numResults = funcOp.getFunctionType().getNumResults();
-//     for (size_t idx = 0, e = numResults; idx < e; ++idx)
-//       outputs.push_back(endOp.getDefaultResultName(idx));
-//   }
-// }
-
-// void PortNamer::inferDefault(Operation *op) {
-//   llvm::TypeSwitch<Operation *, void>(op)
-//       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
-//             arith::CmpFOp, arith::DivFOp, arith::DivSIOp, arith::DivUIOp,
-//             arith::MaximumFOp, arith::MinimumFOp, arith::MulFOp, arith::MulIOp,
-//             arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
-//             arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
-//         infer(
-//             op, [](unsigned idx) { return idx == 0 ? "lhs" : "rhs"; },
-//             [](unsigned idx) { return "result"; });
-//       })
-//       .Case<arith::ExtSIOp, arith::ExtUIOp, arith::NegFOp, arith::TruncIOp>(
-//           [&](auto) {
-//             infer(
-//                 op, [](unsigned idx) { return "ins"; },
-//                 [](unsigned idx) { return "outs"; });
-//           })
-//       .Case<arith::SelectOp>([&](auto) {
-//         infer(
-//             op,
-//             [](unsigned idx) {
-//               if (idx == 0)
-//                 return "condition";
-//               if (idx == 1)
-//                 return "trueValue";
-//               return "falseValue";
-//             },
-//             [](unsigned idx) { return "result"; });
-//       })
-//       .Default([&](auto) {
-//         infer(
-//             op, [](unsigned idx) { return "in" + std::to_string(idx); },
-//             [](unsigned idx) { return "out" + std::to_string(idx); });
-//       });
-// }
-
-void PortNamer::inferFromNamedOpInterface(handshake::NamedIOInterface namedIO) {
-  auto inF = [&](unsigned idx) { return namedIO.getOperandName(idx); };
-  auto outF = [&](unsigned idx) { return namedIO.getResultName(idx); };
-  infer(namedIO, inF, outF);
+  // The Handshake terminator forwards its non-memory inputs to its outputs, so
+  // it needs port names for them
+  if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
+    handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "end must be child of handshake function");
+    size_t numResults = funcOp.getFunctionType().getNumResults();
+    for (size_t idx = 0, e = numResults; idx < e; ++idx)
+      outputs.push_back(endOp.getDefaultResultName(idx));
+  }
 }
 
 void PortNamer::inferFromFuncOp(handshake::FuncOp funcOp) {
@@ -368,8 +335,5 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
-
-
-}
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"
