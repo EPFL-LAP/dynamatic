@@ -239,8 +239,8 @@ struct AccessInfo {
   }
 };
 
-/// \note: Suppose it returns ArraySquashingInfo info. info[0] gives the
-/// information of the inner-most dimension
+/// \note: It returns ArraySquashingInfo info. info[0] gives the information of
+/// the outer-most dimension (same convention as GEP: from outer to inner)
 ArraySquashingInfo extractDimInfo(const isl::set &range,
                                   llvm::Type *allocaElemType) {
   ArraySquashingInfo info;
@@ -305,7 +305,9 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
 llvm::Type *getAllocaElemType(Type *baseElementType,
                               const ArraySquashingInfo &dims) {
   Type *elemTy = baseElementType;
-  for (auto [init, step, elems] : dims) {
+  // Reverse because dim is from outer to inner, but here the construction is
+  // from inner to outer
+  for (auto [init, step, elems] : llvm::reverse(dims)) {
     elemTy = ArrayType::get(elemTy, elems);
   }
   return elemTy;
@@ -518,15 +520,11 @@ llvm::Constant *constructGlobalConstantTensor(
 
   std::vector<llvm::Constant *> newArray;
 
-  // Current dimension: from the outer-most dimension (i.e., info.size() - 1) to
-  // the inner most (0)
-  unsigned currentDim = (info.size() - 1) - indices.size();
-
   // Iterate through the current dimension
-  auto &[firstIdx, step, elems] = info[currentDim];
+  auto &[firstIdx, step, elems] = info[indices.size()];
 
   //
-  llvm::errs() << "Current dim: " << currentDim << " firstIdx: " << firstIdx
+  llvm::errs() << "Current dim: " << indices.size() << " firstIdx: " << firstIdx
                << " step: " << step << " elems: " << elems << "\n";
 
   for (unsigned i = 0; i < elems; ++i) {
