@@ -167,6 +167,18 @@ void changeGEPBasePtr(Instruction *gepInst, Value *newBasePtr) {
 /// manages the indexing of all dimensions.
 void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
                        Type *newArrayType, const ArraySquashingInfo &info) {
+
+  // NOTE: This is a special case where findBaseGEP returns a load. This happens
+  // when we access Array[0][0]...[0]. In this case, we do not need to update
+  // the address calculation (because firstIndex must be 0, so "(idx -
+  // firstIndex) / step" must still be zero). We just need to update the address
+  if (auto *loadInst = dyn_cast<LoadInst>(gepInst)) {
+    if (loadInst->getPointerOperand() != newBasePtr) {
+      loadInst->setOperand(0, newBasePtr);
+    }
+    return;
+  }
+
   // Change the baseptr
   auto *gep = cast<GetElementPtrInst>(gepInst);
   if (gep->getPointerOperand() != newBasePtr) {
@@ -244,6 +256,17 @@ struct AccessInfo {
 ArraySquashingInfo extractDimInfo(const isl::set &range,
                                   llvm::Type *allocaElemType) {
   ArraySquashingInfo info;
+
+  // NULL range: this means that some accesses are not in the Scop and we don't
+  // know the access range of them. Here we simply return a full index range to
+  // be on the safe side.
+  if (range.is_null()) {
+    while (allocaElemType->isArrayTy()) {
+      info.emplace_back(0, 1, allocaElemType->getArrayNumElements());
+      allocaElemType = allocaElemType->getArrayElementType();
+    }
+    return info;
+  }
 
   llvm::errs() << "Enumerating points! with num dims\n";
 
@@ -451,8 +474,10 @@ void partitionVariableAlloca(llvm::AllocaInst *baseAlloca,
     auto *newAlloca = createAlloca(baseAlloca, dimInfo);
 
     for (auto *inst : group) {
-      changeGEPOperands(findBaseGEP(inst), newAlloca,
-                        newAlloca->getAllocatedType(), dimInfo);
+      auto *gepBase = findBaseGEP(inst);
+      llvm::errs() << "Changing GEP operands for " << *gepBase << "\n";
+      changeGEPOperands(gepBase, newAlloca, newAlloca->getAllocatedType(),
+                        dimInfo);
     }
   }
 }
@@ -571,8 +596,6 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
     for (auto *inst : group) {
       auto instRange = info.accessMaps[inst];
       range = range.unite(instRange);
-      llvm::errs() << "Inst Range: ";
-      dumpPw(instRange);
     }
 
     llvm::errs() << "Range: ";
@@ -585,10 +608,15 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
         constructGlobalConstantTensor(dimInfo, {}, gblConstant, dimInfo.size());
     constArray->dump();
 
-    // auto *gVar = new llvm::GlobalVariable(nid, arrayTy,
-    //                                       /*isConstant=*/true,
-    //                                       llvm::GlobalValue::InternalLinkage,
-    //                                       constArray, name);
+    auto *gVar = new llvm::GlobalVariable(
+        *mod, constArray->getType(),
+        /*isConstant=*/true, llvm::GlobalValue::InternalLinkage, constArray,
+        gblConstant->getName() + "duplicated");
+    for (auto *inst : group) {
+      auto *gepBase = findBaseGEP(inst);
+      llvm::errs() << "Changing GEP operands for " << *gepBase << "\n";
+      changeGEPOperands(gepBase, gVar, gVar->getValueType(), dimInfo);
+    }
   }
 }
 
