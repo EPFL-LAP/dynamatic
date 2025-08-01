@@ -5,7 +5,9 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -17,6 +19,7 @@
 #include "llvm/IR/Instructions.h"
 #include "isl/point.h"
 #include <boost/graph/connected_components.hpp>
+#include <boost/property_map/property_map.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -236,6 +239,8 @@ struct AccessInfo {
   }
 };
 
+/// \note: Suppose it returns ArraySquashingInfo info. info[0] gives the
+/// information of the inner-most dimension
 ArraySquashingInfo extractDimInfo(const isl::set &range,
                                   llvm::Type *allocaElemType) {
   ArraySquashingInfo info;
@@ -250,7 +255,7 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
     auto originalDimSize = allocaElemType->getArrayNumElements();
 
     auto dim0 = range.as_set().project_out(
-        isl::dim::set, /*starting from which dimension? */ i,
+        isl::dim::set, /*starting from which dimension? */ numDims - i - 1,
         /* how many dimensions? */ 1);
 
     std::vector<int> reachableIndices;
@@ -264,9 +269,9 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
       reachableIndices.push_back(actualVal);
       return isl::stat::ok();
     });
-    llvm::errs() << "Number of indices! " << reachableIndices.size() << "\n";
 
     llvm::errs() << "Dim " << i << " has " << reachableIndices.size() << "\n";
+    llvm::errs() << "Original dim sizes" << originalDimSize << "\n";
 
     assert(reachableIndices.size() <= originalDimSize &&
            "The number of reachable indices should not exceed the original "
@@ -348,7 +353,6 @@ void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
 /// \example: InstsPerGroup groups;
 /// groups[1] returns all the instructions in group 1
 using InstsPerGroup = std::vector<std::set<Instruction *>>;
-
 InstsPerGroup computeInstsPerGroup(const std::set<Instruction *> &setOfInsts,
                                    AccessInfo &info,
                                    AAManager::Result &aliasAnalysis) {
@@ -414,6 +418,182 @@ InstsPerGroup computeInstsPerGroup(const std::set<Instruction *> &setOfInsts,
   return groups;
 }
 
+void partitionVariableAlloca(llvm::AllocaInst *baseAlloca,
+                             std::set<Instruction *> &insts, AccessInfo &info,
+                             AAManager::Result &aliasAnalysis,
+                             isl::ctx islCtx) {
+  llvm::errs() << "Base alloca: " << *baseAlloca << "\n";
+
+  auto groups = computeInstsPerGroup(insts, info, aliasAnalysis);
+
+  if (groups.size() == 1) {
+    // Cannot partition the array: every memory instruction is conflicting
+    // with another one
+    return;
+  }
+
+  for (auto &group : groups) {
+    // Make an empty set (note: somehow if you just do "isl::union_set
+    // range;" it wouldn't work)
+    isl::union_set range = isl::union_set::empty(islCtx);
+
+    // This computes the union of all memory access indices in the group
+    for (auto *inst : group) {
+      auto instRange = info.accessMaps[inst];
+      range = range.unite(instRange);
+    }
+
+    auto dimInfo =
+        extractDimInfo(range.as_set(), baseAlloca->getAllocatedType());
+
+    auto *newAlloca = createAlloca(baseAlloca, dimInfo);
+
+    for (auto *inst : group) {
+      changeGEPOperands(findBaseGEP(inst), newAlloca,
+                        newAlloca->getAllocatedType(), dimInfo);
+    }
+  }
+}
+
+llvm::Constant *
+getElementFromGlobalArray(llvm::GlobalVariable *globVar,
+                          const std::vector<unsigned> &indices) {
+
+  if (!globVar->hasInitializer()) {
+    llvm::errs() << "Global variable does not have an initializer: "
+                 << globVar->getName() << "\n";
+    return nullptr;
+  }
+
+  llvm::Constant *init = globVar->getInitializer();
+  for (auto idx : llvm::drop_end(indices)) {
+    auto *array = llvm::dyn_cast<llvm::ConstantArray>(init);
+
+    if (!array) {
+      llvm::errs() << "Expected a constant array, but got: "
+                   << init->getType()->getTypeID() << "\n";
+      return nullptr;
+    }
+
+    if (idx >= array->getNumOperands()) {
+      llvm::errs() << "Invalid index " << idx << " for array\n";
+      return nullptr;
+    }
+    init = array->getOperand(idx);
+  }
+
+  auto *array = llvm::dyn_cast<llvm::ConstantDataArray>(init);
+
+  unsigned idx = indices.back();
+
+  if (!array) {
+    llvm::errs() << "Expected a constant data array, but got: "
+                 << init->getType()->getTypeID() << "\n";
+    return nullptr;
+  }
+
+  if (idx >= array->getNumElements()) {
+    llvm::errs() << "Invalid index " << idx << " for constant data array\n";
+    return nullptr;
+  }
+
+  init = array->getElementAsConstant(idx);
+
+  // init->dump();
+  // assert(init->isOneValue());
+
+  return init;
+}
+
+llvm::Constant *constructGlobalConstantTensor(
+    ArraySquashingInfo &info, const std::vector<unsigned> &indices,
+    llvm::GlobalVariable *originalGbl, unsigned dims) {
+
+  // The inner most dimension (i.e., this give a scalar value)
+  if (indices.size() == dims) {
+    return getElementFromGlobalArray(originalGbl, indices);
+  }
+
+  // Try to iterate through the current dimension, and make a new array constant
+
+  std::vector<llvm::Constant *> newArray;
+
+  // Current dimension: from the outer-most dimension (i.e., info.size() - 1) to
+  // the inner most (0)
+  unsigned currentDim = (info.size() - 1) - indices.size();
+
+  // Iterate through the current dimension
+  auto &[firstIdx, step, elems] = info[currentDim];
+
+  //
+  llvm::errs() << "Current dim: " << currentDim << " firstIdx: " << firstIdx
+               << " step: " << step << " elems: " << elems << "\n";
+
+  for (unsigned i = 0; i < elems; ++i) {
+    // Construct the new indices
+    std::vector<unsigned> newIndices = indices;
+    newIndices.push_back(firstIdx + step * i);
+
+    // Get the element from the original global variable
+    auto *element =
+        constructGlobalConstantTensor(info, newIndices, originalGbl, dims);
+    assert(element);
+    newArray.push_back(element);
+  }
+
+  Type *arrayType =
+      llvm::ArrayType::get(newArray.front()->getType(), newArray.size());
+
+  return llvm::ConstantArray::get(llvm::cast<llvm::ArrayType>(arrayType),
+                                  newArray);
+}
+
+void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
+                           std::set<Instruction *> &insts, AccessInfo &info,
+                           AAManager::Result &aliasAnalysis, isl::ctx islCtx
+
+) {
+  if (!gblConstant->hasInitializer())
+    return;
+
+  auto groups = computeInstsPerGroup(insts, info, aliasAnalysis);
+
+  if (groups.size() == 1) {
+    // Cannot partition the array: every memory instruction is conflicting
+    // with another one
+    return;
+  }
+
+  for (auto &group : groups) {
+    // Make an empty set (note: somehow if you just do "isl::union_set
+    // range;" it wouldn't work)
+    isl::union_set range = isl::union_set::empty(islCtx);
+
+    // This computes the union of all memory access indices in the group
+    for (auto *inst : group) {
+      auto instRange = info.accessMaps[inst];
+      range = range.unite(instRange);
+      llvm::errs() << "Inst Range: ";
+      dumpPw(instRange);
+    }
+
+    llvm::errs() << "Range: ";
+    dumpPw(range);
+
+    auto dimInfo = extractDimInfo(range.as_set(), gblConstant->getValueType());
+    // Get all the memory values accessed in the array:
+
+    auto *constArray =
+        constructGlobalConstantTensor(dimInfo, {}, gblConstant, dimInfo.size());
+    constArray->dump();
+
+    // auto *gVar = new llvm::GlobalVariable(nid, arrayTy,
+    //                                       /*isConstant=*/true,
+    //                                       llvm::GlobalValue::InternalLinkage,
+    //                                       constArray, name);
+  }
+}
+
 PreservedAnalyses ArrayPartition::run(Function &f,
                                       FunctionAnalysisManager &fam) {
 
@@ -430,6 +610,9 @@ PreservedAnalyses ArrayPartition::run(Function &f,
   auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
 
   auto &aliasAnalysis = fam.getResult<AAManager>(f);
+
+  // Needed for constructing the global constants
+  Module *mod = f.getParent();
 
   AccessInfo info;
 
@@ -449,6 +632,7 @@ PreservedAnalyses ArrayPartition::run(Function &f,
   unsigned scopId = 0;
   for (Region *r : rq) {
     if ((s = scopInfoAnalysis.getScop(r))) {
+      llvm::errs() << "Scop: " << s->getName() << "\n";
       for (auto &stmt : *s) {
         for (auto *memAccess : stmt) {
           auto *inst = memAccess->getAccessInstruction();
@@ -473,55 +657,35 @@ PreservedAnalyses ArrayPartition::run(Function &f,
           // e.g.,
           // - input: stmt[i, j] -> A[i, j] | i \in [0, N] and j \in [0, M]
           // - output: A[i, j] | i \in [0, N] and j \in [0, M]
-          info.accessMaps[inst] = currentMap.intersect_domain(domain).range();
+          isl::set range = currentMap.intersect_domain(domain).range();
+          llvm::errs() << "Range for " << *inst << ": ";
+          dumpPw(range);
+          info.accessMaps[inst] = range;
         }
       }
       scopId += 1;
     }
   }
 
+  // For each base address of the GEPs that are allocas (i.e., a separate RAM in
+  // HLS circuit), compute the optimal partitioning and create separate alloca
+  // instructions.
   for (auto [base, insts] : info.baseToInsts) {
-
-    if (!isa<Instruction>(base)) {
-      continue;
-    }
-
-    auto *baseAlloca = cast<AllocaInst>(base);
-    if (!baseAlloca) {
-      continue;
-    }
-
-    llvm::errs() << "Base alloca: " << *baseAlloca << "\n";
-
-    auto groups = computeInstsPerGroup(insts, info, aliasAnalysis);
-
-    if (groups.size() == 1) {
-      // Cannot partition the array: every memory instruction is conflicting
-      // with another one
-      continue;
-    }
-
-    for (auto &group : groups) {
-      // Make an empty set (note: somehow if you just do "isl::union_set
-      // range;" it wouldn't work)
-      isl::union_set range = isl::union_set::empty(islCtx);
-
-      // This computes the union of all memory access indices in the group
-      for (auto *inst : group) {
-        auto instRange = info.accessMaps[inst];
-        range = range.unite(instRange);
+    if (isa<Instruction>(base)) {
+      if (auto *allocaInst = dyn_cast<AllocaInst>(base)) {
+        // If the base is an alloca, we can partition it
+        partitionVariableAlloca(allocaInst, insts, info, aliasAnalysis, islCtx);
+      } else {
+        assert(false &&
+               "Base address of the GEP is not an alloca, cannot partition!");
       }
+    }
 
-      auto dimInfo =
-          extractDimInfo(range.as_set(), baseAlloca->getAllocatedType());
-
-      auto *newAlloca = createAlloca(baseAlloca, dimInfo);
-
-      for (auto *inst : group) {
-        changeGEPOperands(findBaseGEP(inst), newAlloca,
-                          newAlloca->getAllocatedType(), dimInfo);
+    if (isa<Constant>(base)) {
+      if (auto *globVar = dyn_cast<GlobalVariable>(base)) {
+        // If the base is a global variable, we can partition it
+        partitionGlobalAlloca(mod, globVar, insts, info, aliasAnalysis, islCtx);
       }
-      llvm::errs() << "\n";
     }
   }
   return PreservedAnalyses::all();
