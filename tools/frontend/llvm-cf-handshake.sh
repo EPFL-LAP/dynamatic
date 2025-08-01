@@ -126,8 +126,10 @@ $LLVM_BINS/opt -S \
   $OUT/clang_optimized.ll \
   > $OUT/clang_optimized_polly_canonicalized.ll
 
+# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
 $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
+  --polly-process-unprofitable \
   -passes="array-partition" \
   $OUT/clang_optimized_polly_canonicalized.ll \
   > $OUT/clang_array_partitioned.ll
@@ -157,6 +159,7 @@ $LLVM_BINS/opt -S \
 $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
   -polly-process-unprofitable \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
+  --polly-process-unprofitable \
   -passes="mem-dep-analysis" \
   $OUT/clang_array_partitioned_cleaned.ll \
   > $OUT/clang_optimized_dep_marked.ll
