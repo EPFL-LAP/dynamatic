@@ -250,6 +250,7 @@ void MAPBUFBuffers::setup() {
     // Create channel variables and constraints
     allChannels.push_back(channel);
     addChannelVars(channel, signals);
+    addCustomChannelConstraints(channel);
     addBlackboxConstraints(channel, ADD_SUB_DELAYS, COMPARATOR_DELAYS);
 
     if (isBackedge(channel))
@@ -273,19 +274,7 @@ void MAPBUFBuffers::setup() {
   }
 
   for (auto &result : channelsToBuffer) {
-    auto &channelProperties = channelProps[result];
-    // Ensure that the minimum number of slots is at least 1
-    channelProperties.minSlots = std::max(channelProperties.minSlots, 1U);
-    channelProperties.minTrans = std::max(channelProperties.minTrans, 1U);
-    channelProperties.minOpaque = std::max(channelProperties.minOpaque, 1U);
-
-    addCustomChannelConstraints(result);
-
-    Operation *producer = result.getDefiningOp();
-    Operation *consumer = *result.getUsers().begin();
-    // Insert buffers in the Subject Graph
-    experimental::BufferSubjectGraph::createAndInsertNewBuffer(
-        producer, consumer, "one_slot_break_dvr");
+    cutGraphEdges(result);
   }
 
   // Connect input/output nodes of Subject Graphs

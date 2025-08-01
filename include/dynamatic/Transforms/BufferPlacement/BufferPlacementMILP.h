@@ -26,6 +26,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
+#include "experimental/Support/SubjectGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
@@ -338,6 +339,11 @@ protected:
   // be removed in order to make the graph acyclic. Returns the Values
   // that needs to be buffered.
   std::vector<Value> findMinimumFeedbackArcSet();
+
+  // Places opaque and transparent buffers to the Dataflow graph channel,
+  // and places a one_slot_break_dvr buffer on the corresponding Subject Graph
+  // edge.
+  void cutGraphEdges(Value channel);
 
   /// Adds Gurobi variables to the MILP model for the provided Node.
   /// For Nodes corresponding to Channels, sets their Gurobi variables to

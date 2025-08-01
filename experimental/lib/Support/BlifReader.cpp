@@ -43,7 +43,7 @@ void Node::configureConstantNode() {
 }
 
 void Node::convertIOToChannel() {
-  assert((isInput || isOutput) &&
+  assert((isInput || isOutput || isChannelEdge) &&
          "The node should be an IO to convert it to a channel");
   isInput = false;
   isOutput = false;

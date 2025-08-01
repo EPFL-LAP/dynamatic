@@ -530,8 +530,8 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
 
   std::vector<NodeProcessingRule> rules = {{"condition", conditionNodes, false},
                                            {"data", inputNodes, false},
-                                           {"true", trueOut, true},
-                                           {"false", falseOut, true}};
+                                           {"trueOut", trueOut, true},
+                                           {"falseOut", falseOut, true}};
 
   processNodesWithRules(rules);
 }

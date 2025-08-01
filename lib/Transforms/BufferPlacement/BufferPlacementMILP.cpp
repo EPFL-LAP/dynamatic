@@ -825,8 +825,6 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   envFeedback.start();
   GRBModel modelFeedback = GRBModel(envFeedback);
 
-  int numOps = 0;
-
   // Maps operations to GRBVars that holds the topological order index of MLIR
   // Operations
   DenseMap<Operation *, GRBVar> opToGRB;
@@ -834,7 +832,6 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   funcInfo.funcOp.walk([&](Operation *op) {
     // Create a Gurobi variable for each operation, which will hold the order of
     // the Operation in the topological ordering
-    ++numOps;
     StringRef uniqueName = getUniqueName(op);
     GRBVar operationVariable = modelFeedback.addVar(
         0, GRB_INFINITY, 0.0, GRB_INTEGER, uniqueName.str());
@@ -902,6 +899,22 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   }
 
   return channelsToBuffer;
+}
+
+void BufferPlacementMILP::cutGraphEdges(Value channel){
+      Operation *producer = channel.getDefiningOp();
+    Operation *consumer = *channel.getUsers().begin(); 
+    // 
+    GRBVar &bufVar =
+        vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
+    model.addConstr(bufVar == 1, "backedge_ready");
+
+    GRBVar &bufVarData =
+        vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
+    model.addConstr(bufVarData == 1, "backedge_data");
+    // Insert buffers in the Subject Graph
+    experimental::BufferSubjectGraph::createAndInsertNewBuffer(
+        producer, consumer, "one_slot_break_dvr");
 }
 
 unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
