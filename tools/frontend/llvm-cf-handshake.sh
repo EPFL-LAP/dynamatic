@@ -154,6 +154,8 @@ $LLVM_BINS/opt -S \
 # a loop depth of 1
 # ===============================
 # ------------------------------------------------------------------------------
+
+# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
 $LLVM_BINS/opt -S \
   -passes="mem-dep-analysis" \
   --polly-process-unprofitable \
