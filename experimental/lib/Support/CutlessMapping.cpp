@@ -119,7 +119,8 @@ std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
 // of the previous wavy lines, i.e., the (n−i)-th wavy line for any i such that
 // 0 < i ≤ n. For example, nodes in the third wavy line may be implemented using
 // nodes from the first or second wavy line.
-static NodeToCuts cutAlgorithm(LogicNetwork *blif, size_t lutSize, bool includeChannels) {
+static NodeToCuts cutAlgorithm(LogicNetwork *blif, size_t lutSize,
+                               bool includeChannels) {
   NodeToCuts cuts;
   // First wavy line consists of the Primary Inputs of the circuit.
   std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
