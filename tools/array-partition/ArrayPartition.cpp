@@ -188,19 +188,11 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
 
   gep->setSourceElementType(newArrayType);
 
-  // NOTE:
-  // - the info stores incresing dimensions
-  // - when you iterate through gep index, you get decreasing dimensions
-  //
+  // NOTE: Both GEP and info store descreasing dimensions.
   // Example: A[3][4][5]
-  // - Info goes from 5 -> 4 -> 3
-  // - GEP indices go from 3 -> 4 -> 5
-  llvm::errs() << "Changing GEP operands for " << *gep << "\n";
+  // - We iterate through 3 -> 4 -> 5
   for (unsigned i = 0; i < info.size(); i++) {
-    auto [firstIndex, step, elems] = info[info.size() - i - 1];
-
-    llvm::errs() << "i " << i << " firstIndex " << firstIndex << " step "
-                 << step << " elems " << elems << "\n";
+    auto [firstIndex, step, elems] = info[i];
 
     // The GEP indices have an extra preceeding zero index, here we skip it if
     // it is the case (i.e., gep->getNumIndices() == info.size() + 1)
@@ -268,8 +260,6 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
     return info;
   }
 
-  llvm::errs() << "Enumerating points! with num dims\n";
-
   // example: A[N][M] gives you 2 dimensions
   auto numDims = unsignedFromIslSize(range.as_set().dim(isl::dim::set));
 
@@ -292,9 +282,6 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
       reachableIndices.push_back(actualVal);
       return isl::stat::ok();
     });
-
-    llvm::errs() << "Dim " << i << " has " << reachableIndices.size() << "\n";
-    llvm::errs() << "Original dim sizes" << originalDimSize << "\n";
 
     assert(reachableIndices.size() <= originalDimSize &&
            "The number of reachable indices should not exceed the original "
@@ -447,8 +434,6 @@ void partitionVariableAlloca(llvm::AllocaInst *baseAlloca,
                              std::set<Instruction *> &insts, AccessInfo &info,
                              AAManager::Result &aliasAnalysis,
                              isl::ctx islCtx) {
-  llvm::errs() << "Base alloca: " << *baseAlloca << "\n";
-
   auto groups = computeInstsPerGroup(insts, info, aliasAnalysis);
 
   if (groups.size() == 1) {
@@ -475,7 +460,6 @@ void partitionVariableAlloca(llvm::AllocaInst *baseAlloca,
 
     for (auto *inst : group) {
       auto *gepBase = findBaseGEP(inst);
-      llvm::errs() << "Changing GEP operands for " << *gepBase << "\n";
       changeGEPOperands(gepBase, newAlloca, newAlloca->getAllocatedType(),
                         dimInfo);
     }
@@ -548,10 +532,6 @@ llvm::Constant *constructGlobalConstantTensor(
   // Iterate through the current dimension
   auto &[firstIdx, step, elems] = info[indices.size()];
 
-  //
-  llvm::errs() << "Current dim: " << indices.size() << " firstIdx: " << firstIdx
-               << " step: " << step << " elems: " << elems << "\n";
-
   for (unsigned i = 0; i < elems; ++i) {
     // Construct the new indices
     std::vector<unsigned> newIndices = indices;
@@ -598,9 +578,6 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
       range = range.unite(instRange);
     }
 
-    llvm::errs() << "Range: ";
-    dumpPw(range);
-
     auto dimInfo = extractDimInfo(range.as_set(), gblConstant->getValueType());
     // Get all the memory values accessed in the array:
 
@@ -614,7 +591,6 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
         gblConstant->getName() + "duplicated");
     for (auto *inst : group) {
       auto *gepBase = findBaseGEP(inst);
-      llvm::errs() << "Changing GEP operands for " << *gepBase << "\n";
       changeGEPOperands(gepBase, gVar, gVar->getValueType(), dimInfo);
     }
   }
@@ -658,7 +634,6 @@ PreservedAnalyses ArrayPartition::run(Function &f,
   unsigned scopId = 0;
   for (Region *r : rq) {
     if ((s = scopInfoAnalysis.getScop(r))) {
-      llvm::errs() << "Scop: " << s->getName() << "\n";
       for (auto &stmt : *s) {
         for (auto *memAccess : stmt) {
           auto *inst = memAccess->getAccessInstruction();
@@ -666,7 +641,11 @@ PreservedAnalyses ArrayPartition::run(Function &f,
           info.instToScopId[inst] = scopId;
 
           // Find the access
-          auto &memoryAccess = stmt.getArrayAccessFor(inst);
+          auto *memoryAccess = stmt.getArrayAccessOrNULLFor(inst);
+
+          if (!memoryAccess) {
+            continue;
+          }
 
           // Maps iteration indices to array access indices:
           // example:
@@ -674,7 +653,7 @@ PreservedAnalyses ArrayPartition::run(Function &f,
           // stmt[i, j] -> B[i, j - 1]
           // NOTE:
           // - The base address might be different for different maps.
-          isl::map currentMap = memoryAccess.getLatestAccessRelation();
+          isl::map currentMap = memoryAccess->getLatestAccessRelation();
 
           // The domain of the map, e.g., the loop bounds for the iterators.
           isl::set domain = stmt.getDomain();
@@ -684,8 +663,6 @@ PreservedAnalyses ArrayPartition::run(Function &f,
           // - input: stmt[i, j] -> A[i, j] | i \in [0, N] and j \in [0, M]
           // - output: A[i, j] | i \in [0, N] and j \in [0, M]
           isl::set range = currentMap.intersect_domain(domain).range();
-          llvm::errs() << "Range for " << *inst << ": ";
-          dumpPw(range);
           info.accessMaps[inst] = range;
         }
       }
