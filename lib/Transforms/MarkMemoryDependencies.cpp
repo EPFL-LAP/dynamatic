@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -163,8 +164,8 @@ LogicalResult MarkMemoryDependenciesPass::checkAffineAccessPair(
     StringRef dstName = namer.getName(dstOp);
     if (result.value == DependenceResult::HasDependence) {
       // Add the dependence to the source operation
-      opDeps[srcOp].push_back(
-          MemDependenceAttr::get(ctx, dstName, loopDepth, components));
+      opDeps[srcOp].push_back(MemDependenceAttr::get(
+          ctx, StringAttr::get(ctx, dstName), loopDepth));
     } else if (result.value == DependenceResult::Failure) {
       return srcOp->emitError()
              << "Dependence check failed with memory access '" << dstName
@@ -186,7 +187,7 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   StringRef dstName = namer.getName(dstOp);
   opDeps[srcOp].push_back(MemDependenceAttr::get(
-      &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{}));
+      &getContext(), mlir::StringAttr::get(srcOp->getContext(), dstName), 0));
 
   return success();
 }
