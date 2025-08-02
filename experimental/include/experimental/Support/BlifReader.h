@@ -18,8 +18,8 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Value.h"
+#include "llvm/Support/raw_ostream.h"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -102,7 +102,8 @@ public:
   // node. This function is used to merge different LogicNetwork objects. Input
   // node of one LogicNetwork object is connected to the output node of
   // LogicNetwork object that comes before it.
-  static void connectNodes(Node *currentNode, Node *previousNode, Value channel) {
+  static void connectNodes(Node *currentNode, Node *previousNode,
+                           Value channel) {
     currentNode->nodeMLIRValue = channel;
     previousNode->nodeMLIRValue = channel;
 
@@ -167,13 +168,13 @@ struct NodePtrEqual {
 };
 
 struct NodePairHash {
-    std::size_t operator()(const std::pair<Node*, Node*>& p) const {
-        auto h1 = NodePtrHash{}(p.first);
-        auto h2 = NodePtrHash{}(p.second);
-        
-        // Simple hash function using bit shifting and XOR
-        return h1 ^ (h2 << 1);
-    }
+  std::size_t operator()(const std::pair<Node *, Node *> &p) const {
+    auto h1 = NodePtrHash{}(p.first);
+    auto h2 = NodePtrHash{}(p.second);
+
+    // Simple hash function using bit shifting and XOR
+    return h1 ^ (h2 << 1);
+  }
 };
 
 /// Manages a collection of interconnected nodes representing a

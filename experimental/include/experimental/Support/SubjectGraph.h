@@ -84,7 +84,7 @@ public:
 
   // Operation that the SubjectGraph is based on
   Operation *op;
-  
+
   // The populated maps store channel-specific information that connects
   // SubjectGraphs together. Each SubjectGraph has a position in the vector
   // which determines what type of data it handles (e.g., data, address, index).
