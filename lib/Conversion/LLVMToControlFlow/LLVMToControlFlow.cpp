@@ -1,4 +1,5 @@
 #include "dynamatic/Conversion/LLVMToControlFlow.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -34,6 +35,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <optional>
+
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -316,6 +319,15 @@ SmallVector<Type> getFuncArgTypes(const std::string &funcName,
 
 namespace {
 
+// Copy the attributes obtained from the MemDepAnalysis LLVM pass to the newly
+// created op
+void copyMemDepAnalysisAttrs(Operation *op, Operation *newOp) {
+  newOp->setAttr(NameAnalysis::ATTR_NAME,
+                 op->getAttrOfType<StringAttr>(NameAnalysis::ATTR_NAME));
+
+  copyDialectAttr<dynamatic::handshake::MemDependenceArrayAttr>(op, newOp);
+}
+
 struct ConvertLLVMFuncOp : public OpConversionPattern<LLVM::LLVMFuncOp> {
 
   // Map: Function names -> "List of ArgTypes in the original C code".
@@ -474,11 +486,11 @@ struct GEPToMemRefLoadAndStore : public OpConversionPattern<LLVM::GEPOp> {
         auto newLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
             loadOp, loadOp.getResult().getType(), gepBasePtr,
             ValueRange(indexValues));
-        newLoadOp->setAttrs(op->getAttrDictionary().getValue());
+        copyMemDepAnalysisAttrs(op, newLoadOp);
       } else if (auto storeOp = dyn_cast<LLVM::StoreOp>(op)) {
         auto newStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
             storeOp, storeOp.getValue(), gepBasePtr, ValueRange(indexValues));
-        newStoreOp->setAttrs(op->getAttrDictionary().getValue());
+        copyMemDepAnalysisAttrs(op, newStoreOp);
       } else {
         op->emitError("Unhandled child operation of GEP!");
         assert(false &&
@@ -516,7 +528,7 @@ struct LLVMLoadWithConstantIndex : OpConversionPattern<LLVM::LoadOp> {
     }
     auto newOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, op.getResult().getType(), address, ValueRange(indexValues));
-    newOp->setAttrs(op->getAttrDictionary().getValue());
+    copyMemDepAnalysisAttrs(op, newOp);
     return success();
   }
 };
@@ -546,7 +558,7 @@ struct LLVMStoreWithConstantIndex : OpConversionPattern<LLVM::StoreOp> {
     }
     auto newOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, adapter.getValue(), address, ValueRange(indexValues));
-    newOp->setAttrs(op->getAttrDictionary().getValue());
+    copyMemDepAnalysisAttrs(op, newOp);
     return success();
   }
 };
