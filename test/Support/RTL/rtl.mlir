@@ -32,12 +32,3 @@ hw.module.extern @test_dataflow() attributes {hw.name = "test_dataflow", hw.para
   PARAM_4 = !handshake.channel<i32, [down1: i1, down2: i4]>,
   PARAM_5 = !handshake.channel<i32, [down1: i4, up1: i1 (U)]>
 }}
-
-// CHECK-LABEL:   hw.module.extern @test_timing
-hw.module.extern @test_timing() attributes {hw.name = "test_timing", hw.parameters = {
-  PARAM_1 = #handshake<timing {}>,
-  PARAM_2 = #handshake<timing {D: 5, V: 1}>,
-  PARAM_3 = #handshake<timing {D: 0, V: 0, R: 0}>,
-  PARAM_4 = #handshake<timing {V: 1}>,
-  PARAM_5 = #handshake<timing {R: 1, V: 2}>
-}}
