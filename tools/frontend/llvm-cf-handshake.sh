@@ -18,7 +18,7 @@ FUNC_NAME=$3
 [ -f "$F_SRC" ] || { echo "$F_SRC is not a file!"; exit 1;}
 
 # Will be change to standard path in the future (i.e., out/comp).
-OUT=/tmp/dhls-frontend-output
+OUT="./out-$FUNC_NAME"
 rm -rf $OUT
 mkdir -p $OUT
 
@@ -78,6 +78,7 @@ $LLVM_BINS/opt -S \
 # a loop depth of 1
 # ===============================
 $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
+  -polly-process-unprofitable \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   > $OUT/clang_optimized_dep_marked.ll
@@ -113,7 +114,6 @@ $DYNAMATIC_BINS/dynamatic-opt \
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/cf.mlir \
   --func-set-arg-names="source=$F_SRC" \
-  --mark-memory-dependencies \
   --flatten-memref-row-major \
   --canonicalize \
   --push-constants \
