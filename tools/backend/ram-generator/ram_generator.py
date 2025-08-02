@@ -65,7 +65,7 @@ entity MODULE_NAME is
 end entity;
 
 architecture arch of MODULE_NAME is
-  type ram_type is array (SIZE - 1 downto 0) of std_logic_vector(DATA_WIDTH - 1 downto 0);
+  type ram_type is array (0 to SIZE - 1) of std_logic_vector(DATA_WIDTH - 1 downto 0);
   INITIAL_BLOCK
 begin
   read_proc : process(clk)
