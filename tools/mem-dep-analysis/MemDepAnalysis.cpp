@@ -857,7 +857,7 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
   }
 
   for (auto [src, dests] : deps) {
-    dests.serializeToLLVMMetaDataNode(ctx, src);
+    dests.toLLVMMetaDataNode(ctx, src);
   }
 
   return PreservedAnalyses::all();

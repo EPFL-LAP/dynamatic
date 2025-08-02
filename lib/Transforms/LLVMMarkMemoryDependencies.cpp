@@ -76,14 +76,14 @@ retriveLoadStoreAnalysisDataFromMetaData(Function &f) {
     for (llvm::Instruction &instr : bb) {
       if (llvm::LoadInst *loadInstr = llvm::dyn_cast<llvm::LoadInst>(&instr)) {
         std::optional<LLVMMemDependency> dep =
-            LLVMMemDependency::unserializeFromInstruction(loadInstr);
+            LLVMMemDependency::fromLLVMInstruction(loadInstr);
         if (dep.has_value()) {
           items.push_back(dep.value());
         }
       } else if (llvm::StoreInst *storeInstr =
                      llvm::dyn_cast<llvm::StoreInst>(&instr)) {
         std::optional<LLVMMemDependency> dep =
-            LLVMMemDependency::unserializeFromInstruction(storeInstr);
+            LLVMMemDependency::fromLLVMInstruction(storeInstr);
         if (dep.has_value()) {
           items.push_back(dep.value());
         }

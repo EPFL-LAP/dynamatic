@@ -33,8 +33,8 @@ struct LLVMMemDependency {
   // depth of the dependency (TODO: why do we care about the loop depth?).
   std::vector<std::pair<std::string, unsigned>> destAndDepth;
 
-  /// \brief: Convert the stored memory dependency values into a list of memory
-  /// dependence attributes
+  // Convert the stored memory dependency values into a list of memory
+  // dependence attributes
   llvm::SmallVector<dynamatic::handshake::MemDependenceAttr>
   getMemoryDependenceAttrs(mlir::MLIRContext &ctx) {
 
@@ -56,7 +56,7 @@ struct LLVMMemDependency {
   /// the following way:
   ///
   /// - A metadata node with key METADATA_DEPENDENCY.
-  /// - In side the metadata node above, there is a list of tuples, each has
+  /// - Inside the metadata node above, there is a list of tuples, each has
   /// (memoryOpName, loopDepth)
   ///
   /// Using json notation, an example of such a meta data node would be:
@@ -67,10 +67,9 @@ struct LLVMMemDependency {
   ///     ("store2", 1)
   ///   ]
   /// }
-  void serializeToLLVMMetaDataNode(llvm::LLVMContext &ctx,
-                                   llvm::Instruction *inst) {
+  void toLLVMMetaDataNode(llvm::LLVMContext &ctx, llvm::Instruction *inst) {
     llvm::SmallVector<llvm::Metadata *, 10> mdVals;
-    for (const auto &[dstName, depth] : destAndDepth) {
+    for (const auto &[dstName, depth] : this->destAndDepth) {
       mdVals.push_back(llvm::MDNode::get(
           ctx, {llvm::MDString::get(ctx, dstName),
                 llvm::MDString::get(ctx, std::to_string(depth))}));
@@ -79,12 +78,12 @@ struct LLVMMemDependency {
                       llvm::MDNode::get(ctx, llvm::ArrayRef(mdVals)));
   }
 
-  /// \brief: This attempts to construct a *this from the meta data available
-  /// from a given instruction. This assumes that:
+  /// \brief: This factory function attempts to construct a *this from the meta
+  /// data available from a given instruction. This function assumes that:
   /// - The instruction has a metadata node called !handshake.name
   /// - The instruction has a metadata node called !METADATA_DEPENDENCY
   static std::optional<LLVMMemDependency>
-  unserializeFromInstruction(llvm::Instruction *inst) {
+  fromLLVMInstruction(llvm::Instruction *inst) {
 
     if (!llvm::isa<llvm::LoadInst, llvm::StoreInst>(inst)) {
       // We can not possibly get LLVMMemDependency from ops other than loads and
@@ -96,17 +95,18 @@ struct LLVMMemDependency {
 
     auto *nameMetaData = inst->getMetadata(dynamatic::NameAnalysis::ATTR_NAME);
 
-    if (!nameMetaData /* the operation is not named in the LLVM pass */) {
+    if (!nameMetaData /* the operation is not named in the MemDepAnalysis pass */) {
       return std::nullopt;
     }
 
+    // This metadata node has name METADATA_NAME, it contains a list of tuples:
+    // {!depTupleNode1, !depTupleNode2, ...}
     llvm::MDString *data =
         llvm::dyn_cast<llvm::MDString>(nameMetaData->getOperand(0));
 
+    // This checks if the metadata node is indeed called METADATA_DEPENDENCY
     depData.name = data->getString().str();
-
     auto *depsMetaDataNode = inst->getMetadata(METADATA_DEPENDENCY);
-
     if (!depsMetaDataNode) {
       return depData;
     }

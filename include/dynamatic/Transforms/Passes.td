@@ -462,7 +462,7 @@ def LLVMMarkMemoryDependencies : Pass<"llvm-mark-memory-dependencies"> {
 
   let description = [{The mlir-translate only retains very few types of meta
   data from the original LLVMIR. This pass assumes that the LLVM IR and MLIR
-  have identical sequence in the operations and converts the memory dependency
+  have identically ordered operations and converts the memory dependency
   metadata nodes in the original IR into MLIR attributes. This pass is a
   temporary solution: we should eliminate the middle step of converting to LLVM
   dialect and directly convert from LLVM IR to CF, and implement the dependency
