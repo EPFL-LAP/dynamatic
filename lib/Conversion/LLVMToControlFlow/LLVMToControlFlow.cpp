@@ -1010,4 +1010,24 @@ void LLVMToControlFlowPass::runOnOperation() {
     llvm::errs() << "Failed to convert all remaining trivial patterns!\n";
     return signalPassFailure();
   }
+
+  // Remove all the unused llvm.mlir.global's
+  DenseMap<StringRef, LLVM::GlobalOp> globalConstants;
+  SmallVector<StringRef> usedGlobalNames;
+
+  modOp.walk([&](LLVM::GlobalOp globalOp) {
+    globalConstants[globalOp.getName()] = globalOp;
+  });
+
+  modOp.walk([&](LLVM::AddressOfOp addressOfOp) {
+    auto globalName = addressOfOp.getGlobalName();
+    usedGlobalNames.push_back(globalName);
+  });
+
+  for (auto &global : globalConstants) {
+    if (!llvm::is_contained(usedGlobalNames, global.first)) {
+      // If the global constant is not used, remove it.
+      global.second.erase();
+    }
+  }
 }
