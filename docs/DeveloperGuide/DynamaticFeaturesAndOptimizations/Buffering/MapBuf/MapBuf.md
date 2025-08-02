@@ -26,14 +26,12 @@ The algorithm consists of 2 main parts, AIG generation and main buffer placement
 To run MapBuf, BLIF files must first be generated. These can be created using the provided [BLIF generation script](https://github.com/EPFL-LAP/dynamatic/blob/main/tools/blif-generator/blif_generator.py) or obtained from the [dataflow-aig-library](https://github.com/ETHZ-DYNAMO/dataflow-aig-library) submodule.
 
 ### Main Buffer Placement Pass
-1) The dataflow graph edges that 
 
 1. Acyclic Graph Creation
 - Takes the dataflow circuit and finds which channels need to be broken in order to have an acyclic graph.
 - Such channels can be found by either Cut Loopbacks method or Minimum Feedback Arc Set method, implemented in [BufferPlacementMILP.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Transforms/BufferPlacement/BufferPlacementMILP.cpp).
 
 2. Read AIGs
-
 - Takes the dataflow circuit and reads the AIGs corresponding to the dataflow units. Generates individual Subject Graph classes of units.
 - Uses [BlifReader.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/BlifReader.cpp) to read BLIF representations of the AIGs and [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/SubjectGraph.cpp) to create Subject Graphs.
 
@@ -45,7 +43,6 @@ To run MapBuf, BLIF files must first be generated. These can be created using th
 - Generates K-feasible cuts of the merged AIG, using the algorithm implemented in [CutlessMapping.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/CutlessMapping.cpp).
 
 5. Formulate MILP Problem
-
 - Creates a Mixed-Integer Linear Programming problem that simultaneously considers:
 	- Buffer placement decisions
 

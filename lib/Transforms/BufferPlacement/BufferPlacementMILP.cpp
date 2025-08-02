@@ -901,20 +901,20 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   return channelsToBuffer;
 }
 
-void BufferPlacementMILP::cutGraphEdges(Value channel){
-      Operation *producer = channel.getDefiningOp();
-    Operation *consumer = *channel.getUsers().begin(); 
-    // 
-    GRBVar &bufVar =
-        vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
-    model.addConstr(bufVar == 1, "backedge_ready");
+void BufferPlacementMILP::cutGraphEdges(Value channel) {
+  Operation *producer = channel.getDefiningOp();
+  Operation *consumer = *channel.getUsers().begin();
+  //
+  GRBVar &bufVar =
+      vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
+  model.addConstr(bufVar == 1, "backedge_ready");
 
-    GRBVar &bufVarData =
-        vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
-    model.addConstr(bufVarData == 1, "backedge_data");
-    // Insert buffers in the Subject Graph
-    experimental::BufferSubjectGraph::createAndInsertNewBuffer(
-        producer, consumer, "one_slot_break_dvr");
+  GRBVar &bufVarData =
+      vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
+  model.addConstr(bufVarData == 1, "backedge_data");
+  // Insert buffers in the Subject Graph
+  experimental::BufferSubjectGraph::createAndInsertNewBuffer(
+      producer, consumer, "one_slot_break_dvr");
 }
 
 unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
