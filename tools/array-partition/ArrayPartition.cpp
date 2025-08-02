@@ -510,9 +510,6 @@ getElementFromGlobalArray(llvm::GlobalVariable *globVar,
 
   init = array->getElementAsConstant(idx);
 
-  // init->dump();
-  // assert(init->isOneValue());
-
   return init;
 }
 
@@ -583,7 +580,6 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
 
     auto *constArray =
         constructGlobalConstantTensor(dimInfo, {}, gblConstant, dimInfo.size());
-    constArray->dump();
 
     auto *gVar = new llvm::GlobalVariable(
         *mod, constArray->getType(),
