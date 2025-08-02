@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <utility>
 
+#include "llvm/Analysis/ValueTracking.h"
+
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/MemoryDependency.h"
 
@@ -522,6 +524,8 @@ bool hasMemoryReadOrWrite(ScopStmt &stmt) {
   return hasRdWr;
 }
 
+// Returns the base address produced by the alloca instruction or the global
+// constant declaration.
 Value *findBaseInternal(Value *addr) {
   if (auto *arg = dyn_cast<Argument>(addr)) {
     if (!arg->getType()->isPointerTy())
@@ -529,8 +533,9 @@ Value *findBaseInternal(Value *addr) {
     return addr;
   }
 
+  // Example: returns a global constant or variable
   if (isa<Constant>(addr))
-    llvm_unreachable("Cannot determine base address of Constant");
+    return addr;
 
   if (auto *inst = dyn_cast_or_null<Instruction>(addr)) {
     if (isa<AllocaInst>(inst))
