@@ -5,6 +5,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
@@ -40,9 +41,10 @@ struct LLVMMemDependency {
     llvm::SmallVector<dynamatic::handshake::MemDependenceAttr> attrs;
 
     for (const auto &[dstName, depth] : destAndDepth) {
+
+      auto dstNameAttr = mlir::StringAttr::get(&ctx, dstName);
       auto attr = dynamatic::handshake::MemDependenceAttr::get(
-          &ctx, dstName, depth,
-          mlir::ArrayRef<mlir::affine::DependenceComponent>{});
+          &ctx, dstNameAttr, depth);
       attrs.push_back(attr);
     }
 
