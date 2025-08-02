@@ -300,8 +300,7 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
 
     // Subcircuits. not used for now.
     else if (line.find(".subckt") == 0) {
-      llvm::errs() << "Subcircuits not supported "
-                   << "\n";
+      llvm::errs() << "Subcircuits not supported " << "\n";
       continue;
     }
 

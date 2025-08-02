@@ -36,10 +36,10 @@ class Cut {
 public:
   // Constructor for trivial cuts, which only have itself as a leaf.
   Cut(Node *root, Node *leaf, int depth = 0)
-      : depth(depth), root(root), leaves({leaf}) {};
+      : depth(depth), root(root), leaves({leaf}){};
   // Constructor for non-trivial cuts
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
-      : depth(depth), root(root), leaves({leaves}) {};
+      : depth(depth), root(root), leaves({leaves}){};
 
   // Returns the depth of a cut, which is the number of wavy lines below the
   // root node
