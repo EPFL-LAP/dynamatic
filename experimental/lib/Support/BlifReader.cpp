@@ -43,7 +43,7 @@ void Node::configureConstantNode() {
 }
 
 void Node::convertIOToChannel() {
-  assert((isInput || isOutput) &&
+  assert((isInput || isOutput || isChannelEdge) &&
          "The node should be an IO to convert it to a channel");
   isInput = false;
   isOutput = false;
@@ -300,8 +300,7 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
 
     // Subcircuits. not used for now.
     else if (line.find(".subckt") == 0) {
-      llvm::errs() << "Subcircuits not supported "
-                   << "\n";
+      llvm::errs() << "Subcircuits not supported " << "\n";
       continue;
     }
 

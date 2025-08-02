@@ -24,6 +24,9 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Support/BlifReader.h"
+#include "experimental/Support/CutlessMapping.h"
+#include "experimental/Support/SubjectGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
@@ -289,6 +292,63 @@ protected:
   /// It is only valid to call this method after having added variables for the
   /// CFDFC to the model.
   void addUnitThroughputConstraints(CFDFC &cfdfc);
+
+  // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
+  // CMPI modules or any other component that is not directly implemented as an
+  // LUT. These delays are retrieved from Vivado Timing Reports. Ready and Valid
+  // signals are not blackboxed.
+  void addBlackboxConstraints(Value channel,
+                              const std::map<unsigned int, double> &addDelays,
+                              const std::map<unsigned int, double> &cmpDelays);
+
+  // Adds Cut Selection Constraints, ensuring that only 1 cut is selected per
+  // node.
+  void addCutSelectionConstraints(std::vector<experimental::Cut> &cutVector);
+
+  // Adds Cut Selection Conflict Constraints. These constraints ensure that
+  // either a buffer is placed on a DFG edge or the cut that containts that edge
+  // is selected.
+  void addCutSelectionConflicts(experimental::Node *root,
+                                experimental::Node *leaf,
+                                GRBVar &cutSelectionVar,
+                                experimental::LogicNetwork *blifData,
+                                std::vector<experimental::Node *> &path);
+
+  // Add clock period constraints for subject graph edges. For subject graph
+  // edges, only a single timing variable is required, as opposed to data flow
+  // graph edges where two timing variables are required. Also adds constraints
+  // for primary inputs and constants.
+  void addClockPeriodConstraintsNodes(experimental::LogicNetwork *blifData);
+
+  // Adds Delay Propagation Constraints for all the cuts by looping over cuts
+  // map. If a node has only one fanin, delay is propagated from the fanin.
+  // Otherwise, delay is propagated from the leaves of the cut. Loops over the
+  // leaves of the cut and adds delay propagation constraints for each leaf.
+  // Also adds cut selection conflict constraints.
+  void addDelayAndCutConflictConstraints(
+      experimental::Node *root, std::vector<experimental::Cut> &cutVector,
+      experimental::LogicNetwork *blifData, double lutDelay);
+
+  // This is an alternative method to cutting loopbacks to create
+  // an acyclic graph. This function converts the cyclic dataflow graph into an
+  // acyclic graph by determining the Minimum Feedback Arc Set (MFAS). A graph
+  // can only be acyclic if a topological ordering can be found. An additional
+  // MILP is used here, which enforces a topological ordering. Since our graph
+  // is cyclic, a topological ordering cannot be found without removing some
+  // edges. The MILP formulated here minimizes the number of edges that needs to
+  // be removed in order to make the graph acyclic. Returns the Values
+  // that needs to be buffered.
+  std::vector<Value> findMinimumFeedbackArcSet();
+
+  // Places opaque and transparent buffers to the Dataflow graph channel,
+  // and places a one_slot_break_dvr buffer on the corresponding Subject Graph
+  // edge.
+  void cutGraphEdges(Value channel);
+
+  /// Adds Gurobi variables to the MILP model for the provided Node.
+  /// For Nodes corresponding to Channels, sets their Gurobi variables to
+  /// Channel Variables. For other Nodes, creates new Gurobi Variables.
+  void addNodeVars(experimental::LogicNetwork *blifData);
 
   /// Returns an estimation of the number of times a token will be transfered on
   /// the input channel. The estimation is based on the Handshake function's
