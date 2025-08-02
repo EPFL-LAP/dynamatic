@@ -529,8 +529,9 @@ Value *findBaseInternal(Value *addr) {
     return addr;
   }
 
-  if (isa<Constant>(addr))
-    llvm_unreachable("Cannot determine base address of Constant");
+  if (isa<Constant>(addr)) {
+    return addr;
+  }
 
   if (auto *inst = dyn_cast_or_null<Instruction>(addr)) {
     if (isa<AllocaInst>(inst))
