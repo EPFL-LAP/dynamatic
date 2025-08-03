@@ -1,4 +1,4 @@
-# Cutless Mapping
+# Technology Mapping
 
 This file provides support for technology mapping algorithm used in MapBuf that generates K-feasible cuts to map Subject Graph nodes to K-input LUTs.
 

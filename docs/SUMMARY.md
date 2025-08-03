@@ -55,9 +55,10 @@
 
 - [Dynamatic Features And Optimizations]()
   - [Buffering](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/Buffering.md)
-    - [MapBuf](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf.md)
+    - [MapBuf](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/MapBuf.md)
       - [Blif Generator](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/BlifGenerator.md)
       - [Blif Reader](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/BlifReader.md)
+      - [Technology Mapping](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/TechnologyMapping.md)
       - [Subject Graph](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/SubjectGraph.md)
   - [Formal Properties](DeveloperGuide/DynamaticFeaturesAndOptimizations/FormalProperties.md)
   - [LSQ](DeveloperGuide/DynamaticFeaturesAndOptimizations/LSQ/LSQ.md)
