@@ -27,6 +27,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <filesystem>
 
 #include "experimental/Support/SubjectGraph.h"
 #include <algorithm>
@@ -875,6 +876,21 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
                                                     StringRef blifFiles) {
   baseBlifPath = blifFiles;
   std::vector<BaseSubjectGraph *> subjectGraphs;
+
+  if (!std::filesystem::exists(baseBlifPath) ||
+      !std::filesystem::is_directory(baseBlifPath) ||
+      std::none_of(std::filesystem::directory_iterator(baseBlifPath),
+                   std::filesystem::directory_iterator{},
+                   [](const std::filesystem::directory_entry &e) {
+                     return std::filesystem::is_directory(e);
+                   })) {
+    llvm::errs() << "The buffer placement algorithm MapBuf expects an aig "
+                    "library at location: '"
+                 << baseBlifPath
+                 << "' which has not been found. Please refer to the doc for "
+                    "more information on how to generate it.\n";
+    assert(false && "AIG library not found.");
+  }
 
   funcOp.walk([&](Operation *op) {
     llvm::TypeSwitch<Operation *, void>(op)
