@@ -26,6 +26,7 @@ The algorithm consists of 2 main parts, AIG generation and main buffer placement
 To run MapBuf, BLIF files must first be generated. These can be created using the provided [BLIF generation script](https://github.com/EPFL-LAP/dynamatic/blob/main/tools/blif-generator/blif_generator.py) or obtained from the [dataflow-aig-library](https://github.com/ETHZ-DYNAMO/dataflow-aig-library) submodule.
 
 ### Main Buffer Placement Pass
+![](figs/mapbuf_flow.png)
 
 1. Acyclic Graph Creation
 - Takes the dataflow circuit and finds which channels need to be broken in order to have an acyclic graph.
@@ -54,15 +55,8 @@ To run MapBuf, BLIF files must first be generated. These can be created using th
 
 - Produces the final buffered circuit
 
-![](figs/mapbuf_flow.png)
-
-
 ## Running MapBuf
-MapBuf can be run after generation of the BLIF library using the [script] 
-
-### Compile Options 
-
-MapBuf requires several new command-line flags to be configured for proper operation:
+After completing the AIG generation step described above, MapBuf can be executed with the following flags set in Buffer Placemet Pass:
 
 - --blif-files: Specifies the directory path containing BLIF files used for technology mapping
 - --lut-delay: Sets the average delay in nanoseconds for Look-Up Tables (LUTs) in the target FPGA
