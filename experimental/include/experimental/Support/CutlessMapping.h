@@ -69,7 +69,7 @@ using NodeToCuts =
 // Cut generation algorithm that finds the K-feasible (K given by lutSize) cuts
 // for each node inside the given LogicNetwork object (in this case this
 // corresponds to an AIG).
-NodeToCuts generateCuts(LogicNetwork *blif, int lutSize);
+NodeToCuts generateCuts(LogicNetwork *blif, size_t lutSize);
 
 // Prints the cuts, used for debugging
 void printCuts(NodeToCuts cuts, std::string &filename);
