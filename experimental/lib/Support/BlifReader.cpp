@@ -228,9 +228,12 @@ void LogicNetwork::generateTopologicalOrder() {
 LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
   LogicNetwork *data = new LogicNetwork();
   std::ifstream file(filename);
-  if (!file.is_open()) {
-    llvm::errs() << "Unable to open file: " << filename << "\n";
-  }
+  llvm::errs() << "The buffer placement algorithm MapBuf expects the BLIF file "
+                  "at location: '"
+               << filename
+               << "' which has not been found. Please refer to the doc for "
+                  "more information on how to generate it.\n";
+  assert(file.is_open() && "Unable to open BLIF file");
 
   std::string line;
   // Loop over all the lines in .blif file.
