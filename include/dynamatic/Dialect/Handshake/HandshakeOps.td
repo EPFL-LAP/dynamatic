@@ -591,7 +591,12 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def SynchronizerOp : Handshake_Op<"synchronizer"> {
+def SynchronizerOp : Handshake_Op<"synchronizer", [
+  Pure,
+  OutputsSameTypeAsInputs<"ins", "outs">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+]> {
   let summary = "Synchronization operation";
   let description = [{
     Token synchronizer.
@@ -600,7 +605,7 @@ def SynchronizerOp : Handshake_Op<"synchronizer"> {
     Example:
 
     ```mlir
-    %0, %1, %2 = synchronizer %a, %b, %c : !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control
+    %0, %1, %2 = handshake.synchronizer %a, %b, %c : !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control -> !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control
     ```
   }];
 
@@ -615,6 +620,31 @@ def SynchronizerOp : Handshake_Op<"synchronizer"> {
       build($_builder, $_state, outTypes, ins);
     }]>
   ];
+
+  let extraClassDeclaration= [{
+    // "size" refers to both num operands
+    // and num results, so utility function is
+    // provided to abstract which is chosen to get value
+    unsigned getSize() {
+      return getNumOperands();
+    }
+  }]
+
+  let extraClassDefinition = [{
+    // use custom getOperandName to prevent
+    // conversion to data array
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return "ins" + std::to_string(idx);
+    }
+
+    // use custom getResultName to prevent
+    // conversion to data array
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return "outs" + std::to_string(idx);
+    }
+  }];
 
   let assemblyFormat = "$ins `:` type($ins) attr-dict `->` type($outs)";
 }

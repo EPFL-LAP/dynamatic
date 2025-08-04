@@ -418,4 +418,19 @@ class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
+class OutputsSameTypeAsInputs<string inputVariadic, string outputVariadic> : PredOpTrait<
+  "outputs must match inputs in number and type (incl. extra signals)",
+  CPred<[{
+    [](OperandRange ins, ResultRange outs) {
+      if (ins.size() != outs.size())
+        return false;
+      for (auto [in, out] : llvm::zip(ins, outs)) {
+        if (in.getType() != out.getType())
+          return false;
+      }
+      return true;
+    }
+  }] # "($" # inputVariadic # ", $" # outputVariadic # ")">
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
