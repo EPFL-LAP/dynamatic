@@ -62,7 +62,7 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getResult(0).getType());
       })
-      .Case<handshake::EndOp, handshake::JoinOp, handshake::BlockerOp>(
+      .Case<handshake::EndOp, handshake::SynchronizerOp>(
           [&](auto) {
             if (op->getNumOperands() == 0)
               return 0u;
