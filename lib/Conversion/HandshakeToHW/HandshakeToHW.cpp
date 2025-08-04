@@ -537,7 +537,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getResult(0));
       })
-      .Case<handshake::JoinOp, handshake::BlockerOp>([&](auto) {
+      .Case<handshake::SynchronizerOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
