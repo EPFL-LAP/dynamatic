@@ -48,24 +48,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       "mlir::OpResult", "getDataResult", (ins)
     >,
   ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    auto operands = concreteOp.getDataOperands();
-
-    if (!operands.size())
-      return concreteOp.emitOpError("must have at least one data operand");
-
-    mlir::Type resultType = $_op->getResult(0).getType();
-
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
-
-    return mlir::success();
-  }];
 }
 
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
@@ -235,62 +217,62 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
 def HasClock : NativeOpTrait<"HasClock">;
 
-def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Identifier for operations representing speculative units.
-  }];
-}
 
-def SameExtraSignalsInterface : OpInterface<"SameExtraSignalsInterface"> {
+def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Ensures that the extra signals of specific operand/result channels
-    (`handshake::ChannelType`) are identical (even if the channels' respective
-    data type may be different). 
+     Handshake operations which have a variable internal delay
+     used in frequency regulation.
   }];
 
   let methods = [
     InterfaceMethod<[{
-        Returns the list of operand/result channels that should have the same
-        extra signals. By default these are all channel-typed operands/results.
-      }], "::mlir::SmallVector<::mlir::TypedValue<::dynamatic::handshake::ChannelType>>",
-        "getChannelsWithSameExtraSignals", (ins), "", [{
-          return ::dynamatic::handshake::detail::getChannelsWithSameExtraSignals(
-            $_op
-          );
-      }]>
+      Sets the internal delay as a StringAttr named "internal_delay".
+    }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("internal_delay",
+                   StringAttr::get(op->getContext(), value));
+    }]>,
+    
+    // Return StringAttr instead of StringRef to ensure proper memory allocation.
+    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+    InterfaceMethod<[{
+      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
+    }], "StringAttr", "getInternalDelay", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
+        return attr;
+      return StringAttr::get(op->getContext(), "0.0");
+    }]>
   ];
-
-  let verify = [{
-    return ::dynamatic::handshake::detail::verifySameExtraSignalsInterface(
-      $_op, ::mlir::cast<ConcreteOp>($_op).getChannelsWithSameExtraSignals()
-    );
-  }];
 }
 
-def ReshapableChannelsInterface : OpInterface<"ReshapableChannelsInterface"> {
+
+def FPUImplInterface : OpInterface<"FPUImplInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Handshake operations which do not care for the content of all extra signals
-    (and optionally, the data signal) of specific operand channels
-    (`handshake::ChannelType`) may implement this interface to let the backend
-    know that it is free to reshape these channel-typed operands. Reshaping
-    tends to simplify RTL generation. 
+     Specifies which "vendor" of floating point units
+     to use
   }];
 
   let methods = [
     InterfaceMethod<[{
-        Returns the operand channel type which can be reshaped, as well as a
-        boolean indicating whether the channel type's data signal is also
-        ignored by the operation. The returned type may be `nullptr` if no such
-        channel type exists. By default, returns the type of the first operand
-        if it is channel-typed and `false`; otherwise returns `nullptr` and an
-        unspecified boolean.
-      }], "::std::pair<::dynamatic::handshake::ChannelType, bool>",
-      "getReshapableChannelType", (ins), "", [{
-        return ::dynamatic::handshake::detail::getReshapableChannelType($_op);
-      }]>
+      Sets the FPU Impl. as a FPUImplAttr attr named "fpu_impl".
+    }], "void", "setFPUImpl", (ins "FPUImpl":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("fpu_impl",
+                  FPUImplAttr::get(op->getContext(), value));
+    }]>,
+
+InterfaceMethod<[{
+      Gets the FPU impl. as a FPUImpl named "fpu_impl". Defaults to "FLOPOCO" if not set.
+    }], "FPUImpl", "getFPUImpl", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl")) {
+        return attr.getValue();
+      }
+      return FPUImpl::FLOPOCO;
+    }]>
   ];
 }
 

@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Buffer placement pass in Handshake functions, it takes the location (i.e.,
-// the predecessor, and which output channel of it), type (i.e., opaque or
-// transparent), and slots of the buffer that should be placed.
+// the predecessor, and which output channel of it), type, and slots of the 
+// buffer that should be placed.
 //
 // This pass facilitates externally prototyping a custom buffer placement
 // analysis, e.g., in Python. This also makes the results of some research
@@ -27,6 +27,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -67,24 +68,29 @@ struct HandshakePlaceBuffersCustomPass
       llvm::errs() << "No operation named \"" << pred << "\" exists\n";
       return signalPassFailure();
     }
-    assert(outid <= op->getNumResults() &&
+    assert(outid < op->getNumResults() &&
            "The output id exceeds the number of output ports!");
     Value channel = op->getResult(outid);
     // Set the insertion point to be before the original successor of the
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
-    handshake::TimingInfo timing;
-    if (type == "oehb") {
-      timing = handshake::TimingInfo::oehb();
-    } else if (type == "tehb") {
-      timing = handshake::TimingInfo::tehb();
-    } else {
+
+    transform(type.begin(), type.end(), type.begin(), ::toupper);
+
+    // returns optional wrapper around buffer type enum
+    auto bufferTypeOpt = handshake::symbolizeBufferType(type);
+
+    if (!bufferTypeOpt.has_value()) {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
+
+    // pull the enum itself from the optional
+    auto bufferType = bufferTypeOpt.value();
+
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots);
+                                                     slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);

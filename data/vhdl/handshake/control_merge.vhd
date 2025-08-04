@@ -10,7 +10,8 @@ entity control_merge is
     INDEX_TYPE : integer
   );
   port (
-    clk, rst : in std_logic;
+    clk : in  std_logic;
+    rst : in std_logic;
     -- input channels
     ins       : in  data_array(SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic_vector(SIZE - 1 downto 0);
@@ -27,7 +28,7 @@ entity control_merge is
 end entity;
 
 architecture arch of control_merge is
-  signal index_internal : std_logic_vector(DATA_TYPE - 1 downto 0);
+  signal index_internal : std_logic_vector(INDEX_TYPE - 1 downto 0);
 begin
   control : entity work.control_merge_dataless
     generic map(

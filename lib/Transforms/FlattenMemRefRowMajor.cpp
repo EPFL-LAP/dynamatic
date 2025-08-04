@@ -18,21 +18,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
-#include "dynamatic/Support/Attribute.h"
-#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/MathExtras.h"
 
 using namespace mlir;
@@ -44,10 +38,9 @@ static inline bool isUniDimensional(MemRefType memref) {
 
 /// Flatten indices in row-major style, making adjacent indices in the last
 /// memref dimension be adjacent indices in the flattened memref.
-static Value flattenIndices(ConversionPatternRewriter &rewriter, Operation *op,
+static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
                             ValueRange indices, MemRefType memrefType) {
   assert(memrefType.hasStaticShape() && "expected statically shaped memref");
-  Location loc = op->getLoc();
   auto numIndices = indices.size();
 
   if (numIndices == 0) {
@@ -60,13 +53,30 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Operation *op,
     // Memref is already unidimensional
     return indices.front();
 
-  // Iterate over indices to compute the final unidimensional index
-  Value finalIdx = indices.back();
+  // An example of flattening a multi-dimension array in a row-major order.
+  // Given an array: my_array[A][B][C][D];
+  // we access it as my_array[i][j][k][l];
+  // The flattened index is computed as:
+  //
+  // (B * C * D) * i + (C * D) * j + (D) * k + l
+
+  // This variable will be the final value that drives the address input of
+  // load/store operations.
+  Value accumulatedArrayIndex = indices.back();
+
+  // This holds the accumulated product of the previous dimensions.
   int64_t dimProduct = 1;
-  for (size_t i = 0, e = numIndices - 1; i < e; ++i) {
-    auto memIdx = numIndices - i - 2;
+
+  // Iterate over indices to compute the final unidimensional index. We iterate
+  // from the second last index to the first index
+  for (int memIdx = numIndices - 2 /* i.e., the second last index */;
+       memIdx >= 0; memIdx--) {
     Value partialIdx = indices[memIdx];
-    dimProduct *= memrefType.getShape()[memIdx];
+    // This multiplies the current index by the product of all the previous
+    // dimensions. For example, in the example above, it would multiply
+    // partialIdx by (B * C * D) for index "i", (C * D) for index "j", and (D)
+    // for index "k".
+    dimProduct *= memrefType.getShape()[memIdx + 1];
 
     // Multiply product by the current index operand
     if (llvm::isPowerOf2_64(dimProduct)) {
@@ -87,10 +97,11 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Operation *op,
     }
 
     // Sum up with the prior lower dimension accessors
-    auto sumOp = rewriter.create<arith::AddIOp>(loc, finalIdx, partialIdx);
-    finalIdx = sumOp.getResult();
+    auto sumOp =
+        rewriter.create<arith::AddIOp>(loc, accumulatedArrayIndex, partialIdx);
+    accumulatedArrayIndex = sumOp.getResult();
   }
-  return finalIdx;
+  return accumulatedArrayIndex;
 }
 
 static bool hasMultiDimMemRef(ValueRange values) {
@@ -118,8 +129,9 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
     if (isUniDimensional(type) || !type.hasStaticShape() ||
         /*Already converted?*/ loadOp.getIndices().size() == 1)
       return failure();
-    Value finalIdx = flattenIndices(rewriter, loadOp, adaptor.getIndices(),
-                                    loadOp.getMemRefType());
+    Value finalIdx =
+        flattenIndices(rewriter, loadOp.getLoc(), adaptor.getIndices(),
+                       loadOp.getMemRefType());
     memref::LoadOp flatLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         loadOp, adaptor.getMemref(), SmallVector<Value>{finalIdx});
     memOpLowering.recordReplacement(loadOp, flatLoadOp);
@@ -145,8 +157,9 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
     if (isUniDimensional(type) || !type.hasStaticShape() ||
         /*Already converted?*/ storeOp.getIndices().size() == 1)
       return failure();
-    Value finalIdx = flattenIndices(rewriter, storeOp, adaptor.getIndices(),
-                                    storeOp.getMemRefType());
+    Value finalIdx =
+        flattenIndices(rewriter, storeOp.getLoc(), adaptor.getIndices(),
+                       storeOp.getMemRefType());
     memref::StoreOp flatStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         storeOp, adaptor.getValue(), adaptor.getMemref(),
         SmallVector<Value>{finalIdx});

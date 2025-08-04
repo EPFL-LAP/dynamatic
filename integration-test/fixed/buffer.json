@@ -1,0 +1,16 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 3,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "fork6",
+    "outid": 4,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  }
+]

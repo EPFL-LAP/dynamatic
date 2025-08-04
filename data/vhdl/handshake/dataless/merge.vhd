@@ -18,35 +18,24 @@ entity merge_dataless is
 end entity;
 
 architecture arch of merge_dataless is
-  signal tehb_pvalid : std_logic;
-  signal tehb_ready  : std_logic;
 begin
-  process (ins_valid)
+  process (ins_valid, outs_ready)
     variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector(SIZE - 1 downto 0);
   begin
     tmp_valid_out := '0';
-    for i in SIZE - 1 downto 0 loop
+    tmp_ready_out := (others => '0');
+    
+    for i in 0 to (SIZE - 1) loop
       if (ins_valid(i) = '1') then
-        tmp_valid_out := ins_valid(I);
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
       end if;
     end loop;
-    tehb_pvalid <= tmp_valid_out;
-  end process;
 
-  process (tehb_ready)
-  begin
-    for i in 0 to SIZE - 1 loop
-      ins_ready(i) <= tehb_ready;
-    end loop;
+    outs_valid <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
   end process;
-
-  tehb : entity work.tehb_dataless(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => tehb_pvalid,
-      outs_ready => outs_ready,
-      outs_valid => outs_valid,
-      ins_ready  => tehb_ready
-    );
+  
 end architecture;

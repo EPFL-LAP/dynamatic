@@ -1,0 +1,44 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 5,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "trunci0",
+    "outid": 0,
+    "slots": 4,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit4 (data)"
+  },
+  {
+    "pred": "extsi1",
+    "outid": 0,
+    "slots": 5,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit1 (data)"
+  },
+  {
+    "pred": "fork9",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit5 (ctrl)"
+  },
+  {
+    "pred": "spec_commit4",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking"
+  },
+  {
+    "pred": "spec_commit5",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking"
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  }
+]

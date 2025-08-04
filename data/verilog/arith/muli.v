@@ -59,7 +59,6 @@ module muli #(
   wire join_valid;
   wire oehb_ready;
   wire buff_valid;
-  wire [DATA_TYPE - 1 : 0] oehb_dataOut, oehb_dataIn;
 
   // Instantiate the join node
   join_type #(
@@ -91,15 +90,11 @@ module muli #(
     .valid_out(buff_valid)
   );
 
-  oehb #(
-    .DATA_TYPE(DATA_TYPE)
-  ) oehb_inst (
+  oehb_dataless oehb_inst (
     .clk(clk),
     .rst(rst),
-    .ins(oehb_dataIn),
     .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
-    .outs(oehb_dataOut),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
   );

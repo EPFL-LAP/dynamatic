@@ -71,12 +71,12 @@ handshake.func @branchBW(%arg0: !handshake.channel<i32>, %start: !handshake.cont
 // CHECK-SAME:                             %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i16>, !handshake.channel<i16>) attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
-// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge %[[VAL_4]], %[[VAL_3]]  : <i16>, <i1>
+// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge [%[[VAL_4]], %[[VAL_3]]]  : [<i16>, <i16>] to <i16>, <i1>
 // CHECK:           %[[VAL_7:.*]] = extui %[[VAL_6]] : <i1> to <i16>
 // CHECK:           end %[[VAL_5]], %[[VAL_7]] : <i16>, <i16>
 // CHECK:         }
 handshake.func @cmergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i16>, !handshake.channel<i16>) {
-  %merge, %index = control_merge %arg0, %arg1 : <i32>, <i32>
+  %merge, %index = control_merge [%arg0, %arg1] : [<i32>, <i32>] to <i32>, <i32>
   %truncMerge = trunci %merge : <i32> to <i16>
   %truncIndex = trunci %index : <i32> to <i16>
   end %truncMerge, %truncIndex : <i16>, <i16>
@@ -90,11 +90,11 @@ handshake.func @cmergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.chann
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_6:.*]] = trunci %[[VAL_2]] {handshake.bb = 0 : ui32} : <i32> to <i1>
-// CHECK:           %[[VAL_7:.*]] = mux %[[VAL_6]] {{\[}}%[[VAL_5]], %[[VAL_4]]] : <i1>, <i16>
+// CHECK:           %[[VAL_7:.*]] = mux %[[VAL_6]] {{\[}}%[[VAL_5]], %[[VAL_4]]] : <i1>, [<i16>, <i16>] to <i16>
 // CHECK:           end %[[VAL_7]] : <i16>
 // CHECK:         }
 handshake.func @muxBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %index: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
-  %mux = mux %index [%arg0, %arg1] : <i32>, <i32>
+  %mux = mux %index [%arg0, %arg1] : <i32>, [<i32>, <i32>] to <i32>
   %trunc = trunci %mux : <i32> to <i16>
   end %trunc : <i16>
 }
@@ -122,11 +122,11 @@ handshake.func @condBrBW(%arg0: !handshake.channel<i32>, %cond: !handshake.chann
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                             %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
-// CHECK:           %[[VAL_3:.*]] = buffer %[[VAL_2]] : <i16>
+// CHECK:           %[[VAL_3:.*]] = buffer %[[VAL_2]], bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 : <i16>
 // CHECK:           end %[[VAL_3]] : <i16>
 // CHECK:         }
 handshake.func @bufferBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
-  %buf = buffer %arg0 : <i32>
+  %buf = buffer %arg0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 : <i32>
   %trunc = trunci %buf : <i32> to <i16>
   end %trunc : <i16>
 }

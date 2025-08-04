@@ -12,32 +12,31 @@ module merge_notehb #(
   output outs_valid,                      
   input  outs_ready                     
 );
-  reg [DATA_TYPE - 1 : 0] tmp_data_out = 0;
-  reg tmp_valid_out = 0;
 
-  integer i;
+  reg tmp_valid_out;
+  reg [INPUTS - 1 : 0] tmp_ready_out;
+  reg [DATA_TYPE - 1 : 0] tmp_data_out;
+	integer i;
+  integer cnt;
 
-  always @(*) begin
+	always @(*) begin
 		tmp_valid_out = 0;
-		tmp_data_out = data_in_bus[0 * DATA_TYPE +: DATA_TYPE];
-		for(i = INPUTS - 1; i >= 0; i = i - 1) begin
-			if(ins_valid[i])begin
-				tmp_data_out = ins[i * DATA_IN_SIZE +: DATA_IN_SIZE];
+    tmp_ready_out = {INPUTS{1'b0}}; 
+    tmp_data_out = data_in_bus[0 * DATA_TYPE +: DATA_TYPE];
+
+    cnt = 1;
+		for (i = 0; i < INPUTS; i = i + 1) begin
+			if (cnt == 1 && ins_valid[i]) begin
+        tmp_data_out = ins[i * DATA_TYPE +: DATA_TYPE];
 				tmp_valid_out = 1;
+        tmp_ready_out[i] = outs_ready;
+        cnt = 0;
 			end
 		end
 	end
-
-  wire [DATA_TYPE - 1 : 0] tehb_data_in;
-  wire tehb_pvalid;
-  wire tehb_ready;
-
-  assign tehb_data_in = tmp_data_out;
-  assign tehb_pvalid = tmp_valid_out;
-
-  assign tehb_ready = outs_ready;
-  assign ins_ready = {INPUTS{tehb_ready}};
-  assign outs_valid = tehb_pvalid;
-  assign outs = tehb_data_in;
+  
+  assign  outs        = tmp_data_out;
+	assign	outs_valid  = tmp_valid_out;
+	assign  ins_ready   = tmp_ready_out;
 
 endmodule

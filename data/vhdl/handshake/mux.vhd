@@ -11,7 +11,8 @@ entity mux is
     SELECT_TYPE : integer
   );
   port (
-    clk, rst : in std_logic;
+    clk : in  std_logic;
+    rst : in std_logic;
     -- data input channels
     ins       : in  data_array(SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic_vector(SIZE - 1 downto 0);
@@ -28,10 +29,8 @@ entity mux is
 end entity;
 
 architecture arch of mux is
-  signal tehb_ins                       : std_logic_vector(DATA_TYPE - 1 downto 0);
-  signal tehb_ins_valid, tehb_ins_ready : std_logic;
 begin
-  process (ins, ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
+  process (ins, ins_valid, outs_ready, index, index_valid)
     variable selectedData                   : std_logic_vector(DATA_TYPE - 1 downto 0);
     variable selectedData_valid, indexEqual : std_logic;
   begin
@@ -48,28 +47,11 @@ begin
         selectedData       := ins(i);
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and outs_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins       <= selectedData;
-    tehb_ins_valid <= selectedData_valid;
+    index_ready    <= (not index_valid) or (selectedData_valid and outs_ready);
+    outs           <= selectedData;
+    outs_valid     <= selectedData_valid;
   end process;
-
-  tehb : entity work.tehb(arch)
-    generic map(
-      DATA_TYPE => DATA_TYPE
-    )
-    port map(
-      clk => clk,
-      rst => rst,
-      -- input channel
-      ins       => tehb_ins,
-      ins_valid => tehb_ins_valid,
-      ins_ready => tehb_ins_ready,
-      -- output channel
-      outs       => outs,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
 end architecture;

@@ -62,12 +62,12 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getResult(0).getType());
       })
-      .Case<handshake::EndOp, handshake::JoinOp>([&](auto) {
-        unsigned maxWidth = 0;
-        for (Type ty : op->getOperandTypes())
-          maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
-        return maxWidth;
-      })
+      .Case<handshake::EndOp, handshake::JoinOp, handshake::BlockerOp>(
+          [&](auto) {
+            if (op->getNumOperands() == 0)
+              return 0u;
+            return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+          })
       .Case<handshake::LoadOp, handshake::StoreOp>([&](auto) {
         return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
                         getHandshakeTypeBitWidth(op->getOperand(1).getType()));
@@ -96,25 +96,40 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   return success();
 }
 
-bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
-  return models.insert(std::make_pair(OperationName(name, ctx), model)).second;
+void TimingDatabase::insertTimingModel(StringRef timingModelKey,
+                                       TimingModel &model) {
+  models.try_emplace(timingModelKey, model);
 }
 
-const TimingModel *TimingDatabase::getModel(OperationName opName) const {
-  auto it = models.find(opName);
+const TimingModel *TimingDatabase::getModel(StringRef timingModelKey) const {
+  auto it = models.find(timingModelKey);
   if (it == models.end())
     return nullptr;
   return &it->second;
 }
 
 const TimingModel *TimingDatabase::getModel(Operation *op) const {
-  return getModel(op->getName());
+  StringRef baseName = op->getName().getStringRef();
+  // if the operation is a floating point operation with multiple
+  // possible implementations
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    // include the implementation in the key
+    std::string timingModelKey =
+        (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    return getModel(timingModelKey);
+  }
+
+  return getModel(baseName);
 }
 
-LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
-                                         double &latency) const {
-  // Our current timing model doesn't have latency information for valid and
-  // ready signals, assume it is 0.
+LogicalResult TimingDatabase::getLatency(
+    Operation *op, SignalType signalType, double &latency,
+    double targetPeriod) const // Our current timing model doesn't have latency
+                               // information for valid and
+// ready signals, assume it is 0
+{
+
   if (signalType != SignalType::DATA) {
     latency = 0.0;
     return success();
@@ -124,13 +139,20 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   if (!model)
     return failure();
 
-  if (failed(model->latency.getCeilMetric(op, latency)))
+  // First, we extract the DelayDepMetric instance for a specific biwdidth.
+  // Then, we use its method (getDelayCeilMetric) to get the latency for the
+  // given targetPeriod.
+  DelayDepMetric<double> DelayStruct;
+
+  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+    return failure();
+  if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
     return failure();
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
   // currenty unable to account for this. It's obviosuly very bad to
-  // special-case this here so we should find a waay to properly express this
+  // special-case this here so we should find a way to properly express this
   // information in our models.
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     auto memOp = findMemInterface(loadOp.getAddressResult());
@@ -140,13 +162,38 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
+LogicalResult TimingDatabase::getInternalCombinationalDelay(
+    Operation *op, SignalType signalType, double &delay,
+    double targetPeriod) const // Our current timing model doesn't have latency
+                               // information for valid and
+// ready signals, assume it is 0
+{
+  const TimingModel *model = getModel(op);
+  if (!model)
+    return failure();
+
+  // This section now must handle the fact that all latency values are now
+  // contained inside an instance of DelayDepMetric. We therefore extract this
+  // structure, and use its method to obtain the latency value at the
+  // targetPeriod provided.
+  DelayDepMetric<double> DelayStruct;
+
+  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+    return failure();
+  if (failed(DelayStruct.getDelayCeilValue(targetPeriod, delay)))
+    return failure();
+
+  return success();
+}
+
+LogicalResult TimingDatabase::getInternalDelay(Operation *op,
+                                               SignalType signalType,
                                                double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
 
-  switch (type) {
+  switch (signalType) {
   case SignalType::DATA:
     return model->dataDelay.getCeilMetric(op, delay);
   case SignalType::VALID:
@@ -180,12 +227,13 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op,
+                                            SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
-  switch (type) {
+  switch (signalType) {
   case SignalType::DATA:
     return model->getTotalDataDelay(getOpDatawidth(op), delay);
   case SignalType::VALID:
@@ -301,12 +349,64 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   return true;
 }
 
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         BitwidthDepMetric<DelayDepMetric<double>> &metric,
+                         ljson::Path path) {
+
+  const ljson::Object *object = value.getAsObject();
+
+  // standard empty object check
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
+  // The outer loop is on the bitwidths: each is associated with a
+  // DelayDepMetric map in the JSON.
+  for (const auto &[bitwidthKey, metricValue] : *object) {
+    unsigned bitwidth;
+    // we start by obtaining the bitwidth value associated with this key
+    if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
+      return false;
+
+    // We instantiate inside the loop an internalMap for this specific bitwidth.
+    std::map<double, double> internalMap;
+
+    // Validity check to ensure the presence of a map.
+    const ljson::Object *nestedMap = metricValue.getAsObject();
+    if (!nestedMap) {
+      path.field(bitwidthKey).report("expected nested map object");
+      return false;
+    }
+
+    // nested fromJSON call, which deserializes individual delay & value pairs
+    // into the internalMap
+    for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
+      double key;
+      key = std::stod(doubleDelay.str());
+
+      double value;
+      if (!fromJSON(doubleValue, value,
+                    path.field(bitwidthKey).field(doubleDelay)))
+        return false;
+
+      internalMap[key] = value;
+    }
+    // We save the internal map as the data field of the DelayDepMetric.
+    DelayDepMetric<double> DelayDepStruct;
+    DelayDepStruct.data = internalMap;
+
+    // Each DelayDepMetric structure is then associated with its bitwidth,
+    // completing the 2-level nested map.
+    metric.data[bitwidth] = DelayDepStruct;
+  }
+
+  return true;
+}
+
 static const std::string LATENCY[] = {"latency"};
 static const std::string DELAY[] = {"delay", "data"};
 static const std::string DELAY_VALID[] = {"delay", "valid", "1"};
 static const std::string DELAY_READY[] = {"delay", "ready", "1"};
-static const std::string BUF_TRANS[] = {"transparentBuffer"};
-static const std::string BUF_OPAQUE[] = {"opaqueBuffer"};
 static const std::string DELAY_VR[] = {"delay", "VR"};
 static const std::string DELAY_CV[] = {"delay", "CV"};
 static const std::string DELAY_CR[] = {"delay", "CR"};
@@ -326,9 +426,6 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   // Deserialize the valid/ready delays
   FW_FALSE(deserializeNested(DELAY_VALID, object, model.validDelay, path));
   FW_FALSE(deserializeNested(DELAY_READY, object, model.readyDelay, path));
-  // Deserialize the number of buffer slots of each type
-  FW_FALSE(deserializeNested(BUF_TRANS, object, model.transparentSlots, path));
-  FW_FALSE(deserializeNested(BUF_OPAQUE, object, model.opaqueSlots, path));
   return true;
 }
 
@@ -381,14 +478,11 @@ bool dynamatic::fromJSON(const ljson::Value &jsonValue,
   if (!components)
     return false;
 
-  for (const auto &[opName, cmpInfo] : *components) {
+  for (const auto &[timingModelKey, cmpInfo] : *components) {
     TimingModel model;
-    ljson::Path opPath = path.field(opName);
-    fromJSON(cmpInfo, model, opPath);
-    if (!timingDB.insertTimingModel(opName, model)) {
-      opPath.report("Overriding existing timing model for operation");
-      return false;
-    }
+    ljson::Path keyPath = path.field(timingModelKey);
+    fromJSON(cmpInfo, model, keyPath);
+    timingDB.insertTimingModel(timingModelKey, model);
   }
   return true;
 }

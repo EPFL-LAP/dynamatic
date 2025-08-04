@@ -16,6 +16,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeSupport.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -28,6 +29,7 @@
 #include <cctype>
 #include <iostream>
 #include <ostream>
+#include <vector>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -115,13 +117,13 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser,
-                  SmallVectorImpl<ExtraSignal::Storage> &extraSignalsStorage) {
+                  SmallVectorImpl<ExtraSignal> &extraSignals) {
 
   auto parseSignal = [&]() -> ParseResult {
-    auto &signal = extraSignalsStorage.emplace_back();
+    auto &extraSignal = extraSignals.emplace_back();
 
-    if (odsParser.parseKeywordOrString(&signal.name) ||
-        odsParser.parseColon() || odsParser.parseType(signal.type))
+    if (odsParser.parseKeyword(&extraSignal.name) || odsParser.parseColon() ||
+        odsParser.parseType(extraSignal.type))
       return failure();
 
     // Attempt to parse the optional upstream symbol
@@ -130,7 +132,7 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
       if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
           upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
         return failure();
-      signal.downstream = false;
+      extraSignal.downstream = false;
     }
     return success();
   };
@@ -166,18 +168,13 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   };
 
   // Declare vector of structs for storing parse results
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
-  if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
+  SmallVector<ExtraSignal> extraSignals;
+  if (failed(parseExtraSignals(emitError, odsParser, extraSignals)))
     return nullptr;
 
   // Parse ']' and '>'
   if (odsParser.parseRSquare() || odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert parse results to ExtraSignal instances
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
@@ -206,10 +203,9 @@ Type ControlType::parse(AsmParser &odsParser) {
   return ControlType::get(odsParser.getContext(), {});
 }
 
-Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
-  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-  newExtraSignals.emplace_back(signal);
-  return ControlType::get(getContext(), newExtraSignals);
+Type ControlType::copyWithExtraSignals(
+    ArrayRef<ExtraSignal> extraSignals) const {
+  return ControlType::get(getContext(), extraSignals);
 }
 
 //===----------------------------------------------------------------------===//
@@ -267,14 +263,14 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
+  SmallVector<ExtraSignal> extraSignals;
   if (!odsParser.parseOptionalComma()) {
     // Parsed literal ','
     // The channel has extra bits
 
     // Parse '[', extra signals and ']'
     if (odsParser.parseLSquare() ||
-        failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)) ||
+        failed(parseExtraSignals(emitError, odsParser, extraSignals)) ||
         odsParser.parseRSquare())
       return nullptr;
   }
@@ -282,12 +278,6 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   // Parse literal '>'
   if (odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert the element type of the extra signal storage list to its
-  // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
@@ -342,24 +332,17 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
   return parseChannelAfterLess(parser);
 }
 
-Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
-  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-  newExtraSignals.emplace_back(signal);
-  return ChannelType::get(getDataType(), newExtraSignals);
+Type ChannelType::copyWithExtraSignals(
+    ArrayRef<ExtraSignal> extraSignals) const {
+  return ChannelType::get(getDataType(), extraSignals);
 }
 
 //===----------------------------------------------------------------------===//
 // ExtraSignal
 //===----------------------------------------------------------------------===//
 
-ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
-    : name(name), type(type), downstream(downstream) {}
-
 ExtraSignal::ExtraSignal(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
-
-ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
-    : name(storage.name), type(storage.type), downstream(storage.downstream) {}
 
 unsigned ExtraSignal::getBitWidth() const {
   return type.getIntOrFloatBitWidth();
@@ -369,6 +352,64 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {
   return lhs.name == rhs.name && lhs.type == rhs.type &&
          lhs.downstream == rhs.downstream;
+}
+
+bool dynamatic::handshake::doesExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays,
+    std::optional<llvm::StringRef> except) {
+
+  // If there are fewer than two arrays, they are trivially considered matching.
+  if (extraSignalArrays.size() < 2)
+    return true;
+
+  auto firstArrayIt = extraSignalArrays.begin();
+  auto secondArrayIt = firstArrayIt + 1;
+
+  // Use the first array as the reference for comparison.
+  ArrayRef<ExtraSignal> refArray = *firstArrayIt;
+  size_t refArraySize = refArray.size();
+
+  // Compare the reference array against all other arrays.
+  for (auto it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
+
+    ArrayRef<ExtraSignal> toCheck = *it;
+    size_t toCheckSize = toCheck.size();
+
+    // Use two indices to traverse both arrays while skipping the `except`
+    // signal.
+    size_t i = 0;
+    size_t j = 0;
+
+    while (i < refArraySize || j < toCheckSize) {
+      // Skip elements in `head` with the excluded name.
+      if (except.has_value() && i < refArraySize &&
+          refArray[i].name == except) {
+        i++;
+        continue;
+      }
+      // Skip elements in `current` with the excluded name.
+      if (except.has_value() && j < toCheckSize && toCheck[j].name == except) {
+        j++;
+        continue;
+      }
+
+      // If one array is fully traversed but the other isn't, they differ.
+      if (i >= refArraySize || j >= toCheckSize)
+        return false;
+
+      // If corresponding signals don't match, the arrays are different.
+      if (refArray[i] != toCheck[j])
+        return false;
+
+      i++;
+      j++;
+    }
+  }
+  return true;
+}
+
+ExtraSignal ExtraSignal::allocateInto(mlir::TypeStorageAllocator &alloc) const {
+  return ExtraSignal(alloc.copyInto(name), type, downstream);
 }
 
 llvm::hash_code dynamatic::handshake::hash_value(const ExtraSignal &signal) {

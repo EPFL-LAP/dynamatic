@@ -24,10 +24,9 @@
 // Pull in the Dialect definition.
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h.inc"
 
-// Pull in all enum type definitions, attributes,
+// Pull in all types, attributes,
 // and utility function declarations.
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
-#include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_DIALECT_H

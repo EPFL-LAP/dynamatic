@@ -66,8 +66,7 @@ static constexpr unsigned MAX_GROUP_SIZE = 20;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 // A FuncPerfInfo holds the extracted data from buffer placement, for a single
@@ -124,7 +123,7 @@ static void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
     cfIndices[cfAndOpt.first] = id;
 
   // Extract result: save global CFDFC throuhgputs into sharingInfo
-  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
 
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
@@ -170,15 +169,13 @@ class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod, bool legacyPlacement,
-                       Logger &logger, StringRef milpName)
-      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
-                      logger, milpName),
+                       double targetPeriod, Logger &logger, StringRef milpName)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, logger, milpName),
         sharingInfo(sharingInfo){};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod, bool legacyPlacement)
-      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
+                       double targetPeriod)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod),
         sharingInfo(sharingInfo){};
 
 private:
@@ -307,11 +304,11 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       env.set(GRB_DoubleParam_TimeLimit, timeout);
     env.start();
 
-    if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY)
+    if (algorithm == FPGA20)
       // Create and solve the MILP
       return checkLoggerAndSolve<buffer::fpga20::FPGA20BuffersWrapper>(
           logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
-          targetCP, algorithm != FPGA20);
+          targetCP);
     if (algorithm == FPL22) {
       // Create disjoint block unions of all CFDFCs
       SmallVector<CFDFC *, 8> cfdfcs;
@@ -361,7 +358,7 @@ struct CreditBasedSharingPass
 
   LogicalResult sharingInFuncOp(handshake::FuncOp *funcOp,
                                 FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-                                TimingDatabase &timingDB);
+                                TimingDatabase &timingDB, double targetCP);
 
   LogicalResult sharingWrapperInsertion(
       handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
@@ -390,7 +387,7 @@ struct CreditBasedSharingPass
   // Call the wrapper class HandshakePlaceBuffersPassWrapper, which again wraps
   // FPGA20BuffersWrapper
   LogicalResult runBufferPlacementPass(ModuleOp &modOp, SharingInfo &data) {
-    TimingDatabase timingDB(&getContext());
+    TimingDatabase timingDB;
     if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
       return failure();
 
@@ -542,7 +539,8 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
 // of all performance critical CFCs.
 void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
                     llvm::MapVector<Operation *, double> &opOccupancy,
-                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
+                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo,
+                    double targetCP) {
 
   double latency;
   for (Operation *target : sharingTargets) {
@@ -553,7 +551,8 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
     for (auto cf : funcPerfInfo.critCfcs) {
       if (funcPerfInfo.cfUnits[cf].find(target) !=
           funcPerfInfo.cfUnits[cf].end()) {
-        if (failed(timingDB.getLatency(target, SignalType::DATA, latency)))
+        if (failed(timingDB.getLatency(target, SignalType::DATA, latency,
+                                       targetCP)))
           latency = 0.0;
         // Formula for operation occupancy:
         // Occupancy = Latency / II = Latency * Throughput.
@@ -595,7 +594,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     Operation *sharedOp = *group.begin();
 
     double latency;
-    if (failed(timingDB.getLatency(sharedOp, SignalType::DATA, latency)))
+    if (failed(
+            timingDB.getLatency(sharedOp, SignalType::DATA, latency, targetCP)))
       latency = 0.0;
 
     // Maps each original successor and the input operand (Value)
@@ -693,7 +693,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
 LogicalResult CreditBasedSharingPass::sharingInFuncOp(
     handshake::FuncOp *funcOp, FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-    TimingDatabase &timingDB) {
+    TimingDatabase &timingDB, double targetCP) {
 
   std::error_code ec;
   SharingLogger sharingLogger(*funcOp, dumpLogs, ec);
@@ -711,7 +711,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
   // opOccupancy: maps each operation to the maximum occupancy it has to
   // achieve.
   llvm::MapVector<Operation *, double> opOccupancy;
-  getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo);
+  getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo, targetCP);
 
   // Initialize the sharing groups:
   SharingGroups sharingGroups;
@@ -746,7 +746,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
 void CreditBasedSharingPass::runDynamaticPass() {
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
-  TimingDatabase timingDB(&getContext());
+  TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     signalPassFailure();
 
@@ -777,7 +777,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   // Apply resource sharing for each function in the module op.
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
-    if (failed(sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB))) {
+    if (failed(
+            sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB, targetCP))) {
       signalPassFailure();
     }
   }

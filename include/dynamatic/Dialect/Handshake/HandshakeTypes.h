@@ -15,8 +15,11 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
 
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -30,40 +33,39 @@ unsigned getHandshakeTypeBitWidth(mlir::Type type);
 /// A dataflow channel's extra signal. The signal has a unique (within a
 /// channel's context) name, specific MLIR type, and a direction (downstream or
 /// upstream).
+/// This struct is used as an MLIR type parameter in the tablegen file
+/// (e.g. ChannelType or ControlType)
 struct ExtraSignal {
-
-  /// Used when creating `handshake::ChannelType` instances. Owns its name
-  /// instead of referencing it.
-  struct Storage {
-    std::string name;
-    mlir::Type type = nullptr;
-    bool downstream = true;
-
-    Storage() = default;
-    Storage(llvm::StringRef name, mlir::Type type, bool downstream = true);
-  };
 
   /// The signal's name.
   llvm::StringRef name;
   /// The signal's MLIR type.
-  mlir::Type type;
+  mlir::Type type = nullptr;
   /// Whether the signal is going downstream or upstream.
-  bool downstream;
+  bool downstream = true;
 
-  /// Simple member-by-member constructor.
   ExtraSignal(llvm::StringRef name, mlir::Type type, bool downstream = true);
 
-  /// Constructs from the storage type (should not be used by client code).
-  ExtraSignal(const Storage &storage);
+  ExtraSignal() = default;
 
   /// Returns the signal type's bitwidth.
   unsigned getBitWidth() const;
+
+  /// Automatically called inside the type builder to make sure that the MLIR
+  /// context guarantees the lifetime of the ExtraSignal.
+  ExtraSignal allocateInto(mlir::TypeStorageAllocator &alloc) const;
 };
 
 bool operator==(const ExtraSignal &lhs, const ExtraSignal &rhs);
 inline bool operator!=(const ExtraSignal &lhs, const ExtraSignal &rhs) {
   return !(lhs == rhs);
 }
+
+/// Compares multiple arrays of ExtraSignal elements, ignoring a specified
+/// signal name.
+bool doesExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays,
+    std::optional<llvm::StringRef> except = std::nullopt);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 llvm::hash_code hash_value(const ExtraSignal &signal);

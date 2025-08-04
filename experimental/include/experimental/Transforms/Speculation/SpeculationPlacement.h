@@ -45,12 +45,16 @@ private:
   llvm::DenseSet<OpOperand *> commits;
   llvm::DenseSet<OpOperand *> saveCommits;
 
+  unsigned int speculatorFifoDepth;
+  unsigned int saveCommitsFifoDepth;
+
 public:
   /// Empty constructor
   SpeculationPlacements() = default;
 
-  /// Initializer with the destination operation operand for the Speculator
-  SpeculationPlacements(OpOperand &dstOpOperand) : speculator(&dstOpOperand){};
+  /// Initializer with operand specifying the speculator position
+  SpeculationPlacements(OpOperand &speculatorPosition)
+      : speculator(&speculatorPosition){};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,
@@ -90,6 +94,11 @@ public:
   /// Get a set of the existing operation placements
   template <typename T>
   const llvm::DenseSet<OpOperand *> &getPlacements();
+
+  unsigned int getSpeculatorFifoDepth();
+  void setSpeculatorFifoDepth(unsigned int depth);
+  unsigned int getSaveCommitsFifoDepth();
+  void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
 } // namespace speculation

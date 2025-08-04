@@ -17,7 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/Utils/Utils.h"
@@ -145,29 +146,11 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::BufferOp>(
           [&](handshake::BufferOp bufferOp) -> std::string {
             // Try to infer the buffer type from HW parameters, if present
-            auto params = bufferOp->getAttrOfType<DictionaryAttr>(
-                RTL_PARAMETERS_ATTR_NAME);
-            if (!params)
-              return "buffer";
-            auto optSlots = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-            std::string numSlotsStr = "";
-            if (optSlots) {
-              if (auto numSlots = dyn_cast<IntegerAttr>(optSlots->getValue())) {
-                if (numSlots.getType().isUnsignedInteger())
-                  numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
-              }
-            }
-            auto optTiming = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-            if (!optTiming)
-              return "buffer" + numSlotsStr;
-            if (auto timing = dyn_cast<TimingAttr>(optTiming->getValue())) {
-              TimingInfo info = timing.getInfo();
-              if (info == TimingInfo::oehb())
-                return "oehb" + numSlotsStr;
-              if (info == TimingInfo::tehb())
-                return "tehb" + numSlotsStr;
-            }
-            return "buffer" + numSlotsStr;
+
+            std::string numSlots = std::to_string(bufferOp.getNumSlots());
+            std::string bufferType =
+                stringifyEnum(bufferOp.getBufferType()).str();
+            return bufferType + " [" + numSlots + "]";
           })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
         return getMemLabel("MC", getMemName(mcOp.getMemRef()));
@@ -269,7 +252,8 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+      .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
+      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
@@ -280,7 +264,10 @@ static StringRef getNodeColor(Operation *op) {
           [&](auto) { return "lightblue"; })
       .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
           [&](auto) { return "tan2"; })
-      .Case<handshake::SpeculationOpInterface>([&](auto) { return "salmon"; })
+      .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
+            handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>(
+          [&](auto) { return "salmon"; })
       .Default([&](auto) { return "moccasin"; });
 }
 

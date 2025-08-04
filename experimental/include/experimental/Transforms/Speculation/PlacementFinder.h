@@ -39,30 +39,29 @@ private:
   /// Mutable SpeculationPlacements data structure to hold the placements
   SpeculationPlacements &placements;
 
-  /// Remove all existing placements except the Speculator
-  void clearPlacements();
-
   /// Find save operations positions
-  LogicalResult findSavePositions();
+  LogicalResult findSaves();
 
-  /// Find commit operations positions. Uses methods findCommitsTraversal and
-  /// findCommitsBetweenBBs
-  LogicalResult findCommitPositions();
+  /// Identifies positions of regular commits that prevent side effects.
+  LogicalResult findRegularCommits();
 
-  /// DFS traversal to find the paths that need Commit units
-  void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                            Operation *currOp);
+  /// Recursively traverse the IR in a DFS way to find the placements of commit
+  /// units.
+  LogicalResult
+  findRegularCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                              OpOperand &currOpOperand);
 
-  /// Check arcs between BBs to determine if extra commits are needed to solve
-  /// out-of-order tokens
-  void findCommitsBetweenBBs();
+  /// Additional commits prevent token reordering in multiple-BB cases.
+  /// Check arcs between BBs to determine if extra commits are needed to
+  /// solve out-of-order tokens
+  LogicalResult findCommitsBetweenBBs();
 
-  /// Find save-commit operations positions. Uses findSaveCommitsTraversal
-  LogicalResult findSaveCommitPositions();
+  /// Identifies save-commit positions.
+  LogicalResult findSaveCommits();
 
   /// DFS traversal of the speculation BB to find all SaveCommit placements
-  void findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                Operation *currOp);
+  LogicalResult findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                                         Operation *currOp);
 };
 } // namespace speculation
 } // namespace experimental

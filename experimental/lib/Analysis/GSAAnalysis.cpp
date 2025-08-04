@@ -1,5 +1,4 @@
-//===- GSAAnalysis.cpp - GSA analysis utilities ------------------*- C++
-//-*-===//
+//===- GSAAnalysis.cpp - GSA analyis utilities ------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,7 +16,9 @@
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "vector"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
@@ -25,17 +26,61 @@
 #define DEBUG_TYPE "gsa"
 
 using namespace mlir;
-using namespace mlir::func;
 using namespace dynamatic;
 using namespace dynamatic::experimental::ftd;
 using namespace dynamatic::experimental::boolean;
 
-Block *experimental::gsa::GSAAnalysis::getBlockFromIndex(unsigned index) {
-  for (auto const &[b, i] : indexPerBlock) {
-    if (index == i)
-      return b;
+experimental::gsa::GSAAnalysis::GSAAnalysis(handshake::MergeOp &merge,
+                                            Region &region) {
+  inputOp = &region;
+  convertSSAToGSAMerges(merge, region);
+}
+
+void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
+    handshake::MergeOp &mergeOp, Region &region) {
+
+  // Associate an index to each basic block in "funcOp" so that if Bi
+  // dominates Bj than i < j
+  BlockIndexing bi(region);
+
+  // Initialize the index of the class
+  uniqueGateIndex = 0;
+
+  Block *block = mergeOp.getResult().getParentBlock();
+
+  // Create an empty list for the phi functions corresponding to the block
+  gatesPerBlock.insert({block, llvm::SmallVector<Gate *>()});
+
+  // Create a set for the operands of the corresponding phi function
+  SmallVector<GateInput *> operands;
+
+  auto isAlreadyPresent = [&](Value c) -> bool {
+    return std::any_of(operands.begin(), operands.end(), [c](GateInput *in) {
+      return in->isTypeValue() && in->getValue() == c;
+    });
+  };
+
+  // Add to the list of operands of the new gate all the values which were not
+  // already used
+  for (Value v : mergeOp.getOperands()) {
+    if (!isAlreadyPresent(v)) {
+      GateInput *gateInput = new GateInput(v);
+      gateInputList.push_back(gateInput);
+      operands.push_back(gateInput);
+    }
   }
-  return nullptr;
+
+  // If the list of operands is not empty (i.e. the phi has at least
+  // one input), add it to the phis associated to that block
+  if (!operands.empty()) {
+    Gate *newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
+                            ++uniqueGateIndex);
+    gatesPerBlock[block].push_back(newPhi);
+  }
+
+  convertPhiToMu(region);
+  convertPhiToGamma(region, bi);
+  printAllGates();
 }
 
 experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
@@ -43,6 +88,8 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
   // Only one function should be present in the module, excluding external
   // functions
   unsigned functionsCovered = 0;
+
+  // TODO: Extend to support multiple functions
 
   // The analysis can be instantiated either over a module containing one
   // function only or over a function
@@ -55,14 +102,14 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 
       // Analyze the function
       if (!functionsCovered) {
-        convertSSAToGSA(funcOp);
+        convertSSAToGSA(funcOp.getRegion());
         functionsCovered++;
       } else {
         llvm::errs() << "[GSA] Too many functions to handle in the module";
       }
     }
   } else if (func::FuncOp fOp = dyn_cast<func::FuncOp>(operation); fOp) {
-    convertSSAToGSA(fOp);
+    convertSSAToGSA(fOp.getRegion());
     functionsCovered = 1;
   }
 
@@ -73,11 +120,11 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 };
 
 experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
-    ListExpressionsPerGate &expressions, std::queue<unsigned> &conditions,
-    Gate *originalPhi) {
+    ListExpressionsPerGate &expressions, std::queue<unsigned> conditions,
+    Gate *originalPhi, const BlockIndexing &bi) {
 
   // At each iteration, we want to use a cofactor that is present in all the
-  // expressions in "expressions". Since the cofactors are ordered according to
+  // expressions in `expressions`. Since the cofactors are ordered according to
   // the basic block number, we can say that if a cofactor is present in one
   // expression, then it must be present in all the others, since they all have
   // the blocks associated to that cofactor as common dominator.
@@ -144,7 +191,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   // considered as empty.
   auto setGammaOperand = [&](int input, ListExpressionsPerGate &list) -> void {
     if (list.size() > 1) {
-      Gate *gamma = expandGammaTree(list, conditions, originalPhi);
+      Gate *gamma = expandGammaTree(list, conditions, originalPhi, bi);
       operandsGamma[input] = new GateInput(gamma);
       gateInputList.push_back(operandsGamma[input]);
     } else if (list.size() == 1) {
@@ -165,39 +212,20 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   // "indexPerBlock" mapping)
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, getBlockFromIndex(indexToUse));
+               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
   gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
 
   return newGate;
 }
 
-void experimental::gsa::GSAAnalysis::mapBlocksToIndex(func::FuncOp &funcOp) {
-  mlir::DominanceInfo domInfo;
+void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
 
-  // Create a vector with all the blocks
-  SmallVector<Block *> allBlocks;
-  for (Block &bb : funcOp.getBlocks())
-    allBlocks.push_back(&bb);
-
-  // Sort the vector according to the dominance information
-  std::sort(allBlocks.begin(), allBlocks.end(),
-            [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
-
-  // Associate a smaller index in the map to the blocks at higher levels of the
-  // dominance tree
-  unsigned bbIndex = 0;
-  for (Block *bb : allBlocks)
-    indexPerBlock.insert({bb, bbIndex++});
-}
-
-void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
-
-  if (funcOp.getBlocks().size() == 1)
+  if (region.getBlocks().size() == 1)
     return;
 
   // Associate an index to each basic block in "funcOp" so that if Bi
   // dominates Bj than i < j
-  mapBlocksToIndex(funcOp);
+  BlockIndexing bi(region);
 
   // This function works in two steps. First, all the block arguments in the
   // IR are converted into PHIs, taking care or properly extracting the
@@ -228,7 +256,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
   SmallVector<MissingPhi> phisToConnect;
 
   // For each block in the function
-  for (Block &block : funcOp.getBlocks()) {
+  for (Block &block : region.getBlocks()) {
 
     // Create an empty list for the phi functions corresponding to the block
     gatesPerBlock.insert({&block, llvm::SmallVector<Gate *>()});
@@ -324,15 +352,16 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
     missing.pi->input = *foundGate;
   }
 
-  convertPhiToMu(funcOp);
-  convertPhiToGamma(funcOp);
+  convertPhiToMu(region);
+  convertPhiToGamma(region, bi);
   printAllGates();
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
+void experimental::gsa::GSAAnalysis::convertPhiToGamma(
+    Region &region, const BlockIndexing &bi) {
 
   mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
   // For each block
   for (auto const &[phiBlock, phis] : gatesPerBlock) {
@@ -340,7 +369,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
     // For each phi
     for (Gate *phi : phis) {
 
-      // Skip if the phi is not of type "Phi"
+      // Skip if the phi is not of type `Phi`
       if (phi->gsaGateFunction != PhiGate)
         continue;
 
@@ -381,7 +410,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
 
         // Find all the paths from "commonDominator" to "phiBlock" which pass
         // through operand's block but not through any of the "blocksToAvoid"
-        auto paths = findAllPaths(commonDominator, phiBlock,
+        auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
 
         BoolExpression *phiInputCondition = BoolExpression::boolZero();
@@ -389,7 +418,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
         // Sum all the conditions for each path
         for (std::vector<Block *> &path : paths) {
           boolean::BoolExpression *condition =
-              getPathExpression(path, blocksWithConditionInPath, indexPerBlock);
+              getPathExpression(path, blocksWithConditionInPath, bi);
           phiInputCondition =
               BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();
@@ -399,16 +428,19 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
         expressionsList.emplace_back(phiInputCondition, operand);
       }
 
-      // Move the indexes of the blocks associated to the conditions into a
-      // queue. Since the set was ordered, the queue will contain the indexes
-      // ordered in ascending order as well
-      std::queue<unsigned> conditionsOrdered;
+      // Get a queue with all the necessary conditions, ordered according to
+      // their basic block index
+      std::vector<unsigned> conditionsToOrder;
       for (unsigned &index : blocksWithConditionInPath)
+        conditionsToOrder.push_back(index);
+      std::sort(conditionsToOrder.begin(), conditionsToOrder.end());
+      std::queue<unsigned> conditionsOrdered;
+      for (unsigned &index : conditionsToOrder)
         conditionsOrdered.push(index);
 
       // Expand the expressions to get the tree of gammas
       Gate *gammaRoot =
-          expandGammaTree(expressionsList, conditionsOrdered, phi);
+          expandGammaTree(expressionsList, conditionsOrdered, phi, bi);
       gammaRoot->isRoot = true;
 
       // Once that a phi has been converted into a tree of gammas, all the
@@ -426,10 +458,10 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
   }
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToMu(func::FuncOp &funcOp) {
+void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
 
   mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
   // For each phi
   for (const std::pair<Block *, SmallVector<Gate *>> &entry : gatesPerBlock) {
@@ -473,16 +505,10 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(func::FuncOp &funcOp) {
   }
 }
 
-SmallVector<const experimental::gsa::Gate *>
-experimental::gsa::GSAAnalysis::getGates(Block *bb) {
+ArrayRef<experimental::gsa::Gate *>
+experimental::gsa::GSAAnalysis::getGatesPerBlock(Block *bb) const {
   auto it = gatesPerBlock.find(bb);
-  // Block was not found
-  if (it == gatesPerBlock.end())
-    return SmallVector<const gsa::Gate *>();
-
-  // Cast the vector so that it contains constant pointers
-  SmallVector<Gate *> gates = it->getSecond();
-  return SmallVector<const gsa::Gate *>(gates.begin(), gates.end());
+  return it == gatesPerBlock.end() ? ArrayRef<Gate *>() : it->getSecond();
 }
 
 void experimental::gsa::GSAAnalysis::printAllGates() {

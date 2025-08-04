@@ -44,13 +44,30 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
     if (!lowerBound || !upperBound)
       return failure();
 
-    // Determine comparison predicate to use when lowering the loop. We can
-    // insert an unsigned comparison only if the lower bound can be guaranteed
-    // to be non-negative
+    // Determine comparison predicate to use when lowering the loop. This tries
+    // to optimise the used comparator to unsigned, in order to allow a more
+    // intense bitwidth optimisation in the later compilations stages.
+    //
+    // To use an unsigned comparator, the following conditions must hold:
+    //
+    // 1. The lower bound of the loop must be postive;
+    // 2. The upper bound of the loop must be postive.
+    //
+    // If the second condition does not hold, the second term of the comparison
+    // might be interpreted as a very large unsigned, leading to an error in the
+    // execution. In case nothing can be said about the upper bound of the loop,
+    // it is safer not to move to an unsigned comparator, so that correctess is
+    // guaranteed.
     NumericAnalysis analysis;
-    arith::CmpIPredicate pred = analysis.getRange(lowerBound).isPositive()
-                                    ? arith::CmpIPredicate::ult
-                                    : arith::CmpIPredicate::slt;
+
+    auto lowerRange = analysis.getRange(lowerBound);
+    auto upperRange = analysis.getRange(upperBound);
+
+    arith::CmpIPredicate pred =
+        lowerRange.isPositive() && upperRange.isPositive()
+            ? arith::CmpIPredicate::ult
+            : arith::CmpIPredicate::slt;
+
     // Start by splitting the block containing the 'scf.for' into two parts.
     // The part before will get the init code, the part after will be the end
     // point.

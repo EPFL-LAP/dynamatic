@@ -23,24 +23,19 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
-  "An optional array of extra signals for a dataflow channel"> {
-  let allocator = [{
-    ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
-    for (const ::dynamatic::handshake::ExtraSignal &signal : $_self) {
-      ::dynamatic::handshake::ExtraSignal& tmp = tmpSignals.emplace_back(signal);
-      tmp.name = $_allocator.copyInto(tmp.name);
-    }
-    }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
-  }];
-  let cppStorageType = "::llvm::SmallVector<::dynamatic::handshake::ExtraSignal::Storage>";
-  let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
-  let defaultValue = cppType # "()";
-}
+def ExtraSignals : ArrayRefOfSelfAllocationParameter<"ExtraSignal", [{
+  This `TypeParameter` describes an array of `ExtraSignal` objects that a
+  `ChannelType` or `ControlType` value carries.
+  `ExtraSignal` contains data whose lifetime is not guaranteed, so this data must
+  be allocated into the MLIR context when constructing a `ChannelType` or
+  `ControlType`.
+  This type aliases `ArrayRefOfSelfAllocationParameter` to automatically invoke
+  `ExtraSignal::allocateInto` C++ function to perform that allocation process.
+  `ArrayRefParameter` cannot be used here, as it is strictly for value types.
+}]> {}
 
 def ControlType : Handshake_Type<"Control", "control", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["copyWithExtraSignals"]>
 ]> {
   let summary = "a control-only dataflow channel";
   let description = [{
@@ -56,7 +51,7 @@ def ControlType : Handshake_Type<"Control", "control", [
   let parameters = (ins ExtraSignals:$extraSignals);
 
   let builders = [
-    // If no parameters provided, build SimpleControl
+    // If no parameters provided, build without extra signals
     TypeBuilder<(ins),
       [{
         return ControlType::get($_ctxt, {});
@@ -68,7 +63,7 @@ def ControlType : Handshake_Type<"Control", "control", [
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["copyWithExtraSignals"]>
 ]> {
   let summary = "a dataflow channel with optional extra signals";
   let description = [{
@@ -125,25 +120,89 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 }
 
 //===----------------------------------------------------------------------===//
-// Type constraints
+// Tablegen helper functions
 //===----------------------------------------------------------------------===//
 
-def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
+/// Convert variable names to an array of ExtraSignal arrays.
+/// e.g., if names is ["a", "b"], the result will be "{a.(...).getExtraSignals(),
+/// b.(...).getExtraSignals()}".
+class valuesToExtraSignalArrays<list<string> names> {
+  string result = "{" # !interleave(!foreach(
+    name, // variable name
+    names,
+    "cast<ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getExtraSignals()"
+  ), ", ") # "}";
+}
 
-class ChannelHasDataType<string type> : CPred<
-  "::mlir::isa<" # type #
-  ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
->;
+/// Convert variable names to data type arrays.
+/// e.g., if names is ["a", "b"], the result will be "{a.(...).getDataType(),
+/// b.(...).getDataType()}".
+class valuesToDataTypes<list<string> names> {
+  string result = "{" # !interleave(!foreach(
+    name, // variable name
+    names,
+    // Treat ControlType's data type as i0
+    "isa<ControlType>($" # name # ".getType()) ? IntegerType::get($_ctxt, 0) :"
+    "$" # name # ".getType().cast<ChannelType>().getDataType()"
+  ), ", ") # "}";
+}
 
-class ChannelHasDataWidth<int width> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
-  "($_self).getDataBitWidth() == " # width
->;
+/// Convert variadic to an array of ExtraSignal arrays.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getExtraSignals(), dataOut1.(...).getExtraSignals()}.
+class variadicToExtraSignalArrays<string variadic> {
+  string result = [{
+    [&](auto &&variadic) -> std::vector<llvm::ArrayRef<ExtraSignal>> {
+      std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
 
-class HasNumExtras<int numExtras> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>" #
-  "($_self).getNumExtraSignals() == " # numExtras
->;
+      for (Type type : variadic.getTypes()) {
+        extraSignalArrays.push_back(
+          type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+      }
+
+      return extraSignalArrays;
+    }
+  }] # "($" # variadic # ")";
+}
+
+/// Convert variadic to data type arrays.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getDataType(), dataOut1.(...).getDataType()}.
+class variadicToDataTypes<string variadic> {
+  string result = [{
+    [&](auto &&variadic) -> std::vector<Type> {
+      std::vector<Type> dataTypes;
+
+      for (Type type : variadic.getTypes()) {
+        if (isa<ControlType>(type)) {
+          // Treat ControlType's data type as i0
+          dataTypes.push_back(IntegerType::get($_ctxt, 0));
+        } else {
+          dataTypes.push_back(type.cast<ChannelType>().getDataType());
+        }
+      }
+
+      return dataTypes;
+    }
+  }] # "($" # variadic # ")";
+}
+
+/// Concat two arrays of the same type, specified by the first argument.
+class concatArrays<string type, string a, string b> {
+  string result = !subst("$T", type, [{
+    [](std::vector<$T> a, std::vector<$T> b) -> std::vector<$T> {
+      std::vector<$T> result;
+      result.insert(result.end(), a.begin(), a.end());
+      result.insert(result.end(), b.begin(), b.end());
+      return result;
+    }
+  }]) # "(" # a # ", " # b # ")";
+}
+
+//===----------------------------------------------------------------------===//
+// Type constraints
+//===----------------------------------------------------------------------===//
 
 def SignalType : Type<
   CPred<"::dynamatic::handshake::ChannelType::isSupportedSignalType($_self)">,
@@ -158,42 +217,66 @@ def HandshakeType : Type<
   "must be a `handshake::ControlType` or `handshake::ChannelType` type"> {
 }
 
-class TypedChannel<string type> : TypeConstraint<
-  ChannelHasDataType<type>,
-  "must be a `handshake::ChannelType` type whose data is " # type,
-  "::dynamatic::handshake::ChannelType"
+class IsChannelPred<string name> : CPred<
+  "::mlir::isa<::dynamatic::handshake::ChannelType>($" # name # ".getType())">;
+
+class IsIntChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::IntegerType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsFloatChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::FloatType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsSizedChannelPred<int width, string name> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataBitWidth() == " # width>;
+
+/// Ensures an operand/result is of ChannelType carrying IntegerType data.
+class IsIntChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data",
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>
+  ]>
 >;
 
-def IntChannelType : TypedChannel<"::mlir::IntegerType">;
-def FloatChannelType : TypedChannel<"::mlir::FloatType">;
-
-class TypedSizedChannel<string type, int width> : TypeConstraint<
-  And<[ChannelHasDataType<type>, ChannelHasDataWidth<width>]>,
-  "must be a `handshake::ChannelType` type whose data is " # type #
-  " and whose bitwidth is " # width,
-  "::dynamatic::handshake::ChannelType"
+/// Ensures an operand/result is of ChannelType carrying IntegerType data of the
+/// specified width.
+class IsIntSizedChannel<int width, string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data of width " # width,
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>,
+    IsSizedChannelPred<width, name>
+  ]>
 >;
 
-class IntSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::IntegerType", width
+/// Ensures an operand/result is of ChannelType carrying FloatType data.
+class IsFloatChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying FloatType data",
+  And<[
+    IsChannelPred<name>,
+    IsFloatChannelPred<name>
+  ]>
 >;
 
-class FloatSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::FloatType", width
+/// Constraint to ensure an operand/result shouldn't have any extra signals.
+class IsSimpleHandshake<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getNumExtraSignals() == 0">
 >;
 
-def BoolChannel : IntSizedChannel<1>;
-
-def SimpleControl : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ControlType` type with no extra signals",
-  "::dynamatic::handshake::ControlType"
->;
-
-def SimpleChannel : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ChannelType` type with no extra signals",
-  "::dynamatic::handshake::ChannelType"
+/// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
+class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<"llvm::all_of($" # name # ".getTypes(), "
+    "[](Type type) {"
+    "  return type.cast<ExtraSignalsTypeInterface>().getNumExtraSignals() == 0;"
+    "})">
 >;
 
 // Temporary constraint for UnbundleOp.
@@ -204,6 +287,135 @@ def ChannelOrSimpleControl : TypeConstraint<
      ::mlir::cast<::dynamatic::handshake::ControlType>($_self).getNumExtraSignals() == 0)
   }]>,
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching data types.
+/// For the ControlType case, this predicate is satisfied only when all types are ControlType.
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<ControlType>($_self.getType()) ?
+    IntegerType::get($_ctxt, 0) // Treat ControlType's data type as i0
+    : ::mlir::cast<ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra signals.
+class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($_self.getType()).getExtraSignals()",
+  "extra signals"
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
+/// signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
+  "all of {" # !interleave(names, ", ") # "} should have the same extra " #
+  "signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    valuesToExtraSignalArrays<names>.result  # ", \"" # except # "\")">
+>;
+
+/// Multi-entity constraint ensuring that the all HandshakeTypes including variadic
+/// have matching data types.
+class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same data type",
+  CPred<[{
+    [](std::vector<Type> dataTypes) {
+      if (dataTypes.empty())
+        return true;
+
+      Type firstType = dataTypes.front();
+
+      // Compares all types with the first type.
+      return llvm::all_of(dataTypes, [&](Type type) {
+        return type == firstType;
+      });
+    }
+  }] # "(" # concatArrays<"Type",
+    variadicToDataTypes<variadic>.result,
+    valuesToDataTypes<nonvariadics>.result
+  >.result # ")">
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes including variadic
+/// have matching extra signals.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same extra signals",
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    concatArrays<"llvm::ArrayRef<ExtraSignal>",
+    variadicToExtraSignalArrays<variadic>.result,
+    valuesToExtraSignalArrays<nonvariadics>.result
+  >.result # ")">
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes including variadic
+/// have matching extra signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same extra signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    concatArrays<"llvm::ArrayRef<ExtraSignal>",
+    variadicToExtraSignalArrays<variadic>.result,
+    valuesToExtraSignalArrays<nonvariadics>.result
+  >.result # ", \"" # except # "\")">
+>;
+
+/// Constraint to ensure that the variadic has at least one element.
+class VariadicHasElement<string variadic> : PredOpTrait<
+  "the variadic " # variadic # " should have at least one element",
+  CPred<"!$" # variadic # ".empty()">
+>;
+
+// Constraints for spec tags
+
+class HasValidSpecTag<string operand> : PredOpTrait<
+  "should have a valid spec tag as an extra signal",
+  CPred<[{
+    [](ExtraSignalsTypeInterface type) {
+      auto getExtraSignalResult = type.getExtraSignal("spec");
+      if (!getExtraSignalResult.has_value()) {
+        // There is no extra signal called "spec"
+        return false;
+      }
+
+      ExtraSignal signal = getExtraSignalResult.value();
+
+      // The signal should be a 1-bit integer downstream signal.
+      if (!signal.downstream)
+        return false;
+      if (!signal.type.isInteger(1))
+        return false;
+
+      return true;
+    }
+  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
+>;
+
+class LacksSpecTag<string operand> : PredOpTrait<
+  "shouldn't have a spec tag as an extra signal",
+  CPred<"!::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" #
+  operand # ".getType()).hasExtraSignal(\"spec\")">
+>;
+
+class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
+  output # " should have a spec tag iff any of " # inputVariadic # " has it",
+  CPred<[{
+    [](OperandRange::type_range inputTypes,
+        ExtraSignalsTypeInterface outputType) {
+      bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
+        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
+      });
+      return outputType.hasExtraSignal("spec") == inputHasSpecTag;
+    }
+  }] # "($" # inputVariadic # ".getTypes(), "
+  "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

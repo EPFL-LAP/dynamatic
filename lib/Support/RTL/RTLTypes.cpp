@@ -16,6 +16,7 @@
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -31,7 +32,7 @@ static const mlir::DenseSet<StringRef> RESERVED_KEYS{"name", KEY_TYPE,
 
 static constexpr StringLiteral ERR_UNKNOWN_TYPE(
     R"(unknown parameter type: options are "boolean", "unsigned", "string", )"
-    R"("dataflow", or "timing")");
+    R"(or "dataflow")");
 
 bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
   if (typeConcept)
@@ -43,8 +44,8 @@ bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
     path.field(KEY_TYPE).report(ERR_MISSING_VALUE);
     return false;
   }
-  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLDataflowType,
-               RTLTimingType>(paramType)) {
+  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLDataflowType>(
+          paramType)) {
     path.field(KEY_TYPE).report(ERR_UNKNOWN_TYPE);
     return false;
   }
@@ -242,51 +243,4 @@ std::string RTLDataflowType::serialize(Attribute attr) {
     return ss.str();
   }
   return "";
-}
-
-//===----------------------------------------------------------------------===//
-// TimingConstraints / RTLTimingType
-//===----------------------------------------------------------------------===//
-
-TimingConstraints::TimingConstraints() {
-  for (SignalType type : getSignalTypes())
-    latencies.emplace(type, UnsignedConstraints{});
-}
-
-bool TimingConstraints::verify(Attribute attr) const {
-  auto timingAttr = dyn_cast_if_present<handshake::TimingAttr>(attr);
-  if (!timingAttr)
-    return false;
-
-  handshake::TimingInfo info = timingAttr.getInfo();
-  for (SignalType type : getSignalTypes()) {
-    std::optional<unsigned> latency = info.getLatency(type);
-    const UnsignedConstraints &cons = latencies.at(type);
-    if (latency) {
-      if (!cons.verify(*latency))
-        return false;
-    } else {
-      if (!cons.unconstrained())
-        return false;
-    }
-  }
-  return true;
-}
-
-static const std::map<SignalType, StringRef> SIGNAL_TYPE_NAMES = {
-    {SignalType::DATA, "data"},
-    {SignalType::VALID, "valid"},
-    {SignalType::READY, "ready"},
-};
-
-bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
-                         ljson::Path path) {
-  ObjectDeserializer deserial(value, path);
-
-  std::string latSuffix = RTLTimingType::LATENCY.str() + "-";
-  for (SignalType type : getSignalTypes()) {
-    std::string key = SIGNAL_TYPE_NAMES.at(type).str() + latSuffix;
-    cons.latencies.at(type).deserialize(deserial, key);
-  }
-  return deserial.exhausted(RESERVED_KEYS);
 }

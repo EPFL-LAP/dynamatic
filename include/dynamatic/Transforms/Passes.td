@@ -225,18 +225,6 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
-def HandshakeReshapeChannels : DynamaticPass<"handshake-reshape-channels"> {
-  let summary = "Reshape channels to simplify RTL generation.";
-  let description = [{
-    Relies on the `ReshapableChannelsInterface` (part of the Handshake dialect)
-    to simplify the shape of channels with extra signals around operations that
-    ignore the content of all extra signals (and potentially the data signal
-    too). The pass inserts `handshake::ReshapeOp` operations as needed to
-    reshape channels back and forth between their original and simplified forms.
-  }];
-  let constructor = "dynamatic::createHandshakeReshapeChannels()"; 
-}
-
 def HandshakeSetBufferingProperties :
   DynamaticPass<"handshake-set-buffering-properties"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
@@ -271,9 +259,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
-    "interprets the MILP's results as legacy Dynamatic would, placing at most "
-    "a single buffer type on any given channel), 'fpl22'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -289,7 +275,35 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"blifFiles", "blif-files", "std::string", "",
+    "Path to AND-Inverter Graphs of dataflow components in Berkeley "
+    "Logic Interchange Format (BLIF).">,
+    Option<"lutDelay", "lut-delay", "double", "0.55",
+    "Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.">,
+    Option<"lutSize", "lut-size", "int", "6",
+    "Maximum LUT input size of the target FPGA.">,
+    Option<"acyclicType", "acyclic-type", "bool", "false",
+    "Method for creating acyclic graphs from cyclic dataflow graph. Required by "
+    "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
+    "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
+    "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
+}
+
+
+def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
+  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+  let description = [{
+    This pass takes a single floating point unit 'vendor' as input and
+    marks every floating point arithmetic operation. This is later used
+    to decide how to generate the RTL of these units.
+    Defaults to vivado.
+  }];
+  let options = [
+    Option<"impl", "impl", "::std::string",
+      "\"VIVADO\"",
+      "Which FPU impl to use.">
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -432,6 +446,28 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
     --allow-unregistered-dialect flag to all optimizer invokations).
   }];
   let constructor = "dynamatic::createRemovePolygeistAttributes()";
+}
+
+// Remark: this is an example where the implicit name analysis in DynamaticPass
+// creates a problem (still need to investigate why). If you switch this to
+// DynamaticPass instead of Pass, somehow it deletes the listed operation from
+// the module in the end.
+def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
+  let summary = "Remove all unlisted functions from a given module.";
+  let description = [{The output from Clang + opt + mlir-translate contains
+  functions that we cannot synthesize (e.g., main(), rand(), srand()...). This
+  function is useful for dropping them. This pass scans the LLVMFuncOp and
+  func::FuncOps and remove the unlisted ones.}];
+
+  let options =
+    [
+      ListOption<"function_names", "function-names", "std::string",
+            "A list of (comma-separated) function names to keep. For example: function-names=fir,wrapper">,
+    ];
+  let dependentDialects = [
+  "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
+  "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
+  "mlir::LLVM::LLVMDialect"];
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
