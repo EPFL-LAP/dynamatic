@@ -606,7 +606,7 @@ def SynchronizerOp : Handshake_Op<"synchronizer"> {
 
   let arguments = (ins Variadic<ChannelType>:$ins);
   let results = (outs Variadic<ChannelType>:$outs);
-  let assemblyFormat = "$ins attr-dict `:` type($outs)";
+  let assemblyFormat = "$ins `:` type($ins) attr-dict `->` type($outs)";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
