@@ -52,7 +52,7 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
                 mergeLikeOp.getDataOperands().front().getType());
           })
       .Case<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BranchOp, handshake::SinkOp>([&](auto) {
+            handshake::BranchOp, handshake::SinkOp, handshake::SynchronizerOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getOperand(0).getType());
       })
       .Case<handshake::ConditionalBranchOp>(
@@ -62,7 +62,7 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getResult(0).getType());
       })
-      .Case<handshake::EndOp, handshake::SynchronizerOp>(
+      .Case<handshake::EndOp>(
           [&](auto) {
             if (op->getNumOperands() == 0)
               return 0u;
