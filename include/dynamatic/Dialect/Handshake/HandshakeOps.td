@@ -628,7 +628,7 @@ def SynchronizerOp : Handshake_Op<"synchronizer", [
     unsigned getSize() {
       return getNumOperands();
     }
-  }]
+  }];
 
   let extraClassDefinition = [{
     // use custom getOperandName to prevent
