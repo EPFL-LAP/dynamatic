@@ -526,7 +526,7 @@ LogicalResult ftd::createPhiNetworkDeps(
         return failure();
     }
 
-    operand->set(synchronizerOp.getOuts(0));
+    operand->set(synchronizerOp.getOuts()[0]);
   }
 
   return success();
