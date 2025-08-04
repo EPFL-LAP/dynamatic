@@ -506,7 +506,7 @@ LogicalResult ftd::createPhiNetworkDeps(
       continue;
     }
 
-    // If the operand has one dependency only, there is no need for a join.
+    // If the operand has one dependency only, there is no need for a synchronizer.
     if (dependencies.size() == 1) {
       if (failed(connect(operand, dependencies[0])))
         return failure();
@@ -514,19 +514,19 @@ LogicalResult ftd::createPhiNetworkDeps(
     }
 
     // If the operand has many dependencies, then each of them is singularly
-    // connected with an SSA network, and then everything is joined.
+    // connected with an SSA network, and then everything is synchronized.
     ValueRange operands = dependencies;
     rewriter.setInsertionPointToStart(operand->getOwner()->getBlock());
-    auto joinOp = rewriter.create<handshake::JoinOp>(
+    auto synchronizerOp = rewriter.create<handshake::SynchronizerOp>(
         operand->getOwner()->getLoc(), operands);
-    joinOp->moveBefore(operandOwner);
+    synchronizerOp->moveBefore(operandOwner);
 
     for (unsigned i = 0; i < dependencies.size(); i++) {
-      if (failed(connect(&joinOp->getOpOperand(i), dependencies[i])))
+      if (failed(connect(&synchronizerOp->getOpOperand(i), dependencies[i])))
         return failure();
     }
 
-    operand->set(joinOp.getResult());
+    operand->set(synchronizerOp.getOuts(0));
   }
 
   return success();
