@@ -186,7 +186,7 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   StringRef dstName = namer.getName(dstOp);
-  MLIRContext* ctx = &getContext();
+  MLIRContext *ctx = &getContext();
   opDeps[srcOp].push_back(MemDependenceAttr::get(
       ctx, dstName, 0, ArrayRef<affine::DependenceComponent>{}, true));
 

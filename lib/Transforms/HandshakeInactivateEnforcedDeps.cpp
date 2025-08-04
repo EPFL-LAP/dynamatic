@@ -122,9 +122,9 @@ static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
 static MemDependenceAttr
 getInactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
-  return MemDependenceAttr::get(
-      ctx, dependency.getDstAccess(), dependency.getLoopDepth(),
-      dependency.getComponents(), false);
+  return MemDependenceAttr::get(ctx, dependency.getDstAccess(),
+                                dependency.getLoopDepth(),
+                                dependency.getComponents(), false);
 }
 
 /// Inactivates the dependencies that are enforced by cheking whether the load
