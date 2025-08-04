@@ -608,10 +608,10 @@ def SynchronizerOp : Handshake_Op<"synchronizer"> {
   let results = (outs Variadic<ChannelType>:$outs);
 
   let builders = [
-    OpBuilder<"ValueRange ins", [{
+    OpBuilder<(ins "ValueRange":$ins), [{
       SmallVector<Type> outTypes;
-      for (Value in ins)
-        outTypes.push_back(Value.getType());
+      for (Value v : ins)
+        outTypes.push_back(v.getType());
       build($_builder, $_state, outTypes, ins);
     }]>
   ];
