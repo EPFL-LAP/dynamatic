@@ -135,11 +135,12 @@ class LSQ:
         stp_data_ready_o = LogicArray(
             ctx, 'stp_data_ready', 'o', self.configs.numStPorts)
 
+        # Store Done Signal (valid, ready) to kernel
         if self.configs.stResp:
-            stp_exec_valid_o = LogicArray(
-                ctx, 'stp_exec_valid', 'o', self.configs.numStPorts)
-            stp_exec_ready_i = LogicArray(
-                ctx, 'stp_exec_ready', 'i', self.configs.numStPorts)
+            stp_done_valid_o = LogicArray(
+                ctx, 'stp_done_valid', 'o', self.configs.numStPorts)
+            stp_done_ready_i = LogicArray(
+                ctx, 'stp_done_ready', 'i', self.configs.numStPorts)
 
         # queue empty signal
         empty_o = Logic(ctx, 'empty', 'o')
@@ -549,7 +550,7 @@ class LSQ:
         if self.configs.stResp:
             arch += lsq_submodules.qtp_dispatcher_stb.instantiate(
                 ctx,
-                None, stp_exec_valid_o, stp_exec_ready_i,
+                None, stp_done_valid_o, stp_done_ready_i,
                 stq_alloc, stq_exec, stq_port_idx, None, stq_reset, stq_head_oh
             )
 

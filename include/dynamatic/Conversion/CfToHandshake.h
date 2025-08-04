@@ -98,10 +98,12 @@ public:
   /// counterparts, and fills `memInfo` with information about which operations
   /// use which interface. The backedge builder is used to create temporary
   /// values for the data input to converted load ports.
-  virtual LogicalResult convertMemoryOps(
-      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-      const DenseMap<Value, unsigned> &memrefIndices,
-      BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo) const;
+  virtual LogicalResult
+  convertMemoryOps(handshake::FuncOp funcOp,
+                   ConversionPatternRewriter &rewriter,
+                   const DenseMap<Value, unsigned> &memrefIndices,
+                   BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
+                   MLIRContext *ctx) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group

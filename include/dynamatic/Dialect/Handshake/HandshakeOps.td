@@ -713,12 +713,12 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
                        Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<HandshakeType>:$outputs, ControlType:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
-                                 "unsigned":$numLoads)>];
+                                 "SmallVector<bool>":$loadAndStorePorts)>];
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -795,10 +795,11 @@ def LSQOp : Handshake_Op<"lsq", [
 
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
-                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, 
+                   "SmallVector<bool>":$loadAndStorePorts)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
-                   "unsigned":$numLoads)>,
+                   "SmallVector<bool>":$loadAndStorePorts)>,
   ];
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -842,7 +843,7 @@ def LSQOp : Handshake_Op<"lsq", [
 //===----------------------------------------------------------------------===//
 
 class Handshake_MemPortOp<
-    string mnemonic, list<Trait> customTraits, list<OpBuilder> customBuilders> :
+    string mnemonic, list<Trait> customTraits, list<OpBuilder> customBuilders>:
   Handshake_Op<mnemonic, customTraits # [
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
@@ -926,6 +927,8 @@ def LoadOp : Handshake_MemPortOp<"load", [
 }
 
 def StoreOp : Handshake_MemPortOp<"store", [
+  StoreMemPortOpInterface,
+  AllDataTypesMatch<["done", "doneResult"]>,
   AllExtraSignalsMatch<["address", "data"]>,
   // In StoreOp, addressResult and dataResult are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
@@ -941,25 +944,57 @@ def StoreOp : Handshake_MemPortOp<"store", [
     The order of operands is
     1. address (from predecessor)
     2. data value (from predecessor)
+    3. done signal (from memory interface)
 
     The order of results is
     1. address (to memory interface).
     2. data value (to memory interface)
+    3. done signal (to successor)
 
     Example:
 
     ```mlir
-    %addrOut, %dataToMem = store [%addrIn] %dataIn : <i32>, <i32>
+    %addrOut, %dataToMem %doneOut = store [%addrIn] %dataIn %doneFromMem : <i32>, <i32>, _
     ```
+  }];
+
+  let arguments = (ins ChannelType:$address, ChannelType:$data, ControlType:$done);
+  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult, ControlType:$doneResult);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$address, "::mlir::Value":$data, "::mlir::Value":$done), [{
+      $_state.addOperands({address, data, done});
+      // Specify {addressResult type, dataResult type}
+      $_state.addTypes({address.getType(), data.getType(), done.getType()});
+    }]>
+  ];
+
+  let assemblyFormat = [{
+    `[` $address `]` $data $done attr-dict `:` type($address) `,` type($data) `,` type($done) `,`
+        type($addressResult) `,` type($dataResult) `,` type($doneResult)
   }];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned int idx) {
-      return (idx == 0) ? "addrIn" : "dataIn";
+      switch(idx) {
+        case 0:
+          return "addrIn";
+        case 1:
+          return "dataIn";
+        default:
+          return "doneFromMem";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned int idx) {
-      return (idx == 0) ? "addrOut" : "dataToMem";
+      switch(idx) {
+        case 0:
+          return "addrOut";
+        case 1:
+          return "dataToMem";
+        default:
+          return "doneOut";
+      }
     }
   }];
 }

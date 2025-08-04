@@ -33,6 +33,9 @@ entity mem_controller_loadless is
     stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_TYPE - 1 downto 0);
     stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
+    -- store done
+    stDone_valid : out std_logic_vector(NUM_STORES - 1 downto 0);
+    stDone_ready : in  std_logic_vector(NUM_STORES - 1 downto 0);
     -- interface to dual-port BRAM
     loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     loadEn    : out std_logic;
@@ -64,6 +67,8 @@ architecture arch of mem_controller_loadless is
   signal store_access_port_selected         : std_logic_vector(NUM_STORES - 1 downto 0);
   signal allRequestsDone                    : std_logic;
 
+  -- Store done signal logic
+  signal store_complete                     : std_logic_vector(NUM_STORES - 1 downto 0);
 
   constant zeroStore : std_logic_vector(31 downto 0)               := (others => '0');
   constant zeroCtrl  : std_logic_vector(NUM_CONTROLS - 1 downto 0) := (others => '0');
@@ -98,6 +103,22 @@ begin
   stData_ready <= store_access_port_selected;
   stAddr_ready <= store_access_port_selected;
   ctrl_ready   <= (others => '1');
+
+  -- Store done logic
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      for i in 0 to NUM_STORES - 1 loop
+        if store_access_port_selected(i) = '1' then
+          store_complete(i) <= '1';
+        elsif stDone_ready(i) = '1' then
+          store_complete(i) <= '0';
+        end if;
+      end loop;
+    end if;
+  end process;
+
+  stDone_valid <= store_complete;
 
   count_stores : process (clk)
     variable counter : std_logic_vector(31 downto 0);

@@ -185,13 +185,16 @@ public:
 /// 1. the address value produced by the port operation and consumed by the
 /// memory interface, and
 /// 2. the data value produced by the port operation and consumed by the
-/// memory interface.
+/// memory interface, and
+/// 3. the done value produced by memory interface and consumed by the port
+/// operation.
 class StorePort : public MemoryPort {
 public:
   /// Constructs the store port from a store operation, the index of the
   /// store's address output in the memory interface's inputs (the store's data
   /// output is assumed to be at the next index), and the specific store kind.
-  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx,
+            unsigned dataOutputIdx);
 
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
@@ -210,6 +213,10 @@ public:
   /// inputs.
   unsigned getDataInputIndex() const { return oprdIndices[1]; }
 
+  /// Returns the index of the store done value in the memory interface's
+  /// outputs
+  unsigned getDoneOutputIndex() const { return resIndices[0]; }
+
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
     return port->getKind() == Kind::STORE;
@@ -219,8 +226,8 @@ public:
 /// Memory load/store port associated with a `dynamatic::handshake::LSQOp`,
 /// which acts as a "middle-person" between individual load/store IR operations
 /// and another memory interface (the one which this port is attached to). As
-/// both a load port and a store port, it references 4 values through their
-/// indices in the memory interface's inputs (3) and outputs (1).
+/// both a load port and a store port, it references 5 values through their
+/// indices in the memory interface's inputs (3) and outputs (2).
 /// 1. The load address value produced by the LSQ and consumed by the memory
 /// interface (input).
 /// 2. The load data value produced by the memory interface and consumed by the
@@ -229,12 +236,15 @@ public:
 /// interface (input).
 /// 4. The store data value produced by the LSQ and consumed by the memory
 /// interface (input).
+/// 5. The store done value produced by the memory interface and consumed by
+/// the LSQ (output).
 class LSQLoadStorePort : public MemoryPort {
 public:
   /// Constructs an LSQ load/store port from an LSQ operation, the index of the
   /// LSQ's load address output in the memory interface's inputs (the store
   /// address and store data inputs are assumed to follow), and the index of the
-  /// LSQ's load data input in the memory interface's results.
+  /// LSQ's load data input in the memory interface's results (the store done is
+  /// assumed to follow).
   LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp, unsigned loadAddrInputIdx,
                    unsigned loadDataOutputIdx);
 
@@ -263,6 +273,10 @@ public:
   /// inputs.
   unsigned getStoreDataInputIndex() const { return oprdIndices[2]; }
 
+  /// Returns the index of the store done value in the memory interface's
+  /// outputs.
+  unsigned getStoreDoneOutputIndex() const { return resIndices[1]; }
+
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
     return port->getKind() == Kind::LSQ_LOAD_STORE;
@@ -283,6 +297,8 @@ public:
 /// the LSQ (output).
 /// 4. The store data value produced by the memory interface and consumed by the
 /// LSQ (output).
+/// 5. The store done value produced by the MC and consumed by the memory
+/// interface (input).
 class MCLoadStorePort : public MemoryPort {
 public:
   /// Constructs an MC load/store port from an MC operation, the index of the
@@ -316,6 +332,10 @@ public:
   /// Returns the index of the store data value in the memory interface's
   /// outputs.
   unsigned getStoreDataOutputIndex() const { return resIndices[2]; }
+
+  /// Returns the index of the store done value in the memory interface's
+  /// inputs.
+  unsigned getStoreDoneInputIndex() const { return oprdIndices[1]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {

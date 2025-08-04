@@ -143,6 +143,33 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
+def StoreMemPortOpInterface : OpInterface<"StoreMemPortOpInterface", [MemPortOpInterface]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Specialized interface for handshake store memory port operations.
+    Adds methods for done signals.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the port's done output.",
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getDoneOutput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getDoneResult();
+      }]
+    >,
+    InterfaceMethod<
+      "Returns the port's done input.",
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getDoneInput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getDone();
+      }]
+    >,
+  ];
+}
+
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
