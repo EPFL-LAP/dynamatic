@@ -180,7 +180,7 @@ ChannelBufProps::ChannelBufProps(unsigned minTrans,
                                  double outDelay, double delay)
     : minTrans(minTrans), maxTrans(maxTrans), minOpaque(minOpaque),
       maxOpaque(maxOpaque), minSlots(minSlots), inDelay(inDelay),
-      outDelay(outDelay), delay(delay) {};
+      outDelay(outDelay), delay(delay){};
 
 bool ChannelBufProps::isSatisfiable() const {
   return (!maxTrans.has_value() || *maxTrans >= minTrans) &&

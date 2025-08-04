@@ -675,14 +675,15 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
             handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
             handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
             handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
-            handshake::OrIOp, handshake::AddFOp, handshake::CmpFOp, 
+            handshake::OrIOp, handshake::AddFOp, handshake::CmpFOp,
             handshake::DivFOp, handshake::MulFOp, handshake::ShLIOp,
-            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp, 
-            handshake::SubIOp, handshake::TruncIOp, handshake::TruncFOp, 
-            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp>([&](auto) {
-        // At least one operand must depend on the predecessor
-        return foldGIIDStatusOr(recurse, defOp->getOperands());
-      })
+            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
+            handshake::SubIOp, handshake::TruncIOp, handshake::TruncFOp,
+            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp>(
+          [&](auto) {
+            // At least one operand must depend on the predecessor
+            return foldGIIDStatusOr(recurse, defOp->getOperands());
+          })
       .Default([&](auto) {
         // To err on the conservative side, produce the most terminating kind of
         // failure on encoutering an unsupported operation
@@ -698,8 +699,8 @@ bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
 bool dynamatic::isChannelOnCycle(mlir::Value channel) {
   llvm::SmallPtrSet<mlir::Value, 32> visited;
 
-  std::function<bool(mlir::Value, bool)> dfs =
-      [&](mlir::Value current, bool isStart) -> bool {
+  std::function<bool(mlir::Value, bool)> dfs = [&](mlir::Value current,
+                                                   bool isStart) -> bool {
     if (!isStart && current == channel)
       return true;
 
