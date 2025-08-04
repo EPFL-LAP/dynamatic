@@ -237,7 +237,7 @@ struct LSQGenerationInfo {
   unsigned indexWidth = 6;
   /// Indicate whether the store response channel
   /// in store access port is enabled
-  unsigned stResp = 0;
+  unsigned stResp = 1;
   /// Indicate whether the multiple groups are allowed
   /// to request an allocation at the same cycle
   unsigned groupMulti = 0;
