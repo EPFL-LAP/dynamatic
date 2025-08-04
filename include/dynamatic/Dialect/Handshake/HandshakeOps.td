@@ -606,6 +606,16 @@ def SynchronizerOp : Handshake_Op<"synchronizer"> {
 
   let arguments = (ins Variadic<ChannelType>:$ins);
   let results = (outs Variadic<ChannelType>:$outs);
+
+  let builders = [
+    OpBuilder<"ValueRange ins", [{
+      SmallVector<Type> outTypes;
+      for (Value in ins)
+        outTypes.push_back(Value.getType());
+      build($_builder, $_state, outTypes, ins);
+    }]>
+  ];
+
   let assemblyFormat = "$ins `:` type($ins) attr-dict `->` type($outs)";
 }
 
