@@ -113,12 +113,15 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
                         const ftd::BlockIndexing &bi,
-                        bool blockToTraverseFound) {
+                        bool blockToTraverseFound,
+                        int endVisitCount) {
 
   // The current block is part of the current path
   path.push_back(start);
   // The current block has been visited
   visited.insert(start);
+  // End is Visited
+  int newEndVisitCount = endVisitCount + (start == end ? 1 : 0);llvm::errs() <<"\nnewEndVisitCount :"<< newEndVisitCount;
   llvm::errs() <<"\nDFS from :"; start->printAsOperand(llvm::errs());
 llvm::errs() <<"\nblockToTraverse:";
 if (blockToTraverse)blockToTraverse->printAsOperand(llvm::errs());
@@ -145,10 +148,10 @@ llvm::errs() <<"\n";
       if (incorrectPath)
         continue;
 
-      if (!visited.count(successor) || successor== end ) {
+      if (!visited.count(successor) || (successor== end && newEndVisitCount < 2)) {
         llvm::errs() <<"\nsuccessor :"; successor->printAsOperand(llvm::errs());
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
-                    blocksToAvoid, bi, blockFound || blockToTraverseFound);
+                    blocksToAvoid, bi, blockFound || blockToTraverseFound, newEndVisitCount);
       }
     }
   }
@@ -166,7 +169,7 @@ ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, blockToTraverse,
-              blocksToAvoid, bi, false);
+              blocksToAvoid, bi, false, 0);
   return allPaths;
 }
 
