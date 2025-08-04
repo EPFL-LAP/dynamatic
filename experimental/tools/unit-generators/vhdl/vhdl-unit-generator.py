@@ -39,6 +39,7 @@ import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
 import generators.handshake.ready_remover as ready_remover
 import generators.handshake.valid_merger as valid_merger
+import generators.handshake.synchronizer as synchronizer
 
 
 def generate_code(name, mod_type, parameters):
@@ -117,6 +118,8 @@ def generate_code(name, mod_type, parameters):
             return ready_remover.generate_ready_remover(name, parameters)
         case "valid_merger":
             return valid_merger.generate_valid_merger(name, parameters)
+        case "synchronizer":
+            return synchronizer.generate_synchronizer(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 

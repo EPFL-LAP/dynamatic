@@ -591,47 +591,22 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def JoinOp : Handshake_Op<"join", [
-  SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
-]> {
-  let summary = "join operation";
+def SynchronizerOp : Handshake_Op<"synchronizer"> {
+  let summary = "Synchronization operation";
   let description = [{
-    A control-only synchronizer.  Produces a valid output when all
-    inputs become available.
+    Token synchronizer.
+    Outputs only become valid when all inputs are valid.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.control
+    %0, %1, %2 = synchronizer %a, %b, %c : !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control
     ```
   }];
 
-  let arguments = (ins Variadic<ControlType>:$data);
-  let results = (outs ControlType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
-}
-
-// TODO: Split the input into two parts and explicitly mark the forwarded input,
-// once the backend supports variadic channels with zero or one item correctly.
-def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
-]> {
-  let summary = "blocker operation";
-  let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
-    then forwards the first input.
-
-    Example:
-
-    ```mlir
-    %0 = blocker %a, %b, %c : !handshake.channel<i32>
-    ```
-  }];
-
-  let arguments = (ins Variadic<ChannelType>:$data);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
+  let arguments = (ins Variadic<ChannelType>:$ins);
+  let results = (outs Variadic<ChannelType>:$outs);
+  let assemblyFormat = "$ins attr-dict `:` type($outs)";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
