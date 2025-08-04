@@ -1,6 +1,5 @@
 from typing import Type, Union
 from enum import Enum
-import re
 
 def data(code: str, bitwidth: int) -> str:
     return code if bitwidth else ""
