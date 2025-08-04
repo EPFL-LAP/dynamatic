@@ -250,7 +250,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
 
 static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
+      .Case<handshake::ForkOp, handshake::LazyForkOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::SynchronizerOp>([&](auto) { return "cyan"; })
       .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
