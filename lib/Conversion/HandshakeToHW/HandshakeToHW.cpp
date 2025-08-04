@@ -541,7 +541,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", synchronizerOp.getSize());
 
-        for(int i = 0; i < synchronizerOp.getSize(); i++){
+        for(unsigned i = 0; i < synchronizerOp.getSize(); i++){
           addType("DATA_TYPE_" + std::to_string(i), op->getResult(i));
         }
       })
