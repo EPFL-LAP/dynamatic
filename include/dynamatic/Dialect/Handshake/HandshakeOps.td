@@ -591,47 +591,62 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def JoinOp : Handshake_Op<"join", [
-  SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+def SynchronizerOp : Handshake_Op<"synchronizer", [
+  Pure,
+  OutputsSameTypeAsInputs<"ins", "outs">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
-  let summary = "join operation";
+  let summary = "Synchronization operation";
   let description = [{
-    A control-only synchronizer.  Produces a valid output when all
-    inputs become available.
+    Token synchronizer.
+    Outputs only become valid when all inputs are valid.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.control
+    %0, %1, %2 = handshake.synchronizer %a, %b, %c : !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control -> !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control
     ```
   }];
 
-  let arguments = (ins Variadic<ControlType>:$data);
-  let results = (outs ControlType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
-}
+  let arguments = (ins Variadic<ChannelType>:$ins);
+  let results = (outs Variadic<ChannelType>:$outs);
 
-// TODO: Split the input into two parts and explicitly mark the forwarded input,
-// once the backend supports variadic channels with zero or one item correctly.
-def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
-]> {
-  let summary = "blocker operation";
-  let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
-    then forwards the first input.
+  let builders = [
+    OpBuilder<(ins "ValueRange":$ins), [{
+      SmallVector<Type> outTypes;
+      for (Value v : ins)
+        outTypes.push_back(v.getType());
+      build($_builder, $_state, outTypes, ins);
+    }]>
+  ];
 
-    Example:
-
-    ```mlir
-    %0 = blocker %a, %b, %c : !handshake.channel<i32>
-    ```
+  let extraClassDeclaration= [{
+    // "size" refers to both num operands
+    // and num results, so utility function is
+    // provided to abstract which is chosen to get value
+    unsigned getSize() {
+      return getNumOperands();
+    }
   }];
 
-  let arguments = (ins Variadic<ChannelType>:$data);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
+  let extraClassDefinition = [{
+    // use custom getOperandName to prevent
+    // conversion to data array
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return "ins" + std::to_string(idx);
+    }
+
+    // use custom getResultName to prevent
+    // conversion to data array
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return "outs" + std::to_string(idx);
+    }
+  }];
+
+  let assemblyFormat = "$ins `:` type($ins) attr-dict `->` type($outs)";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {

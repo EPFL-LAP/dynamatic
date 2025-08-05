@@ -489,12 +489,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
     if (lhsResult.getType().isa<handshake::ControlType>()) {
-      ValueRange joinInputs = {lhsEndBufferOp.getResult(),
+      ValueRange synchronizerInputs = {lhsEndBufferOp.getResult(),
                                rhsEndBufferOp.getResult()};
-      JoinOp joinOp =
-          builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
-      setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);
-      miterResultValues.push_back(joinOp.getResult());
+      SynchronizerOp synchronizerOp =
+          builder.create<SynchronizerOp>(builder.getUnknownLoc(), synchronizerInputs);
+      setHandshakeAttributes(builder, synchronizerOp, BB_OUT, eqName);
+      miterResultValues.push_back(synchronizerOp.getOuts()[0]);
     } else {
       CmpIOp compOp = builder.create<CmpIOp>(
           builder.getUnknownLoc(), CmpIPredicate::eq,

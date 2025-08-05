@@ -582,27 +582,6 @@ private:
   std::vector<ProducerData> outsData;
 };
 
-// Never used but let it be
-class JoinModel : public OpExecutionModel<handshake::JoinOp> {
-public:
-  using OpExecutionModel<handshake::JoinOp>::OpExecutionModel;
-  JoinModel(handshake::JoinOp joinOp, mlir::DenseMap<Value, RW *> &subset);
-
-  void reset() override;
-
-  void exec(bool isClkRisingEdge) override;
-
-  void printStates() override;
-
-private:
-  // ports
-  std::vector<ConsumerRW *> ins;
-  ProducerRW *outs;
-
-  // internal components
-  JoinSupport join;
-};
-
 class LazyForkModel : public OpExecutionModel<handshake::LazyForkOp> {
 public:
   using OpExecutionModel<handshake::LazyForkOp>::OpExecutionModel;

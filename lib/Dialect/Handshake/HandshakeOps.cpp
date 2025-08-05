@@ -584,8 +584,6 @@ LogicalResult ConstantOp::verify() {
   return success();
 }
 
-bool JoinOp::isControl() { return true; }
-
 /// Based on mlir::func::CallOp::verifySymbolUses
 LogicalResult InstanceOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the module attribute was specified.

@@ -680,25 +680,6 @@ void ForkModel::printStates() {
     printValue<ProducerRW, Data>("outs", outs[i], outsData[i].data);
 }
 
-JoinModel::JoinModel(handshake::JoinOp joinOp,
-                     mlir::DenseMap<Value, RW *> &subset)
-    : OpExecutionModel<handshake::JoinOp>(joinOp),
-      outs(getState<ProducerRW>(joinOp.getResult(), subset)),
-      join(joinOp->getNumOperands()) {
-  for (auto oper : joinOp->getOperands())
-    ins.push_back(getState<ConsumerRW>(oper, subset));
-}
-
-void JoinModel::reset() { join.exec(ins, outs); }
-
-void JoinModel::exec(bool isClkRisingEdge) { reset(); }
-
-void JoinModel::printStates() {
-  for (auto *in : ins)
-    llvm::outs() << "Ins: " << in->valid << " " << in->ready << "\n";
-  llvm::outs() << "Outs: " << outs->valid << " " << outs->ready << "\n";
-}
-
 LazyForkModel::LazyForkModel(handshake::LazyForkOp lazyForkOp,
                              mlir::DenseMap<Value, RW *> &subset)
     : OpExecutionModel<handshake::LazyForkOp>(lazyForkOp),
@@ -1383,9 +1364,6 @@ void Simulator::associateModel(Operation *op) {
       })
       .Case<handshake::ForkOp>([&](handshake::ForkOp forkOp) {
         registerModel<ForkModel, handshake::ForkOp>(forkOp);
-      })
-      .Case<handshake::JoinOp>([&](handshake::JoinOp joinOp) {
-        registerModel<JoinModel, handshake::JoinOp>(joinOp);
       })
       .Case<handshake::LazyForkOp>([&](handshake::LazyForkOp lForkOp) {
         registerModel<LazyForkModel, handshake::LazyForkOp>(lForkOp);
