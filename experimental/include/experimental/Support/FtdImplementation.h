@@ -18,10 +18,13 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Analysis/GSAAnalysis.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+using namespace boolean;
 
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
@@ -80,6 +83,15 @@ LogicalResult createPhiNetwork(Region &funcRegion, PatternRewriter &rewriter,
 LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
+
+BoolExpression *enumeratePaths(Block *start, Block *end,
+                               const ftd::BlockIndexing &bi,
+                               const DenseSet<Block *> &controlDeps);
+
+Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+                   const ftd::BlockIndexing &bi);
+
+void eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2);
 
 }; // namespace ftd
 }; // namespace experimental

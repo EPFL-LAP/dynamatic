@@ -215,9 +215,10 @@ static bool isaMuxLoop(Operation *mux, CFGLoopInfo &li) {
 /// (`end`). "Each path identifies a Boolean product of elementary conditions
 /// expressing the reaching of the target BB from the corresponding member of
 /// the set; the product of all such paths are added".
-static BoolExpression *enumeratePaths(Block *start, Block *end,
-                                      const ftd::BlockIndexing &bi,
-                                      const DenseSet<Block *> &controlDeps) {
+BoolExpression *
+experimental::ftd::enumeratePaths(Block *start, Block *end,
+                                  const ftd::BlockIndexing &bi,
+                                  const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
@@ -695,8 +696,9 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi) {
+Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd,
+                                      Block *block,
+                                      const ftd::BlockIndexing &bi) {
   if (!bdd->successors.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
