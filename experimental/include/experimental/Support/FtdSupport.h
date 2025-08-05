@@ -71,7 +71,8 @@ bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
              Block *blockToTraverse = nullptr,
-             ArrayRef<Block *> blocksToAvoid = {});
+             ArrayRef<Block *> blocksToAvoid = {},
+             std::vector<Block *> endEntryBlocks={});
 
 /// Given a sequence of block, find a boolean expression defining the conditions
 /// for which the path is traversed. If one edge is unconditional, then no

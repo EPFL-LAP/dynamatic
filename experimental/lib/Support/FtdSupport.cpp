@@ -112,6 +112,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::vector<std::vector<Block *>> &allPaths,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
+                        const std::vector<Block *> &endEntryBlocks,
                         const ftd::BlockIndexing &bi,
                         bool blockToTraverseFound,
                         int endVisitCount) {
@@ -130,8 +131,16 @@ llvm::errs() <<"\n";
 
   // If we are at the end of the path, then add it to the list of paths
   if (start == end && path.size() > 1 && (blockFound || blockToTraverseFound)) {
-    llvm::errs() <<"\neshgh\n";
-    allPaths.push_back(path);
+    Block *prev = path[path.size() - 2];
+    bool allowed = endEntryBlocks.empty() ||
+                 std::find(endEntryBlocks.begin(), endEntryBlocks.end(), prev) != endEntryBlocks.end();
+
+    if (allowed) {
+      allPaths.push_back(path);
+      llvm::errs() <<"\npath is added\n";
+    }
+    else llvm::errs() <<"\npath isn't added\n";
+
   } else {
     // Else, for each successor which was not visited, run DFS again
     for (Block *successor : start->getSuccessors()) {
@@ -151,7 +160,7 @@ llvm::errs() <<"\n";
       if (!visited.count(successor) || (successor== end && newEndVisitCount < 2)) {
         llvm::errs() <<"\nsuccessor :"; successor->printAsOperand(llvm::errs());
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
-                    blocksToAvoid, bi, blockFound || blockToTraverseFound, newEndVisitCount);
+                    blocksToAvoid, endEntryBlocks, bi, blockFound || blockToTraverseFound, newEndVisitCount);
       }
     }
   }
@@ -164,12 +173,13 @@ llvm::errs() <<"\n";
 
 std::vector<std::vector<Block *>>
 ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
-                  Block *blockToTraverse, ArrayRef<Block *> blocksToAvoid) {
+                  Block *blockToTraverse, ArrayRef<Block *> blocksToAvoid,
+                  std::vector<Block *> endEntryBlocks) {
   std::vector<std::vector<Block *>> allPaths;
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, blockToTraverse,
-              blocksToAvoid, bi, false, 0);
+              blocksToAvoid, endEntryBlocks, bi, false, 0);
   return allPaths;
 }
 

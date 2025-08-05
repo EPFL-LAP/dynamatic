@@ -50,6 +50,9 @@ struct GateInput {
   /// the IR, another gate or empty.
   std::variant<Value, Gate *> input;
 
+  /// A list of blocks that send this input; initially empty.
+  std::vector<Block *> senders;
+
   /// Constructor a gate input being the result of an operation.
   GateInput(Value v) : input(v) {};
 

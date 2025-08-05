@@ -304,7 +304,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<GateInput *> operands;
-      SmallVector<BlockArgument > operands_missphi;
+      SmallVector<MissingPhi > operandsMissPhi;
       DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
       // providing the inputs of the phi functions
@@ -335,15 +335,20 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
         auto isAlreadyPresent = [&](Value c) -> bool {
           // Check for concrete values already present
           for (GateInput *in : operands) {
-            if (in->isTypeValue() && in->getValue() == c)
+            if (in->isTypeValue() && in->getValue() == c){
+              in->senders.push_back(pred);
               return true;
+            }
           }
 
           // Check for duplicate missing phis
           if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
-            for ( BlockArgument barg : operands_missphi) {
-              if(barg.getParentBlock()== blockArgC.getParentBlock())
+            for ( MissingPhi mPhi : operandsMissPhi) {
+              // if same argument of the same phi come from the same producer and both are missing phis (doesn't check the value!!)
+              if(mPhi.blockArg.getParentBlock()== blockArgC.getParentBlock()){ 
+                mPhi.pi->senders.push_back(pred);
                 return true;
+              }
             }
           }
 
@@ -371,15 +376,18 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
           if (BlockArgument blockArg = dyn_cast<BlockArgument>(producer);
               blockArg && !producer.getParentBlock()->hasNoPredecessors() && !isAlreadyPresent(dyn_cast<Value>(producer))) {
             gateInput = new GateInput((Gate *)nullptr);
-            phisToConnect.push_back(MissingPhi(gateInput, blockArg));
+            MissingPhi missingPhi = MissingPhi(gateInput, blockArg);
+            missingPhi.pi->senders.push_back(pred);
+            phisToConnect.push_back(missingPhi);
             gateInputList.push_back(gateInput);
-            operands_missphi.push_back(blockArg);
+            operandsMissPhi.push_back(missingPhi);
             llvm::errs() <<"missphi:    from BB" << bi.getIndexFromBlock(producer.getParentBlock())
               << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
 
           } else {
             if (!isAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
+              gateInput->senders.push_back(pred);
               gateInputList.push_back(gateInput);
               llvm::errs() <<"normalpath: from BB" << bi.getIndexFromBlock(producer.getParentBlock())
                << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
@@ -499,7 +507,8 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
         // Find all the paths from "commonDominator" to "phiBlock" which pass
         // through operand's block but not through any of the "blocksToAvoid"
         auto paths = findAllPaths(commonDominator, phiBlock, bi,
-                                  operand->getBlock(), blocksToAvoid);
+                                  operand->getBlock(), blocksToAvoid,
+                                  operand->senders);
 //PRINT ALL PATHS
       llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) << ":\n";
       for (std::vector<Block *> path : paths) {
@@ -664,12 +673,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
         continue;
       }*/
 
-      if (!loopInfo.getLoopFor(phiBlock) ){
-        llvm::errs() << "I wasn't in loop" <<"\n";
-        continue;
-      }
-      else if (phi->operands.size() < 2){
-        llvm::errs() << " < 1 operands, move on" << "\n";
+      if (!loopInfo.getLoopFor(phiBlock) || (phi->operands.size() < 2)){
         continue;
       }
 
@@ -856,6 +860,18 @@ void experimental::gsa::Gate::print() {
       op->getBlock()->printAsOperand(llvm::errs());
       llvm::errs() << ")";
     }
+
+    // Print the list of senders
+    if (!op->senders.empty()) {
+      llvm::errs() << "\t[senders: ";
+      for (size_t i = 0; i < op->senders.size(); ++i) {
+        op->senders[i]->printAsOperand(llvm::errs());
+        if (i != op->senders.size() - 1)
+          llvm::errs() << ", ";
+      }
+      llvm::errs() << "]";
+    }
+
     llvm::errs() << "\n";
   }
 }
