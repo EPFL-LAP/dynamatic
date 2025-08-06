@@ -12,10 +12,10 @@ def generate_sharing_wrapper(name, params):
     list_of_credits = params["credits"].split()
 
     return _generate_sharing_wrapper(name,
-                                      bitwidth,
-                                      num_shared_operands,
-                                      latency,
-                                      list_of_credits)
+                                     bitwidth,
+                                     num_shared_operands,
+                                     latency,
+                                     list_of_credits)
 
 
 def _generate_sharing_wrapper(name,
@@ -35,18 +35,16 @@ def _generate_sharing_wrapper(name,
     replication_factors["group_size"] = group_size
     replication_factors["num_shared_operands_plus_1"] = num_shared_operands + 1
 
-
     or_name = f"{name}_or"
     buff_name = f"{name}_fifo_break_dv"
     lazy_fork_name = f"{name}_lazy_fork"
 
     dependencies = generate_or_n(or_name, {"size": group_size}) + \
-                  generate_fifo_break_dv(buff_name, {"num_slots": latency, "bitwidth": group_size}) + \
-                  generate_lazy_fork(lazy_fork_name, {"size": 2, "bitwidth": bitwidth})
+        generate_fifo_break_dv(buff_name, {"num_slots": latency, "bitwidth": group_size}) + \
+        generate_lazy_fork(lazy_fork_name, {"size": 2, "bitwidth": bitwidth})
 
     for i, num_credits in enumerate(list_of_credits):
         dependencies += generate_fifo_break_none(f"{name}_fifo_break_none_{i}", {"num_slots": num_credits, "bitwidth": bitwidth})
-
 
     entity = f"""
     library ieee;
@@ -298,7 +296,7 @@ ENDREPLICATE i:group_size
     # with the corresponding value of list_of_credits
     # allowing pre-replication value insertion
     lists = {
-        "list_of_credits" : list_of_credits
+        "list_of_credits": list_of_credits
     }
 
     expanded_architecture = expand_replications(architecture, replication_factors, lists)

@@ -42,6 +42,7 @@ import generators.handshake.valid_merger as valid_merger
 import generators.handshake.sharing_wrapper as sharing_wrapper
 import generators.handshake.lazy_fork as lazy_fork
 
+
 def generate_code(name, mod_type, parameters):
     match mod_type:
         case "addf":
