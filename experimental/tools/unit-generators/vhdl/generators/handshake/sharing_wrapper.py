@@ -33,7 +33,7 @@ def _generate_sharing_wrapper(name,
     replication_factors = {}
     replication_factors["num_shared_operands"] = num_shared_operands
     replication_factors["group_size"] = group_size
-    replication_factors["num_shared_operands_1"] = num_shared_operands + 1
+    replication_factors["num_shared_operands_plus_1"] = num_shared_operands + 1
 
 
     or_name = f"{name}_or"
@@ -92,9 +92,9 @@ def _generate_sharing_wrapper(name,
     architecture = f"""
     architecture arch of {name} is
     REPLICATE i:group_size
-    REPLICATE j:num_shared_operands_1
+    REPLICATE j:num_shared_operands_plus_1
       signal sync[i]_out[j]_data : std_logic_vector({bitwidth} - 1 downto 0);
-    ENDREPLICATE j:num_shared_operands_1
+    ENDREPLICATE j:num_shared_operands_plus_1
       signal sync[i]_out0_valid : std_logic;
     ENDREPLICATE i:group_size
 
@@ -157,9 +157,9 @@ def _generate_sharing_wrapper(name,
           ins_ready([j]) => op[i]in[j]_ready,
     ENDREPLICATE j:num_shared_operands
           ins_ready({num_shared_operands}) => credit[i]_out0_ready,
-    REPLICATE j:num_shared_operands_1
+    REPLICATE j:num_shared_operands_plus_1
           outs([j]) => sync[i]_out[j]_data,
-    ENDREPLICATE j:num_shared_operands_1
+    ENDREPLICATE j:num_shared_operands_plus_1
           outs_valid => sync[i]_out0_valid,
           outs_ready => arbiter_out([i])
         );
@@ -294,6 +294,9 @@ ENDREPLICATE i:group_size
     end architecture;
     """
 
+    # match and replace "[list_of_credits[replication_variable]]"
+    # with the corresponding value of list_of_credits
+    # allowing pre-replication value insertion
     lists = {
         "list_of_credits" : list_of_credits
     }
@@ -303,8 +306,12 @@ ENDREPLICATE i:group_size
     return dependencies + expanded_entity + expanded_architecture
 
 
-
+# Take an f-string and perform parameterized replication
 def expand_replications(s, replication_factors, lists={}):
+    # this is to allow different values per replication
+    # it matches [listname[replication_variable]]
+    # and then for the n-th replication,
+    # inserts the n-th value in that list
     def substitute_list_indexing(line, idx_var, j):
         line = re.sub(
             rf"\[([a-zA-Z_]\w*)\[{idx_var}\]\]",
@@ -331,8 +338,8 @@ def expand_replications(s, replication_factors, lists={}):
                     i += 1
                 i += 1  # skip ENDREPLICATE
                 for j in range(count):
-                    for bline in block:
-                        replaced = substitute_list_indexing(bline, idx_var, j)
+                    for block_line in block:
+                        replaced = substitute_list_indexing(block_line, idx_var, j)
                         replaced = replaced.replace(f"[{idx_var}]", str(j))
                         new_lines.append(replaced)
                 changed = True
