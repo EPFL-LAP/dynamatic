@@ -23,6 +23,7 @@
 #include <queue>
 #include <utility>
 #include <variant>
+#include <unordered_set>
 
 namespace dynamatic {
 namespace experimental {
@@ -51,7 +52,7 @@ struct GateInput {
   std::variant<Value, Gate *> input;
 
   /// A list of blocks that send this input; initially empty.
-  std::vector<Block *> senders;
+  std::unordered_set<Block *> senders;
 
   /// Constructor a gate input being the result of an operation.
   GateInput(Value v) : input(v) {};

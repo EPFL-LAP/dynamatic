@@ -311,10 +311,9 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
       for (Block *pred : block.getPredecessors()) {
         //llvm::errs() << argNumber<<" checking BB" << bi.getIndexFromBlock(&block) << " pred BB" << bi.getIndexFromBlock(pred)<<": "; 
         // Make sure that a predecessor is covered only once
-        if (coveredPredecessors.contains(pred)){
-          //llvm::errs() << "already exist\n" ;
-          continue;}
-        //llvm::errs() << "is new\n" ;
+        if (coveredPredecessors.contains(pred))
+          continue;
+
         coveredPredecessors.insert(pred);
 
         // Get the branch terminator
@@ -336,7 +335,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
           // Check for concrete values already present
           for (GateInput *in : operands) {
             if (in->isTypeValue() && in->getValue() == c){
-              in->senders.push_back(pred);
+              in->senders.insert(pred);
               return true;
             }
           }
@@ -346,7 +345,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
             for ( MissingPhi mPhi : operandsMissPhi) {
               // if same argument of the same phi come from the same producer and both are missing phis (doesn't check the value!!)
               if(mPhi.blockArg.getParentBlock()== blockArgC.getParentBlock()){ 
-                mPhi.pi->senders.push_back(pred);
+                mPhi.pi->senders.insert(pred);
                 return true;
               }
             }
@@ -377,7 +376,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
               blockArg && !producer.getParentBlock()->hasNoPredecessors() && !isAlreadyPresent(dyn_cast<Value>(producer))) {
             gateInput = new GateInput((Gate *)nullptr);
             MissingPhi missingPhi = MissingPhi(gateInput, blockArg);
-            missingPhi.pi->senders.push_back(pred);
+            missingPhi.pi->senders.insert(pred);
             phisToConnect.push_back(missingPhi);
             gateInputList.push_back(gateInput);
             operandsMissPhi.push_back(missingPhi);
@@ -387,7 +386,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
           } else {
             if (!isAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
-              gateInput->senders.push_back(pred);
+              gateInput->senders.insert(pred);
               gateInputList.push_back(gateInput);
               llvm::errs() <<"normalpath: from BB" << bi.getIndexFromBlock(producer.getParentBlock())
                << "to arg "<<argNumber<<" of BB" << bi.getIndexFromBlock(&block) << "\n";
@@ -506,9 +505,15 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
 
         // Find all the paths from "commonDominator" to "phiBlock" which pass
         // through operand's block but not through any of the "blocksToAvoid"
-        auto paths = findAllPaths(commonDominator, phiBlock, bi,
-                                  operand->getBlock(), blocksToAvoid,
-                                  operand->senders);
+        auto allPaths = findAllPaths(commonDominator, phiBlock, bi,
+                                  operand->getBlock(), blocksToAvoid);
+        // filter paths with correct senders
+        std::vector<std::vector<Block *>> paths;
+        for (auto path: allPaths){
+          Block *prev = path[path.size() - 2];
+          if (operand->senders.empty() || llvm::is_contained(operand->senders, prev))
+            paths.push_back(path);
+        }
 //PRINT ALL PATHS
       llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) << ":\n";
       for (std::vector<Block *> path : paths) {
@@ -527,15 +532,6 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
           phiInputCondition =
               BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();
-/*         llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) <<":\n";
-          for (Block * b: path) {
-          llvm::errs() << bi.getIndexFromBlock(b)<<" , ";
-          }
-          llvm::errs() << "\t path condition = " ;
-          condition->print() ;
-          llvm::errs() << "\n total cond: " ;
-          phiInputCondition->print() ;
-          llvm::errs() <<"\n";*/ 
         }
 
         // Associate the expression to the phi operand
@@ -552,7 +548,7 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
       for (unsigned &index : conditionsToOrder)
         conditionsOrdered.push(index);
 
-llvm::errs() << "shallalalllallallal" <<"\n";
+llvm::errs() << "start gamma tree generation\n";
 //print what we have for a phi
 llvm::errs() << "[PHI_ID] = " << phi->index;
 for (std::pair<BoolExpression *, GateInput *> expression_ : expressionsList){
@@ -569,7 +565,7 @@ for (std::pair<BoolExpression *, GateInput *> expression_ : expressionsList){
           expandGammaTree(expressionsList, conditionsOrdered, phi, bi);
       gammaRoot->isRoot = true;
 
-llvm::errs() << "shallalalllallallal2" <<"\n";
+llvm::errs() << "finish gamma tree generation\n";
 
       // Once that a phi has been converted into a tree of gammas, all the
       // gates which used the original phi as input must be connected to the
@@ -584,55 +580,8 @@ llvm::errs() << "shallalalllallallal2" <<"\n";
       }
     }
   }
-  llvm::errs() << "finfifnfinfnfifnifnfnfinffifnfif" <<"\n";
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToMu_(Region &region) {
-
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-
-  // For each phi
-  for (const std::pair<Block *, SmallVector<Gate *>> &entry : gatesPerBlock) {
-    Block *phiBlock = entry.first;
-    SmallVector<Gate *> phis = entry.second;
-    for (Gate *phi : phis) {
-
-      // A phi might be a MU iff it is inside a for loop and has exactly
-      // two operands
-      if (!loopInfo.getLoopFor(phiBlock) || phi->operands.size() != 2)
-        continue;
-
-      Block *op0Block = phi->operands[0]->getBlock(),
-            *op1Block = phi->operands[1]->getBlock();
-
-      // Checks whether the block of the merge is a loop header
-      bool isBlockHeader =
-          loopInfo.getLoopFor(phiBlock)->getHeader() == phiBlock;
-
-      // Checks whether the two operands come from different loops (in
-      // this case, one of the values is the initial definition)
-      bool operandFromOutsideLoop =
-          loopInfo.getLoopFor(op0Block) != loopInfo.getLoopFor(op1Block);
-
-      // If both the conditions hold, then we have a MU gate
-      if (!(isBlockHeader && operandFromOutsideLoop))
-        continue;
-
-      phi->gsaGateFunction = GateType::MuGate;
-
-      // Use the initial value of MU as first input of the gate
-      if (domInfo.dominates(op1Block, phiBlock))
-        std::swap(phi->operands[0], phi->operands[1]);
-
-      // The block determining the MU condition is the exiting block of the
-      // innermost loop the MU is in
-      phi->conditionBlock =
-          loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
-      phi->isRoot = true;
-    }
-  }
-}
 bool experimental::gsa::GSAAnalysis::areEqualGateInputs(GateInput *a, GateInput *b) {
   if (!a || !b) return a == b;
 
@@ -864,10 +813,12 @@ void experimental::gsa::Gate::print() {
     // Print the list of senders
     if (!op->senders.empty()) {
       llvm::errs() << "\t[senders: ";
-      for (size_t i = 0; i < op->senders.size(); ++i) {
-        op->senders[i]->printAsOperand(llvm::errs());
-        if (i != op->senders.size() - 1)
+      bool first = true;
+      for (auto *sender : op->senders) {
+        if (!first)
           llvm::errs() << ", ";
+        sender->printAsOperand(llvm::errs());
+        first = false;
       }
       llvm::errs() << "]";
     }
