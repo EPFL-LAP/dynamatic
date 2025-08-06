@@ -171,9 +171,9 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // Try to find a matching component
     RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
-       emitError(request.loc)
-             << "Failed to find matching RTL component for external module";
-          llvm::errs() << extOp->getAttrOfType<DictionaryAttr>(
+      emitError(request.loc)
+          << "Failed to find matching RTL component for external module";
+      llvm::errs() << extOp->getAttrOfType<DictionaryAttr>(
                           RTL_PARAMETERS_ATTR_NAME)
                    << "\n";
       llvm::errs() << extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME)
