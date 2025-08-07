@@ -6,7 +6,7 @@ It is rendered to an HTML web page using [`mdbook`](https://rust-lang.github.io/
 
 ## Compiling the Documentation
 
-To render and view the documentation locally, please install [`mdbook`](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials/Introduction), and the [`mdbook-alerts`](https://github.com/lambdalisue/rs-mdbook-alerts) plugin
+To render and view the documentation locally, please install [`mdbook`](https://github.com/rust-lang/mdBook), and the [`mdbook-alerts`](https://github.com/lambdalisue/rs-mdbook-alerts) plugin
 
 Optionally, you can install the [`mdbook-linkcheck`](https://github.com/Michael-F-Bryan/mdbook-linkcheck) backend, to check for broken links in the documentation.
 

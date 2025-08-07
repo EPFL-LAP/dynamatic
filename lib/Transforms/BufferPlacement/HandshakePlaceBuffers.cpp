@@ -25,6 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
@@ -44,7 +45,7 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    CostAware("costaware");
+    CostAware("costaware"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -123,6 +124,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -532,6 +534,13 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
         logger, "placement", placement, env, info, timingDB, targetCP);
+  }
+
+  if (algorithm == MAPBUF) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");

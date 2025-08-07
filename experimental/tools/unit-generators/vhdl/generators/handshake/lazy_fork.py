@@ -30,6 +30,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+
 -- Entity of lazy_fork_dataless
 entity {name} is
   port (
@@ -54,7 +55,7 @@ begin
       outs_ready,
       allnReady
       );
-
+      
   valids : process (ins_valid, outs_ready)
     variable tmp_ready : std_logic_vector({size} - 1 downto 0);
   begin
@@ -70,7 +71,6 @@ begin
       outs_valid(i) <= ins_valid and tmp_ready(i);
     end loop;
   end process;
-
   ins_ready <= allnReady;
 end architecture;
 """
@@ -117,7 +117,6 @@ begin
       outs_valid => outs_valid,
       outs_ready => outs_ready
     );
-
   process (ins)
   begin
     for i in 0 to {size} - 1 loop

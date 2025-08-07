@@ -19,8 +19,8 @@ FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
 
-POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
+CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -203,7 +203,8 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
