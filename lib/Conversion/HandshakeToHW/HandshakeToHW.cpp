@@ -688,7 +688,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
-      .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
+      .Case<handshake::RigidifierOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Default([&](auto) {
@@ -697,16 +697,24 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         unsupported = true;
       });
 
-  if (auto internalDelayInterface =
-          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
-    auto delayAttr = internalDelayInterface.getInternalDelay();
-    addParam("INTERNAL_DELAY", delayAttr);
-  }
-
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     auto impl = fpuImplInterface.getFPUImpl();
     addString("FPU_IMPL", stringifyEnum(impl));
+
+    auto delayAttr = fpuImplInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto latencyInterface =
+          llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
+    auto latency = latencyInterface.getLatency();
+    if (failed(latency)) {
+      op->emitError() << "Missing required latency value on operation";
+      unsupported = true;
+      return;
+    }
+    addUnsigned("LATENCY", latency.value());
   }
 }
 
@@ -1831,7 +1839,7 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
+                    ConvertToHWInstance<handshake::RigidifierOp>,
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 

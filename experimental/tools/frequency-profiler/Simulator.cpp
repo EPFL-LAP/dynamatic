@@ -103,6 +103,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::DivFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::NegFOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemFOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemSIOp, std::vector<Any> &,
@@ -484,6 +486,12 @@ LogicalResult StdExecuter::execute(mlir::arith::DivFOp, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::NegFOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = -any_cast<APFloat>(in[0]);
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::RemFOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = any_cast<APFloat>(in[0]).mod(any_cast<APFloat>(in[1]));
@@ -811,9 +819,9 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
                   arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
                   arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
-                  math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
-                  math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
+                  arith::NegFOp, math::SqrtOp, math::CosOp, math::ExpOp,
+                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
+                  math::SqrtOp, math::AbsFOp, memref::AllocOp, memref::LoadOp,
                   memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);

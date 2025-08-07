@@ -1951,34 +1951,18 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
     return getIn();
   return nullptr;
 }
-/// Extension operations can only extend to a channel with a wider data type and
-/// identical extra signals.
-template <typename Op>
-static LogicalResult verifyTruncOp(Op op) {
-  ChannelType srcType = op.getIn().getType();
-  ChannelType dstType = op.getOut().getType();
+
+LogicalResult TruncIOp::verify() {
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return op.emitError() << "result channel's data type "
-                          << dstType.getDataType()
-                          << " must be narrower than operand type "
-                          << srcType.getDataType();
+    return emitError() << "result channel's data type " << dstType.getDataType()
+                       << " must be narrower than operand type "
+                       << srcType.getDataType();
   }
   return success();
 }
-
-LogicalResult TruncIOp::verify() { return verifyTruncOp(*this); }
-
-//===----------------------------------------------------------------------===//
-// TruncFOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
-
-//===----------------------------------------------------------------------===//
-// ExtFOp
-//===----------------------------------------------------------------------===//
-LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
