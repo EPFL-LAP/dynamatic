@@ -479,7 +479,6 @@
     ]
   },
   {
-<<<<<<< HEAD
     "name": "handshake.join",
     "parameters": [
       { "name": "SIZE", "type": "unsigned"}
@@ -488,8 +487,6 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
-    "dependencies": ["types"]
-=======
     "name": "handshake.sharing_wrapper",
     "parameters":[
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"},
@@ -514,7 +511,6 @@
     "dependencies": [
       "types"
     ]
->>>>>>> 37ff5254911b4e3daa999fee7abd7d3ab677ab4e
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
@@ -523,10 +519,9 @@
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
-<<<<<<< HEAD
     "generic": "$DYNAMATIC/data/vhdl/support/vivado_ip_wrappers.vhd"
-=======
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
->>>>>>> 37ff5254911b4e3daa999fee7abd7d3ab677ab4e
   }
 ]
