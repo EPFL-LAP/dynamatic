@@ -142,7 +142,6 @@ end architecture;
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
-	signal join_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
   {signals}
 begin
   one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
@@ -151,7 +150,7 @@ begin
       rst        => rst,
       -- input channel from "ins"
       ins_valid  => ins_valid,
-      ins_ready  => one_slot_break_dv_ready,
+      ins_ready  => ins_ready,
       -- output channel to "outs"
       outs_ready => outs_ready,
       outs_valid => outs_valid
@@ -173,8 +172,7 @@ end architecture;
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
-  signal join_valid                         : std_logic;
-  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
+  signal buff_valid,  one_slot_break_dv_ready : std_logic;
   {signals}
 begin
   buff : entity work.{buff_name}(arch)
@@ -186,7 +184,7 @@ begin
       valid_in  => ins_valid,
       -- output channel to one_slot_break_dv
       valid_out => buff_valid,
-      ready_in   => one_slot_break_dv_ready
+      ready_in  => one_slot_break_dv_ready
     );
 
 
