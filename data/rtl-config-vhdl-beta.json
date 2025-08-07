@@ -486,7 +486,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t top_join -p size=$SIZE"
   },
   {
-    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
     "name": "handshake.sharing_wrapper",
     "parameters":[
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"},
