@@ -39,6 +39,8 @@ import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
 import generators.handshake.ready_remover as ready_remover
 import generators.handshake.valid_merger as valid_merger
+import generators.handshake.sharing_wrapper as sharing_wrapper
+import generators.handshake.lazy_fork as lazy_fork
 
 
 def generate_code(name, mod_type, parameters):
@@ -117,6 +119,10 @@ def generate_code(name, mod_type, parameters):
             return ready_remover.generate_ready_remover(name, parameters)
         case "valid_merger":
             return valid_merger.generate_valid_merger(name, parameters)
+        case "sharing_wrapper":
+            return sharing_wrapper.generate_sharing_wrapper(name, parameters)
+        case "lazy_fork":
+            return sharing_wrapper.generate_lazy_fork(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
