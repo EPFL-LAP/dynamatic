@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_trunci(name, params):
@@ -12,7 +12,7 @@ def generate_trunci(name, params):
   outs       <= ins({output_bitwidth} - 1 downto 0);
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType=modType,
         input_bitwidth=input_bitwidth,

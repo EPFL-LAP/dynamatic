@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_extsi(name, params):
@@ -10,7 +10,7 @@ def generate_extsi(name, params):
   outs({input_bitwidth} - 1 downto 0)            <= ins;
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType="extsi",
         input_bitwidth=input_bitwidth,

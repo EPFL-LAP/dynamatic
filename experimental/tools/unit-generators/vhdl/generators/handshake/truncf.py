@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_truncf(name, params):
@@ -14,7 +14,7 @@ def generate_truncf(name, params):
   outs <= to_std_logic_vector(float_truncated);
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType="truncf",
         input_bitwidth=64,

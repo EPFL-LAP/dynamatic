@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_logical_not(name, params):
@@ -8,7 +8,7 @@ def generate_logical_not(name, params):
   outs       <= not ins;
     """
 
-    return generate_arith1(
+    return generate_unarys(
         name=name,
         modType="not",
         bitwidth=bitwidth,

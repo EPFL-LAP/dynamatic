@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_absf(name, params):
@@ -9,7 +9,7 @@ def generate_absf(name, params):
   outs({bitwidth} - 2 downto 0) <= ins({bitwidth} - 2 downto 0);
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType="absf",
         bitwidth=bitwidth,

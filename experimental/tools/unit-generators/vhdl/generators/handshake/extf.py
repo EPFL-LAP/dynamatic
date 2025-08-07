@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_extf(name, params):
@@ -14,7 +14,7 @@ def generate_extf(name, params):
   outs            <= to_std_logic_vector(float_extended);
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType="extf",
         input_bitwidth=32,
