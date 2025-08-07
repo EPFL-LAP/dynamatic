@@ -280,7 +280,6 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
-  static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -297,9 +296,6 @@ public:
                "placement)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
-    addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
-                          "Warning: This may result in out-of-order memory "
-                          "accesses, use with caution!"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -520,6 +516,11 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+  
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
@@ -545,6 +546,11 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string polygeistPath = args.positionals.front().str();
@@ -571,6 +577,11 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path such as\n /home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -579,18 +590,33 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
-  if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
+  if (fs::exists(vivadoPath)){
+    if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
-                    "please specify the top-level Vivado directory.\n";
+                    "please specify the top-level Vivado directory such as\n /home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+    }
+  }
+  else{
+    llvm::outs() << ERR
+                 << "The path to Vivado does not exist, "
+                    "please specify a valid top-level Vivado directory such as\n /home/username/Xilinx/2025.1/Vivado/\n";
     return CommandResult::FAIL;
   }
+  
 
   state.vivadoPath = state.makeAbsolutePath(vivadoPath);
   return CommandResult::SUCCESS;
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n"
+                << "Options: flopoco, vivado\n";
+    return CommandResult::FAIL;
+  }
+  
   StringRef generator = args.positionals.front();
   if (generator.empty()) {
     llvm::outs() << ERR << "Please specify a floating-point units generator.\n";
@@ -600,14 +626,29 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 CommandResult SetSrc::execute(CommandArguments &args) {
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a non-empty source\n";
+    return CommandResult::FAIL;
+  }
+
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
-  if (!srcName.ends_with(".c")) {
+  if (fs::exists(sourcePath)){
+    if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
                  << "Expected source file to have .c extension, but got '"
                  << path::extension(srcName) << "'.\n";
     return CommandResult::FAIL;
+    }
   }
+  else{
+    llvm::outs() << ERR
+                 << "Source path <<"
+                 << sourcePath
+                 << ">> does not exist. Kindly enter a valid source path\n";
+    return CommandResult::FAIL;
+  }
+  
 
   state.sourcePath = state.makeAbsolutePath(sourcePath);
   return CommandResult::SUCCESS;
@@ -615,6 +656,11 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
 CommandResult SetCP::execute(CommandArguments &args) {
   // Parse the float argument and check if the argument is legal.
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
+    return CommandResult::FAIL;
+  }
+              
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
   llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
@@ -651,14 +697,13 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
-  std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ);
+                 state.fpUnitsGenerator, rigidification);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
