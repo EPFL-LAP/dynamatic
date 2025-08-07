@@ -32,26 +32,28 @@
 
 // Test passes, no public header.
 namespace dynamatic {
-  namespace test {
-    void registerTestRTLSuppport();
-  } // namespace test
+namespace test {
+void registerTestRTLSuppport();
+} // namespace test
 } // namespace dynamatic
 
 // Experimental test passes, no public header.
 namespace dynamatic {
-  namespace experimental {
-    namespace test {
-      void registerTestHandshakeSimulator();
-    } // namespace test
-  } // namespace experimental
+namespace experimental {
+namespace test {
+void registerTestCDGAnalysisPass();
+void registerTestHandshakeSimulator();
+} // namespace test
+} // namespace experimental
 } // namespace dynamatic
 
 void registerTestPasses() {
   dynamatic::test::registerTestRTLSuppport();
+  dynamatic::experimental::test::registerTestCDGAnalysisPass();
   dynamatic::experimental::test::registerTestHandshakeSimulator();
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
 
   // Register standard MLIR passes we care about
@@ -83,5 +85,5 @@ int main(int argc, char** argv) {
   mlir::registerSymbolDCEPass();
 
   return mlir::failed(mlir::MlirOptMain(
-    argc, argv, "Dynamatic modular optimizer driver", registry));
+      argc, argv, "Dynamatic modular optimizer driver", registry));
 }
