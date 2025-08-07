@@ -1,4 +1,4 @@
-from generators.support.arith1 import generate_arith1
+from generators.support.unary import generate_unary
 
 
 def generate_fptosi(name, params):
@@ -39,7 +39,7 @@ def generate_fptosi(name, params):
   end process;
     """
 
-    return generate_arith1(
+    return generate_unary(
         name=name,
         modType="fptosi",
         bitwidth=32,
