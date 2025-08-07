@@ -19,7 +19,7 @@ This tutorial guides you through the
 The tutorial assumes basic knowledge of dataflow circuits but does not require any insight into MLIR or compilers in general.
 
 Below are some technical details about this tutorial.
-- All resources are located in the repository's [tutorials/Introduction/Ch1](../../../../tutorials/Introduction/Ch1/) folder.
+- All resources are located in the repository's [tutorials/Introduction/Ch1](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials/Introduction/Ch1) folder.
 - All relative paths mentionned throughout the tutorial are assumed to start at Dynamatic's top-level folder.
 
 This tutorial is divided into the following sections:
@@ -51,7 +51,7 @@ This kernel:
 > [!TIP]
 > This function is purposefully simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
 
-You can find the source code of this function in [tutorials/Introduction/Ch1/loop_multiply.c](../../../../tutorials/Introduction/Ch1/loop_multiply.c). 
+You can find the source code of this function in `tutorials/Introduction/Ch1/loop_multiply.c`. 
 
 Observe!
 - The `main` function in the file allows one to run the C kernel with user-provided arguments. 
@@ -83,7 +83,7 @@ This will print the frontend's header and display a prompt where you can start i
 dynamatic> # Input your command here
 ```
 ### `set-src`
-Provide Dynamatic with the path to the C source code file under consideration. Ours is located at [tutorials/Introduction/Ch1/loop_multiply.c](../../../../tutorials/Introduction/Ch1/loop_multiply.c), thus we input:
+Provide Dynamatic with the path to the C source code file under consideration. Ours is located at `tutorials/Introduction/Ch1/loop_multiply.c`, thus we input:
 ```sh
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 ```
@@ -101,7 +101,7 @@ That description takes the form of a human-readable and machine-parsable IR (Int
 
 MLIR provides standard dialects for common usecases, while allowing external tools (like Dynamatic) to define custom dialects to model domain-specific semantics. 
 
-To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](../../../../tools/dynamatic/scripts/compile.sh)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
+To compile the C function, simply input `compile`. This will call a shell script `compile.sh` (located at `tools/dynamatic/scripts/compile.sh`) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
 ```sh
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> compile
@@ -202,7 +202,7 @@ dynamatic> exit
 
 Goodbye!
 ```
-If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [tutorials/Introduction/Ch1/frontend-script.dyn](../../../../tutorials/Introduction/Ch1/frontend-script.dyn). You can replay this whole section by running the following from Dynamatic's top-level folder.
+If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at `tutorials/Introduction/Ch1/frontend-script.dyn`. You can replay this whole section by running the following from Dynamatic's top-level folder.
 ```
 ./bin/dynamatic --run tutorials/Introduction/Ch1/frontend-script.dyn
 ```

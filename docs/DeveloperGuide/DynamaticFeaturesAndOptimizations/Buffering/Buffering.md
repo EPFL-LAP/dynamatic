@@ -185,4 +185,4 @@ The following is the code structure in the [BufferPlacement folder](https://gith
 - **FPL22Buffers.cpp**: It contains the functions generating the MILP formulation for FPL22 buffer placement.
 - **HandshakePlaceBuffers.cpp**: It contains the main functions that orchestrate which buffer placement to call and the correct instantiation of buffers in the dataflow circuit.
 - **HandshakeSetBufferingProperties.cpp**: It sets specific buffering properties for particular dataflow units (i.e., LSQ).
-- **MapBuf.cpp**: It contains the functions generating the MILP formulation for MapBuf buffer placement.
+- **MAPBUFBuffers.cpp**: It contains the functions generating the MILP formulation for MapBuf buffer placement.
