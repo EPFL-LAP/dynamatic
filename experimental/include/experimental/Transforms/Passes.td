@@ -68,10 +68,13 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
 }
 
 def CreditBasedSharing : Pass<"credit-based-sharing"> {
-  let summary = "Credit-Based Sharing of Functional Units";
-  let description = [{ Sharing functional units for better resource utilization.
-  This pass currently target maintaining the performance while using as few
-  functional units as possible.}];
+  let summary = "Credit-based sharing of functional units.";
+  let description = [{ Share functional units for better resource utilization.
+  The behavior of this pass depends on whether the buffer placement pass was ran
+  in the same pass pipeline before:
+  - If yes, this pass share functional units as much as possible without
+  penalizing the performance.
+  - Otherwise, it simply share all units of the same type.}];
 
   let options = [
       Option<"timingModels", "timing-models", "std::string", "",

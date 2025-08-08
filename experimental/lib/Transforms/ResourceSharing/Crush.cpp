@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// This file implement the credit-based resource sharing pass
+// This file implements the credit-based resource sharing pass
 // It contains the following components:
 // - An implementation of the sharing target decision heuristic; the heuristic
 //   decides sharing groups---groups of operations that will share the same unit
@@ -524,19 +524,26 @@ void CreditBasedSharingPass::runOnOperation() {
   }
 
   SharingInfo sharingInfo;
-  auto &performanceAnalysis = getAnalysis<PerformanceAnalysis>();
+  auto performanceAnalysis = getCachedAnalysis<PerformanceAnalysis>();
 
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    loadFuncPerfInfoFromAnalysis(funcOp, sharingInfo, performanceAnalysis);
+  if (!performanceAnalysis.has_value()) {
+    llvm::errs() << "Performance analysis result NOT available, share "
+                    "functional units as much as possible...\n";
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+      FuncPerfInfo funcPerfInfo;
+      sharingInfo[funcOp] = funcPerfInfo;
+    }
+  } else {
+    llvm::errs() << "Performance analysis available, share functional units as "
+                    "much as possible while maintaining the performance...\n";
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+      loadFuncPerfInfoFromAnalysis(funcOp, sharingInfo,
+                                   performanceAnalysis.value());
+    }
   }
 
   // If buffers are placed naively, then no critical CFC is set for each funcOp.
   // We can also share operations naively.
-
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    FuncPerfInfo funcPerfInfo;
-    sharingInfo[funcOp] = funcPerfInfo;
-  }
 
   // Apply resource sharing for each function in the module op.
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
