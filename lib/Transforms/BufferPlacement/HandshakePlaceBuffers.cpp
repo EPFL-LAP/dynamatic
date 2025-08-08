@@ -209,14 +209,19 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
       return failure();
   }
-  markAnalysesPreserved<NameAnalysis>();
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+  auto &perfAnalysis = getAnalysis<dynamatic::PerformanceAnalysis>();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
+
+    perfAnalysis.results.insert(
+        std::make_pair(funcOp, BufferPlacementResult()));
+
+    funcToInfo.insert(std::make_pair(
+        funcOp, FuncInfo(funcOp, &perfAnalysis.results[funcOp])));
     FuncInfo &info = funcToInfo[funcOp];
 
     // Read the CSV containing arch information (number of transitions between
@@ -242,6 +247,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
       return failure();
   }
+
+  markAnalysesPreserved<NameAnalysis, PerformanceAnalysis>();
   return success();
 }
 

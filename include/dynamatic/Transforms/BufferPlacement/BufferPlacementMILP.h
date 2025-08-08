@@ -388,6 +388,15 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
+  void populateCFDFCAnalysisResult() {
+    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+      auto [cf, cfVars] = cfdfcWithVars;
+      double cfThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+      this->funcInfo.result->cfdfcAndThroughputs.emplace_back(*cf,
+                                                              cfThroughput);
+    }
+  }
+
 private:
   /// Common logic for all constructors. Fills the channel to buffering
   /// properties mapping and defines a large constant used for elasticity
