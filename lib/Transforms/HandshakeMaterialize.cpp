@@ -345,15 +345,15 @@ struct HandshakeMaterializePass
 
     // First make sure that every value within Handshake functions is used
     // exactly once
-    // OpBuilder builder(ctx);
-    // for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    //   for (BlockArgument funcArg : funcOp.getBody().getArguments())
-    //     materializeValue(funcArg, builder);
-    //   for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-    //     for (OpResult res : op.getResults())
-    //       materializeValue(res, builder);
-    //   }
-    // }
+    OpBuilder builder(ctx);
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+      for (BlockArgument funcArg : funcOp.getBody().getArguments())
+        materializeValue(funcArg, builder);
+      for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+        for (OpResult res : op.getResults())
+          materializeValue(res, builder);
+      }
+    }
 
     // Then, greedily optimize forks
     mlir::GreedyRewriteConfig config;
