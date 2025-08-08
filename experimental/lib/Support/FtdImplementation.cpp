@@ -54,7 +54,10 @@ constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
 /// Annotation to use for a multiplxer crated with the `addGsaGates`
 /// functionalities. This will no go through the FTD process.
-constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+/// Aya: more precisely, these do not go through the addRegen and are used
+/// inside addSupp to indicate consumer Muxes in the non-loop delivery...
+constexpr llvm::StringLiteral FTD_EXPLICIT_MU_PHI("ftd.MUphi");
+constexpr llvm::StringLiteral FTD_EXPLICIT_GAMMA_PHI("ftd.GAMMAphi");
 /// Temporary annotation to be used with merges created with the
 /// `createPhiNetwork` functionality, which will then be converted into muxes.
 constexpr llvm::StringLiteral NEW_PHI("nphi");
@@ -737,8 +740,12 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
   if (Block *loopExit = loop->getExitingBlock(); loopExit) {
 
     // Do not add the branch in case of a while loop with backward edge
+    // A loop is a while loop if the producer is in a loop exit block or comes
+    // later after it
     if (btlt == BackwardRelationship &&
-        bi.isGreater(connection.getParentBlock(), loopExit))
+            bi.isGreater(connection.getParentBlock(), loopExit) ||
+        (connection.getParentBlock() == loopExit &&
+         connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA_PHI)))
       return connection;
 
     // Get the termination operation, which is supposed to be conditional
@@ -817,6 +824,26 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
   return newConnection;
 }
 
+static Block *returnMuxConditionBlock(Value muxCondition) {
+  // Identify the block that the muxCondition serves as the terminator condition
+  // for
+  // Note that it is not necessarily the same block defining the muxCondition
+  Block *muxConditionBlock = nullptr;
+
+  for (auto &use : muxCondition.getUses()) {
+    Operation *userOp = use.getOwner();
+    Block *userBlock = userOp->getBlock();
+
+    if (isa_and_nonnull<cf::CondBranchOp>(userOp)) {
+      muxConditionBlock = userBlock;
+      break;
+    }
+  }
+  assert(muxConditionBlock &&
+         "Mux condition must be feeding any block terminator.");
+  return muxConditionBlock;
+}
+
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static void insertDirectSuppression(
@@ -831,11 +858,13 @@ static void insertDirectSuppression(
 
   bool accountMuxCondition =
       llvm::isa<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
+      consumer->hasAttr(FTD_EXPLICIT_GAMMA_PHI) &&
       (consumer->getOperand(1) == connection ||
        consumer->getOperand(2) == connection) &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock;
+      (consumer->getBlock() != producerBlock ||
+       ((connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU_PHI) ||
+         connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA_PHI))));
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
@@ -850,8 +879,10 @@ static void insertDirectSuppression(
   // dependencies
   if (accountMuxCondition) {
     muxCondition = consumer->getOperand(0);
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+
     DenseSet<Block *> condControlDeps =
-        cdAnalysis[muxCondition.getDefiningOp()->getBlock()].forwardControlDeps;
+        cdAnalysis[muxConditionBlock].forwardControlDeps;
     for (auto &x : condControlDeps)
       consControlDeps.insert(x);
   }
@@ -862,8 +893,20 @@ static void insertDirectSuppression(
   // Compute the activation function of producer and consumer
   BoolExpression *fProd =
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
-  BoolExpression *fCons =
-      enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
+  // TODO: In the tree of muxes that all go to 1 block, if this block is a loop
+  // header, we must explore paths coming from within the loop and my current
+  // way of doing so is by passing the start and end block to be the same
+  // TODO: I would like to investigate (1) if I can map this tree to different
+  // blocks from within the GSA pass, OR (2) change how enumerate paths work
+  BoolExpression *fCons;
+  if (producerBlock == consumerBlock &&
+      (consumer->getAttr(FTD_EXPLICIT_GAMMA_PHI) &&
+           connection.getDefiningOp()->getAttr(FTD_EXPLICIT_MU_PHI) ||
+       consumer->getAttr(FTD_EXPLICIT_MU_PHI) &&
+           connection.getDefiningOp()->getAttr(FTD_EXPLICIT_GAMMA_PHI)))
+    fCons = enumeratePaths(consumerBlock, consumerBlock, bi, consControlDeps);
+  else
+    fCons = enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
   if (accountMuxCondition) {
     BoolExpression *selectOperandCondition = BoolExpression::parseSop(
@@ -943,6 +986,11 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     return;
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
+    // Skip delivery between a tree of muxes all inside 1 block
+    if (consumerBlock == producerBlock &&
+        consumerOp->getAttr(FTD_EXPLICIT_GAMMA_PHI) &&
+        producerOp->getAttr(FTD_EXPLICIT_GAMMA_PHI))
+      return;
 
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         !producerOp->hasAttr(FTD_NEW_SUPP))
