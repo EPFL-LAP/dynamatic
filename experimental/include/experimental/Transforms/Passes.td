@@ -80,7 +80,7 @@ def CreditBasedSharing : Pass<"credit-based-sharing"> {
       Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
       "components.">,
-      Option<"targetCP", "target-period", "double", "4.0",
+      Option<"targetCP", "target-period", "double", "",
       "Target clock period for the buffer placement CFDFC">];
 
   let dependentDialects = ["handshake::HandshakeDialect"];
