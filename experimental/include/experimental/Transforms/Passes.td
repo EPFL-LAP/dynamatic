@@ -74,7 +74,7 @@ def CreditBasedSharing : Pass<"credit-based-sharing"> {
   in the same pass pipeline before:
   - If yes, this pass share functional units as much as possible without
   penalizing the performance.
-  - Otherwise, it simply share all units of the same type.}];
+  - Otherwise, it simply shares all units of the same type.}];
 
   let options = [
       Option<"timingModels", "timing-models", "std::string", "",

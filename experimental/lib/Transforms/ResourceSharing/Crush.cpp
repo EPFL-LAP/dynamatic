@@ -100,7 +100,7 @@ using SharingGroups = std::list<Group>;
 
 void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
                                   SharingInfo &sharingInfo,
-                                  PerformanceAnalysis &analysis) {
+                                  CFDFCAnalysis &analysis) {
 
   SmallVector<CFDFC *> cfdfcPtrs;
 
@@ -524,7 +524,7 @@ void CreditBasedSharingPass::runOnOperation() {
   }
 
   SharingInfo sharingInfo;
-  auto performanceAnalysis = getCachedAnalysis<PerformanceAnalysis>();
+  auto performanceAnalysis = getCachedAnalysis<CFDFCAnalysis>();
 
   if (!performanceAnalysis.has_value()) {
     llvm::errs() << "Performance analysis result NOT available, share "

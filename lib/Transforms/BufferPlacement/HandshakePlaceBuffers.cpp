@@ -286,7 +286,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
-  auto &perfAnalysis = getAnalysis<dynamatic::PerformanceAnalysis>();
+  auto &perfAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
@@ -323,7 +323,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
       return failure();
   }
 
-  markAnalysesPreserved<NameAnalysis, PerformanceAnalysis>();
+  markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
   return success();
 }
 

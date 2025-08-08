@@ -17,9 +17,9 @@ struct BufferPlacementResult {
 };
 
 /// This Analysis is preserved after buffer placement
-struct PerformanceAnalysis {
+struct CFDFCAnalysis {
   std::map<handshake::FuncOp, BufferPlacementResult> results;
-  PerformanceAnalysis(mlir::Operation *modOp) {}
+  CFDFCAnalysis(mlir::Operation *modOp) {}
 };
 
 }; // namespace dynamatic
