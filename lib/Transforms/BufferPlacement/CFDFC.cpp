@@ -191,10 +191,8 @@ void forceSingleBackwardChannelPerCycle(const CycleList& cycles,
         }
 
         if (safeToRemove) {
-          if (backwardChannels.erase(backedge)) {
+          if (backwardChannels.erase(backedge))
             changed = true;
-            backedge.print(llvm::errs());
-          }
         }
       }
     }
@@ -255,12 +253,10 @@ void forceSingleBackwardChannelPerCycle(const CycleList& cycles,
         }
       }
 
-      // if (violation) {
-      //   assert(false && "Cycle has multiple conflicting backedges (non-unique BBs)");
-      // }
+      if (violation) {
+        assert(false && "Cycle has multiple conflicting backedges (non-unique BBs)");
+      }
     }
-
-
   }
 }
 
