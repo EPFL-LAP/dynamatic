@@ -112,8 +112,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::vector<std::vector<Block *>> &allPaths,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
-                        const ftd::BlockIndexing &bi,
-                        bool blockToTraverseFound,
+                        const ftd::BlockIndexing &bi, bool blockToTraverseFound,
                         int endVisitCount) {
 
   // The current block is part of the current path
@@ -126,9 +125,9 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
   bool blockFound = (!blockToTraverse || start == blockToTraverse);
 
   // If we are at the end of the path, then add it to the list of paths
-  if (start == end && (blockFound || blockToTraverseFound) && path.size() > 1) {
+  if (start == end && (blockFound || blockToTraverseFound) && path.size() > 1)
     allPaths.push_back(path);
-  } else {
+  else {
     // Else, for each successor which was not visited, run DFS again
     for (Block *successor : start->getSuccessors()) {
 
@@ -144,7 +143,8 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       if (incorrectPath)
         continue;
 
-      if (!visited.count(successor) || (successor== end && newEndVisitCount < 2)) {
+      if (!visited.count(successor) ||
+          (successor == end && newEndVisitCount < 2)) {
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
                     blocksToAvoid, bi, blockFound || blockToTraverseFound,
                     newEndVisitCount);
