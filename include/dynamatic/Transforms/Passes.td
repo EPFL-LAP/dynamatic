@@ -242,7 +242,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -287,6 +287,8 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
     "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
     "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 

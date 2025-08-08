@@ -28,7 +28,7 @@
 namespace dynamatic {
 namespace buffer {
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffers(
+std::unique_ptr<Pass> createHandshakePlaceBuffers(
     StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
     unsigned timeout = 180, bool dumpLogs = false);
@@ -52,8 +52,7 @@ struct HandshakePlaceBuffersPass
                             StringRef timingModels, bool firstCFDFC,
                             double targetCP, unsigned timeout, bool dumpLogs);
 
-  /// Called on the MLIR module provided as input.
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 protected:
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED

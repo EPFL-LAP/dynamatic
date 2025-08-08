@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
+#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -28,9 +29,11 @@
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <string>
 
@@ -108,13 +111,17 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
 }
 
-void HandshakePlaceBuffersPass::runDynamaticPass() {
+void HandshakePlaceBuffersPass::runOnOperation() {
   // Buffer placement requires that all values are used exactly once
-  mlir::ModuleOp modOp = getOperation();
+  mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
   if (failed(verifyIRMaterialized(modOp))) {
     modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
     return;
   }
+
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (!nameAnalysis.isAnalysisValid())
+    return signalPassFailure();
 
   // Map algorithms to the function to call to execute them
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
@@ -180,6 +187,15 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
       }
     }
   });
+
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached. Also name operations that do not currently have a name (unless
+  // instructed otherwise)
+  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+
+  // The name analysis is always preserved across passes
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -195,7 +211,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
   markAnalysesPreserved<NameAnalysis>();
 
-  mlir::ModuleOp modOp = getOperation();
+  ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
@@ -543,7 +559,9 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
-  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
+  auto modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
     llvm::MapVector<Value, ChannelBufProps> channelProps;
@@ -631,8 +649,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   }
 }
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakePlaceBuffers(
+std::unique_ptr<Pass> dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
   return std::make_unique<HandshakePlaceBuffersPass>(
