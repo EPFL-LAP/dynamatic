@@ -55,6 +55,9 @@ struct CFDFC {
   // block. The distinction is important for the buffer placement MILP, which
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
+
+  // Determines whether the channel has a corresponding CFG edge.
+  bool isCFGCompliant(unsigned srcBB, unsigned dstBB);
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
