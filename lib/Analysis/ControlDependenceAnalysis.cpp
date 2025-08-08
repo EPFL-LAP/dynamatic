@@ -190,10 +190,8 @@ void dynamatic::ControlDependenceAnalysis::identifyForwardControlDeps(
       // It is a forward control dependency if:
       // - `oneDep` is not in a loop;
       // - `oneDep` is not a loop exit or post-dominates `block`;
-      // - `oneDep` is not a latch block.
-      if (!loop || ((!loop->isLoopLatch(oneDep)) &&
-                    (!loop->isLoopExiting(oneDep) ||
-                     postDomInfo.properlyPostDominates(oneDep, &block))))
+      if (!loop || (!loop->isLoopExiting(oneDep) ||
+                    postDomInfo.properlyPostDominates(oneDep, &block)))
         blocksControlDeps[&block].forwardControlDeps.insert(oneDep);
     }
   }
