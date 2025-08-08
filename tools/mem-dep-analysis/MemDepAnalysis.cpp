@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <utility>
 
+#include "llvm/Analysis/ValueTracking.h"
+
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/MemoryDependency.h"
 #include "llvm/Analysis/ValueTracking.h"
