@@ -51,6 +51,13 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     CostAware("costaware"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+namespace dynamatic {
+namespace buffer {
+#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace buffer
+} // namespace dynamatic
+
 namespace {
 
 /// Thin wrapper around a `Logger` that allows to conditionally create the
@@ -87,7 +94,75 @@ public:
       delete log;
   }
 };
+
 } // namespace
+
+namespace dynamatic {
+namespace buffer {
+
+/// Public pass driver for the buffer placement pass. Unlike most other
+/// Dynamatic passes, users may wish to access the pass's internal state to
+/// derive insights useful for different kinds of IR processing. To facilitate
+/// users' workflow and minimize code duplication, this driver is public and
+/// exposes most of its behavior in protected virtual methods which may be
+/// overriden by sub-types of the pass.
+struct HandshakePlaceBuffersPass
+    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+          HandshakePlaceBuffersPass> {
+
+  /// Trivial field-by-field constructor.
+  HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
+                            StringRef timingModels, bool firstCFDFC,
+                            double targetCP, unsigned timeout, bool dumpLogs);
+
+  /// Use the auto-generated construtors from tblgen
+  using HandshakePlaceBuffersBase::HandshakePlaceBuffersBase;
+
+  void runOnOperation() override;
+
+protected:
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  /// Called for all buffer placement strategies that not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeUsingMILP();
+
+  /// Checks a couple of invariants in the function that are required by our
+  /// buffer placement algorithm. Fails when the function does not satisfy at
+  /// least one invariant.
+  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
+
+  /// Places buffers in the function, according to the logic dictated by the
+  /// algorithm the pass was instantiated with.
+  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB);
+
+  /// Identifies and extracts all existing CFDFCs in the function using
+  /// estimated transition frequencies between its basic blocks. Fills the
+  /// `cfdfcs` vector with the extracted cycles. CFDFC identification works by
+  /// iteratively solving MILPs until the MILP solution indicates that no
+  /// "executable cycle" remains in the circuit.
+  virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
+                                  SmallVector<CFDFC> &cfdfcs);
+
+  /// Computes an optimal buffer placement for a Handhsake function by solving
+  /// a large MILP over the entire dataflow circuit represented by the
+  /// function. Fills the `placement` map with placement decisions derived
+  /// from the MILP's solution.
+  virtual LogicalResult getBufferPlacement(FuncInfo &info,
+                                           TimingDatabase &timingDB,
+                                           Logger *logger,
+                                           BufferPlacement &placement);
+#endif
+  /// Called for all buffer placement strategies that do not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeWithoutUsingMILP();
+
+  /// Instantiates buffers inside the IR, following placement decisions
+  /// determined by the buffer placement MILP.
+  virtual void instantiateBuffers(BufferPlacement &placement);
+};
+
+} // namespace buffer
+} // namespace dynamatic
 
 BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
                            std::error_code &ec) {
@@ -654,12 +729,4 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
   }
-}
-
-std::unique_ptr<Pass> dynamatic::buffer::createHandshakePlaceBuffers(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
-  return std::make_unique<HandshakePlaceBuffersPass>(
-      algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
 }

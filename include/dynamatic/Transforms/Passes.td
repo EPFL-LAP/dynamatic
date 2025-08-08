@@ -254,7 +254,6 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     which needs to be setup separately from Dynamatic (and is under a different,
     non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
