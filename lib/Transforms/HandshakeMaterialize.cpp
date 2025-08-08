@@ -344,7 +344,7 @@ struct HandshakeMaterializePass
     MLIRContext *ctx = &getContext();
 
     // First make sure that every value within Handshake functions is used
-    // exactly once
+    // exactly once!
     // OpBuilder builder(ctx);
     // for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     //   for (BlockArgument funcArg : funcOp.getBody().getArguments())
