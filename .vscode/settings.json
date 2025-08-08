@@ -11,6 +11,7 @@
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
     "LLVM_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/llvm",
     "CLANG_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/clang",
+    "Polly_DIR": "${workspaceFolder}/polygeist/llvm-project/build/tools/polly/lib/cmake/polly",
     "CMAKE_C_COMPILER": "clang",
     "CMAKE_CXX_COMPILER": "clang++",
     "LLVM_USE_LINKER": "lld",
