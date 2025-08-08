@@ -64,6 +64,8 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   cmd += " &> ";
   cmd += dynamaticLogPath;
 
+  cmd = "bash -c \"" + cmd + "\"";
+
   int status = system(cmd.c_str());
   if (status == 0) {
     fs::path logFilePath = path.parent_path() / "out" / "sim" / "report.txt";
