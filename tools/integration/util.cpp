@@ -54,15 +54,18 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   scriptFile.close();
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
-  fs::path dynamaticLogPath = path.parent_path() / "out" / "dynamatic_out.txt";
-  if (!fs::exists(dynamaticLogPath.parent_path())) {
-    fs::create_directories(dynamaticLogPath.parent_path());
+  fs::path dynamaticOutPath = path.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath = path.parent_path() / "out" / "dynamatic_err.txt";
+  if (!fs::exists(dynamaticOutPath.parent_path())) {
+    fs::create_directories(dynamaticOutPath.parent_path());
   }
 
   std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
   cmd += tmpFilename;
-  cmd += " &> ";
-  cmd += dynamaticLogPath;
+  cmd += " 1> ";
+  cmd += dynamaticOutPath;
+  cmd += " 2> ";
+  cmd += dynamaticErrPath;
 
   int status = system(cmd.c_str());
   if (status == 0) {
