@@ -11,6 +11,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueMap.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -148,8 +149,10 @@ public:
     SmallVector<mlir::Value> mlirOpOperands;
     for (unsigned i = 0; i < inst->getNumOperands(); ++i) {
       llvm::Value *val = inst->getOperand(i);
-      assert(valueMapping.count(val) > 0);
-
+      if (!valueMapping.count(val)) {
+        inst->dump();
+        llvm_unreachable("Missing mapping from LLVM value to MLIR value");
+      }
       mlirOpOperands.push_back(valueMapping[val]);
     }
 
@@ -194,9 +197,19 @@ public:
                                               mlirOpOperands[1]);
       addMapping(inst, op.getResult());
       loc = op.getLoc();
-    } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
+    } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
+      mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+      translateBinaryOp<arith::SelectOp>(builder, loc, resType, mlirOpOperands,
+                                         inst);
+    } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
+
+    }
+
+    else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
       builder.create<func::ReturnOp>(loc, mlirOpOperands);
-    } else {
+    }
+
+    else {
       llvm_unreachable("Not implemented");
     }
   }
