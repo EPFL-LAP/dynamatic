@@ -18,8 +18,9 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get -y install clang-format-19
+          alias clang-format='clang-format-19'
           git fetch origin main --no-recurse-submodules
-          git clang-format-19 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         if: success() || failure()
