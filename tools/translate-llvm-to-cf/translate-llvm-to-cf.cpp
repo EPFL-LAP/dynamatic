@@ -173,27 +173,26 @@ public:
 
       converted.insert(inst);
     } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
-      auto icmpPredicate = icmpInst->getPredicate();
-      arith::CmpIPredicate arithPred;
-      switch (icmpPredicate) {
+      arith::CmpIPredicate pred;
+      switch (icmpInst->getPredicate()) {
         // clang-format off
-        case llvm::CmpInst::Predicate::ICMP_EQ:  arithPred = arith::CmpIPredicate::eq;  break;
-        case llvm::CmpInst::Predicate::ICMP_NE:  arithPred = arith::CmpIPredicate::ne;  break;
-        case llvm::CmpInst::Predicate::ICMP_UGT: arithPred = arith::CmpIPredicate::ugt; break;
-        case llvm::CmpInst::Predicate::ICMP_UGE: arithPred = arith::CmpIPredicate::uge; break;
-        case llvm::CmpInst::Predicate::ICMP_ULT: arithPred = arith::CmpIPredicate::ult; break;
-        case llvm::CmpInst::Predicate::ICMP_ULE: arithPred = arith::CmpIPredicate::ule; break;
-        case llvm::CmpInst::Predicate::ICMP_SGT: arithPred = arith::CmpIPredicate::sgt; break;
-        case llvm::CmpInst::Predicate::ICMP_SGE: arithPred = arith::CmpIPredicate::sge; break;
-        case llvm::CmpInst::Predicate::ICMP_SLT: arithPred = arith::CmpIPredicate::slt; break;
-        case llvm::CmpInst::Predicate::ICMP_SLE: arithPred = arith::CmpIPredicate::sle; break;
+        case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
+        case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
+        case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
+        case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
+        case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
+        case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
+        case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
+        case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
+        case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
+        case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
         // clang-format on
       default:
         // Handle unknown predicate or assert
         llvm_unreachable("Unsupported ICMP predicate");
       }
 
-      auto op = builder.create<arith::CmpIOp>(loc, arithPred, mlirOpOperands[0],
+      auto op = builder.create<arith::CmpIOp>(loc, pred, mlirOpOperands[0],
                                               mlirOpOperands[1]);
       addMapping(inst, op.getResult());
       loc = op.getLoc();
