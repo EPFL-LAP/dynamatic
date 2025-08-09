@@ -17,6 +17,9 @@ jobs:
       - name: check-format-cpp
         run: |
           sudo apt-get -y update
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
           sudo apt-get -y install clang-format-19
           alias clang-format='clang-format-19'
           git fetch origin main --no-recurse-submodules
