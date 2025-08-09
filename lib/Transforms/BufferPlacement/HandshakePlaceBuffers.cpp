@@ -31,6 +31,8 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <string>
 
@@ -373,6 +375,263 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   return success();
 }
 
+/// Type alias for a cycle (sequence of operations forming a loop)
+using Cycle = std::vector<Operation *>;
+using CycleList = std::vector<Cycle>;
+
+// useful in debugging
+static void printCycles(const CycleList &cycles) {
+  llvm::errs() << "=== Circuit Cycles ===\n";
+  int cycleIdx = 0;
+
+  for (const auto &cycle : cycles) {
+    llvm::errs() << "Cycle " << cycleIdx++ << " (" << cycle.size()
+                 << " ops):\n";
+
+    for (Operation *op : cycle) {
+      llvm::errs() << "  - ";
+      op->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    llvm::errs() << "\n";
+  }
+}
+
+static Cycle normalizeCycle(const Cycle &cycle) {
+  if (cycle.empty())
+    return cycle;
+  auto minIt = std::min_element(cycle.begin(), cycle.end());
+  Cycle rotated;
+  rotated.insert(rotated.end(), minIt, cycle.end());
+  rotated.insert(rotated.end(), cycle.begin(), minIt);
+  return rotated;
+}
+
+static std::string hashCycle(const Cycle &cycle) {
+  std::string repr;
+  llvm::raw_string_ostream rso(repr);
+
+  for (auto *op : cycle) {
+    op->print(rso);
+    rso << ";"; // separator between ops
+  }
+
+  rso.flush();
+  return repr;
+}
+
+// DFS cycle detection
+void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
+                    llvm::SmallPtrSetImpl<Operation *> &recursionStack,
+                    CycleList &cycles, llvm::StringSet<> &seenCycleHashes) {
+
+  recursionStack.insert(op);
+  stack.push_back(op);
+
+  for (auto result : op->getResults()) {
+    for (auto &use : result.getUses()) {
+      Operation *nextOp = use.getOwner();
+
+      if (isa<handshake::MemoryControllerOp>(nextOp) ||
+          isa<handshake::LSQOp>(nextOp))
+        continue;
+
+      if (!recursionStack.contains(nextOp))
+        findCyclesFrom(nextOp, stack, recursionStack, cycles, seenCycleHashes);
+      else {
+        // nextOp is already visited indicating a cycle
+        auto it = std::find(stack.begin(), stack.end(), nextOp);
+        if (it != stack.end()) {
+          Cycle rawCycle(it, stack.end());
+          if (rawCycle.front() != nextOp)
+            rawCycle.push_back(nextOp);
+
+          Cycle normalized = normalizeCycle(rawCycle);
+          std::string hash = hashCycle(normalized);
+
+          if (!seenCycleHashes.contains(hash)) {
+            seenCycleHashes.insert(hash);
+            cycles.push_back(normalized);
+          }
+        }
+      }
+    }
+  }
+
+  recursionStack.erase(op);
+  stack.pop_back();
+}
+
+CycleList findAllCycles(handshake::FuncOp funcOp) {
+  CycleList cycles;
+  llvm::SmallPtrSet<Operation *, 32> recursionStack;
+  llvm::SmallVector<Operation *, 32> stack;
+  llvm::StringSet<> seenCycleHashes;
+
+  for (Operation &op : funcOp.getOps()) {
+    // we do not care of cycles created around mcs and lsqs
+    if (isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op))
+      continue;
+
+    findCyclesFrom(&op, stack, recursionStack, cycles, seenCycleHashes);
+  }
+
+  return cycles;
+}
+
+void forceSingleBackwardChannelPerCycle(const CycleList &cycles,
+                                        DenseSet<Value> &backwardChannels) {
+  bool changed = true;
+
+  while (changed) {
+    changed = false;
+
+    // Map: backward channel to set of cycle indices it appears in
+    DenseMap<Value, SmallVector<int, 4>> backEdgeToCycles;
+
+    // Map: cycle index to list of its backward channels
+    DenseMap<int, SmallVector<Value, 4>> cycleToBackedges;
+
+    for (int i = 0; i < static_cast<int>(cycles.size()); ++i) {
+      // identify backward channels used in this cycle
+      for (size_t j = 0, n = cycles[i].size(); j < n; ++j) {
+        Operation *src = cycles[i][j];
+        Operation *dst = cycles[i][(j + 1) % n];
+
+        for (Value result : src->getResults()) {
+          for (auto &use : result.getUses()) {
+            if (use.getOwner() != dst)
+              continue;
+
+            if (backwardChannels.contains(result)) {
+              cycleToBackedges[i].push_back(result);
+              backEdgeToCycles[result].push_back(i);
+            }
+          }
+        }
+      }
+    }
+
+    // prune unique backedges from cycles with multiple backedges
+    for (auto &[cycleIndex, backedges] : cycleToBackedges) {
+      if (backedges.size() <= 1)
+        continue;
+
+      // loop over all backedges present in one cycle
+      for (Value backedge : backedges) {
+        // retrieve all cycles containing this channel
+        const auto &cyclesUsingThisEdge = backEdgeToCycles[backedge];
+        bool safeToRemove = true;
+
+        // check whether every cycle using this channel has other backedges
+        for (int otherCycleIdx : cyclesUsingThisEdge) {
+          const auto &otherCycleEdges = cycleToBackedges[otherCycleIdx];
+          int numBackedges = llvm::count_if(otherCycleEdges, [&](Value v) {
+            return backwardChannels.contains(v);
+          });
+
+          if (numBackedges <= 1) {
+            // do not leave this other cycle without any backedge
+            safeToRemove = false;
+            break;
+          }
+        }
+
+        if (safeToRemove)
+          if (backwardChannels.erase(backedge))
+            changed = true;
+      }
+    }
+  }
+
+  // final validation
+  for (const auto &cycle : cycles) {
+    // gather all backward edges in this cycle
+    SmallVector<std::pair<Operation *, Operation *>, 4> backedges;
+    for (size_t j = 0, n = cycle.size(); j < n; ++j) {
+      Operation *src = cycle[j];
+      Operation *dst = cycle[(j + 1) % n];
+
+      for (Value result : src->getResults()) {
+        for (auto &use : result.getUses()) {
+          if (use.getOwner() == dst && backwardChannels.contains(result))
+            backedges.emplace_back(src, dst);
+        }
+      }
+    }
+    // assert(backedges.size() == 1 &&
+    //        "Cycle has multiple conflicting backedges (non-unique BBs)");
+  }
+}
+
+/// Identify for each cycle a backward channel (Value)
+DenseSet<Value> findBackwardChannelPerCycle(CycleList &cycles) {
+  DenseSet<Value> backwardChannels;
+
+  for (auto &cycle : cycles) {
+    // rotate the cycle if necessary to identify the best
+    // starting point, based on the BB, favoring MergeLikeOps for common BBs
+    Operation *bestStart = nullptr;
+    for (size_t i = 0, n = cycle.size(); n > 1 && i < n; ++i) {
+      Operation *src = cycle[i];
+      Operation *dst = cycle[(i + 1) % n];
+
+      for (Value result : src->getResults()) {
+        for (auto &use : result.getUses()) {
+          if (use.getOwner() == dst) {
+            std::optional<unsigned> srcBB = getLogicBB(src);
+            std::optional<unsigned> bestStartBB =
+                std::numeric_limits<unsigned>::max();
+
+            if (srcBB.has_value() && bestStartBB.has_value()) {
+              if (srcBB < bestStartBB ||
+                  (srcBB == bestStartBB &&
+                   isa<handshake::MergeLikeOpInterface>(src))) {
+                bestStart = src;
+                bestStartBB = srcBB;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (bestStart) {
+      auto it = std::find(cycle.begin(), cycle.end(), bestStart);
+      if (it != cycle.end())
+        std::rotate(cycle.begin(), it, cycle.end());
+    }
+
+    // take the edge closing the cycle as a backwardEdge
+    std::optional<Value> backwardEdge;
+    Operation *src = cycle.back();
+    Operation *dst = cycle.front();
+
+    for (Value result : src->getResults()) {
+      for (auto &use : result.getUses()) {
+        if (use.getOwner() != dst)
+          continue;
+
+        backwardEdge = result;
+        break;
+      }
+      if (backwardEdge)
+        break;
+    }
+
+    assert(backwardEdge &&
+           "No valid backward edge found from last to first op in cycle!");
+    backwardChannels.insert(*backwardEdge);
+  }
+
+  // After taking the closing edge of each cycle as the backedge, make sure that
+  // none of the cycles have more than 1 backward edge
+  forceSingleBackwardChannelPerCycle(cycles, backwardChannels);
+
+  return backwardChannels;
+}
+
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    Logger *logger,
                                                    SmallVector<CFDFC> &cfdfcs) {
@@ -394,6 +653,12 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
   ArchSet selectedArchs;
   // Number of executions
   unsigned numExecs;
+
+  // Identify the cycles and the backward channels in your circuit
+  CycleList circuitCycles = findAllCycles(info.funcOp);
+  printCycles(circuitCycles);
+  DenseSet<Value> backwardChannels = findBackwardChannelPerCycle(circuitCycles);
+
   do {
     // Clear the sets of selected archs and BBs
     selectedArchs.clear();
@@ -415,7 +680,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs);
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs, backwardChannels);
   } while (!firstCFDFC);
 
   return success();
