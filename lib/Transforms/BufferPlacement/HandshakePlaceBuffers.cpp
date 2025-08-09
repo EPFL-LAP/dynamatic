@@ -601,8 +601,8 @@ void forceSingleBackwardChannelPerCycle(const CycleList &cycles,
         }
       }
     }
-    // assert(backedges.size() == 1 &&
-    //        "Cycle has multiple conflicting backedges (non-unique BBs)");
+    assert(backedges.size() == 1 &&
+           "Cycle has multiple conflicting backedges (non-unique BBs)");
   }
 }
 
@@ -611,7 +611,7 @@ DenseSet<Value> findBackwardChannelPerCycle(CycleList &cycles) {
   DenseSet<Value> backwardChannels;
 
   for (auto &cycle : cycles) {
-    // rotate the cycle if necessary to identify the best
+    // Rotate the cycle if necessary to identify the best
     // starting point, based on the BB, favoring MergeLikeOps for common BBs
     Operation *bestStart = nullptr;
     for (size_t i = 0, n = cycle.size(); n > 1 && i < n; ++i) {
@@ -624,6 +624,9 @@ DenseSet<Value> findBackwardChannelPerCycle(CycleList &cycles) {
             std::optional<unsigned> srcBB = getLogicBB(src);
             std::optional<unsigned> bestStartBB =
                 std::numeric_limits<unsigned>::max();
+
+            if (bestStart)
+              bestStartBB = getLogicBB(bestStart);
 
             if (srcBB.has_value() && bestStartBB.has_value()) {
               if (srcBB < bestStartBB ||
@@ -697,9 +700,9 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
   // Identify the cycles and the backward channels in your circuit
   CycleList circuitCycles = findAllCycles(info.funcOp);
-  printCycles(circuitCycles);
+  // printCycles(circuitCycles);
   DenseSet<Value> backwardChannels = findBackwardChannelPerCycle(circuitCycles);
-  printBackwardChannels(backwardChannels);
+  // printBackwardChannels(backwardChannels);
 
   do {
     // Clear the sets of selected archs and BBs
