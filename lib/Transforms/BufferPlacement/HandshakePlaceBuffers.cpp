@@ -398,6 +398,37 @@ static void printCycles(const CycleList &cycles) {
   }
 }
 
+static void
+printBackwardChannels(const llvm::DenseSet<Value> &backwardChannels) {
+  llvm::errs() << "=== Backward Channels (with src/dst ops) ===\n";
+  int idx = 0;
+
+  for (Value v : backwardChannels) {
+    llvm::errs() << "Channel " << idx++ << ":\n";
+
+    // Source operation
+    if (Operation *srcOp = v.getDefiningOp()) {
+      llvm::errs() << "  Source: ";
+      srcOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    } else {
+      llvm::errs() << "  Source: <block argument>\n";
+    }
+
+    // Destination operations
+    for (auto &use : v.getUses()) {
+      Operation *dstOp = use.getOwner();
+      llvm::errs() << "  Destination: ";
+      dstOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    llvm::errs() << "\n";
+  }
+
+  if (backwardChannels.empty())
+    llvm::errs() << "(empty)\n";
+}
+
 static Cycle normalizeCycle(const Cycle &cycle) {
   if (cycle.empty())
     return cycle;
@@ -416,9 +447,19 @@ static std::string hashCycle(const Cycle &cycle) {
     op->print(rso);
     rso << ";"; // separator between ops
   }
-
   rso.flush();
-  return repr;
+
+  const std::string key = "handshake.name = \"";
+  size_t start = repr.find(key);
+  if (start != std::string::npos) {
+    start += key.size(); // move right after the opening quote
+    size_t end = repr.find("\"", start);
+    if (end != std::string::npos) {
+      return repr.substr(start, end - start);
+    }
+  }
+
+  return "";
 }
 
 // DFS cycle detection
@@ -658,6 +699,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
   CycleList circuitCycles = findAllCycles(info.funcOp);
   printCycles(circuitCycles);
   DenseSet<Value> backwardChannels = findBackwardChannelPerCycle(circuitCycles);
+  printBackwardChannels(backwardChannels);
 
   do {
     // Clear the sets of selected archs and BBs
