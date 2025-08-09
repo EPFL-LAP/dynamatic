@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
 
 add_llvm_tool(translate-llvm-to-cf
   translate-llvm-to-cf.cpp
+  ImportLLVMModule.cpp
 )
 
 llvm_update_compile_flags(translate-llvm-to-cf)
