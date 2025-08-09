@@ -80,9 +80,9 @@ class ImportLLVMModule {
   std::set<Instruction *> converted;
 
   template <typename MLIRTy>
-  void translateBinaryLLVMOp(OpBuilder &builder, Location &loc,
-                             mlir::Type returnType, mlir::ValueRange values,
-                             Instruction *inst) {
+  void translateBinaryOp(OpBuilder &builder, Location &loc,
+                         mlir::Type returnType, mlir::ValueRange values,
+                         Instruction *inst) {
     MLIRTy op = builder.create<MLIRTy>(loc, returnType, values);
     addMapping(inst, op.getResult());
     loc = op.getLoc();
@@ -145,20 +145,23 @@ public:
     inst->dump();
     assert(converted.count(inst) == 0);
 
-    SmallVector<mlir::Value> mlirValues;
+    SmallVector<mlir::Value> mlirOpOperands;
     for (unsigned i = 0; i < inst->getNumOperands(); ++i) {
       llvm::Value *val = inst->getOperand(i);
       assert(valueMapping.count(val) > 0);
 
-      mlirValues.push_back(valueMapping[val]);
+      mlirOpOperands.push_back(valueMapping[val]);
     }
 
     if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
-      mlir::Type resultType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+      mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
       switch (binaryOp->getOpcode()) {
         // clang-format off
-      case Instruction::Add: translateBinaryLLVMOp<arith::AddIOp>(builder, loc, resultType, mlirValues, inst); break;
-      case Instruction::Mul: translateBinaryLLVMOp<arith::MulIOp>(builder, loc, resultType, mlirValues, inst); break;
+        case Instruction::Add: translateBinaryOp<arith::AddIOp>(builder, loc, resType, mlirOpOperands, inst); break;
+        case Instruction::Mul: translateBinaryOp<arith::MulIOp>(builder, loc, resType, mlirOpOperands, inst); break;
+        case Instruction::Shl: translateBinaryOp<arith::ShLIOp>(builder, loc, resType, mlirOpOperands, inst); break;
+        case Instruction::AShr: translateBinaryOp<arith::ShRSIOp>(builder, loc, resType, mlirOpOperands, inst); break;
+        case Instruction::LShr: translateBinaryOp<arith::ShRUIOp>(builder, loc, resType, mlirOpOperands, inst); break;
         // clang-format on
       default: {
         llvm_unreachable("Not implemented");
@@ -166,9 +169,33 @@ public:
       }
 
       converted.insert(inst);
-    } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
-      builder.create<func::ReturnOp>(loc, mlirValues);
+    } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
+      auto icmpPredicate = icmpInst->getPredicate();
+      arith::CmpIPredicate arithPred;
+      switch (icmpPredicate) {
+        // clang-format off
+        case llvm::CmpInst::Predicate::ICMP_EQ:  arithPred = arith::CmpIPredicate::eq;  break;
+        case llvm::CmpInst::Predicate::ICMP_NE:  arithPred = arith::CmpIPredicate::ne;  break;
+        case llvm::CmpInst::Predicate::ICMP_UGT: arithPred = arith::CmpIPredicate::ugt; break;
+        case llvm::CmpInst::Predicate::ICMP_UGE: arithPred = arith::CmpIPredicate::uge; break;
+        case llvm::CmpInst::Predicate::ICMP_ULT: arithPred = arith::CmpIPredicate::ult; break;
+        case llvm::CmpInst::Predicate::ICMP_ULE: arithPred = arith::CmpIPredicate::ule; break;
+        case llvm::CmpInst::Predicate::ICMP_SGT: arithPred = arith::CmpIPredicate::sgt; break;
+        case llvm::CmpInst::Predicate::ICMP_SGE: arithPred = arith::CmpIPredicate::sge; break;
+        case llvm::CmpInst::Predicate::ICMP_SLT: arithPred = arith::CmpIPredicate::slt; break;
+        case llvm::CmpInst::Predicate::ICMP_SLE: arithPred = arith::CmpIPredicate::sle; break;
+        // clang-format on
+      default:
+        // Handle unknown predicate or assert
+        llvm_unreachable("Unsupported ICMP predicate");
+      }
 
+      auto op = builder.create<arith::CmpIOp>(loc, arithPred, mlirOpOperands[0],
+                                              mlirOpOperands[1]);
+      addMapping(inst, op.getResult());
+      loc = op.getLoc();
+    } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
+      builder.create<func::ReturnOp>(loc, mlirOpOperands);
     } else {
       llvm_unreachable("Not implemented");
     }
