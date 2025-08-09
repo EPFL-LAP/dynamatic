@@ -1,6 +1,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -40,6 +41,7 @@ using namespace llvm;
 using namespace mlir;
 
 class ImportLLVMModule {
+
   mlir::ModuleOp mlirModule;
 
   llvm::Module *llvmModule;
@@ -59,16 +61,16 @@ class ImportLLVMModule {
   std::set<Instruction *> converted;
 
   template <typename MLIRTy>
-  void translateBinaryOp(OpBuilder &builder, Location &loc,
-                         mlir::Type returnType, mlir::ValueRange values,
-                         Instruction *inst) {
+  void translateBinaryOp(Location &loc, mlir::Type returnType,
+                         mlir::ValueRange values, Instruction *inst) {
     MLIRTy op = builder.create<MLIRTy>(loc, returnType, values);
     addMapping(inst, op.getResult());
     loc = op.getLoc();
   }
 
-  void createConstants(llvm::Function *llvmFunc, OpBuilder &builder,
-                       Location loc);
+  void initializeBlocks(llvm::Function *llvmFunc, func::FuncOp funcOp);
+
+  void createConstants(llvm::Function *llvmFunc, Location loc);
   void translateLLVMFunction(llvm::Function *llvmFunc);
 
   void translateOperation(llvm::Instruction *inst, Location &loc);
