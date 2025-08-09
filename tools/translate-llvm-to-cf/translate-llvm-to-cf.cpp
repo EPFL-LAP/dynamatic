@@ -1,7 +1,18 @@
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/ValueMap.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
@@ -13,6 +24,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Parser/Parser.h"
@@ -20,6 +32,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <vector>
 
 using namespace llvm;
@@ -41,6 +54,7 @@ mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
   } else if (llvmType->isDoubleTy()) {
     mlirType = mlir::FloatType::getF64(context);
   } else {
+    llvmType->dump();
     assert(false);
   }
   return mlirType;
@@ -63,6 +77,55 @@ class ImportLLVMModule {
     valueMapping[llvmVal] = mlirVal;
   }
 
+  std::set<Instruction *> converted;
+
+  template <typename MLIRTy>
+  void translateBinaryLLVMOp(OpBuilder &builder, Location &loc,
+                             mlir::Type returnType, mlir::ValueRange values,
+                             Instruction *inst) {
+    MLIRTy op = builder.create<MLIRTy>(loc, returnType, values);
+    addMapping(inst, op.getResult());
+    loc = op.getLoc();
+  }
+
+  void createConstants(llvm::Function *llvmFunc, OpBuilder &builder,
+                       Location loc) {
+    for (auto &block : *llvmFunc) {
+      for (auto &inst : block) {
+        for (unsigned i = 0; i < inst.getNumOperands(); ++i) {
+          llvm::Value *val = inst.getOperand(i);
+
+          // NOTE: llvm use the same pointer for multiple uses of the same
+          // constant, therefore we don't need to add it twice.
+          if (!isa<llvm::Constant>(val) || valueMapping.count(val)) {
+            continue;
+          }
+
+          if (auto *intConst = dyn_cast<ConstantInt>(val)) {
+            APInt intVal = intConst->getValue();
+            auto constOp = builder.create<arith::ConstantIntOp>(
+                loc, intVal.getSExtValue(), intVal.getBitWidth());
+            valueMapping[val] = constOp->getResult(0);
+          }
+
+          if (auto *floatConst = dyn_cast<llvm::ConstantFP>(val)) {
+            const APFloat &floatVal = floatConst->getValue();
+            if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
+              auto constOp = builder.create<arith::ConstantFloatOp>(
+                  loc, floatVal, builder.getF32Type());
+              valueMapping[val] = constOp->getResult(0);
+            } else if (&floatVal.getSemantics() ==
+                       &llvm::APFloat::IEEEdouble()) {
+              auto constOp = builder.create<arith::ConstantFloatOp>(
+                  loc, floatVal, builder.getF64Type());
+              valueMapping[val] = constOp->getResult(0);
+            }
+          }
+        }
+      }
+    }
+  }
+
 public:
   ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
                    OpBuilder &builder)
@@ -78,16 +141,37 @@ public:
     }
   }
 
-  template <typename LLVMOpType, typename MLIROpType>
-  void translateOperation(LLVMOpType inst) {
+  void translateOperation(llvm::Instruction *inst, Location &loc) {
+    inst->dump();
+    assert(converted.count(inst) == 0);
+
     SmallVector<mlir::Value> mlirValues;
-    mlir::Type resultType = convertLLVMTypeToMLIR(inst, ctx);
     for (unsigned i = 0; i < inst->getNumOperands(); ++i) {
       llvm::Value *val = inst->getOperand(i);
+      assert(valueMapping.count(val) > 0);
+
       mlirValues.push_back(valueMapping[val]);
     }
-    builder.create<MLIROpType>(resultType, mlirValues);
-    addMapping(inst, resultType);
+
+    if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
+      mlir::Type resultType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+      switch (binaryOp->getOpcode()) {
+        // clang-format off
+      case Instruction::Add: translateBinaryLLVMOp<arith::AddIOp>(builder, loc, resultType, mlirValues, inst); break;
+      case Instruction::Mul: translateBinaryLLVMOp<arith::MulIOp>(builder, loc, resultType, mlirValues, inst); break;
+        // clang-format on
+      default: {
+        llvm_unreachable("Not implemented");
+      }
+      }
+
+      converted.insert(inst);
+    } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
+      builder.create<func::ReturnOp>(loc, mlirValues);
+
+    } else {
+      llvm_unreachable("Not implemented");
+    }
   }
 };
 
@@ -95,20 +179,41 @@ void ImportLLVMModule::translateLLVMFunction(llvm::Function *llvmFunc) {
   builder.setInsertionPointToEnd(mlirModule->getBlock());
   SmallVector<mlir::Type> argTypes;
   for (auto &arg : llvmFunc->args()) {
-    argTypes.push_back(builder.getI32Type()); // Simplification
+    argTypes.push_back(
+        convertLLVMTypeToMLIR(arg.getType(), ctx)); // Simplification
   }
 
   auto funcType = builder.getFunctionType(argTypes, {builder.getI32Type()});
   auto funcOp = builder.create<func::FuncOp>(mlirModule->getLoc(),
                                              llvmFunc->getName(), funcType);
+
+  funcOp.dump();
+
+  llvm::errs() << "LLVM IR, # arguments" << llvmFunc->arg_size() << "\n";
+  llvm::errs() << "MLIR IR, # arguments" << funcOp.getNumArguments() << "\n";
+
+  // Convert the entry block
   auto &entryBlock = *funcOp.addEntryBlock();
+
+  // Note: funcType and the actual function arguments (i.e., the arguments of
+  // the first block) are two separate concepts:
+  for (auto &arg : llvmFunc->args()) {
+    entryBlock.addArgument(convertLLVMTypeToMLIR(arg.getType(), ctx),
+                           funcOp->getLoc());
+  }
+
+  for (unsigned i = 0; i < llvmFunc->arg_size(); i++) {
+    llvm::errs() << "Arg # " << i << "\n";
+    valueMapping[llvmFunc->getArg(i)] = funcOp.getArgument(i);
+  }
 
   builder.setInsertionPointToStart(&entryBlock);
 
-  // Fake return 0
-  auto zero =
-      builder.create<arith::ConstantIntOp>(builder.getUnknownLoc(), 0, 32);
-  builder.create<func::ReturnOp>(builder.getUnknownLoc(), zero.getResult());
+  Location loc = mlir::UnknownLoc::get(ctx);
+  createConstants(llvmFunc, builder, loc);
+  for (auto &inst : llvmFunc->getEntryBlock()) {
+    translateOperation(&inst, loc);
+  }
 
   mlirModule.push_back(funcOp);
 }
