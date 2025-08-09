@@ -69,11 +69,18 @@ static Cycle normalizeCycle(const Cycle &cycle) {
 
 static std::string hashCycle(const Cycle &cycle) {
   std::string repr;
-  for (auto *op : cycle)
-    repr += op->getName().getStringRef().str() + ";";
+  llvm::raw_string_ostream rso(repr);
+
+  for (auto *op : cycle) {
+    op->print(rso);
+    rso << ";"; // separator between ops
+  }
+
+  rso.flush();
   return repr;
 }
 
+// DFS cycle detection
 void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
                     llvm::SmallPtrSetImpl<Operation *> &recursionStack,
                     CycleList &cycles, llvm::StringSet<> &seenCycleHashes) {
@@ -89,10 +96,10 @@ void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
           isa<handshake::LSQOp>(nextOp))
         continue;
 
-      if (!recursionStack.contains(nextOp)) {
+      if (!recursionStack.contains(nextOp))
         findCyclesFrom(nextOp, stack, recursionStack, cycles, seenCycleHashes);
-      } else {
-        // Found a cycle
+      else {
+        // nextOp is already visited indicating a cycle
         auto it = std::find(stack.begin(), stack.end(), nextOp);
         if (it != stack.end()) {
           Cycle rawCycle(it, stack.end());
@@ -122,10 +129,10 @@ CycleList findAllCycles(handshake::FuncOp funcOp) {
   llvm::StringSet<> seenCycleHashes;
 
   for (Operation &op : funcOp.getOps()) {
+    // we do not care of cycles created around mcs and lsqs
     if (isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op))
       continue;
 
-    // Start from every op (even if visited before!)
     findCyclesFrom(&op, stack, recursionStack, cycles, seenCycleHashes);
   }
 
@@ -459,12 +466,12 @@ static void setBBConstraints(GRBModel &model, MILPVars &vars) {
 CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
 
-  // Identify the block that starts the CFDFC; it's the only one that is both
-  // the source of an arch and the destination of another
-
   CycleList circuitCycles = findAllCycles(funcOp);
   DenseSet<Value> uniqueBackwardChannels =
       findBackwardChannelPerCycle(circuitCycles);
+
+  // Identify the block that starts the CFDFC; it's the only one that is both
+  // the source of an arch and the destination of another
   std::optional<unsigned> startBB;
   llvm::SmallSet<unsigned, 4> uniqueBlocks;
   for (ArchBB *arch : archs) {
@@ -525,7 +532,6 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       if (!uniqueBackwardChannels.contains(res))
         channels.insert(res);
       else {
-
         // insert backedges only if they are compliant with the CFG
         backedges.insert(res);
         if (isCFGCompliant(srcBB, dstBB))
