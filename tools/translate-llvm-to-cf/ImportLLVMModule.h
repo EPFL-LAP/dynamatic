@@ -64,8 +64,8 @@ class ImportLLVMModule {
   std::set<Instruction *> converted;
 
   template <typename MLIRTy>
-  void translateBinaryOp(Location &loc, mlir::Type returnType,
-                         mlir::ValueRange values, Instruction *inst) {
+  void naiveTranslation(Location &loc, mlir::Type returnType,
+                        mlir::ValueRange values, Instruction *inst) {
     MLIRTy op = builder.create<MLIRTy>(loc, returnType, values);
     addMapping(inst, op.getResult());
     loc = op.getLoc();

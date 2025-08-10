@@ -1,21 +1,23 @@
 #include "ImportLLVMModule.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/Casting.h"
 
 mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
                                  mlir::MLIRContext *context) {
   mlir::Type mlirType;
 
-  if (llvmType->isIntegerTy(1)) {
-    mlirType = mlir::IntegerType::get(context, 1);
-  } else if (llvmType->isIntegerTy(32)) {
-    mlirType = mlir::IntegerType::get(context, 32);
+  if (llvmType->isIntegerTy()) {
+    mlirType = mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   } else if (llvmType->isFloatTy()) {
     mlirType = mlir::FloatType::getF32(context);
   } else if (llvmType->isDoubleTy()) {
@@ -135,16 +137,29 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
     switch (binaryOp->getOpcode()) {
       // clang-format off
-      case Instruction::Add:  translateBinaryOp<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Mul:  translateBinaryOp<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Shl:  translateBinaryOp<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::AShr: translateBinaryOp<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::LShr: translateBinaryOp<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
       // clang-format on
     default: {
       llvm_unreachable("Not implemented");
     }
     }
+  } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
+    mlir::Value arg = valueMapping[inst->getOperand(0)];
+    mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+
+    switch (castOp->getOpcode()) {
+      // clang-format off
+      case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
+      // clang-format on
+    default:
+      llvm_unreachable("Not implemented");
+    }
+
   } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
     mlir::Value lhs = valueMapping[inst->getOperand(0)];
     mlir::Value rhs = valueMapping[inst->getOperand(1)];
@@ -175,7 +190,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     mlir::Value trueOperand = valueMapping[inst->getOperand(1)];
     mlir::Value falseOperand = valueMapping[inst->getOperand(2)];
     mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
-    translateBinaryOp<arith::SelectOp>(
+    naiveTranslation<arith::SelectOp>(
         loc, resType, {condition, trueOperand, falseOperand}, inst);
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
 
