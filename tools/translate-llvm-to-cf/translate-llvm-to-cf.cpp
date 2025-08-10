@@ -16,21 +16,28 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "dynamatic/InitAllDialects.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
 
 #include "ImportLLVMModule.h"
+#include "mlir/Support/FileUtilities.h"
 
 #include <fstream>
 #include <iostream>
@@ -43,6 +50,10 @@ using namespace mlir;
 
 static cl::opt<std::string>
     inputFilename(cl::Positional, cl::desc("<input .ll file>"), cl::Required);
+
+static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
+                                           cl::value_desc("filename"),
+                                           cl::init("-"));
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
@@ -60,17 +71,51 @@ int main(int argc, char **argv) {
   }
 
   // Initialize MLIR
-  MLIRContext context;
+  mlir::DialectRegistry registry;
+
+  registry.insert<
+      // clang-format off
+      func::FuncDialect,
+      memref::MemRefDialect,
+      arith::ArithDialect,
+      math::MathDialect,
+      cf::ControlFlowDialect
+      // clang-format on
+      >();
+  MLIRContext context(registry);
+
   context.getOrLoadDialect<func::FuncDialect>();
-  context.getOrLoadDialect<cf::ControlFlowDialect>();
+  context.getOrLoadDialect<memref::MemRefDialect>();
   context.getOrLoadDialect<arith::ArithDialect>();
+  context.getOrLoadDialect<math::MathDialect>();
+  context.getOrLoadDialect<cf::ControlFlowDialect>();
 
   OpBuilder builder(&context);
-  auto module = ModuleOp::create(builder.getUnknownLoc());
 
-  ImportLLVMModule importer(llvmModule.get(), module, builder);
+  auto module = builder.create<ModuleOp>(builder.getUnknownLoc());
+  // auto module = ModuleOp::create(builder.getUnknownLoc());
+
+  ImportLLVMModule importer(llvmModule.get(), module, builder, &context);
   importer.translateModule();
 
-  module.print(llvm::outs());
+  if (failed(module.verify())) {
+    return 1;
+  }
+
+  std::string errorMessage;
+  auto output = openOutputFile(outputFilename, &errorMessage);
+  if (!output) {
+    llvm::errs() << errorMessage << "\n";
+    return 1;
+  }
+
+  mlir::OpPrintingFlags printFlags;
+
+  AsmState state(module, OpPrintingFlags());
+
+  module->print(output->os(), state);
+
+  output->keep();
+
   return 0;
 }

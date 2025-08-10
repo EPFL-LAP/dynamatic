@@ -93,5 +93,4 @@ $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
   > $OUT/clang_optimized_dep_marked.ll
 
 $DYNAMATIC_BINS/translate-llvm-to-cf \
-  "$OUT/clang_optimized_dep_marked.ll" \
-  > $OUT/std.mlir
+  "$OUT/clang_optimized_dep_marked.ll" -o $OUT/std.mlir

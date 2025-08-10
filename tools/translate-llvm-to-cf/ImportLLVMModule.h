@@ -68,19 +68,22 @@ class ImportLLVMModule {
     loc = op.getLoc();
   }
 
-  void initializeBlocks(llvm::Function *llvmFunc, func::FuncOp funcOp);
+  void initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
+                                       func::FuncOp funcOp);
 
-  void createConstants(llvm::Function *llvmFunc, Location loc);
+  void createConstants(llvm::Function *llvmFunc);
   void translateLLVMFunction(llvm::Function *llvmFunc);
 
-  void translateOperation(llvm::Instruction *inst, Location &loc);
+  void translateOperation(llvm::Instruction *inst);
+
+  SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
+                                                       BasicBlock *nextBB);
 
 public:
   ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
-                   OpBuilder &builder)
-      : mlirModule(mlirModule), llvmModule(llvmModule), builder(builder) {
-    ctx = mlirModule->getContext();
-  };
+                   OpBuilder &builder, MLIRContext *ctx)
+      : mlirModule(mlirModule), llvmModule(llvmModule), builder(builder),
+        ctx(ctx){};
 
   void translateModule() {
     for (auto &f : llvmModule->functions()) {

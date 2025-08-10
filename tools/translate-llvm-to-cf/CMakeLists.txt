@@ -10,6 +10,8 @@ add_llvm_tool(translate-llvm-to-cf
 llvm_update_compile_flags(translate-llvm-to-cf)
 target_link_libraries(translate-llvm-to-cf
   PRIVATE
+  DynamaticHandshake
+  DynamaticExperimentalSupport
 
   MLIRIR
   MLIRAffineTransforms
@@ -30,7 +32,6 @@ target_link_libraries(translate-llvm-to-cf
   LLVMSupport
   LLVMAnalysis
 )
-
 
 if(DYNAMATIC_ENABLE_XLS)
   target_link_libraries(dynamatic-opt
