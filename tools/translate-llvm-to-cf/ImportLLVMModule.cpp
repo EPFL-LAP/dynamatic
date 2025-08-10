@@ -173,7 +173,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
     mlir::Value condition = valueMapping[inst->getOperand(0)];
     mlir::Value trueOperand = valueMapping[inst->getOperand(1)];
-    mlir::Value falseOperand = valueMapping[inst->getOperand(1)];
+    mlir::Value falseOperand = valueMapping[inst->getOperand(2)];
     mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
     translateBinaryOp<arith::SelectOp>(
         loc, resType, {condition, trueOperand, falseOperand}, inst);
