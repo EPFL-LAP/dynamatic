@@ -5,6 +5,7 @@
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -16,6 +17,9 @@
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/MemoryDependency.h"
 
 mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
                                  mlir::MLIRContext *context) {
@@ -32,6 +36,22 @@ mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
     assert(false);
   }
   return mlirType;
+}
+
+void translateDepAttr(llvm::Instruction *inst, Operation *op, MLIRContext &ctx,
+                      OpBuilder &builder) {
+  if (auto depData = LLVMMemDependency::fromLLVMInstruction(inst);
+      depData.has_value()) {
+    std::string opName = depData.value().name;
+    SmallVector<dynamatic::handshake::MemDependenceAttr> deps =
+        depData.value().getMemoryDependenceAttrs(ctx);
+    op->setAttr(StringRef(dynamatic::NameAnalysis::ATTR_NAME),
+                builder.getStringAttr(opName));
+    if (!deps.empty()) {
+      dynamatic::setDialectAttr<dynamatic::handshake::MemDependenceArrayAttr>(
+          op, &ctx, deps);
+    }
+  }
 }
 
 SmallVector<mlir::Value>
@@ -302,17 +322,19 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
           "Invalid GEP -> GEP pattern detected! It is assumed that this kind "
           "of pattern is canonicalized away using instcombine pass.");
     } else if (auto *loadInst = dyn_cast<LoadInst>(user)) {
+
       auto newLoadOp = builder.create<memref::LoadOp>(
           UnknownLoc::get(ctx), convertLLVMTypeToMLIR(loadInst->getType(), ctx),
           baseAddress, ValueRange(indexOperands));
+      translateDepAttr(loadInst, newLoadOp, *ctx, builder);
       valueMapping[user] = newLoadOp.getResult();
       converted.insert(loadInst);
     } else if (auto *storeInst = dyn_cast<StoreInst>(user)) {
-
       auto storeValue = valueMapping[storeInst->getValueOperand()];
-      builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue,
-                                      baseAddress, indexOperands);
+      auto newStoreOp = builder.create<memref::StoreOp>(
+          UnknownLoc::get(ctx), storeValue, baseAddress, indexOperands);
       converted.insert(storeInst);
+      translateDepAttr(storeInst, newStoreOp, *ctx, builder);
     }
   }
 }
@@ -371,6 +393,7 @@ void ImportLLVMModule::translateLoadWithZeroIndices(llvm::LoadInst *loadInst) {
   auto newOp =
       builder.create<memref::LoadOp>(loc, resType, addressVal, indexValues);
   valueMapping[loadInst] = newOp.getResult();
+  translateDepAttr(loadInst, newOp, *ctx, builder);
 }
 
 void ImportLLVMModule::translateStoreWithZeroIndices(
@@ -394,7 +417,9 @@ void ImportLLVMModule::translateStoreWithZeroIndices(
   }
   mlir::Value storeValue = valueMapping[storeInst->getValueOperand()];
 
-  builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
+  auto newOp =
+      builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
+  translateDepAttr(storeInst, newOp, *ctx, builder);
 }
 
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {

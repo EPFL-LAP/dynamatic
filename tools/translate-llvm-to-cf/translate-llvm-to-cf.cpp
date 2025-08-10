@@ -87,7 +87,8 @@ int main(int argc, char **argv) {
       memref::MemRefDialect,
       arith::ArithDialect,
       math::MathDialect,
-      cf::ControlFlowDialect
+      cf::ControlFlowDialect,
+      dynamatic::handshake::HandshakeDialect
       // clang-format on
       >();
   MLIRContext context(registry);
@@ -97,6 +98,7 @@ int main(int argc, char **argv) {
   context.getOrLoadDialect<arith::ArithDialect>();
   context.getOrLoadDialect<math::MathDialect>();
   context.getOrLoadDialect<cf::ControlFlowDialect>();
+  context.getOrLoadDialect<dynamatic::handshake::HandshakeDialect>();
 
   OpBuilder builder(&context);
 
