@@ -91,6 +91,7 @@ class ImportLLVMModule {
   void translateGEPOp(llvm::GetElementPtrInst *gepInst);
   void translateLoadWithZeroIndices(llvm::LoadInst *loadInst);
   void translateStoreWithZeroIndices(llvm::StoreInst *storeInst);
+  void translateAllocaOp(llvm::AllocaInst *allocaInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
                                                        BasicBlock *nextBB);

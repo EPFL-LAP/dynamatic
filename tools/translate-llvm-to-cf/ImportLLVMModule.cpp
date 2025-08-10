@@ -14,6 +14,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/Value.h"
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -291,6 +292,20 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
         UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
     indexOperands.push_back(idxCastOp);
   }
+
+  if (auto *defInst = gepInst->getPointerOperand();
+      isa_and_nonnull<AllocaInst>(defInst)) {
+    // NOTE: If GEP calculates value from a memory allocation (which is a
+    // global value), an extra zero index value is required at the beginning
+    // to calculate the address.
+    //
+    // Reference:
+    // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
+    //
+    // Therefore, we drop the first element in this case
+    indexOperands.erase(indexOperands.begin());
+  }
+
   // NOTE: GEPOp has the following syntax (some details omitted):
   // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
   // When you iterate through the indices, it also returns indices from left
@@ -303,8 +318,7 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
   //
   // However, memref::LoadOp and memref::StoreOp must have their indices
   // match the memref. So here we need to fill in the constant zeros.
-  int remainingConstZeros =
-      memrefType.getShape().size() - gepInst->getNumIndices();
+  int remainingConstZeros = memrefType.getShape().size() - indexOperands.size();
   assert(remainingConstZeros >= 0 &&
          "GEP should only omit indices, but shouldn't have more indices than "
          "the original memref type extracted from the function argument!");
@@ -422,6 +436,25 @@ void ImportLLVMModule::translateStoreWithZeroIndices(
   translateDepAttr(storeInst, newOp, *ctx, builder);
 }
 
+void ImportLLVMModule::translateAllocaOp(llvm::AllocaInst *allocaInst) {
+  Location loc = UnknownLoc::get(ctx);
+
+  SmallVector<int64_t> shape;
+  llvm::Type *baseElementType = allocaInst->getAllocatedType();
+
+  while (baseElementType->isArrayTy()) {
+    shape.push_back(baseElementType->getArrayNumElements());
+    baseElementType = baseElementType->getArrayElementType();
+  }
+
+  auto memrefType =
+      MemRefType::get(shape, convertLLVMTypeToMLIR(baseElementType, ctx));
+
+  auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
+
+  valueMapping[allocaInst] = allocaOp->getResult(0);
+}
+
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   inst->dump();
 
@@ -454,6 +487,8 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
         loc, resType, {condition, trueOperand, falseOperand}, inst);
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
     translateBranchInst(branchInst);
+  } else if (auto *allocaOp = dyn_cast<llvm::AllocaInst>(inst)) {
+    translateAllocaOp(allocaOp);
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMapping[inst->getOperand(0)];
