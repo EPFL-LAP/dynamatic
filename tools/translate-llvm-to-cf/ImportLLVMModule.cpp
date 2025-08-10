@@ -207,12 +207,22 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     switch (binaryOp->getOpcode()) {
       // clang-format off
       case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FAdd:  naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FMul:  naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
       case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
       // clang-format on
     default: {
       llvm_unreachable("Not implemented");
@@ -226,6 +236,12 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
       // clang-format off
       case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
       case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
+      case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
+      case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
       // clang-format on
     default:
       llvm_unreachable("Not implemented");
@@ -233,6 +249,10 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
 
   } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
     translateGEPOp(gepInst);
+  } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
+    // NOTE: This condition handles a special case where a load only has
+    // constant indices, e.g., tmp = mat[0][0].
+
   } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
     mlir::Value lhs = valueMapping[inst->getOperand(0)];
     mlir::Value rhs = valueMapping[inst->getOperand(1)];
@@ -249,15 +269,52 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
       case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
       case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
       case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
+
+      default: llvm_unreachable("Unsupported ICMP predicate");
       // clang-format on
-    default:
-      // Handle unknown predicate or assert
-      llvm_unreachable("Unsupported ICMP predicate");
     }
 
     auto op = builder.create<arith::CmpIOp>(loc, pred, lhs, rhs);
     addMapping(inst, op.getResult());
     loc = op.getLoc();
+  } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
+    mlir::Value lhs = valueMapping[inst->getOperand(0)];
+    mlir::Value rhs = valueMapping[inst->getOperand(1)];
+    arith::CmpFPredicate pred;
+
+    switch (fcmpInst->getPredicate()) {
+      // clang-format off
+      // Ordered comparisons
+      case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
+      case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
+      case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
+      case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
+      case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
+      case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
+
+      // Ordered / unordered special checks
+      case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
+      case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
+
+      // Unordered comparisons
+      case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
+      case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
+      case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
+      case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
+      case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
+      case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
+
+      // No comparison (always false/true)
+      case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
+      case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
+
+      default: llvm_unreachable("Unsupported FCMP predicate");
+      // clang-format on
+    }
+    auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
+    addMapping(inst, op.getResult());
+    loc = op.getLoc();
+
   } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
     mlir::Value condition = valueMapping[inst->getOperand(0)];
     mlir::Value trueOperand = valueMapping[inst->getOperand(1)];
