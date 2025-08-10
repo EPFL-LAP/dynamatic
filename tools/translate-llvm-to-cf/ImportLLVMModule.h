@@ -43,6 +43,8 @@ using namespace mlir;
 
 class ImportLLVMModule {
 
+  StringRef funcName;
+
   mlir::ModuleOp mlirModule;
 
   llvm::Module *llvmModule;
@@ -87,14 +89,18 @@ class ImportLLVMModule {
 public:
   ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
                    OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
-                   MLIRContext *ctx)
-      : mlirModule(mlirModule), llvmModule(llvmModule), builder(builder),
-        ctx(ctx), argMap(argMap){};
+                   MLIRContext *ctx, StringRef funcName)
+      : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
+        builder(builder), ctx(ctx), argMap(argMap){};
 
   void translateModule() {
     for (auto &f : llvmModule->functions()) {
       if (f.isDeclaration())
         continue;
+
+      if (f.getName() != funcName)
+        continue;
+
       translateLLVMFunction(&f);
     }
   }

@@ -208,6 +208,8 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
       // clang-format off
       case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FAdd:  naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FMul:  naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
       case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
       case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
@@ -299,8 +301,12 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     }
 
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
-    mlir::Value arg = valueMapping[inst->getOperand(0)];
-    builder.create<func::ReturnOp>(loc, arg);
+    if (returnOp->getNumOperands() == 1) {
+      mlir::Value arg = valueMapping[inst->getOperand(0)];
+      builder.create<func::ReturnOp>(loc, arg);
+    } else {
+      builder.create<func::ReturnOp>(loc);
+    }
   }
 
   else {

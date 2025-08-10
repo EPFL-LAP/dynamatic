@@ -55,6 +55,9 @@ static cl::opt<std::string>
 static cl::opt<std::string> csource("csource", cl::desc("C source file name"),
                                     cl::value_desc("filename"), cl::init("-"));
 
+static cl::opt<std::string> funcName("function-name", cl::desc("Function name"),
+                                     cl::value_desc("name"), cl::init("-"));
+
 static cl::opt<std::string> dynamaticPath("dynamatic-path",
                                           cl::desc("Dynamatic path"),
                                           cl::value_desc("path name"),
@@ -108,7 +111,7 @@ int main(int argc, char **argv) {
       inferArgTypes(csource, dynamaticPath + "/include");
 
   ImportLLVMModule importer(llvmModule.get(), module, builder,
-                            nameToArgTypesMap, &context);
+                            nameToArgTypesMap, &context, funcName);
   importer.translateModule();
 
   if (failed(module.verify())) {

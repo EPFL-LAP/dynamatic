@@ -94,6 +94,7 @@ $LLVM_BINS/opt $OUT/clang_optimized.ll -S \
 
 $DYNAMATIC_BINS/translate-llvm-to-cf \
   "$OUT/clang_optimized_dep_marked.ll" \
+  -function-name "$FUNC_NAME" \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
    -o $OUT/std.mlir
