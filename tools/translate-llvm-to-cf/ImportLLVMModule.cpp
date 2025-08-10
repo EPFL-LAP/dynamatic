@@ -5,12 +5,17 @@
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
 
 mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
                                  mlir::MLIRContext *context) {
@@ -54,8 +59,6 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
 
   // Note: funcType and the actual function arguments (i.e., the arguments of
   // the first block) are two separate concepts:
-
-  unsigned i = 0;
 
   for (auto [llvmArg, mlirArg] :
        llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
@@ -122,6 +125,72 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
   }
 }
 
+void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
+  // Check if the GEP is not chained
+  mlir::Value baseAddress = valueMapping[gepInst->getPointerOperand()];
+  SmallVector<mlir::Value, 4> indexOperands;
+
+  auto memrefType = baseAddress.getType().dyn_cast<MemRefType>();
+
+  if (!memrefType)
+    llvm_unreachable("GEP should take memref as reference");
+
+  for (auto &indexUse : gepInst->indices()) {
+    llvm::Value *indexValue = indexUse;
+    mlir::Value mlirIndexValue = valueMapping[indexValue];
+    // NOTE: memref::LoadOp and memref::StoreOp expect their indices to be of
+    // IndexType. Therefore, we cast the i32/i64 indices to IndexType. This
+    // pattern will later be folded in the bitwidth optimization pass.
+    auto idxCastOp = builder.create<arith::IndexCastOp>(
+        UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
+    indexOperands.push_back(idxCastOp);
+  }
+  // NOTE: GEPOp has the following syntax (some details omitted):
+  // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
+  // When you iterate through the indices, it also returns indices from left
+  // to right. However, the following two syntaxes are equivalent in LLVM:
+  // - (1) GEPop %basePtr, %firstDim, 0, 0
+  // - (2) GEPop %basePtr, %firstDim
+  // Notice that, in the second example, the trailing constant 0s are omitted.
+  // Source:
+  // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
+  //
+  // However, memref::LoadOp and memref::StoreOp must have their indices
+  // match the memref. So here we need to fill in the constant zeros.
+  int remainingConstZeros =
+      memrefType.getShape().size() - gepInst->getNumIndices();
+  assert(remainingConstZeros >= 0 &&
+         "GEP should only omit indices, but shouldn't have more indices than "
+         "the original memref type extracted from the function argument!");
+  for (int i = 0; i < remainingConstZeros; i++) {
+    auto constZeroOp = builder.create<arith::ConstantOp>(
+        UnknownLoc::get(ctx), builder.getI64IntegerAttr(0));
+    auto idxCastOp = builder.create<arith::IndexCastOp>(
+        UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
+    indexOperands.push_back(idxCastOp);
+  }
+
+  for (auto *user : gepInst->users()) {
+    if (isa<GetElementPtrInst>(user)) {
+      llvm_unreachable(
+          "Invalid GEP -> GEP pattern detected! It is assumed that this kind "
+          "of pattern is canonicalized away using instcombine pass.");
+    } else if (auto *loadInst = dyn_cast<LoadInst>(user)) {
+      auto newLoadOp = builder.create<memref::LoadOp>(
+          UnknownLoc::get(ctx), convertLLVMTypeToMLIR(loadInst->getType(), ctx),
+          baseAddress, ValueRange(indexOperands));
+      valueMapping[user] = newLoadOp.getResult();
+      converted.insert(loadInst);
+    } else if (auto *storeInst = dyn_cast<StoreInst>(user)) {
+
+      auto storeValue = valueMapping[storeInst->getValueOperand()];
+      builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue,
+                                      baseAddress, indexOperands);
+      converted.insert(storeInst);
+    }
+  }
+}
+
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   inst->dump();
 
@@ -160,6 +229,8 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
       llvm_unreachable("Not implemented");
     }
 
+  } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
+    translateGEPOp(gepInst);
   } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
     mlir::Value lhs = valueMapping[inst->getOperand(0)];
     mlir::Value rhs = valueMapping[inst->getOperand(1)];
