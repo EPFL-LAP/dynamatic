@@ -909,13 +909,15 @@ static void insertDirectSuppression(
     fCons = enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
   if (accountMuxCondition) {
-    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        bi.getBlockCondition(muxCondition.getDefiningOp()->getBlock()));
+
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+    BoolExpression *selectOperandCondition =
+        BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
 
     // The condition must be taken into account for `fCons` only if the
     // producer is not control dependent from the block which produces the
     // condition of the mux
-    if (!prodControlDeps.contains(muxCondition.getParentBlock())) {
+    if (!prodControlDeps.contains(muxConditionBlock)) {
       if (consumer->getOperand(1) == connection)
         fCons = BoolExpression::boolAnd(fCons,
                                         selectOperandCondition->boolNegate());
