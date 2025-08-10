@@ -3,6 +3,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
@@ -10,7 +11,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
@@ -140,6 +143,54 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
             valueMapping[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
+        }
+
+        if (auto *localConst = dyn_cast<llvm::GlobalVariable>(val)) {
+          auto *baseElementType = localConst->getInitializer()->getType();
+
+          SmallVector<int64_t> shape;
+
+          while (baseElementType->isArrayTy()) {
+            shape.push_back(baseElementType->getArrayNumElements());
+            baseElementType = baseElementType->getArrayElementType();
+          }
+
+          auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElementType, ctx);
+
+          auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+
+          auto *init = localConst->getInitializer();
+
+          auto *arrType = llvm::dyn_cast<llvm::ArrayType>(init->getType());
+
+          llvm::SmallVector<mlir::Attribute> values;
+          values.reserve(arrType->getNumElements());
+
+          for (unsigned i = 0; i < arrType->getNumElements(); ++i) {
+
+            auto *elem = init->getAggregateElement(i);
+            if (auto *constInt = llvm::dyn_cast<llvm::ConstantInt>(elem)) {
+              values.push_back(mlir::IntegerAttr::get(
+                  baseMLIRElemType, constInt->getSExtValue()));
+            } else if (auto *constFloat =
+                           llvm::dyn_cast<llvm::ConstantFP>(elem)) {
+              values.push_back(mlir::FloatAttr::get(baseMLIRElemType,
+                                                    constFloat->getValueAPF()));
+
+            } else {
+              llvm_unreachable("Unhandled base element type.");
+            }
+          }
+
+          auto denseAttr = mlir::DenseElementsAttr::get(
+              mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
+
+          auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
+
+          // setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+          //     allocaOp, ctx, denseAttr);
+
+          llvm::errs() << localConst << " what do we do?\n";
         }
       }
     }
@@ -451,19 +502,15 @@ void ImportLLVMModule::translateAllocaOp(llvm::AllocaInst *allocaInst) {
       MemRefType::get(shape, convertLLVMTypeToMLIR(baseElementType, ctx));
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
-
   valueMapping[allocaInst] = allocaOp->getResult(0);
 }
 
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   inst->dump();
-
   Location loc = UnknownLoc::get(ctx);
-
   if (converted.count(inst)) {
     return;
   }
-
   if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
     translateBinaryInst(binaryOp);
   } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
@@ -511,30 +558,13 @@ void ImportLLVMModule::translateLLVMFunction(llvm::Function *llvmFunc) {
   SmallVector<mlir::Type> argTypes =
       getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
 
-  // SmallVector<mlir::Type> argTypes;
-  // for (auto &arg : llvmFunc->args()) {
-  //   argTypes.push_back(convertLLVMTypeToMLIR(arg.getType(), ctx));
-  // }
-
-  llvm::errs() << "Available dialects:\n";
-
-  for (auto str : ctx->getAvailableDialects()) {
-    llvm::errs() << str << "\n";
-  }
-
   builder.setInsertionPointToEnd(mlirModule.getBody());
 
   auto funcType = builder.getFunctionType(argTypes, {builder.getI32Type()});
   auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
                                              llvmFunc->getName(), funcType);
 
-  funcOp.dump();
-
   initializeBlocksAndBlockMapping(llvmFunc, funcOp);
-  llvm::errs() << "LLVM IR, # arguments" << llvmFunc->arg_size() << "\n";
-  llvm::errs() << "MLIR IR, # arguments" << funcOp.getNumArguments() << "\n";
-  llvm::errs() << "MLIR IR, # arguments block"
-               << funcOp.getBlocks().front().getNumArguments() << "\n";
 
   auto &entryBlock = funcOp.getBody().front();
   builder.setInsertionPointToStart(&entryBlock);
