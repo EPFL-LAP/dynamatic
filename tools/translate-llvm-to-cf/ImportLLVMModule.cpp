@@ -125,6 +125,132 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
   }
 }
 
+void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
+  Location loc = UnknownLoc::get(ctx);
+  mlir::Value lhs = valueMapping[inst->getOperand(0)];
+  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+  switch (inst->getOpcode()) {
+    // clang-format off
+      case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
+      case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
+      case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
+    // clang-format on
+  default: {
+    llvm::errs() << "Not yet handled binary operation type "
+                 << inst->getOpcodeName() << "\n";
+    llvm_unreachable("Not handled operation type");
+  }
+  }
+}
+
+void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
+  Location loc = UnknownLoc::get(ctx);
+  mlir::Value arg = valueMapping[inst->getOperand(0)];
+  mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+
+  switch (inst->getOpcode()) {
+    // clang-format off
+      case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
+      case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
+      case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
+      case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
+    // clang-format on
+  default: {
+    llvm::errs() << "Not yet handled binary operation type "
+                 << inst->getOpcodeName() << "\n";
+    llvm_unreachable("Not implemented");
+  }
+  }
+}
+
+void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
+  Location loc = UnknownLoc::get(ctx);
+
+  mlir::Value lhs = valueMapping[inst->getOperand(0)];
+  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  arith::CmpIPredicate pred;
+  switch (inst->getPredicate()) {
+    // clang-format off
+      case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
+      case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
+      case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
+      case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
+      case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
+      case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
+      case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
+      case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
+      case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
+      case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
+
+      default: llvm_unreachable("Unsupported ICMP predicate");
+    // clang-format on
+  }
+
+  auto op = builder.create<arith::CmpIOp>(loc, pred, lhs, rhs);
+  addMapping(inst, op.getResult());
+  loc = op.getLoc();
+}
+
+void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
+
+  Location loc = UnknownLoc::get(ctx);
+  mlir::Value lhs = valueMapping[inst->getOperand(0)];
+  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  arith::CmpFPredicate pred;
+
+  switch (inst->getPredicate()) {
+    // clang-format off
+      // Ordered comparisons
+      case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
+      case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
+      case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
+      case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
+      case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
+      case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
+
+      // Ordered / unordered special checks
+      case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
+      case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
+
+      // Unordered comparisons
+      case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
+      case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
+      case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
+      case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
+      case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
+      case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
+
+      // No comparison (always false/true)
+      case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
+      case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
+
+      default: llvm_unreachable("Unsupported FCMP predicate");
+    // clang-format on
+  }
+  auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
+  addMapping(inst, op.getResult());
+  loc = op.getLoc();
+}
+
 void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
   // Check if the GEP is not chained
   mlir::Value baseAddress = valueMapping[gepInst->getPointerOperand()];
@@ -191,6 +317,86 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
   }
 }
 
+void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
+  BasicBlock *currLLVMBB = inst->getParent();
+  Location loc = UnknownLoc::get(ctx);
+  if (inst->isUnconditional()) {
+    BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
+    assert(nextLLVMBB &&
+           "The unconditional branch doesn't have a BB as operand!");
+    auto op = builder.create<cf::BranchOp>(
+        loc, blockMapping[nextLLVMBB],
+        getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB));
+    loc = op.getLoc();
+  } else {
+    // NOTE: operands of the branch instruction [Cond, FalseDest,] TrueDest
+    // (from the C++ API).
+    BasicBlock *falseDestBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(1));
+    assert(falseDestBB);
+    BasicBlock *trueDestBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(2));
+    assert(trueDestBB);
+    SmallVector<mlir::Value> falseOperands =
+        getBranchOperandsForCFGEdge(currLLVMBB, falseDestBB);
+    SmallVector<mlir::Value> trueOperands =
+        getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
+
+    mlir::Value condition = valueMapping[inst->getCondition()];
+
+    auto op = builder.create<cf::CondBranchOp>(
+        loc, condition, blockMapping[trueDestBB], trueOperands,
+        blockMapping[falseDestBB], falseOperands);
+    loc = op.getLoc();
+  }
+}
+
+void ImportLLVMModule::translateLoadWithZeroIndices(llvm::LoadInst *loadInst) {
+  Location loc = UnknownLoc::get(ctx);
+  // NOTE: This condition handles a special case where a load only has
+  // constant indices, e.g., tmp = mat[0][0].
+  auto *instAddr = loadInst->getPointerOperand();
+  if (isa<GetElementPtrInst>(instAddr))
+    llvm_unreachable(
+        "Converting a load but the producer hasn't been converted yet!");
+  mlir::Value addressVal = valueMapping[instAddr];
+  auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+
+  SmallVector<mlir::Value> indexValues;
+  int constZerosToAdd = memrefType.getShape().size();
+  for (int i = 0; i < constZerosToAdd; i++) {
+    auto constZeroOp =
+        builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(0));
+    indexValues.push_back(constZeroOp);
+  }
+  mlir::Type resType = convertLLVMTypeToMLIR(loadInst->getType(), ctx);
+  auto newOp =
+      builder.create<memref::LoadOp>(loc, resType, addressVal, indexValues);
+  valueMapping[loadInst] = newOp.getResult();
+}
+
+void ImportLLVMModule::translateStoreWithZeroIndices(
+    llvm::StoreInst *storeInst) {
+  Location loc = UnknownLoc::get(ctx);
+  // NOTE: This condition handles a special case where a load only has
+  // constant indices, e.g., tmp = mat[0][0].
+  auto *instAddr = storeInst->getPointerOperand();
+  if (isa<GetElementPtrInst>(instAddr))
+    llvm_unreachable(
+        "Converting a load but the producer hasn't been converted yet!");
+  mlir::Value addressVal = valueMapping[instAddr];
+  auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+
+  SmallVector<mlir::Value> indexValues;
+  int constZerosToAdd = memrefType.getShape().size();
+  for (int i = 0; i < constZerosToAdd; i++) {
+    auto constZeroOp =
+        builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(0));
+    indexValues.push_back(constZeroOp);
+  }
+  mlir::Value storeValue = valueMapping[storeInst->getValueOperand()];
+
+  builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
+}
+
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   inst->dump();
 
@@ -201,120 +407,19 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   }
 
   if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
-    mlir::Value lhs = valueMapping[inst->getOperand(0)];
-    mlir::Value rhs = valueMapping[inst->getOperand(1)];
-    mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
-    switch (binaryOp->getOpcode()) {
-      // clang-format off
-      case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
-      // clang-format on
-    default: {
-      llvm_unreachable("Not implemented");
-    }
-    }
+    translateBinaryInst(binaryOp);
   } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
-    mlir::Value arg = valueMapping[inst->getOperand(0)];
-    mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
-
-    switch (castOp->getOpcode()) {
-      // clang-format off
-      case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
-      case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
-      case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
-      // clang-format on
-    default:
-      llvm_unreachable("Not implemented");
-    }
-
+    translateCastInst(castOp);
   } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
     translateGEPOp(gepInst);
   } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
-    // NOTE: This condition handles a special case where a load only has
-    // constant indices, e.g., tmp = mat[0][0].
-
+    translateLoadWithZeroIndices(loadInst);
+  } else if (auto *storeInst = dyn_cast<llvm::StoreInst>(inst)) {
+    translateStoreWithZeroIndices(storeInst);
   } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
-    mlir::Value lhs = valueMapping[inst->getOperand(0)];
-    mlir::Value rhs = valueMapping[inst->getOperand(1)];
-    arith::CmpIPredicate pred;
-    switch (icmpInst->getPredicate()) {
-      // clang-format off
-      case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
-      case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
-      case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
-      case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
-      case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
-      case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
-      case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
-      case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
-      case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
-      case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
-
-      default: llvm_unreachable("Unsupported ICMP predicate");
-      // clang-format on
-    }
-
-    auto op = builder.create<arith::CmpIOp>(loc, pred, lhs, rhs);
-    addMapping(inst, op.getResult());
-    loc = op.getLoc();
+    translateICmpInst(icmpInst);
   } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
-    mlir::Value lhs = valueMapping[inst->getOperand(0)];
-    mlir::Value rhs = valueMapping[inst->getOperand(1)];
-    arith::CmpFPredicate pred;
-
-    switch (fcmpInst->getPredicate()) {
-      // clang-format off
-      // Ordered comparisons
-      case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
-      case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
-      case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
-      case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
-      case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
-      case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
-
-      // Ordered / unordered special checks
-      case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
-      case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
-
-      // Unordered comparisons
-      case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
-      case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
-      case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
-      case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
-      case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
-      case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
-
-      // No comparison (always false/true)
-      case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
-      case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
-
-      default: llvm_unreachable("Unsupported FCMP predicate");
-      // clang-format on
-    }
-    auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
-    addMapping(inst, op.getResult());
-    loc = op.getLoc();
-
+    translateFCmpInst(fcmpInst);
   } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
     mlir::Value condition = valueMapping[inst->getOperand(0)];
     mlir::Value trueOperand = valueMapping[inst->getOperand(1)];
@@ -323,40 +428,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     naiveTranslation<arith::SelectOp>(
         loc, resType, {condition, trueOperand, falseOperand}, inst);
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
-
-    BasicBlock *currLLVMBB = branchInst->getParent();
-
-    if (branchInst->isUnconditional()) {
-      BasicBlock *nextLLVMBB =
-          dyn_cast_or_null<BasicBlock>(branchInst->getOperand(0));
-      assert(nextLLVMBB &&
-             "The unconditional branch doesn't have a BB as operand!");
-      auto op = builder.create<cf::BranchOp>(
-          loc, blockMapping[nextLLVMBB],
-          getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB));
-      loc = op.getLoc();
-    } else {
-      // NOTE: operands of the branch instruction [Cond, FalseDest,] TrueDest
-      // (from the C++ API).
-      BasicBlock *falseDestBB =
-          dyn_cast_or_null<BasicBlock>(branchInst->getOperand(1));
-      assert(falseDestBB);
-      BasicBlock *trueDestBB =
-          dyn_cast_or_null<BasicBlock>(branchInst->getOperand(2));
-      assert(trueDestBB);
-      SmallVector<mlir::Value> falseOperands =
-          getBranchOperandsForCFGEdge(currLLVMBB, falseDestBB);
-      SmallVector<mlir::Value> trueOperands =
-          getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
-
-      mlir::Value condition = valueMapping[branchInst->getCondition()];
-
-      auto op = builder.create<cf::CondBranchOp>(
-          loc, condition, blockMapping[trueDestBB], trueOperands,
-          blockMapping[falseDestBB], falseOperands);
-      loc = op.getLoc();
-    }
-
+    translateBranchInst(branchInst);
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMapping[inst->getOperand(0)];
@@ -364,9 +436,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     } else {
       builder.create<func::ReturnOp>(loc);
     }
-  }
-
-  else {
+  } else {
     llvm_unreachable("Not implemented");
   }
 

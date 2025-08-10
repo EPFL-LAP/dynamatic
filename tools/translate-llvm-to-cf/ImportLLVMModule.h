@@ -79,9 +79,18 @@ class ImportLLVMModule {
   void createConstants(llvm::Function *llvmFunc);
   void translateLLVMFunction(llvm::Function *llvmFunc);
 
+  // Dispatches to specialized functions:
   void translateOperation(llvm::Instruction *inst);
 
+  // Specialized translation functions:
+  void translateBinaryInst(llvm::BinaryOperator *inst);
+  void translateCastInst(llvm::CastInst *inst);
+  void translateICmpInst(llvm::ICmpInst *inst);
+  void translateFCmpInst(llvm::FCmpInst *inst);
+  void translateBranchInst(llvm::BranchInst *inst);
   void translateGEPOp(llvm::GetElementPtrInst *gepInst);
+  void translateLoadWithZeroIndices(llvm::LoadInst *loadInst);
+  void translateStoreWithZeroIndices(llvm::StoreInst *storeInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
                                                        BasicBlock *nextBB);
