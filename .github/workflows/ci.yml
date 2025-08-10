@@ -1,10 +1,10 @@
 name: CI
 
-# on:
-#   # Make sure that settings are set to require permission
-#   # to run workflows by external contributors!
-#   pull_request:
-#     branches: ["main"]
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
 
 jobs:
   integration:
