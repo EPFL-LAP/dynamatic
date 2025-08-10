@@ -5,11 +5,13 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(translate-llvm-to-cf
   translate-llvm-to-cf.cpp
   ImportLLVMModule.cpp
+  InferArgTypes.cpp
 )
 
 llvm_update_compile_flags(translate-llvm-to-cf)
 target_link_libraries(translate-llvm-to-cf
   PRIVATE
+  DynamaticSupport
   DynamaticHandshake
   DynamaticExperimentalSupport
 
@@ -31,6 +33,8 @@ target_link_libraries(translate-llvm-to-cf
   LLVMCore
   LLVMSupport
   LLVMAnalysis
+
+  libclang
 )
 
 if(DYNAMATIC_ENABLE_XLS)

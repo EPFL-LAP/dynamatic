@@ -19,6 +19,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "InferArgTypes.h"
 #include "dynamatic/InitAllDialects.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -50,6 +51,14 @@ using namespace mlir;
 
 static cl::opt<std::string>
     inputFilename(cl::Positional, cl::desc("<input .ll file>"), cl::Required);
+
+static cl::opt<std::string> csource("csource", cl::desc("C source file name"),
+                                    cl::value_desc("filename"), cl::init("-"));
+
+static cl::opt<std::string> dynamaticPath("dynamatic-path",
+                                          cl::desc("Dynamatic path"),
+                                          cl::value_desc("path name"),
+                                          cl::init("-"));
 
 static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
                                            cl::value_desc("filename"),
@@ -95,7 +104,11 @@ int main(int argc, char **argv) {
   auto module = builder.create<ModuleOp>(builder.getUnknownLoc());
   // auto module = ModuleOp::create(builder.getUnknownLoc());
 
-  ImportLLVMModule importer(llvmModule.get(), module, builder, &context);
+  FuncNameToCFuncArgsMap nameToArgTypesMap =
+      inferArgTypes(csource, dynamaticPath + "/include");
+
+  ImportLLVMModule importer(llvmModule.get(), module, builder,
+                            nameToArgTypesMap, &context);
   importer.translateModule();
 
   if (failed(module.verify())) {

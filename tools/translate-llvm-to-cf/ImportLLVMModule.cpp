@@ -228,10 +228,14 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
 }
 
 void ImportLLVMModule::translateLLVMFunction(llvm::Function *llvmFunc) {
-  SmallVector<mlir::Type> argTypes;
-  for (auto &arg : llvmFunc->args()) {
-    argTypes.push_back(convertLLVMTypeToMLIR(arg.getType(), ctx));
-  }
+
+  SmallVector<mlir::Type> argTypes =
+      getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
+
+  // SmallVector<mlir::Type> argTypes;
+  // for (auto &arg : llvmFunc->args()) {
+  //   argTypes.push_back(convertLLVMTypeToMLIR(arg.getType(), ctx));
+  // }
 
   llvm::errs() << "Available dialects:\n";
 

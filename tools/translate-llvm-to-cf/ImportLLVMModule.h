@@ -19,6 +19,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "InferArgTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -54,6 +55,8 @@ class ImportLLVMModule {
 
   mlir::DenseMap<llvm::Value *, mlir::Value> valueMapping;
 
+  FuncNameToCFuncArgsMap &argMap;
+
   void addMapping(llvm::Value *llvmVal, mlir::Value mlirVal) {
     valueMapping[llvmVal] = mlirVal;
   }
@@ -81,9 +84,10 @@ class ImportLLVMModule {
 
 public:
   ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
-                   OpBuilder &builder, MLIRContext *ctx)
+                   OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
+                   MLIRContext *ctx)
       : mlirModule(mlirModule), llvmModule(llvmModule), builder(builder),
-        ctx(ctx){};
+        ctx(ctx), argMap(argMap){};
 
   void translateModule() {
     for (auto &f : llvmModule->functions()) {
