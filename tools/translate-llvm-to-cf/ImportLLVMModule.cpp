@@ -132,23 +132,23 @@ void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
   mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
   switch (inst->getOpcode()) {
     // clang-format off
-      case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
-      case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
-      case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
+    case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
     // clang-format on
   default: {
     llvm::errs() << "Not yet handled binary operation type "
@@ -165,14 +165,14 @@ void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
 
   switch (inst->getOpcode()) {
     // clang-format off
-      case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
-      case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
-      case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
-      case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
+    case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
+    case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
+    case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
     // clang-format on
   default: {
     llvm::errs() << "Not yet handled binary operation type "
@@ -190,18 +190,18 @@ void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
   arith::CmpIPredicate pred;
   switch (inst->getPredicate()) {
     // clang-format off
-      case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
-      case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
-      case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
-      case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
-      case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
-      case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
-      case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
-      case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
-      case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
-      case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
+    case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
+    case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
+    case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
+    case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
+    case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
+    case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
+    case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
+    case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
+    case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
+    case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
 
-      default: llvm_unreachable("Unsupported ICMP predicate");
+    default: llvm_unreachable("Unsupported ICMP predicate");
     // clang-format on
   }
 
@@ -219,31 +219,31 @@ void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
 
   switch (inst->getPredicate()) {
     // clang-format off
-      // Ordered comparisons
-      case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
-      case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
-      case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
-      case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
-      case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
-      case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
+    // Ordered comparisons
+    case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
+    case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
+    case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
+    case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
+    case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
+    case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
 
-      // Ordered / unordered special checks
-      case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
-      case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
+    // Ordered / unordered special checks
+    case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
+    case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
 
-      // Unordered comparisons
-      case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
-      case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
-      case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
-      case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
-      case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
-      case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
+    // Unordered comparisons
+    case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
+    case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
+    case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
+    case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
+    case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
+    case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
 
-      // No comparison (always false/true)
-      case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
-      case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
+    // No comparison (always false/true)
+    case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
+    case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
 
-      default: llvm_unreachable("Unsupported FCMP predicate");
+    default: llvm_unreachable("Unsupported FCMP predicate");
     // clang-format on
   }
   auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
