@@ -465,7 +465,11 @@ static std::string hashCycle(const Cycle &cycle) {
 // DFS cycle detection
 void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
                     llvm::SmallPtrSetImpl<Operation *> &recursionStack,
+                    llvm::SmallPtrSetImpl<Operation *> &visited,
                     CycleList &cycles, llvm::StringSet<> &seenCycleHashes) {
+  // If already fully processed, skip
+  if (visited.contains(op))
+    return;
 
   recursionStack.insert(op);
   stack.push_back(op);
@@ -479,7 +483,8 @@ void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
         continue;
 
       if (!recursionStack.contains(nextOp))
-        findCyclesFrom(nextOp, stack, recursionStack, cycles, seenCycleHashes);
+        findCyclesFrom(nextOp, stack, recursionStack, visited, cycles,
+                       seenCycleHashes);
       else {
         // nextOp is already visited indicating a cycle
         auto it = std::find(stack.begin(), stack.end(), nextOp);
@@ -502,11 +507,13 @@ void findCyclesFrom(Operation *op, llvm::SmallVectorImpl<Operation *> &stack,
 
   recursionStack.erase(op);
   stack.pop_back();
+  visited.insert(op);
 }
 
 CycleList findAllCycles(handshake::FuncOp funcOp) {
   CycleList cycles;
   llvm::SmallPtrSet<Operation *, 32> recursionStack;
+  llvm::SmallPtrSet<Operation *, 32> visited;
   llvm::SmallVector<Operation *, 32> stack;
   llvm::StringSet<> seenCycleHashes;
 
@@ -514,8 +521,8 @@ CycleList findAllCycles(handshake::FuncOp funcOp) {
     // we do not care of cycles created around mcs and lsqs
     if (isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op))
       continue;
-
-    findCyclesFrom(&op, stack, recursionStack, cycles, seenCycleHashes);
+    findCyclesFrom(&op, stack, recursionStack, visited, cycles,
+                   seenCycleHashes);
   }
 
   return cycles;
@@ -699,10 +706,14 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
   unsigned numExecs;
 
   // Identify the cycles and the backward channels in your circuit
+  llvm::errs() << "\nBefore findALlCycles\n";
   CycleList circuitCycles = findAllCycles(info.funcOp);
-  // printCycles(circuitCycles);
+  llvm::errs() << "\nAfter findALlCycles\n";
+  printCycles(circuitCycles);
   DenseSet<Value> backwardChannels = findBackwardChannelPerCycle(circuitCycles);
-  // printBackwardChannels(backwardChannels);
+  printBackwardChannels(backwardChannels);
+
+  // DenseSet<Value> backwardChannels;
 
   do {
     // Clear the sets of selected archs and BBs
