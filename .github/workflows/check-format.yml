@@ -22,7 +22,7 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install clang-format-20
           git fetch origin main --no-recurse-submodules
-          git clang-format-20 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         if: success() || failure()
