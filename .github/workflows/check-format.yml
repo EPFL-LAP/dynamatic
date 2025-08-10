@@ -23,6 +23,7 @@ jobs:
           sudo apt-get -y install clang-format-20
           sudo rm /usr/bin/clang-format
           sudo ln -s $(which clang-format-20) /usr/bin/clang-format
+          clang-format --version
           git fetch origin main --no-recurse-submodules
           git clang-format-20 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
