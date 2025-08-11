@@ -112,9 +112,9 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
   }
 }
 
-void retrieveValue(llvm::Constant *constValue,
-                   SmallVector<mlir::Attribute> &values,
-                   const mlir::Type &baseMLIRElemType) {
+void convertInitializerToDenseElemAttrRecursive(
+    llvm::Constant *constValue, SmallVector<mlir::Attribute> &values,
+    const mlir::Type &baseMLIRElemType) {
   auto *arrType = llvm::dyn_cast<llvm::ArrayType>(constValue->getType());
   for (unsigned i = 0; i < arrType->getNumElements(); ++i) {
     auto *elem = constValue->getAggregateElement(i);
@@ -126,7 +126,8 @@ void retrieveValue(llvm::Constant *constValue,
           mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
     } else if (auto *constArray =
                    llvm::dyn_cast<llvm::ConstantDataArray>(elem)) {
-      retrieveValue(elem, values, baseMLIRElemType);
+      convertInitializerToDenseElemAttrRecursive(elem, values,
+                                                 baseMLIRElemType);
     } else {
       llvm::errs() << "Unhandled constant element type:\n";
       elem->dump();
@@ -150,7 +151,8 @@ convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
   auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElementType, ctx);
   SmallVector<mlir::Attribute> values;
   values.reserve(numElems);
-  retrieveValue(globVar->getInitializer(), values, baseMLIRElemType);
+  convertInitializerToDenseElemAttrRecursive(globVar->getInitializer(), values,
+                                             baseMLIRElemType);
   auto denseAttr = mlir::DenseElementsAttr::get(
       mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
   return denseAttr;
