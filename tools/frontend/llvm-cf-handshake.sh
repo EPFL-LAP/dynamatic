@@ -15,6 +15,8 @@ LLVM=$DYNAMATIC_PATH/polygeist/llvm-project
 
 LLVM_BINS=$LLVM/build/bin
 
+export PATH=$PATH:$LLVM_BINS
+
 [ -f "$F_SRC" ] || { echo "$F_SRC is not a file!"; exit 1;}
 
 # Will be change to standard path in the future (i.e., out/comp).
@@ -163,36 +165,22 @@ $LLVM_BINS/opt -S \
   $OUT/clang_array_partitioned_cleaned.ll \
   > $OUT/clang_optimized_dep_marked.ll
 
-$LLVM_BINS/mlir-translate \
-  --import-llvm $OUT/clang_optimized_dep_marked.ll \
-  > $OUT/clang_optimized_translated.mlir
-
-# The llvm -> mlir translation does not carry the dependency information (and
-# any meta data in general), therefore, the "--llvm-mark-memory-dependencies"
-# post-processes the converted mlir file and put the dependency information
-# there 
-$DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/clang_optimized_translated.mlir \
-  --remove-polygeist-attributes \
-  --llvm-mark-memory-dependencies="llvmir=$OUT/clang_optimized_dep_marked.ll" \
-  --allow-unregistered-dialect \
-  > $OUT/clang_optimized_translated_dep_marked.mlir
+$DYNAMATIC_BINS/translate-llvm-to-cf \
+  "$OUT/clang_optimized_dep_marked.ll" \
+  -function-name "$FUNC_NAME" \
+  -csource "$F_SRC" \
+  -dynamatic-path "$DYNAMATIC_PATH" \
+   -o $OUT/cf.mlir
 
 # - drop-unlist-functions: Dropping the functions that are not needed in HLS
 # compilation
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/clang_optimized_translated_dep_marked.mlir \
-  --remove-polygeist-attributes \
-  --drop-unlisted-functions="function-names=$FUNC_NAME" \
-  > $OUT/clang_optimized_translated_droped_main_removed_attributes.mlir \
-
-$DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/clang_optimized_translated_droped_main_removed_attributes.mlir \
-  --convert-llvm-to-cf="source=$F_SRC dynamatic-path=$DYNAMATIC_PATH" \
-  > $OUT/cf.mlir
-
-$DYNAMATIC_BINS/dynamatic-opt \
   $OUT/cf.mlir \
+  --drop-unlisted-functions="function-names=$FUNC_NAME" \
+  > $OUT/cf_drop_unlisted_functions.mlir \
+
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/cf_drop_unlisted_functions.mlir \
   --func-set-arg-names="source=$F_SRC" \
   --flatten-memref-row-major \
   --canonicalize \
