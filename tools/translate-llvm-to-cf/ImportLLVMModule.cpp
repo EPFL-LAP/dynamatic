@@ -14,6 +14,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
@@ -21,6 +22,7 @@
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cstdint>
 
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/MemoryDependency.h"
@@ -108,6 +110,50 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
   }
 }
 
+void retrieveValue(llvm::Constant *constValue,
+                   SmallVector<mlir::Attribute> &values,
+                   const mlir::Type &baseMLIRElemType) {
+  auto *arrType = llvm::dyn_cast<llvm::ArrayType>(constValue->getType());
+  for (unsigned i = 0; i < arrType->getNumElements(); ++i) {
+    auto *elem = constValue->getAggregateElement(i);
+    if (auto *constInt = llvm::dyn_cast<llvm::ConstantInt>(elem)) {
+      values.push_back(
+          mlir::IntegerAttr::get(baseMLIRElemType, constInt->getSExtValue()));
+    } else if (auto *constFloat = llvm::dyn_cast<llvm::ConstantFP>(elem)) {
+      values.push_back(
+          mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
+    } else if (auto *constArray =
+                   llvm::dyn_cast<llvm::ConstantDataArray>(elem)) {
+      retrieveValue(elem, values, baseMLIRElemType);
+    } else {
+      llvm::errs() << "Unhandled constant element type:\n";
+      elem->dump();
+      llvm_unreachable("Unhandled base element type.");
+    }
+  }
+}
+
+DenseElementsAttr
+convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
+                                  MLIRContext *ctx) {
+  auto *baseElementType = globVar->getInitializer()->getType();
+  SmallVector<int64_t> shape;
+  int64_t numElems = 1;
+  while (baseElementType->isArrayTy()) {
+    int64_t numElemCurrDim = baseElementType->getArrayNumElements();
+    shape.push_back(numElemCurrDim);
+    baseElementType = baseElementType->getArrayElementType();
+    numElems *= numElemCurrDim;
+  }
+  auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElementType, ctx);
+  SmallVector<mlir::Attribute> values;
+  values.reserve(numElems);
+  retrieveValue(globVar->getInitializer(), values, baseMLIRElemType);
+  auto denseAttr = mlir::DenseElementsAttr::get(
+      mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
+  return denseAttr;
+}
+
 void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
   for (auto &block : *llvmFunc) {
     for (auto &inst : block) {
@@ -146,6 +192,8 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
         }
 
         if (auto *localConst = dyn_cast<llvm::GlobalVariable>(val)) {
+
+          auto denseAttr = convertInitializerToDenseElemAttr(localConst, ctx);
           auto *baseElementType = localConst->getInitializer()->getType();
 
           SmallVector<int64_t> shape;
@@ -159,38 +207,12 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
 
           auto memrefType = MemRefType::get(shape, baseMLIRElemType);
 
-          auto *init = localConst->getInitializer();
-
-          auto *arrType = llvm::dyn_cast<llvm::ArrayType>(init->getType());
-
-          llvm::SmallVector<mlir::Attribute> values;
-          values.reserve(arrType->getNumElements());
-
-          for (unsigned i = 0; i < arrType->getNumElements(); ++i) {
-
-            auto *elem = init->getAggregateElement(i);
-            if (auto *constInt = llvm::dyn_cast<llvm::ConstantInt>(elem)) {
-              values.push_back(mlir::IntegerAttr::get(
-                  baseMLIRElemType, constInt->getSExtValue()));
-            } else if (auto *constFloat =
-                           llvm::dyn_cast<llvm::ConstantFP>(elem)) {
-              values.push_back(mlir::FloatAttr::get(baseMLIRElemType,
-                                                    constFloat->getValueAPF()));
-
-            } else {
-              llvm_unreachable("Unhandled base element type.");
-            }
-          }
-
-          auto denseAttr = mlir::DenseElementsAttr::get(
-              mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
-
           auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
 
-          // setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
-          //     allocaOp, ctx, denseAttr);
-
-          llvm::errs() << localConst << " what do we do?\n";
+          dynamatic::setDialectAttr<
+              dynamatic::handshake::MemoryInitialValueAttr>(allocaOp, ctx,
+                                                            denseAttr);
+          valueMapping[val] = allocaOp.getResult();
         }
       }
     }
@@ -345,7 +367,8 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
   }
 
   if (auto *defInst = gepInst->getPointerOperand();
-      isa_and_nonnull<AllocaInst>(defInst)) {
+      isa_and_nonnull<AllocaInst>(defInst) ||
+      isa_and_nonnull<GlobalVariable>(defInst)) {
     // NOTE: If GEP calculates value from a memory allocation (which is a
     // global value), an extra zero index value is required at the beginning
     // to calculate the address.
@@ -370,9 +393,14 @@ void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
   // However, memref::LoadOp and memref::StoreOp must have their indices
   // match the memref. So here we need to fill in the constant zeros.
   int remainingConstZeros = memrefType.getShape().size() - indexOperands.size();
-  assert(remainingConstZeros >= 0 &&
-         "GEP should only omit indices, but shouldn't have more indices than "
-         "the original memref type extracted from the function argument!");
+
+  if (remainingConstZeros < 0) {
+    gepInst->dump();
+    llvm_unreachable(
+        "GEP should only omit indices, but shouldn't have more indices than "
+        "the original memref type extracted from the function argument!");
+  }
+
   for (int i = 0; i < remainingConstZeros; i++) {
     auto constZeroOp = builder.create<arith::ConstantOp>(
         UnknownLoc::get(ctx), builder.getI64IntegerAttr(0));
@@ -506,7 +534,6 @@ void ImportLLVMModule::translateAllocaOp(llvm::AllocaInst *allocaInst) {
 }
 
 void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
-  inst->dump();
   Location loc = UnknownLoc::get(ctx);
   if (converted.count(inst)) {
     return;
