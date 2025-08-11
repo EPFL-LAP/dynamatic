@@ -971,12 +971,12 @@ def StoreOp : Handshake_MemPortOp<"store", [
 
 def RAMOp : Handshake_Op<"ram", []>  {
   let arguments = (ins 
-    TypeAttr:$type,
     OptionalAttr<MemoryInitialValueAttr>:$initial_value,
     UnitAttr:$constant
   );
 
   let builders = [
+    // With initial value
     OpBuilder<(ins 
     "MemRefType":$memrefType,
     "DenseElementsAttr":$initial_value,
@@ -985,6 +985,11 @@ def RAMOp : Handshake_Op<"ram", []>  {
       $_state.types.push_back(memrefType);
       $_state.addAttribute("initial_value", MemoryInitialValueAttr::get($_builder.getContext(), initial_value));
       $_state.addAttribute("constant", UnitAttr::get($_builder.getContext()));
+    }]>,
+    OpBuilder<(ins 
+    "MemRefType":$memrefType
+    ), [{
+      $_state.types.push_back(memrefType);
     }]>
   ];
 

@@ -798,7 +798,7 @@
     ]
   },
   {
-    "name": "memref.alloca",
+    "name": "handshake.ram",
     "parameters": [
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
@@ -809,7 +809,7 @@
     "hdl": "vhdl"
   },
   {
-    "name": "memref.alloca",
+    "name": "handshake.ram",
     "parameters": [
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },

@@ -732,7 +732,7 @@
     }
   },
   {
-    "name": "memref.alloca",
+    "name": "handshake.ram",
     "parameters": [
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
@@ -743,7 +743,7 @@
     "hdl": "verilog"
   },
   {
-    "name": "memref.alloca",
+    "name": "handshake.ram",
     "parameters": [
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },

@@ -213,11 +213,11 @@ struct MemLoweringState {
 };
 
 /// \brief: utility struct that holds useful information for converting memory
-/// interfaces (i.e., mem_controller and lsqs) that are connected to an allocaOp
+/// interfaces (i.e., mem_controller and lsqs) that are connected to an ramOp
 /// (i.e., instantiated as interal BRAMs).
 struct InternalMemLoweringState {
   /// The placeholder operation for memory instance
-  memref::AllocaOp allocaOp;
+  handshake::RAMOp ramOp;
   handshake::MemoryOpInterface memInterface;
   FuncMemoryPorts ports;
 
@@ -226,14 +226,14 @@ struct InternalMemLoweringState {
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
   InternalMemLoweringState()
-      : allocaOp(nullptr), memInterface(nullptr), ports(nullptr),
+      : ramOp(nullptr), memInterface(nullptr), ports(nullptr),
         portNames(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
-  InternalMemLoweringState(memref::AllocaOp allocaOp,
+  InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
-      : allocaOp(allocaOp), memInterface(memInterface),
+      : ramOp(ramOp), memInterface(memInterface),
         ports(getMemoryPorts(memInterface)), portNames(memInterface){};
 };
 
@@ -247,7 +247,7 @@ struct ModuleLoweringState {
   unsigned numMemories = 0;
 
   /// Memory interfaces connected to the internal BRAMs (represented using an
-  /// AllocaOp).
+  /// ramOp).
   llvm::MapVector<handshake::MemoryOpInterface, InternalMemLoweringState>
       internalMemInterfaces;
 
@@ -372,7 +372,7 @@ public:
   /// specialized for memory interfaces, passed through their port information.
   ModuleDiscriminator(FuncMemoryPorts &ports);
 
-  ModuleDiscriminator(memref::AllocaOp *op, FuncMemoryPorts &ports);
+  ModuleDiscriminator(handshake::RAMOp *op, FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
   /// with different parameter values will never receive the same name.
@@ -725,11 +725,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<memref::AllocaOp>([&](memref::AllocaOp allocaOp) {
+      .Case<handshake::RAMOp>([&](handshake::RAMOp ramOp) {
+        MemRefType resType = ramOp.getResult().getType();
         // No parameters needed for these operations
-        addUnsigned("DATA_WIDTH",
-                    allocaOp.getMemref().getType().getElementTypeBitWidth());
-        addUnsigned("SIZE", allocaOp.getMemref().getType().getNumElements());
+        addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
+        addUnsigned("SIZE", resType.getNumElements());
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -837,12 +837,14 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
       });
 }
 
-ModuleDiscriminator::ModuleDiscriminator(memref::AllocaOp *op,
+ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
                                          FuncMemoryPorts &ports) {
+
+  MemRefType resType = op->getResult().getType();
   init(op->getOperation());
   addUnsigned("DATA_WIDTH", ports.dataWidth);
   addUnsigned("ADDR_WIDTH", ports.addrWidth);
-  addUnsigned("SIZE", op->getMemref().getType().getNumElements());
+  addUnsigned("SIZE", resType.getNumElements());
 
   if (auto initialValueAttr =
           getDialectAttr<MemoryInitialValueAttr>(op->getOperation())) {
@@ -1219,11 +1221,11 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   ModuleLoweringState state(funcOp);
   hw::ModulePortInfo modInfo = getFuncPortInfo(funcOp, state);
 
-  // Register all the memory interfaces that are connect to an allocaOp
-  for (auto allocaOp : funcOp.getOps<memref::AllocaOp>()) {
+  // Register all the memory interfaces that are connect to an ramOp
+  for (auto ramOp : funcOp.getOps<handshake::RAMOp>()) {
     for (auto memInterface : funcOp.getOps<handshake::MemoryOpInterface>()) {
-      if (allocaOp.getMemref() == memInterface.getMemRef()) {
-        InternalMemLoweringState memLowingState(allocaOp, memInterface);
+      if (ramOp.getResult() == memInterface.getMemRef()) {
+        InternalMemLoweringState memLowingState(ramOp, memInterface);
         state.internalMemInterfaces.insert({memInterface, memLowingState});
       }
     }
@@ -1419,10 +1421,10 @@ private:
 } // namespace
 
 // Steps:
-// 1. Materialize the AllocaOp as a RAM module (here we assume that it is
+// 1. Materialize the ramOp as a RAM module (here we assume that it is
 // instantiated as a dual-port, single cycle latency BRAM).
 // 2. Replace the memory interface op.
-// 3. Erase the old memory interface op and the allocaOp.
+// 3. Erase the old memory interface op and the ramOp.
 LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
     handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
@@ -1458,7 +1460,7 @@ LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
   BackedgeBuilder edgeBuilder(rewriter, memOp->getLoc());
 
   if (memOp.isMasterInterface()) {
-    // Materialize the allocaOp as a hardware BRAM module:
+    // Materialize the ramOp as a hardware BRAM module:
     // NOTE: This is only needed if the memory interface is not an LSQ -> MC
     HWBuilder bramBuilder(getContext());
 
@@ -1489,11 +1491,11 @@ LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
     memInterfaceToBRAMChannels = {loadEn, loadAddr, storeEn, storeAddr,
                                   storeData};
 
-    // Query the parameters of allocaOp (used to generate external module op).
-    ModuleDiscriminator bramDiscriminator(&memState.allocaOp, memState.ports);
+    // Query the parameters of ramOp (used to generate external module op).
+    ModuleDiscriminator bramDiscriminator(&memState.ramOp, memState.ports);
 
     auto bramInstanceOp = bramBuilder.createInstance(
-        bramDiscriminator, getUniqueName(memState.allocaOp), memOp->getLoc(),
+        bramDiscriminator, getUniqueName(memState.ramOp), memOp->getLoc(),
         rewriter);
 
     // Create new input connections that are not present in the handshake op (in
@@ -1529,7 +1531,7 @@ LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
   memInterfaceConverter.convertToInstance(memState, rewriter,
                                           memInterfaceToBRAMChannels);
 
-  rewriter.eraseOp(memState.allocaOp);
+  rewriter.eraseOp(memState.ramOp);
   return success();
 }
 

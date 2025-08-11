@@ -1476,6 +1476,16 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
   return success();
 }
 
+struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
+  using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType());
+    return success();
+  }
+};
+
 //===-----------------------------------------------------------------------==//
 // Pass driver
 //===-----------------------------------------------------------------------==//
@@ -1509,7 +1519,7 @@ struct CfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
     patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
-                 ConvertUndefinedValues,
+                 ConvertUndefinedValues, AllocaOpConversion,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -1548,7 +1558,6 @@ struct CfToHandshakePass
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
     target.addLegalDialect<handshake::HandshakeDialect>();
-    target.addLegalOp<memref::AllocOp, memref::AllocaOp>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();
