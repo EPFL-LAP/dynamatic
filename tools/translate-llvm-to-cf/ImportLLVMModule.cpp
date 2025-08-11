@@ -587,7 +587,13 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
 
   builder.setInsertionPointToEnd(mlirModule.getBody());
 
-  auto funcType = builder.getFunctionType(argTypes, {builder.getI32Type()});
+  SmallVector<mlir::Type> resTypes;
+
+  if (!llvmFunc->getReturnType()->isVoidTy()) {
+    resTypes.push_back(convertLLVMTypeToMLIR(llvmFunc->getReturnType(), ctx));
+  }
+
+  auto funcType = builder.getFunctionType(argTypes, resTypes);
   auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
                                              llvmFunc->getName(), funcType);
 
