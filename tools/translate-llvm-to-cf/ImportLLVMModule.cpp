@@ -651,7 +651,7 @@ void ImportLLVMModule::translateGlobalVars() {
 
     auto isConstantAttr = UnitAttr::get(ctx);
 
-    auto alignmentAttr = builder.getI32IntegerAttr(globalVar->getAlignment());
+    auto alignmentAttr = builder.getI64IntegerAttr(globalVar->getAlignment());
 
     DenseElementsAttr initialValueAttr;
 
