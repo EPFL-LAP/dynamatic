@@ -346,9 +346,12 @@ void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
 }
 
 void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
+  // NOTE: this function does not create any corresponding op in the CF MLIR but
+  // only computes the indices for the LOAD/STORE ops that the gepInst drives.
+
   // Check if the GEP is not chained
   mlir::Value baseAddress = valueMapping[gepInst->getPointerOperand()];
-  SmallVector<mlir::Value, 4> indexOperands;
+  SmallVector<mlir::Value> indexOperands;
 
   auto memrefType = baseAddress.getType().dyn_cast<MemRefType>();
 
@@ -409,27 +412,8 @@ void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     indexOperands.push_back(idxCastOp);
   }
 
-  for (auto *user : gepInst->users()) {
-    if (isa<GetElementPtrInst>(user)) {
-      llvm_unreachable(
-          "Invalid GEP -> GEP pattern detected! It is assumed that this kind "
-          "of pattern is canonicalized away using instcombine pass.");
-    } else if (auto *loadInst = dyn_cast<LoadInst>(user)) {
-
-      auto newLoadOp = builder.create<memref::LoadOp>(
-          UnknownLoc::get(ctx), convertLLVMTypeToMLIR(loadInst->getType(), ctx),
-          baseAddress, ValueRange(indexOperands));
-      translateDepAttr(loadInst, newLoadOp, *ctx, builder);
-      valueMapping[user] = newLoadOp.getResult();
-      converted.insert(loadInst);
-    } else if (auto *storeInst = dyn_cast<StoreInst>(user)) {
-      auto storeValue = valueMapping[storeInst->getValueOperand()];
-      auto newStoreOp = builder.create<memref::StoreOp>(
-          UnknownLoc::get(ctx), storeValue, baseAddress, indexOperands);
-      converted.insert(storeInst);
-      translateDepAttr(storeInst, newStoreOp, *ctx, builder);
-    }
-  }
+  this->gepInstToMemRefAndIndicesMap[gepInst] =
+      MemRefAndIndices(baseAddress, indexOperands);
 }
 
 void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
@@ -464,23 +448,33 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
   }
 }
 
-void ImportLLVMModule::translateLoadWithZeroIndices(llvm::LoadInst *loadInst) {
+void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
   Location loc = UnknownLoc::get(ctx);
-  // NOTE: This condition handles a special case where a load only has
-  // constant indices, e.g., tmp = mat[0][0].
   auto *instAddr = loadInst->getPointerOperand();
-  if (isa<GetElementPtrInst>(instAddr))
-    llvm_unreachable(
-        "Converting a load but the producer hasn't been converted yet!");
-  mlir::Value addressVal = valueMapping[instAddr];
-  auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
-
+  mlir::Value addressVal;
   SmallVector<mlir::Value> indexValues;
-  int constZerosToAdd = memrefType.getShape().size();
-  for (int i = 0; i < constZerosToAdd; i++) {
-    auto constZeroOp =
-        builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(0));
-    indexValues.push_back(constZeroOp);
+  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
+    // Logic: In LLVM IR, load/store operations take the pointer computed from
+    // GEP ops, whereas in memref, load operations takes indices (of index
+    // type). This function uses the index operand collected when processing
+    // GEPs as operands of LOAD/STOREs.
+    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
+    addressVal = memrefAndIndices.first;
+    indexValues = memrefAndIndices.second;
+  } else {
+    if (isa<GetElementPtrInst>(instAddr))
+      llvm_unreachable(
+          "Converting a load but the producer hasn't been converted yet!");
+    // NOTE: This condition handles a special case where a load only has
+    // constant indices, e.g., tmp = mat[0][0].
+    addressVal = this->valueMapping[instAddr];
+    auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+    int constZerosToAdd = memrefType.getShape().size();
+    for (int i = 0; i < constZerosToAdd; i++) {
+      auto constZeroOp = this->builder.create<arith::ConstantOp>(
+          loc, this->builder.getIndexAttr(0));
+      indexValues.push_back(constZeroOp);
+    }
   }
   mlir::Type resType = convertLLVMTypeToMLIR(loadInst->getType(), ctx);
   auto newOp =
@@ -489,27 +483,39 @@ void ImportLLVMModule::translateLoadWithZeroIndices(llvm::LoadInst *loadInst) {
   translateDepAttr(loadInst, newOp, *ctx, builder);
 }
 
-void ImportLLVMModule::translateStoreWithZeroIndices(
-    llvm::StoreInst *storeInst) {
+void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
   Location loc = UnknownLoc::get(ctx);
-  // NOTE: This condition handles a special case where a load only has
-  // constant indices, e.g., tmp = mat[0][0].
   auto *instAddr = storeInst->getPointerOperand();
-  if (isa<GetElementPtrInst>(instAddr))
-    llvm_unreachable(
-        "Converting a load but the producer hasn't been converted yet!");
-  mlir::Value addressVal = valueMapping[instAddr];
-  auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
 
+  mlir::Value addressVal;
   SmallVector<mlir::Value> indexValues;
-  int constZerosToAdd = memrefType.getShape().size();
-  for (int i = 0; i < constZerosToAdd; i++) {
-    auto constZeroOp =
-        builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(0));
-    indexValues.push_back(constZeroOp);
-  }
-  mlir::Value storeValue = valueMapping[storeInst->getValueOperand()];
 
+  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
+    // Logic: In LLVM IR, load/store operations take the pointer computed from
+    // GEP ops, whereas in memref, load operations takes indices (of index
+    // type). This function uses the index operand collected when processing
+    // GEPs as operands of LOAD/STOREs.
+    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
+    addressVal = memrefAndIndices.first;
+    indexValues = memrefAndIndices.second;
+  } else {
+    // NOTE: This condition handles a special case where a load only has
+    // constant indices, e.g., tmp = mat[0][0].
+    if (isa<GetElementPtrInst>(instAddr))
+      llvm_unreachable(
+          "Converting a load but the producer hasn't been converted yet!");
+    addressVal = this->valueMapping[instAddr];
+    auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+
+    int constZerosToAdd = memrefType.getShape().size();
+    for (int i = 0; i < constZerosToAdd; i++) {
+      auto constZeroOp = this->builder.create<arith::ConstantOp>(
+          loc, this->builder.getIndexAttr(0));
+      indexValues.push_back(constZeroOp);
+    }
+  }
+
+  mlir::Value storeValue = valueMapping[storeInst->getValueOperand()];
   auto newOp =
       builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
   translateDepAttr(storeInst, newOp, *ctx, builder);
@@ -545,9 +551,9 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
     translateGEPInst(gepInst);
   } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
-    translateLoadWithZeroIndices(loadInst);
+    translateLoadInst(loadInst);
   } else if (auto *storeInst = dyn_cast<llvm::StoreInst>(inst)) {
-    translateStoreWithZeroIndices(storeInst);
+    translateStoreInst(storeInst);
   } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
     translateICmpInst(icmpInst);
   } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {

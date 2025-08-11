@@ -63,6 +63,14 @@ class ImportLLVMModule {
   /// In MLIR memref, globals are identified using the sym_name.
   mlir::DenseMap<llvm::Value *, memref::GlobalOp> globalValToGlobalOpMap;
 
+  /// In LLVM IR to CF, we convert GEP -> LOAD/STORE to LOAD/STORE. However, the
+  /// data operand might not be available when we convert the LOAD/STORE. This
+  /// data structure registers the memref and address.
+  using MemRefAndIndices = std::pair<mlir::Value /* memref */,
+                                     SmallVector<mlir::Value> /* Indices */>;
+
+  mlir::DenseMap<llvm::Value *, MemRefAndIndices> gepInstToMemRefAndIndicesMap;
+
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
@@ -109,8 +117,8 @@ class ImportLLVMModule {
   void translateFCmpInst(llvm::FCmpInst *inst);
   void translateBranchInst(llvm::BranchInst *inst);
   void translateGEPInst(llvm::GetElementPtrInst *gepInst);
-  void translateLoadWithZeroIndices(llvm::LoadInst *loadInst);
-  void translateStoreWithZeroIndices(llvm::StoreInst *storeInst);
+  void translateLoadInst(llvm::LoadInst *loadInst);
+  void translateStoreInst(llvm::StoreInst *storeInst);
   void translateAllocaInst(llvm::AllocaInst *allocaInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
