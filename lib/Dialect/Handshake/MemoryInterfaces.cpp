@@ -69,8 +69,8 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
       anyChange |= opWasReplaced;
       if (opWasReplaced) {
         StringAttr newName = StringAttr::get(ctx, replacedName->second);
-        newMemDeps.push_back(MemDependenceAttr::get(
-            ctx, newName, oldDep.getLoopDepth(), oldDep.getComponents()));
+        newMemDeps.push_back(
+            MemDependenceAttr::get(ctx, newName, oldDep.getLoopDepth()));
       } else {
         newMemDeps.push_back(oldDep);
       }

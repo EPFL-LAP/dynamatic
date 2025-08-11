@@ -54,7 +54,7 @@ return mergedBlif;
 
 ```
 
-The process of constructing a unified circuit graph begins with invoking the connectInputNodes() function for each SubjectGraph. This function establishes connections between adjacent graphs by merging their input and output nodes.
+The process of constructing a unified circuit graph begins with invoking the `connectInputNodes()` function for each SubjectGraph. This function establishes connections between adjacent graphs by merging their input and output nodes.
 
 Next, a new LogicNetwork object—referred to as mergedBlif—is instantiated to serve as the container for the complete circuit. All nodes from the individual SubjectGraphs are then added to this new LogicNetwork. Because each node already encapsulates its connection information, simply aggregating them into a single network is sufficient to produce a fully connected representation of the circuit.
 
@@ -80,7 +80,7 @@ After parsing the BLIF, two functions are used to interpret and process the AIG 
 - `processOutOfRuleNodes`: A subclass-specific function that performs custom processing of AIG nodes, typically identifying matches between primary inputs (PIs) and primary outputs (POs) and the corresponding ports of the dataflow unit.
 - `processNodesWithRules`: A generic function shared across all subclasses, which matches the PIs and POs of the AIG with the corresponding ports of the dataflow units applying the rules describes by `NodeProcessingRule` structure. 
 
-An example of a NodeProcessingRule is `{"lhs", lhsNodes, false, nullptr}`. This rule instructs the system to collect AIG PIs or POs whose names contain the substring `"lhs"` into the set `lhsNodes`, without renaming them (`false` flag) and without applying additional processing (`nullptr` argument).
+An example of a NodeProcessingRule is `{"lhs", lhsNodes, false}`. This rule instructs the system to collect AIG PIs or POs whose names contain the substring `"lhs"` into the set `lhsNodes`, without renaming them (`false` flag).
 
 
 Another key step is handled by the `buildSubjectGraphConnections` function. It iterates over the dataflow unit's input and output ports and stores their corresponding subject graphs in two vectors—one for inputs and one for outputs.
@@ -118,7 +118,7 @@ Represents arithmetic operations in the Handshake dialect, which consists of Add
 ### Variables
 1) unsigned int dataWidth: Bit width of the data signals (DATA_TYPE parameter in the HDL)
 Corresponds to the DATA_TYPE parameter in the HDL implementation. 
-2) std::unordered_map<unsigned int, ChannelSignals> inputNodes: Maps lhs and rhs inputs to their corresponding Channel Signals. lhs goes to inputNodes[0] and rhs goes to inputNodes[1].
+2) `std::unordered_map<unsigned int, ChannelSignals> inputNodes`: Maps lhs and rhs inputs to their corresponding Channel Signals. lhs goes to `inputNodes[0]` and rhs goes to `inputNodes[1]`.
 3) ChannelSignals outputNodes: Output Channel Signals of the module.
 
 ### Functions

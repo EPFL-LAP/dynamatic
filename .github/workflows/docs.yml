@@ -1,0 +1,84 @@
+name: docs
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+
+# Allow only one concurrent run, preventing conflicts during deployment.
+# This is technically not needed for pull_request runs.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Build docs
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mdbook
+        env:
+          MDBOOK_HASH: "d611bcde080f1ab9932ca1724197ac2c23bb8c5d64581bb5da238bfbb4d39184"
+        run: |
+          mkdir -p ~/bin
+          curl -sSL -o /tmp/mdbook.tar.gz https://github.com/rust-lang/mdBook/releases/download/v0.4.51/mdbook-v0.4.51-x86_64-unknown-linux-gnu.tar.gz
+          echo "$MDBOOK_HASH  /tmp/mdbook.tar.gz" | sha256sum --check --status || { echo "mdBook hash mismatch!"; exit 1; }
+          tar -xz -f /tmp/mdbook.tar.gz --directory="$HOME/bin"
+          chmod +x ~/bin/mdbook
+
+      - name: Install mdbook-alerts
+        env:
+          MDBOOK_ALERTS_HASH: "443951345caf628b2893fe7c9e566c1262b1c9d37328d81e622e5c15a35c96a5"
+        run: |
+          mkdir -p ~/bin
+          wget https://github.com/lambdalisue/rs-mdbook-alerts/releases/download/v0.8.0/mdbook-alerts-x86_64-unknown-linux-gnu -O /tmp/mdbook-alerts
+          echo "$MDBOOK_ALERTS_HASH  /tmp/mdbook-alerts" | sha256sum --check --status || { echo "mdbook-alerts hash mismatch!"; exit 1; }
+          mv /tmp/mdbook-alerts $HOME/bin/mdbook-alerts
+          chmod +x ~/bin/mdbook-alerts
+
+      - name: Install mdbook-linkcheck
+        env:
+          MDBOOK_LINKCHECK_HASH: "18cebca9493804b307b39a44af2664cdfa881e84b8d92a94205d6c51572318ef"
+        run: |
+          mkdir -p ~/bin
+          cd /tmp
+          curl -L -o mdbook-linkcheck.zip https://github.com/Michael-F-Bryan/mdbook-linkcheck/releases/download/v0.7.7/mdbook-linkcheck.x86_64-unknown-linux-gnu.zip
+          echo "$MDBOOK_LINKCHECK_HASH  mdbook-linkcheck.zip" | sha256sum --check --status || { echo "mdbook-linkcheck hash mismatch!"; exit 1; }
+          unzip mdbook-linkcheck.zip -d $HOME/bin
+          chmod +x $HOME/bin/mdbook-linkcheck
+
+      - name: Build documentation
+        run: |
+          PATH=$PATH:$HOME/bin ls ~/bin
+          PATH=$PATH:$HOME/bin which mdbook-alerts
+          PATH=$PATH:$HOME/bin mdbook build
+
+      - name: Upload artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{github.workspace}}/build/mdbook/html/
+
+  # Deploy to github pages (push only)
+  docs-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    if: github.event_name == 'push'
+    needs: ["docs"]
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
