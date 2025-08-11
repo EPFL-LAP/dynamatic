@@ -598,6 +598,7 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
         *mod, constArray->getType(),
         /*isConstant=*/true, llvm::GlobalValue::InternalLinkage, constArray,
         gblConstant->getName() + "duplicated");
+    gVar->setAlignment(gblConstant->getAlign());
     for (auto *inst : group) {
       auto *gepBase = findBaseGEP(inst);
       changeGEPOperands(gepBase, gVar, gVar->getValueType(), dimInfo);
