@@ -12,6 +12,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "llvm/Analysis/LoopInfo.h"
@@ -179,8 +180,20 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
     return;
   }
 
-  // Change the baseptr
-  auto *gep = cast<GetElementPtrInst>(gepInst);
+  if (auto *storeInst = dyn_cast<StoreInst>(gepInst)) {
+    if (storeInst->getPointerOperand() != newBasePtr) {
+      storeInst->setOperand(1, newBasePtr);
+    }
+    return;
+  }
+
+  if (!isa<GetElementPtrInst>(gepInst)) {
+    gepInst->dump();
+    llvm_unreachable(
+        "Trying to change the operands of an operation with unhandled type.");
+  }
+
+  auto *gep = dyn_cast<GetElementPtrInst>(gepInst);
   if (gep->getPointerOperand() != newBasePtr) {
     // Change the base pointer of the GEP instruction
     gep->setOperand(0, newBasePtr);
