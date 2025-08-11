@@ -449,7 +449,7 @@ def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
 //===----------------------------------------------------------------------===//
 
 // Used to represent the constant/initial value of the ROM/RAM
-def MemoryInitalValueAttr : Handshake_Attr<"MemoryInitialValue", "init_value"> {
+def MemoryInitialValueAttr : Handshake_Attr<"MemoryInitialValue", "init_value"> {
   let parameters = (ins "DenseElementsAttr":$constant);
   let assemblyFormat = "`[` $constant `]`";
 }

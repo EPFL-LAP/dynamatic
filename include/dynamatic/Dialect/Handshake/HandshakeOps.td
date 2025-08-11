@@ -966,6 +966,32 @@ def StoreOp : Handshake_MemPortOp<"store", [
 }
 
 //===----------------------------------------------------------------------===//
+// Memory hierarchy
+//===----------------------------------------------------------------------===//
+
+def RAMOp : Handshake_Op<"ram", []>  {
+  let arguments = (ins 
+    TypeAttr:$type,
+    OptionalAttr<MemoryInitialValueAttr>:$initial_value,
+    UnitAttr:$constant
+  );
+
+  let builders = [
+    OpBuilder<(ins 
+    "MemRefType":$memrefType,
+    "DenseElementsAttr":$initial_value,
+    "UnitAttr":$constant
+    ), [{
+      $_state.types.push_back(memrefType);
+      $_state.addAttribute("initial_value", MemoryInitialValueAttr::get($_builder.getContext(), initial_value));
+      $_state.addAttribute("constant", UnitAttr::get($_builder.getContext()));
+    }]>
+  ];
+
+  let results = (outs AnyStaticShapeMemRef:$result);
+}
+
+//===----------------------------------------------------------------------===//
 // Terminator
 //===----------------------------------------------------------------------===//
 

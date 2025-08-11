@@ -174,6 +174,53 @@ private:
   MemoryOpLowering &memOpLowering;
 };
 
+struct GlobalOpConversion : public OpConversionPattern<memref::GlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+
+    auto newType =
+        MemRefType::get({type.getNumElements()}, type.getElementType());
+    auto attr = op.getInitialValueAttr();
+
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(attr)) {
+      auto newDenseType =
+          RankedTensorType::get({type.getNumElements()}, type.getElementType());
+      rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+          op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+          TypeAttr::get(newType), denseAttr.reshape(newDenseType),
+          op.getConstantAttr(), op.getAlignmentAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+          op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+          TypeAttr::get(newType), op.getInitialValueAttr(),
+          op.getConstantAttr(), op.getAlignmentAttr());
+    }
+    return success();
+  }
+};
+
+struct GetGlobalConversion : public OpConversionPattern<memref::GetGlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+    auto newType =
+        MemRefType::get({type.getNumElements()}, type.getElementType());
+
+    auto newop = rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(
+        op, newType, op.getNameAttr());
+    return success();
+  }
+};
+
 struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -319,6 +366,10 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
       [](memref::AllocOp op) { return isUniDimensional(op.getType()); });
   target.addDynamicallyLegalOp<memref::AllocaOp>(
       [](memref::AllocaOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::GlobalOp>(
+      [](memref::GlobalOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::GetGlobalOp>(
+      [](memref::GetGlobalOp op) { return isUniDimensional(op.getType()); });
   target.addDynamicallyLegalOp<memref::StoreOp>(
       [](memref::StoreOp op) { return op.getIndices().size() == 1; });
   target.addDynamicallyLegalOp<memref::LoadOp>(
@@ -368,13 +419,19 @@ public:
 
     RewritePatternSet patterns(ctx);
     SetVector<StringRef> rewrittenCallees;
-    patterns.add<AllocOpConversion, AllocaOpConversion,
-                 OperandConversionPattern<func::ReturnOp>,
-                 OperandConversionPattern<memref::DeallocOp>,
-                 CondBranchOpConversion,
-                 OperandConversionPattern<memref::DeallocOp>,
-                 OperandConversionPattern<memref::CopyOp>, CallOpConversion>(
-        typeConverter, ctx);
+    patterns.add<
+        // clang-format off
+        AllocOpConversion,
+        AllocaOpConversion,
+        GetGlobalConversion,
+        GlobalOpConversion,
+        OperandConversionPattern<func::ReturnOp>,
+        OperandConversionPattern<memref::DeallocOp>,
+        CondBranchOpConversion,
+        OperandConversionPattern<memref::DeallocOp>,
+        OperandConversionPattern<memref::CopyOp>, CallOpConversion
+        // clang-format on
+        >(typeConverter, ctx);
     patterns.add<LoadOpConversion, StoreOpConversion>(memOpLowering,
                                                       typeConverter, ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
