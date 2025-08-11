@@ -118,20 +118,18 @@ $LLVM_BINS/opt -S \
 
 # Somehow here we need to canonicalized again, otherwise, Polly cannot recognize
 # some Scops in some cases
-$LLVM_BINS/opt -S \
-  -mem2reg \
-  -loop-simplify \
-  -simplifycfg \
-  -polly-canonicalize \
-  $OUT/clang_optimized.ll \
-  > $OUT/clang_optimized_polly_canonicalized.ll
+# NOTE: -polly-canonicalize breaks test_memory_11 !!!
+# $LLVM_BINS/opt -S \
+#   -polly-canonicalize \
+#   $OUT/clang_optimized.ll \
+#   > $OUT/clang_optimized_polly_canonicalized.ll
 
 # NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
 $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
   --polly-process-unprofitable \
   -passes="array-partition" \
-  $OUT/clang_optimized_polly_canonicalized.ll \
+  $OUT/clang_optimized.ll \
   > $OUT/clang_array_partitioned.ll
 
 # Clean up the index calculation logic inserted by the array-partition pass
@@ -156,11 +154,10 @@ $LLVM_BINS/opt -S \
 # a loop depth of 1
 # ===============================
 # ------------------------------------------------------------------------------
-$LLVM_BINS/opt $OUT/clang_optimized.ll -S \
-  -polly-process-unprofitable \
-  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
-  --polly-process-unprofitable \
+$LLVM_BINS/opt -S \
   -passes="mem-dep-analysis" \
+  --polly-process-unprofitable \
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   $OUT/clang_array_partitioned_cleaned.ll \
   > $OUT/clang_optimized_dep_marked.ll
 
