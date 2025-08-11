@@ -2,6 +2,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -12,6 +13,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -190,29 +192,29 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
             loc = constOp->getLoc();
           }
         }
+      }
+    }
+  }
+}
 
-        if (auto *localConst = dyn_cast<llvm::GlobalVariable>(val)) {
+void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
+  for (auto &block : *llvmFunc) {
+    for (auto &inst : block) {
+      for (unsigned i = 0; i < inst.getNumOperands(); ++i) {
 
-          auto denseAttr = convertInitializerToDenseElemAttr(localConst, ctx);
-          auto *baseElementType = localConst->getInitializer()->getType();
+        Location loc = UnknownLoc::get(ctx);
+        llvm::Value *val = inst.getOperand(i);
 
-          SmallVector<int64_t> shape;
+        if (auto *globalVar = dyn_cast<llvm::GlobalVariable>(val)) {
 
-          while (baseElementType->isArrayTy()) {
-            shape.push_back(baseElementType->getArrayNumElements());
-            baseElementType = baseElementType->getArrayElementType();
-          }
+          auto globalOp = globalValToGlobalOpMap[globalVar];
 
-          auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElementType, ctx);
+          auto memrefType = globalOp.getType();
 
-          auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+          auto getGlobalOp = builder.create<memref::GetGlobalOp>(
+              loc, memrefType, globalOp.getSymName());
 
-          auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
-
-          dynamatic::setDialectAttr<
-              dynamatic::handshake::MemoryInitialValueAttr>(allocaOp, ctx,
-                                                            denseAttr);
-          valueMapping[val] = allocaOp.getResult();
+          valueMapping[val] = getGlobalOp.getResult();
         }
       }
     }
@@ -595,6 +597,7 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   builder.setInsertionPointToStart(&entryBlock);
 
   createConstants(llvmFunc);
+  createGetGlobals(llvmFunc);
 
   for (auto &block : *llvmFunc) {
     builder.setInsertionPointToEnd(blockMapping[&block]);
@@ -604,7 +607,55 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   }
 }
 
+void ImportLLVMModule::translateGlobalVars() {
+  builder.setInsertionPointToEnd(mlirModule.getBody());
+  for (auto &constant : llvmModule->global_values()) {
+
+    auto *globalVar = dyn_cast<llvm::GlobalVariable>(&constant);
+
+    if (!globalVar)
+      continue;
+    // assert(globalVar->hasPrivateLinkage() && "Other types are not
+    // handled...");
+
+    auto *baseElemType = globalVar->getValueType();
+    SmallVector<int64_t> shape;
+    while (baseElemType->isArrayTy()) {
+      shape.push_back(baseElemType->getArrayNumElements());
+      baseElemType = baseElemType->getArrayElementType();
+    }
+    auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElemType, ctx);
+    auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+
+    StringRef symName = constant.getName();
+
+    StringAttr symNameAttr = StringAttr::get(ctx, Twine(symName));
+
+    StringAttr visibilityAttr = StringAttr::get(ctx, Twine("private"));
+
+    auto typeAttr = TypeAttr::get(memrefType);
+
+    auto isConstantAttr = UnitAttr::get(ctx);
+
+    auto alignmentAttr = builder.getI32IntegerAttr(globalVar->getAlignment());
+
+    DenseElementsAttr initialValueAttr;
+
+    if (globalVar->hasInitializer()) {
+      initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
+    }
+
+    auto globalOp = builder.create<memref::GlobalOp>(
+        UnknownLoc::get(ctx), symNameAttr, visibilityAttr, typeAttr,
+        initialValueAttr, isConstantAttr, alignmentAttr);
+    globalValToGlobalOpMap[&constant] = globalOp;
+  }
+}
+
 void ImportLLVMModule::translateModule() {
+
+  translateGlobalVars();
+
   for (auto &f : llvmModule->functions()) {
     if (f.isDeclaration())
       continue;

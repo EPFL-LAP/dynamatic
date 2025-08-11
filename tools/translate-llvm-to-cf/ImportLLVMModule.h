@@ -1,4 +1,5 @@
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/BasicBlock.h"
@@ -59,6 +60,9 @@ class ImportLLVMModule {
   /// Mapping LLVM instruction values to MLIR results.
   mlir::DenseMap<llvm::Value *, mlir::Value> valueMapping;
 
+  /// In MLIR memref, globals are identified using the sym_name.
+  mlir::DenseMap<llvm::Value *, memref::GlobalOp> globalValToGlobalOpMap;
+
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
@@ -87,7 +91,13 @@ class ImportLLVMModule {
   /// LLVM embeds constants into the instructions, where in MLIR we need to
   /// explicitly create them.
   void createConstants(llvm::Function *llvmFunc);
+
+  /// LLVM GEP instructions can directly take a global pointer. We need to
+  /// explicitly create memref::GetGlobalOp here
+  void createGetGlobals(llvm::Function *llvmFunc);
   void translateFunction(llvm::Function *llvmFunc);
+
+  void translateGlobalVars();
 
   // Dispatches to specialized functions:
   void translateInstruction(llvm::Instruction *inst);
