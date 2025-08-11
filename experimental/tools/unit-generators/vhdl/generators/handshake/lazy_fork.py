@@ -29,6 +29,8 @@ def _generate_lazy_fork_dataless(name, size):
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+
+
 -- Entity of lazy_fork_dataless
 entity {name} is
   port (
@@ -53,6 +55,7 @@ begin
       outs_ready,
       allnReady
       );
+      
   valids : process (ins_valid, outs_ready)
     variable tmp_ready : std_logic_vector({size} - 1 downto 0);
   begin
@@ -84,6 +87,7 @@ def _generate_lazy_fork(name, size, bitwidth):
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
+
 -- Entity of lazy_fork
 entity {name} is
   port (
