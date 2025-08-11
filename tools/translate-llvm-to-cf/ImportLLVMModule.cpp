@@ -220,29 +220,28 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
 }
 
 void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
-  Location loc = UnknownLoc::get(ctx);
   mlir::Value lhs = valueMapping[inst->getOperand(0)];
   mlir::Value rhs = valueMapping[inst->getOperand(1)];
   mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
   switch (inst->getOpcode()) {
     // clang-format off
-    case Instruction::Add:  naiveTranslation<arith::AddIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::Sub:  naiveTranslation<arith::SubIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::Mul:  naiveTranslation<arith::MulIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::SRem: naiveTranslation<arith::RemSIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::URem: naiveTranslation<arith::RemUIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::FAdd: naiveTranslation<arith::AddFOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::FSub: naiveTranslation<arith::SubFOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::FDiv: naiveTranslation<arith::DivFOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::FMul: naiveTranslation<arith::MulFOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( loc, resType,  {lhs, rhs}, inst); break;
-    case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( loc, resType, {lhs, rhs}, inst); break;
-    case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( loc, resType, {lhs, rhs}, inst); break;
-    case Instruction::And:  naiveTranslation<arith::AndIOp>( loc, resType, {lhs, rhs}, inst); break;
-    case Instruction::Or:   naiveTranslation<arith::OrIOp>( loc, resType, {lhs, rhs}, inst); break;
-    case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( loc, resType, {lhs, rhs}, inst); break;
+    case Instruction::Add:  naiveTranslation<arith::AddIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::Sub:  naiveTranslation<arith::SubIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::Mul:  naiveTranslation<arith::MulIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::UDiv: naiveTranslation<arith::DivUIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::SDiv: naiveTranslation<arith::DivSIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::SRem: naiveTranslation<arith::RemSIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::URem: naiveTranslation<arith::RemUIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::FAdd: naiveTranslation<arith::AddFOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::FSub: naiveTranslation<arith::SubFOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::FDiv: naiveTranslation<arith::DivFOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::FMul: naiveTranslation<arith::MulFOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::Shl:  naiveTranslation<arith::ShLIOp>( resType,  {lhs, rhs}, inst); break;
+    case Instruction::AShr: naiveTranslation<arith::ShRSIOp>( resType, {lhs, rhs}, inst); break;
+    case Instruction::LShr: naiveTranslation<arith::ShRUIOp>( resType, {lhs, rhs}, inst); break;
+    case Instruction::And:  naiveTranslation<arith::AndIOp>( resType, {lhs, rhs}, inst); break;
+    case Instruction::Or:   naiveTranslation<arith::OrIOp>( resType, {lhs, rhs}, inst); break;
+    case Instruction::Xor:  naiveTranslation<arith::XOrIOp>( resType, {lhs, rhs}, inst); break;
     // clang-format on
   default: {
     llvm::errs() << "Not yet handled binary operation type "
@@ -253,20 +252,19 @@ void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
 }
 
 void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
-  Location loc = UnknownLoc::get(ctx);
   mlir::Value arg = valueMapping[inst->getOperand(0)];
   mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
 
   switch (inst->getOpcode()) {
     // clang-format off
-    case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>(loc, resType, {arg}, inst); break;
-    case Instruction::SExt: naiveTranslation<arith::ExtSIOp>(loc, resType, {arg}, inst); break;
-    case Instruction::FPExt: naiveTranslation<arith::ExtFOp>(loc, resType, {arg}, inst); break;
-    case Instruction::Trunc: naiveTranslation<arith::TruncIOp>(loc, resType, {arg}, inst); break;
-    case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>(loc, resType, {arg}, inst); break;
-    case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>(loc, resType, {arg}, inst); break;
-    case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>(loc, resType, {arg}, inst); break;
-    case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>(loc, resType, {arg}, inst); break;
+    case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>( resType, {arg}, inst); break;
+    case Instruction::SExt: naiveTranslation<arith::ExtSIOp>( resType, {arg}, inst); break;
+    case Instruction::FPExt: naiveTranslation<arith::ExtFOp>( resType, {arg}, inst); break;
+    case Instruction::Trunc: naiveTranslation<arith::TruncIOp>( resType, {arg}, inst); break;
+    case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>( resType, {arg}, inst); break;
+    case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>( resType, {arg}, inst); break;
+    case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>( resType, {arg}, inst); break;
+    case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>( resType, {arg}, inst); break;
     // clang-format on
   default: {
     llvm::errs() << "Not yet handled binary operation type "
@@ -345,7 +343,7 @@ void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
   loc = op.getLoc();
 }
 
-void ImportLLVMModule::translateGEPOp(llvm::GetElementPtrInst *gepInst) {
+void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // Check if the GEP is not chained
   mlir::Value baseAddress = valueMapping[gepInst->getPointerOperand()];
   SmallVector<mlir::Value, 4> indexOperands;
@@ -515,7 +513,7 @@ void ImportLLVMModule::translateStoreWithZeroIndices(
   translateDepAttr(storeInst, newOp, *ctx, builder);
 }
 
-void ImportLLVMModule::translateAllocaOp(llvm::AllocaInst *allocaInst) {
+void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   Location loc = UnknownLoc::get(ctx);
 
   SmallVector<int64_t> shape;
@@ -533,7 +531,7 @@ void ImportLLVMModule::translateAllocaOp(llvm::AllocaInst *allocaInst) {
   valueMapping[allocaInst] = allocaOp->getResult(0);
 }
 
-void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
+void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   Location loc = UnknownLoc::get(ctx);
   if (converted.count(inst)) {
     return;
@@ -543,7 +541,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
     translateCastInst(castOp);
   } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
-    translateGEPOp(gepInst);
+    translateGEPInst(gepInst);
   } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
     translateLoadWithZeroIndices(loadInst);
   } else if (auto *storeInst = dyn_cast<llvm::StoreInst>(inst)) {
@@ -558,11 +556,11 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
     mlir::Value falseOperand = valueMapping[inst->getOperand(2)];
     mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
     naiveTranslation<arith::SelectOp>(
-        loc, resType, {condition, trueOperand, falseOperand}, inst);
+        resType, {condition, trueOperand, falseOperand}, inst);
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
     translateBranchInst(branchInst);
   } else if (auto *allocaOp = dyn_cast<llvm::AllocaInst>(inst)) {
-    translateAllocaOp(allocaOp);
+    translateAllocaInst(allocaOp);
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMapping[inst->getOperand(0)];
@@ -580,7 +578,7 @@ void ImportLLVMModule::translateOperation(llvm::Instruction *inst) {
   converted.insert(inst);
 }
 
-void ImportLLVMModule::translateLLVMFunction(llvm::Function *llvmFunc) {
+void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
 
   SmallVector<mlir::Type> argTypes =
       getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
@@ -601,7 +599,19 @@ void ImportLLVMModule::translateLLVMFunction(llvm::Function *llvmFunc) {
   for (auto &block : *llvmFunc) {
     builder.setInsertionPointToEnd(blockMapping[&block]);
     for (auto &inst : block) {
-      translateOperation(&inst);
+      translateInstruction(&inst);
     }
+  }
+}
+
+void ImportLLVMModule::translateModule() {
+  for (auto &f : llvmModule->functions()) {
+    if (f.isDeclaration())
+      continue;
+
+    if (f.getName() != funcName)
+      continue;
+
+    translateFunction(&f);
   }
 }

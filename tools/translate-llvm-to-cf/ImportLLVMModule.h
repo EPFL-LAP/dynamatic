@@ -53,10 +53,13 @@ class ImportLLVMModule {
 
   MLIRContext *ctx;
 
+  /// LLVM -> MLIR basic block mapping.
   mlir::DenseMap<llvm::BasicBlock *, mlir::Block *> blockMapping;
 
+  /// Mapping LLVM instruction values to MLIR results.
   mlir::DenseMap<llvm::Value *, mlir::Value> valueMapping;
 
+  /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
   void addMapping(llvm::Value *llvmVal, mlir::Value mlirVal) {
@@ -65,22 +68,29 @@ class ImportLLVMModule {
 
   std::set<Instruction *> converted;
 
+  /// Construct an op without adding any attributes. TODO: maybe return the op
+  /// to enable it?
   template <typename MLIRTy>
-  void naiveTranslation(Location &loc, mlir::Type returnType,
-                        mlir::ValueRange values, Instruction *inst) {
-    MLIRTy op = builder.create<MLIRTy>(loc, returnType, values);
-    addMapping(inst, op.getResult());
-    loc = op.getLoc();
+  void naiveTranslation(mlir::Type returnType, mlir::ValueRange values,
+                        Instruction *inst) {
+    MLIRTy op =
+        builder.create<MLIRTy>(UnknownLoc::get(ctx), returnType, values);
+
+    // Register the corresponding MLIR value of the result of the original
+    // instruction.
+    valueMapping[inst] = op.getResult();
   }
 
   void initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
                                        func::FuncOp funcOp);
 
+  /// LLVM embeds constants into the instructions, where in MLIR we need to
+  /// explicitly create them.
   void createConstants(llvm::Function *llvmFunc);
-  void translateLLVMFunction(llvm::Function *llvmFunc);
+  void translateFunction(llvm::Function *llvmFunc);
 
   // Dispatches to specialized functions:
-  void translateOperation(llvm::Instruction *inst);
+  void translateInstruction(llvm::Instruction *inst);
 
   // Specialized translation functions:
   void translateBinaryInst(llvm::BinaryOperator *inst);
@@ -88,10 +98,10 @@ class ImportLLVMModule {
   void translateICmpInst(llvm::ICmpInst *inst);
   void translateFCmpInst(llvm::FCmpInst *inst);
   void translateBranchInst(llvm::BranchInst *inst);
-  void translateGEPOp(llvm::GetElementPtrInst *gepInst);
+  void translateGEPInst(llvm::GetElementPtrInst *gepInst);
   void translateLoadWithZeroIndices(llvm::LoadInst *loadInst);
   void translateStoreWithZeroIndices(llvm::StoreInst *storeInst);
-  void translateAllocaOp(llvm::AllocaInst *allocaInst);
+  void translateAllocaInst(llvm::AllocaInst *allocaInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
                                                        BasicBlock *nextBB);
@@ -103,15 +113,5 @@ public:
       : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
         builder(builder), ctx(ctx), argMap(argMap){};
 
-  void translateModule() {
-    for (auto &f : llvmModule->functions()) {
-      if (f.isDeclaration())
-        continue;
-
-      if (f.getName() != funcName)
-        continue;
-
-      translateLLVMFunction(&f);
-    }
-  }
+  void translateModule();
 };
