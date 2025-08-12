@@ -76,7 +76,13 @@ bool dynamatic::SSAMaximizationStrategy::maximizeArgument(BlockArgument arg) {
   return true;
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeOp(Operation &op) {
-  return !isa<memref::AllocOp, memref::AllocaOp>(op);
+  return !isa<
+      // clang-format off
+      memref::AllocOp,
+      memref::AllocaOp,
+      memref::GetGlobalOp
+      // clang-format on
+      >(op);
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeResult(OpResult res) {
   return true;
