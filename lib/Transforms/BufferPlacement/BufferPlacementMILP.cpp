@@ -183,6 +183,10 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   // Create a variable for the CFDFC's throughput
   cfVars.throughput = createVar("throughput");
 
+  // Create a variable to explore b_c, modeling the number of tokens circulating
+  // in a cycle
+  cfVars.bc = createVar("b_c");
+
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
   model.update();
@@ -415,13 +419,26 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
     GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
     GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
-    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
+    // Added b_c as a variable to the exploration that is passed to the
+    // constraint if the channel is backedge
+    GRBVar &bc = cfVars.bc;
+
+    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
     model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
                     "throughput_channelRetiming");
+
+    // Aya: replace the above code with the following if you want to explore B_c
+    // if (cfdfc.backedges.contains(channel))
+    //   model.addConstr(chTokenOccupancy - bc == retDst - retSrc,
+    //                   "throughput_channelRetiming");
+    // else
+    //   // subtract 0 in case of non-backward channels
+    //   model.addConstr(chTokenOccupancy == retDst - retSrc,
+    //                   "throughput_channelRetiming");
   }
 }
 
@@ -462,6 +479,10 @@ void BufferPlacementMILP::
 
     // The channel's throughput cannot exceed the number of buffer slots.
     model.addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
+
+    // New constraint to ensure that the throughput cannot be more than 1,
+    // especially when bc ends up being > 1
+    model.addConstr(cfVars.throughput <= 1, "throughput_upper_bound");
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
@@ -1108,7 +1129,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-    os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
+    os << "Throughput of CFDFC #" << idx << ": " << throughput << " and B_c is "
+       << cfVars.bc.get(GRB_DoubleAttr_X) << "\n";
   }
 
   os << "\n# =================== #\n";
