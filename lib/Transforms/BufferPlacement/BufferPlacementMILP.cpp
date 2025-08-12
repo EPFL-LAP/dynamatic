@@ -955,6 +955,8 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
+GRBLinExpr overallThrObj;
+GRBLinExpr numSlotsObj;
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
                                                     ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
@@ -965,8 +967,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   }
 
   // Create the expression for the MILP objective
-  GRBLinExpr objective;
-
+  // GRBLinExpr overallThrObj;
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
   double maxCoefCFDFC = 0.0;
@@ -974,25 +975,61 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
       double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
-      objective += coef * vars.cfdfcVars[cfdfc].throughput;
+      llvm::errs()
+          << "\n\n\tPrinting the number of execution of the single CFDFC: "
+          << cfdfc->numExecs << "\n\n";
+      overallThrObj += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
   }
-
   // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
   // coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
-  // For each channel, add a "penalty" in case a buffer is added to the channel,
-  // and another penalty that depends on the number of slots
+  // GRBLinExpr numSlotsObj;
+  //  For each channel, add a "penalty" in case a buffer is added to the
+  //  channel, and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
   double slotPenaltyMul = 1e-5;
   for (Value channel : channels) {
     ChannelVars &chVars = vars.channelVars[channel];
-    objective -= maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
-    objective -= maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
+    numSlotsObj += maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
+    numSlotsObj += maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
   }
+
+  GRBLinExpr objective = overallThrObj - numSlotsObj;
+
+  // Aya: The old way of constructing the objective function
+  // // Create the expression for the MILP objective
+  // GRBLinExpr objective;
+  // // For each CFDFC, add a throughput contribution to the objective, weighted
+  // // by the "importance" of the CFDFC
+  // double maxCoefCFDFC = 0.0;
+  // double fTotalExecs = static_cast<double>(totalExecs);
+  // if (totalExecs != 0) {
+  //   for (CFDFC *cfdfc : cfdfcs) {
+  //     double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+  //     objective += coef * vars.cfdfcVars[cfdfc].throughput;
+  //     maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+  //   }
+  // }
+  // // In case we ran the MILP without providing any CFDFC, set the maximum
+  // CFDFC
+  // // coefficient to any positive value
+  // if (maxCoefCFDFC == 0.0)
+  //   maxCoefCFDFC = 1.0;
+
+  // // For each channel, add a "penalty" in case a buffer is added to the
+  // channel,
+  // // and another penalty that depends on the number of slots
+  // double bufPenaltyMul = 1e-4;
+  // double slotPenaltyMul = 1e-5;
+  // for (Value channel : channels) {
+  //   ChannelVars &chVars = vars.channelVars[channel];
+  //   objective -= maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
+  //   objective -= maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
+  // }
 
   // Finally, set the MILP objective
   model.setObjective(objective, GRB_MAXIMIZE);
@@ -1132,6 +1169,15 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << "Throughput of CFDFC #" << idx << ": " << throughput << " and B_c is "
        << cfVars.bc.get(GRB_DoubleAttr_X) << "\n";
   }
+
+  GRBQuadExpr obj = model.getObjective();
+  os << "# ================= #\n\n";
+  os << "# Overall Throughput #\n";
+  os << "# ================= #\n\n";
+  os << "Overall throughput is " << overallThrObj.getValue() << "\n";
+  os << "Total number of slots multiplied by a factor is "
+     << numSlotsObj.getValue() << "\n";
+  os << "Full objective " << obj.getValue() << "\n\n";
 
   os << "\n# =================== #\n";
   os << "# Channel Throughputs #\n";
