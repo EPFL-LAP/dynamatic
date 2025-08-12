@@ -79,6 +79,14 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   ];
 }
 
+def CfGateBinarization : DynamaticPass<"cf-gate-binarization"> {
+  let summary = "Limit entries to at most 2";
+  let description = [{
+  }];
+  let options = [
+  ];
+}
+
 def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
   let summary = "Credit-Based Sharing of Functional Units";
   let description = [{ Sharing functional units for better resource utilization.

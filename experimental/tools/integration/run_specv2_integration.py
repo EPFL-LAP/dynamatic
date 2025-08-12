@@ -248,11 +248,26 @@ def run_test(c_file, n, variable):
         else:
             return fail(id, "Failed to apply Dynamatic transformations to cf")
 
+    # gate binarization
+    gate_binarized = os.path.join(comp_out_dir, "gate_binarized.mlir")
+    with open(gate_binarized, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, cf_dyn_transformed,
+            "--cf-gate-binarization"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Applied gate binarization")
+        else:
+            return fail(id, "Failed to apply gate binarization")
+
     # cf level -> handshake level
     handshake = os.path.join(comp_out_dir, "handshake.mlir")
     with open(handshake, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, cf_dyn_transformed,
+            DYNAMATIC_OPT_BIN, gate_binarized,
             "--lower-cf-to-handshake"
         ],
             stdout=f,
@@ -330,7 +345,7 @@ def run_test(c_file, n, variable):
     frequencies = os.path.join(comp_out_dir, "frequencies.csv")
     with open(frequencies, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_PROFILER_BIN, cf_dyn_transformed,
+            DYNAMATIC_PROFILER_BIN, gate_binarized,
             "--top-level-function=" + kernel_name,
             "--input-args-file=" + profiler_inputs,
         ],
