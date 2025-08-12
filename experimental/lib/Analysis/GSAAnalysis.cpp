@@ -510,9 +510,11 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
         // filter paths with correct senders
         std::vector<std::vector<Block *>> paths;
         for (auto path: allPaths){
-          Block *prev = path[path.size() - 2];
-          if (operand->senders.empty() || llvm::is_contained(operand->senders, prev))
-            paths.push_back(path);
+          if(path.size()> 1){
+            Block *prev = path[path.size() - 2];
+            if (operand->senders.empty() || llvm::is_contained(operand->senders, prev))
+              paths.push_back(path);
+          }
         }
 //PRINT ALL PATHS
       llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) << ":\n";
@@ -639,16 +641,15 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
         for(GateInput* operand : phi->operands)
           llvm::errs() <<"BB" << bi.getIndexFromBlock(operand->getBlock()) << "\t";
         
-        // seperate initial inputs from loop inputs
-      
-        auto *phiLoop = loopInfo.getLoopFor(phiBlock);
-
+        // seperate inputs from ouside the loop(initialInputs) from inside(loopInputs)
+        // loop header dominates any block inside its loop and
+        // any ouside block that sends initial value to a loop header properly dominate loop heather
         for (GateInput *input : phi->operands) {
-          auto *inputLoop = loopInfo.getLoopFor(input->getBlock());
-          if (inputLoop != phiLoop)
-            initialInputs.push_back(input);
-          else
+          Block *inputBlock = input->getBlock();
+          if (domInfo.dominates(phiBlock, inputBlock))
             loopInputs.push_back(input);
+            else
+            initialInputs.push_back(input);   
         }
 
       }
