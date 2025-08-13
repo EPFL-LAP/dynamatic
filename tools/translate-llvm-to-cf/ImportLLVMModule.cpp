@@ -19,6 +19,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueMap.h"
@@ -255,9 +256,11 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
     } else {
       builder.create<func::ReturnOp>(loc);
     }
-  } else if (auto *phiOp = dyn_cast<llvm::PHINode>(inst)) {
+  } else if (isa<llvm::PHINode>(inst)) {
     // At this stage, Phi nodes are all converted to the block arguments
     return;
+  } else if (auto *callInst = dyn_cast<llvm::CallInst>(inst)) {
+    translateCallInst(callInst);
   } else {
     inst->dump();
     llvm_unreachable("Not implemented");
@@ -677,4 +680,23 @@ void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
+}
+
+void ImportLLVMModule::translateCallInst(llvm::CallInst *callInst) {
+
+  Function *calledFunc = callInst->getCalledFunction();
+  assert(calledFunc);
+
+  if (!calledFunc->isIntrinsic()) {
+    assert(false && "Function calls are not currently supported");
+  }
+
+  if (calledFunc->getIntrinsicID() == Intrinsic::smax) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else {
+    llvm_unreachable("Not implemented llvm intrinsic function handling!");
+  }
 }

@@ -118,6 +118,7 @@ private:
   void translateLoadInst(llvm::LoadInst *loadInst);
   void translateStoreInst(llvm::StoreInst *storeInst);
   void translateAllocaInst(llvm::AllocaInst *allocaInst);
+  void translateCallInst(llvm::CallInst *callInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                                        BasicBlock *nextBB);
