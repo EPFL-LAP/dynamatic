@@ -955,6 +955,14 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
+bool isInternal(CFDFC *small, CFDFC *big) {
+  for (unsigned bb : small->cycle) {
+    if (!big->cycle.count(bb))
+      return false;
+  }
+  return true;
+}
+
 GRBLinExpr overallThrObj;
 GRBLinExpr numSlotsObj;
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
@@ -966,8 +974,6 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
     totalExecs += getChannelNumExecs(channel);
   }
 
-  // Create the expression for the MILP objective
-  // GRBLinExpr overallThrObj;
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
   double maxCoefCFDFC = 0.0;
@@ -982,12 +988,31 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
   }
-  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
-  // coefficient to any positive value
+  // // In case we ran the MILP without providing any CFDFC, set the maximum
+  // CFDFC
+  // // coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
-  // GRBLinExpr numSlotsObj;
+  CFDFC *outerCFDFC = nullptr;
+  for (auto [cfdfc1, optimize1] : funcInfo.cfdfcs) {
+    for (auto [cfdfc2, optimize2] : funcInfo.cfdfcs) {
+      if (cfdfc1 == cfdfc2)
+        continue;
+      if (!isInternal(cfdfc1, cfdfc2)) {
+        outerCFDFC = cfdfc1;
+        break;
+      }
+    }
+  }
+  if (funcInfo.cfdfcs.size() == 1)
+    outerCFDFC = funcInfo.cfdfcs.front().first;
+
+  // Change the overall throughput calculation
+  assert(outerCFDFC && "Did not find any outermost loops in the CFG!");
+  // overallThrObj = vars.cfdfcVars[outerCFDFC].throughput *
+  // outerCFDFC->numExecs;
+
   //  For each channel, add a "penalty" in case a buffer is added to the
   //  channel, and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
@@ -1167,11 +1192,11 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
     os << "Throughput of CFDFC #" << idx << ": " << throughput << " and B_c is "
-       << cfVars.bc.get(GRB_DoubleAttr_X) << "\n";
+       << cfVars.bc.get(GRB_DoubleAttr_X) << "\n\n";
   }
 
   GRBQuadExpr obj = model.getObjective();
-  os << "# ================= #\n\n";
+  os << "# ================= #\n";
   os << "# Overall Throughput #\n";
   os << "# ================= #\n\n";
   os << "Overall throughput is " << overallThrObj.getValue() << "\n";

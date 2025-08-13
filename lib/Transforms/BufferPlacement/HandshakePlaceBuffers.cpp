@@ -706,14 +706,12 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
   unsigned numExecs;
 
   // Identify the cycles and the backward channels in your circuit
-  llvm::errs() << "\nBefore findALlCycles\n";
+  // llvm::errs() << "\nBefore findALlCycles\n";
   CycleList circuitCycles = findAllCycles(info.funcOp);
-  llvm::errs() << "\nAfter findALlCycles\n";
-  printCycles(circuitCycles);
+  // llvm::errs() << "\nAfter findALlCycles\n";
+  // printCycles(circuitCycles);
   DenseSet<Value> backwardChannels = findBackwardChannelPerCycle(circuitCycles);
-  printBackwardChannels(backwardChannels);
-
-  // DenseSet<Value> backwardChannels;
+  // printBackwardChannels(backwardChannels);
 
   do {
     // Clear the sets of selected archs and BBs
