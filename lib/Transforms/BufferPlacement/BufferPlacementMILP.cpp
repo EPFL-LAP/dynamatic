@@ -401,10 +401,10 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     /// stores that are connected to the LSQ and those that are not.
     /// In the new implementation, we use the MemInterfaceAttr to determine
     /// whether the StoreOp is connected to the LSQ or not.
-    if (isa<handshake::StoreOp>(dstOp) &&
-        getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()) {
-      continue;
-    }
+    // if (isa<handshake::StoreOp>(dstOp) &&
+    //     getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()) {
+    //   continue;
+    // }
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -455,8 +455,8 @@ void BufferPlacementMILP::
     /// TODO: this is from legacy implementation, we should understand why we
     /// really do this and figure out if it makes sense (@lucas-rami: I don't
     /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
+    // if (isa<handshake::StoreOp>(dstOp))
+    //   continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -545,8 +545,8 @@ void BufferPlacementMILP::
     /// TODO: this is from legacy implementation, we should understand why we
     /// really do this and figure out if it makes sense (@lucas-rami: I don't
     /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
+    // if (isa<handshake::StoreOp>(dstOp))
+    //   continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
