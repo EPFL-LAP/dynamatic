@@ -66,46 +66,6 @@ void translateMemDepAndNameAttrs(llvm::Instruction *inst, Operation *op,
   }
 }
 
-SmallVector<mlir::Value>
-ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currBB,
-                                              BasicBlock *nextBB) {
-  SmallVector<mlir::Value> operands;
-  for (PHINode &phi : nextBB->phis()) {
-    mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
-    operands.push_back(argument);
-  }
-  return operands;
-}
-
-void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
-                                                       func::FuncOp funcOp) {
-
-  // Convert the entry block (specially handled, because its arguments are also
-  // the function arguments). NOTE: "funcOp.addEntryBlock()" automatically adds
-  // the block arguments of the first block according to the predefined function
-  // signiture.
-  Block *entryBlock = funcOp.addEntryBlock();
-  BasicBlock &entryBB = llvmFunc->getEntryBlock();
-  blockMap[&entryBB] = entryBlock;
-
-  for (auto [llvmArg, mlirArg] :
-       llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
-    valueMap[&llvmArg] = mlirArg;
-  }
-
-  // Remaining basic blocks
-  for (BasicBlock &bb : drop_begin(*llvmFunc)) {
-    auto *block = funcOp.addBlock();
-    assert(!blockMap.count(&bb));
-    blockMap[&bb] = block;
-    for (auto &phi : bb.phis()) {
-      auto mlirArg = block->addArgument(getMLIRType(phi.getType(), ctx),
-                                        mlir::UnknownLoc::get(ctx));
-      valueMap[&phi] = mlirArg;
-    }
-  }
-}
-
 void convertInitializerToDenseElemAttrRecursive(
     llvm::Constant *constValue, SmallVector<mlir::Attribute> &values,
     const mlir::Type &baseMLIRElemType);
@@ -158,6 +118,187 @@ void convertInitializerToDenseElemAttrRecursive(
       llvm::errs() << "Unhandled constant element type:\n";
       elem->dump();
       llvm_unreachable("Unhandled base element type.");
+    }
+  }
+}
+
+void ImportLLVMModule::translateModule() {
+  translateGlobalVars();
+
+  for (auto &f : llvmModule->functions()) {
+    if (f.isDeclaration())
+      continue;
+
+    if (f.getName() != funcName)
+      continue;
+
+    translateFunction(&f);
+  }
+}
+
+void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
+
+  SmallVector<mlir::Type> argTypes =
+      getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
+
+  builder.setInsertionPointToEnd(mlirModule.getBody());
+
+  SmallVector<mlir::Type> resTypes;
+
+  if (!llvmFunc->getReturnType()->isVoidTy()) {
+    resTypes.push_back(getMLIRType(llvmFunc->getReturnType(), ctx));
+  }
+
+  auto funcType = builder.getFunctionType(argTypes, resTypes);
+  auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
+                                             llvmFunc->getName(), funcType);
+
+  initializeBlocksAndBlockMapping(llvmFunc, funcOp);
+
+  auto &entryBlock = funcOp.getBody().front();
+  builder.setInsertionPointToStart(&entryBlock);
+
+  createConstants(llvmFunc);
+  createGetGlobals(llvmFunc);
+
+  for (auto &block : *llvmFunc) {
+    builder.setInsertionPointToEnd(blockMap[&block]);
+    for (auto &inst : block) {
+      translateInstruction(&inst);
+    }
+  }
+}
+
+void ImportLLVMModule::translateGlobalVars() {
+  builder.setInsertionPointToEnd(mlirModule.getBody());
+  for (auto &constant : llvmModule->global_values()) {
+
+    auto *globalVar = dyn_cast<llvm::GlobalVariable>(&constant);
+
+    if (!globalVar)
+      continue;
+
+    auto *baseElemType = globalVar->getValueType();
+    SmallVector<int64_t> shape;
+    while (baseElemType->isArrayTy()) {
+      shape.push_back(baseElemType->getArrayNumElements());
+      baseElemType = baseElemType->getArrayElementType();
+    }
+    auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
+    auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+
+    StringRef symName = constant.getName();
+    StringAttr symNameAttr = StringAttr::get(ctx, Twine(symName));
+    // TODO: handling public visibility? Maybe we don't care about this?
+    StringAttr visibilityAttr = StringAttr::get(ctx, Twine("private"));
+    TypeAttr typeAttr = TypeAttr::get(memrefType);
+    UnitAttr isConstantAttr = UnitAttr::get(ctx);
+    IntegerAttr alignmentAttr =
+        builder.getI64IntegerAttr(globalVar->getAlignment());
+    DenseElementsAttr initialValueAttr;
+
+    if (globalVar->hasInitializer()) {
+      initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
+    }
+
+    auto globalOp = builder.create<memref::GlobalOp>(
+        // clang-format off
+        UnknownLoc::get(ctx),
+        symNameAttr,
+        visibilityAttr,
+        typeAttr,
+        initialValueAttr,
+        isConstantAttr,
+        alignmentAttr
+        // clang-format on
+    );
+    globalValToGlobalOpMap[&constant] = globalOp;
+  }
+}
+
+void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
+  Location loc = UnknownLoc::get(ctx);
+  if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
+    translateBinaryInst(binaryOp);
+  } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
+    translateCastInst(castOp);
+  } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
+    translateGEPInst(gepInst);
+  } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
+    translateLoadInst(loadInst);
+  } else if (auto *storeInst = dyn_cast<llvm::StoreInst>(inst)) {
+    translateStoreInst(storeInst);
+  } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
+    translateICmpInst(icmpInst);
+  } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
+    translateFCmpInst(fcmpInst);
+  } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
+    mlir::Value condition = valueMap[inst->getOperand(0)];
+    mlir::Value trueOperand = valueMap[inst->getOperand(1)];
+    mlir::Value falseOperand = valueMap[inst->getOperand(2)];
+    mlir::Type resType = getMLIRType(inst->getType(), ctx);
+    naiveTranslation<arith::SelectOp>(
+        // clang-format off
+        resType,
+        {condition, trueOperand, falseOperand},
+        inst
+        // clang-format on
+    );
+  } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
+    translateBranchInst(branchInst);
+  } else if (auto *allocaOp = dyn_cast<llvm::AllocaInst>(inst)) {
+    translateAllocaInst(allocaOp);
+  } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
+    if (returnOp->getNumOperands() == 1) {
+      mlir::Value arg = valueMap[inst->getOperand(0)];
+      builder.create<func::ReturnOp>(loc, arg);
+    } else {
+      builder.create<func::ReturnOp>(loc);
+    }
+  } else if (auto *phiOp = dyn_cast<llvm::PHINode>(inst)) {
+    // At this stage, Phi nodes are all converted to the block arguments
+    return;
+  } else {
+    inst->dump();
+    llvm_unreachable("Not implemented");
+  }
+}
+
+SmallVector<mlir::Value>
+ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currBB,
+                                              BasicBlock *nextBB) {
+  SmallVector<mlir::Value> operands;
+  for (PHINode &phi : nextBB->phis()) {
+    mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
+    operands.push_back(argument);
+  }
+  return operands;
+}
+
+void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
+                                                       func::FuncOp funcOp) {
+  // Convert the entry block (specially handled, because its arguments are also
+  // the function arguments). NOTE: "funcOp.addEntryBlock()" automatically adds
+  // the block arguments of the first block according to the predefined function
+  // signiture.
+  Block *entryBlock = funcOp.addEntryBlock();
+  BasicBlock &entryBB = llvmFunc->getEntryBlock();
+  blockMap[&entryBB] = entryBlock;
+
+  for (auto [llvmArg, mlirArg] :
+       llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
+    valueMap[&llvmArg] = mlirArg;
+  }
+
+  // Remaining basic blocks
+  for (BasicBlock &bb : drop_begin(*llvmFunc)) {
+    auto *block = funcOp.addBlock();
+    assert(!blockMap.count(&bb));
+    blockMap[&bb] = block;
+    for (auto &phi : bb.phis()) {
+      auto argType = getMLIRType(phi.getType(), ctx);
+      auto mlirArg = block->addArgument(argType, mlir::UnknownLoc::get(ctx));
+      valueMap[&phi] = mlirArg;
     }
   }
 }
@@ -418,8 +559,12 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
     builder.create<cf::BranchOp>(
-        UnknownLoc::get(ctx), blockMap[nextLLVMBB],
-        getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB));
+        // clang-format off
+        loc,
+        blockMap[nextLLVMBB],
+        getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB)
+        // clang-format on
+    );
   } else {
     // NOTE: operands of the branch instruction [Cond, FalseDest,] TrueDest
     // (from the C++ API).
@@ -432,9 +577,16 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
     mlir::Value condition = valueMap[inst->getCondition()];
-    builder.create<cf::CondBranchOp>(loc, condition, blockMap[trueDestBB],
-                                     trueOperands, blockMap[falseDestBB],
-                                     falseOperands);
+    builder.create<cf::CondBranchOp>(
+        // clang-format off
+        loc,
+        condition,
+        blockMap[trueDestBB],
+        trueOperands,
+        blockMap[falseDestBB],
+        falseOperands
+        // clang-format on
+    );
   }
 }
 
@@ -525,140 +677,4 @@ void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
-}
-
-void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
-  Location loc = UnknownLoc::get(ctx);
-  if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
-    translateBinaryInst(binaryOp);
-  } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
-    translateCastInst(castOp);
-  } else if (auto *gepInst = dyn_cast<llvm::GetElementPtrInst>(inst)) {
-    translateGEPInst(gepInst);
-  } else if (auto *loadInst = dyn_cast<llvm::LoadInst>(inst)) {
-    translateLoadInst(loadInst);
-  } else if (auto *storeInst = dyn_cast<llvm::StoreInst>(inst)) {
-    translateStoreInst(storeInst);
-  } else if (auto *icmpInst = dyn_cast<llvm::ICmpInst>(inst)) {
-    translateICmpInst(icmpInst);
-  } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
-    translateFCmpInst(fcmpInst);
-  } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
-    mlir::Value condition = valueMap[inst->getOperand(0)];
-    mlir::Value trueOperand = valueMap[inst->getOperand(1)];
-    mlir::Value falseOperand = valueMap[inst->getOperand(2)];
-    mlir::Type resType = getMLIRType(inst->getType(), ctx);
-    naiveTranslation<arith::SelectOp>(
-        resType, {condition, trueOperand, falseOperand}, inst);
-  } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
-    translateBranchInst(branchInst);
-  } else if (auto *allocaOp = dyn_cast<llvm::AllocaInst>(inst)) {
-    translateAllocaInst(allocaOp);
-  } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
-    if (returnOp->getNumOperands() == 1) {
-      mlir::Value arg = valueMap[inst->getOperand(0)];
-      builder.create<func::ReturnOp>(loc, arg);
-    } else {
-      builder.create<func::ReturnOp>(loc);
-    }
-  } else if (auto *phiOp = dyn_cast<llvm::PHINode>(inst)) {
-    // At this stage, Phi nodes are all converted to the block arguments
-    return;
-  } else {
-    inst->dump();
-    llvm_unreachable("Not implemented");
-  }
-}
-
-void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
-
-  SmallVector<mlir::Type> argTypes =
-      getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
-
-  builder.setInsertionPointToEnd(mlirModule.getBody());
-
-  SmallVector<mlir::Type> resTypes;
-
-  if (!llvmFunc->getReturnType()->isVoidTy()) {
-    resTypes.push_back(getMLIRType(llvmFunc->getReturnType(), ctx));
-  }
-
-  auto funcType = builder.getFunctionType(argTypes, resTypes);
-  auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
-                                             llvmFunc->getName(), funcType);
-
-  initializeBlocksAndBlockMapping(llvmFunc, funcOp);
-
-  auto &entryBlock = funcOp.getBody().front();
-  builder.setInsertionPointToStart(&entryBlock);
-
-  createConstants(llvmFunc);
-  createGetGlobals(llvmFunc);
-
-  for (auto &block : *llvmFunc) {
-    builder.setInsertionPointToEnd(blockMap[&block]);
-    for (auto &inst : block) {
-      translateInstruction(&inst);
-    }
-  }
-}
-
-void ImportLLVMModule::translateGlobalVars() {
-  builder.setInsertionPointToEnd(mlirModule.getBody());
-  for (auto &constant : llvmModule->global_values()) {
-
-    auto *globalVar = dyn_cast<llvm::GlobalVariable>(&constant);
-
-    if (!globalVar)
-      continue;
-    // assert(globalVar->hasPrivateLinkage() && "Other types are not
-    // handled...");
-
-    auto *baseElemType = globalVar->getValueType();
-    SmallVector<int64_t> shape;
-    while (baseElemType->isArrayTy()) {
-      shape.push_back(baseElemType->getArrayNumElements());
-      baseElemType = baseElemType->getArrayElementType();
-    }
-    auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
-    auto memrefType = MemRefType::get(shape, baseMLIRElemType);
-
-    StringRef symName = constant.getName();
-
-    StringAttr symNameAttr = StringAttr::get(ctx, Twine(symName));
-
-    StringAttr visibilityAttr = StringAttr::get(ctx, Twine("private"));
-
-    auto typeAttr = TypeAttr::get(memrefType);
-
-    auto isConstantAttr = UnitAttr::get(ctx);
-
-    auto alignmentAttr = builder.getI64IntegerAttr(globalVar->getAlignment());
-
-    DenseElementsAttr initialValueAttr;
-
-    if (globalVar->hasInitializer()) {
-      initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
-    }
-
-    auto globalOp = builder.create<memref::GlobalOp>(
-        UnknownLoc::get(ctx), symNameAttr, visibilityAttr, typeAttr,
-        initialValueAttr, isConstantAttr, alignmentAttr);
-    globalValToGlobalOpMap[&constant] = globalOp;
-  }
-}
-
-void ImportLLVMModule::translateModule() {
-
-  translateGlobalVars();
-
-  for (auto &f : llvmModule->functions()) {
-    if (f.isDeclaration())
-      continue;
-
-    if (f.getName() != funcName)
-      continue;
-
-    translateFunction(&f);
-  }
 }
