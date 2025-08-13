@@ -19,6 +19,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "isl/point.h"
+#include "isl/set.h"
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <cstddef>
@@ -33,6 +34,11 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/detail/adjacency_list.hpp>
+
+#include "llvm/Support/Debug.h"
+#include <polly/Support/ISLOStream.h>
+
+#define DEBUG_TYPE "array-parition"
 
 #include <boost/throw_exception.hpp>
 void boost::throw_exception(std::exception const &e) { std::abort(); }
@@ -260,12 +266,16 @@ struct AccessInfo {
 /// the outer-most dimension (same convention as GEP: from outer to inner)
 ArraySquashingInfo extractDimInfo(const isl::set &range,
                                   llvm::Type *allocaElemType) {
+
+  LLVM_DEBUG(llvm::errs() << "Extracting dimension info for access range "
+                          << range << "\n";);
+
   ArraySquashingInfo info;
 
-  // NULL range: this means that some accesses are not in the Scop and we don't
-  // know the access range of them. Here we simply return a full index range to
-  // be on the safe side.
   if (range.is_null()) {
+    // NULL range: this means that some accesses are not in the Scop and we
+    // don't know the access range of them. Here we simply return a full index
+    // range to be on the safe side.
     while (allocaElemType->isArrayTy()) {
       info.emplace_back(0, 1, allocaElemType->getArrayNumElements());
       allocaElemType = allocaElemType->getArrayElementType();
@@ -276,25 +286,36 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
   // example: A[N][M] gives you 2 dimensions
   auto numDims = unsignedFromIslSize(range.as_set().dim(isl::dim::set));
 
+  // For each dimension: enumerate all reachable indices
   for (unsigned i = 0; i < numDims; i++) {
-
     auto originalDimSize = allocaElemType->getArrayNumElements();
 
-    auto dim0 = range.as_set().project_out(
-        isl::dim::set, /*starting from which dimension? */ numDims - i - 1,
-        /* how many dimensions? */ 1);
+    isl::set reachableIndicesIslSet = range;
+    for (unsigned j = 0; j < numDims; ++j) {
+      // We need to remove all other dimensions that are not "i".
+      if (i != j) {
+        // "project_out" existence-quantifies a range of specified dimensions.
+        reachableIndicesIslSet =
+            range.project_out(isl::dim::set,
+                              /* starting from which dimension? */ j,
+                              /* how many dimensions? */ 1);
+      }
+    }
 
+    // The reachableIndicesIslSet is an isl::set type; we convert it to a set of
+    // integers to compute the step size and start index.
     std::vector<int> reachableIndices;
-    dim0.foreach_point([&reachableIndices](const isl::point &p) {
-      auto val = p.coordinate_val(
-          isl::dim::set,
-          /* dim only has one dimension so the position of the dim is 0 */
-          0);
-
-      int actualVal = val.get_num_si();
-      reachableIndices.push_back(actualVal);
-      return isl::stat::ok();
-    });
+    reachableIndicesIslSet.foreach_point(
+        [&reachableIndices](const isl::point &p) {
+          // isl::point is a multidimensional vector (a, b, c, d).
+          // "coordinate_val" retrives the values of pos-th dimension.
+          // In this case, dim only has one dimension (other dimensions are
+          // quantified away) so the position of the dimension is always 0.
+          auto val = p.coordinate_val(isl::dim::set, 0);
+          int actualVal = val.get_num_si();
+          reachableIndices.push_back(actualVal);
+          return isl::stat::ok();
+        });
 
     assert(reachableIndices.size() <= originalDimSize &&
            "The number of reachable indices should not exceed the original "
@@ -587,7 +608,6 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
       auto instRange = info.accessMaps[inst];
       range = range.unite(instRange);
     }
-
     auto dimInfo = extractDimInfo(range.as_set(), gblConstant->getValueType());
     // Get all the memory values accessed in the array:
 
