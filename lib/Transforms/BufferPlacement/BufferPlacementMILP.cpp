@@ -422,23 +422,24 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
     // Added b_c as a variable to the exploration that is passed to the
     // constraint if the channel is backedge
+    cfVars.bc.set(GRB_CharAttr_VType, GRB_INTEGER); // Force it to be integer
     GRBVar &bc = cfVars.bc;
 
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
-    model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
-                    "throughput_channelRetiming");
+    // model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
+    //                 "throughput_channelRetiming");
 
     // Aya: replace the above code with the following if you want to explore B_c
-    // if (cfdfc.backedges.contains(channel))
-    //   model.addConstr(chTokenOccupancy - bc == retDst - retSrc,
-    //                   "throughput_channelRetiming");
-    // else
-    //   // subtract 0 in case of non-backward channels
-    //   model.addConstr(chTokenOccupancy == retDst - retSrc,
-    //                   "throughput_channelRetiming");
+    if (cfdfc.backedges.contains(channel))
+      model.addConstr(chTokenOccupancy - bc == retDst - retSrc,
+                      "throughput_channelRetiming");
+    else
+      // subtract 0 in case of non-backward channels
+      model.addConstr(chTokenOccupancy == retDst - retSrc,
+                      "throughput_channelRetiming");
   }
 }
 
@@ -619,6 +620,55 @@ void BufferPlacementMILP::
   }
 }
 
+// Returns true if the small cfdfc is contained inside the big cfdfc
+bool isInternal(CFDFC *small, CFDFC *big) {
+  for (unsigned bb : small->cycle) {
+    if (!big->cycle.count(bb))
+      return false;
+  }
+  return true;
+}
+
+// Returns all cfdfcs nested inside the passed cfdfc and containing the
+// operation unit
+SmallVector<CFDFC *> returnNestedCfdfcsContainingUnit(FuncInfo &funcInfo,
+                                                      CFDFC &enclosingCfdfc,
+                                                      Operation *unit) {
+  SmallVector<CFDFC *> cfdfcsContainingUnit;
+  for (auto &[cfdfc, _] : funcInfo.cfdfcs) {
+    if (cfdfc == &enclosingCfdfc)
+      continue;
+    if (!isInternal(cfdfc, &enclosingCfdfc))
+      continue;
+    if (cfdfc->units.count(unit))
+      cfdfcsContainingUnit.push_back(cfdfc);
+  }
+
+  return cfdfcsContainingUnit;
+}
+
+CFDFC *returnInnerMostCFDFC(FuncInfo &funcInfo, CFDFC &enclosingCfdfc,
+                            Operation *unit) {
+  CFDFC *innermostCfdfc = nullptr;
+  int cycleSize = -1;
+
+  for (auto [cfdfc, _] : funcInfo.cfdfcs) {
+    if (cfdfc == &enclosingCfdfc || !isInternal(cfdfc, &enclosingCfdfc) ||
+        !cfdfc->units.count(unit))
+      continue;
+
+    if (cycleSize == -1 || cfdfc->cycle.size() < cycleSize) {
+      innermostCfdfc = cfdfc;
+      cycleSize = cfdfc->cycle.size();
+    }
+  }
+
+  if (innermostCfdfc == nullptr)
+    return &enclosingCfdfc;
+
+  return innermostCfdfc;
+}
+
 void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
@@ -627,6 +677,21 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
                                    targetPeriod)) ||
         latency == 0.0)
       continue;
+
+    // Aya: The idea is that every high-latency operation that belongs to a
+    // deeper loop than my current cfdfc should have its latency multiplied by
+    // the number of iterations of all loops above it not including my cfdfc,
+
+    // Multiply the latency by the total number of iterations of all loops
+    // nested inside cfdfc but excluding cfdfc
+    // Idenitfy the numExecs of the innermost cfdfc containing the unit
+    CFDFC *innerMostCfdfc = returnInnerMostCFDFC(funcInfo, cfdfc, unit);
+    int totalNumExecs = innerMostCfdfc->numExecs;
+
+    llvm::errs() << "\n\n\t\tInnermost numExec is " << totalNumExecs << "\n\n";
+    llvm::errs() << "\n\n\t\tMy cfdfc numExec is " << cfdfc.numExecs << "\n\n";
+
+    latency = latency * (totalNumExecs / cfdfc.numExecs);
 
     // Retrieve the MILP variables corresponding to the unit's fluid retiming
     UnitVars &unitVars = cfVars.unitVars[unit];
@@ -948,19 +1013,12 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   // number of executions. Backedges are executed one less time than "forward
   // edges" since they are only taken between executions of the cycle the CFDFC
   // represents
+
   unsigned numExec = isBackedge(channel) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
       numExec += cfdfc->numExecs;
   return numExec;
-}
-
-bool isInternal(CFDFC *small, CFDFC *big) {
-  for (unsigned bb : small->cycle) {
-    if (!big->cycle.count(bb))
-      return false;
-  }
-  return true;
 }
 
 GRBLinExpr overallThrObj;
@@ -970,9 +1028,8 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
-  for (Value channel : channels) {
+  for (Value channel : channels)
     totalExecs += getChannelNumExecs(channel);
-  }
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -981,37 +1038,43 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
       double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
-      llvm::errs()
-          << "\n\n\tPrinting the number of execution of the single CFDFC: "
-          << cfdfc->numExecs << "\n\n";
-      overallThrObj += coef * vars.cfdfcVars[cfdfc].throughput;
+      // overallThrObj += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
   }
+  llvm::errs() << "\n\n\t\t\tOld Coefficient of global throughput is "
+               << maxCoefCFDFC << "\n";
   // // In case we ran the MILP without providing any CFDFC, set the maximum
   // CFDFC
   // // coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
+  // Search for any cfdfc that is an outermost loop
   CFDFC *outerCFDFC = nullptr;
   for (auto [cfdfc1, optimize1] : funcInfo.cfdfcs) {
+    bool isOuterLoop = true;
     for (auto [cfdfc2, optimize2] : funcInfo.cfdfcs) {
       if (cfdfc1 == cfdfc2)
         continue;
-      if (!isInternal(cfdfc1, cfdfc2)) {
-        outerCFDFC = cfdfc1;
+      if (isInternal(cfdfc1, cfdfc2)) {
+        isOuterLoop = false;
         break;
       }
     }
+    if (isOuterLoop) {
+      outerCFDFC = cfdfc1;
+      break;
+    }
   }
-  if (funcInfo.cfdfcs.size() == 1)
-    outerCFDFC = funcInfo.cfdfcs.front().first;
 
   // Change the overall throughput calculation
   assert(outerCFDFC && "Did not find any outermost loops in the CFG!");
-  // overallThrObj = vars.cfdfcVars[outerCFDFC].throughput *
-  // outerCFDFC->numExecs;
+  double outerProbability = 1.0f / outerCFDFC->numExecs;
+  llvm::errs() << "\n\n\t\t\tNew Coefficient of global throughput is "
+               << outerProbability << "\n";
+  overallThrObj = vars.cfdfcVars[outerCFDFC].throughput * outerProbability;
+  maxCoefCFDFC = outerProbability;
 
   //  For each channel, add a "penalty" in case a buffer is added to the
   //  channel, and another penalty that depends on the number of slots

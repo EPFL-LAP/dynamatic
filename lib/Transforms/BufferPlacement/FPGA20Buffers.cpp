@@ -204,10 +204,8 @@ void FPGA20Buffers::setup() {
   // was marked to be optimized
   SmallVector<CFDFC *> cfdfcs;
   for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-    if (!optimize) {
-      llvm::errs() << "\n\nDo not optimize one of the CFDFCs\n\n";
+    if (!optimize)
       continue;
-    }
     cfdfcs.push_back(cfdfc);
     addCFDFCVars(*cfdfc);
     addSteadyStateReachabilityConstraints(*cfdfc);
@@ -218,22 +216,22 @@ void FPGA20Buffers::setup() {
   // The goal is to identify the relationship between CFDFCs
   // Identify the relationship between every BB and every other BB
   SmallVector<CFDFC *> outerMostCfdfcs;
-  for (auto [cfdfc1, optimize1] : funcInfo.cfdfcs) {
+  for (auto [cfdfc1, _] : funcInfo.cfdfcs) {
     CFDFC *enclosingCfdfc;
     int enclosingCycleSize = -1;
 
-    for (auto [cfdfc2, optimize2] : funcInfo.cfdfcs) {
+    for (auto [cfdfc2, _] : funcInfo.cfdfcs) {
       if (cfdfc1 == cfdfc2)
         continue;
-      if (isContained(cfdfc1, cfdfc2)) {
+      if (isContained(cfdfc1, cfdfc2))
         if (enclosingCycleSize == -1 ||
             cfdfc2->cycle.size() < enclosingCycleSize) {
           enclosingCfdfc = cfdfc2;
           enclosingCycleSize = cfdfc2->cycle.size();
         }
-      }
     }
 
+    // if there is no enclosing cycle, then cfdfc1 is an outerMostCfdfc
     if (enclosingCycleSize == -1)
       outerMostCfdfcs.push_back(cfdfc1);
     else {
@@ -243,32 +241,33 @@ void FPGA20Buffers::setup() {
 
       // TODO: Doublecheck that this is the right way of calculating the
       // probability of the inner loop
-      float innerProbability = enclosingCfdfc->numExecs / cfdfc1->numExecs;
+      double innerProbability =
+          (double)enclosingCfdfc->numExecs / cfdfc1->numExecs;
+
+      llvm::errs() << "\nInner probab. is " << innerProbability << "\n";
 
       // The outerCfdfcThroughput must = the innerCfdfcThroughput * probability
       // of exiting the inner loop
-      // model.addConstr(outerCfdfcThroughput ==
-      //                     innerCfdfcThroughput * innerProbability,
-      //                 "nested_throughput");
+      model.addConstr(outerCfdfcThroughput ==
+                          innerCfdfcThroughput * innerProbability,
+                      "nested_throughput");
     }
   }
 
-  if (funcInfo.cfdfcs.size() == 1)
-    outerMostCfdfcs.push_back(funcInfo.cfdfcs.front().first);
-
+  // Add a constraint to equate the global throughput of all outermost loops
   CFDFC *firstCfdfc = outerMostCfdfcs.front();
   GRBVar &firstCfdfcThroughput = vars.cfdfcVars[firstCfdfc].throughput;
-  float firstCfdfcProbability = 1 / firstCfdfc->numExecs;
+  double firstCfdfcProbability = 1.0f / firstCfdfc->numExecs;
   for (CFDFC *cfdfc : outerMostCfdfcs) {
     if (cfdfc == firstCfdfc)
       continue;
 
     GRBVar &cfdfcThroughput = vars.cfdfcVars[cfdfc].throughput;
-    float cfdfcProbability = 1 / cfdfc->numExecs;
+    double cfdfcProbability = 1.0f / cfdfc->numExecs;
 
-    // model.addConstr(cfdfcThroughput * cfdfcProbability ==
-    //                     firstCfdfcThroughput * firstCfdfcProbability,
-    //                 "sequential_throughput");
+    model.addConstr(cfdfcThroughput * cfdfcProbability ==
+                        firstCfdfcThroughput * firstCfdfcProbability,
+                    "sequential_throughput");
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
