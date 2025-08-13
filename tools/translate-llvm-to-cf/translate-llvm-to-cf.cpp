@@ -103,8 +103,9 @@ int main(int argc, char **argv) {
   OpBuilder builder(&context);
 
   auto module = builder.create<ModuleOp>(builder.getUnknownLoc());
-  // auto module = ModuleOp::create(builder.getUnknownLoc());
 
+  // LLVM IR's argument does not indicate high-level types such as array shapes.
+  // We use the original C code to recover this information.
   FuncNameToCFuncArgsMap nameToArgTypesMap =
       inferArgTypes(csource, dynamaticPath + "/include");
 

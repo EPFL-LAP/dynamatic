@@ -1,10 +1,6 @@
-#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constant.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
@@ -21,29 +17,32 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "InferArgTypes.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/Parser/Parser.h"
-
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <vector>
 
 using namespace llvm;
 using namespace mlir;
 
-class ImportLLVMModule {
+using MemRefAndIndices =
+    std::pair<mlir::Value /* memref */, SmallVector<mlir::Value> /* Indices */>;
 
+class ImportLLVMModule {
+public:
+  ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
+                   OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
+                   MLIRContext *ctx, StringRef funcName)
+      : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
+        builder(builder), ctx(ctx), argMap(argMap){};
+
+  /// Calling this method will translate the funcName to mlirModule. TODO: maybe
+  /// we could return a newly created "OwnOpReference<ModuleOp>" instead?
+  void translateModule();
+
+private:
+  /// FIXME: This module importer only converts for one given function (name).
   StringRef funcName;
 
   mlir::ModuleOp mlirModule;
@@ -55,30 +54,28 @@ class ImportLLVMModule {
   MLIRContext *ctx;
 
   /// LLVM -> MLIR basic block mapping.
-  mlir::DenseMap<llvm::BasicBlock *, mlir::Block *> blockMapping;
+  mlir::DenseMap<llvm::BasicBlock *, mlir::Block *> blockMap;
 
-  /// Mapping LLVM instruction values to MLIR results.
-  mlir::DenseMap<llvm::Value *, mlir::Value> valueMapping;
-
-  /// In MLIR memref, globals are identified using the sym_name.
+  /// In MLIR memref, globals are identified using the sym_name; in LLVM IR,
+  /// globals produce values and can be read by GEPs. We use this data structure
+  /// to remember the mapping.
   mlir::DenseMap<llvm::Value *, memref::GlobalOp> globalValToGlobalOpMap;
 
-  /// In LLVM IR to CF, we convert GEP -> LOAD/STORE to LOAD/STORE. However, the
-  /// data operand might not be available when we convert the LOAD/STORE. This
-  /// data structure registers the memref and address.
-  using MemRefAndIndices = std::pair<mlir::Value /* memref */,
-                                     SmallVector<mlir::Value> /* Indices */>;
+  /// Mapping LLVM instruction values to MLIR results. The values of LLVM IR to
+  /// Std dialect generally have one-to-one correspondence (except for the
+  /// inputs of load/store, see below).
+  mlir::DenseMap<llvm::Value *, mlir::Value> valueMap;
 
+  /// In LLVM IR to CF, we convert GEP -> LOAD/STORE to LOAD/STORE.
+  /// - In LLVM IR: load and store take pointer operand
+  /// - In MLIR IR: load and store take base address and indices
+  /// We use this data structure to store the base address and indices provided
+  /// by GEPs when processing GEPs. This will be used in LOAD/STORE conversions
+  /// to lookup the input base address and indices.
   mlir::DenseMap<llvm::Value *, MemRefAndIndices> gepInstToMemRefAndIndicesMap;
 
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
-
-  void addMapping(llvm::Value *llvmVal, mlir::Value mlirVal) {
-    valueMapping[llvmVal] = mlirVal;
-  }
-
-  std::set<Instruction *> converted;
 
   /// Construct an op without adding any attributes. TODO: maybe return the op
   /// to enable it?
@@ -87,30 +84,31 @@ class ImportLLVMModule {
                         Instruction *inst) {
     MLIRTy op =
         builder.create<MLIRTy>(UnknownLoc::get(ctx), returnType, values);
-
     // Register the corresponding MLIR value of the result of the original
     // instruction.
-    valueMapping[inst] = op.getResult();
+    valueMap[inst] = op.getResult();
   }
 
   void initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
                                        func::FuncOp funcOp);
 
-  /// LLVM embeds constants into the instructions, where in MLIR we need to
+  void translateFunction(llvm::Function *llvmFunc);
+
+  /// LLVM embeds constants into the instructions, wheres in MLIR we need to
   /// explicitly create them.
   void createConstants(llvm::Function *llvmFunc);
+
+  /// LLVM "GlobalVariables" are converted to "memref.global"
+  void translateGlobalVars();
 
   /// LLVM GEP instructions can directly take a global pointer. We need to
   /// explicitly create memref::GetGlobalOp here
   void createGetGlobals(llvm::Function *llvmFunc);
-  void translateFunction(llvm::Function *llvmFunc);
 
-  void translateGlobalVars();
-
-  // Dispatches to specialized functions:
+  /// Dispatches to specialized functions:
   void translateInstruction(llvm::Instruction *inst);
 
-  // Specialized translation functions:
+  /// Specialized translation functions:
   void translateBinaryInst(llvm::BinaryOperator *inst);
   void translateCastInst(llvm::CastInst *inst);
   void translateICmpInst(llvm::ICmpInst *inst);
@@ -121,15 +119,6 @@ class ImportLLVMModule {
   void translateStoreInst(llvm::StoreInst *storeInst);
   void translateAllocaInst(llvm::AllocaInst *allocaInst);
 
-  SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currentBB,
+  SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                                        BasicBlock *nextBB);
-
-public:
-  ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
-                   OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
-                   MLIRContext *ctx, StringRef funcName)
-      : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
-        builder(builder), ctx(ctx), argMap(argMap){};
-
-  void translateModule();
 };

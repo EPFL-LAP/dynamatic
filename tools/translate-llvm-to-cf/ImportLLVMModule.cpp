@@ -29,23 +29,24 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/MemoryDependency.h"
 
+/// Returns the corresponding scalar MLIR Type from a given LLVM type
 mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
                                  mlir::MLIRContext *context) {
-  mlir::Type mlirType;
-
   if (llvmType->isIntegerTy()) {
-    mlirType = mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
-  } else if (llvmType->isFloatTy()) {
-    mlirType = mlir::FloatType::getF32(context);
-  } else if (llvmType->isDoubleTy()) {
-    mlirType = mlir::FloatType::getF64(context);
-  } else {
-    llvmType->dump();
-    assert(false);
+    return mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   }
-  return mlirType;
+  if (llvmType->isFloatTy()) {
+    return mlir::FloatType::getF32(context);
+  }
+  if (llvmType->isDoubleTy()) {
+    return mlir::FloatType::getF64(context);
+  }
+
+  llvmType->dump();
+  llvm_unreachable("Unhandled scalar type");
 }
 
+/// Translates the LLVM dependency attribute to handshake dependency attribute.
 void translateDepAttr(llvm::Instruction *inst, Operation *op, MLIRContext &ctx,
                       OpBuilder &builder) {
   if (auto depData = LLVMMemDependency::fromLLVMInstruction(inst);
@@ -63,12 +64,11 @@ void translateDepAttr(llvm::Instruction *inst, Operation *op, MLIRContext &ctx,
 }
 
 SmallVector<mlir::Value>
-ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currentBB,
+ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                               BasicBlock *nextBB) {
   SmallVector<mlir::Value> operands;
   for (PHINode &phi : nextBB->phis()) {
-    mlir::Value argument =
-        valueMapping[phi.getIncomingValueForBlock(currentBB)];
+    mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
     operands.push_back(argument);
   }
   return operands;
@@ -77,37 +77,32 @@ ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currentBB,
 void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
                                                        func::FuncOp funcOp) {
 
-  // Convert the entry block
-
-  // NOTE: this automatically adds the block arguments of the first block
-  // according to the predefined function signiture.
+  // Convert the entry block (specially handled, because its arguments are also
+  // the function arguments). NOTE: "funcOp.addEntryBlock()" automatically adds
+  // the block arguments of the first block according to the predefined function
+  // signiture.
   Block *entryBlock = funcOp.addEntryBlock();
   BasicBlock &entryBB = llvmFunc->getEntryBlock();
-  blockMapping[&entryBB] = entryBlock;
-
-  // Note: funcType and the actual function arguments (i.e., the arguments of
-  // the first block) are two separate concepts:
+  blockMap[&entryBB] = entryBlock;
 
   for (auto [llvmArg, mlirArg] :
        llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
-    valueMapping[&llvmArg] = mlirArg;
+    valueMap[&llvmArg] = mlirArg;
   }
 
   // Remaining basic blocks
   for (BasicBlock &bb : *llvmFunc) {
-
     if (&bb == &entryBB)
       continue;
 
     auto *block = funcOp.addBlock();
-    assert(!blockMapping.count(&bb));
-    blockMapping[&bb] = block;
+    assert(!blockMap.count(&bb));
+    blockMap[&bb] = block;
     for (auto &phi : bb.phis()) {
       auto mlirArg =
           block->addArgument(convertLLVMTypeToMLIR(phi.getType(), ctx),
                              mlir::UnknownLoc::get(ctx));
-      valueMapping[&phi] = mlirArg;
-      converted.insert(&phi);
+      valueMap[&phi] = mlirArg;
     }
   }
 }
@@ -168,7 +163,7 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
 
         // NOTE: llvm use the same pointer for multiple uses of the same
         // constant, therefore we don't need to add it twice.
-        if (!isa<llvm::Constant>(val) || valueMapping.count(val)) {
+        if (!isa<llvm::Constant>(val) || valueMap.count(val)) {
           continue;
         }
 
@@ -176,7 +171,7 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
           APInt intVal = intConst->getValue();
           auto constOp = builder.create<arith::ConstantIntOp>(
               loc, intVal.getSExtValue(), intVal.getBitWidth());
-          valueMapping[val] = constOp->getResult(0);
+          valueMap[val] = constOp->getResult(0);
           loc = constOp->getLoc();
         }
 
@@ -185,12 +180,12 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
                 loc, floatVal, builder.getF32Type());
-            valueMapping[val] = constOp->getResult(0);
+            valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
                 loc, floatVal, builder.getF64Type());
-            valueMapping[val] = constOp->getResult(0);
+            valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
         }
@@ -216,7 +211,7 @@ void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
           auto getGlobalOp = builder.create<memref::GetGlobalOp>(
               loc, memrefType, globalOp.getSymName());
 
-          valueMapping[val] = getGlobalOp.getResult();
+          valueMap[val] = getGlobalOp.getResult();
         }
       }
     }
@@ -224,8 +219,8 @@ void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
 }
 
 void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
-  mlir::Value lhs = valueMapping[inst->getOperand(0)];
-  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  mlir::Value lhs = valueMap[inst->getOperand(0)];
+  mlir::Value rhs = valueMap[inst->getOperand(1)];
   mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
   switch (inst->getOpcode()) {
     // clang-format off
@@ -256,7 +251,7 @@ void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
 }
 
 void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
-  mlir::Value arg = valueMapping[inst->getOperand(0)];
+  mlir::Value arg = valueMap[inst->getOperand(0)];
   mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
 
   switch (inst->getOpcode()) {
@@ -281,8 +276,8 @@ void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
 void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
   Location loc = UnknownLoc::get(ctx);
 
-  mlir::Value lhs = valueMapping[inst->getOperand(0)];
-  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  mlir::Value lhs = valueMap[inst->getOperand(0)];
+  mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpIPredicate pred;
   switch (inst->getPredicate()) {
     // clang-format off
@@ -302,40 +297,33 @@ void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
   }
 
   auto op = builder.create<arith::CmpIOp>(loc, pred, lhs, rhs);
-  addMapping(inst, op.getResult());
+  valueMap[inst] = op->getResult(0);
   loc = op.getLoc();
 }
 
 void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
 
   Location loc = UnknownLoc::get(ctx);
-  mlir::Value lhs = valueMapping[inst->getOperand(0)];
-  mlir::Value rhs = valueMapping[inst->getOperand(1)];
+  mlir::Value lhs = valueMap[inst->getOperand(0)];
+  mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpFPredicate pred;
 
   switch (inst->getPredicate()) {
     // clang-format off
-    // Ordered comparisons
     case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
     case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
     case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
     case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
     case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
     case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
-
-    // Ordered / unordered special checks
     case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
     case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
-
-    // Unordered comparisons
     case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
     case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
     case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
     case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
     case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
     case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
-
-    // No comparison (always false/true)
     case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
     case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
 
@@ -343,7 +331,7 @@ void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
     // clang-format on
   }
   auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
-  addMapping(inst, op.getResult());
+  valueMap[inst] = op->getResult(0);
   loc = op.getLoc();
 }
 
@@ -352,7 +340,7 @@ void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // only computes the indices for the LOAD/STORE ops that the gepInst drives.
 
   // Check if the GEP is not chained
-  mlir::Value baseAddress = valueMapping[gepInst->getPointerOperand()];
+  mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
   SmallVector<mlir::Value> indexOperands;
 
   auto memrefType = baseAddress.getType().dyn_cast<MemRefType>();
@@ -362,7 +350,7 @@ void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   for (auto &indexUse : gepInst->indices()) {
     llvm::Value *indexValue = indexUse;
-    mlir::Value mlirIndexValue = valueMapping[indexValue];
+    mlir::Value mlirIndexValue = valueMap[indexValue];
     // NOTE: memref::LoadOp and memref::StoreOp expect their indices to be of
     // IndexType. Therefore, we cast the i32/i64 indices to IndexType. This
     // pattern will later be folded in the bitwidth optimization pass.
@@ -426,7 +414,7 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
     auto op = builder.create<cf::BranchOp>(
-        loc, blockMapping[nextLLVMBB],
+        loc, blockMap[nextLLVMBB],
         getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB));
     loc = op.getLoc();
   } else {
@@ -441,11 +429,11 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
 
-    mlir::Value condition = valueMapping[inst->getCondition()];
+    mlir::Value condition = valueMap[inst->getCondition()];
 
     auto op = builder.create<cf::CondBranchOp>(
-        loc, condition, blockMapping[trueDestBB], trueOperands,
-        blockMapping[falseDestBB], falseOperands);
+        loc, condition, blockMap[trueDestBB], trueOperands,
+        blockMap[falseDestBB], falseOperands);
     loc = op.getLoc();
   }
 }
@@ -469,7 +457,7 @@ void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
           "Converting a load but the producer hasn't been converted yet!");
     // NOTE: This condition handles a special case where a load only has
     // constant indices, e.g., tmp = mat[0][0].
-    addressVal = this->valueMapping[instAddr];
+    addressVal = this->valueMap[instAddr];
     auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
@@ -481,7 +469,7 @@ void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
   mlir::Type resType = convertLLVMTypeToMLIR(loadInst->getType(), ctx);
   auto newOp =
       builder.create<memref::LoadOp>(loc, resType, addressVal, indexValues);
-  valueMapping[loadInst] = newOp.getResult();
+  valueMap[loadInst] = newOp.getResult();
   translateDepAttr(loadInst, newOp, *ctx, builder);
 }
 
@@ -506,7 +494,7 @@ void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
     if (isa<GetElementPtrInst>(instAddr))
       llvm_unreachable(
           "Converting a load but the producer hasn't been converted yet!");
-    addressVal = this->valueMapping[instAddr];
+    addressVal = this->valueMap[instAddr];
     auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
 
     int constZerosToAdd = memrefType.getShape().size();
@@ -517,7 +505,7 @@ void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
     }
   }
 
-  mlir::Value storeValue = valueMapping[storeInst->getValueOperand()];
+  mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
       builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
   translateDepAttr(storeInst, newOp, *ctx, builder);
@@ -538,14 +526,11 @@ void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
       MemRefType::get(shape, convertLLVMTypeToMLIR(baseElementType, ctx));
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
-  valueMapping[allocaInst] = allocaOp->getResult(0);
+  valueMap[allocaInst] = allocaOp->getResult(0);
 }
 
 void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   Location loc = UnknownLoc::get(ctx);
-  if (converted.count(inst)) {
-    return;
-  }
   if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
     translateBinaryInst(binaryOp);
   } else if (auto *castOp = dyn_cast<llvm::CastInst>(inst)) {
@@ -561,9 +546,9 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
     translateFCmpInst(fcmpInst);
   } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
-    mlir::Value condition = valueMapping[inst->getOperand(0)];
-    mlir::Value trueOperand = valueMapping[inst->getOperand(1)];
-    mlir::Value falseOperand = valueMapping[inst->getOperand(2)];
+    mlir::Value condition = valueMap[inst->getOperand(0)];
+    mlir::Value trueOperand = valueMap[inst->getOperand(1)];
+    mlir::Value falseOperand = valueMap[inst->getOperand(2)];
     mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
     naiveTranslation<arith::SelectOp>(
         resType, {condition, trueOperand, falseOperand}, inst);
@@ -573,19 +558,18 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
     translateAllocaInst(allocaOp);
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
-      mlir::Value arg = valueMapping[inst->getOperand(0)];
+      mlir::Value arg = valueMap[inst->getOperand(0)];
       builder.create<func::ReturnOp>(loc, arg);
     } else {
       builder.create<func::ReturnOp>(loc);
     }
+  } else if (auto *phiOp = dyn_cast<llvm::PHINode>(inst)) {
+    // At this stage, Phi nodes are all converted to the block arguments
+    return;
   } else {
+    inst->dump();
     llvm_unreachable("Not implemented");
   }
-
-  // This method usually converts a single instruction. When it does DAG-DAG
-  // conversion (e.g., GEP -> LOAD/STORE), we register the additionally
-  // converted instructions in specific cases.
-  converted.insert(inst);
 }
 
 void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
@@ -614,7 +598,7 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   createGetGlobals(llvmFunc);
 
   for (auto &block : *llvmFunc) {
-    builder.setInsertionPointToEnd(blockMapping[&block]);
+    builder.setInsertionPointToEnd(blockMap[&block]);
     for (auto &inst : block) {
       translateInstruction(&inst);
     }
