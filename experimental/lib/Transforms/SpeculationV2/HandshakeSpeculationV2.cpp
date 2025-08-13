@@ -830,6 +830,84 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
   return merge;
 }
 
+static void placeIdOps(FuncOp funcOp) {
+  OpBuilder builder(funcOp->getContext());
+  for (auto initOp : llvm::make_early_inc_range(funcOp.getOps<InitOp>())) {
+    materializeValue(initOp.getOperand());
+    builder.setInsertionPoint(initOp);
+    auto idOp = builder.create<IdOp>(initOp.getLoc(), initOp.getOperand());
+    inheritBB(initOp, idOp);
+    initOp.getOperand().replaceAllUsesExcept(idOp.getResult(), idOp);
+  }
+  for (auto riOp :
+       llvm::make_early_inc_range(funcOp.getOps<SpecV2RepeatingInitOp>())) {
+    materializeValue(riOp.getOperand());
+    builder.setInsertionPoint(riOp);
+    auto idOp = builder.create<IdOp>(riOp.getLoc(), riOp.getOperand());
+    inheritBB(riOp, idOp);
+    riOp.getOperand().replaceAllUsesExcept(idOp.getResult(), idOp);
+  }
+}
+
+static DenseMap<unsigned, unsigned> unifyBBs(ArrayRef<unsigned> loopBBs,
+                                             FuncOp funcOp) {
+  DenseMap<unsigned, unsigned> bbMap;
+  unsigned minBB = *std::min_element(loopBBs.begin(), loopBBs.end());
+  funcOp.walk([&](Operation *op) {
+    auto bbOrNull = getLogicBB(op);
+    if (!bbOrNull.has_value())
+      return;
+
+    unsigned bb = bbOrNull.value();
+    if (!bbMap.contains(bb)) {
+      if (std::find(loopBBs.begin(), loopBBs.end(), bb) != loopBBs.end()) {
+        bbMap[bb] = minBB;
+      } else {
+        unsigned d = 0;
+        for (auto loopBB : loopBBs) {
+          if (loopBB == minBB)
+            continue;
+          if (loopBB < bb)
+            d++;
+        }
+        bbMap[bb] = bb - d;
+      }
+    }
+
+    setBB(op, bbMap[bb]);
+  });
+
+  return bbMap;
+}
+
+static void recalculateMCBlocks(FuncOp funcOp) {
+  DenseSet<unsigned> bbs;
+  OpBuilder builder(funcOp->getContext());
+
+  for (auto mc :
+       llvm::make_early_inc_range(funcOp.getOps<MemoryControllerOp>())) {
+    bbs.clear();
+    for (auto oprd : mc->getOperands()) {
+      if (oprd.getDefiningOp()) {
+        if (auto bbOrNull = getLogicBB(oprd.getDefiningOp())) {
+          bbs.insert(bbOrNull.value());
+        }
+      }
+    }
+    for (auto res : mc->getResults()) {
+      for (auto *user : res.getUsers()) {
+        if (isa<EndOp>(user))
+          continue;
+        if (auto bbOrNull = getLogicBB(user)) {
+          bbs.insert(bbOrNull.value());
+        }
+      }
+    }
+    auto i32Attr = builder.getI32ArrayAttr({static_cast<int32_t>(bbs.size())});
+    mc.setConnectedBlocksAttr(i32Attr);
+  }
+}
+
 struct SpecSpecification {
   SmallVector<unsigned> loopBBs;
 };
@@ -1137,4 +1215,18 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       }
     }
   }
+
+  DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
+  // Convert bbMap to a json file
+  std::ofstream csvFile(bbMapping);
+  csvFile << "before,after\n";
+  for (const auto &entry : bbMap) {
+    csvFile << entry.first << "," << entry.second << "\n";
+    // }
+  }
+  csvFile.close();
+
+  recalculateMCBlocks(funcOp);
+
+  // placeIdOps(funcOp);
 }

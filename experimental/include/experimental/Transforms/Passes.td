@@ -75,7 +75,9 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the kernel information related to speculation.">,
     Option<"n", "n", "unsigned", "", "the number of iterations to speculate">,
-    Option<"variable", "variable", "bool", "false", "enable variable speculation">
+    Option<"variable", "variable", "bool", "false", "enable variable speculation">,
+    Option<"bbMapping", "bb-mapping", "std::string", "",
+           "Path to the output bb mapping file.">
   ];
 }
 

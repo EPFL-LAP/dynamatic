@@ -300,12 +300,13 @@ def run_test(c_file, n, variable):
     # Speculation
     handshake_speculation = os.path.join(
         comp_out_dir, "handshake_speculation.mlir")
+    bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
     with open(handshake_speculation, "w") as f:
         print(f"n={n}, variable={variable}")
         json_path = os.path.join(c_file_dir, "specv2.json")
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_transformed,
-            f"--handshake-speculation-v2=json-path={json_path} n={n} {"variable" if variable else ""}",
+            f"--handshake-speculation-v2=json-path={json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""}",
             "--handshake-materialize",
             "--handshake-canonicalize"
         ],
@@ -357,6 +358,22 @@ def run_test(c_file, n, variable):
         else:
             return fail(id, "Failed to profile cf-level")
 
+    # Update frequencies.csv
+    updated_frequencies = os.path.join(comp_out_dir, "updated_frequencies.csv")
+    with open(updated_frequencies, "w") as f:
+        result = subprocess.run([
+            "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
+            "--frequencies=" + frequencies,
+            "--mapping=" + bb_mapping
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Updated frequencies.csv")
+        else:
+            return fail(id, "Failed to update frequencies.csv")
+
     # Buffer placement (FPGA20)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
     timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
@@ -364,7 +381,7 @@ def run_test(c_file, n, variable):
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout

@@ -188,13 +188,13 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   // SpecV2 Constraints
   for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
     Channel channel(initOp.getOperand(), true);
-    channel.props->minSlots = std::max(channel.props->minSlots, 2U);
+    channel.props->minSlots = std::max(channel.props->minSlots, 1U);
   }
 
   for (auto repeatingInitOp :
        funcOp.getOps<handshake::SpecV2RepeatingInitOp>()) {
     Channel channel(repeatingInitOp.getOperand(), true);
-    channel.props->minSlots = std::max(channel.props->minSlots, 2U);
+    channel.props->minSlots = std::max(channel.props->minSlots, 1U);
   }
 
   // for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
