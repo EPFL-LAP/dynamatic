@@ -687,10 +687,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
             handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
             handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
-            handshake::FPToSIOp, handshake::AbsFOp>([&](auto) {
-        // Bitwidth
-        addType("DATA_TYPE", op->getOperand(0));
-      })
+            handshake::FPToSIOp, handshake::AbsFOp, handshake::MaxSIOp>(
+          [&](auto) {
+            // Bitwidth
+            addType("DATA_TYPE", op->getOperand(0));
+          })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
         addType("DATA_TYPE", selectOp.getTrueValue());
@@ -2121,6 +2122,7 @@ public:
                     ConvertToHWInstance<handshake::FPToSIOp>,
                     ConvertToHWInstance<handshake::ExtFOp>,
                     ConvertToHWInstance<handshake::AbsFOp>,
+                    ConvertToHWInstance<handshake::MaxSIOp>,
 
                     // Speculative operations
                     ConvertToHWInstance<handshake::SpecCommitOp>,

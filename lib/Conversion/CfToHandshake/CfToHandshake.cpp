@@ -1609,6 +1609,7 @@ struct CfToHandshakePass
         OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
         OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+        OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
         OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
         OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
         OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
