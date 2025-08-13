@@ -30,8 +30,7 @@
 #include "dynamatic/Support/MemoryDependency.h"
 
 /// Returns the corresponding scalar MLIR Type from a given LLVM type
-mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
-                                 mlir::MLIRContext *context) {
+mlir::Type getMLIRType(llvm::Type *llvmType, mlir::MLIRContext *context) {
   if (llvmType->isIntegerTy()) {
     return mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   }
@@ -46,9 +45,13 @@ mlir::Type convertLLVMTypeToMLIR(llvm::Type *llvmType,
   llvm_unreachable("Unhandled scalar type");
 }
 
-/// Translates the LLVM dependency attribute to handshake dependency attribute.
-void translateDepAttr(llvm::Instruction *inst, Operation *op, MLIRContext &ctx,
-                      OpBuilder &builder) {
+void translateMemDepAndNameAttrs(llvm::Instruction *inst, Operation *op,
+                                 MLIRContext &ctx, OpBuilder &builder) {
+  // Dynamatic marks memory dependency as metadata nodes in LLVM IR. This
+  // function convert them to the corresponding MLIR attributes in MLIR.
+  // TODOs:
+  // - Separate the handling for "handshake.name" and "deps"
+  // - Put MemoryDependency.h to this translation tool
   if (auto depData = LLVMMemDependency::fromLLVMInstruction(inst);
       depData.has_value()) {
     std::string opName = depData.value().name;
@@ -91,20 +94,48 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
   }
 
   // Remaining basic blocks
-  for (BasicBlock &bb : *llvmFunc) {
-    if (&bb == &entryBB)
-      continue;
-
+  for (BasicBlock &bb : drop_begin(*llvmFunc)) {
     auto *block = funcOp.addBlock();
     assert(!blockMap.count(&bb));
     blockMap[&bb] = block;
     for (auto &phi : bb.phis()) {
-      auto mlirArg =
-          block->addArgument(convertLLVMTypeToMLIR(phi.getType(), ctx),
-                             mlir::UnknownLoc::get(ctx));
+      auto mlirArg = block->addArgument(getMLIRType(phi.getType(), ctx),
+                                        mlir::UnknownLoc::get(ctx));
       valueMap[&phi] = mlirArg;
     }
   }
+}
+
+void convertInitializerToDenseElemAttrRecursive(
+    llvm::Constant *constValue, SmallVector<mlir::Attribute> &values,
+    const mlir::Type &baseMLIRElemType);
+
+// Unlike LLVM, in MLIR the dense data array itself doesn't have a particular
+// shape, so we need to do this flattening conversion for multidimensional
+// arrays.
+//
+// Converts a LLVM IR multidimension array initialization constant data into an
+// 1D MLIR dense array in row major. This function recursively visits the
+// dimensions and push the scalar elements into a flat array (values).
+DenseElementsAttr
+convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
+                                  MLIRContext *ctx) {
+  auto *baseElementType = globVar->getInitializer()->getType();
+  SmallVector<int64_t> shape;
+  int64_t numElems = 1;
+  while (baseElementType->isArrayTy()) {
+    int64_t numElemCurrDim = baseElementType->getArrayNumElements();
+    shape.push_back(numElemCurrDim);
+    baseElementType = baseElementType->getArrayElementType();
+    numElems *= numElemCurrDim;
+  }
+  auto baseMLIRElemType = getMLIRType(baseElementType, ctx);
+  SmallVector<mlir::Attribute> values;
+  values.reserve(numElems);
+  convertInitializerToDenseElemAttrRecursive(globVar->getInitializer(), values,
+                                             baseMLIRElemType);
+  return mlir::DenseElementsAttr::get(
+      mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
 }
 
 void convertInitializerToDenseElemAttrRecursive(
@@ -129,28 +160,6 @@ void convertInitializerToDenseElemAttrRecursive(
       llvm_unreachable("Unhandled base element type.");
     }
   }
-}
-
-DenseElementsAttr
-convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
-                                  MLIRContext *ctx) {
-  auto *baseElementType = globVar->getInitializer()->getType();
-  SmallVector<int64_t> shape;
-  int64_t numElems = 1;
-  while (baseElementType->isArrayTy()) {
-    int64_t numElemCurrDim = baseElementType->getArrayNumElements();
-    shape.push_back(numElemCurrDim);
-    baseElementType = baseElementType->getArrayElementType();
-    numElems *= numElemCurrDim;
-  }
-  auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElementType, ctx);
-  SmallVector<mlir::Attribute> values;
-  values.reserve(numElems);
-  convertInitializerToDenseElemAttrRecursive(globVar->getInitializer(), values,
-                                             baseMLIRElemType);
-  auto denseAttr = mlir::DenseElementsAttr::get(
-      mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
-  return denseAttr;
 }
 
 void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
@@ -221,7 +230,7 @@ void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
 void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
-  mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+  mlir::Type resType = getMLIRType(inst->getType(), ctx);
   switch (inst->getOpcode()) {
     // clang-format off
     case Instruction::Add:  naiveTranslation<arith::AddIOp>( resType,  {lhs, rhs}, inst); break;
@@ -252,18 +261,18 @@ void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
 
 void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
   mlir::Value arg = valueMap[inst->getOperand(0)];
-  mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+  mlir::Type resType = getMLIRType(inst->getType(), ctx);
 
   switch (inst->getOpcode()) {
     // clang-format off
-    case Instruction::ZExt: naiveTranslation<arith::ExtUIOp>( resType, {arg}, inst); break;
-    case Instruction::SExt: naiveTranslation<arith::ExtSIOp>( resType, {arg}, inst); break;
-    case Instruction::FPExt: naiveTranslation<arith::ExtFOp>( resType, {arg}, inst); break;
-    case Instruction::Trunc: naiveTranslation<arith::TruncIOp>( resType, {arg}, inst); break;
+    case Instruction::ZExt:    naiveTranslation<arith::ExtUIOp>( resType, {arg}, inst); break;
+    case Instruction::SExt:    naiveTranslation<arith::ExtSIOp>( resType, {arg}, inst); break;
+    case Instruction::FPExt:   naiveTranslation<arith::ExtFOp>( resType, {arg}, inst); break;
+    case Instruction::Trunc:   naiveTranslation<arith::TruncIOp>( resType, {arg}, inst); break;
     case Instruction::FPTrunc: naiveTranslation<arith::TruncFOp>( resType, {arg}, inst); break;
-    case Instruction::SIToFP: naiveTranslation<arith::SIToFPOp>( resType, {arg}, inst); break;
-    case Instruction::FPToSI: naiveTranslation<arith::FPToSIOp>( resType, {arg}, inst); break;
-    case Instruction::FPToUI: naiveTranslation<arith::FPToUIOp>( resType, {arg}, inst); break;
+    case Instruction::SIToFP:  naiveTranslation<arith::SIToFPOp>( resType, {arg}, inst); break;
+    case Instruction::FPToSI:  naiveTranslation<arith::FPToSIOp>( resType, {arg}, inst); break;
+    case Instruction::FPToUI:  naiveTranslation<arith::FPToUIOp>( resType, {arg}, inst); break;
     // clang-format on
   default: {
     llvm::errs() << "Not yet handled binary operation type "
@@ -274,65 +283,60 @@ void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
 }
 
 void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
-  Location loc = UnknownLoc::get(ctx);
-
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
-  arith::CmpIPredicate pred;
+  arith::CmpIPredicate predicate;
   switch (inst->getPredicate()) {
     // clang-format off
-    case llvm::CmpInst::Predicate::ICMP_EQ:  pred = arith::CmpIPredicate::eq;  break;
-    case llvm::CmpInst::Predicate::ICMP_NE:  pred = arith::CmpIPredicate::ne;  break;
-    case llvm::CmpInst::Predicate::ICMP_UGT: pred = arith::CmpIPredicate::ugt; break;
-    case llvm::CmpInst::Predicate::ICMP_UGE: pred = arith::CmpIPredicate::uge; break;
-    case llvm::CmpInst::Predicate::ICMP_ULT: pred = arith::CmpIPredicate::ult; break;
-    case llvm::CmpInst::Predicate::ICMP_ULE: pred = arith::CmpIPredicate::ule; break;
-    case llvm::CmpInst::Predicate::ICMP_SGT: pred = arith::CmpIPredicate::sgt; break;
-    case llvm::CmpInst::Predicate::ICMP_SGE: pred = arith::CmpIPredicate::sge; break;
-    case llvm::CmpInst::Predicate::ICMP_SLT: pred = arith::CmpIPredicate::slt; break;
-    case llvm::CmpInst::Predicate::ICMP_SLE: pred = arith::CmpIPredicate::sle; break;
+    case llvm::CmpInst::Predicate::ICMP_EQ:  predicate = arith::CmpIPredicate::eq;  break;
+    case llvm::CmpInst::Predicate::ICMP_NE:  predicate = arith::CmpIPredicate::ne;  break;
+    case llvm::CmpInst::Predicate::ICMP_UGT: predicate = arith::CmpIPredicate::ugt; break;
+    case llvm::CmpInst::Predicate::ICMP_UGE: predicate = arith::CmpIPredicate::uge; break;
+    case llvm::CmpInst::Predicate::ICMP_ULT: predicate = arith::CmpIPredicate::ult; break;
+    case llvm::CmpInst::Predicate::ICMP_ULE: predicate = arith::CmpIPredicate::ule; break;
+    case llvm::CmpInst::Predicate::ICMP_SGT: predicate = arith::CmpIPredicate::sgt; break;
+    case llvm::CmpInst::Predicate::ICMP_SGE: predicate = arith::CmpIPredicate::sge; break;
+    case llvm::CmpInst::Predicate::ICMP_SLT: predicate = arith::CmpIPredicate::slt; break;
+    case llvm::CmpInst::Predicate::ICMP_SLE: predicate = arith::CmpIPredicate::sle; break;
 
     default: llvm_unreachable("Unsupported ICMP predicate");
     // clang-format on
   }
 
-  auto op = builder.create<arith::CmpIOp>(loc, pred, lhs, rhs);
+  auto op =
+      builder.create<arith::CmpIOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
-  loc = op.getLoc();
 }
 
 void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
-
-  Location loc = UnknownLoc::get(ctx);
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
-  arith::CmpFPredicate pred;
-
+  arith::CmpFPredicate predicate;
   switch (inst->getPredicate()) {
     // clang-format off
-    case llvm::CmpInst::FCMP_OEQ: pred = arith::CmpFPredicate::OEQ; break;
-    case llvm::CmpInst::FCMP_OGT: pred = arith::CmpFPredicate::OGT; break;
-    case llvm::CmpInst::FCMP_OGE: pred = arith::CmpFPredicate::OGE; break;
-    case llvm::CmpInst::FCMP_OLT: pred = arith::CmpFPredicate::OLT; break;
-    case llvm::CmpInst::FCMP_OLE: pred = arith::CmpFPredicate::OLE; break;
-    case llvm::CmpInst::FCMP_ONE: pred = arith::CmpFPredicate::ONE; break;
-    case llvm::CmpInst::FCMP_ORD: pred = arith::CmpFPredicate::ORD; break;
-    case llvm::CmpInst::FCMP_UNO: pred = arith::CmpFPredicate::UNO; break;
-    case llvm::CmpInst::FCMP_UEQ: pred = arith::CmpFPredicate::UEQ; break;
-    case llvm::CmpInst::FCMP_UGT: pred = arith::CmpFPredicate::UGT; break;
-    case llvm::CmpInst::FCMP_UGE: pred = arith::CmpFPredicate::UGE; break;
-    case llvm::CmpInst::FCMP_ULT: pred = arith::CmpFPredicate::ULT; break;
-    case llvm::CmpInst::FCMP_ULE: pred = arith::CmpFPredicate::ULE; break;
-    case llvm::CmpInst::FCMP_UNE: pred = arith::CmpFPredicate::UNE; break;
-    case llvm::CmpInst::FCMP_FALSE: pred = arith::CmpFPredicate::AlwaysFalse; break;
-    case llvm::CmpInst::FCMP_TRUE:  pred = arith::CmpFPredicate::AlwaysTrue; break;
+    case llvm::CmpInst::FCMP_OEQ: predicate = arith::CmpFPredicate::OEQ; break;
+    case llvm::CmpInst::FCMP_OGT: predicate = arith::CmpFPredicate::OGT; break;
+    case llvm::CmpInst::FCMP_OGE: predicate = arith::CmpFPredicate::OGE; break;
+    case llvm::CmpInst::FCMP_OLT: predicate = arith::CmpFPredicate::OLT; break;
+    case llvm::CmpInst::FCMP_OLE: predicate = arith::CmpFPredicate::OLE; break;
+    case llvm::CmpInst::FCMP_ONE: predicate = arith::CmpFPredicate::ONE; break;
+    case llvm::CmpInst::FCMP_ORD: predicate = arith::CmpFPredicate::ORD; break;
+    case llvm::CmpInst::FCMP_UNO: predicate = arith::CmpFPredicate::UNO; break;
+    case llvm::CmpInst::FCMP_UEQ: predicate = arith::CmpFPredicate::UEQ; break;
+    case llvm::CmpInst::FCMP_UGT: predicate = arith::CmpFPredicate::UGT; break;
+    case llvm::CmpInst::FCMP_UGE: predicate = arith::CmpFPredicate::UGE; break;
+    case llvm::CmpInst::FCMP_ULT: predicate = arith::CmpFPredicate::ULT; break;
+    case llvm::CmpInst::FCMP_ULE: predicate = arith::CmpFPredicate::ULE; break;
+    case llvm::CmpInst::FCMP_UNE: predicate = arith::CmpFPredicate::UNE; break;
+    case llvm::CmpInst::FCMP_FALSE: predicate = arith::CmpFPredicate::AlwaysFalse; break;
+    case llvm::CmpInst::FCMP_TRUE:  predicate = arith::CmpFPredicate::AlwaysTrue; break;
 
     default: llvm_unreachable("Unsupported FCMP predicate");
     // clang-format on
   }
-  auto op = builder.create<arith::CmpFOp>(loc, pred, lhs, rhs);
+  auto op =
+      builder.create<arith::CmpFOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
-  loc = op.getLoc();
 }
 
 void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
@@ -413,10 +417,9 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
     BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
-    auto op = builder.create<cf::BranchOp>(
-        loc, blockMap[nextLLVMBB],
+    builder.create<cf::BranchOp>(
+        UnknownLoc::get(ctx), blockMap[nextLLVMBB],
         getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB));
-    loc = op.getLoc();
   } else {
     // NOTE: operands of the branch instruction [Cond, FalseDest,] TrueDest
     // (from the C++ API).
@@ -428,57 +431,53 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
         getBranchOperandsForCFGEdge(currLLVMBB, falseDestBB);
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
-
     mlir::Value condition = valueMap[inst->getCondition()];
-
-    auto op = builder.create<cf::CondBranchOp>(
-        loc, condition, blockMap[trueDestBB], trueOperands,
-        blockMap[falseDestBB], falseOperands);
-    loc = op.getLoc();
+    builder.create<cf::CondBranchOp>(loc, condition, blockMap[trueDestBB],
+                                     trueOperands, blockMap[falseDestBB],
+                                     falseOperands);
   }
 }
 
 void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
-  mlir::Value addressVal;
-  SmallVector<mlir::Value> indexValues;
+  mlir::Value memref;
+  SmallVector<mlir::Value> indices;
   if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
     // Logic: In LLVM IR, load/store operations take the pointer computed from
     // GEP ops, whereas in memref, load operations takes indices (of index
     // type). This function uses the index operand collected when processing
     // GEPs as operands of LOAD/STOREs.
     auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    addressVal = memrefAndIndices.first;
-    indexValues = memrefAndIndices.second;
+    memref = memrefAndIndices.first;
+    indices = memrefAndIndices.second;
   } else {
     if (isa<GetElementPtrInst>(instAddr))
       llvm_unreachable(
           "Converting a load but the producer hasn't been converted yet!");
     // NOTE: This condition handles a special case where a load only has
     // constant indices, e.g., tmp = mat[0][0].
-    addressVal = this->valueMap[instAddr];
-    auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+    memref = this->valueMap[instAddr];
+    auto memrefType = memref.getType().dyn_cast<MemRefType>();
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
       auto constZeroOp = this->builder.create<arith::ConstantOp>(
           loc, this->builder.getIndexAttr(0));
-      indexValues.push_back(constZeroOp);
+      indices.push_back(constZeroOp);
     }
   }
-  mlir::Type resType = convertLLVMTypeToMLIR(loadInst->getType(), ctx);
-  auto newOp =
-      builder.create<memref::LoadOp>(loc, resType, addressVal, indexValues);
+  mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
+  auto newOp = builder.create<memref::LoadOp>(loc, resType, memref, indices);
   valueMap[loadInst] = newOp.getResult();
-  translateDepAttr(loadInst, newOp, *ctx, builder);
+  translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
 void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = storeInst->getPointerOperand();
 
-  mlir::Value addressVal;
-  SmallVector<mlir::Value> indexValues;
+  mlir::Value memref;
+  SmallVector<mlir::Value> indices;
 
   if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
     // Logic: In LLVM IR, load/store operations take the pointer computed from
@@ -486,29 +485,29 @@ void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
     // type). This function uses the index operand collected when processing
     // GEPs as operands of LOAD/STOREs.
     auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    addressVal = memrefAndIndices.first;
-    indexValues = memrefAndIndices.second;
+    memref = memrefAndIndices.first;
+    indices = memrefAndIndices.second;
   } else {
     // NOTE: This condition handles a special case where a load only has
     // constant indices, e.g., tmp = mat[0][0].
     if (isa<GetElementPtrInst>(instAddr))
       llvm_unreachable(
           "Converting a load but the producer hasn't been converted yet!");
-    addressVal = this->valueMap[instAddr];
-    auto memrefType = addressVal.getType().dyn_cast<MemRefType>();
+    memref = this->valueMap[instAddr];
+    auto memrefType = memref.getType().dyn_cast<MemRefType>();
 
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
       auto constZeroOp = this->builder.create<arith::ConstantOp>(
           loc, this->builder.getIndexAttr(0));
-      indexValues.push_back(constZeroOp);
+      indices.push_back(constZeroOp);
     }
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
-      builder.create<memref::StoreOp>(loc, storeValue, addressVal, indexValues);
-  translateDepAttr(storeInst, newOp, *ctx, builder);
+      builder.create<memref::StoreOp>(loc, storeValue, memref, indices);
+  translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
 void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
@@ -522,8 +521,7 @@ void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
     baseElementType = baseElementType->getArrayElementType();
   }
 
-  auto memrefType =
-      MemRefType::get(shape, convertLLVMTypeToMLIR(baseElementType, ctx));
+  auto memrefType = MemRefType::get(shape, getMLIRType(baseElementType, ctx));
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
@@ -549,7 +547,7 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
     mlir::Value condition = valueMap[inst->getOperand(0)];
     mlir::Value trueOperand = valueMap[inst->getOperand(1)];
     mlir::Value falseOperand = valueMap[inst->getOperand(2)];
-    mlir::Type resType = convertLLVMTypeToMLIR(inst->getType(), ctx);
+    mlir::Type resType = getMLIRType(inst->getType(), ctx);
     naiveTranslation<arith::SelectOp>(
         resType, {condition, trueOperand, falseOperand}, inst);
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
@@ -582,7 +580,7 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   SmallVector<mlir::Type> resTypes;
 
   if (!llvmFunc->getReturnType()->isVoidTy()) {
-    resTypes.push_back(convertLLVMTypeToMLIR(llvmFunc->getReturnType(), ctx));
+    resTypes.push_back(getMLIRType(llvmFunc->getReturnType(), ctx));
   }
 
   auto funcType = builder.getFunctionType(argTypes, resTypes);
@@ -622,7 +620,7 @@ void ImportLLVMModule::translateGlobalVars() {
       shape.push_back(baseElemType->getArrayNumElements());
       baseElemType = baseElemType->getArrayElementType();
     }
-    auto baseMLIRElemType = convertLLVMTypeToMLIR(baseElemType, ctx);
+    auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
     auto memrefType = MemRefType::get(shape, baseMLIRElemType);
 
     StringRef symName = constant.getName();
