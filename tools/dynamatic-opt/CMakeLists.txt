@@ -20,6 +20,7 @@ target_link_libraries(dynamatic-opt
   DynamaticLSQSizing
   DynamaticSpeculation
   DynamaticSpeculationV2
+  DynamaticCfGateBinarization
   DynamaticRigidification
   DynamaticFormalPropertyAnnotation
   DynamaticExperimentalResourceSharing
