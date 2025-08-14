@@ -875,13 +875,15 @@ static DenseMap<unsigned, unsigned> unifyBBs(ArrayRef<unsigned> loopBBs,
 }
 
 static void recalculateMCBlocks(FuncOp funcOp) {
-  DenseSet<unsigned> bbs;
+  DenseSet<int32_t> bbs;
   OpBuilder builder(funcOp->getContext());
 
   for (auto mc :
        llvm::make_early_inc_range(funcOp.getOps<MemoryControllerOp>())) {
     bbs.clear();
     for (auto oprd : mc->getOperands()) {
+      if (isa<ControlType>(oprd.getType()))
+        continue;
       if (oprd.getDefiningOp()) {
         if (auto bbOrNull = getLogicBB(oprd.getDefiningOp())) {
           bbs.insert(bbOrNull.value());
@@ -889,15 +891,15 @@ static void recalculateMCBlocks(FuncOp funcOp) {
       }
     }
     for (auto res : mc->getResults()) {
+      if (isa<ControlType>(res.getType()))
+        continue;
       for (auto *user : res.getUsers()) {
-        if (isa<EndOp>(user))
-          continue;
         if (auto bbOrNull = getLogicBB(user)) {
           bbs.insert(bbOrNull.value());
         }
       }
     }
-    auto i32Attr = builder.getI32ArrayAttr({static_cast<int32_t>(bbs.size())});
+    auto i32Attr = builder.getI32ArrayAttr(llvm::to_vector(bbs));
     mc.setConnectedBlocksAttr(i32Attr);
   }
 }
