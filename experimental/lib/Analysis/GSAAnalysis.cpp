@@ -604,6 +604,15 @@ bool experimental::gsa::GSAAnalysis::areEqualGateInputs(GateInput *a, GateInput 
   return false;
 }
 
+static bool IsBlockInLoop(Block* block, CFGLoop * loop,  mlir::CFGLoopInfo &li){
+  for (CFGLoop *blockLoop = li.getLoopFor(block); blockLoop;
+       blockLoop = blockLoop->getParentLoop()) {
+    if (blockLoop == loop)
+      return true;
+  }
+  return false;
+}
+
 void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIndexing &bi) {
 
   mlir::DominanceInfo domInfo;
@@ -646,7 +655,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
         // any ouside block that sends initial value to a loop header properly dominate loop heather
         for (GateInput *input : phi->operands) {
           Block *inputBlock = input->getBlock();
-          if (domInfo.dominates(phiBlock, inputBlock))
+          if (IsBlockInLoop(inputBlock,loopInfo.getLoopFor(phiBlock), loopInfo))
             loopInputs.push_back(input);
             else
             initialInputs.push_back(input);   
