@@ -843,25 +843,6 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
   return merge;
 }
 
-static void placeIdOps(FuncOp funcOp) {
-  OpBuilder builder(funcOp->getContext());
-  for (auto initOp : llvm::make_early_inc_range(funcOp.getOps<InitOp>())) {
-    materializeValue(initOp.getOperand());
-    builder.setInsertionPoint(initOp);
-    auto idOp = builder.create<IdOp>(initOp.getLoc(), initOp.getOperand());
-    inheritBB(initOp, idOp);
-    initOp.getOperand().replaceAllUsesExcept(idOp.getResult(), idOp);
-  }
-  for (auto riOp :
-       llvm::make_early_inc_range(funcOp.getOps<SpecV2RepeatingInitOp>())) {
-    materializeValue(riOp.getOperand());
-    builder.setInsertionPoint(riOp);
-    auto idOp = builder.create<IdOp>(riOp.getLoc(), riOp.getOperand());
-    inheritBB(riOp, idOp);
-    riOp.getOperand().replaceAllUsesExcept(idOp.getResult(), idOp);
-  }
-}
-
 static DenseMap<unsigned, unsigned> unifyBBs(ArrayRef<unsigned> loopBBs,
                                              FuncOp funcOp) {
   DenseMap<unsigned, unsigned> bbMap;
@@ -1240,6 +1221,4 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   csvFile.close();
 
   recalculateMCBlocks(funcOp);
-
-  // placeIdOps(funcOp);
 }
