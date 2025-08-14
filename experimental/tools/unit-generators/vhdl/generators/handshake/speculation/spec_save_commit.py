@@ -1,20 +1,21 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_spec_units_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.utils import data
 
 
 def generate_spec_save_commit(name, params):
-  bitwidth = params["bitwidth"]
-  fifo_depth = params["fifo_depth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    fifo_depth = params["fifo_depth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-  return _generate_spec_save_commit(name, bitwidth, fifo_depth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
+    return _generate_spec_save_commit(name, bitwidth, fifo_depth)
 
 
 def _generate_spec_save_commit(name, bitwidth, fifo_depth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -22,7 +23,8 @@ use ieee.numeric_std.all;
 -- Entity of spec_save_commit
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- inputs
     {data(f"ins : in std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in std_logic;
@@ -40,19 +42,12 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of spec_save_commit
 architecture arch of {name} is
   signal HeadEn : std_logic := '0';
   signal TailEn : std_logic := '0';
   signal CurrEn : std_logic := '0';
-
-  signal CurrHeadEqual : std_logic;
-
-  signal PassEn   : std_logic := '0';
-  signal KillEn   : std_logic := '0';
-  signal ResendEn : std_logic := '0';
-  signal NoCmpEn  : std_logic := '0';
 
   signal Tail : natural range 0 to {fifo_depth} - 1;
   signal Head : natural range 0 to {fifo_depth} - 1;
@@ -64,82 +59,105 @@ architecture arch of {name} is
 
   {data(f"type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} - 1 downto 0);", bitwidth)}
   {data("signal Memory : FIFO_Memory;", bitwidth)}
-
-  signal bypass : std_logic;
-
 begin
   ins_ready <= not Full;
-  outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
-  --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
 
-  CurrHeadEqual <= '1' when Curr = Head else '0';
-  TailEn <= not Full and ins_valid;
-  HeadEn <= not Empty and ((outs_ready and ResendEn) or (ctrl_ready and KillEn));
-  CurrEn <= ((not CurrEmpty or ins_valid) and (outs_ready and PassEn)) or
-            (not Empty and (outs_ready and NoCmpEn)) or
-            (CurrHeadEqual and ctrl_ready and KillEn);
-
-  bypass <= ins_valid and CurrEmpty;
-  -------------------
-  -- comb process for control en
-  -------------------
-  en_proc : process (ins_valid, ctrl_valid, ctrl)
+  -------------------------------------------
+  -- comb process for all signals
+  -------------------------------------------
+  signal_proc : process (
+    ctrl_valid, ctrl,
+    CurrEmpty, Empty, Full,
+    {data("Memory, ins,", bitwidth)}
+    Head, Curr,
+    outs_ready, ins_valid)
   begin
-    PassEn <= '0';
-    KillEn <= '0';
-    ResendEn <= '0';
-    NoCmpEn <= '0';
+    TailEn <= not Full and ins_valid;
+    HeadEn <= '0';
+    CurrEn <= '0';
+
+    ctrl_ready <= '0';
+    outs_valid <= '0';
+    {data("outs <= Memory(Head);", bitwidth)}
+    outs_spec <= "0";
 
     if ctrl_valid = '1' and ctrl = "000" then
-      PassEn <= '1';
-    elsif ctrl_valid = '1' and ctrl = "001" then
-      KillEn <= '1';
-    elsif ctrl_valid = '1' and ctrl = "010" then
-      ResendEn <= '1';
-    elsif ctrl_valid = '1' and ctrl = "011" then
-      PassEn <= '1';
-      KillEn <= '1';
-    elsif ctrl_valid = '1' and ctrl = "100" then
-      ResendEn <= '1';
-      NoCmpEn <= '1';
-    end if;
-  end process;
+      -- PASS
+      if CurrEmpty = '1' then
+        -- Curr = Tail. Perform bypassing.
 
-  -------------------------------------------
-  -- comb process for control ready
-  -------------------------------------------
-  ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, outs_ready, ctrl_valid, ins_valid)
-  begin
-    -- Note: PassEn and KillEn can be simultaneously '1'
-    -- In that case, PassEn is prioritized
-    if PassEn = '1' then
-      ctrl_ready <= (not CurrEmpty or ins_valid) and outs_ready;
-      --ctrl_ready <= not CurrEmpty and outs_ready;
-    elsif ResendEn = '1' then
-      ctrl_ready <= not Empty and outs_ready;
-    elsif KillEn = '1' then
-      ctrl_ready <= not Empty;
-    else
-      ctrl_ready <= '0';
-    end if;
-  end process;
+        -- Consider the condition required for TailEn = '1' (not Full and ins_valid).
+        CurrEn <= outs_ready and ins_valid and not Full;
 
-  -------------------------------------------
-  -- comb process for output data
-  -------------------------------------------
-  output_proc : process (PassEn, Curr, bypass, {data("ins, Memory, ", bitwidth)}Head)
-  begin
-    if PassEn = '1' then
-      {data("""
-      if bypass = '1' then
-        outs <= ins;
+        ctrl_ready <= outs_ready and ins_valid and not Full;
+        outs_valid <= ins_valid and not Full;
+        {data("outs <= ins;", bitwidth)}
       else
-        outs <= Memory(Curr);
+        -- Curr < Tail.
+        CurrEn <= outs_ready;
+
+        ctrl_ready <= outs_ready;
+        outs_valid <= '1';
+        {data("outs <= Memory(Curr);", bitwidth)}
       end if;
-      """, bitwidth)}
       outs_spec <= "1";
-    else
-      {data(f"outs <= Memory(Head);", bitwidth)}
+    elsif ctrl_valid = '1' and ctrl = "001" then
+      -- KILL
+      if Head = Curr then
+        -- Exceptional case. See my report.
+        -- `not Empty` ensures Curr < Tail.
+        CurrEn <= not Empty;
+        HeadEn <= not Empty;
+        ctrl_ready <= not Empty;
+      else
+        -- Head < Curr.
+        HeadEn <= '1';
+        ctrl_ready <= '1';
+      end if;
+    elsif ctrl_valid = '1' and ctrl = "011" then
+      -- PASS_KILL
+      -- Head < Curr is assumed from the specification.
+      if CurrEmpty = '1' then
+        -- Curr = Tail. Perform bypassing.
+
+        -- Consider the condition required for TailEn = '1' (not Full and ins_valid).
+        CurrEn <= outs_ready and ins_valid and not Full;
+        HeadEn <= outs_ready and ins_valid and not Full;
+
+        ctrl_ready <= outs_ready and ins_valid and not Full;
+        outs_valid <= ins_valid and not Full;
+        {data("outs <= ins;", bitwidth)}
+      else
+        -- Curr < Tail.
+        CurrEn <= outs_ready;
+        HeadEn <= outs_ready;
+
+        ctrl_ready <= outs_ready;
+        outs_valid <= '1';
+        {data("outs <= Memory(Curr);", bitwidth)}
+      end if;
+      outs_spec <= "1";
+    elsif ctrl_valid = '1' and ctrl = "010" then
+      -- RESEND
+      -- Head < Curr is assumed from the specification.
+      HeadEn <= outs_ready;
+
+      ctrl_ready <= outs_ready;
+      outs_valid <= '1';
+      {data("outs <= Memory(Head);", bitwidth)}
+      outs_spec <= "0";
+    elsif ctrl_valid = '1' and ctrl = "100" then
+      -- NO_CMP
+      -- TODO: When Empty = '1', input data should be bypassed,
+      --       just like when PASS or PASS_KILL, for better performance.
+      -- Head = Curr is assumed from the specification.
+      -- `not Empty` ensures Curr < Tail.
+      CurrEn <= outs_ready and not Empty;
+      HeadEn <= outs_ready and not Empty;
+
+      ctrl_ready <= outs_ready and not Empty;
+      outs_valid <= not Empty;
+      {data("outs <= Memory(Head);", bitwidth)}
       outs_spec <= "0";
     end if;
   end process;
@@ -289,30 +307,30 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl",
-          "bitwidth": 3
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals_without_spec,
-      "ignore_ports": ["ctrl"]
-  }, lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_spec_units_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl",
+            "bitwidth": 3
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals_without_spec,
+        ["ctrl"],
+        lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

@@ -2,33 +2,33 @@ from generators.support.mc_support import generate_mc_control, generate_read_mem
 
 
 def generate_mem_controller(name, params):
-  num_controls = params["num_controls"]
-  num_loads = params["num_loads"]
-  num_stores = params["num_stores"]
-  data_bitwidth = params["data_bitwidth"]
-  addr_bitwidth = params["addr_bitwidth"]
+    num_controls = params["num_controls"]
+    num_loads = params["num_loads"]
+    num_stores = params["num_stores"]
+    data_bitwidth = params["data_bitwidth"]
+    addr_bitwidth = params["addr_bitwidth"]
 
-  if num_controls == 0 and num_loads > 0 and num_stores == 0:
-    return _generate_mem_controller_storeless(name, num_loads, addr_bitwidth, data_bitwidth)
-  elif num_controls > 0 and num_loads == 0 and num_stores > 0:
-    return _generate_mem_controller_loadless(name, num_controls, num_stores, addr_bitwidth, data_bitwidth)
-  elif num_controls > 0 and num_loads > 0 and num_stores > 0:
-    return _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth)
-  raise ValueError("Invalid configuration for mem_controller")
+    if num_controls == 0 and num_loads > 0 and num_stores == 0:
+        return _generate_mem_controller_storeless(name, num_loads, addr_bitwidth, data_bitwidth)
+    elif num_controls > 0 and num_loads == 0 and num_stores > 0:
+        return _generate_mem_controller_loadless(name, num_controls, num_stores, addr_bitwidth, data_bitwidth)
+    elif num_controls > 0 and num_loads > 0 and num_stores > 0:
+        return _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth)
+    raise ValueError("Invalid configuration for mem_controller")
 
 
 def _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth):
-  loadless_name = f"{name}_loadless"
-  read_arbiter_name = f"{name}_read_arbiter"
+    loadless_name = f"{name}_loadless"
+    read_arbiter_name = f"{name}_read_arbiter"
 
-  dependencies = _generate_mem_controller_loadless(loadless_name, num_controls, num_stores, addr_bitwidth, data_bitwidth) + \
-      generate_read_memory_arbiter(read_arbiter_name, {
-          "arbiter_size": num_loads,
-          "addr_bitwidth": addr_bitwidth,
-          "data_bitwidth": data_bitwidth,
-      })
+    dependencies = _generate_mem_controller_loadless(loadless_name, num_controls, num_stores, addr_bitwidth, data_bitwidth) + \
+        generate_read_memory_arbiter(read_arbiter_name, {
+            "arbiter_size": num_loads,
+            "addr_bitwidth": addr_bitwidth,
+            "data_bitwidth": data_bitwidth,
+        })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -37,7 +37,8 @@ use work.types.all;
 -- Entity of mem_controller
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
@@ -78,7 +79,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mem_controller
 architecture arch of {name} is
   signal dropLoadAddr : std_logic_vector({addr_bitwidth} - 1 downto 0);
@@ -130,21 +131,21 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_mem_controller_storeless(name, num_loads, addr_bitwidth, data_bitwidth):
-  read_arbiter_name = f"{name}_read_arbiter"
-  control_name = f"{name}_control"
+    read_arbiter_name = f"{name}_read_arbiter"
+    control_name = f"{name}_control"
 
-  dependencies = generate_mc_control(control_name) + \
-      generate_read_memory_arbiter(read_arbiter_name, {
-          "arbiter_size": num_loads,
-          "addr_bitwidth": addr_bitwidth,
-          "data_bitwidth": data_bitwidth,
-      })
+    dependencies = generate_mc_control(control_name) + \
+        generate_read_memory_arbiter(read_arbiter_name, {
+            "arbiter_size": num_loads,
+            "addr_bitwidth": addr_bitwidth,
+            "data_bitwidth": data_bitwidth,
+        })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -153,7 +154,8 @@ use work.types.all;
 -- Entity of mem_controller_storeless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
@@ -182,7 +184,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mem_controller_storeless
 architecture arch of {name} is
   signal allRequestsDone : std_logic;
@@ -229,21 +231,21 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_mem_controller_loadless(name, num_controls, num_stores, addr_bitwidth, data_bitwidth):
-  write_arbiter_name = f"{name}_write_arbiter"
-  control_name = f"{name}_control"
+    write_arbiter_name = f"{name}_write_arbiter"
+    control_name = f"{name}_control"
 
-  dependencies = generate_mc_control(control_name) + \
-      generate_write_memory_arbiter(write_arbiter_name, {
-          "arbiter_size": num_stores,
-          "addr_bitwidth": addr_bitwidth,
-          "data_bitwidth": data_bitwidth,
-      })
+    dependencies = generate_mc_control(control_name) + \
+        generate_write_memory_arbiter(write_arbiter_name, {
+            "arbiter_size": num_stores,
+            "addr_bitwidth": addr_bitwidth,
+            "data_bitwidth": data_bitwidth,
+        })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -252,7 +254,8 @@ use work.types.all;
 -- Entity of mem_controller_loadless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
@@ -285,7 +288,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mem_controller_loadless
 
 -- Terminology:
@@ -380,4 +383,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture

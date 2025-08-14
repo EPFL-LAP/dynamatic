@@ -1,11 +1,15 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
+  CutlessMapping.cpp
+  SubjectGraph.cpp
   CDGAnalysis.cpp
+  CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
   FtdImplementation.cpp
   FtdSupport.cpp
   CFGAnnotation.cpp
+  FormalProperty.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -17,6 +21,8 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+  DynamaticAnalysis
+  DynamaticExperimentalSupportBooleanLogic
 )
 
 add_subdirectory(BooleanLogic)

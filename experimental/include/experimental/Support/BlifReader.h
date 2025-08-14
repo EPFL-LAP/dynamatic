@@ -18,8 +18,8 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -35,7 +35,7 @@ class LogicNetwork;
 struct MILPVarsSubjectGraph {
   GRBVar tIn;
   GRBVar tOut;
-  std::optional<GRBVar> bufferVar;
+  GRBVar bufferVar;
 };
 
 /// Represents a node in an And-Inverter Graph (AIG) circuit representation.
@@ -63,6 +63,7 @@ public:
   bool isOutput = false;
   bool isLatchInput = false;
   bool isLatchOutput = false;
+  Value nodeMLIRValue; // MLIR Value associated with the node, if any
 
   MILPVarsSubjectGraph *gurobiVars;
   std::set<Node *> fanins = {};
@@ -91,6 +92,41 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
+  // Replaces an existing fanin with a new one.
+  void replaceFanin(Node *oldFanin, Node *newFanin) {
+    fanins.erase(oldFanin);
+    fanins.insert(newFanin);
+  }
+
+  // Connects two nodes by setting the pointer of current node to the previous
+  // node. This function is used to merge different LogicNetwork objects. Input
+  // node of one LogicNetwork object is connected to the output node of
+  // LogicNetwork object that comes before it.
+  static void connectNodes(Node *currentNode, Node *previousNode,
+                           Value channel) {
+    currentNode->nodeMLIRValue = channel;
+    previousNode->nodeMLIRValue = channel;
+
+    // Once Input/Output Nodes are connected, they should not be Input/Output in
+    // the BLIF, but just become internal Nodes
+    currentNode->convertIOToChannel();
+    previousNode->convertIOToChannel();
+
+    if (previousNode->isBlackboxOutput) {
+      previousNode->isInput = true;
+    }
+
+    for (auto &fanout : currentNode->fanouts) {
+      previousNode->addFanout(fanout);
+      fanout->replaceFanin(currentNode, previousNode);
+    }
+
+    // Reverse the naming for ready signals
+    if (previousNode->name.find("ready") != std::string::npos) {
+      previousNode->name = currentNode->name;
+    }
+  }
+
   // Configures the node based on the type of I/O node.
   void configureIONode(const std::string &type);
 
@@ -103,6 +139,10 @@ public:
   }
   bool isPrimaryOutput() const { return (isOutput || isLatchInput); }
 
+  // Used to merge I/O nodes. I/O is set false and isChannelEdge is set to true
+  // so that the node can be considered as a dataflow graph edge.
+  void convertIOToChannel();
+
   std::string str() const { return name; }
 
   ~Node() {
@@ -112,6 +152,29 @@ public:
   }
 
   friend class LogicNetwork;
+};
+
+// Hash and Equality functions for Node pointers, used in unordered maps
+struct NodePtrHash {
+  std::size_t operator()(const Node *node) const {
+    return std::hash<std::string>()(node->name);
+  }
+};
+
+struct NodePtrEqual {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->name == rhs->name;
+  }
+};
+
+struct NodePairHash {
+  std::size_t operator()(const std::pair<Node *, Node *> &p) const {
+    auto h1 = NodePtrHash{}(p.first);
+    auto h2 = NodePtrHash{}(p.second);
+
+    // Simple hash function using bit shifting and XOR
+    return h1 ^ (h2 << 1);
+  }
 };
 
 /// Manages a collection of interconnected nodes representing a
@@ -167,17 +230,6 @@ public:
   // Finds the path from "start" to "end" using bfs.
   std::vector<Node *> findPath(Node *start, Node *end);
 
-  // Implements the "Cutless FPGA Mapping" algorithm.Returns the nodes in the
-  // circuit that can be implemented with "limit" number of nodes from the set
-  // "wavyLine". For example, if the limit is 6 (6-input LUT), returns all the
-  // nodes that can be implemented with 6 Nodes from wavyLine set.
-  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
-                                                  std::set<Node *> &wavyLine);
-
-  // Helper function for findNodesWithLimitedWavyInputs. Finds the wavy inputs
-  // using dfs.
-  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
-
   // Returns all of the Nodes.
   std::set<Node *> getAllNodes();
 
@@ -199,7 +251,9 @@ public:
 
   // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
-  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
+  std::vector<Node *> getNodesInTopologicalOrder() {
+    return nodesTopologicalOrder;
+  }
 
   // Returns Inputs of the Blif file.
   std::set<Node *> getInputs();
@@ -236,4 +290,3 @@ public:
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
-

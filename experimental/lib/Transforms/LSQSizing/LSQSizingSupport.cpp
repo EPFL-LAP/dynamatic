@@ -38,26 +38,16 @@ using namespace dynamatic::experimental::lsqsizing;
 /// 2. If the operation is a buffer operation, the latency is extracted from the
 /// timing attribute
 /// 3. If the operation is neither, then its latency is set to 0
-static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
+static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
+                              double targetCP) {
   double latency = 0;
 
-  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency))) {
+  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
     return latency;
   }
 
-  if (isa<handshake::BufferOp>(op)) {
-    auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    if (!params)
-      return 0;
-
-    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-    if (!optTiming)
-      return 0;
-
-    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-      handshake::TimingInfo info = timing.getInfo();
-      return info.getLatency(SignalType::DATA).value_or(0);
-    }
+  if (auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op)) {
+    return bufferOp.getLatencyDV();
   }
 
   return 0;
@@ -65,7 +55,7 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
 
 CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
                        llvm::SetVector<unsigned> cfdfcBBs,
-                       TimingDatabase timingDB, unsigned II) {
+                       TimingDatabase timingDB, unsigned II, double targetCP) {
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -80,7 +70,7 @@ CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
       continue;
 
     // Add the unit and valid outgoing channels to the CFDFC
-    addNode(&op, extractNodeLatency(&op, timingDB));
+    addNode(&op, extractNodeLatency(&op, timingDB, targetCP));
 
     for (OpResult res : op.getResults()) {
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&

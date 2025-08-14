@@ -267,17 +267,6 @@ struct RTLDataflowType
   static std::string serialize(mlir::Attribute attr);
 };
 
-/// An RTL parameter representing timing information, stored in the IR as a
-/// `handshake::TimingAttr`.
-struct RTLTimingType : public RTLType::Model<RTLTimingType, TimingConstraints> {
-  static constexpr llvm::StringLiteral ID = "timing", LATENCY = "-lat";
-
-  /// Serializes timing information into a string.
-  /// The output format is the TimingAttr assembly format with single quotes.
-  /// E.g., '#handshake<timing {R: 1}>'
-  static std::string serialize(mlir::Attribute attr);
-};
-
 } // namespace dynamatic
 
 #endif // DYNAMATIC_SUPPORT_RTL_RTLTYPES_H

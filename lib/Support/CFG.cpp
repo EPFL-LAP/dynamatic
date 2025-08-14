@@ -667,7 +667,8 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
           return GIIDStatus::SUCCEED;
 
         // The select's true value or false value must depend on the predecessor
-        ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
+        llvm::SmallVector<Value> values{selectOp.getTrueValue(),
+                                        selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
@@ -691,4 +692,30 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
 bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
   assert(path.size() >= 2 && "path must have at least two blocks");
   return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
+}
+
+bool dynamatic::isChannelOnCycle(mlir::Value channel) {
+  llvm::SmallPtrSet<mlir::Value, 32> visited;
+
+  std::function<bool(mlir::Value, bool)> dfs =
+      [&](mlir::Value current, bool isStart) -> bool {
+    if (!isStart && current == channel)
+      return true;
+
+    if (visited.contains(current))
+      return false;
+    visited.insert(current);
+
+    for (mlir::Operation *user : current.getUsers()) {
+      if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user))
+        continue;
+      for (mlir::Value next : user->getResults()) {
+        if (dfs(next, false))
+          return true;
+      }
+    }
+    return false;
+  };
+
+  return dfs(channel, true);
 }

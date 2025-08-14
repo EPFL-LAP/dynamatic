@@ -15,9 +15,12 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf
+  DynamaticLLVMToControlFlow
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
+  DynamaticRigidification
+  DynamaticFormalPropertyAnnotation
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake
@@ -29,6 +32,7 @@ target_link_libraries(dynamatic-opt
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms
+  DynamaticExperimentalAnalysis
 
   MLIRIR
   MLIRAffineTransforms

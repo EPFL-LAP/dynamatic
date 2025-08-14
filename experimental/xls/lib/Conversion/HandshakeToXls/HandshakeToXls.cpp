@@ -106,12 +106,14 @@ xls::AfterAllOp createAfterAll(OpBuilder builder, ValueRange ts) {
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, Value t1, Value t2) {
-  return createAfterAll(builder, ValueRange{t1, t2});
+  llvm::SmallVector<Value> vals = {t1, t2};
+  return createAfterAll(builder, vals);
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, Value t1, Value t2,
                                Value t3) {
-  return createAfterAll(builder, ValueRange{t1, t2, t3});
+  llvm::SmallVector<Value> vals = {t1, t2, t3};
+  return createAfterAll(builder, vals);
 }
 
 } // namespace
@@ -352,9 +354,9 @@ void SelectProc::build(OpBuilder builder) const {
                        .getResult();
 
   // Select the result:
-  auto selOp = b.create<xls::SelOp>(
-      typeVal, rxSel.getResult(),
-      ValueRange{rxFalseVal.getResult(), rxTrueVal.getResult()});
+  llvm::SmallVector<Value> operands = {rxFalseVal.getResult(),
+                                       rxTrueVal.getResult()};
+  auto selOp = b.create<xls::SelOp>(typeVal, rxSel.getResult(), operands);
 
   // Send the result:
   b.create<xls::SSendOp>(tokResult, selOp.getResult(), nextArgs[3]);
@@ -1215,8 +1217,10 @@ LogicalResult ConvertToXlsSpawn<T>::matchAndRewrite(
     auto outChanTy = xls::SchanType::get(ctx, innerType,
                                          /*is_input=*/false);
 
+    llvm::SmallVector<Type> returnType = {outChanTy, inChanTy};
+
     xls::SchanOp ch = rewriter.create<xls::SchanOp>( // TODO BROKEN BUILD
-        op.getLoc(), TypeRange{outChanTy, inChanTy}, "ssa", innerType,
+        op.getLoc(), returnType, "ssa", innerType,
         xls::FifoConfigAttr::get(ctx, /*fifo_depth=*/0,
                                  /*bypass=*/true,
                                  /*register_push_outputs=*/false,
@@ -1416,52 +1420,23 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
     return failure();
   }
 
-  auto params = bufOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-  if (!params) {
-    bufOp.emitError() << "underdefined buffer (params)";
-    return failure();
-  }
+  uint64_t depth = bufOp.getNumSlots();
 
-  auto numSlotsAttr = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-  if (!numSlotsAttr) {
-    bufOp.emitError() << "underdefined buffer (numSlots)";
-    return failure();
-  }
-  auto numSlots = dyn_cast<IntegerAttr>(numSlotsAttr->getValue());
-  if (!numSlots) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  if (!numSlots.getType().isUnsignedInteger()) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  uint64_t depth = numSlots.getUInt();
-
-  auto timingAttr = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-  if (!timingAttr) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  auto timing = dyn_cast<TimingAttr>(timingAttr->getValue());
-  if (!timing) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  TimingInfo info = timing.getInfo();
-
-  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
-      (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
+  switch (bufferOp.getBufferType()) {
+  case BufferType::ONE_SLOT_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+  case BufferType::ONE_SLOT_BREAK_R:
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::FIFO_BREAK_NONE:
+    break;
+  case BufferType::SHIFT_REG_BREAK_DV:
     bufOp.emitError() << "unknown buffer";
     return failure();
   }
 
-  bool bypass = info == TimingInfo::break_r();
   auto newFifoConfig =
       xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
-                               /*bypass=*/bypass,
+                               /*bypass=*/bufferOp.isBypassDV(),
                                /*register_push_outputs=*/false,
                                /*register_pop_outputs=*/false);
   ch.setFifoConfigAttr(newFifoConfig);

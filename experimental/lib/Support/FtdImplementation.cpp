@@ -63,6 +63,25 @@ constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 /// Annotation to use for regeneration multiplexers.
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
+/// Identify the block that has muxCondition as its terminator condition
+/// Note that it is not necessarily the same block defining the muxCondition
+static Block *returnMuxConditionBlock(Value muxCondition) {
+  Block *muxConditionBlock = nullptr;
+
+  for (auto &use : muxCondition.getUses()) {
+    Operation *userOp = use.getOwner();
+    Block *userBlock = userOp->getBlock();
+
+    if (isa_and_nonnull<cf::CondBranchOp>(userOp)) {
+      muxConditionBlock = userBlock;
+      break;
+    }
+  }
+  assert(muxConditionBlock &&
+         "Mux condition must be feeding any block terminator.");
+  return muxConditionBlock;
+}
+
 /// Given a block, get its immediate dominator if exists
 static Block *getImmediateDominator(Region &region, Block *bb) {
 
@@ -850,8 +869,9 @@ static void insertDirectSuppression(
   // dependencies
   if (accountMuxCondition) {
     muxCondition = consumer->getOperand(0);
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     DenseSet<Block *> condControlDeps =
-        cdAnalysis[muxCondition.getDefiningOp()->getBlock()].forwardControlDeps;
+        cdAnalysis[muxConditionBlock].forwardControlDeps;
     for (auto &x : condControlDeps)
       consControlDeps.insert(x);
   }
@@ -866,13 +886,14 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
   if (accountMuxCondition) {
-    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        bi.getBlockCondition(muxCondition.getDefiningOp()->getBlock()));
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+    BoolExpression *selectOperandCondition =
+        BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
 
     // The condition must be taken into account for `fCons` only if the
     // producer is not control dependent from the block which produces the
     // condition of the mux
-    if (!prodControlDeps.contains(muxCondition.getParentBlock())) {
+    if (!prodControlDeps.contains(muxConditionBlock)) {
       if (consumer->getOperand(1) == connection)
         fCons = BoolExpression::boolAnd(fCons,
                                         selectOperandCondition->boolNegate());

@@ -1,26 +1,26 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_blocker(name, params):
     # Number of input ports
-  size = params["size"]
+    size = params["size"]
 
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_blocker_signal_manager(name, size, bitwidth, extra_signals)
-  else:
-    return _generate_blocker(name, size, bitwidth)
+    if extra_signals:
+        return _generate_blocker_signal_manager(name, size, bitwidth, extra_signals)
+    else:
+        return _generate_blocker(name, size, bitwidth)
 
 
 def _generate_blocker(name, size, bitwidth):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": size})
+    dependencies = generate_join(join_name, {"size": size})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -42,7 +42,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of blocker
 architecture arch of {name} is
 begin
@@ -61,23 +61,22 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_blocker_signal_manager(name, size, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals,
-          "2d": True,
-          "size": size
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name:  _generate_blocker(name, size, bitwidth))
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name:  _generate_blocker(name, size, bitwidth))

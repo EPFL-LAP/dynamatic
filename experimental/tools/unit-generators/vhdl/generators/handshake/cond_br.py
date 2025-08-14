@@ -1,25 +1,25 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_cond_br(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_cond_br_dataless(name)
-  else:
-    return _generate_cond_br(name, bitwidth)
+    if extra_signals:
+        return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_cond_br_dataless(name)
+    else:
+        return _generate_cond_br(name, bitwidth)
 
 
 def _generate_cond_br_dataless(name):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+    dependencies = generate_join(join_name, {"size": 2})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -27,7 +27,8 @@ use ieee.numeric_std.all;
 -- Entity of cond_br_dataless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- data input channel
     data_valid : in  std_logic;
     data_ready : out std_logic;
@@ -45,7 +46,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cond_br_dataless
 architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
@@ -69,15 +70,15 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cond_br(name, bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_cond_br_dataless(inner_name)
+    dependencies = _generate_cond_br_dataless(inner_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -85,7 +86,8 @@ use ieee.numeric_std.all;
 -- Entity of cond_br
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- data input channel
     data       : in  std_logic_vector({bitwidth} - 1 downto 0);
     data_valid : in  std_logic;
@@ -106,7 +108,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cond_br
 architecture arch of {name} is
 begin
@@ -130,30 +132,31 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "data",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "trueOut",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseOut",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_cond_br_dataless(name) if bitwidth == 0
-      else _generate_cond_br(name, bitwidth))
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "data",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "condition",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "trueOut",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "falseOut",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name:
+            (_generate_cond_br_dataless(name) if bitwidth == 0
+             else _generate_cond_br(name, bitwidth)))

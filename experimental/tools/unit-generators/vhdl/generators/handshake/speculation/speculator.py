@@ -1,20 +1,22 @@
 from generators.handshake.fork import generate_fork
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
+from generators.support.signal_manager import generate_spec_units_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
 def generate_speculator(name, params):
-  bitwidth = params["bitwidth"]
-  fifo_depth = params["fifo_depth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    fifo_depth = params["fifo_depth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-  return _generate_speculator(name, bitwidth, fifo_depth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals)
+    return _generate_speculator(name, bitwidth, fifo_depth)
 
 
 def _generate_specGen_core(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -22,7 +24,8 @@ use ieee.numeric_std.all;
 -- Entity of specgenCore
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
@@ -52,10 +55,10 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of specgenCore
 architecture arch of {name} is
-  type State_type is (IDLE, KILL, KILL_ONLY_TOKENS);
+  type State_type is (IDLE, KILL, KILL_ONLY_DATA);
   type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
   signal State : State_type;
 
@@ -122,10 +125,10 @@ begin
                   State <= IDLE;
                 else
                   -- Wait for all misspec tokens, but accept new speculation
-                  State <= KILL_ONLY_TOKENS;
+                  State <= KILL_ONLY_DATA;
                 end if;
             end if;
-          when KILL_ONLY_TOKENS =>
+          when KILL_ONLY_DATA =>
             if (DatapV = '1' and ins_spec = "0") then
               State <= IDLE;
             end if;
@@ -134,7 +137,8 @@ begin
     end if;
   end process;
 
-  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
+  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec,
+           DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
   begin
     outs <= ins;
     outs_spec <= "0";
@@ -164,20 +168,20 @@ begin
           ControlInternal <= CONTROL_NO_CMP;
           outs <= ins;
           outs_spec <= "0";
-        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and FifoNotFull = '1' and ins = fifo_ins) then
           DataR <= ControlnR;
-          PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
+          PredictR <= ControlnR;
 
           ControlV <= '1';
           ControlInternal <= CONTROL_CORRECT_SPEC;
           outs <= predict_ins;
           outs_spec <= "1";
-          FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
-          FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
-        elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
+          FifoV <= ControlnR;
+          FifoR <= ControlnR;
+        elsif ((DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) or
+               (DatapV = '1' and PredictpV = '1' and FifoNotFull = '0' and ins = fifo_ins)) then
           DataR <= ControlnR;
-          -- TODO: Not Specifying PredictR <= '0' is buggy?
-          PredictR <= FifoNotFull and ControlnR;
+          PredictR <= '0';
           FifoR <= ControlnR;
 
           FifoV <= '0';
@@ -194,8 +198,8 @@ begin
           outs <= ins;
           outs_spec <= "0";
         else
-          DataR <= ControlnR; -- TODO: '0'?
-          PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
+          DataR <= '0';
+          PredictR <= '0';
           ControlV <= '0';
           FifoR <= '0';
           FifoV <= '0';
@@ -216,7 +220,7 @@ begin
 
         -- Never pushes new data to fifo
         FifoV <= '0';
-      when KILL_ONLY_TOKENS =>
+      when KILL_ONLY_DATA =>
         -- Accepts spec data to kill it
         DataR <= ins_spec(0);
 
@@ -239,11 +243,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeSave(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -262,7 +266,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeSave
 architecture arch of {name} is
 begin
@@ -296,11 +300,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeCommit(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -319,7 +323,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeCommit
 architecture arch of {name} is
 begin
@@ -350,11 +354,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeBranch(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -373,7 +377,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeBranch
 architecture arch of {name} is
 begin
@@ -404,11 +408,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeSC(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -431,11 +435,12 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeSC
 architecture arch of {name} is
 begin
-  process (control_in, control_in_valid, control_out0_ready, control_out1_ready)
+  process (control_in, control_in_valid,
+           control_out0_ready, control_out1_ready)
   begin
     if (control_in = "000" or control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
       control_in_ready <= control_out0_ready;
@@ -473,11 +478,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
-def _generate_decodeOutput(name):
-  entity = f"""
+def _generate_decodeOutput(name, bitwidth):
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -489,46 +494,55 @@ entity {name} is
     control_in_valid : in std_logic;
     control_in_ready : out std_logic;
 
-    out_valid : out std_logic;
-    out_ready : in std_logic
+    one_slot_break_r_outs : in std_logic_vector({bitwidth} - 1 downto 0);
+    one_slot_break_r_outs_spec : in std_logic_vector(0 downto 0);
+
+    outs : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs_spec : out std_logic_vector(0 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in std_logic
   );
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeOutput
 architecture arch of {name} is
 begin
-  process (control_in, control_in_valid, out_ready)
+  -- Forward outs data and spec bit
+  outs <= one_slot_break_r_outs;
+  outs_spec <= one_slot_break_r_outs_spec;
+
+  process (control_in, control_in_valid, outs_ready)
   begin
     if (control_in = "000" or control_in = "001" or control_in = "011" or control_in = "101") then
-      control_in_ready <= out_ready;
+      control_in_ready <= outs_ready;
     else
       control_in_ready <= '1';
     end if;
 
-    out_valid <= '0';
+    outs_valid <= '0';
 
     if (control_in_valid = '1') then
       if control_in = "000" then -- spec
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "101" then -- correct-spec
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "001" then -- no cmp
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "011" then -- cmp wrong resend
-        out_valid <= '1';
+        outs_valid <= '1';
       end if;
     end if;
   end process;
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_predictor(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -557,7 +571,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of predictor
 architecture arch of {name} is
   signal zeros : std_logic_vector({bitwidth}-2 downto 0);
@@ -570,21 +584,16 @@ begin
   begin
     if (rst = '1') then
       data_reg <= zeros & '1';
-      data_out <= zeros & '1';
     elsif (rising_edge(clk)) then
       if (data_in_valid = '1') then
         data_reg <= data_in;
-      end if;
-      if (data_out_ready = '1' and trigger_valid = '1') then
-        -- After handshaking, data_out updates and holds its value until the
-        -- next handshaking, ensuring stability while valid is high.
-        data_out <= data_reg;
       end if;
     end if;
   end process;
 
   data_in_ready <= '1';
 
+  data_out <= data_reg;
   data_out_valid <= trigger_valid;
   trigger_ready <= data_out_ready;
 
@@ -592,11 +601,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_predFifo(name, bitwidth, fifo_depth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -604,7 +613,8 @@ use ieee.numeric_std.all;
 -- Entity of predFifo
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
 
     data_in : in std_logic_vector({bitwidth} - 1 downto 0);
     data_in_valid : in std_logic;
@@ -617,7 +627,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of predFifo
 architecture arch of {name} is
   signal HeadEn   : std_logic := '0';
@@ -742,41 +752,46 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_speculator(name, bitwidth, fifo_depth):
-  data_fork_name = f"{name}_data_fork"
-  specGen_name = f"{name}_specGen"
-  predictor_name = f"{name}_predictor"
-  predFifo_name = f"{name}_predFifo"
-  control_fork_name = f"{name}_control_fork"
-  decodeSave_name = f"{name}_decodeSave"
-  decodeCommit_name = f"{name}_decodeCommit"
-  decodeSC_name = f"{name}_decodeSC"
-  decodeOutput_name = f"{name}_decodeOutput"
-  decodeBranch_name = f"{name}_decodeBranch"
+    data_fork_name = f"{name}_data_fork"
+    specGen_name = f"{name}_specGen"
+    predictor_name = f"{name}_predictor"
+    predFifo_name = f"{name}_predFifo"
+    control_fork_name = f"{name}_control_fork"
+    decodeSave_name = f"{name}_decodeSave"
+    decodeCommit_name = f"{name}_decodeCommit"
+    decodeSC_name = f"{name}_decodeSC"
+    decodeOutput_name = f"{name}_decodeOutput"
+    decodeBranch_name = f"{name}_decodeBranch"
+    one_slot_break_r_name = f"{name}_one_slot_break_r"
 
-  dependencies = \
-      generate_fork(data_fork_name, {
-          "size": 2,
-          "bitwidth": bitwidth,
-          "extra_signals": {"spec": 1}
-      }) + \
-      _generate_specGen_core(specGen_name, bitwidth) + \
-      _generate_predictor(predictor_name, bitwidth) + \
-      _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
-      generate_fork(control_fork_name, {
-          "size": 5,
-          "bitwidth": 3
-      }) + \
-      _generate_decodeSave(decodeSave_name) + \
-      _generate_decodeCommit(decodeCommit_name) + \
-      _generate_decodeSC(decodeSC_name) + \
-      _generate_decodeOutput(decodeOutput_name) + \
-      _generate_decodeBranch(decodeBranch_name)
+    dependencies = \
+        generate_fork(data_fork_name, {
+            "size": 2,
+            "bitwidth": bitwidth,
+            "extra_signals": {"spec": 1}
+        }) + \
+        _generate_specGen_core(specGen_name, bitwidth) + \
+        _generate_predictor(predictor_name, bitwidth) + \
+        _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
+        generate_fork(control_fork_name, {
+            "size": 5,
+            "bitwidth": 3
+        }) + \
+        _generate_decodeSave(decodeSave_name) + \
+        _generate_decodeCommit(decodeCommit_name) + \
+        _generate_decodeSC(decodeSC_name) + \
+        _generate_decodeOutput(decodeOutput_name, bitwidth) + \
+        _generate_decodeBranch(decodeBranch_name) + \
+        generate_one_slot_break_r(one_slot_break_r_name, {
+            "bitwidth": bitwidth,
+            "extra_signals": {"internal_ctrl": 3, "spec": 1}
+        })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -819,7 +834,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of speculator
 architecture arch of {name} is
   signal fork_data_outs : data_array(1 downto 0)({bitwidth} - 1 downto 0);
@@ -832,6 +847,8 @@ architecture arch of {name} is
   signal predictor_data_out_spec : std_logic_vector(0 downto 0);
   signal predictor_data_out_ready : std_logic;
 
+  signal specgenCore_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal specgenCore_outs_spec : std_logic_vector(0 downto 0);
   signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
   signal specgenCore_fifo_outs_valid : std_logic;
   signal specgenCore_fifo_outs_ready : std_logic;
@@ -839,6 +856,12 @@ architecture arch of {name} is
   signal specgenCore_control_outs : std_logic_vector(2 downto 0);
   signal specgenCore_control_outs_valid : std_logic;
   signal specgenCore_control_outs_ready : std_logic;
+
+  signal one_slot_break_r_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal one_slot_break_r_outs_spec : std_logic_vector(0 downto 0);
+  signal one_slot_break_r_control_outs : std_logic_vector(2 downto 0);
+  signal one_slot_break_r_control_outs_valid : std_logic;
+  signal one_slot_break_r_control_outs_ready : std_logic;
 
   signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
   signal predFifo_data_out_valid : std_logic;
@@ -882,8 +905,8 @@ begin
       fifo_ins_valid => predFifo_data_out_valid,
       fifo_ins_ready => predFifo_data_out_ready,
 
-      outs => outs,
-      outs_spec => outs_spec,
+      outs => specgenCore_outs,
+      outs_spec => specgenCore_outs_spec,
 
       fifo_outs => specgenCore_fifo_outs,
       fifo_outs_valid => specgenCore_fifo_outs_valid,
@@ -927,13 +950,29 @@ begin
       data_out_ready => predFifo_data_out_ready
     );
 
+  one_slot_break_r: entity work.{one_slot_break_r_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      ins => specgenCore_outs,
+      ins_spec => specgenCore_outs_spec,
+      ins_internal_ctrl => specgenCore_control_outs,
+      ins_valid => specgenCore_control_outs_valid,
+      ins_ready => specgenCore_control_outs_ready,
+      outs => one_slot_break_r_outs,
+      outs_spec => one_slot_break_r_outs_spec,
+      outs_internal_ctrl => one_slot_break_r_control_outs,
+      outs_valid => one_slot_break_r_control_outs_valid,
+      outs_ready => one_slot_break_r_control_outs_ready
+    );
+
   fork0: entity work.{control_fork_name}(arch)
     port map (
       clk => clk,
       rst => rst,
-      ins => specgenCore_control_outs,
-      ins_valid => specgenCore_control_outs_valid,
-      ins_ready => specgenCore_control_outs_ready,
+      ins => one_slot_break_r_control_outs,
+      ins_valid => one_slot_break_r_control_outs_valid,
+      ins_ready => one_slot_break_r_control_outs_ready,
       outs => fork_control_outs,
       outs_valid => fork_control_outs_valid,
       outs_ready => fork_control_outs_ready
@@ -977,8 +1016,12 @@ begin
       control_in => fork_control_outs(4),
       control_in_valid => fork_control_outs_valid(4),
       control_in_ready => fork_control_outs_ready(4),
-      out_valid => outs_valid,
-      out_ready => outs_ready
+      one_slot_break_r_outs => one_slot_break_r_outs,
+      one_slot_break_r_outs_spec => one_slot_break_r_outs_spec,
+      outs => outs,
+      outs_spec => outs_spec,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
     );
 
   decodeBranch0: entity work.{decodeBranch_name}(arch)
@@ -993,51 +1036,52 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trigger",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl_save",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_commit",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_save",
-          "bitwidth": 3,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_commit",
-          "bitwidth": 3,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_branch",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }],
-      "extra_signals": extra_signals_without_spec,
-      "ignore_ports": ["ctrl_save", "ctrl_commit", "ctrl_sc_save", "ctrl_sc_commit", "ctrl_sc_branch"]
-  }, lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_spec_units_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "trigger",
+            "bitwidth": 0,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl_save",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_commit",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_save",
+            "bitwidth": 3,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_commit",
+            "bitwidth": 3,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_branch",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }],
+        extra_signals_without_spec,
+        ["ctrl_save", "ctrl_commit", "ctrl_sc_save",
+         "ctrl_sc_commit", "ctrl_sc_branch"],
+        lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

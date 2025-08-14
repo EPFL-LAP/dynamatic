@@ -1,25 +1,25 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.handshake.oehb import generate_oehb
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
 
 def generate_muli(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_muli_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_muli(name, bitwidth)
+    if extra_signals:
+        return _generate_muli_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_muli(name, bitwidth)
 
 
 def _get_latency():
-  return 4
+    return 4
 
 
 def _generate_mul_4_stage(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -35,7 +35,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mul_4_stage
 architecture behav of {name} is
 
@@ -67,22 +67,22 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_muli(name, bitwidth):
-  join_name = f"{name}_join"
-  mul_4_stage_name = f"{name}_mul_4_stage"
-  buff_name = f"{name}_buff"
-  oehb_name = f"{name}_oehb"
+    join_name = f"{name}_join"
+    mul_4_stage_name = f"{name}_mul_4_stage"
+    buff_name = f"{name}_buff"
+    one_slot_break_dv_name = f"{name}_one_slot_break_dv"
 
-  dependencies = \
-      generate_join(join_name, {"size": 2}) + \
-      _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
-      generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
-      generate_oehb(oehb_name, {"bitwidth": bitwidth})
+    dependencies = \
+        generate_join(join_name, {"size": 2}) + \
+        _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
+        generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
+        generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -106,19 +106,19 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of muli
 architecture arch of {name} is
   signal join_valid                         : std_logic;
-  signal buff_valid, oehb_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic_vector({bitwidth} - 1 downto 0);
+  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
+  signal one_slot_break_dv_dataOut, one_slot_break_dv_datain          : std_logic_vector({bitwidth} - 1 downto 0);
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      outs_ready   => oehb_ready,
+      outs_ready   => one_slot_break_dv_ready,
       -- outputs
       outs_valid   => join_valid,
       ins_ready(0) => lhs_ready,
@@ -128,7 +128,7 @@ begin
   multiply_unit : entity work.{mul_4_stage_name}(behav)
     port map(
       clk => clk,
-      ce  => oehb_ready,
+      ce  => one_slot_break_dv_ready,
       a   => lhs,
       b   => rhs,
       p   => result
@@ -139,44 +139,44 @@ begin
       clk,
       rst,
       join_valid,
-      oehb_ready,
+      one_slot_break_dv_ready,
       buff_valid
     );
 
-  oehb : entity work.{oehb_name}(arch)
+  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
       ins_valid  => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready  => oehb_ready,
-      ins        => oehb_datain,
-      outs       => oehb_dataOut
+      ins_ready  => one_slot_break_dv_ready,
+      ins        => one_slot_break_dv_datain,
+      outs       => one_slot_break_dv_dataOut
     );
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_muli_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "buffered",
-      "latency": _get_latency(),
-      "in_ports": [{
-          "name": "lhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "rhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_muli(name, bitwidth))
+    return generate_buffered_signal_manager(
+        name,
+        [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_muli(name, bitwidth),
+        _get_latency())

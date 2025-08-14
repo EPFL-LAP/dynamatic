@@ -3,27 +3,27 @@ from generators.support.utils import *
 
 
 def generate_cond_br(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data"])
+    data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-  if data_type.bitwidth == 0:
-    return _generate_cond_br_dataless(name)
-  else:
-    return _generate_cond_br(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_cond_br_dataless(name)
+    else:
+        return _generate_cond_br(name, data_type)
 
 
 def _generate_cond_br_dataless(name):
-  return f"""
+    return f"""
 MODULE {name}(condition, condition_valid, data_valid, trueOut_ready, falseOut_ready)
   VAR
-  inner_join : {name}__join(data_valid, condition_valid, branch_ready);
+  inner_join : {name}__join(condition_valid, data_valid, branch_ready);
 
   DEFINE
   branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
 
   -- output
   DEFINE
-  data_ready := inner_join.ins_0_ready;
-  condition_ready := inner_join.ins_1_ready;
+  condition_ready := inner_join.ins_0_ready;
+  data_ready := inner_join.ins_1_ready;
   trueOut_valid := condition & inner_join.outs_valid;
   falseOut_valid := !condition & inner_join.outs_valid;
 
@@ -32,10 +32,10 @@ MODULE {name}(condition, condition_valid, data_valid, trueOut_ready, falseOut_re
 
 
 def _generate_cond_br(name, data_type):
-  return f"""
+    return f"""
 MODULE {name}(condition, condition_valid, data, data_valid, trueOut_ready, falseOut_ready)
   VAR
-  inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+  inner_br : {name}__cond_br_dataless(condition, condition_valid, data_valid, trueOut_ready, falseOut_ready);
 
   -- output
   DEFINE

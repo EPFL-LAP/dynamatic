@@ -51,10 +51,12 @@ endif()
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
+message(STATUS "Using PollyConfig.cmake in: ${Polly_DIR}")
 
 find_package(MLIR REQUIRED CONFIG)
 set(Clang_DIR ${CLANG_DIR})
 find_package(Clang REQUIRED CONFIG)
+find_package(Polly REQUIRED CONFIG)
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
@@ -73,9 +75,13 @@ include(FetchContent)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
+link_directories(${Polly_LIBRARIES})
+
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${CLANG_INCLUDE_DIRS})
+include_directories(${Polly_INCLUDE_DIRS})
+message(STATUS "Including from ${Polly_INCLUDE_DIRS}")
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -179,9 +185,9 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   # Download dot2smv Python scripts
   FetchContent_Declare(
     dot2smv
-    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
+    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
   )
 
   FetchContent_MakeAvailable(dot2smv)

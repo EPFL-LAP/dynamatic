@@ -1,19 +1,19 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 
 
 def generate_trunci(name, params):
-  input_bitwidth = params["input_bitwidth"]
-  output_bitwidth = params["output_bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    input_bitwidth = params["input_bitwidth"]
+    output_bitwidth = params["output_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
-  else:
-    return _generate_trunci(name, input_bitwidth, output_bitwidth)
+    if extra_signals:
+        return _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
+    else:
+        return _generate_trunci(name, input_bitwidth, output_bitwidth)
 
 
 def _generate_trunci(name, input_bitwidth, output_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -21,7 +21,8 @@ use ieee.numeric_std.all;
 -- Entity of trunci
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     ins       : in  std_logic_vector({input_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic;
@@ -34,7 +35,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of trunci
 architecture arch of {name} is
 begin
@@ -44,21 +45,21 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": input_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": output_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_trunci(name, input_bitwidth, output_bitwidth))
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": input_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": output_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_trunci(name, input_bitwidth, output_bitwidth))

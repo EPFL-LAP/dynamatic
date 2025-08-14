@@ -1,12 +1,13 @@
 def generate_eager_fork_register_block(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
 -- Entity of eager_fork_register_block
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- inputs
     ins_valid    : in std_logic;
     outs_ready   : in std_logic;
@@ -18,7 +19,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of eager_fork_register_block
 architecture arch of {name} is
   signal transmitValue, keepValue : std_logic;
@@ -41,4 +42,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
