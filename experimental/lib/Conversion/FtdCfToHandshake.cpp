@@ -54,39 +54,40 @@ struct FtdCfToHandshakePass
         getAnalysis<gsa::GSAAnalysis>(), getAnalysis<NameAnalysis>(), converter,
         ctx);
 
-    patterns.add<ConvertCalls,
-                 ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-                 ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-                 OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-                 OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-                 OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-                 OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-                 OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-                 OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-                 OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-                 OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-                 OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-                 OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-                 OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-                 OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-                 OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-                 OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-                 OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-                 OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-                 OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-                 OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-                 OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
-        getAnalysis<NameAnalysis>(), converter, ctx);
+    patterns
+        .add<ConvertCalls,
+             FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+             FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+             FtdOneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+             FtdOneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+             FtdOneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+             FtdOneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+             FtdOneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+             FtdOneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+             FtdOneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+             FtdOneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+             FtdOneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+             FtdOneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+             FtdOneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+             FtdOneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+             FtdOneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+             FtdOneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+             FtdOneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+             FtdOneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+             FtdOneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+             FtdOneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+             FtdOneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+             FtdOneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+             FtdOneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+             FtdOneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+             FtdOneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+             FtdOneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+             FtdOneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+             FtdOneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+             FtdOneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+             FtdOneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+             FtdOneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
+            getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
@@ -169,21 +170,6 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
                                       handshake::FuncOp &funcOp,
                                       NameAnalysis &namer) {
 
-  // Check whether the current constant can be connected to a source rather than
-  // to start.
-  auto isCstSourcable = [](arith::ConstantOp cstOp) -> bool {
-    std::function<bool(Operation *)> isValidUser =
-        [&](Operation *user) -> bool {
-      if (isa<UnrealizedConversionCastOp>(user))
-        return llvm::all_of(user->getUsers(), isValidUser);
-      return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-                  handshake::LoadOp, handshake::StoreOp, handshake::MergeOp>(
-          user);
-    };
-
-    return llvm::all_of(cstOp->getUsers(), isValidUser);
-  };
-
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
   llvm::DenseMap<Block *, Value> sourcesPerBlock;
@@ -198,12 +184,6 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
     // constant is considered as sourcable, this will be the output of a source
     // component, otherwise it remains startValue
     auto controlValue = startValue;
-
-    if (isCstSourcable(cstOp)) {
-      auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-      inheritBB(cstOp, sourceOp);
-      controlValue = sourceOp.getResult();
-    }
 
     // Continue the conversion by obtaining the size of the constnat
     TypedAttr valueAttr = cstOp.getValue();
@@ -227,10 +207,28 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+template <typename SrcOp, typename DstOp>
+LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
+    SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
+  rewriter.setInsertionPoint(srcOp);
+  SmallVector<Type> newTypes;
+  for (Type resType : srcOp->getResultTypes())
+    newTypes.push_back(channelifyType(resType));
+  auto newOp =
+      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
+                             srcOp->getAttrDictionary().getValue());
+
+  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
+    from.replaceAllUsesWith(to);
+
+  this->namer.replaceOp(srcOp, newOp);
+  rewriter.replaceOp(srcOp, newOp);
+  return success();
+}
+
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
-
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
   DenseMap<Value, unsigned> memrefToArgIdx;
@@ -282,7 +280,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo)))
+                              memInfo, true)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports
@@ -322,6 +320,47 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
+  return success();
+}
+
+template <typename CastOp, typename ExtOp>
+LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
+    CastOp castOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+
+  auto getWidth = [](Type type) -> unsigned {
+    // In Fast Token Delivery the type of the element might be already a
+    // channel, rather than a simple type. In this case, the type should be
+    // extracted. We also make sure that no extra bits are present at this
+    // compilation stage.
+    if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
+      assert(dataType.getNumExtraSignals() == 0 &&
+             "expected type to have no extra signals");
+      type = dataType.getDataType();
+    }
+    if (isa<IndexType>(type))
+      return 32;
+    return type.getIntOrFloatBitWidth();
+  };
+
+  unsigned srcWidth = getWidth(castOp.getOperand().getType());
+  unsigned dstWidth = getWidth(castOp.getResult().getType());
+  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
+  Operation *newOp;
+  if (srcWidth < dstWidth) {
+    // This is an extension
+    newOp =
+        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
+                               castOp->getAttrDictionary().getValue());
+  } else {
+    // This is a truncation
+    newOp = rewriter.create<handshake::TruncIOp>(
+        castOp.getLoc(), dstType, adaptor.getOperands(),
+        castOp->getAttrDictionary().getValue());
+  }
+  this->namer.replaceOp(castOp, newOp);
+  rewriter.replaceOp(castOp, newOp);
+  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }
 

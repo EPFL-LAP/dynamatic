@@ -25,7 +25,6 @@ inline void registerAllPasses() {
   dynamatic::experimental::registerPasses();
   registerConversionPasses();
   registerAnalysisPasses();
-  dynamatic::experimental::registerPasses();
 }
 
 } // namespace experimental

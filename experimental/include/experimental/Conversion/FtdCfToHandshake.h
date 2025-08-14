@@ -55,6 +55,36 @@ protected:
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
 };
+
+template <typename SrcOp, typename DstOp>
+struct FtdOneToOneConversion : public OneToOneConversion<SrcOp, DstOp> {
+public:
+  using OpAdaptor = typename SrcOp::Adaptor;
+
+  FtdOneToOneConversion(NameAnalysis &namer, const TypeConverter &typeConverter,
+                        MLIRContext *ctx)
+      : dynamatic::OneToOneConversion<SrcOp, DstOp>(namer, typeConverter, ctx) {
+  }
+
+  LogicalResult
+  matchAndRewrite(SrcOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
+template <typename CastOp, typename ExtOp>
+struct FtdConvertIndexCast : public ConvertIndexCast<CastOp, ExtOp> {
+public:
+  using OpAdaptor = typename CastOp::Adaptor;
+
+  FtdConvertIndexCast(NameAnalysis &namer, const TypeConverter &typeConverter,
+                      MLIRContext *ctx)
+      : dynamatic::ConvertIndexCast<CastOp, ExtOp>(namer, typeConverter, ctx) {}
+
+  LogicalResult
+  matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
 #include "experimental/Conversion/Passes.h.inc"

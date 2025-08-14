@@ -694,7 +694,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefIndices,
     BackedgeBuilder &edgeBuilder,
-    LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
+    LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -758,7 +758,13 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               memOpLowering.recordReplacement(loadOp, newOp, false);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
-              loadOp.getResult().replaceAllUsesWith(dataOut);
+
+              // TODO: /!\ FTD requires this quirk to work, due to soem internal
+              // limitations. An additional flag is introudced so that the main
+              // flow does not get affected.
+              if (isFtd)
+                loadOp.getResult().replaceAllUsesWith(dataOut);
+
               return newOp;
             })
             .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
@@ -1034,10 +1040,6 @@ LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
   auto newOp =
       rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
                              srcOp->getAttrDictionary().getValue());
-
-  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
-    from.replaceAllUsesWith(to);
-
   namer.replaceOp(srcOp, newOp);
   rewriter.replaceOp(srcOp, newOp);
   return success();
@@ -1049,15 +1051,6 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
-    // In Fast Token Delivery the type of the element might be already a
-    // channel, rather than a simple type. In this case, the type should be
-    // extracted. We also make sure that no extra bits are present at this
-    // compilation stage.
-    if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
-      assert(dataType.getNumExtraSignals() == 0 &&
-             "expected type to have no extra signals");
-      type = dataType.getDataType();
-    }
     if (isa<IndexType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
@@ -1080,7 +1073,6 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   }
   namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);
-  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }
 

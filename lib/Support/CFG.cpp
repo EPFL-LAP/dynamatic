@@ -445,7 +445,7 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
               addToCtrlOps(ctrlOp->getUsers());
               return success();
             })
-            .Case<handshake::MergeLikeOpInterface>([&](auto) {
+            .Case<handshake::ControlMergeOp>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
               return updateCtrl(bb, mergeRes);
