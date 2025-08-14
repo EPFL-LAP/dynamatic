@@ -827,6 +827,19 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
     ri = nextRI;
   }
 
+  materializeValue(merge.getResult());
+  auto forkOp = cast<ForkOp>(*merge.getResult().getUsers().begin());
+  builder.setInsertionPoint(forkOp);
+  LazyForkOp lazyForkOp = builder.create<LazyForkOp>(
+      forkOp.getLoc(), merge.getResult(), forkOp->getNumResults());
+  inheritBB(forkOp, lazyForkOp);
+
+  for (unsigned i = 0; i < forkOp->getNumResults(); i++) {
+    forkOp->getResult(i).replaceAllUsesWith(lazyForkOp->getResult(i));
+  }
+
+  forkOp->erase();
+
   return merge;
 }
 

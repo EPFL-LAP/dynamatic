@@ -114,7 +114,8 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   // buffer slot at its output, and this is necessary only if
   // the merge is on a cycle.
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
-    if (mergeOp->getNumOperands() > 1) {
+    if (mergeOp->getNumOperands() > 1 &&
+        !isa<handshake::LazyForkOp>(*mergeOp.getResult().getUsers().begin())) {
       for (OpResult mergeRes : mergeOp->getResults()) {
         Channel channel(mergeRes, true);
         if (isChannelOnCycle(mergeRes)) {
