@@ -8,16 +8,25 @@
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
-int matvec(in_int_t m[N][N], in_int_t v[N], out_int_t out[N]) {
-  int tmp = 0;
+int matvec(in_int_t v[N]) {
+  int tmp = 1;
   for (unsigned i = 0; i < N; i++) {
-    tmp = 0;
+    tmp = v[i];
     for (unsigned j = 0; j < N; j++) {
-      tmp += v[j] * m[i][j];
+      tmp *= v[j];
     }
-    out[i] = tmp;
   }
   return tmp;
+
+  // int tmp2 = 1;
+  // for (unsigned i = 0; i < N; i++) {
+  //   //tmp = 0;
+  //   //for (unsigned j = 0; j < N; j++) {
+  //   tmp2 *= v[i] + m[i][i];
+  //   //}
+  //   //out[i] = tmp;
+  // }
+  // return tmp + tmp2;
 }
 
 int main(void) {
@@ -32,6 +41,6 @@ int main(void) {
     }
   }
 
-  CALL_KERNEL(matvec, m, v, out);
+  CALL_KERNEL(matvec, v);
   return 0;
 }
