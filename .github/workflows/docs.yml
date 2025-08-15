@@ -56,8 +56,6 @@ jobs:
 
       - name: Build documentation
         run: |
-          PATH=$PATH:$HOME/bin ls ~/bin
-          PATH=$PATH:$HOME/bin which mdbook-alerts
           PATH=$PATH:$HOME/bin mdbook build
 
       - name: Upload artifact
