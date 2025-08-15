@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
+#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -28,9 +29,11 @@
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <string>
 
@@ -47,6 +50,13 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     CostAware("costaware"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+namespace dynamatic {
+namespace buffer {
+#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace buffer
+} // namespace dynamatic
 
 namespace {
 
@@ -84,7 +94,75 @@ public:
       delete log;
   }
 };
+
 } // namespace
+
+namespace dynamatic {
+namespace buffer {
+
+/// Public pass driver for the buffer placement pass. Unlike most other
+/// Dynamatic passes, users may wish to access the pass's internal state to
+/// derive insights useful for different kinds of IR processing. To facilitate
+/// users' workflow and minimize code duplication, this driver is public and
+/// exposes most of its behavior in protected virtual methods which may be
+/// overriden by sub-types of the pass.
+struct HandshakePlaceBuffersPass
+    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+          HandshakePlaceBuffersPass> {
+
+  /// Trivial field-by-field constructor.
+  HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
+                            StringRef timingModels, bool firstCFDFC,
+                            double targetCP, unsigned timeout, bool dumpLogs);
+
+  /// Use the auto-generated construtors from tblgen
+  using HandshakePlaceBuffersBase::HandshakePlaceBuffersBase;
+
+  void runOnOperation() override;
+
+protected:
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  /// Called for all buffer placement strategies that not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeUsingMILP();
+
+  /// Checks a couple of invariants in the function that are required by our
+  /// buffer placement algorithm. Fails when the function does not satisfy at
+  /// least one invariant.
+  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
+
+  /// Places buffers in the function, according to the logic dictated by the
+  /// algorithm the pass was instantiated with.
+  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB);
+
+  /// Identifies and extracts all existing CFDFCs in the function using
+  /// estimated transition frequencies between its basic blocks. Fills the
+  /// `cfdfcs` vector with the extracted cycles. CFDFC identification works by
+  /// iteratively solving MILPs until the MILP solution indicates that no
+  /// "executable cycle" remains in the circuit.
+  virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
+                                  SmallVector<CFDFC> &cfdfcs);
+
+  /// Computes an optimal buffer placement for a Handhsake function by solving
+  /// a large MILP over the entire dataflow circuit represented by the
+  /// function. Fills the `placement` map with placement decisions derived
+  /// from the MILP's solution.
+  virtual LogicalResult getBufferPlacement(FuncInfo &info,
+                                           TimingDatabase &timingDB,
+                                           Logger *logger,
+                                           BufferPlacement &placement);
+#endif
+  /// Called for all buffer placement strategies that do not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeWithoutUsingMILP();
+
+  /// Instantiates buffers inside the IR, following placement decisions
+  /// determined by the buffer placement MILP.
+  virtual void instantiateBuffers(BufferPlacement &placement);
+};
+
+} // namespace buffer
+} // namespace dynamatic
 
 BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
                            std::error_code &ec) {
@@ -108,13 +186,17 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
 }
 
-void HandshakePlaceBuffersPass::runDynamaticPass() {
+void HandshakePlaceBuffersPass::runOnOperation() {
   // Buffer placement requires that all values are used exactly once
-  mlir::ModuleOp modOp = getOperation();
+  mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
   if (failed(verifyIRMaterialized(modOp))) {
     modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
     return;
   }
+
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (!nameAnalysis.isAnalysisValid())
+    return signalPassFailure();
 
   // Map algorithms to the function to call to execute them
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
@@ -180,6 +262,15 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
       }
     }
   });
+
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached. Also name operations that do not currently have a name (unless
+  // instructed otherwise)
+  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+
+  // The name analysis is always preserved across passes
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -193,14 +284,19 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
       return failure();
   }
-  markAnalysesPreserved<NameAnalysis>();
 
-  mlir::ModuleOp modOp = getOperation();
+  ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+  auto &perfAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
+
+    perfAnalysis.results.insert(
+        std::make_pair(funcOp, BufferPlacementResult()));
+
+    funcToInfo.insert(std::make_pair(
+        funcOp, FuncInfo(funcOp, &perfAnalysis.results[funcOp])));
     FuncInfo &info = funcToInfo[funcOp];
 
     // Read the CSV containing arch information (number of transitions between
@@ -226,6 +322,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
       return failure();
   }
+
+  markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
   return success();
 }
 
@@ -543,7 +641,9 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
-  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
+  auto modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
     llvm::MapVector<Value, ChannelBufProps> channelProps;
@@ -629,13 +729,4 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
   }
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakePlaceBuffers(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
-  return std::make_unique<HandshakePlaceBuffersPass>(
-      algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
 }
