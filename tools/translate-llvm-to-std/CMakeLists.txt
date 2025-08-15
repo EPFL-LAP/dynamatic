@@ -2,14 +2,14 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_llvm_tool(translate-llvm-to-cf
-  translate-llvm-to-cf.cpp
+add_llvm_tool(translate-llvm-to-std
+  translate-llvm-to-std.cpp
   ImportLLVMModule.cpp
   InferArgTypes.cpp
 )
 
-llvm_update_compile_flags(translate-llvm-to-cf)
-target_link_libraries(translate-llvm-to-cf
+llvm_update_compile_flags(translate-llvm-to-std)
+target_link_libraries(translate-llvm-to-std
   PRIVATE
   DynamaticSupport
   DynamaticHandshake

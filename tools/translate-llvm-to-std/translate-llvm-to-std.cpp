@@ -1,5 +1,4 @@
 #include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
@@ -16,7 +15,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "InferArgTypes.h"
-#include "dynamatic/InitAllDialects.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,8 +23,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
@@ -36,11 +32,6 @@
 #include "ImportLLVMModule.h"
 #include "mlir/Support/FileUtilities.h"
 
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <vector>
 
 using namespace llvm;
 using namespace mlir;

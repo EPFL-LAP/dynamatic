@@ -165,7 +165,7 @@ $LLVM_BINS/opt -S \
   $OUT/clang_array_partitioned_cleaned.ll \
   > $OUT/clang_optimized_dep_marked.ll
 
-$DYNAMATIC_BINS/translate-llvm-to-cf \
+$DYNAMATIC_BINS/translate-llvm-to-std \
   "$OUT/clang_optimized_dep_marked.ll" \
   -function-name "$FUNC_NAME" \
   -csource "$F_SRC" \
