@@ -18,6 +18,7 @@ USE_SHARING=$8
 FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
 
 POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
 CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
@@ -151,9 +152,18 @@ else
 fi
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
-  > "$F_HANDSHAKE"
-exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+  echo_info "Running FTD algorithm for handshake conversion"
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+fi
 
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \

@@ -440,12 +440,12 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
             .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) {
-                  addToCtrlOps(ctrlOp->getUsers());
-                  return success();
-                })
-            .Case<handshake::MergeLikeOpInterface>([&](auto) {
+                  handshake::BranchOp, handshake::ConditionalBranchOp,
+                  handshake::MuxOp, handshake::MergeOp>([&](auto) {
+              addToCtrlOps(ctrlOp->getUsers());
+              return success();
+            })
+            .Case<handshake::ControlMergeOp>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
               return updateCtrl(bb, mergeRes);

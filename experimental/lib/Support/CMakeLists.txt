@@ -8,6 +8,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   HandshakeSimulator.cpp
   FtdImplementation.cpp
   FtdSupport.cpp
+  CFGAnnotation.cpp
   FormalProperty.cpp
 
   LINK_LIBS PUBLIC
