@@ -218,6 +218,13 @@ LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
       rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
                              srcOp->getAttrDictionary().getValue());
 
+  // /!\ This is the main difference from the base function. Without such
+  // replacement, a "null operand found" error is present at the end of the
+  // transformation pass in almost any test. This is due to the way FTD tweaks
+  // the coexistence of `cf` and `handshake` dialect to obtain a final circuit:
+  // without such explicit replacement, deleted operations still provide values
+  // to new operations. However, this should be fixed by understanding what is
+  // causing MLIR to complain.
   for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
     from.replaceAllUsesWith(to);
 
@@ -360,6 +367,9 @@ LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   }
   this->namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);
+
+  // /!\ This is again the main difference from the normal flow. See the comment
+  // in FtdOneToOneConversion.
   castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }

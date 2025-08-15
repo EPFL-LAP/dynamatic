@@ -759,9 +759,13 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
 
-              // TODO: /!\ FTD requires this quirk to work, due to soem internal
-              // limitations. An additional flag is introudced so that the main
-              // flow does not get affected.
+              // /!\ In FTD, the way operations are converted between dialects
+              // is done in a way that both operations from `cf` to `handshake`
+              // coexist in some intertwined way. New operations from the
+              // `handshake` dialect are instantiated while connected to the old
+              // `cf` versions. When rewriting, we found that this call is
+              // necessary to avoid having a "null operand found" error (e.g.
+              // get_tanh)
               if (isFtd)
                 loadOp.getResult().replaceAllUsesWith(dataOut);
 
