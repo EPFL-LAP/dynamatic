@@ -21,6 +21,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -50,14 +51,17 @@ struct GateInput {
   /// the IR, another gate or empty.
   std::variant<Value, Gate *> input;
 
+  /// Set of all blocks that forward this gateInput to the gate.
+  std::unordered_set<Block *> senders;
+
   /// Constructor a gate input being the result of an operation.
-  GateInput(Value v) : input(v) {};
+  GateInput(Value v) : input(v){};
 
   /// Constructor for a gate input being the output of another gate.
-  GateInput(Gate *p) : input(p) {};
+  GateInput(Gate *p) : input(p){};
 
   /// Constructor for a gate input being empty.
-  GateInput() : input(nullptr) {};
+  GateInput() : input(nullptr){};
 
   /// Returns the block owner of the input.
   Block *getBlock();

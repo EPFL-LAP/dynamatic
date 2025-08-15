@@ -266,6 +266,8 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<GateInput *> operands;
+      // Create a set to track repetition of missing-phi operands
+      SmallVector<MissingPhi> operandsMissPhi;
       DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
       // providing the inputs of the phi functions
@@ -281,13 +283,32 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
         assert(branchOp && "Expected terminator operation in a predecessor "
                            "block feeding a block argument!");
 
-        // Check if the input value "c" of type Value is already present among
-        // the operands of the phi function
+        // Check if input value `c` is already among the phi's operands
+        // (either as a concrete value or a missing-phi) and update its senders
+        // if found.
         auto isAlreadyPresent = [&](Value c) -> bool {
-          return std::any_of(operands.begin(), operands.end(),
-                             [c](GateInput *in) {
-                               return in->isTypeValue() && in->getValue() == c;
-                             });
+          // Check for concrete values already present
+          for (GateInput *in : operands) {
+            if (in->isTypeValue() && in->getValue() == c) {
+              in->senders.insert(pred);
+              return true;
+            }
+          }
+
+          // Check for duplicate missing-phi operands
+          if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
+            for (MissingPhi mPhi : operandsMissPhi) {
+              // Two missing-phi operands are considered equal if they target
+              // the same argument of the same phi and have the same producer
+              // block. The value is not compared, which might be problematic.
+              if (mPhi.blockArg.getParentBlock() ==
+                  blockArgC.getParentBlock()) {
+                mPhi.pi->senders.insert(pred);
+                return true;
+              }
+            }
+          }
+          return false;
         };
 
         // For each alternative in the branch terminator
@@ -309,13 +330,18 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
           /// of missing phis. Otherwise, the input is a value, and it can be
           /// safely added directly.
           if (BlockArgument blockArg = dyn_cast<BlockArgument>(producer);
-              blockArg && !producer.getParentBlock()->hasNoPredecessors()) {
+              blockArg && !producer.getParentBlock()->hasNoPredecessors() &&
+              !isAlreadyPresent(dyn_cast<Value>(producer))) {
             gateInput = new GateInput((Gate *)nullptr);
-            phisToConnect.push_back(MissingPhi(gateInput, blockArg));
+            MissingPhi missingPhi = MissingPhi(gateInput, blockArg);
+            missingPhi.pi->senders.insert(pred);
+            phisToConnect.push_back(missingPhi);
             gateInputList.push_back(gateInput);
+            operandsMissPhi.push_back(missingPhi);
           } else {
             if (!isAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
+              gateInput->senders.insert(pred);
               gateInputList.push_back(gateInput);
             }
           }
@@ -410,8 +436,18 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
 
         // Find all the paths from "commonDominator" to "phiBlock" which pass
         // through operand's block but not through any of the "blocksToAvoid"
-        auto paths = findAllPaths(commonDominator, phiBlock, bi,
-                                  operand->getBlock(), blocksToAvoid);
+        auto allPaths = findAllPaths(commonDominator, phiBlock, bi,
+                                     operand->getBlock(), blocksToAvoid);
+
+        // Keep paths where the block before the phi matches a sender or no
+        // senders are recorded.
+        std::vector<std::vector<Block *>> paths;
+        for (auto path : allPaths) {
+          Block *prev = path[path.size() - 2];
+          if (operand->senders.empty() ||
+              llvm::is_contained(operand->senders, prev))
+            paths.push_back(path);
+        }
 
         BoolExpression *phiInputCondition = BoolExpression::boolZero();
 
@@ -458,6 +494,15 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
   }
 }
 
+static bool IsBlockInLoop(Block *block, CFGLoop *loop, mlir::CFGLoopInfo &li) {
+  for (CFGLoop *blockLoop = li.getLoopFor(block); blockLoop;
+       blockLoop = blockLoop->getParentLoop()) {
+    if (blockLoop == loop)
+      return true;
+  }
+  return false;
+}
+
 void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
 
   mlir::DominanceInfo domInfo;
@@ -469,32 +514,60 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
     SmallVector<Gate *> phis = entry.second;
     for (Gate *phi : phis) {
 
-      // A phi might be a MU iff it is inside a for loop and has exactly
-      // two operands
-      if (!loopInfo.getLoopFor(phiBlock) || phi->operands.size() != 2)
+      // A phi can be a MU only if it is inside a loop and has at least two
+      // operands
+      if (!loopInfo.getLoopFor(phiBlock) || phi->operands.size() < 2)
         continue;
-
-      Block *op0Block = phi->operands[0]->getBlock(),
-            *op1Block = phi->operands[1]->getBlock();
 
       // Checks whether the block of the merge is a loop header
-      bool isBlockHeader =
-          loopInfo.getLoopFor(phiBlock)->getHeader() == phiBlock;
-
-      // Checks whether the two operands come from different loops (in
-      // this case, one of the values is the initial definition)
-      bool operandFromOutsideLoop =
-          loopInfo.getLoopFor(op0Block) != loopInfo.getLoopFor(op1Block);
-
-      // If both the conditions hold, then we have a MU gate
-      if (!(isBlockHeader && operandFromOutsideLoop))
+      if (loopInfo.getLoopFor(phiBlock)->getHeader() != phiBlock)
         continue;
 
-      phi->gsaGateFunction = GateType::MuGate;
+      // MU gate has two groups of operands: from inside and from outside the
+      // loop
+      SmallVector<GateInput *> initialInputs, loopInputs;
 
-      // Use the initial value of MU as first input of the gate
-      if (domInfo.dominates(op1Block, phiBlock))
-        std::swap(phi->operands[0], phi->operands[1]);
+      // Separate inputs from outside the loop (initialInputs) and inside the
+      // loop (loopInputs)
+      for (GateInput *input : phi->operands) {
+        Block *inputBlock = input->getBlock();
+        if (IsBlockInLoop(inputBlock, loopInfo.getLoopFor(phiBlock), loopInfo))
+          loopInputs.push_back(input);
+        else
+          initialInputs.push_back(input);
+      }
+
+      // If both initialInputs and loopInputs have at least one member, we have
+      // a MU gate
+      if (initialInputs.size() < 1 || loopInputs.size() < 1)
+        continue;
+
+      // MU gate has exactly one operand from inside and one from outside the
+      // loop. If more than one exists, a phi gate is added to select the output
+      GateInput *operandInit = nullptr, *operandLoop = nullptr;
+
+      if (initialInputs.size() == 1)
+        operandInit = initialInputs[0];
+      else {
+        Gate *initialPhi = new Gate(phi->result, initialInputs,
+                                    GateType::PhiGate, ++uniqueGateIndex);
+        gatesPerBlock[phiBlock].push_back(initialPhi);
+        operandInit = new GateInput(initialPhi);
+        gateInputList.push_back(operandInit);
+      }
+
+      if (loopInputs.size() == 1)
+        operandLoop = loopInputs[0];
+      else {
+        Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
+                                 ++uniqueGateIndex);
+        gatesPerBlock[phiBlock].push_back(loopPhi);
+        operandLoop = new GateInput(loopPhi);
+        gateInputList.push_back(operandLoop);
+      }
+
+      phi->gsaGateFunction = GateType::MuGate;
+      phi->operands = {operandInit, operandLoop};
 
       // The block determining the MU condition is the exiting block of the
       // innermost loop the MU is in
@@ -553,7 +626,8 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op : operands) {
+      for (GateInput *&op
+           : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());
@@ -568,6 +642,18 @@ void experimental::gsa::Gate::print() {
           llvm::dbgs() << "\t(";
           op->getBlock()->printAsOperand(llvm::dbgs());
           llvm::dbgs() << ")";
+        }
+
+        if (!op->senders.empty()) {
+          llvm::dbgs() << "\t[senders: ";
+          bool first = true;
+          for (auto *sender : op->senders) {
+            if (!first)
+              llvm::dbgs() << ", ";
+            sender->printAsOperand(llvm::dbgs());
+            first = false;
+          }
+          llvm::dbgs() << "]";
         }
         llvm::dbgs() << "\n";
       });
