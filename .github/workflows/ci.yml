@@ -8,7 +8,6 @@ on:
 
 jobs:
   check-format:
-    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     steps:
@@ -53,6 +52,43 @@ jobs:
           echo "autopep8 exited with $STATUS"
           deactivate
           exit $STATUS
+
+  build-polygeist:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: cache-polygeist-restore
+        id: cache-polygeist-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/
+            llvm-project/build/
+          key: polygeist-build
+
+      - name: checkout-polygeist
+        if: steps.cache-polygeist.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: 'EPFL-LAP/Polygeist'
+          submodules: recursive
+
+      - name: build-polygeist
+        if: steps.cache-polygeist.outputs.cache-hit != 'true'
+        run: |
+          echo "Cache miss for Polygeist build artifacts"
+          sudo apt-get -y install ccache
+          bash build-polygeist.sh --release --force
+      
+      - name: cache-polygeist-save
+        id: cache-polygeist-save
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/
+            llvm-project/build/
+          key: ${{ steps.cache-polygeist-restore.outputs.cache-primary-key }}
 
   integration:
     if: github.event.pull_request.draft == false
