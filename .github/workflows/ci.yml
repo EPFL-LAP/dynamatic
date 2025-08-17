@@ -101,13 +101,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: list-contents
-        run: |
-          echo "workdir contains"
-          ls .
-          ls build
-          ls llvm-project/build
-
       - name: fetch-polygeist
         uses: actions/cache/restore@v4
         with:
@@ -117,23 +110,22 @@ jobs:
           key: polygeist-build
 
       - name: build
-        if: success() || failure()
         run: ./build.sh --release --force
 
       - name: check-dynamatic
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
 
       - uses: actions/upload-artifact@v4
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         with: 
           name: integration-report
           path: |
