@@ -116,7 +116,7 @@ jobs:
           rmdir llvm-project
 
       - name: build
-        run: ./build.sh --release --force
+        run: ./build.sh --debug --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
