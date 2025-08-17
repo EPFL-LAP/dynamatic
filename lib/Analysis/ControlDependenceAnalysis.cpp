@@ -188,7 +188,7 @@ void dynamatic::ControlDependenceAnalysis::identifyForwardControlDeps(
   if (region.empty())
     return;
 
-  dfs(dfs, &*region.begin());
+  dfs(dfs, &region.front());
 
   auto comesBeforeInCFG = [&](Block *a, Block *b) -> bool {
     return dfsNum[a] < dfsNum[b];
