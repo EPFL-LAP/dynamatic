@@ -68,14 +68,14 @@ jobs:
           key: polygeist-build
 
       - name: checkout-polygeist
-        if: steps.cache-polygeist.outputs.cache-hit != 'true'
+        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: 'EPFL-LAP/Polygeist'
           submodules: recursive
 
       - name: build-polygeist
-        if: steps.cache-polygeist.outputs.cache-hit != 'true'
+        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss for Polygeist build artifacts"
           sudo apt-get -y install ccache
@@ -83,6 +83,7 @@ jobs:
       
       - name: cache-polygeist-save
         id: cache-polygeist-save
+        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
