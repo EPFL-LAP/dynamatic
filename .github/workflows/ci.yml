@@ -100,7 +100,7 @@ jobs:
       - name: cleanup
         run: |
           echo "Emptying folder"
-          rm -rf *
+          rm -rf * .*
           echo "Folder contents"
           ls -la
 
