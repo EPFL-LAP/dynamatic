@@ -97,6 +97,13 @@ jobs:
     needs: [build-polygeist]
 
     steps:
+      - name: cleanup
+        run: |
+          echo "Emptying folder"
+          rm -rf *
+          echo "Folder contents"
+          ls -la
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
