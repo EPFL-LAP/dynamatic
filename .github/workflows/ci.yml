@@ -77,7 +77,7 @@ jobs:
       - name: build-polygeist
         if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
         run: |
-          echo "Cache miss for Polygeist build artifacts"
+          echo "Cache miss for Polygeist build artifacts, need to rebuild"
           sudo apt-get -y install ccache
           bash build-polygeist.sh --release --force
       
@@ -89,22 +89,32 @@ jobs:
           path: |
             build/
             llvm-project/build/
-          key: ${{ steps.cache-polygeist-restore.outputs.cache-primary-key }}
+          key: polygeist-build
 
   integration:
     if: github.event.pull_request.draft == false
     runs-on: self-hosted
+    needs: [build-polygeist]
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: sync-submodules
+      - name: list-contents
         run: |
-          git submodule update --recursive .
-          git submodule sync --recursive .
-          echo "polygeist/llvm-project url: " $(git -C ./polygeist/llvm-project remote get-url origin)
+          echo "workdir contains"
+          ls .
+          ls build
+          ls llvm-project/build
+
+      - name: fetch-polygeist
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/
+            llvm-project/build/
+          key: polygeist-build
 
       - name: build
         if: success() || failure()
