@@ -23,15 +23,11 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -45,8 +41,6 @@
 #include <list>
 #include <map>
 #include <set>
-#include <string>
-#include <system_error>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -97,6 +91,8 @@ using Group = std::vector<Operation *>;
 
 // SharingGroups: a list of operations that share the same unit.
 using SharingGroups = std::list<Group>;
+
+namespace {
 
 void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
                                   SharingInfo &sharingInfo,
@@ -150,41 +146,6 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
     sharingInfo[funcOp].critCfcs.emplace(cfIndices[*critCf]);
   }
 }
-
-struct CreditBasedSharingPass
-    : public dynamatic::experimental::impl::CreditBasedSharingBase<
-          CreditBasedSharingPass> {
-
-  using CreditBasedSharingBase::CreditBasedSharingBase;
-  void runOnOperation() override;
-
-  LogicalResult sharingInFuncOp(handshake::FuncOp funcOp,
-                                FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-                                TimingDatabase &timingDB, double targetCP);
-
-  LogicalResult sharingWrapperInsertion(
-      handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-      MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB);
-
-  // This class method finds all sharing targets for a given handshake function
-  SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
-    SmallVector<Operation *> sharingTargets;
-
-    funcOp.walk([&](Operation *op) {
-      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp,
-              handshake::MulIOp, handshake::DivUIOp, handshake::DivSIOp,
-              handshake::DivFOp>(op)) {
-        assert(op->getNumOperands() > 1 && op->getNumResults() == 1 &&
-               "Invalid sharing target is being added to the list of sharing "
-               "targets! Currently operations with 1 input or more than 1 "
-               "outputs are not supported!");
-        sharingTargets.emplace_back(op);
-      }
-    });
-
-    return sharingTargets;
-  }
-};
 
 // For two sharing groups, check if the following criteria hold (see
 // descriptions below).
@@ -275,22 +236,6 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
   return false;
 }
 
-void logGroups(Logger &logger, bool dumpLogs,
-               const SharingGroups &sharingGroups, NameAnalysis &namer,
-               StringRef intro) {
-  if (!dumpLogs)
-    return;
-  mlir::raw_indented_ostream &os = *logger;
-  os << intro << "\n";
-  for (const Group &group : sharingGroups) {
-    os << "group : {";
-    for (auto *op : group) {
-      os << namer.getName(op) << " ";
-    }
-    os << "}\n";
-  }
-}
-
 // For a given sharingGroup, we determine an access priority order that does not
 // hurt the performance.
 void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
@@ -346,7 +291,7 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
 
 /// Replaces the first use of `oldVal` by `newVal` in the operation's operands.
 /// Asserts if the operation's operands do not contain the old value.
-static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
+void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
   for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i) {
     if (op->getOperand(i) == oldVal) {
       op->setOperand(i, newVal);
@@ -355,6 +300,43 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
   }
   llvm_unreachable("failed to find operation operand");
 }
+
+} // namespace
+
+struct CreditBasedSharingPass
+    : public dynamatic::experimental::impl::CreditBasedSharingBase<
+          CreditBasedSharingPass> {
+
+  using CreditBasedSharingBase::CreditBasedSharingBase;
+  void runOnOperation() override;
+
+  LogicalResult sharingInFuncOp(handshake::FuncOp funcOp,
+                                FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
+                                TimingDatabase &timingDB, double targetCP);
+
+  LogicalResult sharingWrapperInsertion(
+      handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
+      MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB);
+
+  // This class method finds all sharing targets for a given handshake function
+  SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
+    SmallVector<Operation *> sharingTargets;
+
+    funcOp.walk([&](Operation *op) {
+      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp,
+              handshake::MulIOp, handshake::DivUIOp, handshake::DivSIOp,
+              handshake::DivFOp>(op)) {
+        assert(op->getNumOperands() > 1 && op->getNumResults() == 1 &&
+               "Invalid sharing target is being added to the list of sharing "
+               "targets! Currently operations with 1 input or more than 1 "
+               "outputs are not supported!");
+        sharingTargets.emplace_back(op);
+      }
+    });
+
+    return sharingTargets;
+  }
+};
 
 // This function
 // 1. Replaces a group of operations with a single operation

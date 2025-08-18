@@ -388,6 +388,9 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
+  /// Store the CFDFC extraction result into the reference stored in funcInfo.
+  /// This makes it possible for a later pass in the pass pipeline to retrieve
+  /// the graph and throughput and each CFDFC of the current function.
   void populateCFDFCAnalysisResult() {
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
