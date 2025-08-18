@@ -59,7 +59,7 @@ def fail(id, msg):
     }
 
 
-def run_test(c_file, n, variable):
+def run_test(c_file, n, variable, transformed_code_filename):
     """
     Runs the specified integration test.
     """
@@ -69,6 +69,11 @@ def run_test(c_file, n, variable):
     # Get the c_file directory
     c_file_dir = os.path.dirname(c_file)
     kernel_name = os.path.splitext(os.path.basename(c_file))[0]
+
+    if transformed_code_filename:
+        transformed_code = c_file_dir + f"/{transformed_code_filename}"
+    else:
+        transformed_code = c_file
 
     # Get out dir name
     out_dir = os.path.join(c_file_dir, "out")
@@ -84,7 +89,7 @@ def run_test(c_file, n, variable):
     clang_file = os.path.join(comp_out_dir, f"clang.ll")
     with open(clang_file, "w") as f:
         result = subprocess.run([
-            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", c_file,
+            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", transformed_code,
             "-I", DYNAMATIC_ROOT / "include",
             "-Xclang", "-ffp-contract=off",
             "-o", clang_file
@@ -169,7 +174,7 @@ def run_test(c_file, n, variable):
     with open(cf_file, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, remove_polygeist_attr,
-            f"--convert-llvm-to-cf=source={c_file} dynamatic-path={DYNAMATIC_ROOT}",
+            f"--convert-llvm-to-cf=source={transformed_code} dynamatic-path={DYNAMATIC_ROOT}",
             "--remove-polygeist-attributes"
         ],
             stdout=f,
@@ -185,7 +190,7 @@ def run_test(c_file, n, variable):
     with open(cf_file_2, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, cf_file,
-            f"--func-set-arg-names=source={c_file}",
+            f"--func-set-arg-names=source={transformed_code}",
             "--mark-memory-dependencies",
             "--flatten-memref-row-major",
             "--mark-memory-interfaces"
@@ -307,7 +312,7 @@ def run_test(c_file, n, variable):
     # Buffer placement (fpga20)
     profiler_bin = os.path.join(comp_out_dir, "profile")
     result = subprocess.run([
-        CLANGXX_BIN, c_file,
+        CLANGXX_BIN, transformed_code,
         "-D", "PRINT_PROFILING_INFO",
         "-I", str(DYNAMATIC_ROOT / "include"),
         "-Wno-deprecated",
@@ -517,14 +522,17 @@ def main():
     parser.add_argument(
         "--variable", action='store_true',
         help="Run variable speculation")
+    parser.add_argument(
+        "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
 
     args = parser.parse_args()
     test_name = args.test_name
     n = args.n
     variable = args.variable
+    transformed_code = args.transformed_code
 
     result = run_test(INTEGRATION_FOLDER / test_name /
-                      f"{test_name}.c", n, variable)
+                      f"{test_name}.c", n, variable, transformed_code)
     if result["status"] == "pass":
         color_print(result["msg"], TermColors.OKGREEN)
     elif result["status"] == "fail":
