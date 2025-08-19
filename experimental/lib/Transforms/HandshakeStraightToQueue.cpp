@@ -504,7 +504,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   // feed end through fast token delivery
   // Try to remove the network of cmerges
   // if possible (i.e. if the function was not void)
-  removeNetworkCMerges(funcOp, rewriter);
+  
+  //removeNetworkCMerges(funcOp, rewriter);
 
   // Remove the blocks and terminators
   if (failed(cfg::flattenFunction(funcOp)))

@@ -126,7 +126,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
   bool blockFound = (!blockToTraverse || start == blockToTraverse);
 
   // If we are at the end of the path, then add it to the list of paths
-  if (start == end && (blockFound || blockToTraverseFound)) {
+  if (start == end && (blockFound || blockToTraverseFound) && path.size()> 1) {
     allPaths.push_back(path);
   } else {
     // Else, for each successor which was not visited, run DFS again
