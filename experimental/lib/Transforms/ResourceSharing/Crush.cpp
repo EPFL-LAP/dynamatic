@@ -24,16 +24,13 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
-#include "llvm/Support/Path.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -320,21 +317,29 @@ struct CreditBasedSharingPass
 
   // This class method finds all sharing targets for a given handshake function
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
-    SmallVector<Operation *> sharingTargets;
+    SmallVector<Operation *> targets;
 
     funcOp.walk([&](Operation *op) {
-      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp,
-              handshake::MulIOp, handshake::DivUIOp, handshake::DivSIOp,
-              handshake::DivFOp>(op)) {
+      if (isa<
+              // clang-format off
+              handshake::MulFOp,
+              handshake::AddFOp,
+              handshake::SubFOp,
+              handshake::MulIOp,
+              handshake::DivUIOp,
+              handshake::DivSIOp,
+              handshake::DivFOp
+              // clang-format on
+              >(op)) {
         assert(op->getNumOperands() > 1 && op->getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
                "outputs are not supported!");
-        sharingTargets.emplace_back(op);
+        targets.emplace_back(op);
       }
     });
 
-    return sharingTargets;
+    return targets;
   }
 };
 
