@@ -213,7 +213,16 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
                ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
-  gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
+
+  // If the Gamma is a result of the expansion of a Mu that has more than two
+  // inputs, force its placement in the block of its condition because placing
+  // it in the block of the Mu, which is always a loop header, will mess up the
+  // control dependence analysis betweem the newly inserted Gamma and its
+  // producers that are in the loop body in this case
+  if (originalPhi->muGenerated)
+    newGate->gateBlock = newGate->conditionBlock;
+
+  gatesPerBlock[newGate->getBlock()].push_back(newGate);
 
   return newGate;
 }
@@ -549,8 +558,9 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
       if (initialInputs.size() == 1)
         operandInit = initialInputs[0];
       else {
-        Gate *initialPhi = new Gate(phi->result, initialInputs,
-                                    GateType::PhiGate, ++uniqueGateIndex);
+        Gate *initialPhi =
+            new Gate(phi->result, initialInputs, GateType::PhiGate,
+                     ++uniqueGateIndex, nullptr, true);
         gatesPerBlock[phiBlock].push_back(initialPhi);
         operandInit = new GateInput(initialPhi);
         gateInputList.push_back(operandInit);
@@ -560,7 +570,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
         operandLoop = loopInputs[0];
       else {
         Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
-                                 ++uniqueGateIndex);
+                                 ++uniqueGateIndex, nullptr, true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
         operandLoop = new GateInput(loopPhi);
         gateInputList.push_back(operandLoop);
