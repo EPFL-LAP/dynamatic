@@ -107,6 +107,13 @@ struct Gate {
   /// Block whose terminator is used to drive the condition of the gate.
   Block *conditionBlock;
 
+  /// Block in which the gate is placed
+  Block *gateBlock;
+
+  /// True if this gate was generated as part of expanding a Mu gate. 
+  /// Allows special handling when splitting multi-input Mu structures.
+  bool muGenerated;
+
   /// Index of the current gate, which uniquely identifies it.
   unsigned index;
 
@@ -116,15 +123,15 @@ struct Gate {
 
   /// Initialize the values of the gate.
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
-       Block *c = nullptr)
+       Block *c = nullptr, bool muGen = false)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
-        index(i) {}
+        gateBlock(v.getParentBlock()), muGenerated(muGen), index(i)  {}
 
   /// Print the information about the gate.
   void print();
 
   /// Get the block the gate refers to.
-  inline Block *getBlock() { return result.getParentBlock(); }
+  inline Block *getBlock() { return gateBlock; }
 
   /// Get the argument numebr the gate refers to. If the value is not a block
   /// argument, return 0

@@ -250,7 +250,14 @@ llvm:: errs() << "\ni survied22\n\n ~" <<conditionToUse ;
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
                ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
-  gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
+  
+  // If the Gamma is a result of the expansion of a Mu that has more than two inputs, force its placement in the block of its condition
+  // because placing it in the block of the Mu, which is always a loop header, will mess up the control dependence analysis betweem the newly inserted Gamma and its producers that are in the loop body in this case
+  if (originalPhi->muGenerated)
+              newGate->gateBlock = newGate->conditionBlock;
+
+  gatesPerBlock[newGate->getBlock()].push_back(newGate);
+  llvm:: errs() << " get block of the new gate: "<< bi.getIndexFromBlock(newGate->getBlock())<<"\n";
 
   return newGate;
 }
@@ -510,11 +517,9 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
         // filter paths with correct senders
         std::vector<std::vector<Block *>> paths;
         for (auto path: allPaths){
-          if(path.size()> 1){
             Block *prev = path[path.size() - 2];
             if (operand->senders.empty() || llvm::is_contained(operand->senders, prev))
               paths.push_back(path);
-          }
         }
 //PRINT ALL PATHS
       llvm::errs() << "phi "<< phi->index << ",  operand: "<< bi.getIndexFromBlock(operand->getBlock()) << ":\n";
@@ -671,7 +676,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(initialInputs.size()>1){
 
         Gate *initialPhi =
-            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex); 
+            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr,true); 
         gatesPerBlock[phiBlock].push_back(initialPhi);
 
         operandInit = new GateInput(initialPhi);
@@ -690,7 +695,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(loopInputs.size()>1){
 
         Gate *loopPhi =
-            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex);
+            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr,true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
 
         operandLoop = new GateInput(loopPhi);
