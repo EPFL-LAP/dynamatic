@@ -138,7 +138,8 @@ struct Argument {
 struct CommandArguments {
   SmallVector<StringRef> positionals;
   mlir::DenseSet<StringRef> flags;
-  StringMap<StringRef> options;
+  StringMap<StringRef> options;                   // single-valued options
+  StringMap<SmallVector<StringRef>> multiOptions; // multi-valued options
 };
 
 class Command {
@@ -149,6 +150,7 @@ public:
   StringMap<Argument> positionals;
   StringMap<Argument> flags;
   StringMap<Argument> options;
+  StringMap<Argument> multiOptions;
 
   Command(StringRef keyword, StringRef desc, FrontendState &state)
       : keyword(keyword), desc(desc), state(state) {}
@@ -161,13 +163,25 @@ public:
   void addFlag(const Argument &arg) {
     assert(!flags.contains(arg.name) && "duplicate flag name");
     assert(!options.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and flag have same name");
     flags[arg.name] = arg;
   }
 
   void addOption(const Argument &arg) {
     assert(!options.contains(arg.name) && "duplicate option name");
     assert(!flags.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and option have same name");
     options[arg.name] = arg;
+  }
+
+  void addMultiOption(const Argument &arg) {
+    assert(!multiOptions.contains(arg.name) && "duplicate multi-option name");
+    assert(!flags.contains(arg.name) && "multi-option and flag have same name");
+    assert(!options.contains(arg.name) &&
+           "multi-option and option have same name");
+    multiOptions[arg.name] = arg;
   }
 
   CommandResult parseAndExecute(ArrayRef<std::string> tokens);
@@ -192,6 +206,9 @@ private:
 
   LogicalResult parseOption(StringRef name, StringRef value,
                             CommandArguments &args) const;
+
+  LogicalResult parseMultiOption(StringRef name, SmallVector<StringRef> value,
+                                 CommandArguments &args) const;
 };
 
 class Exit : public Command {
@@ -281,6 +298,7 @@ public:
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
+  static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -295,6 +313,10 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addMultiOption({
+        SKIPPABLE_SEQ_N,
+        "Number of Comparators in SkippableSeq",
+    });
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
@@ -422,6 +444,19 @@ CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
         }
         if (failed(parseOption(name, *nextToken, parsed)))
           return CommandResult::SYNTAX_ERROR;
+      } else if (multiOptions.contains(name)) {
+        // This is a multi-valued option
+        SmallVector<StringRef> values;
+        ++tokIt;
+        StringRef nextTokenStr = *tokIt;
+        while (tokIt != opts.end() && !nextTokenStr.starts_with("--")) {
+          values.push_back(*tokIt);
+          ++tokIt;
+          nextTokenStr = *tokIt;
+        }
+        --tokIt; // Adjust for the loop increment
+        if (failed(parseMultiOption(name, values, parsed)))
+          return CommandResult::SYNTAX_ERROR;
       } else {
         llvm::errs() << ERR << "Unknow flag/option '" << tok << "'\n";
         return CommandResult::SYNTAX_ERROR;
@@ -466,6 +501,18 @@ LogicalResult Command::parseOption(StringRef name, StringRef value,
   args.options.insert({name, value});
   return success();
 };
+
+LogicalResult Command::parseMultiOption(StringRef name,
+                                        SmallVector<StringRef> values,
+                                        CommandArguments &args) const {
+  if (args.multiOptions.contains(name)) {
+    llvm::errs() << ERR << "Multi-option '" << name
+                 << "' given more than once\n";
+    return failure();
+  }
+  args.multiOptions[name] = values;
+  return success();
+}
 
 std::string Command::getShortCmdDesc() const {
   std::stringstream ss;
@@ -631,6 +678,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string skippableSeqNListString = "none";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -649,6 +697,15 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.multiOptions.find(SKIPPABLE_SEQ_N);
+      it != args.multiOptions.end()) {
+    skippableSeqNListString = "";
+    for (const auto &valStr : it->second) {
+      int val = std::stoi(std::string(valStr));
+      skippableSeqNListString += std::to_string(val) + ",";
+    }
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
@@ -658,7 +715,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ);
+                 state.fpUnitsGenerator, rigidification, disableLSQ,
+                 skippableSeqNListString);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

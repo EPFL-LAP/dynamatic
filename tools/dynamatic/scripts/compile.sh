@@ -19,6 +19,22 @@ FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
 
+for i in {1..11}; do shift; done
+
+SKIPPABLE_ACTTIVE=0
+SKIPPABLE_SEQ_N=()
+
+if [ "$1" != "none" ]; then
+  SKIPPABLE_ACTTIVE=1
+  while [[ "$#" -gt 0 && "${1}" != "--" ]]; do
+    SKIPPABLE_ACTTIVE=1
+    SKIPPABLE_SEQ_N+=("$1")
+    shift
+  done
+else
+  shift
+fi
+
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -156,13 +172,28 @@ fi
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
 # handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-inactivate-enforced-deps --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+# with skippable sequentializer
+if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-inactivate-enforced-deps \
+      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME" \
+      --handshake-replace-memory-interfaces \
+      --handshake-minimize-cst-width \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize --handshake-infer-basic-blocks \
+      > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
+    "Applied transformations to handshake with skippable sequentializer"
+# without skippable sequentializer
+else
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-inactivate-enforced-deps --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+fi
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then

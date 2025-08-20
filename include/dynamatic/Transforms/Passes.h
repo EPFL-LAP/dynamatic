@@ -27,6 +27,7 @@
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Transforms/HandshakeInactivateEnforcedDeps.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
+#include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
 #include "dynamatic/Transforms/HandshakeMarkFPUImpl.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"

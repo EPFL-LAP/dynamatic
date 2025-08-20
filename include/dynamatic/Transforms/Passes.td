@@ -128,6 +128,23 @@ DynamaticPass<"handshake-inactivate-enforced-deps"> {
   let constructor = "dynamatic::createHandshakeInactivateEnforcedDeps()";
 }
 
+def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"> {
+  let summary = "Inserts the skippable sequencializer which replaces the LSQ.";
+  let description = [{
+    Inserts a specific logic in the IR to respect the memory dependencies
+    between memory accesses in a Handshake function. Its logic is based on
+    sequentializing memory accesses in a way that allows the circuit to
+    "skip" the sequencialization logic when the accesses are prooven to be
+    independent.
+  }];
+  let constructor = "dynamatic::createHandshakeInsertSkippableSeq()";
+  let options =
+    [Option<"NStr", "NStr", "std::string", "\"3\"",
+            "Number of comparators">,
+    Option<"kernelName", "kernelName", "std::string", "\"histogram\"",
+            "Name">];
+}
+
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
