@@ -174,32 +174,29 @@ void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(Region &region) {
 void dynamatic::ControlDependenceAnalysis::identifyForwardControlDeps(
     Region &region) {
 
-  DenseMap<Block *, unsigned> dfsNum;
-  unsigned counter = 0;
+  // Get dominance, post-dominance and loop information
+  DominanceInfo domInfo;
+  PostDominanceInfo postDomInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
+  CFGLoopInfo li(domTree);
 
-  auto dfs = [&](auto &&self, Block *b) -> void {
-    if (dfsNum.count(b))
-      return;
-    dfsNum[b] = counter++;
-    for (Block *succ : b->getSuccessors())
-      self(self, succ);
-  };
+  for (Block &block : region.getBlocks()) {
 
-  if (region.empty())
-    return;
+    // Consider all block's dependencies
+    for (Block *oneDep : blocksControlDeps[&block].allControlDeps) {
 
-  dfs(dfs, &region.front());
+      CFGLoop *loop = li.getLoopFor(oneDep);
 
-  auto comesBeforeInCFG = [&](Block *a, Block *b) -> bool {
-    return dfsNum[a] < dfsNum[b];
-  };
-
-  // oneDep is considered a forwardControlDep if it comes before block in the
-  // CFG
-  for (Block &block : region.getBlocks())
-    for (Block *oneDep : blocksControlDeps[&block].allControlDeps)
-      if (comesBeforeInCFG(oneDep, &block))
+      // It is a forward control dependency if:
+      // - `oneDep` is not in a loop;
+      // - `oneDep` is not a loop exit or post-dominates `block`;
+      // - `oneDep` is not a latch block.
+      if (!loop || ((!loop->isLoopLatch(oneDep)) &&
+                    (!loop->isLoopExiting(oneDep) ||
+                     postDomInfo.properlyPostDominates(oneDep, &block))))
         blocksControlDeps[&block].forwardControlDeps.insert(oneDep);
+    }
+  }
 }
 
 std::optional<DenseSet<Block *>>
