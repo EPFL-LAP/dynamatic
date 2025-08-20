@@ -779,7 +779,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
 
               // Record the memory access replacement
-              copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp, newOp);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp,
+                                                                 newOp);
               namer.replaceOp(storeOp, newOp);
               rewriter.eraseOp(storeOp);
               return newOp;
