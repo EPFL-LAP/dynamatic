@@ -763,7 +763,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
 
               // Record the memory access replacement
-              memOpLowering.recordReplacement(loadOp, newOp, false);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, newOp);
+              namer.replaceOp(loadOp, newOp);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
               return newOp;
@@ -778,7 +779,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
 
               // Record the memory access replacement
-              memOpLowering.recordReplacement(storeOp, newOp, false);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp, newOp);
+              namer.replaceOp(storeOp, newOp);
               rewriter.eraseOp(storeOp);
               return newOp;
             })
