@@ -722,10 +722,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     }
   }
 
-  // Used to keep consistency betweeen memory access names referenced by memory
-  // dependencies and names of replaced memory operations
-  MemoryOpLowering memOpLowering(namer);
-
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
   // by memory interface placement later)
@@ -799,7 +795,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
   }
 
-  memOpLowering.renameDependencies(funcOp);
   return success();
 }
 
