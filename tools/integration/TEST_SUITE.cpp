@@ -28,6 +28,15 @@ TEST_P(BasicFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
+TEST_P(BasicFixture, verilog) {
+  std::string name = GetParam();
+  int simTime = -1;
+
+  EXPECT_EQ(runIntegrationTest(name, simTime, std::nullopt, true), 0);
+
+  RecordProperty("cycles", std::to_string(simTime));
+}
+
 TEST_P(MemoryFixture, basic) {
   fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
   std::string name = GetParam();
