@@ -157,7 +157,7 @@ $LLVM_BINS/opt -S \
 
 # Clean up the index calculation logic inserted by the array-partition pass
 $LLVM_BINS/opt -S \
-  -passes="instcombine" \
+  -passes="instcombine,sroa" \
   $OUT/clang_array_partitioned.ll \
   > $OUT/clang_array_partitioned_cleaned.ll
 
@@ -167,7 +167,6 @@ $DYNAMATIC_BINS/translate-llvm-to-std \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
    -o $OUT/cf.mlir
-
 
 # - drop-unlist-functions: Dropping the functions that are not needed in HLS
 # compilation
