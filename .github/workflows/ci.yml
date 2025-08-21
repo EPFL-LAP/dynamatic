@@ -54,45 +54,6 @@ jobs:
           deactivate
           exit $STATUS
 
-  build-polygeist:
-    if: github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: cache-polygeist-restore
-        id: cache-polygeist-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            build/
-            llvm-project/build/
-          key: polygeist-build
-          lookup-only: true
-
-      - name: checkout-polygeist
-        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: 'EPFL-LAP/Polygeist'
-          submodules: recursive
-
-      - name: build-polygeist
-        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss for Polygeist build artifacts, need to rebuild"
-          sudo apt-get -y install ccache
-          bash build-polygeist.sh --release --force
-      
-      - name: cache-polygeist-save
-        id: cache-polygeist-save
-        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            build/
-            llvm-project/build/
-          key: polygeist-build
-
   integration:
     if: github.event.pull_request.draft == false
     runs-on: self-hosted
@@ -110,23 +71,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: fetch-polygeist
+      - name: cache-polygeist-restore
+        id: cache-polygeist-restore
         uses: actions/cache/restore@v4
         with:
           path: |
-            build/
-            llvm-project/build/
+            polygeist/build/
+            polygeist/llvm-project/build/
           key: polygeist-build
 
-      - name: move-build-artifacts
-        run: |
-          ls -la
-          mv build/ polygeist/
-          mv llvm-project/build polygeist/llvm-project
-          rmdir llvm-project
-
       - name: build
-        run: ./build.sh --release --force --skip-polygeist polygeist
+        run: ./build.sh --release --force
+
+      - name: cache-polygeist-save
+        id: cache-polygeist-save
+        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            polygeist/build/
+            polygeist/llvm-project/build/
+          key: polygeist-build
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
