@@ -288,6 +288,9 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
 
   // For each dimension: enumerate all reachable indices
   for (unsigned i = 0; i < numDims; i++) {
+    assert(allocaElemType->isArrayTy() &&
+           "The allocated element type is not an array (e.g., the global array "
+           "is only paritially intialized)?");
     auto originalDimSize = allocaElemType->getArrayNumElements();
 
     isl::set reachableIndicesIslSet = range;
