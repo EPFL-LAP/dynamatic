@@ -38,7 +38,7 @@
 #include "llvm/Support/Debug.h"
 #include <polly/Support/ISLOStream.h>
 
-#define DEBUG_TYPE "array-parition"
+#define DEBUG_TYPE "array-partition"
 
 #include <boost/throw_exception.hpp>
 void boost::throw_exception(std::exception const &e) { std::abort(); }
@@ -330,12 +330,21 @@ ArraySquashingInfo extractDimInfo(const isl::set &range,
       diffs.insert(diff);
     }
 
-    if (diffs.size() != 1) {
+    if (diffs.size() == 0) {
+      assert(reachableIndices.size() == 1);
+      info.emplace_back(reachableIndices.front(), 1, reachableIndices.size());
+    } else if (diffs.size() != 1) {
+      LLVM_DEBUG(llvm::errs()
+                     << "Dim " << i << " doesn't a single step!\nIndices:\n";
+                 for (auto idx : reachableIndices) {
+                   llvm::errs() << "Index" << idx << "\n";
+                 });
       info.emplace_back(0,
                         /* step = 1 indicates that we can't squash the array
                            into a smaller one currently */
                         1, originalDimSize);
     } else {
+
       info.emplace_back(reachableIndices.front(), abs(*diffs.begin()),
                         reachableIndices.size());
     }
@@ -424,8 +433,14 @@ InstsPerGroup computeInstsPerGroup(const std::set<Instruction *> &setOfInsts,
       if (inst1 == inst2)
         continue;
 
-      bool isDependent = true;
+      // If both memory accesses are loads: they will not overwrite each others
+      // results so they can be placed in two separate banks (but if a store has
+      // an overlapping index with both of them, then all 3 instructions must be
+      // placed in the same bank).
+      if (isa<LoadInst>(inst1) && isa<LoadInst>(inst2))
+        continue;
 
+      bool isDependent = true;
       // If their are in the same scop
       if (info.sameScop(inst1, inst2)) {
 
@@ -611,6 +626,9 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
       auto instRange = info.accessMaps[inst];
       range = range.unite(instRange);
     }
+
+    LLVM_DEBUG(llvm::errs() << "Range: " << range << "\n";);
+
     auto dimInfo = extractDimInfo(range.as_set(), gblConstant->getValueType());
     // Get all the memory values accessed in the array:
 
