@@ -28,78 +28,85 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-ForkOp flattenFork(ForkOp topFork) {
-  SmallVector<Value> values;
-  SmallVector<ForkOp> forksToBeErased;
-  for (OpResult result : llvm::make_early_inc_range(topFork.getResults())) {
-    materializeValue(result);
-    Operation *user = getUniqueUser(result);
+Value getForkTop(Value value) {
+  if (auto fork = dyn_cast<ForkOp>(value.getDefiningOp())) {
+    return getForkTop(fork.getOperand());
+  }
+  return value;
+}
 
+void iterateUsersOverNestedForkResults(Value result,
+                                       llvm::SmallVector<Operation *> &users) {
+  for (Operation *user : result.getUsers()) {
     if (auto forkOp = dyn_cast<ForkOp>(user)) {
-      ForkOp newForkOp = flattenFork(forkOp);
-      for (OpResult forkResult : newForkOp.getResults()) {
-        assertMaterialization(forkResult);
-        values.push_back(forkResult);
+      for (Value forkResult : forkOp.getResults()) {
+        iterateUsersOverNestedForkResults(forkResult, users);
       }
-      forksToBeErased.push_back(newForkOp);
     } else {
-      values.push_back(result);
+      users.push_back(user);
     }
   }
+}
 
-  if (values.size() == topFork.getResults().size())
-    return topFork; // No need to flatten, already flat
-
-  OpBuilder builder(topFork->getContext());
-  builder.setInsertionPoint(topFork);
-  ForkOp newForkOp = builder.create<ForkOp>(
-      topFork.getLoc(), topFork.getOperand(), values.size());
-  inheritBB(topFork, newForkOp);
-
-  for (unsigned i = 0; i < values.size(); ++i) {
-    values[i].replaceAllUsesWith(newForkOp.getResult()[i]);
+void iterateUsesOverNestedForkResults(Value result,
+                                      llvm::SmallVector<OpOperand *> &uses) {
+  for (OpOperand &use : result.getUses()) {
+    if (auto forkOp = dyn_cast<ForkOp>(use.getOwner())) {
+      for (Value forkResult : forkOp.getResults()) {
+        iterateUsesOverNestedForkResults(forkResult, uses);
+      }
+    } else {
+      uses.push_back(&use);
+    }
   }
+}
 
-  for (ForkOp forkOp : forksToBeErased) {
-    // Erase the old fork
-    forkOp->erase();
+void eraseOpRecursively(Operation *op) {
+  for (auto res : op->getResults()) {
+    for (Operation *user : res.getUsers()) {
+      eraseOpRecursively(user);
+    }
   }
-  topFork->erase();
-
-  return newForkOp;
+  op->erase();
 }
 
 void materializeValue(Value val) {
-  Operation *definingOp = val.getDefiningOp();
-  OpBuilder builder(definingOp->getContext());
-  builder.setInsertionPoint(definingOp);
+  Value forkTop = getForkTop(val);
 
-  if (val.use_empty()) {
+  SmallVector<OpOperand *> uses;
+  iterateUsesOverNestedForkResults(forkTop, uses);
+
+  OpBuilder builder(forkTop.getContext());
+  builder.setInsertionPointAfterValue(forkTop);
+
+  if (uses.empty()) {
     SinkOp sinkOp = builder.create<SinkOp>(val.getLoc(), val);
-    inheritBB(definingOp, sinkOp);
+    inheritBB(val.getDefiningOp(), sinkOp);
     return;
   }
-  if (val.hasOneUse())
+
+  unsigned numUses = std::distance(uses.begin(), uses.end());
+
+  if (numUses == 1)
     return;
 
-  unsigned numUses = std::distance(val.getUses().begin(), val.getUses().end());
-
   ForkOp forkOp = builder.create<ForkOp>(val.getLoc(), val, numUses);
-  inheritBB(definingOp, forkOp);
+  inheritBB(val.getDefiningOp(), forkOp);
 
   int i = 0;
-  // To allow operand mutation, we use an early-increment range.
-  // TODO: The original author may have been unaware of this approach;
-  // the materialization pass appears unnecessarily complex. Consider
-  // refactoring it to use an early-increment range as well.
-  for (OpOperand &opOperand : llvm::make_early_inc_range(val.getUses())) {
-    if (opOperand.getOwner() == forkOp)
+  for (OpOperand *opOperand : llvm::make_early_inc_range(uses)) {
+    if (opOperand->getOwner() == forkOp)
       continue;
-    opOperand.set(forkOp.getResult()[i]);
+    opOperand->set(forkOp.getResult()[i]);
     i++;
   }
 
-  flattenFork(forkOp);
+  // Erase old forks
+  for (Operation *user : val.getUsers()) {
+    if (user == forkOp)
+      continue;
+    eraseOpRecursively(user);
+  }
 }
 
 Operation *getUniqueUser(Value val) {
@@ -108,13 +115,7 @@ Operation *getUniqueUser(Value val) {
 }
 
 bool equalsIndirectly(Value a, Value b) {
-  if (auto fork = dyn_cast<ForkOp>(a.getDefiningOp())) {
-    return equalsIndirectly(fork.getOperand(), b);
-  }
-  if (auto fork = dyn_cast<ForkOp>(b.getDefiningOp())) {
-    return equalsIndirectly(a, fork.getOperand());
-  }
-  return a == b;
+  return getForkTop(a) == getForkTop(b);
 }
 
 void eraseMaterializedOperation(Operation *op) {
@@ -142,35 +143,12 @@ void assertMaterialization(Value val) {
   llvm_unreachable("MaterializationUtil failed");
 }
 
-void iterateOverForkResults(Value result,
-                            llvm::SmallVector<Operation *> &users) {
-  for (Operation *user : result.getUsers()) {
-    if (auto forkOp = dyn_cast<ForkOp>(user)) {
-      for (Value forkResult : forkOp.getResults()) {
-        iterateOverForkResults(forkResult, users);
-      }
-    } else {
-      users.push_back(user);
-    }
-  }
-}
-
 llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result) {
-  if (auto forkOp = dyn_cast<ForkOp>(result.getDefiningOp())) {
-    // If the result is from a ForkOp, start iteration from the top of the fork.
-    return iterateOverPossiblyIndirectUsers(forkOp.getOperand());
-  }
-
   llvm::SmallVector<Operation *> users;
-  iterateOverForkResults(result, users);
-
+  iterateUsersOverNestedForkResults(getForkTop(result), users);
   return users;
 }
 
 Operation *getIndirectDefiningOp(Value value) {
-  Operation *definingOp = value.getDefiningOp();
-  if (auto forkOp = dyn_cast<ForkOp>(definingOp)) {
-    return getIndirectDefiningOp(forkOp.getOperand());
-  }
-  return definingOp;
+  return getForkTop(value).getDefiningOp();
 }

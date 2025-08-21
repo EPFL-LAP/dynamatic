@@ -51,6 +51,9 @@ void assertMaterialization(Value val);
 /// forked values.
 llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result);
 
+/// Retrieves the top of fork tree.
+Value getForkTop(Value value);
+
 /// Retrieves the defining operation, ignoring any forks present between uses.
 Operation *getIndirectDefiningOp(Value value);
 
