@@ -107,6 +107,9 @@ struct Gate {
   /// Block whose terminator is used to drive the condition of the gate.
   Block *conditionBlock;
 
+  /// Condition of the gate.
+  boolean::BoolExpression *condition;
+
   /// Block in which the gate is placed
   Block *gateBlock;
 
@@ -123,8 +126,8 @@ struct Gate {
 
   /// Initialize the values of the gate.
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
-       Block *c = nullptr, bool muGen = false)
-      : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
+       Block *c = nullptr, boolean::BoolExpression *cond = boolean::BoolExpression::boolZero(),bool muGen = false) // later think of initaial value fron condition 0 or 1
+      : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c), condition(cond),
         gateBlock(v.getParentBlock()), muGenerated(muGen), index(i)  {}
 
   /// Print the information about the gate.

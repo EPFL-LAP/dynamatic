@@ -14,6 +14,7 @@
 
 #include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -28,6 +29,9 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::ftd;
+//using dynamatic::experimental::ftd::BlockIndexing;
+
+//using dynamatic::experimental::boolean::getBlockLoopExitCondition;
 using namespace dynamatic::experimental::boolean;
 
 experimental::gsa::GSAAnalysis::GSAAnalysis(handshake::MergeOp &merge,
@@ -249,7 +253,8 @@ llvm:: errs() << "\ni survied22\n\n ~" <<conditionToUse ;
   // "indexPerBlock" mapping)
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
+               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(), 
+               BoolExpression::boolVar(conditionToUse));//since condition is one block boolvar is enough
   
   // If the Gamma is a result of the expansion of a Mu that has more than two inputs, force its placement in the block of its condition
   // because placing it in the block of the Mu, which is always a loop header, will mess up the control dependence analysis betweem the newly inserted Gamma and its producers that are in the loop body in this case
@@ -530,7 +535,7 @@ llvm::errs() << "****Common Dominator: ";commonDominator->printAsOperand(llvm::e
         llvm::errs() <<"\n";
       }
 
-        BoolExpression *phiInputCondition = BoolExpression::boolZero();
+        BoolExpression *phiInputCondition = BoolExpression::boolZero();//
 
         // Sum all the conditions for each path
         for (std::vector<Block *> &path : paths) {
@@ -617,6 +622,44 @@ static bool IsBlockInLoop(Block* block, CFGLoop * loop,  mlir::CFGLoopInfo &li){
   }
   return false;
 }
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                                 CFGLoopInfo &li,
+                                                 const BlockIndexing &bi) {
+
+  // Get the boolean expression associated to the block exit
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
+  auto *terminatorOperation = loopExit->getTerminator();
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+
+  // If the destination of the false outcome is not the block, then the
+  // condition must be negated
+  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
+    blockCond->boolNegate();
+
+  return blockCond;
+}
+static BoolExpression* getLoopExitCondition (CFGLoop* loop, mlir::CFGLoopInfo &li, const BlockIndexing &bi){
+  
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+  //loopExit = exitBlocks.front();
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    //cofactorList.push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+  return fLoopExit;
+}
 
 void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIndexing &bi) {
 
@@ -676,7 +719,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(initialInputs.size()>1){
 
         Gate *initialPhi =
-            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr,true); 
+            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),true); 
         gatesPerBlock[phiBlock].push_back(initialPhi);
 
         operandInit = new GateInput(initialPhi);
@@ -695,7 +738,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(loopInputs.size()>1){
 
         Gate *loopPhi =
-            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr,true);
+            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
 
         operandLoop = new GateInput(loopPhi);
@@ -738,6 +781,10 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       // innermost loop the MU is in
       phi->conditionBlock =
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
+      // Mu condition is the negation of loop exit-> if loop exit == false ? use loop input : use initial input
+      phi->condition =
+          getLoopExitCondition(loopInfo.getLoopFor(phiBlock), loopInfo, bi)->boolNegate();
+
       phi->isRoot = true;
     }
   }
@@ -801,12 +848,16 @@ void experimental::gsa::Gate::print() {
   llvm::errs() << " arg " << getArgumentNumber() << " type "
                << getPhiName(this) << "_" << index;
 
-  if (gsaGateFunction == GammaGate || gsaGateFunction == MuGate) {
+  if (conditionBlock) {
     llvm::errs() << " condition ";
     conditionBlock->printAsOperand(llvm::errs());
   }
+  if ((gsaGateFunction == GammaGate || gsaGateFunction == MuGate)) {
+    llvm::errs() << "\tc: "; 
+    condition->print();
+  }
 
-  llvm::errs() << "\n";
+  //llvm::errs() << "\n";
 
   for (GateInput *&op : operands) {
     if (op->isTypeValue()) {
