@@ -873,8 +873,7 @@ Value createWaitingSignalForPair(
 MemDependenceAttr getInactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
   return MemDependenceAttr::get(ctx, dependency.getDstAccess(),
-                                dependency.getLoopDepth(),
-                                dependency.getComponents(), false);
+                                dependency.getLoopDepth(), false);
 }
 
 /// This function creates the waiting signals for all pairs of memory accesses.

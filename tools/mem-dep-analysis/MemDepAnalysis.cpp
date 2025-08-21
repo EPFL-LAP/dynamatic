@@ -846,12 +846,12 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
       if (deps.count(src) == 0) {
         LLVMMemDependency newDep;
         newDep.name = nameMapping[src];
-        newDep.destAndDepth.emplace_back(nameMapping[dst],
-                                         meta.loop->getLoopDepth());
+        newDep.dependencyInfo.emplace_back(nameMapping[dst],
+                                           meta.loop->getLoopDepth(), true);
         deps[src] = newDep;
       } else {
-        deps[src].destAndDepth.emplace_back(nameMapping[dst],
-                                            meta.loop->getLoopDepth());
+        deps[src].dependencyInfo.emplace_back(nameMapping[dst],
+                                              meta.loop->getLoopDepth(), true);
       }
     }
   }

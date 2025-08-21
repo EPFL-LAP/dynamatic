@@ -204,7 +204,8 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     "bool":$isActive
   );
 
-  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `]`";
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $isActive `]`";
+
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {

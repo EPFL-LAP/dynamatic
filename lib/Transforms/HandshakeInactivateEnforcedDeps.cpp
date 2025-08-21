@@ -123,8 +123,7 @@ static MemDependenceAttr
 getInactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
   return MemDependenceAttr::get(ctx, dependency.getDstAccess(),
-                                dependency.getLoopDepth(),
-                                dependency.getComponents(), false);
+                                dependency.getLoopDepth(), false);
 }
 
 /// Inactivates the dependencies that are enforced by cheking whether the load

@@ -31,7 +31,7 @@ struct LLVMMemDependency {
 
   // A list of dest (destination op of RAW and WAW dependencies) and the loop
   // depth of the dependency (TODO: why do we care about the loop depth?).
-  std::vector<std::pair<std::string, unsigned>> destAndDepth;
+  std::vector<std::tuple<std::string, unsigned, bool>> dependencyInfo;
 
   // Convert the stored memory dependency values into a list of memory
   // dependence attributes
@@ -40,11 +40,11 @@ struct LLVMMemDependency {
 
     llvm::SmallVector<dynamatic::handshake::MemDependenceAttr> attrs;
 
-    for (const auto &[dstName, depth] : destAndDepth) {
+    for (const auto &[dstName, depth, isActive] : dependencyInfo) {
 
       auto dstNameAttr = mlir::StringAttr::get(&ctx, dstName);
       auto attr = dynamatic::handshake::MemDependenceAttr::get(
-          &ctx, dstNameAttr, depth);
+          &ctx, dstNameAttr, depth, isActive);
       attrs.push_back(attr);
     }
 
@@ -69,10 +69,11 @@ struct LLVMMemDependency {
   /// }
   void toLLVMMetaDataNode(llvm::LLVMContext &ctx, llvm::Instruction *inst) {
     llvm::SmallVector<llvm::Metadata *, 10> mdVals;
-    for (const auto &[dstName, depth] : this->destAndDepth) {
+    for (const auto &[dstName, depth, isActive] : this->dependencyInfo) {
       mdVals.push_back(llvm::MDNode::get(
           ctx, {llvm::MDString::get(ctx, dstName),
-                llvm::MDString::get(ctx, std::to_string(depth))}));
+                llvm::MDString::get(ctx, std::to_string(depth)),
+                llvm::MDString::get(ctx, isActive ? "true" : "false")}));
     }
     inst->setMetadata(METADATA_DEPENDENCY,
                       llvm::MDNode::get(ctx, llvm::ArrayRef(mdVals)));
@@ -122,12 +123,17 @@ struct LLVMMemDependency {
       assert(mdDstName &&
              "Malformed IR metadata! The first element must be a string.");
       auto *mdDepth = llvm::dyn_cast<llvm::MDString>(dep->getOperand(1));
-      assert(mdDepth);
-      assert(mdDstName &&
+      assert(mdDepth &&
              "Malformed IR metadata! The second element must be a string.");
+      auto *mdIsActive = llvm::dyn_cast<llvm::MDString>(dep->getOperand(2));
+      assert(mdIsActive &&
+             "Malformed IR metadata! The third element must be a string.");
 
-      depData.destAndDepth.emplace_back(mdDstName->getString().str(),
-                                        std::stoi(mdDepth->getString().str()));
+      bool isActive = mdIsActive->getString() == "true" ? true : false;
+
+      depData.dependencyInfo.emplace_back(mdDstName->getString().str(),
+                                          std::stoi(mdDepth->getString().str()),
+                                          isActive);
     }
 
     return depData;
