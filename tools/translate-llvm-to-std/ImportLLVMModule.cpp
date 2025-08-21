@@ -111,8 +111,8 @@ void convertInitializerToDenseElemAttrRecursive(
     } else if (auto *constFloat = llvm::dyn_cast<llvm::ConstantFP>(elem)) {
       values.push_back(
           mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
-    } else if (auto *constArray =
-                   llvm::dyn_cast<llvm::ConstantDataArray>(elem)) {
+    } else if (llvm::isa<llvm::ConstantAggregateZero, llvm::ConstantDataArray>(
+                   elem)) {
       convertInitializerToDenseElemAttrRecursive(elem, values,
                                                  baseMLIRElemType);
     } else {
