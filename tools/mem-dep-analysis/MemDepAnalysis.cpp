@@ -24,6 +24,8 @@
 #include "dynamatic/Support/MemoryDependency.h"
 #include "llvm/Analysis/ValueTracking.h"
 
+#define DEBUG_TYPE "mem-dep-analysis"
+
 using namespace llvm;
 using namespace polly;
 
@@ -791,8 +793,10 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
       if (!inst.mayReadOrWriteMemory())
         continue;
       if (isa<CallInst>(&inst)) {
-        llvm::errs() << "Warning - Applying memory analysis on a function with "
-                        "a call instruction!\n";
+        LLVM_DEBUG(
+            llvm::errs()
+                << "Warning - Applying memory analysis on a function with "
+                   "a call instruction!\n";);
         continue;
       }
 
