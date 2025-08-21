@@ -183,19 +183,6 @@ def MemInterfaceAttr : Handshake_Attr<"MemInterface", "mem_interface"> {
   }];
 }
 
-def DependenceComponentAttr : Handshake_Attr<"DependenceComponent", "dep_comp"> {
-  let summary = "Information about the direction of a dependence for an AffineForOp";
-  let description = [{
-    Holds the same information as a `mlir::affine::DependenceComponent` (except 
-    the `op` it refers to, since this would typically be attached to the
-    operation in question or to one that would reference it through a
-    `::dynamatic::handshake::MemDependenceAttr`).
-  }];
-
-  let parameters = (ins "::std::optional<int64_t>":$lb, "::std::optional<int64_t>":$ub);
-  let assemblyFormat = "`[` $lb `,` $ub `]`";
-}
-
 def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let summary = "A memory dependence with respect to another memory access";
   let description = [{
@@ -206,9 +193,7 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     represents a RAW memory dependency. 
     
     The dependency is furthermore characterized by the loop depth at which the
-    dependency is (`loopDepth`) and a list of dependence components
-    (`components`) whose size indicates the number of commom loops surrounding
-    both operations. Also, there is a boolean (`isActive`) that demonstrates 
+    dependency is (`loopDepth`). Also, there is a boolean (`isActive`) that demonstrates 
     whether the dependency needs to be considered. An example of when there is
     no need to consider a dependency is when it is guaranteed by data dependency.
   }];
@@ -216,30 +201,10 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
     "unsigned":$loopDepth,
-    ArrayRefParameter<"::dynamatic::handshake::DependenceComponentAttr">:$components,
     "bool":$isActive
   );
 
-  let builders = [
-    AttrBuilder<(ins  "::mlir::StringRef":$dstAccess, 
-                      "unsigned":$loopDepth,
-                      "::mlir::ArrayRef<::mlir::affine::DependenceComponent>":$components, 
-                      "bool":$isActive), [{
-      SmallVector<::dynamatic::handshake::DependenceComponentAttr> compAttrs;
-      for (auto &comp : components)
-        compAttrs.push_back(::dynamatic::handshake::DependenceComponentAttr::get(
-          context, comp.lb, comp.ub));
-      return $_get(context, ::mlir::StringAttr::get(context, dstAccess), 
-        loopDepth, compAttrs, isActive);  
-    }]>
-  ];
-
-  let hasCustomAssemblyFormat = 1;
-  let extraClassDeclaration = [{
-    size_t getNumCommonLoops() {
-      return getComponents().size();
-    }
-  }];
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `]`";
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {

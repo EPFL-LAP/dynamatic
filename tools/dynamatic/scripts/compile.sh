@@ -35,8 +35,8 @@ else
   shift
 fi
 
-POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
+CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
