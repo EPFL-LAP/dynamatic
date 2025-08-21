@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/AffineToScf.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
@@ -43,8 +44,8 @@ class AffineLoadLowering : public OpRewritePattern<AffineLoadOp> {
 public:
   using OpRewritePattern<AffineLoadOp>::OpRewritePattern;
 
-  AffineLoadLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering){};
+  AffineLoadLowering(NameAnalysis &namer, MLIRContext *ctx)
+      : OpRewritePattern(ctx, 2), namer(namer){};
 
   LogicalResult matchAndRewrite(AffineLoadOp affineLoadOp,
                                 PatternRewriter &rewriter) const override {
@@ -59,14 +60,15 @@ public:
     // two operations
     memref::LoadOp loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         affineLoadOp, affineLoadOp.getMemRef(), *resultOperands);
-    memOpLowering.recordReplacement(affineLoadOp, loadOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(affineLoadOp, loadOp);
+    namer.replaceOp(affineLoadOp, loadOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement (from an affine-level load to a
   /// memref-level load).
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
 };
 
 /// Apply the affine map from an 'affine.store' operation to its operands, and
@@ -76,8 +78,8 @@ class AffineStoreLowering : public OpRewritePattern<AffineStoreOp> {
 public:
   using OpRewritePattern<AffineStoreOp>::OpRewritePattern;
 
-  AffineStoreLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering){};
+  AffineStoreLowering(NameAnalysis &namer, MLIRContext *ctx)
+      : OpRewritePattern(ctx, 2), namer(namer){};
 
   LogicalResult matchAndRewrite(AffineStoreOp affineStoreOp,
                                 PatternRewriter &rewriter) const override {
@@ -94,14 +96,15 @@ public:
     memref::StoreOp storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         affineStoreOp, affineStoreOp.getValueToStore(),
         affineStoreOp.getMemRef(), *maybeExpandedMap);
-    memOpLowering.recordReplacement(affineStoreOp, storeOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(affineStoreOp, storeOp);
+    namer.replaceOp(affineStoreOp, storeOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement (from an affine-level store to a
   /// memref-level store).
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
 };
 
 } // namespace
@@ -112,21 +115,17 @@ class AffineToScfPass
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
-    MemoryOpLowering memOpLowering(getAnalysis<NameAnalysis>());
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
     RewritePatternSet patterns(ctx);
     populateAffineToStdConversionPatterns(patterns);
-    patterns.add<AffineLoadLowering, AffineStoreLowering>(memOpLowering, ctx);
+    patterns.add<AffineLoadLowering, AffineStoreLowering>(namer, ctx);
 
     ConversionTarget target(*ctx);
     target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect,
                            scf::SCFDialect, VectorDialect>();
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       signalPassFailure();
-
-    // Change the name of destination memory acceses in all stored memory
-    // dependencies to reflect the new access names
-    memOpLowering.renameDependencies(modOp);
   }
 };
 } // namespace

@@ -18,7 +18,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -118,9 +120,9 @@ namespace {
 struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LoadOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+  LoadOpConversion(NameAnalysis &namer, TypeConverter &converter,
                    MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), namer(namer){};
 
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -134,21 +136,22 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
                        loadOp.getMemRefType());
     memref::LoadOp flatLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         loadOp, adaptor.getMemref(), SmallVector<Value>{finalIdx});
-    memOpLowering.recordReplacement(loadOp, flatLoadOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, flatLoadOp);
+    namer.replaceOp(loadOp, flatLoadOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement.
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
 };
 
 struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  StoreOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+  StoreOpConversion(NameAnalysis &namer, TypeConverter &converter,
                     MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), namer(namer){};
 
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
@@ -163,13 +166,14 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
     memref::StoreOp flatStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         storeOp, adaptor.getValue(), adaptor.getMemref(),
         SmallVector<Value>{finalIdx});
-    memOpLowering.recordReplacement(storeOp, flatStoreOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp, flatStoreOp);
+    namer.replaceOp(storeOp, flatStoreOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement.
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
 };
 
 struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
@@ -320,7 +324,7 @@ public:
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
     TypeConverter typeConverter;
-    MemoryOpLowering memOpLowering(getAnalysis<NameAnalysis>());
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     populateTypeConversionPatterns(typeConverter);
 
     RewritePatternSet patterns(ctx);
@@ -331,8 +335,8 @@ public:
                  OperandConversionPattern<memref::DeallocOp>,
                  OperandConversionPattern<memref::CopyOp>, CallOpConversion>(
         typeConverter, ctx);
-    patterns.add<LoadOpConversion, StoreOpConversion>(memOpLowering,
-                                                      typeConverter, ctx);
+    patterns.add<LoadOpConversion, StoreOpConversion>(namer, typeConverter,
+                                                      ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
 
@@ -341,10 +345,6 @@ public:
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
-
-    // Change the name of destination memory acceses in all stored memory
-    // dependencies to reflect the new access names
-    memOpLowering.renameDependencies(modOp);
   }
 };
 
