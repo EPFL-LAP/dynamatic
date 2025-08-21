@@ -3,6 +3,9 @@ include_directories(${DYNAMATIC_SOURCE_DIR}/experimental/include/experimental/Tr
 add_dynamatic_library(DynamaticSpeculationV2
   MaterializationUtil.cpp
   HandshakeSpeculationV2.cpp
+  PostSpecV2.cpp
+  PreSpecV2.cpp
+  JSONImporter.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

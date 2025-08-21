@@ -67,6 +67,26 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   ];
 }
 
+def PreSpecV2 : DynamaticPass<"handshake-pre-spec-v2"> {
+  let summary = "Spec v2 preparation";
+  let description = [{
+  }];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the kernel information related to speculation.">,
+  ];
+}
+
+def PostSpecV2 : DynamaticPass<"handshake-post-spec-v2"> {
+  let summary = "Spec v2 finalization";
+  let description = [{
+  }];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the kernel information related to speculation.">,
+  ];
+}
+
 def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   let summary = "Place Speculation operations";
   let description = [{
