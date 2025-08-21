@@ -120,8 +120,9 @@ jobs:
 
       - name: move-build-artifacts
         run: |
-          mv build/ Polygeist/
-          mv llvm-project/build Polygeist/llvm-project
+          ls -la
+          mv build/ polygeist/
+          mv llvm-project/build polygeist/llvm-project
           rmdir llvm-project
 
       - name: build
