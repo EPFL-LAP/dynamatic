@@ -111,22 +111,6 @@ generateDefaultMiterContext(MLIRContext &context,
                             const std::filesystem::path &lhsFile,
                             const std::filesystem::path &outputFile);
 
-// TODO: MaterializationUtil
-
-/// Flatten nested forks. Returns the new top fork.
-ForkOp flattenFork(ForkOp topFork);
-
-/// Materialize the value (i.e., ensuring it has a single user), by introducing
-/// a fork unit. Nested forks are flattened internally.
-void materializeValue(Value val);
-
-/// Under the materialization, the user of the value should be unique (as long
-/// as it's handshake-typed). This function returns the unique user of the
-/// value.
-Operation *getUniqueUser(Value val);
-
-/// Asserts the value is materialized.
-void assertMaterialization(Value val);
 } // namespace dynamatic::experimental
 
 #endif
