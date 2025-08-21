@@ -57,7 +57,6 @@ jobs:
   integration:
     if: github.event.pull_request.draft == false
     runs-on: self-hosted
-    needs: [build-polygeist]
 
     steps:
       - name: cleanup
