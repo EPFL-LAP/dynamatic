@@ -67,6 +67,7 @@ jobs:
             build/
             llvm-project/build/
           key: polygeist-build
+          lookup-only: true
 
       - name: checkout-polygeist
         if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
