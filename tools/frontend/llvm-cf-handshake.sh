@@ -162,7 +162,7 @@ $LLVM_BINS/opt -S \
   > $OUT/clang_array_partitioned_cleaned.ll
 
 $DYNAMATIC_BINS/translate-llvm-to-std \
-  "$OUT/clang_optimized_dep_marked.ll" \
+  "$OUT/clang_array_partitioned_cleaned.ll" \
   -function-name "$FUNC_NAME" \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
