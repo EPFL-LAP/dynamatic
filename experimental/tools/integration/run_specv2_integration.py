@@ -288,16 +288,35 @@ def run_test(c_file, n, variable, transformed_code_filename):
         else:
             return fail(id, "Failed to apply transformations to handshake")
 
+    spec_json_path = os.path.join(c_file_dir, "specv2.json")
+
+    # Pre-speculation
+    handshake_pre_speculation = os.path.join(
+        comp_out_dir, "handshake_pre_speculation.mlir")
+    with open(handshake_pre_speculation, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_transformed,
+            f"--handshake-pre-spec-v2=json-path={spec_json_path}",
+            "--handshake-materialize",
+            "--handshake-canonicalize"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Pre-speculation")
+        else:
+            return fail(id, "Failed on pre-speculation")
+
     # Speculation
     handshake_speculation = os.path.join(
         comp_out_dir, "handshake_speculation.mlir")
     bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
     with open(handshake_speculation, "w") as f:
         print(f"n={n}, variable={variable}")
-        json_path = os.path.join(c_file_dir, "specv2.json")
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_transformed,
-            f"--handshake-speculation-v2=json-path={json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""}",
+            DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+            f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""}",
             "--handshake-materialize",
             "--handshake-canonicalize"
         ],
