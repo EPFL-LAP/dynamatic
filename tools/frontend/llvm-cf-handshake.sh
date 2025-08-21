@@ -42,11 +42,10 @@ $LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm $F_SRC \
 # - When calling clang with "-ffp-contract=off", clang will bypass the
 # "-disable-O0-optnone" flag and still adds "optnone" to the IR. This is a hacky
 # way to ignore it
-# - Please aware that there might be other attributes that need to be stripped:
-# for example, noinline, nounwind, and uwtable ("noinline" seems like something
-# we also need to strip).
+# - Clang always adds "noinline" to the IR.
 # ------------------------------------------------------------------------------
 sed -i "s/optnone//g" $OUT/clang.ll
+sed -i "s/noinline//g" $OUT/clang.ll
 
 # Strip information that we don't care (and mlir-translate also doesn't know how
 # to handle it).
@@ -67,25 +66,25 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
- -passes="mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
+ -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
   $OUT/clang.ll \
   > $OUT/clang_loop_canonicalized.ll
 
 # ------------------------------------------------------------------------------
 # Example (how to unroll loops):
 #
-#// void test_unrolling(const int A[N], const int B[N], const int C[N], int result[N]) {
-#//   // NOTE: The "array-partition" pass replicate this array to allow 2 concurrent accesses
-#//   int intermediate[N];
-#// #pragma clang loop unroll_count(2)
-#//   for (int i = 0; i < N; i++) {
-#//     intermediate[i] = A[i] * B[i];
-#//   }
-#// #pragma clang loop unroll_count(2)
-#//   for (int i = 0; i < N; i++) {
-#//     result[i] = intermediate[i] * C[i];
-#//   }
-#// }
+# void test_unrolling(const int A[N], const int B[N], const int C[N], int result[N]) {
+#   // NOTE: The "array-partition" pass replicate this array to allow 2 concurrent accesses
+#   int intermediate[N];
+# #pragma clang loop unroll_count(2)
+#   for (int i = 0; i < N; i++) {
+#     intermediate[i] = A[i] * B[i];
+#   }
+# #pragma clang loop unroll_count(2)
+#   for (int i = 0; i < N; i++) {
+#     result[i] = intermediate[i] * C[i];
+#   }
+# }
 #
 # We use the clang pragma to tell the compiler to unroll the loop.
 # 
@@ -103,43 +102,7 @@ $LLVM_BINS/opt -S \
   -strip-debug \
   $OUT/clang_unrolled.ll \
   > $OUT/clang_optimized.ll
-
-# ------------------------------------------------------------------------------
-# This pass computes the set of disjoint accesses to the same baseptr, and
-# replicate the arrays if disjoint sets can be found.
-# Example: consider A[10] and loadA, loadB, loadC, loadD interact with it.
 #
-# - loadA:  accesses 0, 2, 4, 6, 8
-# - loadB:  accesses 1, 3, 5, 7, 9
-# - storeA: accesses 0, 2, 4, 6, 8
-# - storeB: accesses 1, 3, 5, 7, 9
-#
-# We can parition it into {loadA, storeA} and {loadB, storeB}, such that you
-# cannot find two insts in these two sets that access the same array element.
-# ------------------------------------------------------------------------------
-
-# Somehow here we need to canonicalized again, otherwise, Polly cannot recognize
-# some Scops in some cases
-# NOTE: -polly-canonicalize breaks test_memory_11 !!!
-# $LLVM_BINS/opt -S \
-#   -polly-canonicalize \
-#   $OUT/clang_optimized.ll \
-#   > $OUT/clang_optimized_polly_canonicalized.ll
-
-# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
-$LLVM_BINS/opt -S \
-  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
-  --polly-process-unprofitable \
-  -passes="array-partition" \
-  $OUT/clang_optimized.ll \
-  > $OUT/clang_array_partitioned.ll
-
-# Clean up the index calculation logic inserted by the array-partition pass
-$LLVM_BINS/opt -S \
-  -passes="instcombine" \
-  $OUT/clang_array_partitioned.ll \
-  > $OUT/clang_array_partitioned_cleaned.ll
-
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
@@ -157,13 +120,46 @@ $LLVM_BINS/opt -S \
 # ===============================
 # ------------------------------------------------------------------------------
 
+# NOTE:
+# - without "--polly-process-unprofitable", polly ignores certain small loops
+# - ArrayParititon pass currently breaks the SCoP analysis in Polly. Therefore,
+# we need to first attach analysis results to memory ops and then apply memory
+# bank partition.
+$LLVM_BINS/opt -S \
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
+  -passes="mem-dep-analysis" \
+  -polly-process-unprofitable \
+  $OUT/clang_optimized.ll \
+  > $OUT/clang_optimized_dep_marked.ll
+
+# ------------------------------------------------------------------------------
+# This pass computes the set of disjoint accesses to the same baseptr, and
+# replicate the arrays if disjoint sets can be found.
+# Example: consider A[10] and loadA, loadB, loadC, loadD interact with it.
+#
+# - loadA:  accesses 0, 2, 4, 6, 8
+# - loadB:  accesses 1, 3, 5, 7, 9
+# - storeA: accesses 0, 2, 4, 6, 8
+# - storeB: accesses 1, 3, 5, 7, 9
+#
+# We can parition it into {loadA, storeA} and {loadB, storeB}, such that you
+# cannot find two insts in these two sets that access the same array element.
+# ------------------------------------------------------------------------------
+
 # NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
 $LLVM_BINS/opt -S \
-  -passes="mem-dep-analysis" \
-  --polly-process-unprofitable \
-  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
-  $OUT/clang_array_partitioned_cleaned.ll \
-  > $OUT/clang_optimized_dep_marked.ll
+  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
+  -polly-process-unprofitable \
+  -passes="array-partition" \
+  -debug -debug-only="array-partition" \
+  $OUT/clang_optimized_dep_marked.ll \
+  > $OUT/clang_array_partitioned.ll
+
+# Clean up the index calculation logic inserted by the array-partition pass
+$LLVM_BINS/opt -S \
+  -passes="instcombine" \
+  $OUT/clang_array_partitioned.ll \
+  > $OUT/clang_array_partitioned_cleaned.ll
 
 $DYNAMATIC_BINS/translate-llvm-to-std \
   "$OUT/clang_optimized_dep_marked.ll" \
@@ -171,6 +167,7 @@ $DYNAMATIC_BINS/translate-llvm-to-std \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
    -o $OUT/cf.mlir
+
 
 # - drop-unlist-functions: Dropping the functions that are not needed in HLS
 # compilation
@@ -203,36 +200,36 @@ $DYNAMATIC_BINS/dynamatic-opt \
 # ------------------------------------------------------------------------------
 # Run simple buffer placement
 # ------------------------------------------------------------------------------
-$DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/handshake_transformed.mlir \
-  --handshake-mark-fpu-impl="impl=flopoco" \
-  --handshake-set-buffering-properties="version=fpga20" \
-  --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
-  > $OUT/handshake_buffered.mlir
+# $DYNAMATIC_BINS/dynamatic-opt \
+#   $OUT/handshake_transformed.mlir \
+#   --handshake-mark-fpu-impl="impl=flopoco" \
+#   --handshake-set-buffering-properties="version=fpga20" \
+#   --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
+#   > $OUT/handshake_buffered.mlir
 
 # ------------------------------------------------------------------------------
 # Run throughput-driven buffer placement (needs a valid Gurobi license)
 # ------------------------------------------------------------------------------
 
-# "$LLVM_BINS/clang++" "$F_SRC" \
-#   -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
-#   -Wno-deprecated -o "$OUT/profiler_bin.exe"
+"$LLVM_BINS/clang++" "$F_SRC" \
+  -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
+  -Wno-deprecated -o "$OUT/profiler_bin.exe"
 
-# "$OUT/profiler_bin.exe" \
-#   > "$OUT/profiler.txt"
+"$OUT/profiler_bin.exe" \
+  > "$OUT/profiler.txt"
 
-# "$DYNAMATIC_BINS/exp-frequency-profiler" \
-#   "$OUT/cf_transformed.mlir" \
-#   --top-level-function="$FUNC_NAME" \
-#   --input-args-file="$OUT/profiler.txt" \
-#   > "$OUT/frequencies.csv"
+"$DYNAMATIC_BINS/exp-frequency-profiler" \
+  "$OUT/cf_transformed.mlir" \
+  --top-level-function="$FUNC_NAME" \
+  --input-args-file="$OUT/profiler.txt" \
+  > "$OUT/frequencies.csv"
 
-# $DYNAMATIC_BINS/dynamatic-opt \
-#   $OUT/handshake_transformed.mlir \
-#   --handshake-mark-fpu-impl="impl=flopoco" \
-#   --handshake-set-buffering-properties="version=fpga20" \
-#   --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=300" \
-#   > $OUT/handshake_buffered.mlir
+$DYNAMATIC_BINS/dynamatic-opt \
+  $OUT/handshake_transformed.mlir \
+  --handshake-mark-fpu-impl="impl=flopoco" \
+  --handshake-set-buffering-properties="version=fpga20" \
+  --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=30" \
+  > $OUT/handshake_buffered.mlir
 
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/handshake_buffered.mlir \
