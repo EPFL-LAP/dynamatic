@@ -123,19 +123,11 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
   return results;
 }
 
-/// Checks whether the blocks in `opsPerBlock`'s keys exhibit a "linear
-/// dominance relationship" i.e., whether the execution of the "most dominant"
-/// block necessarily triggers the execution of all others in a deterministic
-/// order. This verification happens in linear time thanks to the cached
-/// dominator/dominated relationships in `dominations`. On success, stores the
-/// blocks' execution order in `dominanceOrder` ("most dominant" block first,
-/// then "second most dominant", etc.). Fails when the blocks do not exhibit
-/// that property.
-static LogicalResult computeLinearDominance(
+LogicalResult LowerFuncToHandshake::computeLinearDominance(
     DenseMap<Block *, DenseSet<Block *>> &dominations,
     llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
         &opsPerBlock,
-    SmallVector<Block *> &dominanceOrder) {
+    SmallVector<Block *> &dominanceOrder) const {
   // Initialize the dominance order to the proper size, setting each element to
   // nullptr initially
   size_t numBlocks = opsPerBlock.size();
@@ -702,7 +694,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefIndices,
     BackedgeBuilder &edgeBuilder,
-    LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
+    LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -763,6 +755,17 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               namer.replaceOp(loadOp, newOp);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
+
+              // /!\ In FTD, the way operations are converted between dialects
+              // is done in a way that both operations from `cf` to `handshake`
+              // coexist in some intertwined way. New operations from the
+              // `handshake` dialect are instantiated while connected to the old
+              // `cf` versions. When rewriting, we found that this call is
+              // necessary to avoid having a "null operand found" error (e.g.
+              // get_tanh)
+              if (isFtd)
+                loadOp.getResult().replaceAllUsesWith(dataOut);
+
               return newOp;
             })
             .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
@@ -1028,80 +1031,6 @@ static Value getBlockControl(Operation *op) {
   llvm_unreachable("cannot find cmerge in block");
   return nullptr;
 }
-
-namespace {
-
-template <typename SrcOp, typename DstOp>
-struct OneToOneConversion : public OpConversionPattern<SrcOp> {
-public:
-  using OpAdaptor = typename SrcOp::Adaptor;
-
-  OneToOneConversion(NameAnalysis &namer, const TypeConverter &typeConverter,
-                     MLIRContext *ctx)
-      : OpConversionPattern<SrcOp>(typeConverter, ctx), namer(namer) {}
-
-  LogicalResult
-  matchAndRewrite(SrcOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-
-protected:
-  /// Reference to the running pass's naming analysis.
-  NameAnalysis &namer;
-};
-
-template <typename CastOp, typename ExtOp>
-struct ConvertIndexCast : public OpConversionPattern<CastOp> {
-public:
-  using OpAdaptor = typename CastOp::Adaptor;
-
-  ConvertIndexCast(NameAnalysis &namer, const TypeConverter &typeConverter,
-                   MLIRContext *ctx)
-      : OpConversionPattern<CastOp>(typeConverter, ctx), namer(namer) {}
-
-  LogicalResult
-  matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-
-protected:
-  /// Reference to the running pass's naming analysis.
-  NameAnalysis &namer;
-};
-
-/// Converts each `func::CallOp` operation to an equivalent
-/// `handshake::InstanceOp` operation.
-struct ConvertCalls : public DynOpConversionPattern<func::CallOp> {
-public:
-  using DynOpConversionPattern<func::CallOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-
-/// Convers arith-level constants to handshake-level constants. Constants are
-/// triggered by a source if their successor is not a branch/return or memory
-/// operation. Otherwise they are triggered by the control-only network.
-struct ConvertConstants : public DynOpConversionPattern<arith::ConstantOp> {
-public:
-  using DynOpConversionPattern<arith::ConstantOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(arith::ConstantOp cstOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-
-/// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
-/// triggered by the control merge of the block associated to the matched
-/// operation.
-struct ConvertUndefinedValues : public DynOpConversionPattern<LLVM::UndefOp> {
-public:
-  using DynOpConversionPattern<LLVM::UndefOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(LLVM::UndefOp undefOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-} // namespace
 
 template <typename SrcOp, typename DstOp>
 LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(

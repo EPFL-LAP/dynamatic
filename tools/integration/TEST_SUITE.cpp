@@ -28,6 +28,21 @@ TEST_P(BasicFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
+//
+// This is an example test case which uses the Verilog backend.
+// It is currently disabled because a lot of benchmarks still
+// don't work properly with Verilog, so running it would create
+// a lot of errors, preventing the CI from running normally.
+//
+// TEST_P(BasicFixture, verilog) {
+//   std::string name = GetParam();
+//   int simTime = -1;
+
+//   EXPECT_EQ(runIntegrationTest(name, simTime, std::nullopt, true), 0);
+
+//   RecordProperty("cycles", std::to_string(simTime));
+// }
+
 TEST_P(MemoryFixture, basic) {
   fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
   std::string name = GetParam();
