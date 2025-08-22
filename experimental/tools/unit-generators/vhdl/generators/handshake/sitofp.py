@@ -28,7 +28,7 @@ def generate_sitofp(name, params):
         q2 <= (others => '0');
         q3 <= (others => '0');
         q4 <= (others => '0');
-      elsif (one_slot_break_dv_ready) then
+      elsif (valid_buffer_ready) then
         q0 <= converted;
         q1 <= q0;
         q2 <= q1;
