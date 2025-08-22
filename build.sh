@@ -97,7 +97,6 @@ create_include_symlink() {
     local src=$1
     local dst="build/include/polygeist"
     echo "$dst -> $src"
-    rm -rf "$dst"
     ln -f --symbolic "$src" "$dst"
 }
 
