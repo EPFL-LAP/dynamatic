@@ -133,7 +133,7 @@ end architecture;
     # otherwise, we need a buffer to propagate the valid
     else:
         valid_buffer_name = f"{name}_valid_buffer"
-        dependencies += generate_valid_propagation_buffer(valid_buffer_name, 1)
+        dependencies += generate_valid_propagation_buffer(valid_buffer_name, latency)
 
         architecture = f"""
 -- Architecture of {modType}
