@@ -66,8 +66,6 @@ public:
   }
 
 private:
-  /// Used to record the operation replacement (from an affine-level load to a
-  /// memref-level load).
   NameAnalysis &namer;
 };
 
@@ -102,8 +100,6 @@ public:
   }
 
 private:
-  /// Used to record the operation replacement (from an affine-level store to a
-  /// memref-level store).
   NameAnalysis &namer;
 };
 
