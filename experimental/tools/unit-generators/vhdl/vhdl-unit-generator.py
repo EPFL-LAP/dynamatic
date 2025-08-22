@@ -20,7 +20,6 @@ class Generators():
         self._data[mod] = getattr(imported, f"generate_{mod}")
 
 
-
 def parse_parameters(param_list):
     try:
         param_dict = {}
