@@ -519,9 +519,10 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
   if (!fs::exists(dynamaticPath + sep + "bin" + sep + "dynamatic")) {
-    llvm::outs() << ERR
-                << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
-                    "seem to have been built.\n";
+    llvm::outs()
+        << ERR
+        << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
+           "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
@@ -614,11 +615,10 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery);
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
