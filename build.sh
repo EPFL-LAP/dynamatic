@@ -95,7 +95,7 @@ create_generator_symlink() {
 
 create_include_symlink() {
     local src=$1
-    local dst="include/polygeist"
+    local dst="build/include/polygeist"
     echo "$dst -> $src"
     ln -fnsv "$src" "$dst"
 }
