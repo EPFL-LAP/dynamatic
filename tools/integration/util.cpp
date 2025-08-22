@@ -31,7 +31,8 @@ bool runSubprocess(const std::vector<std::string> &args,
 };
 
 int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath) {
+                       const std::optional<fs::path> &customPath,
+                       bool useVerilog) {
   fs::path path =
       customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
       name / (name + ".c");
@@ -47,7 +48,8 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << path.string() << std::endl
              << "compile" << std::endl
-             << "write-hdl" << std::endl
+             << "write-hdl --hdl " << (useVerilog ? "verilog" : "vhdl")
+             << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
 
