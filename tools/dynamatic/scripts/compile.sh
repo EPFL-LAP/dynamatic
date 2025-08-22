@@ -97,7 +97,7 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/include/polygeist" \
   -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE"
