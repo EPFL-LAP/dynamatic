@@ -17,12 +17,6 @@ def try_enum_cast(value: str, enum_class: Type[Enum]) -> Union[Enum, str]:
     except ValueError:
         return value
 
-def generate_valid_propagation_buffer(name, latency):
-    if latency == 1:
-        return generate_one_slot_break_dv(name, {"bitwidth": 0})
-    else:
-        return generate_shift_reg_break_dv(name, {"bitwidth": 0, "num_slots": latency})
-
 
 VIVADO_IMPL = "vivado"
 FLOPOCO_IMPL = "flopoco"

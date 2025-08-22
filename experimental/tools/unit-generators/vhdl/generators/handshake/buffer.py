@@ -38,3 +38,9 @@ def generate_buffer(name, params):
             return generate_shift_reg_break_dv(name, params)
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")
+
+def generate_valid_propagation_buffer(name, latency):
+    if latency == 1:
+        return generate_one_slot_break_dv(name, {"bitwidth": 0})
+    else:
+        return generate_shift_reg_break_dv(name, {"bitwidth": 0, "num_slots": latency})

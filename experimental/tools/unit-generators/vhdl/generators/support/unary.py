@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_unary_signal_manager
 from generators.support.utils import ExtraSignals
-from generators.support.utils import ExtraSignals, generate_valid_propagation_buffer
+from generators.support.utils import ExtraSignals
+from generators.handshake.buffer import generate_valid_propagation_buffer
 
 
 def generate_unary(
