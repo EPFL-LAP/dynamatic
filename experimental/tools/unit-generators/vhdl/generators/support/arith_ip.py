@@ -19,7 +19,7 @@ def generate_flopoco_ip_wrapper(name,
   """
 
     clock_enables = "\n".join(
-        [f"        ce_{i} => one_slot_break_dv_ready," for i in range(1, latency + 1)]
+        [f"        ce_{i} => valid_buffer_ready," for i in range(1, latency + 1)]
     )
     clock_enables = clock_enables.lstrip()
 
@@ -79,7 +79,7 @@ def generate_vivado_ip_wrapper(name,
     port map(
       clk   => clk,
       reset => rst,
-      ce    => one_slot_break_dv_ready,
+      ce    => valid_buffer_ready,
       din0  => lhs,
       din1  => rhs,
       dout  => result
