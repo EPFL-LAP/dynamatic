@@ -144,6 +144,7 @@ end architecture;
 -- Architecture of {modType}
 architecture arch of {name} is
   {signals}
+  signal valid_buffer_ready : std_logic;
 begin
   valid_buffer : entity work.{valid_buffer_name}(arch)
     port map(
@@ -151,11 +152,14 @@ begin
       rst        => rst,
       -- input channel from "ins"
       ins_valid  => ins_valid,
-      ins_ready  => ins_ready,
+      ins_ready  => valid_buffer_ready,
       -- output channel to "outs"
       outs_valid => outs_valid,
       outs_ready => outs_ready
   );
+
+  -- expose to allow use as a clock enable signal
+  ins_ready <= valid_buffer_ready;
 
   {body}
 
