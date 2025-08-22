@@ -1,9 +1,6 @@
 from generators.handshake.join import generate_join
-from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
-from generators.support.delay_buffer import generate_delay_buffer
 from generators.support.signal_manager import generate_arith2_signal_manager
-from generators.support.utils import ExtraSignals
-
+from generators.support.utils import ExtraSignals, generate_valid_propagation_buffer
 
 def generate_arith2(
     name: str,
@@ -132,16 +129,15 @@ begin
 
 end architecture;
 """
-    # with latency 1,
-    # we need an one_slot_break_dv to store the valid
-    elif latency == 1:
-        one_slot_break_dv_name = f"{name}_one_slot_break_dv"
-        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
+    # otherwise, we need a buffer to propagate the valid
+    else:
+        valid_buffer_name = f"{name}_valid_buffer"
+        dependencies += generate_valid_propagation_buffer(valid_buffer_name, 1)
 
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
-	signal join_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
+	signal join_valid, valid_buffer_ready : std_logic;
   {signals}
 begin
 
@@ -153,78 +149,18 @@ begin
       -- input readys
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready,
-      -- output channel to one_slot_break_dv
+      -- output channel to valid_buffer
       outs_valid   => join_valid,
-      outs_ready   => one_slot_break_dv_ready
+      outs_ready   => valid_buffer_ready
     );
 
-  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
+  valid_buffer : entity work.{valid_buffer_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
       -- input channel from join
       ins_valid  => join_valid,
-      ins_ready  => one_slot_break_dv_ready,
-      -- output channel to "result"
-      outs_ready => result_ready,
-      outs_valid => result_valid
-    );
-
-  {body}
-
-end architecture;
-"""
-    # with latency >1,
-    # we need a delay buffer to propagate the valids
-    # with the same latency as the unit
-    # and we need an one_slot_break_dv to store the final valid
-    else:
-        one_slot_break_dv_name = f"{name}_one_slot_break_dv"
-        buff_name = f"{name}_buff"
-
-        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
-        dependencies += generate_delay_buffer(
-            buff_name,
-            {"slots": latency - 1})
-
-        architecture = f"""
--- Architecture of {modType}
-architecture arch of {name} is
-  signal join_valid                         : std_logic;
-  signal buff_valid, one_slot_break_dv_valid, one_slot_break_dv_ready : std_logic;
-  {signals}
-begin
-  join_inputs : entity work.{join_name}(arch)
-    port map(
-      -- input valids
-      ins_valid(0) => lhs_valid,
-      ins_valid(1) => rhs_valid,
-      -- input readys
-      ins_ready(0) => lhs_ready,
-      ins_ready(1) => rhs_ready,
-      -- output channel to buffer, using one_slot_break_dv ready
-      outs_valid   => join_valid,
-      outs_ready   => one_slot_break_dv_ready
-    );
-
-  buff : entity work.{buff_name}(arch)
-    port map(
-      clk,
-      rst,
-      -- input channel from join
-      valid_in  => join_valid,
-      -- output channel to one_slot_break_dv
-      valid_out => buff_valid,
-      ready_in   => one_slot_break_dv_ready
-    );
-
-  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      -- input channel from buffer
-      ins_valid  => buff_valid,
-      ins_ready  => one_slot_break_dv_ready,
+      ins_ready  => valid_buffer_ready,
       -- output channel to "result"
       outs_ready => result_ready,
       outs_valid => result_valid

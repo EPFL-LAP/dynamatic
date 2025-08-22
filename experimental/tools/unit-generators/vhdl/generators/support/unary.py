@@ -1,7 +1,6 @@
 from generators.support.signal_manager import generate_unary_signal_manager
 from generators.support.utils import ExtraSignals
-from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
-from generators.support.delay_buffer import generate_delay_buffer
+from generators.support.utils import ExtraSignals, generate_valid_propagation_buffer
 
 
 def generate_unary(
@@ -23,16 +22,12 @@ def generate_unary(
     If latency = 0:
       Output ready is directly forwarded up from input ready.
       Output valid is directly forwarded down from input valid.
-
-    If latency = 1:
-      Handshaking signals are passed through a 1-slot BREAK_DV buffer.
-
-    If latency > 1:
-      Handshaking signals are passed through a shift register with
-      latency - 1 slots, and then a 1-slot BREAK_DV buffer.
+    Else:
+      Handshaking signals are passed through a valid propagation buffer.
+      Which is either a one slot break dv, or a shift register buffer
 
     Args:
-        name: Unique name based on MLIR op name (e.g. buffer0).
+        name: Unique name based on MLIR op name (e.g. adder0).
         modType: More specific name, used in comments only.
         signals: Local signal declarations used in body.
         body: VHDL body of the unit, excluding handshaking.
@@ -94,6 +89,7 @@ def _generate_arith1(
         latency
 ):
 
+    # all unary units have the same entity
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -119,6 +115,10 @@ end entity;
     signals = signals.lstrip()
     body = body.lstrip()
 
+    # but the architecture differs depending
+    # on the latency
+
+    # Handshaking is directly forwarded
     if latency == 0:
         architecture = f"""
 -- Architecture of {modType}
@@ -134,17 +134,17 @@ begin
 
 end architecture;
 """
-    elif latency == 1:
-        one_slot_break_dv_name = f"{name}_one_slot_break_dv"
-
-        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
+    # otherwise, we need a buffer to propagate the valid
+    else:
+        valid_buffer_name = f"{name}_valid_buffer"
+        dependencies += generate_valid_propagation_buffer(valid_buffer_name, 1)
 
         architecture = f"""
 -- Architecture of {modType}
 architecture arch of {name} is
   {signals}
 begin
-  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
+  valid_buffer : entity work.{valid_buffer_name}(arch)
     port map(
       clk        => clk,
       rst        => rst,
@@ -152,57 +152,9 @@ begin
       ins_valid  => ins_valid,
       ins_ready  => ins_ready,
       -- output channel to "outs"
-      outs_ready => outs_ready,
-      outs_valid => outs_valid
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
   );
-
-  {body}
-
-end architecture;
-"""
-    else:
-        one_slot_break_dv_name = f"{name}_one_slot_break_dv"
-        buff_name = f"{name}_buff"
-
-        dependencies += generate_one_slot_break_dv(one_slot_break_dv_name, {"bitwidth": 0})
-        dependencies += generate_delay_buffer(
-            buff_name,
-            {"slots": latency - 1})
-
-        architecture = f"""
--- Architecture of {modType}
-architecture arch of {name} is
-  signal buff_valid,  one_slot_break_dv_ready : std_logic;
-  {signals}
-begin
-  buff : entity work.{buff_name}(arch)
-    port map(
-      clk,
-      rst,
-      -- input channel from "ins"
-      -- (without ready)
-      valid_in  => ins_valid,
-      -- output channel to one_slot_break_dv
-      valid_out => buff_valid,
-      ready_in  => one_slot_break_dv_ready
-    );
-
-
-  one_slot_break_dv : entity work.{one_slot_break_dv_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      -- input channel from buffer
-      ins_valid  => buff_valid,
-      ins_ready  => one_slot_break_dv_ready,
-      -- output channel to "outs"
-      outs_ready => outs_ready,
-      outs_valid => outs_valid
-  );
-
-  -- input channel from "ins" to one_slot_break_dv
-  -- (ready only)
-  ins_ready <= one_slot_break_dv_ready;
 
   {body}
 
