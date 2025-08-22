@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: cleanup
+        run: |
+          ls -la
+
       - uses: actions/checkout@v4
 
       - name: check-format-cpp
