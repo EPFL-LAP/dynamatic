@@ -97,7 +97,8 @@ create_include_symlink() {
     local src=$1
     local dst="build/include/polygeist"
     echo "$dst -> $src"
-    ln -fnsv "$src" "$dst"
+    rm -rf "$dst"
+    ln -f --symbolic "$src" "$dst"
 }
 
 # Determine whether cmake should be re-configured by looking for a
