@@ -70,33 +70,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: get-cache-key
-        id: get-cache-key
-        run: |
-          echo "key=$(git -C polygeist rev-parse HEAD)$(git -C polygeist/llvm-project rev-parse HEAD)" >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: cache-polygeist-restore
-        id: cache-polygeist-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            polygeist/build/
-            polygeist/llvm-project/build/
-          key: ${{ steps.get-cache-key.outputs.key }}
-
       - name: build
         run: ./build.sh --release --force
-
-      - name: cache-polygeist-save
-        id: cache-polygeist-save
-        if: steps.cache-polygeist-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            polygeist/build/
-            polygeist/llvm-project/build/
-          key: ${{ steps.get-cache-key.outputs.key }}
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
