@@ -20,7 +20,7 @@ def generate_muli(name, params):
   process (clk)
   begin
     if (clk'event and clk = '1') then
-      if (one_slot_break_dv_ready = '1') then
+      if (valid_buffer_ready = '1') then
         a_reg <= lhs;
         b_reg <= rhs;
         q0    <= mul;
