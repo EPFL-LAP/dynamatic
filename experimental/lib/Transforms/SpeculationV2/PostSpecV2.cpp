@@ -1,4 +1,6 @@
 #include "PostSpecV2.h"
+#include "JSONImporter.h"
+#include "MaterializationUtil.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -46,4 +48,66 @@ struct PostSpecV2Pass
   void runDynamaticPass() override;
 };
 
-void PostSpecV2Pass::runDynamaticPass() {}
+static InitOp moveInitsUp(Value fedValue) {
+  fedValue = getForkTop(fedValue);
+  materializeValue(fedValue);
+
+  Operation *uniqueUser = getUniqueUser(fedValue);
+  if (auto init = dyn_cast<InitOp>(uniqueUser)) {
+    // Single use. No need to move repeating inits.
+    return init;
+  }
+
+  OpBuilder builder(fedValue.getContext());
+  builder.setInsertionPointAfterValue(fedValue);
+
+  ForkOp fork = cast<ForkOp>(uniqueUser);
+
+  auto newInit = builder.create<InitOp>(fedValue.getLoc(), fedValue, 0);
+  inheritBB(fedValue.getDefiningOp(), newInit);
+  fedValue.replaceAllUsesExcept(newInit.getResult(), newInit);
+
+  for (auto res : fork->getResults()) {
+    if (auto init = dyn_cast<InitOp>(getUniqueUser(res))) {
+      init.getResult().replaceAllUsesWith(newInit.getResult());
+      init->erase();
+    } else {
+      res.replaceAllUsesWith(fedValue);
+    }
+  }
+
+  fork->erase();
+
+  materializeValue(fedValue);
+  materializeValue(newInit.getResult());
+
+  return newInit;
+}
+
+void PostSpecV2Pass::runDynamaticPass() {
+  // Parse json (jsonPath is a member variable handled by tablegen)
+  auto bbOrFailure = readFromJSON(jsonPath);
+  if (failed(bbOrFailure))
+    return signalPassFailure();
+
+  auto [loopBBs] = bbOrFailure.value();
+
+  ModuleOp modOp = getOperation();
+
+  // Support only one funcOp
+  assert(std::distance(modOp.getOps<FuncOp>().begin(),
+                       modOp.getOps<FuncOp>().end()) == 1 &&
+         "Expected a single FuncOp in the module");
+
+  FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
+
+  unsigned headBB = loopBBs[0];
+
+  // Move the init op up
+  for (auto init : funcOp.getOps<InitOp>()) {
+    if (getLogicBB(init) != headBB)
+      continue;
+    moveInitsUp(init.getOperand());
+    return;
+  }
+}

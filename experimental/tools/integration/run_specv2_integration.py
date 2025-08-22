@@ -328,6 +328,24 @@ def run_test(c_file, n, variable, transformed_code_filename):
         else:
             return fail(id, "Failed to add speculative units")
 
+    # Post-speculation
+    handshake_post_speculation = os.path.join(
+        comp_out_dir, "handshake_post_speculation.mlir")
+    with open(handshake_post_speculation, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_speculation,
+            f"--handshake-post-spec-v2=json-path={spec_json_path}",
+            "--handshake-materialize",
+            "--handshake-canonicalize"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Post-speculation")
+        else:
+            return fail(id, "Failed on post-speculation")
+
     # Buffer placement (fpga20)
     profiler_bin = os.path.join(comp_out_dir, "profile")
     result = subprocess.run([
@@ -389,7 +407,7 @@ def run_test(c_file, n, variable, transformed_code_filename):
     timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_speculation,
+            DYNAMATIC_OPT_BIN, handshake_post_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
             f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
         ],

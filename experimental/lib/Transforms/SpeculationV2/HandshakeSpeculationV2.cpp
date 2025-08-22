@@ -1,15 +1,14 @@
 #include "HandshakeSpeculationV2.h"
 #include "JSONImporter.h"
 #include "MaterializationUtil.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
@@ -246,43 +245,45 @@ static llvm::SmallVector<Value> getEffectiveResults(Operation *op) {
   return results;
 }
 
-/// Performs the motion of the OpT operation over a PM unit.
-template <typename OpT>
-static LogicalResult performMotionOverPM(Operation *pmOp,
-                                         std::function<OpT(Value)> buildOp) {
-  // Add new OpT for each effective result of the PM unit.
-  for (Value result : getEffectiveResults(pmOp)) {
-    assertMaterialization(result);
+static LogicalResult movePassersDownPM(Operation *pmOp) {
+  OpBuilder builder(pmOp->getContext());
+  builder.setInsertionPoint(pmOp);
 
-    OpT newOp = buildOp(result);
-    inheritBB(pmOp, newOp);
+  Location loc = builder.getUnknownLoc();
+  Value ctrl = nullptr;
 
-    if (newOp->getNumResults() != 1)
-      return newOp->emitError("Expected OpT to have a single result");
-
-    result.replaceAllUsesExcept(newOp->getResult(0), newOp);
-  }
-
-  // Remove OpT from each effective operand of the PM unit.
+  // Remove PasserOp from each effective operand of the PM unit.
   for (Value operand : getEffectiveOperands(pmOp)) {
     Operation *definingOp = operand.getDefiningOp();
-    if (!isa<OpT>(definingOp)) {
+    if (auto passer = dyn_cast<PasserOp>(definingOp)) {
+      loc = passer->getLoc();
+      ctrl = passer.getCtrl();
+
+      // The operand must be materialized to perform the motion correctly.
+      assertMaterialization(operand);
+
+      // Remove the defining PasserOp operation.
+      passer.getResult().replaceAllUsesWith(passer.getData());
+      passer->erase();
+    } else {
       // If the operand is sourced, it doesn't need to be defined by OpT.
       if (isSourced(operand))
         continue;
-      return pmOp->emitError("Expected all operands to be defined by the OpT");
+      return pmOp->emitError(
+          "Expected all operands to be defined by the PasserOp");
     }
-
-    if (definingOp->getNumResults() != 1)
-      return pmOp->emitError("Expected OpT to have a single result");
-
-    // The operand must be materialized to perform the motion correctly.
-    assertMaterialization(operand);
-
-    // Remove the defining OpT operation.
-    definingOp->getResult(0).replaceAllUsesWith(definingOp->getOperand(0));
-    definingOp->erase();
   }
+
+  // Add new PasserOp for each effective result of the PM unit.
+  for (Value result : getEffectiveResults(pmOp)) {
+    assertMaterialization(result);
+
+    PasserOp newPasser = builder.create<PasserOp>(loc, result, ctrl);
+    inheritBB(pmOp, newPasser);
+
+    result.replaceAllUsesExcept(newPasser.getResult(), newPasser);
+  }
+
   return success();
 }
 
@@ -319,7 +320,6 @@ static bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
 static void performPasserMotionPastPM(PasserOp passerOp,
                                       DenseSet<PasserOp> &frontiers) {
   Value passerControl = passerOp.getCtrl();
-  Location passerLoc = passerOp.getLoc();
   OpBuilder builder(passerOp->getContext());
   builder.setInsertionPoint(passerOp);
 
@@ -333,10 +333,7 @@ static void performPasserMotionPastPM(PasserOp passerOp,
   }
 
   // Perform the motion
-  auto motionResult = performMotionOverPM<PasserOp>(targetOp, [&](Value v) {
-    // Use unchanged passer control.
-    return builder.create<PasserOp>(passerLoc, v, passerControl);
-  });
+  auto motionResult = movePassersDownPM(targetOp);
 
   if (failed(motionResult)) {
     targetOp->emitError("Failed to perform motion for PasserOp");
@@ -522,10 +519,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator, unsigned n) {
   builder.setInsertionPoint(fork);
   // getUniqueUser(oldPasserOp.getResult())->dump();
 
-  if (performMotionOverPM<PasserOp>(fork, [&](Value v) {
-        return builder.create<PasserOp>(oldPasserOp.getLoc(), v,
-                                        oldPasserOp.getCtrl());
-      }).failed()) {
+  if (movePassersDownPM(fork).failed()) {
     llvm::errs() << "Failed to perform motion for PasserOp";
     llvm_unreachable("SpeculationV2 algorithm failed");
   }
@@ -561,7 +555,8 @@ isEligibleForResolverIntroduction(SpecV2InterpolatorOp interpolator) {
 
 /// Introduces a spec resolver.
 /// Returns the resolver result value.
-static Value introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
+static SpecV2ResolverOp
+introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
   auto riOp = cast<SpecV2RepeatingInitOp>(
       (interpolator.getShortOperand().getDefiningOp()));
   auto passerOp = cast<PasserOp>(riOp.getOperand().getDefiningOp());
@@ -577,69 +572,96 @@ static Value introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
   interpolator->erase();
   riOp->erase();
   passerOp->erase();
-  return resolverOp.getResult();
-}
-
-/// Generate Spec Loop Exit signal by building an AndIOp.
-static Value generateSpecLoopExit(Value loopExit, Value confirmSpec) {
-  OpBuilder builder(confirmSpec.getContext());
-  builder.setInsertionPoint(confirmSpec.getDefiningOp());
-
-  AndIOp andOp =
-      builder.create<AndIOp>(confirmSpec.getLoc(), loopExit, confirmSpec);
-  inheritBB(confirmSpec.getDefiningOp(), andOp);
-
-  return andOp.getResult();
+  return resolverOp;
 }
 
 /// Returns if the simplification of 3 passers is possible.
-static bool isPasserSimplifiable(PasserOp bottomPasser, Value cond1,
-                                 Value cond2, Value andCond) {
+static bool isPasserSimplifiable(PasserOp ctrlDefiningPasser) {
   // Ensure the structure
-  Operation *ctrlDefiningOp = bottomPasser.getCtrl().getDefiningOp();
-  if (!isa<PasserOp>(ctrlDefiningOp))
+  Operation *bottomOp = getUniqueUser(ctrlDefiningPasser.getResult());
+  if (!isa<PasserOp>(bottomOp)) {
+    llvm::errs() << "Bottom passer not found\n";
     return false;
-  auto ctrlDefiningPasser = cast<PasserOp>(ctrlDefiningOp);
+  }
+  auto bottomPasser = cast<PasserOp>(bottomOp);
 
   Operation *topOp = bottomPasser.getData().getDefiningOp();
-  if (!isa<PasserOp>(topOp))
+  if (!isa<PasserOp>(topOp)) {
+    llvm::errs() << "Top passer not found\n";
     return false;
+  }
   auto topPasser = cast<PasserOp>(topOp);
 
   // Confirm the context
-  if (!equalsIndirectly(ctrlDefiningPasser.getData(), cond1))
+  if (!equalsIndirectly(ctrlDefiningPasser.getCtrl(), topPasser.getCtrl())) {
+    llvm::errs() << "Ctrl mismatch\n";
     return false;
-
-  if (!equalsIndirectly(ctrlDefiningPasser.getCtrl(), cond2))
-    return false;
-
-  if (!equalsIndirectly(topPasser.getCtrl(), cond2))
-    return false;
-
-  Operation *andCondDefiningOp = andCond.getDefiningOp();
-  if (!isa<AndIOp>(andCondDefiningOp))
-    return false;
-  auto andOp = cast<AndIOp>(andCondDefiningOp);
-
-  if (!equalsIndirectly(andOp.getLhs(), cond1))
-    return false;
-  if (!equalsIndirectly(andOp.getRhs(), cond2))
-    return false;
+  }
 
   return true;
 }
 
 /// Simplify 3 passers into a single one.
-static void simplifyPassers(PasserOp bottomPasser, Value andCond) {
-  auto topPasser = cast<PasserOp>(bottomPasser.getData().getDefiningOp());
-  auto ctrlDefiningPasser =
-      cast<PasserOp>(bottomPasser.getCtrl().getDefiningOp());
+static PasserOp simplifyPasser(PasserOp ctrlDefiningPasser) {
+  OpBuilder builder(ctrlDefiningPasser.getContext());
+  builder.setInsertionPoint(ctrlDefiningPasser);
 
-  bottomPasser.getCtrlMutable()[0].set(andCond);
+  AndIOp andOp = builder.create<AndIOp>(builder.getUnknownLoc(),
+                                        ctrlDefiningPasser.getData(),
+                                        ctrlDefiningPasser.getCtrl());
+  inheritBB(ctrlDefiningPasser, andOp);
+
+  auto bottomPasser =
+      cast<PasserOp>(getUniqueUser(ctrlDefiningPasser.getResult()));
+  auto topPasser = cast<PasserOp>(bottomPasser.getData().getDefiningOp());
+
+  bottomPasser.getCtrlMutable()[0].set(andOp.getResult());
   bottomPasser.getDataMutable()[0].set(topPasser.getData());
 
   topPasser->erase();
   ctrlDefiningPasser->erase();
+
+  return bottomPasser;
+}
+
+static AndIOp moveAndIUp(Value lhs, Value rhs) {
+  lhs = getForkTop(lhs);
+
+  materializeValue(lhs);
+
+  Operation *lhsUniqueUser = getUniqueUser(lhs);
+
+  if (!isa<ForkOp>(lhsUniqueUser)) {
+    return cast<AndIOp>(lhsUniqueUser);
+  }
+
+  ForkOp lhsFork = cast<ForkOp>(lhsUniqueUser);
+
+  OpBuilder builder(lhs.getContext());
+  builder.setInsertionPointAfterValue(rhs);
+
+  AndIOp newAndI = builder.create<AndIOp>(lhs.getLoc(), lhs, rhs);
+  inheritBB(lhsFork, newAndI);
+
+  for (auto res : lhsFork->getResults()) {
+    bool rewritten = false;
+    if (auto andI = dyn_cast<AndIOp>(getUniqueUser(res))) {
+      if (andI.getLhs() == res && equalsIndirectly(andI.getRhs(), rhs)) {
+        andI.getResult().replaceAllUsesWith(newAndI.getResult());
+        andI->erase();
+        rewritten = true;
+      }
+    }
+    if (!rewritten) {
+      res.replaceAllUsesWith(lhs);
+    }
+  }
+
+  materializeValue(lhs);
+  materializeValue(rhs);
+  materializeValue(newAndI.getResult());
+
+  return newAndI;
 }
 
 /// Replace the repeating init chain with a merge to enable variable
@@ -882,8 +904,10 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     for (Operation *user :
          iterateOverPossiblyIndirectUsers(repeatingInits[0].getResult())) {
       if (auto passer = dyn_cast<PasserOp>(user)) {
-        introduceIdentInterpolator(passer);
-        bottomPassers.push_back(passer);
+        if (!isa<MuxOp>(getUniqueUser(passer.getResult()))) {
+          introduceIdentInterpolator(passer);
+          bottomPassers.push_back(passer);
+        }
       }
     }
 
@@ -908,6 +932,8 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     SpecV2InterpolatorOp interpolator = moveInterpolatorsUp(
         repeatingInits[0].getResult(), repeatingInits[n - 1].getResult());
 
+    ForkOp fork = cast<ForkOp>(interpolator.getShortOperand().getDefiningOp());
+
     // Preparation for the resolver insertion
     moveTopRIAndPasser(interpolator, n);
 
@@ -917,38 +943,37 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
           "The circuit is not eligible for the resolver introduction");
       return signalPassFailure();
     }
-    Value confirmSpec = introduceSpecResolver(interpolator);
+    SpecV2ResolverOp resolver = introduceSpecResolver(interpolator);
+    Value confirmSpec = resolver.getResult();
 
-    DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
-    // Convert bbMap to a json file
-    std::ofstream csvFile(bbMapping);
-    csvFile << "before,after\n";
-    for (const auto &entry : bbMap) {
-      csvFile << entry.first << "," << entry.second << "\n";
+    Operation *shortDefiningOp =
+        resolver.getGeneratedCondition().getDefiningOp();
+    if (auto ri = dyn_cast<SpecV2RepeatingInitOp>(shortDefiningOp)) {
+      // need to move up passer and ri
+      movePassersUpFork(fork);
+      moveRepeatingInitsUp(ri.getOperand());
     }
-    csvFile.close();
-
-    recalculateMCBlocks(funcOp);
-    return;
 
     // Simplify the exit passers.
-    Value specLoopExit = generateSpecLoopExit(loopExit, confirmSpec);
+    PasserOp lastBottomPasser = nullptr;
     for (Operation *user : iterateOverPossiblyIndirectUsers(loopExit)) {
-      if (auto topPasser = dyn_cast<PasserOp>(user)) {
-        if (equalsIndirectly(topPasser.getCtrl(), confirmSpec)) {
-          // Passer's result is materialized
-          Operation *downstreamOp = getUniqueUser(topPasser.getResult());
-          if (auto bottomPasser = dyn_cast<PasserOp>(downstreamOp)) {
-            if (isPasserSimplifiable(bottomPasser, loopExit, confirmSpec,
-                                     specLoopExit)) {
-              simplifyPassers(bottomPasser, specLoopExit);
-            } else {
-              bottomPasser->emitError(
-                  "Expected the exit passer to be simplifiable");
-            }
+      if (auto ctrlDefiningPasser = dyn_cast<PasserOp>(user)) {
+        if (equalsIndirectly(ctrlDefiningPasser.getCtrl(), confirmSpec)) {
+          if (isPasserSimplifiable(ctrlDefiningPasser)) {
+            lastBottomPasser = simplifyPasser(ctrlDefiningPasser);
+          } else {
+            ctrlDefiningPasser->emitError(
+                "Expected the exit passer to be simplifiable");
           }
         }
       }
+    }
+
+    Value specLoopExit = nullptr;
+    if (lastBottomPasser != nullptr) {
+      auto lastAndI = cast<AndIOp>(lastBottomPasser.getCtrl().getDefiningOp());
+      auto newAndI = moveAndIUp(lastAndI.getLhs(), lastAndI.getRhs());
+      specLoopExit = newAndI.getResult();
     }
 
     // variable is a member variable handled by tablegen.
@@ -961,9 +986,11 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       MergeOp merge = replaceRIChainWithMerge(repeatingInits[n - 1], n);
 
       // Optimize for buffering
-      auto passer = cast<PasserOp>(
-          merge->getOperand(0).getDefiningOp()->getOperand(0).getDefiningOp());
-      passer.getCtrlMutable()[0].set(specLoopExit);
+      if (specLoopExit != nullptr) {
+        auto buf = cast<BufferOp>(merge->getOperand(0).getDefiningOp());
+        auto passer = cast<PasserOp>(buf.getOperand().getDefiningOp());
+        passer.getCtrlMutable()[0].set(specLoopExit);
+      }
     }
   }
 
