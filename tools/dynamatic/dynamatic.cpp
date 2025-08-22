@@ -90,7 +90,6 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
-  std::string polygeistPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
@@ -216,17 +215,6 @@ public:
       : Command("set-dynamatic-path",
                 "Sets the path to Dynamatic's top-level directory", state) {
     addPositionalArg({"path", "path to Dynamatic's top-level directory"});
-  }
-
-  CommandResult execute(CommandArguments &args) override;
-};
-
-class SetPolygeistPath : public Command {
-public:
-  SetPolygeistPath(FrontendState &state)
-      : Command("set-polygeist-path",
-                "Sets the path to Polygeist installation directory", state) {
-    addPositionalArg({"path", "path to Polygeist installation directory"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -530,47 +518,14 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
-  // Check whether the path makes sense
-  if (!fs::exists(dynamaticPath + sep + "polygeist")) {
-    llvm::outs() << ERR << "'" << dynamaticPath
-                 << "' doesn't seem to point to Dynamatic, expected to "
-                    "find, for example, a directory named 'polygeist' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(dynamaticPath + sep + "bin")) {
+  if (!fs::exists(dynamaticPath + sep + "bin" + sep + "dynamatic")) {
     llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Dynamatic doesn't "
+                << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
                     "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
   state.dynamaticPath = state.makeAbsolutePath(dynamaticPath);
-  return CommandResult::SUCCESS;
-}
-
-CommandResult SetPolygeistPath::execute(CommandArguments &args) {
-  // Remove the separator at the end of the path if there is one
-  StringRef sep = sys::path::get_separator();
-  std::string polygeistPath = args.positionals.front().str();
-  if (StringRef(polygeistPath).ends_with(sep))
-    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
-
-  // Check whether the path makes sense
-  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
-    llvm::outs()
-        << ERR << "'" << polygeistPath
-        << "' doesn't seem to point to Polygeist, expected to "
-           "find, for example, a directory named 'llvm-project/' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
-    llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Polygeist doesn't "
-                    "seem to have been built.\n";
-    return CommandResult::FAIL;
-  }
-
-  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
   return CommandResult::SUCCESS;
 }
 
@@ -658,12 +613,10 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
-  state.polygeistPath = state.polygeistPath.empty()
-                            ? state.dynamaticPath + getSeparator() + "polygeist"
-                            : state.polygeistPath;
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
                  fastTokenDelivery);
 }
@@ -787,7 +740,6 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
-  commands.add<SetPolygeistPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
