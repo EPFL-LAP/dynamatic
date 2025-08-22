@@ -1197,7 +1197,6 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // The condition value is provided by the `condition` field of the phi
-      rewriter.setInsertionPointAfterValue(gate->result);
       Value conditionValue =
           gate->conditionBlock->getTerminator()->getOperand(0);
 
