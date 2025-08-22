@@ -242,7 +242,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -254,7 +254,6 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     which needs to be setup separately from Dynamatic (and is under a different,
     non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
@@ -287,6 +286,8 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
     "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
     "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 
