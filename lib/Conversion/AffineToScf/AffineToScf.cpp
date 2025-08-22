@@ -45,7 +45,7 @@ public:
   using OpRewritePattern<AffineLoadOp>::OpRewritePattern;
 
   AffineLoadLowering(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), namer(namer){};
+      : OpRewritePattern(ctx, 2), namer(namer) {};
 
   LogicalResult matchAndRewrite(AffineLoadOp affineLoadOp,
                                 PatternRewriter &rewriter) const override {
@@ -77,7 +77,7 @@ public:
   using OpRewritePattern<AffineStoreOp>::OpRewritePattern;
 
   AffineStoreLowering(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), namer(namer){};
+      : OpRewritePattern(ctx, 2), namer(namer) {};
 
   LogicalResult matchAndRewrite(AffineStoreOp affineStoreOp,
                                 PatternRewriter &rewriter) const override {
