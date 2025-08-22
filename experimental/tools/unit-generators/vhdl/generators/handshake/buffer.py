@@ -39,6 +39,7 @@ def generate_buffer(name, params):
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")
 
+
 def generate_valid_propagation_buffer(name, latency):
     if latency == 1:
         return generate_one_slot_break_dv(name, {"bitwidth": 0})
