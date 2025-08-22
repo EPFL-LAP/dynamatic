@@ -609,11 +609,10 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
   }
 
   if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
-      llvm::outs()
-          << ERR
-          << "The path to Vivado should not contain a 'bin' directory, "
-             "please specify the top-level Vivado directory.\n";
-      return CommandResult::FAIL;
+    llvm::outs() << ERR
+                 << "The path to Vivado should not contain a 'bin' directory, "
+                    "please specify the top-level Vivado directory.\n";
+    return CommandResult::FAIL;
   }
 
   state.vivadoPath = state.makeAbsolutePath(vivadoPath);
@@ -652,10 +651,10 @@ CommandResult SetSrc::execute(CommandArguments &args) {
   }
 
   if (!srcName.ends_with(".c")) {
-      llvm::outs() << ERR
-                   << "Expected source file to have .c extension, but got '"
-                   << path::extension(srcName) << "'.\n";
-      return CommandResult::FAIL;
+    llvm::outs() << ERR
+                 << "Expected source file to have .c extension, but got '"
+                 << path::extension(srcName) << "'.\n";
+    return CommandResult::FAIL;
   }
 
   state.sourcePath = state.makeAbsolutePath(sourcePath);
