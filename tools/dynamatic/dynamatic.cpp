@@ -596,20 +596,20 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
-  if (fs::exists(vivadoPath)) {
-    if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
-      llvm::outs()
-          << ERR
-          << "The path to Vivado should not contain a 'bin' directory, "
-             "please specify the top-level Vivado directory.\n";
-      return CommandResult::FAIL;
-    }
-  } else {
+  if (!fs::exists(vivadoPath)) {
     llvm::outs() << ERR
                  << "The path to Vivado does not exist, "
                     "please specify a valid top-level Vivado directory such "
                     "as\n /home/username/Xilinx/2025.1/Vivado/\n";
     return CommandResult::FAIL;
+  }
+
+  if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
+      llvm::outs()
+          << ERR
+          << "The path to Vivado should not contain a 'bin' directory, "
+             "please specify the top-level Vivado directory.\n";
+      return CommandResult::FAIL;
   }
 
   state.vivadoPath = state.makeAbsolutePath(vivadoPath);
@@ -641,17 +641,17 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
-  if (fs::exists(sourcePath)) {
-    if (!srcName.ends_with(".c")) {
+  if (!fs::exists(sourcePath)) {
+    llvm::outs() << ERR << "Source path <<" << sourcePath
+                 << ">> does not exist. Kindly enter a valid source path\n";
+    return CommandResult::FAIL;
+  }
+
+  if (!srcName.ends_with(".c")) {
       llvm::outs() << ERR
                    << "Expected source file to have .c extension, but got '"
                    << path::extension(srcName) << "'.\n";
       return CommandResult::FAIL;
-    }
-  } else {
-    llvm::outs() << ERR << "Source path <<" << sourcePath
-                 << ">> does not exist. Kindly enter a valid source path\n";
-    return CommandResult::FAIL;
   }
 
   state.sourcePath = state.makeAbsolutePath(sourcePath);
