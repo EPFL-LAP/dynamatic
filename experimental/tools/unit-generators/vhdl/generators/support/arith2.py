@@ -16,6 +16,35 @@ def generate_arith2(
     rhs_bitwidth: int = None,
     output_bitwidth: int = None,
 ):
+    """
+    Generates boilerplate VHDL entity and handshaking code for two input arithmetic units
+    (though it could be used for any operation with two data-carrying inputs 
+    used to generate a data output, 
+    but it depends where we draw the line of what "arithmetic" means)
+
+    If latency = 0:
+      Output ready is directly forwarded up from input ready.
+      Output valid is directly forwarded down from input valid.
+    Else:
+      Handshaking signals are passed through a valid propagation buffer.
+      Which is either a one slot break dv, or a shift register buffer
+
+    Args:
+        name: Unique name based on MLIR op name (e.g. adder0).
+        modType: More specific name, used in comments only.
+        extra_signals: Extra signals on input/output channels, from IR.
+        body: VHDL body of the unit, excluding handshaking.
+        signals: Local signal declarations used in body.
+        dependencies: Dependencies, excluding handshaking.
+        latency:
+        bitwidth: Unit bitwidth (if input/output are the same).
+        input_bitwidth: Input bitwidth (used if asymmetric).
+        output_bitwidth: Output bitwidth (used if asymmetric).
+
+
+    Returns:
+        VHDL code as a string.
+    """
 
     if bitwidth is not None:
         if lhs_bitwidth is not None or \

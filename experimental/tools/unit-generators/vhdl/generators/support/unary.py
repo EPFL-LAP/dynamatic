@@ -53,7 +53,7 @@ def generate_unary(
     elif input_bitwidth is None or output_bitwidth is None:
         raise RuntimeError("If bitwidth is not specified, both input and output bitwidth must be specified")
 
-    def generate_inner(name): return _generate_arith1(
+    def generate_inner(name): return _generate_unary(
         name,
         modType,
         input_bitwidth,
@@ -79,7 +79,7 @@ def generate_unary(
         return generate()
 
 
-def _generate_arith1(
+def _generate_unary(
         name,
         modType,
         input_bitwidth,
