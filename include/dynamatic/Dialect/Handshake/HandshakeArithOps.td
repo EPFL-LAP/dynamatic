@@ -285,14 +285,14 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
 }
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi", [
-  ArithNamedIOInterface
+  SimpleNamedIOInterface
 ]> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
 }
 
 def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui", [
-  ArithNamedIOInterface
+  SimpleNamedIOInterface
 ]> {
   let summary = "Integer signed width extension.";
 }
