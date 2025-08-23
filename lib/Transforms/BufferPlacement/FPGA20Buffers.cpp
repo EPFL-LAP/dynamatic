@@ -83,6 +83,10 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numOneSlotR = 1;
     }
 
+    if (srcOp && isa<handshake::LazyForkOp>(srcOp)) {
+      result.numOneSlotR = 1;
+    }
+
     placement[channel] = result;
   }
 
