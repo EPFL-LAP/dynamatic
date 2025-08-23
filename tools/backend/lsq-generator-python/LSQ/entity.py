@@ -73,3 +73,4 @@ ports(
   clk : in std_logic;
   {self.signals}
 )
+"""
