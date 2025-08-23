@@ -1991,7 +1991,6 @@ LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
 //===----------------------------------------------------------------------===//
 LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
 
-
 //===----------------------------------------------------------------------===//
 // Memory Controller GetOperandName and GetResultName Utilities
 //===----------------------------------------------------------------------===//
@@ -2006,7 +2005,7 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
 }
 
 inline static StringRef getIfControlOprd(MemoryOpInterface memOp,
-                                        unsigned idx) {
+                                         unsigned idx) {
   if (!memOp.isMasterInterface())
     return "";
   switch (idx) {

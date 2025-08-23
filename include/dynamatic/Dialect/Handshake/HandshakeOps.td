@@ -582,7 +582,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     enum { trueIndex = 0, falseIndex = 1 };
 
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      assert(idx < 2 && "index too high");
       return idx == 0 ? "condition" : "data";
     }
 
@@ -910,7 +910,6 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    CustomNamedIOInterface,
     IsIntChannel<"address">,
     IsIntChannel<"addressResult">
   ]
@@ -978,12 +977,12 @@ def LoadOp : Handshake_MemPortOp<"load", [
 
   let extraClassDeclaration= [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
@@ -1020,10 +1019,12 @@ def StoreOp : Handshake_MemPortOp<"store", [
 
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned int idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
     std::string getResultName(unsigned int idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
