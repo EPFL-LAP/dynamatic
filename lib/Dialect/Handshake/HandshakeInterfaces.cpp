@@ -37,7 +37,7 @@ namespace handshake {
 
 /// Returns the name of an operand which is either provided by the
 /// handshake::NamedIOInterface interface  or, failing that, is its index.
-static std::string getOperandName(Operation *op, size_t oprdIdx) {
+std::string getOperandName(Operation *op, size_t oprdIdx) {
 
   if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
     return nameInterface.getOperandName(oprdIdx);
@@ -53,7 +53,7 @@ static std::string getOperandName(Operation *op, size_t oprdIdx) {
 
 /// Returns the name of a result which is either provided by the
 /// handshake::NamedIOInterface interface or, failing that, is its index.
-static std::string getResultName(Operation *op, size_t resIdx) {
+std::string getResultName(Operation *op, size_t resIdx) {
 
   if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
     return nameInterface.getResultName(resIdx);
