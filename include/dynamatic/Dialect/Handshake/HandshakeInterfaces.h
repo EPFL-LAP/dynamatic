@@ -79,7 +79,7 @@ inline std::string simpleOperandName(unsigned idx, unsigned numOperands) {
   return "ins_" + std::to_string(idx);
 }
 
-inline std::string simpleResultsName(unsigned idx, unsigned numResults) {
+inline std::string simpleResultName(unsigned idx, unsigned numResults) {
   assert(idx < numResults && "index too high");
 
   // TODO: Remove 2D I/O packing
