@@ -53,7 +53,7 @@ class Entity():
       )
       self.signalss += newSignal
     else:
-      for i in range(signal_size[1]):
+      for i in range(signal_size.number):
         newSignal = makeEntitySignal(
           f"{signal_base_name}_{i}",
           entitySignalType=entity_signal_type,
