@@ -67,11 +67,27 @@ class ControlType;
 
 namespace detail {
 
-inline std::string simpleInputPortName(unsigned idx) {
+inline std::string simpleOperandName(unsigned idx, unsigned numOperands) {
+  assert(idx < numOperands && "index too high");
+
+  // TODO: Remove 2D I/O packing
+  // but for now this is needed
+  if(numOperands == 1){
+    return "ins";
+  }
+
   return "ins_" + std::to_string(idx);
 }
 
-inline std::string simpleOutputPortName(unsigned idx) {
+inline std::string simpleResultsName(unsigned idx, unsigned numResults) {
+  assert(idx < numResults && "index too high");
+
+  // TODO: Remove 2D I/O packing
+  // but for now this is needed
+  if(numResults == 1){
+    return "outs";
+  }
+
   return "outs_" + std::to_string(idx);
 }
 

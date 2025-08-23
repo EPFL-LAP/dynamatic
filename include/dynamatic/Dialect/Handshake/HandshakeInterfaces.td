@@ -172,16 +172,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        // Simple input name
-        assert(idx < concreteOp->getNumOperands() && "index too high");
-
-        // TODO: Remove 2D I/O packing
-        // but for now this is needed
-        if(concreteOp->getNumOperands() == 1){
-          return "ins";
-        }
-
-        return simpleInputPortName(idx);
+        return simpleOperandName(idx, concreteOp->getNumOperands());
       }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
@@ -190,15 +181,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        // Generic output name
-        assert(idx < concreteOp->getNumResults() && "index too high");
-
-        // TODO: Remove 2D I/O packing
-        // but for now this is needed
-        if(concreteOp->getNumResults() == 1){
-          return "outs";
-        }
-        return simpleOutputPortName(idx);
+        return simpleResultName(idx, concreteOp->getNumResults);
       }]>
   ];
 }

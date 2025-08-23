@@ -248,8 +248,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < 1 && "index too high");
-      return detail::simpleOutputPortName(idx);
+      return detail::simpleResultName(idx, 1);
     }
   }];
 
