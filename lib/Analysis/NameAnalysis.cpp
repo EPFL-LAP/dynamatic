@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -26,6 +27,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace handshake;
 
 /// Shortcut to get the name attribute of an operation.
 inline static mlir::StringAttr getNameAttr(Operation *op) {
@@ -90,24 +92,6 @@ static bool tryToGetBlockArgName(BlockArgument arg, StringRef parentOpName,
             std::to_string(regionNumber) + "_" + std::to_string(blockNumber);
         return true;
       });
-}
-
-/// Returns the name of a result which is either provided by the
-/// handshake::NamedIOInterface interface or, failing that, is its index.
-static std::string getResultName(Operation *op, size_t resIdx) {
-  std::string oprName;
-  if (auto namedIO = dyn_cast<handshake::NamedIOInterface>(op))
-    return namedIO.getResultName(resIdx);
-  return std::to_string(resIdx);
-}
-
-/// Returns the name of an operand which is either provided by the
-/// handshake::NamedIOInterface interface  or, failing that, is its index.
-static std::string getOperandName(Operation *op, size_t oprdIdx) {
-  std::string oprName;
-  if (auto namedIO = dyn_cast<handshake::NamedIOInterface>(op))
-    return namedIO.getOperandName(oprdIdx);
-  return std::to_string(oprdIdx);
 }
 
 StringRef NameAnalysis::getName(Operation *op) {

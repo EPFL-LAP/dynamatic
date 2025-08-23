@@ -30,8 +30,10 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         DeclareOpInterfaceMethods<NamedIOInterface>,
-         DeclareOpInterfaceMethods<ControlInterface>]> {
+         DeclareOpInterfaceMethods<ControlInterface>,
+         InputRTLPortsAreOperandsInterface,
+         OutputRTLPortsAreResultsInterface
+         ]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -43,7 +45,10 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    Symbol,
    RegionKindInterface,
    OpAsmOpInterface,
-   HasClock
+   HasClock,
+   SimpleNamedIOInterface,
+   CustomRTLInputPortsInterface,
+   CustomRTLOutputPortsInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -127,6 +132,39 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     static ::llvm::StringRef getDefaultDialect() {
       return "handshake";
     }
+
+    //===------------------------------------------------------------------===//
+    // CustomRTLInputPortsInterface Methods
+    //===------------------------------------------------------------------===//
+
+    unsigned getNumInputPorts(){
+      if (auto names = getArgNames()) {
+        return names.size();
+      }
+      return 0;
+    }
+
+    std::string getInputPortName(unsigned idx){
+      assert(idx < getNumInputPorts() && "index too high");
+      return getArgName(idx).str();
+    }
+
+
+    //===------------------------------------------------------------------===//
+    // CustomRTLOutputPortsInterface Methods
+    //===------------------------------------------------------------------===//
+
+      unsigned getNumOutputPorts(){
+      if (auto names = getResNames()) {
+        return names.size();
+      }
+      return 0;
+    }
+
+    std::string getOutputPortName(unsigned idx){
+      assert(idx < getNumOutputPorts() && "index too high");
+      return getResName(idx).str();
+    }
   }];
 
   let hasVerifier = 1;
@@ -137,7 +175,8 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 def InstanceOp : Handshake_Op<"instance", [
     CallOpInterface,
     HasClock,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    SimpleNamedIOInterface
 ]> {
   let summary = "module instantiate operation";
   let description = [{
@@ -215,7 +254,9 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -286,7 +327,9 @@ def BufferOp : Handshake_Op<"buffer", [
 }
 
 def InitOp : Handshake_Op<"init", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "init operation";
   let description = [{
@@ -308,7 +351,9 @@ def InitOp : Handshake_Op<"init", [
 }
 
 def NDWireOp : Handshake_Op<"ndwire", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "non-deterministic wire operation";
   let description = [{
@@ -323,9 +368,12 @@ def NDWireOp : Handshake_Op<"ndwire", [
   }];
 }
 
-class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
+class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [
-    Pure, HasClock, SameOperandsAndResultType
+    Pure,
+    HasClock,
+    SameOperandsAndResultType,
+    SimpleNamedIOInterface
 ]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
@@ -338,7 +386,7 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     }]>
   ];
 
-  let assemblyFormat = [{ 
+  let assemblyFormat = [{
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
   }];
@@ -381,7 +429,8 @@ def MergeOp : Handshake_Op<"merge", [
   // require that the data types match.
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
-  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  SimpleNamedIOInterface
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -412,7 +461,7 @@ def MuxOp : Handshake_Op<"mux", [
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -438,6 +487,18 @@ def MuxOp : Handshake_Op<"mux", [
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
 
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
+    }
+
+    std::string getResultName(unsigned idx) {
+      return detail::simpleResultName(idx, 1);
+    }
+  }];
+
+
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
@@ -449,7 +510,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -461,32 +522,45 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
     Example:
     ```
-    %res, %idx = control_merge %a, %b, %c : 
+    %res, %idx = control_merge %a, %b, %c :
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result, ChannelType:$index);
-  
+
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
       assert(!operands.empty() && "cmerge needs at least one operand");
       $_state.addOperands(operands);
-      
+
       // Optimize the size of the index result based on the number of operands
       auto dataType = ::dynamatic::handshake::getOptimizedIndexValType(
           $_builder, operands.size());
       auto idxType = ::dynamatic::handshake::ChannelType::get(dataType);
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
-  
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      return detail::simpleOperandName(idx, getOperation()->getNumOperands());
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "outs" : "index";
+    }
+  }];
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
 def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType
+  Pure,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "branch operation";
   let description = [{
@@ -503,7 +577,7 @@ def BranchOp : Handshake_Op<"br", [
   }];
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
-  
+
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
   }];
@@ -515,7 +589,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -535,18 +609,31 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
                        HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
-  
+
   let assemblyFormat = [{
     $conditionOperand `,` $dataOperand attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
+
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+
+    std::string getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "condition" : "data";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == trueIndex ? "trueOut" : "falseOut";
+    }
   }];
 }
 
-def SinkOp : Handshake_Op<"sink"> {
+def SinkOp : Handshake_Op<"sink", [
+  SimpleNamedIOInterface
+]> {
   let summary = "sink operation";
   let description = [{
     The sink operation discards any data that arrives at its
@@ -558,14 +645,17 @@ def SinkOp : Handshake_Op<"sink"> {
     sink %data : !handshake.channel<i32>
     ```
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
 }
 
-def SourceOp : Handshake_Op<"source", [Pure]> {
+def SourceOp : Handshake_Op<"source", [
+  Pure,
+  SimpleNamedIOInterface
+  ]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
@@ -593,7 +683,8 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  SimpleNamedIOInterface
 ]> {
   let summary = "join operation";
   let description = [{
@@ -615,11 +706,12 @@ def JoinOp : Handshake_Op<"join", [
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "blocker operation";
   let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
+    A data synchronizer. Blocks handshakes until all inputs are valid,
     then forwards the first input.
 
     Example:
@@ -634,7 +726,11 @@ def BlockerOp : Handshake_Op<"blocker", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotOp : Handshake_Op<"not", [
+  Pure,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
+]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -664,13 +760,12 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   IsSimpleHandshakeVariadic<"inputs">,
   IsSimpleHandshakeVariadic<"outputs">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -683,7 +778,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -691,7 +786,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     The order of memory inputs is
     1. For each basic block:
       a. If there is at least one store in the block, a control signal fed
-         through a constant indicating the number of store operations in the 
+         through a constant indicating the number of store operations in the
          block.
       b. Load/Store access requests from within the block, in program order.
     2. If an LSQ references the same memory region:
@@ -700,7 +795,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -717,8 +812,9 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
+
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -739,13 +835,15 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller. 
     dynamatic::MCPorts getPorts();
+
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
 }
 
 def LSQOp : Handshake_Op<"lsq", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "load-store queue  (dynamatic)";
   let description = [{
@@ -786,18 +884,18 @@ def LSQOp : Handshake_Op<"lsq", [
     1. Load results, in program order (i.e., in load accesses order).
     2. If an MC references the same memory region, a single address operand for
        load accesses and a single pair of address/data operands for store
-       accesses going to the external memory through the MC. 
+       accesses going to the external memory through the MC.
     3. Control signal indicating completion.
   }];
-  
+
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
   let builders = [
-    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
+    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs,
                    "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
-    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
-                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
+    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp,
+                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes,
                    "unsigned":$numLoads)>,
   ];
   let hasVerifier = 1;
@@ -813,10 +911,10 @@ def LSQOp : Handshake_Op<"lsq", [
     }
 
     /// Returns a convenient data-structure to go over the controls and memory
-    /// accesses that are connected to the LSQ. 
+    /// accesses that are connected to the LSQ.
     dynamatic::LSQPorts getPorts();
     
-    /// Determines whether the LSQ is connected to an MC. 
+    /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
       return !isa<mlir::MemRefType>(getInputs().front().getType());
     }
@@ -834,6 +932,9 @@ def LSQOp : Handshake_Op<"lsq", [
     /// materialized when called. The returned values are guaranteed to be in
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
+
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
 }
 
@@ -847,7 +948,6 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
     IsIntChannel<"address">,
     IsIntChannel<"addressResult">
   ]
@@ -875,7 +975,8 @@ def LoadOp : Handshake_MemPortOp<"load", [
   AllExtraSignalsMatch<["address", "dataResult"]>,
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"data">
+  IsSimpleHandshake<"data">,
+  CustomNamedIOInterface
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
@@ -912,14 +1013,14 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+  let extraClassDeclaration= [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    std::string getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
@@ -929,7 +1030,8 @@ def StoreOp : Handshake_MemPortOp<"store", [
   AllExtraSignalsMatch<["address", "data"]>,
   // In StoreOp, addressResult and dataResult are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"dataResult">
+  IsSimpleHandshake<"dataResult">,
+  CustomNamedIOInterface
 ], []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
@@ -953,12 +1055,14 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned int idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned int idx) {
+    std::string getResultName(unsigned int idx) {
+      assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
@@ -968,9 +1072,15 @@ def StoreOp : Handshake_MemPortOp<"store", [
 // Terminator
 //===----------------------------------------------------------------------===//
 
-def EndOp : Handshake_Op<"end", [
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  Terminator
+// Not a handshake op, as its RTL ports do not correspond to
+// its operands and results
+def EndOp : Op<Handshake_Dialect, "end", [
+  Terminator,
+  HasParent<"handshake::FuncOp">,
+  DeclareOpInterfaceMethods<ControlInterface>,
+  SimpleNamedIOInterface,
+  InputRTLPortsAreOperandsInterface,
+  CustomRTLOutputPortsInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -985,6 +1095,12 @@ def EndOp : Handshake_Op<"end", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$inputs);
+
+  let extraClassDeclaration = [{
+    unsigned getNumOutputPorts();
+
+    std::string getOutputPortName(unsigned idx);
+  }];
 
   let assemblyFormat = [{
     attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
@@ -1012,7 +1128,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCIsMisspec">,
   IsIntSizedChannel<1, "SCIsMisspec">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1063,14 +1179,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       wideControlType, ctrlType});
   }]>];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "trigger";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    std::string getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
       switch (idx) {
       case 0:
         return "outs";
@@ -1096,7 +1212,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1122,13 +1238,13 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1142,7 +1258,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1170,13 +1286,13 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1189,7 +1305,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1212,13 +1328,13 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
@@ -1232,7 +1348,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1255,19 +1371,19 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
-    `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
+    `[` $tagFromOperand `]` $dataOperand attr-dict `:`
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    std::string getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
     }
   }];
@@ -1278,7 +1394,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = "Adds a non-speculative spec bit.";
   let description = [{
@@ -1300,13 +1416,13 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
     }
@@ -1318,15 +1434,15 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-  SameOperandsAndResultType, 
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  SameOperandsAndResultType,
+  CustomNamedIOInterface,
 ]> {
 
   let summary = "sharing wrapper operation";
   let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic 
+    The sharing_wrapper operation represents the selecting & distributing logic
     that manages access to a shared unit.
-    
+
     The sharing wrapper interfaces with the shared unit and the rest of the
     circuit.
 
@@ -1336,18 +1452,18 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
       operation that share the unit.
     - $numSharedOperands: the number of operands of the shared unit.
     - $latency: the execution latency of the shared unit.
-    
+
     The convention for the input operands:
     - the first "numSharedOperands * len(credits)" operands are the operands
       from the circuit
     - the last operand is the result computed by the shared unit
-    
+
     The convention for the output results:
     - the first "len(credits)" results are results dispatched to the rest of the
       circuit
     - the last "numSharedOperands" result is the selected operands that will be
       delivered to the shared unit.
-    
+
     Future improvement:
     - Add the number of operations that share the unit (now it is assumed to be
       the size of the DenseI64ArrayAttr credits).
@@ -1363,6 +1479,24 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
+
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      if (idx < getNumSharedOperands() * getNumSharedOperations()) {
+        return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
+              std::to_string(idx % getNumSharedOperands());
+      }
+      return "fromSharedUnitOut0";
+    }
+
+    std::string getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      if (idx < getNumSharedOperations())
+        return "op" + std::to_string(idx) + "out0";
+      return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
+    }
+  }];
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
@@ -1385,7 +1519,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     that combining individual signals into a `handshake::ChannelType` is a
     two-step process.
     1. First, bundle a `i1` value, which produces a `!handshake.control` and
-       `i1` (representing the upstream ready signal) as results. 
+       `i1` (representing the upstream ready signal) as results.
     2. Then, bundle the `!handshake.control` along with a value representing the
        data signal (of a compatible signal type e.g., `i32`), which produces
        a `!handshake.channel<i32>`.
@@ -1395,12 +1529,12 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     ```mlir
     // Bundling into a channel with a downstream extra signal
     %channel = bundle %ctrl, %data, %extra : _ to <i32, [extra: i1]>
-    
+
     // -----
-    
+
     // Bundling into a channel with an upstream extra signal
     %channel, %extra = bundle %ctrl, %data : _ to <i32, [extra: i1 (U)]>
-    
+
     // -----
 
     // Bundling into a control-only channel
@@ -1432,7 +1566,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     >
   ];
 
-  let hasCustomAssemblyFormat = 1; 
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
@@ -1453,16 +1587,16 @@ def UnbundleOp : Handshake_Op<"unbundle", [
        "downstream bundle").
     2. Then, unbundle the `!handshake.control` along with an `i1` value
        representing the ready signal, which produces an `i1` result representing
-       the valid signal. 
+       the valid signal.
 
     Example:
 
     ```mlir
     // Unbundling a channel with a downstream extra signal
     %ctrl, %data, %extra = unbundle %channel : <i32, [extra: i2]> to _
-    
+
     // -----
-    
+
     // Unbundling a channel with an upstream extra signal
     %ctrl, %data = unbundle %channel [%extra] : <i32, [extra: i2 (U)]> to _
 
@@ -1500,7 +1634,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1517,12 +1651,14 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx = 0) {
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx){
+      assert(idx < 1 && "index too high");
       return "ins";
     }
 
-    std::string $cppClass::getResultName(unsigned idx = 0) {
+    std::string getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
       return "outs";
     }
   }];
@@ -1532,7 +1668,7 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
 def ValidMergerOp : Handshake_Op<"valid_merger",[
   AllTypesMatch<["lhsIn", "lhs"]>,
   AllTypesMatch<["rhsIn", "rhs"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  CustomNamedIOInterface
 ]> {
   let summary = [{
     Merges the valid signals of two channels.
@@ -1550,14 +1686,14 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    std::string getOperandName(unsigned idx) {
+    assert(idx < getOperation()->getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
+    std::string getResultName(unsigned idx) {
+    assert(idx < getOperation()->getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
   }];

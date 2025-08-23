@@ -13,15 +13,14 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 BUFFER_ALGORITHM=$5
 TARGET_CP=$6
-POLYGEIST_PATH=$7
-USE_SHARING=$8
-FPUNITS_GEN=$9
-USE_RIGIDIFICATION=${10}
-DISABLE_LSQ=${11}
-FAST_TOKEN_DELIVERY=${12}
+USE_SHARING=$7
+FPUNITS_GEN=$8
+USE_RIGIDIFICATION=${9}
+DISABLE_LSQ=${10}
+FAST_TOKEN_DELIVERY=${11}
 
-POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
-CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
+POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
+CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -98,7 +97,7 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/build/include/polygeist" \
   -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE"
