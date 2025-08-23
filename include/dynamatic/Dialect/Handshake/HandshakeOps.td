@@ -771,10 +771,6 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
 
-  let extraClassDeclaration = [{
-    std::string getOperandName(unsigned idx);
-    std::string getResultName(unsigned idx);
-  }];
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -795,6 +791,9 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller. 
     dynamatic::MCPorts getPorts();
+
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
 }
 
