@@ -1548,7 +1548,7 @@ LogicalResult EndOp::verify() {
   return success();
 }
 
-std::string EndOp::getOperandName(unsigned idx){
+std::string EndOp::getOperandName(unsigned idx) {
   assert(idx < getOperation()->getNumOperands() && "index too high");
   handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "end must be child of handshake function");
@@ -2005,7 +2005,8 @@ static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
 }
 
-inline static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
+inline static StringRef getIfControlOprd(MemoryOpInterface memOp,
+                                        unsigned idx) {
   if (!memOp.isMasterInterface())
     return "";
   switch (idx) {
@@ -2026,7 +2027,7 @@ static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
 
 /// Common operand naming logic for memory controllers and LSQs.
 inline static std::string getMemOperandName(const FuncMemoryPorts &ports,
-                                     unsigned idx) {
+                                            unsigned idx) {
   // Iterate through all memory ports to find out the type of the operand
   unsigned ctrlIdx = 0, loadIdx = 0, storeIdx = 0;
   for (const GroupMemoryPorts &blockPorts : ports.groups) {
@@ -2086,7 +2087,7 @@ std::string LSQOp::getOperandName(unsigned idx) {
   // Get the operand name from a port to a memory controller
   assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
   assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
-        "unknown LSQ/MC operand");
+         "unknown LSQ/MC operand");
   return "ldDataFromMC";
 }
 

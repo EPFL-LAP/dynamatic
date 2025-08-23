@@ -39,15 +39,17 @@ namespace handshake {
 /// handshake::NamedIOInterface interface  or, failing that, is its index.
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
-  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
+  if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
     return nameInterface.getOperandName(oprdIdx);
-  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+  } else if (auto nameInterface =
+                dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
-  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+  } else if (auto nameInterface =
+                dyn_cast<handshake::ArithNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
-  };
+  }
 
-  op->emitError("all operations must specify operand names");
+  op->emitError() << "must specify operation names, op: " << *op;
   assert(0);
 }
 
@@ -55,20 +57,23 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
 /// handshake::NamedIOInterface interface or, failing that, is its index.
 std::string getResultName(Operation *op, size_t resIdx) {
 
-  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
+  if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
     return nameInterface.getResultName(resIdx);
-  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+  } else if (auto nameInterface =
+                dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
-  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+  } else if (auto nameInterface =
+                dyn_cast<handshake::ArithNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
-  };
+  }
 
   op->emitError("all operations must specify result names");
   assert(0);
 }
 
-}
-}
+} // namespace handshake
+} // namespace dynamatic
+
 
 //===----------------------------------------------------------------------===//
 // Operand and Result Names to Port Names
@@ -136,6 +141,5 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
     return mcOp.getCtrlEnd();
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
-
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

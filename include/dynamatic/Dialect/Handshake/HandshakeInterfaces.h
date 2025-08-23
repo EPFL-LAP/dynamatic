@@ -72,7 +72,7 @@ inline std::string simpleOperandName(unsigned idx, unsigned numOperands) {
 
   // TODO: Remove 2D I/O packing
   // but for now this is needed
-  if(numOperands == 1){
+  if (numOperands == 1){
     return "ins";
   }
 
@@ -84,7 +84,7 @@ inline std::string simpleResultName(unsigned idx, unsigned numResults) {
 
   // TODO: Remove 2D I/O packing
   // but for now this is needed
-  if(numResults == 1){
+  if (numResults == 1){
     return "outs";
   }
 
