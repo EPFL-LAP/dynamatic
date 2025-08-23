@@ -230,7 +230,7 @@ def InputRTLPortsAreOperandsInterface : OpInterface<"InputRTLPortsAreOperandsInt
         "",
         [{
           ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return getOperandName(idx, concreteOp->getNumOperands());
+          return getOperandName(op, idx);
         }]>
     ];
 }
@@ -270,7 +270,7 @@ def OutputRTLPortsAreResultsInterface : OpInterface<"OutputRTLPortsAreResultsInt
         "",
         [{
           ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return getResultName(idx, concreteOp->getNumResults());
+          return getResultName(op, idx);
         }]>
     ];
 }
