@@ -59,10 +59,39 @@ def fail(id, msg):
     }
 
 
-def run_test(c_file, n, variable, transformed_code_filename):
+def main():
     """
-    Runs the specified integration test.
+    Entry point for the script.
     """
+
+    parser = argparse.ArgumentParser(
+        description="Run speculation integration test")
+    parser.add_argument(
+        "test_name", type=str, help="Name of the test to run")
+    parser.add_argument(
+        "--n", type=int, default=3,
+        help="Number of iterations to speculate")
+    parser.add_argument(
+        "--variable", action='store_true',
+        help="Run variable speculation")
+    parser.add_argument(
+        "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
+    parser.add_argument(
+        "--out", type=str, help="out dir name (Default: out)", default="out")
+
+    args = parser.parse_args()
+    test_name = args.test_name
+    n = args.n
+    variable = args.variable
+    transformed_code_filename = args.transformed_code
+
+    c_file = INTEGRATION_FOLDER / test_name / f"{test_name}.c"
+    # if result["status"] == "pass":
+    #     color_print(result["msg"], TermColors.OKGREEN)
+    # elif result["status"] == "fail":
+    #     color_print(result["msg"], TermColors.FAIL)
+    # else:
+    #     color_print(result["msg"], TermColors.WARNING)
 
     print(c_file)
 
@@ -76,7 +105,7 @@ def run_test(c_file, n, variable, transformed_code_filename):
         transformed_code = c_file
 
     # Get out dir name
-    out_dir = os.path.join(c_file_dir, "out")
+    out_dir = os.path.join(c_file_dir, args.out)
     # Remove previous out directory
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
@@ -542,40 +571,6 @@ def run_test(c_file, n, variable, transformed_code_filename):
         "msg": "Test passed",
         "status": "pass"
     }
-
-
-def main():
-    """
-    Entry point for the script.
-    """
-
-    parser = argparse.ArgumentParser(
-        description="Run speculation integration test")
-    parser.add_argument(
-        "test_name", type=str, help="Name of the test to run")
-    parser.add_argument(
-        "--n", type=int, default=3,
-        help="Number of iterations to speculate")
-    parser.add_argument(
-        "--variable", action='store_true',
-        help="Run variable speculation")
-    parser.add_argument(
-        "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
-
-    args = parser.parse_args()
-    test_name = args.test_name
-    n = args.n
-    variable = args.variable
-    transformed_code = args.transformed_code
-
-    result = run_test(INTEGRATION_FOLDER / test_name /
-                      f"{test_name}.c", n, variable, transformed_code)
-    if result["status"] == "pass":
-        color_print(result["msg"], TermColors.OKGREEN)
-    elif result["status"] == "fail":
-        color_print(result["msg"], TermColors.FAIL)
-    else:
-        color_print(result["msg"], TermColors.WARNING)
 
 
 if __name__ == "__main__":
