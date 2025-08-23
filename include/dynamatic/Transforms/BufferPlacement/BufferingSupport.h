@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 
+#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -35,13 +36,17 @@ struct FuncInfo {
   /// should be optimized.
   llvm::MapVector<CFDFC *, bool> cfdfcs;
 
+  /// A pointer to the result of the buffer placement.
+  BufferPlacementResult *result;
+
   /// Argument-less constructor so that we can use the struct as a value type
   /// for maps.
   FuncInfo() : funcOp(nullptr){};
 
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
-  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp){};
+  FuncInfo(handshake::FuncOp funcOp, BufferPlacementResult *placementResult)
+      : funcOp(funcOp), result(placementResult){};
 };
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.

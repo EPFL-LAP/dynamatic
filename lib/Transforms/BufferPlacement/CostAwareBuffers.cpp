@@ -92,6 +92,8 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
   auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+
+  populateCFDFCAnalysisResult();
 }
 
 void CostAwareBuffers::addCustomChannelConstraints(Value channel) {
