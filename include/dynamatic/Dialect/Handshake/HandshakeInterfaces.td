@@ -175,7 +175,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
         // Simple input name
         assert(idx < concreteOp->getNumOperands() && "index too high");
 
-        // TODO: Remove 2D output packing
+        // TODO: Remove 2D I/O packing
         // but for now this is needed
         if(concreteOp->getNumOperands() == 1){
           return "ins";
@@ -193,7 +193,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
         // Generic output name
         assert(idx < concreteOp->getNumResults() && "index too high");
 
-        // TODO: Remove 2D output packing
+        // TODO: Remove 2D I/O packing
         // but for now this is needed
         if(concreteOp->getNumResults() == 1){
           return "outs";
