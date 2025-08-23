@@ -12,7 +12,7 @@
 # std_logic bit
 #
 
-from context import VHDLContext
+from LSQ.context import VHDLContext
 from utils import *
 
 
