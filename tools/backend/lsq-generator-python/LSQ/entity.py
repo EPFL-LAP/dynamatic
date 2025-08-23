@@ -63,8 +63,13 @@ class Entity():
           )
         self.signals += newSignal
 
-  def get(self):
-     self.signals = self.signals.lstrip()
-     print(self.signals)
-
-    
+  def get(self, name, entity_type):
+     self.signals = self.signals.lstrip()[:-1]
+     entity = f"""
+-- {entity_type}
+entity {name} is
+ports(
+  rst : in std_logic;
+  clk : in std_logic;
+  {self.signals}
+)
