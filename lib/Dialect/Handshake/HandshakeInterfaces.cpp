@@ -102,7 +102,7 @@ unsigned getNumOutputPorts(Operation *op) {
               dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
     return resultsPortsInterface.getNumOutputPorts();
   } else if (auto customPortsInterface = 
-              dyn_cast<handshake::CustomOutputRTLPortsInterface>(op)){
+              dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
     return customPortsInterface.getNumInputPorts();
   }
 
