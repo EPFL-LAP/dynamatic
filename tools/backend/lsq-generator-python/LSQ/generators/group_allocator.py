@@ -1,8 +1,10 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from vhdl_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
-from vhdl_gen.utils import MaskLess
-from vhdl_gen.configs import Configs
+from LSQ.context import VHDLContext
+from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
+from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from LSQ.utils import MaskLess
+from LSQ.config import Configs
+
+from LSQ.entity import Entity, SignalSize
 
 
 class GroupAllocator:
@@ -46,7 +48,7 @@ class GroupAllocator:
         self.configs = configs
         self.module_name = name + suffix
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, path_rtl, config) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 
@@ -91,6 +93,31 @@ class GroupAllocator:
         ctx.portInitString = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
+
+        entity = Entity()
+
+        entity.addInputSignal(
+           "group_init_valid",
+            SignalSize(bitwidth=1, number=config.numGroups)
+        )
+        entity.addOutputSignal(
+            "group_init_ready",
+            SignalSize(bitwidth=1, number=config.numGroups)
+        )
+
+        entity.get()
+        quit()
+        
+#         entity = f"""\
+        
+# entity {self.module_name} is
+# port(
+#   rst : in std_logic;
+#   clk : in std_logic;
+#   group_init_valid_i 
+# ) 
+# end entity;
+#         """
 
         # IOs
         group_init_valid_i = LogicArray(
@@ -254,6 +281,7 @@ class GroupAllocator:
             file.write(ctx.signalInitString)
             file.write('begin\n' + arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
+
 
     def instantiate(
         self,

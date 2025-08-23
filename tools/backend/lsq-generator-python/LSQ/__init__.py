@@ -1,10 +1,10 @@
 # vhdl_gen/__init__.py
-from vhdl_gen.utils import (
+from LSQ.utils import (
     VHDLLogicType, VHDLLogicVecType, VHDLLogicTypeArray, VHDLLogicVecTypeArray,
     OpTab,
 )
-from vhdl_gen.configs import GetConfigs, Configs
-from vhdl_gen.codegen import codeGen
+from LSQ.config import Config
+from LSQ.codegen import codeGen
 
 
 # from vhdlgen import *
@@ -13,7 +13,7 @@ __all__ = [
     "VHDLLogicType", "VHDLLogicVecType", "VHDLLogicTypeArray", "VHDLLogicVecTypeArray",
     "OpTab",
     # configs
-    "GetConfigs", "Configs",
+    "Config",
     # codegen
     "codeGen",
 ]

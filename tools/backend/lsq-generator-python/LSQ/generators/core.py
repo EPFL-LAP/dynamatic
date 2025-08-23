@@ -1,9 +1,9 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import *
-from vhdl_gen.operators import *
-from vhdl_gen.configs import Configs
+from LSQ.context import VHDLContext
+from LSQ.signals import *
+from LSQ.operators import *
+from LSQ.config import Config
 
-import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 class LSQ:
@@ -11,7 +11,7 @@ class LSQ:
         self,
         name: str,
         suffix: str,
-        configs: Configs
+        configs: Config
     ):
         """
         LSQ

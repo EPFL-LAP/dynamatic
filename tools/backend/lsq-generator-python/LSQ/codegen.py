@@ -1,25 +1,21 @@
-from vhdl_gen.context import VHDLContext
-import vhdl_gen.generators.group_allocator as group_allocator
-import vhdl_gen.generators.dispatchers as dispatchers
-import vhdl_gen.generators.lsq as lsq
+from LSQ.context import VHDLContext
+import LSQ.generators.group_allocator as group_allocator
+import LSQ.generators.dispatchers as dispatchers
+import LSQ.generators.core as core
 
-import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(path_rtl, configs):
-    ctx = VHDLContext()
-
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()
 
     name = configs.name + '_core'
-    # empty the file
-    file = open(f'{path_rtl}/{name}.vhd', 'w').close()
 
     # Group Allocator
     ga = group_allocator.GroupAllocator(
         name=name, suffix='_ga', configs=configs)
-    ga.generate(path_rtl)
+    ga.generate(path_rtl, configs)
     lsq_submodules.group_allocator = ga
 
     # Load Address Port Dispatcher
@@ -54,5 +50,5 @@ def codeGen(path_rtl, configs):
         lsq_submodules.qtp_dispatcher_stb = qtp_dispatcher_stb
 
     # Change the name of the following module to lsq_core
-    lsq_core = lsq.LSQ(name, '', configs)
+    lsq_core = core.LSQ(name, '', configs)
     lsq_core.generate(lsq_submodules, path_rtl)
