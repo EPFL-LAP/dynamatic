@@ -24,7 +24,7 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
         case EntitySignalType.OUTPUT:
             io_suffix = "o"
             direction = "out"
-            
+
     type_declaration = signalSizeToTypeDeclaration(signal_size)
 
     return f"""
@@ -65,7 +65,6 @@ class Entity():
 
   def get(self):
      self.signals = self.signals.lstrip()
-     signals_string = "".join(self.signals_list)
-     print(signals_string)
+     print(self.signals)
 
     
