@@ -42,7 +42,8 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    Symbol,
    RegionKindInterface,
    OpAsmOpInterface,
-   HasClock
+   HasClock,
+   SimpleNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -136,7 +137,8 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 def InstanceOp : Handshake_Op<"instance", [
     CallOpInterface,
     HasClock,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    SimpleNamedIOInterface
 ]> {
   let summary = "module instantiate operation";
   let description = [{
@@ -214,7 +216,9 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -285,7 +289,9 @@ def BufferOp : Handshake_Op<"buffer", [
 }
 
 def InitOp : Handshake_Op<"init", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "init operation";
   let description = [{
@@ -307,7 +313,9 @@ def InitOp : Handshake_Op<"init", [
 }
 
 def NDWireOp : Handshake_Op<"ndwire", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIOInterface
 ]> {
   let summary = "non-deterministic wire operation";
   let description = [{
@@ -383,7 +391,8 @@ def MergeOp : Handshake_Op<"merge", [
   // require that the data types match.
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
-  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  SimpleNamedIOInterface
 ]> {
   let summary = "merge operation";
   let description = [{
