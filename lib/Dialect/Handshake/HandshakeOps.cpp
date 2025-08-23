@@ -2060,5 +2060,46 @@ static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   return "";
 }
 
+std::string LSQOp::getOperandName(unsigned idx) {
+
+  assert(idx < getOperation()->getNumOperands() && "index too high");
+
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  LSQPorts lsqPorts = getPorts();
+  if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
+        "unknown LSQ/MC operand");
+  return "ldDataFromMC";
+}
+
+std::string LSQOp::getResultName(unsigned idx) {
+  assert(idx < getOperation()->getNumResults() && "index too high");
+
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  LSQPorts lsqPorts = getPorts();
+  if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+  MCLoadStorePort mcPort = lsqPorts.getMCPort();
+  if (mcPort.getLoadAddrOutputIndex() == idx)
+    return "ldAddrToMC";
+  if (mcPort.getStoreAddrOutputIndex() == idx)
+    return "stAddrToMC";
+  assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
+  return "stDataToMC";
+}
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
