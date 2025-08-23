@@ -100,7 +100,7 @@ PortNamer::PortNamer(Operation *op) {
       assert(funcOp && "end must be child of handshake function");
       size_t numResults = funcOp.getFunctionType().getNumResults();
       for (size_t idx = 0; idx < numResults; ++idx)
-        outputs.push_back(detail::simpleOutputPortName(idx));
+        outputs.push_back(detail::simpleResultName(idx, numResults));
     }
   }
 }
