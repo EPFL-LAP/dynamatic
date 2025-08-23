@@ -27,6 +27,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace handshake;
 
 /// Shortcut to get the name attribute of an operation.
 inline static mlir::StringAttr getNameAttr(Operation *op) {
