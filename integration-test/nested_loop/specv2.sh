@@ -12,4 +12,5 @@ python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 3 --out out_3
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 4 --out out_4
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 5 --out out_5
-python3 experimental/tools/integration/run_specv2_integration.py single_loop --variable --out out_variable
+python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 6 --out out_6
+python3 experimental/tools/integration/run_specv2_integration.py nested_loop --variable --out out_variable
