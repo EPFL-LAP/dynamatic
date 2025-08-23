@@ -3,6 +3,9 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
+# Spec v1
+python3 tools/integration/run_spec_integration.py single_loop --out out_v1
+
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 0 --out out_0
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 1 --out out_1
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 2 --out out_2

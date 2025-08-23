@@ -48,10 +48,26 @@ def color_print(string: str, color: str):
     print(f"{color}{string}{TermColors.ENDC}")
 
 
-def run_test(c_file: str, spec: bool) -> bool:
+def main():
     """
-    Runs the specified integration test.
+    Entry point for the script.
     """
+
+    parser = argparse.ArgumentParser(
+        description="Run speculation integration test")
+    parser.add_argument(
+        "test_name", type=str, help="Name of the test to run")
+    parser.add_argument(
+        "--disable-spec", action="store_false", dest="spec",
+        help="Run without speculation (but with custom compilation flow)")
+    parser.add_argument(
+        "--out", type=str, help="out dir name (Default: out)", default="out")
+
+    args = parser.parse_args()
+    test_name = args.test_name
+    spec = args.spec
+
+    c_file = INTEGRATION_FOLDER / test_name / f"{test_name}.c"
 
     print("Running", c_file, "Speculation Enabled:", spec)
 
@@ -60,7 +76,7 @@ def run_test(c_file: str, spec: bool) -> bool:
     kernel_name = os.path.splitext(os.path.basename(c_file))[0]
 
     # Get out dir name
-    out_dir = os.path.join(c_file_dir, "out")
+    out_dir = os.path.join(c_file_dir, args.out)
     # Remove previous out directory
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
@@ -450,29 +466,6 @@ def run_test(c_file: str, spec: bool) -> bool:
         return False
 
     return True
-
-
-def main():
-    """
-    Entry point for the script.
-    """
-
-    parser = argparse.ArgumentParser(
-        description="Run speculation integration test")
-    parser.add_argument(
-        "test_name", type=str, help="Name of the test to run")
-    parser.add_argument(
-        "--disable-spec", action="store_false", dest="spec",
-        help="Run without speculation (but with custom compilation flow)")
-
-    args = parser.parse_args()
-    test_name = args.test_name
-    spec = args.spec
-
-    success = run_test(INTEGRATION_FOLDER / test_name /
-                       f"{test_name}.c", spec)
-    if success:
-        color_print("Test passed", TermColors.OKGREEN)
 
 
 if __name__ == "__main__":
