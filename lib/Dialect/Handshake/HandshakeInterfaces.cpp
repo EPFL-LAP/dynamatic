@@ -103,7 +103,7 @@ unsigned getNumOutputPorts(Operation *op) {
     return resultsPortsInterface.getNumOutputPorts();
   } else if (auto customPortsInterface = 
               dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
-    return customPortsInterface.getNumInputPorts();
+    return customPortsInterface.getNumOutputPorts();
   }
 
   op->emitError("All operations must specify output ports");
