@@ -827,26 +827,28 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   SmallVector<SpecV2RepeatingInitOp> repeatingInits(n);
   Value specLoopContinue = loopContinue;
 
-  for (Operation *op : iterateOverPossiblyIndirectUsers(loopContinue)) {
-    if (auto passer = dyn_cast<PasserOp>(op)) {
-      frontiers.insert(passer);
-    }
-  }
-
-  bool frontiersUpdated;
-  do {
-    frontiersUpdated = false;
-    for (auto passerOp : frontiers) {
-      if (isEligibleForPasserMotionOverPM(passerOp)) {
-        performPasserMotionPastPM(passerOp, frontiers);
-        frontiersUpdated = true;
-        // If frontiers are updated, the iterator is outdated.
-        // Break and restart the loop.
-        break;
+  if (!disableInitialMotion) {
+    for (Operation *op : iterateOverPossiblyIndirectUsers(loopContinue)) {
+      if (auto passer = dyn_cast<PasserOp>(op)) {
+        frontiers.insert(passer);
       }
     }
-    // If no frontiers were updated, we can stop.
-  } while (frontiersUpdated);
+
+    bool frontiersUpdated;
+    do {
+      frontiersUpdated = false;
+      for (auto passerOp : frontiers) {
+        if (isEligibleForPasserMotionOverPM(passerOp)) {
+          performPasserMotionPastPM(passerOp, frontiers);
+          frontiersUpdated = true;
+          // If frontiers are updated, the iterator is outdated.
+          // Break and restart the loop.
+          break;
+        }
+      }
+      // If no frontiers were updated, we can stop.
+    } while (frontiersUpdated);
+  }
 
   // Repeatedly move passers past Muxes and PMSC.
   for (unsigned i = 0; i < n; i++) {

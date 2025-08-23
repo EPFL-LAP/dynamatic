@@ -4,15 +4,18 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd $DYNAMATIC_DIR
 
 # Standard flow
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_standard nested_loop 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_standard if_convert 4.000 2.000
+
+# Only code transformation
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_transformed if_convert 4.000 2.000
 
 # Spec v1
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_v1 nested_loop 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_v1 if_convert 4.000 2.000
 
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_0 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_1 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_2 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_3 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_4 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_5 nested_loop 4.000 2.000
-./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_variable nested_loop 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_0 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_1 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_2 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_3 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_4 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_5 if_convert 4.000 2.000
+./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/if_convert/out_variable if_convert 4.000 2.000

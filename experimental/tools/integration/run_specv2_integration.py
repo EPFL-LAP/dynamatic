@@ -78,6 +78,12 @@ def main():
         "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
     parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
+    parser.add_argument(
+        "--disable-initial-motion", action='store_true',
+        help="Disable initial motion of suppressors when loop consists of multiple BBs")
+    parser.add_argument(
+        "--disable-spec", action='store_true',
+        help="Disable speculation")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -319,61 +325,64 @@ def main():
 
     spec_json_path = os.path.join(c_file_dir, "specv2.json")
 
-    # Pre-speculation
-    handshake_pre_speculation = os.path.join(
-        comp_out_dir, "handshake_pre_speculation.mlir")
-    with open(handshake_pre_speculation, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_transformed,
-            f"--handshake-pre-spec-v2=json-path={spec_json_path}",
-            "--handshake-materialize",
-            "--handshake-canonicalize"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Pre-speculation")
-        else:
-            return fail(id, "Failed on pre-speculation")
+    if args.disable_spec:
+        handshake_post_speculation = handshake_transformed
+    else:
+        # Pre-speculation
+        handshake_pre_speculation = os.path.join(
+            comp_out_dir, "handshake_pre_speculation.mlir")
+        with open(handshake_pre_speculation, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_transformed,
+                f"--handshake-pre-spec-v2=json-path={spec_json_path}",
+                "--handshake-materialize",
+                "--handshake-canonicalize"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Pre-speculation")
+            else:
+                return fail(id, "Failed on pre-speculation")
 
-    # Speculation
-    handshake_speculation = os.path.join(
-        comp_out_dir, "handshake_speculation.mlir")
-    bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
-    with open(handshake_speculation, "w") as f:
-        print(f"n={n}, variable={variable}")
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-            f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""}",
-            "--handshake-materialize",
-            "--handshake-canonicalize"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Added speculative units")
-        else:
-            return fail(id, "Failed to add speculative units")
+        # Speculation
+        handshake_speculation = os.path.join(
+            comp_out_dir, "handshake_speculation.mlir")
+        bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+        with open(handshake_speculation, "w") as f:
+            print(f"n={n}, variable={variable}")
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""}",
+                "--handshake-materialize",
+                "--handshake-canonicalize"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Added speculative units")
+            else:
+                return fail(id, "Failed to add speculative units")
 
-    # Post-speculation
-    handshake_post_speculation = os.path.join(
-        comp_out_dir, "handshake_post_speculation.mlir")
-    with open(handshake_post_speculation, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_speculation,
-            f"--handshake-post-spec-v2=json-path={spec_json_path}",
-            "--handshake-materialize",
-            "--handshake-canonicalize"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Post-speculation")
-        else:
-            return fail(id, "Failed on post-speculation")
+        # Post-speculation
+        handshake_post_speculation = os.path.join(
+            comp_out_dir, "handshake_post_speculation.mlir")
+        with open(handshake_post_speculation, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_speculation,
+                f"--handshake-post-spec-v2=json-path={spec_json_path}",
+                "--handshake-materialize",
+                "--handshake-canonicalize"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Post-speculation")
+            else:
+                return fail(id, "Failed on post-speculation")
 
     # Buffer placement (fpga20)
     profiler_bin = os.path.join(comp_out_dir, "profile")
@@ -416,20 +425,24 @@ def main():
             return fail(id, "Failed to profile cf-level")
 
     # Update frequencies.csv
-    updated_frequencies = os.path.join(comp_out_dir, "updated_frequencies.csv")
-    with open(updated_frequencies, "w") as f:
-        result = subprocess.run([
-            "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
-            "--frequencies=" + frequencies,
-            "--mapping=" + bb_mapping
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Updated frequencies.csv")
-        else:
-            return fail(id, "Failed to update frequencies.csv")
+    if args.disable_spec:
+        updated_frequencies = frequencies
+    else:
+        updated_frequencies = os.path.join(
+            comp_out_dir, "updated_frequencies.csv")
+        with open(updated_frequencies, "w") as f:
+            result = subprocess.run([
+                "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
+                "--frequencies=" + frequencies,
+                "--mapping=" + bb_mapping
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Updated frequencies.csv")
+            else:
+                return fail(id, "Failed to update frequencies.csv")
 
     # Buffer placement (FPGA20)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")

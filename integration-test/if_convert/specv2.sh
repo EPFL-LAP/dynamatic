@@ -4,8 +4,10 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd $DYNAMATIC_DIR
 
 # Standard flow
-./bin/dynamatic --exit-on-failure --run ./integration-test/if_convert/standard-flow.dyn
-mv ./integration-test/if_convert/out ./integration-test/if_convert/out_standard
+python3 experimental/tools/integration/run_specv2_integration.py if_convert --disable-spec --out out_standard
+
+# Only code transformation
+python3 experimental/tools/integration/run_specv2_integration.py if_convert --disable-spec --transformed-code if_convert_transformed.c --out out_transformed
 
 # Spec v1
 python3 tools/integration/run_spec_integration.py if_convert --out out_v1
