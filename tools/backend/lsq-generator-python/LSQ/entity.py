@@ -16,7 +16,7 @@ class EntitySignalType(Enum):
     OUTPUT = 2
 
 
-def makeEntitySignal(base_name, entity_signal_type, signal_size):
+def makeEntitySignal(base_name, signal_size, entity_signal_type):
     match entity_signal_type:
         case EntitySignalType.INPUT:
             io_suffix = "i"
@@ -48,15 +48,17 @@ class Entity():
   ):
     if signal_size.number == 1:
       newSignal = makeEntitySignal(
-        f"{signal_base_name}",
-        entitySignalType=entity_signal_type,
+        signal_base_name,
+        signal_size,
+        entity_signal_type
       )
       self.signalss += newSignal
     else:
       for i in range(signal_size.number):
         newSignal = makeEntitySignal(
           f"{signal_base_name}_{i}",
-          entitySignalType=entity_signal_type,
+          signal_size,
+          entity_signal_type,
           )
       self.signals += newSignal
 
