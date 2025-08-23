@@ -554,7 +554,7 @@ unsigned FuncOp::getNumInputPorts(){
 
 std::string FuncOp::getInputPortName(unsigned idx){
   assert(idx < getNumInputPorts() && "index too high");
-  return getArgName(idx)
+  return getArgName(idx);
 }
 
 unsigned FuncOp::getNumOutputPorts(){
@@ -566,7 +566,7 @@ unsigned FuncOp::getNumOutputPorts(){
 
 std::string FuncOp::getOutputPortName(unsigned idx){
   assert(idx < getNumOutputPorts() && "index too high");
-  return getResName(idx)
+  return getResName(idx);
 }
 
 
