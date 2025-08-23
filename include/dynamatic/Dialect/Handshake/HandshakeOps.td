@@ -141,7 +141,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       if (auto names = getArgNames()) {
         return names.size();
       }
-      return 0
+      return 0;
     }
 
     std::string FuncOp::getInputPortName(unsigned idx){
@@ -158,7 +158,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       if (auto names = getResNames()) {
         return names.size();
       }
-      return 0
+      return 0;
     }
 
     std::string FuncOp::getOutputPortName(unsigned idx){
