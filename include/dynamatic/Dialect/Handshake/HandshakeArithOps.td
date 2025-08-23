@@ -69,18 +69,6 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs)";
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
-      return (idx == 0) ? "lhs" : "rhs";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < 1 && "index too high");
-      return "result";
-    }
-  }];
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
