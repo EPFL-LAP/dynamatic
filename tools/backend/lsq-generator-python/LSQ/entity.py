@@ -29,7 +29,7 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
 
     return f"""
   {base_name}_{io_suffix} : {direction} {type_declaration}
-""".lstrip("\n")
+""".removeprefix("\n")
 
 class Entity():
   def __init__(self):
