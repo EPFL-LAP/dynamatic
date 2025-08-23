@@ -154,27 +154,13 @@ def main():
             color_print("Failed to translate LLVM IR to MLIR", TermColors.FAIL)
             return False
 
-    dropped_funcs = os.path.join(comp_out_dir, "dropped_funcs.mlir")
-    with open(dropped_funcs, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_ROOT / "build" / "bin" / "drop-functions", mlir_file,
-            "--func=main",
-            "--func=rand",
-            "--func=srand",
-            f"-o={dropped_funcs}"
-        ])
-        if result.returncode == 0:
-            print("Dropped functions")
-        else:
-            color_print("Failed to drop functions", TermColors.FAIL)
-            return False
-
     remove_polygeist_attr = os.path.join(
         comp_out_dir, "removed_polygeist_attr.mlir")
     with open(remove_polygeist_attr, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, dropped_funcs,
+            DYNAMATIC_OPT_BIN, mlir_file,
             "--remove-polygeist-attributes",
+            f"--drop-unlisted-functions=function-names={kernel_name}",
             "--allow-unregistered-dialect"
         ],
             stdout=f,
