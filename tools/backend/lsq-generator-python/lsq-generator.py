@@ -33,7 +33,7 @@ def main():
         exist_ok=True
     )
 
-    lsq_config = Config()
+    lsq_config = Config(args.config_file)
 
     # STEP 1: Generate the desired core lsq logic
     codeGen(args.output_dir, lsq_config)
