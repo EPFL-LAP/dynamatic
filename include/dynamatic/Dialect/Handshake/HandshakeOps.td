@@ -772,45 +772,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "unsigned":$numLoads)>];
 
   let extraClassDeclaration = [{
-    std::string getOperandName(unsigned idx) {
-    //   assert(idx < getOperation()->getNumOperands() && "index too high");
-
-    //   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
-    //     return name.str();
-
-    //   // Try to get the operand name from the regular ports
-    //   MCPorts mcPorts = getPorts();
-    //   if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
-    //     return name;
-
-    //   // Get the operand name from a port to an LSQ
-    //   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
-    //   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    //   if (lsqPort.getLoadAddrInputIndex() == idx)
-    //     return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
-    //   if (lsqPort.getStoreAddrInputIndex() == idx)
-    //     return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
-    //   assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
-    //   return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
-    // }
-
-    // std::string getResultName(unsigned idx) {
-    //   assert(idx < getOperation()->getNumResults() && "index too high");
-
-    //   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
-    //     return name.str();
-
-    //   // Try to get the operand name from the regular ports
-    //   MCPorts mcPorts = getPorts();
-    //   if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
-    //     return name;
-
-    //   // Get the operand name from a port to an LSQ
-    //   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
-    //   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    //   assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
-    //   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
-    }
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
   let hasVerifier = 1;
 
