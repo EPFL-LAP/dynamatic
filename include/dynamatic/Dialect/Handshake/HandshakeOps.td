@@ -146,7 +146,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     std::string FuncOp::getInputPortName(unsigned idx){
       assert(idx < getNumInputPorts() && "index too high");
-      return getArgName(idx);
+      return getArgName(idx).str();
     }
 
 
@@ -163,7 +163,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     std::string FuncOp::getOutputPortName(unsigned idx){
       assert(idx < getNumOutputPorts() && "index too high");
-      return getResName(idx);
+      return getResName(idx).str();
     }
   }];
 
