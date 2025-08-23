@@ -12,7 +12,7 @@ class GroupAllocator:
         self,
         name: str,
         suffix: str,
-        configs: Configs
+        configs: Config
     ):
         """
         Group Allocator
