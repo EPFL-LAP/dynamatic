@@ -105,6 +105,11 @@ class GroupAllocator:
             SignalSize(bitwidth=1, number=config.numGroups)
         )
 
+        entity.addInputSignal(
+            "ldq_tail",
+            SignalSize(bitwidth=config.ldqAddrW, number=1)
+        )
+
         entity.get(self.module_name, "Group Allocator")
         quit()
         
