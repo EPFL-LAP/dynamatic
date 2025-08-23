@@ -2,7 +2,7 @@ from LSQ.context import VHDLContext
 from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from LSQ.utils import MaskLess
-from LSQ.config import Configs
+from LSQ.config import Config
 
 from LSQ.entity import Entity, SignalSize
 
