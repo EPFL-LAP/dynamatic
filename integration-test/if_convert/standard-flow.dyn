@@ -1,0 +1,5 @@
+set-src integration-test/if_convert/if_convert.c
+compile --buffer-algorithm fpga20
+write-hdl --hdl vhdl-beta
+simulate
+exit
