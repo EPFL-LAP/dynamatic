@@ -545,6 +545,31 @@ void FuncOp::print(OpAsmPrinter &p) {
       getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
+unsigned FuncOp::getNumInputPorts(){
+  if (auto names = getArgNames()) {
+    return names.size();
+  }
+  return 0
+}
+
+std::string FuncOp::getInputPortName(unsigned idx){
+  assert(idx < getNumInputPorts() && "index too high");
+  return getArgName(idx)
+}
+
+unsigned FuncOp::getNumOutputPorts(){
+  if (auto names = getResNames()) {
+    return names.size();
+  }
+  return 0
+}
+
+std::string FuncOp::getOutputPortName(unsigned idx){
+  assert(idx < getNumOutputPorts() && "index too high");
+  return getResName(idx)
+}
+
+
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
                                       getDataOperand());
@@ -1548,16 +1573,18 @@ LogicalResult EndOp::verify() {
   return success();
 }
 
-std::string EndOp::getOperandName(unsigned idx) {
-  assert(idx < getOperation()->getNumOperands() && "index too high");
+unsigned EndOp::getNumOutputPorts(){
   handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "end must be child of handshake function");
-
-  unsigned numResults = funcOp.getFunctionType().getNumResults();
-  if (idx < numResults)
-    return "ins_" + std::to_string(idx);
-  return "memDone_" + std::to_string(idx - numResults);
+  return funcOp.getFunctionType().getNumResults();
 }
+
+std::string EndOp::getOutputPortName(unsigned idx){
+  handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "end must be child of handshake function");
+  return funcOp.getOutputPortName(idx);
+}
+
 
 //===----------------------------------------------------------------------===//
 // BundleOp

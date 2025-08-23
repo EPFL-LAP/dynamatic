@@ -30,7 +30,10 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         DeclareOpInterfaceMethods<ControlInterface>]> {
+         DeclareOpInterfaceMethods<ControlInterface>,
+         InputRTLPortsAreOperandsInterface,
+         OutputRTLPortsAreResultsInterface
+         ]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -43,7 +46,9 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   SimpleNamedIOInterface
+   SimpleNamedIOInterface,
+   CustomRTLInputPortsInterface,
+   CustomRTLOutputPortsInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -1034,9 +1039,15 @@ def StoreOp : Handshake_MemPortOp<"store", [
 // Terminator
 //===----------------------------------------------------------------------===//
 
-def EndOp : Handshake_Op<"end", [
+// Not a handshake op, as its RTL ports do not correspond to
+// its operands and results
+def EndOp : Op<Handshake_Dialect, "end", [
+  Terminator,
+  HasParent<"handshake::FuncOp">,
+  DeclareOpInterfaceMethods<ControlInterface>,
   CustomNamedIOInterface,
-  Terminator
+  InputRTLPortsAreOperandsInterface,
+  CustomRTLOutputPortsInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -1053,11 +1064,17 @@ def EndOp : Handshake_Op<"end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    std::string getOperandName(unsigned idx);
+    std::string getOperandName(unsigned idx){
+      return detail::simpleOperandName(idx, getOperation()->getNumOperands());
+    }
 
     std::string getResultName(unsigned idx) {
       assert(false && "index too high");
     }
+
+    unsigned getNumOutputPorts();
+
+    std::string getOutputPortName(unsigned idx);
   }];
 
   let assemblyFormat = [{

@@ -49,7 +49,7 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
     return nameInterface.getOperandName(oprdIdx);
   }
 
-  op->emitError() << "must specify operation names, op: " << *op;
+  op->emitError() << "must specify operand names, op: " << *op;
   assert(0);
 }
 
@@ -67,9 +67,62 @@ std::string getResultName(Operation *op, size_t resIdx) {
     return nameInterface.getResultName(resIdx);
   }
 
-  op->emitError("all operations must specify result names");
+  op->emitError() << "must specify result names, op: " << *op;
   assert(0);
 }
+
+unsigned getNumInputPorts(Operation *op) {
+  if(auto operandPortsInterface = 
+              dyn_cast<handshake::InputRTLPortsAreOperandsInterface>(op)){
+    return operandPortsInterface.getNumInputPorts();
+  } else if (auto customPortsInterface = 
+              dyn_cast<handshake::CustomRTLInputPortsInterface>(op)){
+    return customPortsInterface.getNumInputPorts();
+  }
+
+  op->emitError("All operations must specify input ports");
+  assert(0);
+}
+
+std::string getInputPortName(Operation *op, size_t portIdx) {
+  if(auto operandPortsInterface = 
+              dyn_cast<handshake::InputRTLPortsAreOperandsInterface>(op)){
+    return operandPortsInterface.getInputPortName(portIdx);
+  } else if (auto customPortsInterface = 
+              dyn_cast<handshake::CustomRTLInputPortsInterface>(op)){
+    return customPortsInterface.getInputPortName(portIdx);
+  }
+
+  op->emitError("All operations must specify input ports");
+  assert(0);
+}
+
+unsigned getNumOutputPorts(Operation *op) {
+  if(auto resultsPortsInterface = 
+              dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
+    return resultsPortsInterface.getNumOutputPorts();
+  } else if (auto customPortsInterface = 
+              dyn_cast<handshake::CustomOutputRTLPortsInterface>(op)){
+    return customPortsInterface.getNumInputPorts();
+  }
+
+  op->emitError("All operations must specify output ports");
+  assert(0);
+}
+
+std::string getOutputPortName(Operation *op, size_t portIdx) {
+  if(auto resultsPortsInterface = 
+              dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
+    return resultsPortsInterface.getOutputPortName(portIdx);
+  } else if (auto customPortsInterface = 
+              dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
+    return customPortsInterface.getOutputPortName(portIdx);
+  }
+
+  op->emitError("All operations must specify output ports");
+  assert(0);
+}
+
 
 } // namespace handshake
 } // namespace dynamatic
@@ -81,31 +134,12 @@ std::string getResultName(Operation *op, size_t resIdx) {
 PortNamer::PortNamer(Operation *op) {
   assert(op && "cannot generate port names for null operation");
 
-  // special case: input and output port names
-  // are actually stored in dictionary attributes
-  if (auto funcOp = dyn_cast<handshake::FuncOp>(op)) {
-    llvm::transform(funcOp.getArgNames(), std::back_inserter(inputs),
-                    [](Attribute arg) { return cast<StringAttr>(arg).str(); });
-    llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
-                    [](Attribute res) { return cast<StringAttr>(res).str(); });
-  } else {
-    // all other operations must directly provide names for their
-    // inputs and outputs
+  for (size_t idx = 0, e = getNumInputPorts(op); idx < e; ++idx){
+    inputs.push_back(getInputPortName(op, idx));
+  }
 
-    for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
-      inputs.push_back(getOperandName(op, idx));
-    for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
-      outputs.push_back(getResultName(op, idx));
-
-    // The Handshake terminator forwards its non-memory inputs to its outputs,
-    // so it needs port names for them
-    if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
-      handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
-      assert(funcOp && "end must be child of handshake function");
-      size_t numResults = funcOp.getFunctionType().getNumResults();
-      for (size_t idx = 0; idx < numResults; ++idx)
-        outputs.push_back(detail::simpleResultName(idx, numResults));
-    }
+  for (size_t idx = 0, e = getNumOutputPorts(op); idx < e; ++idx){
+    outputs.push_back(getOutputPortName(op, idx));
   }
 }
 
