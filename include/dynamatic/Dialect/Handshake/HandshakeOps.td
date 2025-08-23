@@ -137,14 +137,14 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     // CustomRTLInputPortsInterface Methods
     //===------------------------------------------------------------------===//
 
-    unsigned FuncOp::getNumInputPorts(){
+    unsigned getNumInputPorts(){
       if (auto names = getArgNames()) {
         return names.size();
       }
       return 0;
     }
 
-    std::string FuncOp::getInputPortName(unsigned idx){
+    std::string getInputPortName(unsigned idx){
       assert(idx < getNumInputPorts() && "index too high");
       return getArgName(idx).str();
     }
@@ -154,14 +154,14 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     // CustomRTLOutputPortsInterface Methods
     //===------------------------------------------------------------------===//
 
-      unsigned FuncOp::getNumOutputPorts(){
+      unsigned getNumOutputPorts(){
       if (auto names = getResNames()) {
         return names.size();
       }
       return 0;
     }
 
-    std::string FuncOp::getOutputPortName(unsigned idx){
+    std::string getOutputPortName(unsigned idx){
       assert(idx < getNumOutputPorts() && "index too high");
       return getResName(idx).str();
     }
