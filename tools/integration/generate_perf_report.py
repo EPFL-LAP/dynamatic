@@ -1,6 +1,7 @@
 def parse_results():
     return [
-        {"name": "test1", "cycles": 1234, "result": "pass"},
+        {"name": "test1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaathis is a very long name",
+            "cycles": 1234, "result": "pass"},
         {"name": "test2", "cycles": -1, "result": "fail"},
         {"name": "test3", "cycles": -1, "result": "timeout"}
     ]
