@@ -181,7 +181,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        return simpleResultName(idx, concreteOp->getNumResults);
+        return simpleResultName(idx, concreteOp->getNumResults());
       }]>
   ];
 }

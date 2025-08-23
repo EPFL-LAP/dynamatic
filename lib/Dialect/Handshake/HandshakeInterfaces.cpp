@@ -85,7 +85,7 @@ PortNamer::PortNamer(Operation *op) {
     llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
                     [](Attribute res) { return cast<StringAttr>(res).str(); });
   } else {
-    // all other operations must direclty provide names for their
+    // all other operations must directly provide names for their
     // inputs and outputs
 
     for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
