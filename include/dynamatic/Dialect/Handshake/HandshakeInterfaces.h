@@ -34,6 +34,10 @@ namespace handshake {
 
 class FuncOp;
 
+static std::string getOperandName(Operation *op, size_t oprdIdx);
+
+static std::string getResultName(Operation *op, size_t resIdx);
+
 /// Provides an opaque interface for generating the port names of an operation;
 /// handshake operations generate names by the `handshake::NamedIOInterface`;
 /// other operations, such as arithmetic ones, are assigned default names.
