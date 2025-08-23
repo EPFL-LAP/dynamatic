@@ -132,6 +132,39 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     static ::llvm::StringRef getDefaultDialect() {
       return "handshake";
     }
+
+    //===------------------------------------------------------------------===//
+    // CustomRTLInputPortsInterface Methods
+    //===------------------------------------------------------------------===//
+
+    unsigned FuncOp::getNumInputPorts(){
+      if (auto names = getArgNames()) {
+        return names.size();
+      }
+      return 0
+    }
+
+    std::string FuncOp::getInputPortName(unsigned idx){
+      assert(idx < getNumInputPorts() && "index too high");
+      return getArgName(idx);
+    }
+
+
+    //===------------------------------------------------------------------===//
+    // CustomRTLOutputPortsInterface Methods
+    //===------------------------------------------------------------------===//
+
+      unsigned FuncOp::getNumOutputPorts(){
+      if (auto names = getResNames()) {
+        return names.size();
+      }
+      return 0
+    }
+
+    std::string FuncOp::getOutputPortName(unsigned idx){
+      assert(idx < getNumOutputPorts() && "index too high");
+      return getResName(idx);
+    }
   }];
 
   let hasVerifier = 1;

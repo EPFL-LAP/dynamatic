@@ -545,30 +545,6 @@ void FuncOp::print(OpAsmPrinter &p) {
       getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
-unsigned FuncOp::getNumInputPorts(){
-  if (auto names = getArgNames()) {
-    return names.size();
-  }
-  return 0
-}
-
-std::string FuncOp::getInputPortName(unsigned idx){
-  assert(idx < getNumInputPorts() && "index too high");
-  return getArgName(idx);
-}
-
-unsigned FuncOp::getNumOutputPorts(){
-  if (auto names = getResNames()) {
-    return names.size();
-  }
-  return 0
-}
-
-std::string FuncOp::getOutputPortName(unsigned idx){
-  assert(idx < getNumOutputPorts() && "index too high");
-  return getResName(idx);
-}
-
 
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
