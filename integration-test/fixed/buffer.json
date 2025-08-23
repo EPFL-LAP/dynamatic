@@ -12,5 +12,12 @@
     "slots": 2,
     "type": "fifo_break_none",
     "comment": "To achieve better II"
+  },
+  {
+    "pred": "fork8",
+    "outid": 1,
+    "slots": 1,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
   }
 ]
