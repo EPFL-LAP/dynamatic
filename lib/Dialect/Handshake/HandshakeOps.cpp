@@ -1548,6 +1548,17 @@ LogicalResult EndOp::verify() {
   return success();
 }
 
+std::string EndOp::getOperandName(unsigned idx){
+  assert(idx < getOperation()->getNumOperands() && "index too high");
+  handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "end must be child of handshake function");
+
+  unsigned numResults = funcOp.getFunctionType().getNumResults();
+  if (idx < numResults)
+    return "ins_" + std::to_string(idx);
+  return "memDone_" + std::to_string(idx - numResults);
+}
+
 //===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
