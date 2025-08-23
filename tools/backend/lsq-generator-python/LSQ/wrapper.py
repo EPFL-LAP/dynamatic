@@ -1,4 +1,4 @@
-from utils import VHDLLogicType, VHDLLogicTypeArray, VHDLLogicVecType, VHDLLogicVecTypeArray, OpTab
+from LSQ.utils import VHDLLogicType, VHDLLogicTypeArray, VHDLLogicVecType, VHDLLogicVecTypeArray, OpTab
 
 class Wrapper:
     """This class adapts the LSQ core module to handle the following:
