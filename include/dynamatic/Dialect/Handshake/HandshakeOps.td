@@ -1045,7 +1045,7 @@ def EndOp : Op<Handshake_Dialect, "end", [
   Terminator,
   HasParent<"handshake::FuncOp">,
   DeclareOpInterfaceMethods<ControlInterface>,
-  CustomNamedIOInterface,
+  SimpleNamedIOInterface,
   InputRTLPortsAreOperandsInterface,
   CustomRTLOutputPortsInterface
 ]> {
@@ -1064,14 +1064,6 @@ def EndOp : Op<Handshake_Dialect, "end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    std::string getOperandName(unsigned idx){
-      return detail::simpleOperandName(idx, getOperation()->getNumOperands());
-    }
-
-    std::string getResultName(unsigned idx) {
-      assert(false && "index too high");
-    }
-
     unsigned getNumOutputPorts();
 
     std::string getOutputPortName(unsigned idx);
