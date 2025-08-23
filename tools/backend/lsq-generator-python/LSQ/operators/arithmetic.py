@@ -1,5 +1,5 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
+from LSQ.context import VHDLContext
+from LSQ.utils import *
 from vhdl_gen.signals import *
 
 

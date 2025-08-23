@@ -1,6 +1,6 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
+from LSQ.context import VHDLContext
+from LSQ.utils import *
+from LSQ.signals import *
 
 
 def Op(ctx: VHDLContext, out, *list_in) -> str:

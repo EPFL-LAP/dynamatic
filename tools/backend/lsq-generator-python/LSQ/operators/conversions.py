@@ -1,7 +1,7 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
-from vhdl_gen.operators import *
+from LSQ.context import VHDLContext
+from LSQ.utils import *
+from LSQ.signals import *
+from LSQ.operators import *
 
 
 def VecToArray(ctx: VHDLContext, dout, din) -> str:
