@@ -64,8 +64,8 @@ class Entity():
         self.signals += newSignal
 
   def get(self, name, entity_type):
-     self.signals = self.signals.lstrip()[:-1]
-     entity = f"""
+    self.signals = self.signals.lstrip()[:-1]
+    entity = f"""
 -- {entity_type}
 entity {name} is
 ports(
@@ -74,3 +74,4 @@ ports(
   {self.signals}
 )
 """
+    print(entity)
