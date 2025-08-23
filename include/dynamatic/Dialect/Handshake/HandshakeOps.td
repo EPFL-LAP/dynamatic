@@ -929,7 +929,7 @@ def LSQOp : Handshake_Op<"lsq", [
 
     std::string getOperandName(unsigned idx);
     std::string getResultName(unsigned idx);
-  }]
+  }];
 }
 
 //===----------------------------------------------------------------------===//
