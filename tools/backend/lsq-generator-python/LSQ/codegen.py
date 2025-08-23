@@ -3,7 +3,7 @@ import LSQ.generators.group_allocator as group_allocator
 import LSQ.generators.dispatchers as dispatchers
 import LSQ.generators.core as core
 
-import generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(path_rtl, configs):
