@@ -22,7 +22,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-#include <boost/functional/hash/extensions.hpp>
 #include <string>
 #include <vector>
 
@@ -42,7 +41,6 @@ struct NodeProcessingRule {
   std::string pattern;
   ChannelSignals &signals;
   bool renameNode;
-  std::function<void(Node *)> extraProcessing;
 };
 
 /// Base class for all subject graphs. This class represents the subject graph
@@ -53,9 +51,6 @@ struct NodeProcessingRule {
 /// - Unique naming and module type identification
 class BaseSubjectGraph {
 protected:
-  // Operation that the SubjectGraph is based on
-  Operation *op;
-
   // uniqueName is used to generate unique names for the nodes in the BLIF file
   std::string uniqueName;
 
@@ -86,6 +81,9 @@ public:
   BaseSubjectGraph();
   // Constructor for a SubjectGraph based on an Operation
   BaseSubjectGraph(Operation *op);
+
+  // Operation that the SubjectGraph is based on
+  Operation *op;
 
   // The populated maps store channel-specific information that connects
   // SubjectGraphs together. Each SubjectGraph has a position in the vector
@@ -135,6 +133,8 @@ private:
   ChannelSignals lhsNodes;
   ChannelSignals rhsNodes;
   ChannelSignals resultNodes;
+
+  void processOutOfRuleNodes();
 
 public:
   ArithSubjectGraph(Operation *op);

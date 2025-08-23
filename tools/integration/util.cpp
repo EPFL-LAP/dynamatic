@@ -31,7 +31,8 @@ bool runSubprocess(const std::vector<std::string> &args,
 };
 
 int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath) {
+                       const std::optional<fs::path> &customPath,
+                       bool useVerilog) {
   fs::path path =
       customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
       name / (name + ".c");
@@ -47,22 +48,26 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << path.string() << std::endl
              << "compile" << std::endl
-             << "write-hdl" << std::endl
+             << "write-hdl --hdl " << (useVerilog ? "verilog" : "vhdl")
+             << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
 
   scriptFile.close();
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
-  fs::path dynamaticLogPath = path.parent_path() / "out" / "dynamatic_out.txt";
-  if (!fs::exists(dynamaticLogPath.parent_path())) {
-    fs::create_directories(dynamaticLogPath.parent_path());
+  fs::path dynamaticOutPath = path.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath = path.parent_path() / "out" / "dynamatic_err.txt";
+  if (!fs::exists(dynamaticOutPath.parent_path())) {
+    fs::create_directories(dynamaticOutPath.parent_path());
   }
 
   std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
   cmd += tmpFilename;
-  cmd += " &> ";
-  cmd += dynamaticLogPath;
+  cmd += " 1> ";
+  cmd += dynamaticOutPath;
+  cmd += " 2> ";
+  cmd += dynamaticErrPath;
 
   int status = system(cmd.c_str());
   if (status == 0) {

@@ -96,6 +96,8 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+
+  populateCFDFCAnalysisResult();
 }
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {

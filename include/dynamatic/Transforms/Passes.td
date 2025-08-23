@@ -242,7 +242,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -254,11 +254,10 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     which needs to be setup separately from Dynamatic (and is under a different,
     non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -274,7 +273,21 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"blifFiles", "blif-files", "std::string", "",
+    "Path to AND-Inverter Graphs of dataflow components in Berkeley "
+    "Logic Interchange Format (BLIF).">,
+    Option<"lutDelay", "lut-delay", "double", "0.55",
+    "Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.">,
+    Option<"lutSize", "lut-size", "int", "6",
+    "Maximum LUT input size of the target FPGA.">,
+    Option<"acyclicType", "acyclic-type", "bool", "false",
+    "Method for creating acyclic graphs from cyclic dataflow graph. Required by "
+    "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
+    "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
+    "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 
@@ -456,5 +469,26 @@ def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
   "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
   "mlir::LLVM::LLVMDialect"];
 }
+
+def LLVMMarkMemoryDependencies : Pass<"llvm-mark-memory-dependencies"> {
+  let summary = "Annotate the memory dependency data on LLVM dialect using the result from the memory analysis pass.";
+
+  let description = [{The mlir-translate only retains very few types of meta
+  data from the original LLVMIR. This pass assumes that the LLVM IR and MLIR
+  have identically ordered operations and converts the memory dependency
+  metadata nodes in the original IR into MLIR attributes. This pass is a
+  temporary solution: we should eliminate the middle step of converting to LLVM
+  dialect and directly convert from LLVM IR to CF, and implement the dependency
+  annotation logic there.}];
+
+  let options = [
+      Option<"llvmir", "llvmir", "std::string", "",
+            "Path to the LLVM IR file.">,
+    ];
+
+  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
+}
+
+
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

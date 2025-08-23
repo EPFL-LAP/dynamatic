@@ -2,12 +2,12 @@ add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
   CutlessMapping.cpp
   SubjectGraph.cpp
-  CDGAnalysis.cpp
   CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
   FtdImplementation.cpp
   FtdSupport.cpp
+  CFGAnnotation.cpp
   FormalProperty.cpp
 
   LINK_LIBS PUBLIC

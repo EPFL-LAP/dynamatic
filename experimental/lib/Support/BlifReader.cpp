@@ -43,7 +43,7 @@ void Node::configureConstantNode() {
 }
 
 void Node::convertIOToChannel() {
-  assert((isInput || isOutput) &&
+  assert((isInput || isOutput || isChannelEdge) &&
          "The node should be an IO to convert it to a channel");
   isInput = false;
   isOutput = false;
@@ -228,8 +228,15 @@ void LogicNetwork::generateTopologicalOrder() {
 LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
   LogicNetwork *data = new LogicNetwork();
   std::ifstream file(filename);
+
   if (!file.is_open()) {
-    llvm::errs() << "Unable to open file: " << filename << "\n";
+    llvm::errs()
+        << "The buffer placement algorithm MapBuf expects the BLIF file "
+           "at location: '"
+        << filename
+        << "' which has not been found. Please refer to the doc for "
+           "more information on how to generate it.\n";
+    assert(false && "Unable to open BLIF file");
   }
 
   std::string line;
@@ -300,8 +307,7 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
 
     // Subcircuits. not used for now.
     else if (line.find(".subckt") == 0) {
-      llvm::errs() << "Subcircuits not supported "
-                   << "\n";
+      llvm::errs() << "Subcircuits not supported " << "\n";
       continue;
     }
 

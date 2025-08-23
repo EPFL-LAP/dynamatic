@@ -277,6 +277,8 @@ public:
 
 class Compile : public Command {
 public:
+  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
+      "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
@@ -292,8 +294,12 @@ public:
                "'on-merges' (default option: minimum buffering for "
                "correctness), 'fpga20' (throughput-driven buffering), "
                "'fpl22' (throughput- and timing-driven buffering), or "
-               "costaware (throughput- and area-driven buffering)"});
+               "costaware (throughput- and area-driven buffering), or "
+               "'mapbuf' (simultaneous technology mapping and buffer "
+               "placement)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
+    addFlag({FAST_TOKEN_DELIVERY,
+             "Use fast token delivery strategy to build the circuit"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
@@ -629,18 +635,22 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string fastTokenDelivery =
+      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22" || it->second == "costaware") {
+        it->second == "fpl22" || it->second == "costaware" ||
+        it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
           << "Unknown buffer placement algorithm " << it->second
           << "! Possible options are 'on-merges' (minimum buffering for "
-             "correctness), 'fpga20' (throughput-driven buffering), 'fpl22' "
+             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
              "(throughput- and timing-driven buffering), or 'costaware' "
-             "(throughput- and area-driven buffering).";
+             "(throughput- and area-driven buffering), or 'mapbuf' "
+             "(simultaneous technology mapping and buffer placement).";
       return CommandResult::FAIL;
     }
   }
@@ -654,7 +664,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ);
+                 state.fpUnitsGenerator, rigidification, disableLSQ,
+                 fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
