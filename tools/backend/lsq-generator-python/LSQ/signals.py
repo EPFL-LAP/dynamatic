@@ -13,7 +13,7 @@
 #
 
 from LSQ.context import VHDLContext
-from utils import *
+from LSQ.utils import *
 
 
 class Logic:
