@@ -24,7 +24,8 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
         case EntitySignalType.OUTPUT:
             io_suffix = "o"
             direction = "out"
-            type_declaration = signalSizeToTypeDeclaration(signal_size)
+            
+    type_declaration = signalSizeToTypeDeclaration(signal_size)
 
     return f"""
   {base_name}_{io_suffix} : {direction} {type_declaration}
