@@ -52,13 +52,6 @@ public:
   StringRef getOutputName(unsigned idx) const { return outputs[idx]; }
 
 private:
-  /// Maps the index of an input or output to its port name.
-  using IdxToStrF = const std::function<std::string(unsigned)> &;
-
-  void inferFromInterface(Operation *op);
-
-  /// Infers port names for a Handshake function.
-  void inferFromFuncOp(FuncOp funcOp);
 
   /// List of input port names.
   SmallVector<std::string> inputs;

@@ -28,56 +28,78 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+
 //===----------------------------------------------------------------------===//
-// PortNameGenerator (uses NamedIOInterface)
+// Operand and Result Names
+//===----------------------------------------------------------------------===//
+
+
+/// Returns the name of a result which is either provided by the
+/// handshake::NamedIOInterface interface or, failing that, is its index.
+static std::string getResultName(Operation *op, size_t resIdx) {
+
+  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
+    return nameInterface.getResultName(resIdx);
+  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  };
+
+  op->emitError("all operations must specify result names");
+  assert(0);
+}
+
+/// Returns the name of an operand which is either provided by the
+/// handshake::NamedIOInterface interface  or, failing that, is its index.
+static std::string getOperandName(Operation *op, size_t oprdIdx) {
+
+  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
+    return nameInterface.getOperandName(oprdIdx);
+  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+    return nameInterface.getOperandName(oprdIdx);
+  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+    return nameInterface.getOperandName(oprdIdx);
+  };
+
+  op->emitError("all operations must specify operand names");
+  assert(0);
+}
+
+
+//===----------------------------------------------------------------------===//
+// Operand and Result Names to Port Names
 //===----------------------------------------------------------------------===//
 
 PortNamer::PortNamer(Operation *op) {
   assert(op && "cannot generate port names for null operation");
+
+  // special case: input and output port names
+  // are actually stored in dictionary attributes
   if (auto funcOp = dyn_cast<handshake::FuncOp>(op)){
-    inferFromFuncOp(funcOp);
+    llvm::transform(funcOp.getArgNames(), std::back_inserter(inputs),
+                    [](Attribute arg) { return cast<StringAttr>(arg).str(); });
+    llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
+                    [](Attribute res) { return cast<StringAttr>(res).str(); });
   } else {
-    inferFromInterface(op);
+    // all other operations must direclty provide names for their
+    // inputs and outputs
+
+    for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
+      inputs.push_back(getOperandName(op, idx));
+    for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
+      outputs.push_back(getResultName(op, idx));
+
+    // The Handshake terminator forwards its non-memory inputs to its outputs, so
+    // it needs port names for them
+    if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
+      handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
+      assert(funcOp && "end must be child of handshake function");
+      size_t numResults = funcOp.getFunctionType().getNumResults();
+      for (size_t idx = 0; idx < numResults; ++idx)
+        outputs.push_back(detail::simpleOutputPortName(idx));
+    }
   }
-}
-
-void PortNamer::inferFromInterface(Operation *op) {
-  IdxToStrF inF, outF;
-  if(auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)){
-    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
-    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
-  } else if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
-    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
-    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
-  } else if (auto nameInterface = dyn_cast<handshake::ArithNamedIOInterface>(op)) {
-    inF = [&](unsigned idx) { return nameInterface.getOperandName(idx); };
-    outF = [&](unsigned idx) { return nameInterface.getResultName(idx); };
-  } else {
-    op->emitError("all normal operations must specify port names");
-    assert(false);
-  }
-
-  for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
-    inputs.push_back(inF(idx));
-  for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
-    outputs.push_back(outF(idx));
-
-  // The Handshake terminator forwards its non-memory inputs to its outputs, so
-  // it needs port names for them
-  if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
-    handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
-    assert(funcOp && "end must be child of handshake function");
-    size_t numResults = funcOp.getFunctionType().getNumResults();
-    for (size_t idx = 0, e = numResults; idx < e; ++idx)
-      outputs.push_back(detail::simpleOutputPortName(idx));
-  }
-}
-
-void PortNamer::inferFromFuncOp(handshake::FuncOp funcOp) {
-  llvm::transform(funcOp.getArgNames(), std::back_inserter(inputs),
-                  [](Attribute arg) { return cast<StringAttr>(arg).str(); });
-  llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
-                  [](Attribute res) { return cast<StringAttr>(res).str(); });
 }
 
 //===----------------------------------------------------------------------===//
