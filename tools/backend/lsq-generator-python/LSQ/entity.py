@@ -33,7 +33,7 @@ def makeEntitySignal(base_name, signal):
 
     full_declaration = f"{name} : {direction} {type_declaration};"
     if signal.signal_size.bitwidth == 0:
-        full_declaration = f"--{full_declaration}"
+        full_declaration = f"-- {full_declaration}"
     return f"""
     {full_declaration}
 """.removeprefix("\n")
