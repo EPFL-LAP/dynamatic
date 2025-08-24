@@ -280,7 +280,7 @@ class GroupAllocatorDeclarativeSignals():
             self.comment = f"""
 
     -- Load port index to write into each load queue entry.
-    -- {config.load_queue_num_entries()} signals, each {config.load_port_idx_bitwidth} bit(s).
+    -- {config.load_queue_num_entries()} signals, each {config.load_port_idx_bitwidth()} bit(s).
     -- Not one-hot.
     -- There is inconsistant code implying this signal should not be present 
     -- if there are no load ports.
@@ -364,7 +364,7 @@ class GroupAllocatorDeclarativeSignals():
             self.comment = f"""
 
     -- Store port index to write into each store queue entry.
-    -- {config.store_queue_num_entries()} signals, each {config.store_port_idx_bitwidth} bit(s).
+    -- {config.store_queue_num_entries()} signals, each {config.store_port_idx_bitwidth()} bit(s).
     -- Not one-hot.
     -- There is inconsistant code implying this signal should not be present 
     -- if there are no store ports.
