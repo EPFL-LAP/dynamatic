@@ -39,14 +39,14 @@ class Entity():
   def __init__(self):
     self.signals = ""
 
-    def __init__(self, declaration):
-      self.signals = ""
-      for signal in declaration.io_signals:
-         self._addSignal(
-            signal.rtl_name,
-            signal.signal_size,
-            signal.direction
-         )
+  def __init__(self, declaration):
+    self.signals = ""
+    for signal in declaration.io_signals:
+        self._addSignal(
+          signal.rtl_name,
+          signal.signal_size,
+          signal.direction
+        )
 
   def addInputSignal(self, signal_base_name, signal_size):
     self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.INPUT)
