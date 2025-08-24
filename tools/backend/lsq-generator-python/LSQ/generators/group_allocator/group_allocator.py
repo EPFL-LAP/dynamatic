@@ -7,39 +7,41 @@ from LSQ.config import Config
 from LSQ.entity import Entity
 from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeSignals
+from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals, GroupAllocatorDeclarativeLocalSignals
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
-        s = GroupAllocatorDeclarativeSignals()
+        io = GroupAllocatorDeclarativeIOSignals()
         self.io_signals = [
-            s.Reset(),
-            s.Clock(),
+            io.Reset(),
+            io.Clock(),
 
-            s.GroupInitValid(config),
-            s.GroupInitReady(config),
+            io.GroupInitValid(config),
+            io.GroupInitReady(config),
 
-            s.LoadQueueTailPointer(config),
-            s.LoadQueueHeadPointer(config),
-            s.LoadQueueIsEmpty(),
+            io.LoadQueueTailPointer(config),
+            io.LoadQueueHeadPointer(config),
+            io.LoadQueueIsEmpty(),
 
-            s.StoreQueueTailPointer(config),
-            s.StoreQueueHeadPointer(config),
-            s.StoreQueueIsEmpty(),
+            io.StoreQueueTailPointer(config),
+            io.StoreQueueHeadPointer(config),
+            io.StoreQueueIsEmpty(),
 
-            s.LoadQueueWriteEnable(config),
-            s.NumNewLoadQueueEntries(config),
-            s.LoadPortIndexPerLoadQueueEntry(config),
+            io.LoadQueueWriteEnable(config),
+            io.NumNewLoadQueueEntries(config),
+            io.LoadPortIndexPerLoadQueueEntry(config),
 
-            s.StoreQueueWriteEnable(config),
-            s.NumNewStoreQueueEntries(config),
-            s.StorePortIndexPerStoreQueueEntry(config),
+            io.StoreQueueWriteEnable(config),
+            io.NumNewStoreQueueEntries(config),
+            io.StorePortIndexPerStoreQueueEntry(config),
 
-            s.StorePositionPerLoad(config)
+            io.StorePositionPerLoad(config)
         ]
 
+        l = GroupAllocatorDeclarativeLocalSignals()
         self.local_signals = [
-            s.NumNewLoadQueueEntries(config)
+            l.NumNewLoadQueueEntries(config),
+            l.NumNewStoreQueueEntries(config)
         ]
 
     
@@ -142,7 +144,7 @@ class GroupAllocator:
 
         architecture = architecture.get(self.module_name)
 
-
+        quit()
 
         # IOs
 

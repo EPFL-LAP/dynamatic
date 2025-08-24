@@ -3,7 +3,7 @@ from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-class GroupAllocatorDeclarativeSignals():
+class GroupAllocatorDeclarativeIOSignals():
     class Reset():
         """
         Input: generic RTL reset signal
@@ -414,3 +414,50 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = STORE_POSITION_PER_LOAD_NAME
             
             self.direction = EntitySignalType.OUTPUT
+
+class GroupAllocatorDeclarativeLocalSignals():
+    class NumNewLoadQueueEntries():
+        """
+        Intermediate local signal that is the same as the NumNewLoadQueueEntries output.
+        Used to make the value internally readable, to shift the load queue write enables.
+        """
+        def __init__(self, config : Config):
+
+            # There is a single N-bit "number of load queue entries to allocate" signal
+            # and its bitwidth is equal to the bitwidth of the load queue pointers, to allow easy arithmetic between then.
+            self.signal_size = SignalSize(
+                                bitwidth=config.load_queue_idx_bitwidth(), 
+                                number=1
+                                )
+
+            self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
+                        
+            self.comment = f"""
+
+    -- Intermediate local signal that is the same as the NumNewLoadQueueEntries output.
+    -- Used to make the value internally readable
+    -- to shift the load queue write enables.
+""".removeprefix("\n")
+            
+    class NumNewStoreQueueEntries():
+        """
+        Intermediate local signal that is the same as the NumNewStoreQueueEntries output.
+        Used to make the value internally readable, to shift the store queue write enables.
+        """
+        def __init__(self, config : Config):
+
+            # There is a single N-bit "number of store queue entries to allocate" signal
+            # and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
+            self.signal_size = SignalSize(
+                                bitwidth=config.store_queue_idx_bitwidth(), 
+                                number=1
+                                )
+
+            self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
+            
+            self.comment = f"""
+
+    -- Intermediate local signal that is the same as the NumNewStoreQueueEntries output.
+    -- Used to make the value internally readable
+    -- to shift the store queue write enables.
+""".removeprefix("\n")
