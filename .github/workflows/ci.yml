@@ -87,7 +87,14 @@ jobs:
 
       - name: performance-report
         run: |
-          python tools/integration/generate_perf_report.py >> $GITHUB_STEP_SUMMARY
+          git checkout origin/main perf_ci.bin 
+          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
+          mv perf_ci_branch.bin perf_ci.bin
+          git config --global user.name 'Eugen Bosnjak'
+          git config --global user.email '11596160+ebosnjak@users.noreply.github.com'
+          git add perf_ci.bin
+          git commit -m "[AUTO][CI] Update performance report"
+          git push
 
       - uses: actions/upload-artifact@v4
         if: steps.build.outputs.exit_code == 0
