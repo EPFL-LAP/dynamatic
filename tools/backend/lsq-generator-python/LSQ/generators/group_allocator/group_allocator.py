@@ -110,7 +110,7 @@ class GroupAllocator:
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
 
-        declaration = GroupAllocatorDeclarative()
+        declaration = GroupAllocatorDeclarative(config)
 
         entity = Entity(declaration)
 
