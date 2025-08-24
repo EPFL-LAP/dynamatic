@@ -112,4 +112,7 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
                                          "loop_path", "nested_loop",
                                          "single_loop", "sparse", "subdiag",
-                                         "subdiag_fast"));
+                                         "subdiag_fast"),
+                        [](const auto &info) {
+                          return "spec_" + info.param;
+                        });
