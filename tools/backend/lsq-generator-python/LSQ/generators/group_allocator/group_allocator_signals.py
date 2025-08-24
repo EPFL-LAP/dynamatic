@@ -214,7 +214,11 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.OUTPUT
 
-            self.comment = None
+            self.comment = f"""
+
+    -- Load queue write enable signals
+    -- {config.ldq_num_entries()} signals, one for each queue entry.
+""".removeprefix("\n")
 
     class NumNewLoadQueueEntries():
         """
@@ -236,6 +240,7 @@ class GroupAllocatorDeclarativeSignals():
             self.direction = EntitySignalType.OUTPUT
             
             self.comment = f"""
+
     -- Number of new load queue entries to allocate.
     -- Used by the load queue to update its tail pointer.
     -- Bitwidth equal to the load queue pointer bitwidth.
@@ -256,6 +261,7 @@ class GroupAllocatorDeclarativeSignals():
                                 )
 
             self.comment = f"""
+
     -- Load port index to write into each load queue entry.
     -- {config.ldq_num_entries()} signals, each {config.ldpAddrW} bit(s).
     -- This signal is not present if there is a single load port into the LSQ.
