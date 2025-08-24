@@ -40,9 +40,9 @@ def parse_xml(path):
             fail_messages.append(f.attrib["message"])
 
         if len(fail_messages) > 0:
-            result = "fail"
+            result = "**fail** :x:"
         else:
-            result = "pass"
+            result = "pass :heavy_check_mark:"
 
         row["name"] = test_name
         row["result"] = result
