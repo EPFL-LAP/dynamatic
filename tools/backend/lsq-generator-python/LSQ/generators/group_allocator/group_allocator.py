@@ -16,6 +16,7 @@ class GroupAllocatorDeclarative():
             s.Clock(),
 
             s.GroupInitValid(config),
+            s.GroupInitReady(config),
 
             s.LoadQueueTailPointer(config),
             s.LoadQueueHeadPointer(config),

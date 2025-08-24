@@ -86,10 +86,7 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = f"""
-
-    -- Input signals from the load queue
-""".removeprefix("\n")
+            self.comment = None
 
     class LoadQueueTailPointer():
         """
@@ -108,7 +105,10 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.comment = f"""
+
+    -- Input signals from the load queue
+""".removeprefix("\n")
 
     class LoadQueueHeadPointer():
         """
