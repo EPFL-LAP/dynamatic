@@ -4,6 +4,8 @@ GoogleTest's .xml outputs.
 """
 
 import os
+import sys
+import pickle
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -129,11 +131,41 @@ def table(header, data):
 def main():
     """
     Entry point.
+
+    Arguments:
+    `save_path` -- Path to which the pickled performance report will be saved.
+    `compare_path` -- Path of perf. report against which this one will be compared.
     """
+    if len(sys.argv) < 3:
+        print("Error: Not enough arguments")
+        exit(-1)
+
+    data = {
+        "columns": ["name", "cycles", "result", "old_cycles"],
+        "data": parse_results(RESULTS_DIR)
+    }
+
+    with open(sys.argv[1], "wb") as f:
+        pickle.dump(data, f)
+
+    with open(sys.argv[2], "rb") as f:
+        old_data = pickle.load(f)
+
+    for old_row in old_data["data"]:
+        if "fail" in old_row["result"]:
+            continue
+
+        test_name = old_row["name"]
+        cycles = old_row["cycles"]
+
+        for row in data["data"]:
+            if row["name"] == test_name:
+                row["old_cycles"] = cycles
+
     print("## Performance Report")
     print(table(
-        ["name", "cycles", "result"],
-        parse_results(RESULTS_DIR)
+        data["columns"],
+        data["data"]
     ))
 
 
