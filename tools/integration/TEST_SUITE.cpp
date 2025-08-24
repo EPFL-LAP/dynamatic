@@ -88,7 +88,8 @@ INSTANTIATE_TEST_SUITE_P(
                     "pivot", "polyn_mult", "simple_example_1", "sobel", "spmv",
                     "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
                     "test_stdint", "threshold", "triangular", "vector_rescale",
-                    "video_filter", "while_loop_1", "while_loop_3"));
+                    "video_filter", "while_loop_1", "while_loop_3"),
+    [](const auto &info) { return info.param; });
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
@@ -109,6 +110,6 @@ INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
-                                         "loop_path", "nested_loop",
-                                         "single_loop", "sparse", "subdiag",
-                                         "subdiag_fast"));
+                                         "loop_path", "nested_loop", "sparse",
+                                         "subdiag", "subdiag_fast"),
+                         [](const auto &info) { return "spec_" + info.param; });

@@ -85,6 +85,10 @@ jobs:
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
 
+      - name: performance-report
+        run: |
+          python tools/integration/generate_perf_report.py >> $GITHUB_STEP_SUMMARY
+
       - uses: actions/upload-artifact@v4
         if: steps.build.outputs.exit_code == 0
         with: 
