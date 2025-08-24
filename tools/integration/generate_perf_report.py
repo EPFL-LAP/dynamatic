@@ -141,7 +141,7 @@ def main():
         exit(-1)
 
     data = {
-        "columns": ["name", "cycles", "result", "old_cycles"],
+        "columns": ["name", "cycles", "result", "old_cycles", "comparison"],
         "data": parse_results(RESULTS_DIR)
     }
 
@@ -156,11 +156,23 @@ def main():
             continue
 
         test_name = old_row["name"]
-        cycles = old_row["cycles"]
+        old_cycles = old_row["cycles"]
 
         for row in data["data"]:
             if row["name"] == test_name:
-                row["old_cycles"] = cycles
+                row["old_cycles"] = old_cycles
+
+                try:
+                    diff = int(row["cycles"]) - int(row["old_cycles"])
+                    if diff < 0:
+                        row["comparison"] = f"{diff} :heavy_check_mark:"
+                    elif diff > 0:
+                        row["comparison"] = f"**{diff}** :heavy_exclamation_mark:"
+                    else:
+                        row["comparison"] = f"{diff} :heavy_minus_sign:"
+
+                except ValueError:
+                    pass
 
     print("## Performance Report")
     print(table(
