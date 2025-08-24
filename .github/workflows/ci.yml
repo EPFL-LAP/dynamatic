@@ -69,6 +69,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          ref: ${{ github.head_ref }}
 
       - name: build
         run: ./build.sh --release --force
@@ -86,13 +87,11 @@ jobs:
         run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
-        if: github.event.pull_request.merged == false
         run: |
-          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
-
-      - name: save-performance-report
-        if: github.event.pull_request.merged == true
-        run: |
+          git status
+          git fetch origin main --no-recurse-submodules
+          rm perf_ci.bin
+          git checkout FETCH_HEAD -- perf_ci.bin 
           python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
           mv perf_ci_branch.bin perf_ci.bin
           git config --global user.name 'Eugen Bosnjak'
