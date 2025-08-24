@@ -1,7 +1,7 @@
 from LSQ.entity import signalSizeToTypeDeclaration, SignalSize
 
 def makeArchitectureSignal(base_name, signal):
-  name = base_name.ljust("20")
+  name = base_name.ljust(20)
   type_declaration = signalSizeToTypeDeclaration(signal.signal_size)
   return f"""
   signal {name} : {type_declaration};
