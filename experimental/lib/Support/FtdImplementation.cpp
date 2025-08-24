@@ -245,6 +245,11 @@ static BoolExpression *enumeratePaths(Block *start, Block *end,
   // Find all the paths from the producer to the consumer, using a DFS
   std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
 
+  // If the start and end block are the same (e.g., BB0 to BB0) and there is no
+  // real path between them, then consider the sop = 1
+  if (start == end && allPaths.size() == 0)
+    sop = BoolExpression::boolOne();
+
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
 
