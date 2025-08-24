@@ -57,7 +57,11 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.comment = f"""
+
+    -- Group init signals from the dataflow circuit
+    -- {config.num_groups()} signals, one for each group of memory operations.
+""".removeprefix("\n")
 
     class GroupInitReady():
         """
@@ -82,7 +86,10 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.comment = f"""
+
+    -- Input signals from the load queue
+""".removeprefix("\n")
 
     class LoadQueueTailPointer():
         """
@@ -157,7 +164,11 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+
+            self.comment = f"""
+
+    -- Input signals from the store queue
+""".removeprefix("\n")
 
     class StoreQueueHeadPointer():
         """
