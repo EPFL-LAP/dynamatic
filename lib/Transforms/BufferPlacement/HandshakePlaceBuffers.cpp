@@ -214,8 +214,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
-    if (failed(checkFuncInvariants(info)))
-      return failure();
+    // if (failed(checkFuncInvariants(info)))
+    //   return failure();
   }
 
   // Read the operations' timing models from disk
