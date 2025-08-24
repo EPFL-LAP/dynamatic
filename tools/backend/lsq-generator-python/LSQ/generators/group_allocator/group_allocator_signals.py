@@ -1,4 +1,4 @@
-from LSQ.entity import SignalSize, EntitySignalType
+from LSQ.entity import SignalSize, EntitySignalType, Entity
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
@@ -453,7 +453,7 @@ class GroupAllocatorDeclarativeLocalSignals():
                                 number=1
                                 )
 
-            self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
+            self.rtl_name = NUM_NEW_STORE_QUEUE_ENTRIES_NAME
             
             self.comment = f"""
 
@@ -461,3 +461,30 @@ class GroupAllocatorDeclarativeLocalSignals():
     -- Used to make the value internally readable
     -- to shift the store queue write enables.
 """.removeprefix("\n")
+
+class Empty():
+    pass
+
+class GroupAllocatorDeclarativeBody():
+    class GroupHandshaking():
+        def __init__(self, config : Config):
+
+            group_handshaking_declarative = Empty()
+
+            io = GroupAllocatorDeclarativeIOSignals()
+            group_handshaking_declarative.io_signals = [
+                io.LoadQueueHeadPointer(config),
+                io.LoadQueueTailPointer(config),
+                io.StoreQueueHeadPointer(config),
+                io.StoreQueueTailPointer(config),
+                io.GroupInitValid(config),
+                io.GroupInitReady(config)
+            ]
+
+
+            entity = Entity(group_handshaking_declarative)
+
+            self.statement = entity.instantiate(
+                "GroupHandshaking",
+                "GroupHandshaking"
+            )

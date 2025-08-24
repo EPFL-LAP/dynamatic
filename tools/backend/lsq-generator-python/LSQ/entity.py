@@ -39,12 +39,25 @@ def makeEntitySignal(base_name, signal):
 """.removeprefix("\n")
     
 
+
+def makeInstantiationSignal(base_name, signal):
+    name = f"{base_name}"
+
+    full_declaration = f"{name},"
+    if signal.signal_size.bitwidth == 0:
+        full_declaration = f"-- {full_declaration}"
+    return f"""
+    {full_declaration}
+""".removeprefix("\n")
+    
+
 class Entity():
   def __init__(self):
-    self.signals = ""
+    self.entity_signals = ""
 
   def __init__(self, declaration):
-    self.signals = ""
+    self.entity_signals = ""
+    self.instantiate_signals = ""
     for signal in declaration.io_signals:
         self._addSignal(signal)
 
@@ -58,35 +71,64 @@ class Entity():
 
   def _addSignal(self, signal):
     if signal.comment is not None:
-      self.signals += signal.comment
+      self.entity_signals += signal.comment
       
     if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(
          signal.rtl_name,
-          signal
+         signal
         )
-      self.signals += newSignal
+      self.entity_signals += newSignal
+
+      newSignal = makeInstantiationSignal(
+        signal.rtl_name,
+         signal
+      )
+      self.instantiate_signals += newSignal
+
     else:
       for i in range(signal.signal_size.number):
         newSignal = makeEntitySignal(
           f"{signal.rtl_name}_{i}",
           signal
           )
-        self.signals += newSignal
+        self.entity_signals += newSignal
+
+        newSignal = makeInstantiationSignal(
+          f"{signal.rtl_name}_{i}",
+          signal
+      )
+      self.instantiate_signals += newSignal
 
 
   def get(self, name, entity_type):
     # remove leading whitespace
     # the required leading whitespace is present in the string
     # and remove final character, which is a semi-colon
-    self.signals = self.signals.lstrip()[:-1]
+    self.entity_signals = self.entity_signals.lstrip()[:-1]
 
     entity = f"""
 -- {entity_type}
 entity {name} is
   port(
-    {self.signals}
+    {self.entity_signals}
   );
 end entity;
 """
     print(entity)
+
+  def instantiate(self, unit_name, entity_name):
+    # remove leading whitespace
+    # the required leading whitespace is present in the string
+    # and remove final character, which is a semi-colon
+    self.entity_signals = self.entity_signals.lstrip()[:-1]
+
+    entity = f"""
+
+{unit_name} : entity work.{entity_name}
+  port(
+    {self.entity_signals}
+  );
+"""
+    print(entity)
+

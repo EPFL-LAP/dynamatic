@@ -7,7 +7,7 @@ from LSQ.config import Config
 from LSQ.entity import Entity
 from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals, GroupAllocatorDeclarativeLocalSignals
+from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals, GroupAllocatorDeclarativeLocalSignals, GroupAllocatorDeclarativeBody
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
@@ -42,6 +42,11 @@ class GroupAllocatorDeclarative():
         self.local_signals = [
             l.NumNewLoadQueueEntries(config),
             l.NumNewStoreQueueEntries(config)
+        ]
+
+        b = GroupAllocatorDeclarativeBody()
+        self.body = [
+            b.GroupHandshaking(config)
         ]
 
     
@@ -167,7 +172,9 @@ class GroupAllocator:
 
         # The number of empty load and store is calculated with cyclic subtraction.
         # If the empty signal is high, then set the number to max value.
+
         loads_sub = LogicVec(ctx, 'loads_sub', 'w', self.configs.ldqAddrW)
+
         stores_sub = LogicVec(ctx, 'stores_sub', 'w', self.configs.stqAddrW)
         empty_loads = LogicVec(ctx, 'empty_loads', 'w',
                                self.configs.emptyLdAddrW)

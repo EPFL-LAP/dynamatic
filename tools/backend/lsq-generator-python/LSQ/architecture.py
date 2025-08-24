@@ -13,6 +13,10 @@ class Architecture():
     for signal in declaration.local_signals:
       self._addSignal(signal)
 
+    self.statements = ""
+    for statement in declaration.body:
+      self._addStatement(statement)
+
   def _addSignal(self, signal):
     if signal.comment is not None:
       self.signals += signal.comment
@@ -31,7 +35,9 @@ class Architecture():
             )
         self.signals += newSignal
 
-    
+  def _addStatement(self, statement):
+    self.statements += statement.statement
+
   def get(self, name):
     # remove leading whitespace
     # the required leading whitespace is present in the string
@@ -40,8 +46,9 @@ class Architecture():
 
     architecture = f"""
 architecture arch of {name} is
-    {self.signals}
+  {self.signals}
 begin
+  {self.statements}
 end architecture;
 """
     print(architecture)
