@@ -130,5 +130,5 @@ end entity;
     {self.entity_signals}
   );
 """
-    print(entity)
+    return entity
 
