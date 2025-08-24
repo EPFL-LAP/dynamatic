@@ -87,9 +87,9 @@ jobs:
 
       - name: performance-report
         run: |
-          git fetch --recurse-submodules=no
+          git fetch origin main --recurse-submodules=no
           rm perf_ci.bin
-          git checkout origin/main -- perf_ci.bin 
+          git checkout FETCH_HEAD -- perf_ci.bin 
           python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
           mv perf_ci_branch.bin perf_ci.bin
           git config --global user.name 'Eugen Bosnjak'
