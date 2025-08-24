@@ -88,7 +88,8 @@ INSTANTIATE_TEST_SUITE_P(
                     "pivot", "polyn_mult", "simple_example_1", "sobel", "spmv",
                     "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
                     "test_stdint", "threshold", "triangular", "vector_rescale",
-                    "video_filter", "while_loop_1", "while_loop_3"));
+                    "video_filter", "while_loop_1", "while_loop_3"),
+    [](const auto &info) { return info.param; });
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
