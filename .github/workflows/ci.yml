@@ -87,6 +87,7 @@ jobs:
         run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
+        if: steps.build.outputs.exit_code == 0
         run: |
           git status
           git fetch origin main --no-recurse-submodules
