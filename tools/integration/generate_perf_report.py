@@ -1,3 +1,8 @@
+"""
+This script outputs a performance report generated from 
+GoogleTest's .xml outputs.
+"""
+
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -26,6 +31,15 @@ def find_files_ext(directory, ext):
 
 
 def parse_xml(path):
+    """
+    Parses a single .xml report.
+
+    Arguments:
+    `path` -- XML file path
+
+    Returns: List of dictionaries describing the logged information
+    for each test case found in the report. 
+    """
     tree = ET.parse(path)
     root = tree.getroot()
 
@@ -60,6 +74,15 @@ def parse_xml(path):
 
 
 def parse_results(path):
+    """
+    Collects data from all reports in a folder and its subtree.
+
+    Arguments:
+    `path` -- Directory path
+
+    Returns: List of dictionaries describing the logged information
+    found in all reports.
+    """
     xml_files = find_files_ext(path, ".xml")
 
     columns = ["name", "result", "cycles"]
@@ -72,6 +95,17 @@ def parse_results(path):
 
 
 def table(header, data):
+    """
+    Generates a markdown table with the given data.
+
+    Arguments:
+    `header` -- List of column names
+    `data` -- List of dictionaries representing rows in the table;
+    keys correspond to elements of header (i.e. column names)
+
+    Returns: A string representing a markdown table containing the
+    given data.
+    """
     res = ""
     for elem in header:
         res += f"| {elem} "
@@ -93,6 +127,9 @@ def table(header, data):
 
 
 def main():
+    """
+    Entry point.
+    """
     print("## Performance Report")
     print(table(
         ["name", "cycles", "result"],
