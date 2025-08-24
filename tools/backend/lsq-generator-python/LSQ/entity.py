@@ -5,6 +5,7 @@ class SignalSize():
         self.bitwidth = bitwidth
         self.number = number
 
+
 def signalSizeToTypeDeclaration(signal_size):
     if signal_size.bitwidth == 1:
         return "std_logic"
@@ -35,11 +36,14 @@ class Entity():
   def __init__(self):
     self.signals = ""
 
+
   def addInputSignal(self, signal_base_name, signal_size):
     self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.INPUT)
 
+
   def addOutputSignal(self, signal_base_name, signal_size):
     self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.OUTPUT)
+
 
   def _addSignal(
       self,
@@ -63,8 +67,13 @@ class Entity():
           )
         self.signals += newSignal
 
+
   def get(self, name, entity_type):
+    # remove leading whitespace
+    # the required leading whitespace is present in the string
+    # and remove final character, which is a semi-colon
     self.signals = self.signals.lstrip()[:-1]
+
     entity = f"""
 -- {entity_type}
 entity {name} is
@@ -72,6 +81,7 @@ entity {name} is
     rst : in std_logic;
     clk : in std_logic;
     {self.signals}
-)
+  );
+end entity;
 """
     print(entity)

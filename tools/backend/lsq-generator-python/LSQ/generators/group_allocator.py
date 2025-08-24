@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriority
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, SignalSize
+from LSQ.entity import Entity, SignalSize,
 
 
 class GroupAllocator:
@@ -102,7 +102,7 @@ class GroupAllocator:
         )
         entity.addOutputSignal(
             "group_init_ready",
-            SignalSize(bitwidth=1, number=config.numGroups)
+            SignalSize(bitwidth=1, number=config.numGroups),
         )
 
         entity.addInputSignal(
@@ -110,50 +110,94 @@ class GroupAllocator:
             SignalSize(bitwidth=config.ldqAddrW, number=1)
         )
 
+        entity.addInputSignal(
+            "ldq_head",
+            SignalSize(bitwidth=config.ldqAddrW, number=1)
+        )
+
+        entity.addInputSignal(
+            "ldq_empty",
+            SignalSize(bitwidth=1, number=1)
+        )
+
+        entity.addInputSignal(
+            "stq_tail",
+            SignalSize(bitwidth=config.stqAddrW, number=1)
+        )
+
+        entity.addInputSignal(
+            "stq_head",
+            SignalSize(bitwidth=config.stqAddrW, number=1)
+        )
+
+        entity.addInputSignal(
+            "stq_empty",
+            SignalSize(bitwidth=1, number=1)
+        )
+
+        entity.addOutputSignal(
+            "ldq_wen",
+            SignalSize(bitwidth=1, number=config.numLdqEntries)
+        )
+
+        entity.addOutputSignal(
+            "num_loads",
+            SignalSize(bitwidth=config.ldqAddrW, number=1)
+        )
+
+        if(config.ldpAddrW > 0):
+            entity.addOutputSignal(
+                "ldq_port_idx",
+                SignalSize(
+                    bitwidth=config.numLdqEntries, 
+                    number=config.ldpAddrW)
+            )
+        
+        entity.addOutputSignal(
+            "stq_wen",
+            SignalSize(bitwidth=1, number=config.numStqEntries)
+        )
+
+        entity.addOutputSignal(
+            "num_stores",
+            SignalSize(bitwidth=config.stqAddrW, number=1)
+        )
+
+        if (config.stpAddrW > 0):
+            entity.addOutputSignal(
+                "stq_port_idx",
+                SignalSize(bitwidth=config.numStqEntries),
+                SignalSize(config.stpAddrW)
+            )
+
+        entity.addOutputSignal(
+            "ga_ls_order",
+            SignalSize(
+                bitwidth=config.numLdqEntries, 
+                number=config.numStqEntries)
+        )
+
         entity.get(self.module_name, "Group Allocator")
         quit()
-        
-#         entity = f"""\
-        
-# entity {self.module_name} is
-# port(
-#   rst : in std_logic;
-#   clk : in std_logic;
-#   group_init_valid_i 
-# ) 
-# end entity;
-#         """
 
         # IOs
-        group_init_valid_i = LogicArray(
-            ctx, 'group_init_valid', 'i', self.configs.numGroups)
-        group_init_ready_o = LogicArray(
-            ctx, 'group_init_ready', 'o', self.configs.numGroups)
 
-        ldq_tail_i = LogicVec(ctx, 'ldq_tail', 'i', self.configs.ldqAddrW)
-        ldq_head_i = LogicVec(ctx, 'ldq_head', 'i', self.configs.ldqAddrW)
-        ldq_empty_i = Logic(ctx, 'ldq_empty', 'i')
+        # ldq_wen_o = LogicArray(ctx, 'ldq_wen', 'o', self.configs.numLdqEntries)
+        # num_loads_o = LogicVec(ctx, 'num_loads', 'o', self.configs.ldqAddrW)
+        # num_loads = LogicVec(ctx, 'num_loads', 'w', self.configs.ldqAddrW)
+        # if (self.configs.ldpAddrW > 0):
+        #     ldq_port_idx_o = LogicVecArray(
+        #         ctx, 'ldq_port_idx', 'o', self.configs.numLdqEntries, self.configs.ldpAddrW)
 
-        stq_tail_i = LogicVec(ctx, 'stq_tail', 'i', self.configs.stqAddrW)
-        stq_head_i = LogicVec(ctx, 'stq_head', 'i', self.configs.stqAddrW)
-        stq_empty_i = Logic(ctx, 'stq_empty', 'i')
+        # stq_wen_o = LogicArray(ctx, 'stq_wen', 'o', self.configs.numStqEntries)
+        # num_stores_o = LogicVec(ctx, 'num_stores', 'o', self.configs.stqAddrW)
+        # # num_stores = LogicVec(ctx, 'num_stores', 'w', self.configs.stqAddrW)
+        # if (self.configs.stpAddrW > 0):
+        #     stq_port_idx_o = LogicVecArray(
+        #         ctx, 'stq_port_idx', 'o', self.configs.numStqEntries, self.configs.stpAddrW)
 
-        ldq_wen_o = LogicArray(ctx, 'ldq_wen', 'o', self.configs.numLdqEntries)
-        num_loads_o = LogicVec(ctx, 'num_loads', 'o', self.configs.ldqAddrW)
-        num_loads = LogicVec(ctx, 'num_loads', 'w', self.configs.ldqAddrW)
-        if (self.configs.ldpAddrW > 0):
-            ldq_port_idx_o = LogicVecArray(
-                ctx, 'ldq_port_idx', 'o', self.configs.numLdqEntries, self.configs.ldpAddrW)
-
-        stq_wen_o = LogicArray(ctx, 'stq_wen', 'o', self.configs.numStqEntries)
-        num_stores_o = LogicVec(ctx, 'num_stores', 'o', self.configs.stqAddrW)
-        num_stores = LogicVec(ctx, 'num_stores', 'w', self.configs.stqAddrW)
-        if (self.configs.stpAddrW > 0):
-            stq_port_idx_o = LogicVecArray(
-                ctx, 'stq_port_idx', 'o', self.configs.numStqEntries, self.configs.stpAddrW)
-
-        ga_ls_order_o = LogicVecArray(
-            ctx, 'ga_ls_order', 'o', self.configs.numLdqEntries, self.configs.numStqEntries)
+        # ga_ls_order_o = LogicVecArray(
+        #     ctx, 'ga_ls_order', 'o', self.configs.numLdqEntries, self.configs.numStqEntries)
 
         # The number of empty load and store is calculated with cyclic subtraction.
         # If the empty signal is high, then set the number to max value.
