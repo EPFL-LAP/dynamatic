@@ -68,9 +68,12 @@ class Config:
 
             # numStqEntries
             self._stq_num_entries = obj["fifoDepth_S"]
+
+            # numLdPorts
+            self._num_ld_ports = obj["numLoadPorts"]
             
-            self.numLdPorts = obj["numLoadPorts"]
-            self.numStPorts = obj["numStorePorts"]
+            # numStPorts
+            self._num_st_ports = obj["numStorePorts"]
 
             self._num_groups = obj["numBBs"]
 
@@ -145,7 +148,7 @@ class Config:
         """
         return self._ldq_num_entries
     
-    def load_port_idx_bitwidth(self) -> int:
+    def load_ports_idx_bitwidth(self) -> int:
         """
         Bitwidth required to identify a load port.
         Calculated by ceil(log2(num_load_ports))
@@ -161,7 +164,7 @@ class Config:
         """
         return self._stq_num_entries
     
-    def store_port_idx_bitwidth(self) -> int:
+    def store_ports_idx_bitwidth(self) -> int:
         """
         Bitwidth required to identify a store port.
         Calculated by ceil(log2(num_store_ports))
@@ -170,3 +173,15 @@ class Config:
         but there are checks for if it is equal to 0 across the code
         """
         return self._stp_idx_w
+    
+    def store_ports_num(self) -> int:
+        """
+        Number of store ports.
+        """
+        return self._num_st_ports
+    
+    def load_ports_num(self) -> int:
+        """
+        Number of load ports.
+        """
+        return self._num_ld_ports

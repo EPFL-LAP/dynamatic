@@ -273,18 +273,19 @@ class GroupAllocatorDeclarativeSignals():
             # There are N M-bit signals. One per load queue entry
             # and with the bitdwith required to identify a load port
             self.signal_size = SignalSize(
-                                bitwidth=config.load_port_idx_bitwidth(), 
+                                bitwidth=config.load_ports_idx_bitwidth(), 
                                 number=config.load_queue_num_entries()
                                 )
 
             self.comment = f"""
 
     -- Load port index to write into each load queue entry.
-    -- {config.load_queue_num_entries()} signals, each {config.load_port_idx_bitwidth()} bit(s).
+    -- {config.load_queue_num_entries()} signals, each {config.load_ports_idx_bitwidth()} bit(s).
     -- Not one-hot.
     -- There is inconsistant code implying this signal should not be present 
     -- if there are no load ports.
     -- But it is currently added regardless (with bitwidth 1)
+    -- Actual number of load ports: {config.load_ports_num()}
 """.removeprefix("\n")
 
             self.rtl_name = LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME
@@ -357,18 +358,19 @@ class GroupAllocatorDeclarativeSignals():
             # There are N M-bit signals. One per store queue entry
             # and with the bitdwidth required to identify a store port
             self.signal_size = SignalSize(
-                                bitwidth=config.store_port_idx_bitwidth(), 
+                                bitwidth=config.store_ports_idx_bitwidth(), 
                                 number=config.store_queue_num_entries()
                                 )
 
             self.comment = f"""
 
     -- Store port index to write into each store queue entry.
-    -- {config.store_queue_num_entries()} signals, each {config.store_port_idx_bitwidth()} bit(s).
+    -- {config.store_queue_num_entries()} signals, each {config.store_ports_idx_bitwidth()} bit(s).
     -- Not one-hot.
     -- There is inconsistant code implying this signal should not be present 
     -- if there are no store ports.
     -- But it is currently added regardless (with bitwidth 1)
+    -- Actual number of store ports: {config.store_ports_num()}
 """.removeprefix("\n")
 
             self.rtl_name = STORE_PORT_INDEX_PER_STORE_QUEUE_NAME
