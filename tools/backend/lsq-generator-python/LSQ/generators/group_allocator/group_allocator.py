@@ -38,7 +38,7 @@ class GroupAllocatorDeclarative():
             s.StorePositionPerLoad(config)
         ]
 
-        self.internal_signals = [
+        self.local_signals = [
             s.NumNewLoadQueueEntries(config)
         ]
 
