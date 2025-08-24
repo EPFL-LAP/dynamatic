@@ -302,7 +302,7 @@ class GroupAllocatorDeclarativeSignals():
             # As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
             self.signal_size = SignalSize(
                                 bitwidth=1, 
-                                number=config.stq_num_entries()
+                                number=config.store_queue_num_entries()
                                 )
 
             self.rtl_name = STORE_QUEUE_WRITE_ENABLE_NAME
@@ -317,7 +317,7 @@ class GroupAllocatorDeclarativeSignals():
 
     class NumNewStoreQueueEntries():
         """
-        Output: Number of store queue entries to allocate, which is output directly to the load queue.
+        Output: Number of store queue entries to allocate, which is output directly to the store queue.
         Non-handshaked signal. Used by the store queue to update its tail pointer, using update logic appropriate to circular buffers.
         There is a single "number of store queue entries to allocate" signal, and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
         """
@@ -343,9 +343,9 @@ class GroupAllocatorDeclarativeSignals():
 
     class StorePortIndexPerStoreQueueEntry():
         """
-        Output: Which load port index to allocate into each load queue entry. The group allocator uses the head pointer from the load queue to place the load port indices in the correct signal, so that they arrive in the correct load queue entries. This is guarded by the load queue entry write enable, so not all of these signals are used.
+        Output: Which store port index to allocate into each store queue entry. The group allocator uses the head pointer from the store queue to place the store port indices in the correct signal, so that they arrive in the correct store queue entries. This is guarded by the store queue entry write enable, so not all of these signals are used.
 
-        There is one signal per load queue entry, and with the bitwidth required to identify a load port.
+        There is one signal per store queue entry, and with the bitwidth required to identify a store port.
         Not one-hot.
 
         There is inconsistant code implying this signal should not be present 
@@ -358,13 +358,13 @@ class GroupAllocatorDeclarativeSignals():
             # and with the bitdwidth required to identify a store port
             self.signal_size = SignalSize(
                                 bitwidth=config.store_port_idx_bitwidth(), 
-                                number=config.load_queue_num_entries()
+                                number=config.store_queue_num_entries()
                                 )
 
             self.comment = f"""
 
     -- Store port index to write into each store queue entry.
-    -- {config.load_queue_num_entries()} signals, each {config.store_port_idx_bitwidth} bit(s).
+    -- {config.store_queue_num_entries()} signals, each {config.store_port_idx_bitwidth} bit(s).
     -- Not one-hot.
     -- There is inconsistant code implying this signal should not be present 
     -- if there are no store ports.
