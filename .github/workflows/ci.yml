@@ -72,19 +72,19 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - name: build
-        run: ls -l # ./build.sh --release --force
+        run: ./build.sh --release --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
-        run: ls -l # ninja -C build check-dynamatic
+        run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
         if: steps.build.outputs.exit_code == 0
-        run: ls -l # ninja -C build check-dynamatic-experimental
+        run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
-        run: echo skip this # ninja -C build run-ci-integration-tests
+        run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
         run: |
