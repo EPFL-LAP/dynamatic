@@ -166,8 +166,10 @@ class GroupAllocator:
         if (config.stpAddrW > 0):
             entity.addOutputSignal(
                 "stq_port_idx",
-                SignalSize(bitwidth=config.numStqEntries),
-                SignalSize(config.stpAddrW)
+                SignalSize(
+                    bitwidth=config.numStqEntries,
+                    number=config.stpAddrW
+                    )
             )
 
         entity.addOutputSignal(
