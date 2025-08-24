@@ -47,7 +47,7 @@ def makeInstantiationSignal(base_name, signal):
     if signal.signal_size.bitwidth == 0:
         full_declaration = f"-- {full_declaration}"
     return f"""
-    {full_declaration}
+      {full_declaration}
 """.removeprefix("\n")
     
 
@@ -72,6 +72,7 @@ class Entity():
   def _addSignal(self, signal):
     if signal.comment is not None:
       self.entity_signals += signal.comment
+      self.instantiate_signals += signal.comment
       
     if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(

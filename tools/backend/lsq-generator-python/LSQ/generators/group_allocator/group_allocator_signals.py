@@ -473,10 +473,10 @@ class GroupAllocatorDeclarativeBody():
 
             io = GroupAllocatorDeclarativeIOSignals()
             group_handshaking_declarative.io_signals = [
-                io.LoadQueueHeadPointer(config),
                 io.LoadQueueTailPointer(config),
-                io.StoreQueueHeadPointer(config),
+                io.LoadQueueHeadPointer(config),
                 io.StoreQueueTailPointer(config),
+                io.StoreQueueHeadPointer(config),
                 io.GroupInitValid(config),
                 io.GroupInitReady(config)
             ]
