@@ -52,9 +52,10 @@ constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 /// Annotation to use when a suppression branch is added which needs to go
 /// through the suppression mechanism again.
 constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
-/// Annotation to use for a multiplxer crated with the `addGsaGates`
-/// functionalities. This will no go through the FTD process.
-constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+/// Annotation to to identify muxes inserted with the `addGsaGates`
+/// functionalities.
+constexpr llvm::StringLiteral FTD_EXPLICIT_MU("ftd.MU");
+constexpr llvm::StringLiteral FTD_EXPLICIT_GAMMA("ftd.GAMMA");
 /// Temporary annotation to be used with merges created with the
 /// `createPhiNetwork` functionality, which will then be converted into muxes.
 constexpr llvm::StringLiteral NEW_PHI("nphi");
@@ -62,6 +63,25 @@ constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 /// Annotation to use for regeneration multiplexers.
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
+
+/// Identify the block that has muxCondition as its terminator condition
+/// Note that it is not necessarily the same block defining the muxCondition
+static Block *returnMuxConditionBlock(Value muxCondition) {
+  Block *muxConditionBlock = nullptr;
+
+  for (auto &use : muxCondition.getUses()) {
+    Operation *userOp = use.getOwner();
+    Block *userBlock = userOp->getBlock();
+
+    if (isa_and_nonnull<cf::CondBranchOp>(userOp)) {
+      muxConditionBlock = userBlock;
+      break;
+    }
+  }
+  assert(muxConditionBlock &&
+         "Mux condition must be feeding any block terminator.");
+  return muxConditionBlock;
+}
 
 /// Given a block, get its immediate dominator if exists
 static Block *getImmediateDominator(Region &region, Block *bb) {
@@ -546,9 +566,11 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
-  // it comes from the explicit phi process or if it is a generic operation to
-  // skip
-  if (consumerOp->hasAttr(FTD_REGEN) || consumerOp->hasAttr(FTD_EXPLICIT_PHI) ||
+  // it comes from the explicit gsa gate insertion process or if it is a generic
+  // operation to skip
+  if (consumerOp->hasAttr(FTD_REGEN) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_GAMMA) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_MU) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
     return;
@@ -726,6 +748,24 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   return muxOp.getResult();
 }
 
+// Returns true if loop is a while loop, detected by the loop header being
+// also a loop exit and not a loop latch
+static bool isWhileLoop(CFGLoop *loop) {
+  if (!loop)
+    return false;
+
+  Block *headerBlock = loop->getHeader();
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  SmallVector<Block *> latchBlocks;
+  loop->getLoopLatches(latchBlocks);
+
+  return llvm::is_contained(exitBlocks, headerBlock) &&
+         !llvm::is_contained(latchBlocks, headerBlock);
+}
+
 using PairOperandConsumer = std::pair<Value, Operation *>;
 
 /// Insert a branch to the correct position, taking into account whether it
@@ -742,8 +782,7 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
   if (Block *loopExit = loop->getExitingBlock(); loopExit) {
 
     // Do not add the branch in case of a while loop with backward edge
-    if (btlt == BackwardRelationship &&
-        bi.isGreater(connection.getParentBlock(), loopExit))
+    if (btlt == BackwardRelationship && isWhileLoop(loop))
       return connection;
 
     // Get the termination operation, which is supposed to be conditional
@@ -834,13 +873,12 @@ static void insertDirectSuppression(
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
 
-  bool accountMuxCondition =
-      llvm::isa<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
-      (consumer->getOperand(1) == connection ||
-       consumer->getOperand(2) == connection) &&
-      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock;
+  // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
+  // gate and the producer is one of its data inputs
+  bool accountMuxCondition = llvm::isa<handshake::MuxOp>(consumer) &&
+                             consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
+                             (consumer->getOperand(1) == connection ||
+                              consumer->getOperand(2) == connection);
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
@@ -855,8 +893,9 @@ static void insertDirectSuppression(
   // dependencies
   if (accountMuxCondition) {
     muxCondition = consumer->getOperand(0);
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     DenseSet<Block *> condControlDeps =
-        cdAnalysis[muxCondition.getDefiningOp()->getBlock()].forwardControlDeps;
+        cdAnalysis[muxConditionBlock].forwardControlDeps;
     for (auto &x : condControlDeps)
       consControlDeps.insert(x);
   }
@@ -871,13 +910,14 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
   if (accountMuxCondition) {
-    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        bi.getBlockCondition(muxCondition.getDefiningOp()->getBlock()));
+    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+    BoolExpression *selectOperandCondition =
+        BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
 
     // The condition must be taken into account for `fCons` only if the
     // producer is not control dependent from the block which produces the
     // condition of the mux
-    if (!prodControlDeps.contains(muxCondition.getParentBlock())) {
+    if (!prodControlDeps.contains(muxConditionBlock)) {
       if (consumer->getOperand(1) == connection)
         fCons = BoolExpression::boolAnd(fCons,
                                         selectOperandCondition->boolNegate());
@@ -938,7 +978,13 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp))
     return;
 
+  // The consumer block is the block which contains the consumer
   Block *consumerBlock = consumerOp->getBlock();
+
+  // The producer block is the block which contains the producer, and it
+  // corresponds to the parent block of the operand. Since the operand might
+  // have no producer operation (if it is a function argument) then this is the
+  // only way to get the relevant information.
   Block *producerBlock = operand.getParentBlock();
 
   // If the consumer and the producer are in the same block without the
@@ -949,6 +995,9 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
+    // A conditional branch should undergo the suppression mechanism only if it
+    // has the `FTD_NEW_SUPP` annotation, set in `addMoreSuppressionInLoop`. In
+    // any other cases, suppressing a branch ends up with incorrect results.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         !producerOp->hasAttr(FTD_NEW_SUPP))
       return;
@@ -1119,11 +1168,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   for (Block &block : llvm::drop_begin(region)) {
 
     // For each GSA function
-    ArrayRef<Gate *> phis = gsa.getGatesPerBlock(&block);
-    for (Gate *phi : phis) {
-
-      if (phi->gsaGateFunction == PhiGate)
-        continue;
+    ArrayRef<Gate *> gates = gsa.getGatesPerBlock(&block);
+    for (Gate *gate : gates) {
 
       Location loc = block.front().getLoc();
       rewriter.setInsertionPointToStart(&block);
@@ -1135,7 +1181,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       int nullOperand = -1;
 
       // For each of its operand
-      for (auto *operand : phi->operands) {
+      for (auto *operand : gate->operands) {
         // If the input is another GSA function, then a dummy value is used as
         // operand and the operations will be reconnected later on.
         // If the input is empty, we keep track of its index.
@@ -1144,7 +1190,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           Gate *g = std::get<Gate *>(operand->input);
           operands.emplace_back(g->result);
           missingGsaList.emplace_back(
-              MissingGsa(phi->index, g->index, operandIndex));
+              MissingGsa(gate->index, g->index, operandIndex));
         } else if (operand->isTypeEmpty()) {
           nullOperand = operandIndex;
           operands.emplace_back(nullptr);
@@ -1156,13 +1202,12 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // The condition value is provided by the `condition` field of the phi
-      rewriter.setInsertionPointAfterValue(phi->result);
       Value conditionValue =
-          phi->conditionBlock->getTerminator()->getOperand(0);
+          gate->conditionBlock->getTerminator()->getOperand(0);
 
       // If the function is MU, then we create a merge
       // and use its result as condition
-      if (phi->gsaGateFunction == MuGate) {
+      if (gate->gsaGateFunction == MuGate) {
         mlir::DominanceInfo domInfo;
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
@@ -1202,7 +1247,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(loc, phi->result.getType(),
+      auto mux = rewriter.create<handshake::MuxOp>(loc, gate->result.getType(),
                                                    conditionValue, operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
@@ -1210,11 +1255,15 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       if (nullOperand >= 0)
         oneInputGammaList.insert(mux);
 
-      if (phi->isRoot)
-        rewriter.replaceAllUsesWith(phi->result, mux.getResult());
+      if (gate->isRoot)
+        rewriter.replaceAllUsesWith(gate->result, mux.getResult());
 
-      gsaList.insert({phi->index, mux});
-      mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
+      gsaList.insert({gate->index, mux});
+
+      if (gate->gsaGateFunction == MuGate)
+        mux->setAttr(FTD_EXPLICIT_MU, rewriter.getUnitAttr());
+      else
+        mux->setAttr(FTD_EXPLICIT_GAMMA, rewriter.getUnitAttr());
     }
   }
 
