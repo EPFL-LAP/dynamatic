@@ -98,8 +98,8 @@ class Entity():
         newSignal = makeInstantiationSignal(
           f"{signal.rtl_name}_{i}",
           signal
-      )
-      self.instantiate_signals += newSignal
+        )
+        self.instantiate_signals += newSignal
 
 
   def get(self, name, entity_type):
