@@ -9,9 +9,9 @@ def makeArchitectureSignal(base_name, signal):
 
 class Architecture():
   def __init__(self, declaration):
-    signals = ""
+    self.signals = ""
     for signal in declaration.local_signals:
-      signals += self._addSignal(signal)
+      self._addSignal(signal)
 
   def _addSignal(self, signal):
     if signal.comment is not None:
