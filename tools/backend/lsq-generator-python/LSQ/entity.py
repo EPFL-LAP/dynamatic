@@ -60,7 +60,7 @@ class Entity():
     if signal.comment is not None:
       self.signals += f"""
     -- {signal.comment}
-  """.removeprefix("\n")
+""".removeprefix("\n")
       
     if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(
