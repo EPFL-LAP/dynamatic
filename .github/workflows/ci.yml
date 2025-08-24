@@ -5,27 +5,27 @@ on:
   # to run workflows by external contributors!
   pull_request:
     branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  integration:
-    if: github.event.pull_request.draft == false
-    runs-on: self-hosted
+  check-format:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: sync-submodules
-        run: |
-          git submodule update --recursive .
-          git submodule sync --recursive .
-          echo "polygeist/llvm-project url: " $(git -C ./polygeist/llvm-project remote get-url origin)
 
       - name: check-format-cpp
         run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo apt-get -y update
+          sudo apt-get -y install clang-format-20
+          sudo rm /usr/bin/clang-format
+          sudo ln -s $(which clang-format-20) /usr/bin/clang-format
+          clang-format --version
           git fetch origin main --no-recurse-submodules
-          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+          git clang-format-20 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         if: success() || failure()
@@ -54,24 +54,39 @@ jobs:
           deactivate
           exit $STATUS
 
+  integration:
+    if: github.event.pull_request.draft == false
+    runs-on: self-hosted
+
+    steps:
+      - name: cleanup
+        run: |
+          echo "Emptying folder"
+          rm -rf * .*
+          echo "Folder contents"
+          ls -la
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: build
-        if: success() || failure()
         run: ./build.sh --release --force
 
       - name: check-dynamatic
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
 
       - uses: actions/upload-artifact@v4
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         with: 
           name: integration-report
           path: |
