@@ -666,9 +666,9 @@ void experimental::gsa::Gate::print() {
       << "\n";
 
       for (GateInput *&op : operands) {
-         if (op->isTypeValue()) {
-           llvm::dbgs() << "[GSA]\t VALUE\t: ";
-           op->getValue().print(llvm::dbgs());
+        if (op->isTypeValue()) {
+          llvm::dbgs() << "[GSA]\t VALUE\t: ";
+          op->getValue().print(llvm::dbgs());
         } else if (op->isTypeEmpty()) {
           llvm::dbgs() << "[GSA]\t EMPTY";
         } else {
