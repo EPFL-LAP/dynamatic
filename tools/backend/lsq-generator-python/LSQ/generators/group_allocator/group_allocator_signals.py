@@ -15,6 +15,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = "rst"
             
             self.direction = EntitySignalType.INPUT
+
+            self.comment = None
     
     class Clock():
         """
@@ -28,6 +30,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = "clk"
             
             self.direction = EntitySignalType.INPUT
+
+            self.comment = None
 
     class GroupInitValid():
         """
@@ -53,6 +57,8 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
+            self.comment = None
+
     class GroupInitReady():
         """
         Input: 1-bit ready signals for the "group init" channels, from the dataflow circuit. For N groups, there are N "group init" channels, which results in
@@ -76,6 +82,8 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
+            self.comment = None
+
     class LoadQueueTailPointer():
         """
         Input: pointer to the tail entry of the load queue, which is an input to the group allocator directly from the load queue.
@@ -92,6 +100,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = LOAD_QUEUE_TAIL_POINTER_NAME
             
             self.direction = EntitySignalType.INPUT
+
+            self.comment = None
 
     class LoadQueueHeadPointer():
         """
@@ -110,6 +120,8 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
+            self.comment = None
+
     class LoadQueueIsEmpty():
         """
         Input: isEmpty? signal from the load queue. There is a single, 1-bit isEmpty? signal, which is an input directly from the load queue.
@@ -125,6 +137,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = LOAD_QUEUE_IS_EMPTY_NAME
             
             self.direction = EntitySignalType.INPUT
+
+            self.comment = None
 
     class StoreQueueTailPointer():
         """
@@ -143,6 +157,8 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
+            self.comment = None
+
     class StoreQueueHeadPointer():
         """
         Input: pointer to the head entry of the store queue, which is an input to the group allocator directly from the store queue.
@@ -159,6 +175,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = STORE_QUEUE_HEAD_POINTER_NAME
             
             self.direction = EntitySignalType.INPUT
+
+            self.comment = None
 
 
     class StoreQueueIsEmpty():
@@ -177,6 +195,8 @@ class GroupAllocatorDeclarativeSignals():
             
             self.direction = EntitySignalType.INPUT
 
+            self.comment = None
+
     class LoadQueueWriteEnable():
         """
         Output: Write enable signals to the load queue, used to allocate entries in the load queue. There are N 1-bit write enable signals, which are an output directly from the store queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
@@ -193,6 +213,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = LOAD_QUEUE_WRITE_ENABLE_NAME
             
             self.direction = EntitySignalType.OUTPUT
+
+            self.comment = None
 
     class NumNewLoadQueueEntries():
         """
@@ -212,6 +234,8 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
             
             self.direction = EntitySignalType.OUTPUT
+            
+            self.comment = None
 
     class LoadPortIndexPerLoadQueueEntry():
         """
