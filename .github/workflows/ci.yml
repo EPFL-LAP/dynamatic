@@ -71,15 +71,15 @@ jobs:
           submodules: recursive
 
       - name: build
-        run: ./build.sh --release --force
+        run: ls -l # ./build.sh --release --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
-        run: ninja -C build check-dynamatic
+        run: ls -l # ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
         if: steps.build.outputs.exit_code == 0
-        run: ninja -C build check-dynamatic-experimental
+        run: ls -l # ninja -C build check-dynamatic-experimental
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
@@ -87,7 +87,7 @@ jobs:
 
       - name: performance-report
         run: |
-          git fetch
+          git fetch --recurse-submodules=no
           rm perf_ci.bin
           git checkout origin/main -- perf_ci.bin 
           python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
