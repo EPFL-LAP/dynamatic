@@ -21,7 +21,8 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
     match entity_signal_type:
         case EntitySignalType.INPUT:
             io_suffix = "i"
-            direction = "in"
+            # with space at the end to match witdth of out
+            direction = "in "
         case EntitySignalType.OUTPUT:
             io_suffix = "o"
             direction = "out"
