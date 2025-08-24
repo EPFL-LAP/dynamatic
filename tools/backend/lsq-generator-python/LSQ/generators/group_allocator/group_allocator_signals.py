@@ -65,14 +65,14 @@ class GroupAllocatorDeclarativeIOSignals():
 
     class GroupInitReady():
         """
-        Input: 1-bit ready signals for the "group init" channels, from the dataflow circuit. For N groups, there are N "group init" channels, which results in
+        OUTPUT: 1-bit ready signals for the "group init" channels, from the dataflow circuit. For N groups, there are N "group init" channels, which results in
 
-        group_init_ready_0_i : in std_logic;
-        group_init_ready_1_i : in std_logic;
+        group_init_ready_0_i : out std_logic;
+        group_init_ready_1_i : out std_logic;
         .
         .
         .
-        group_init_ready_N_i : in std_logic;
+        group_init_ready_N_i : out std_logic;
         """
         def __init__(self, config : Config):
 
@@ -84,7 +84,7 @@ class GroupAllocatorDeclarativeIOSignals():
 
             self.rtl_name = f"{GROUP_INIT_CHANNEL_NAME}_ready"
             
-            self.direction = EntitySignalType.INPUT
+            self.direction = EntitySignalType.OUTPUT
 
             self.comment = None
 

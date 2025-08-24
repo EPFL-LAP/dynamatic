@@ -121,14 +121,14 @@ end entity;
     # remove leading whitespace
     # the required leading whitespace is present in the string
     # and remove final character, which is a semi-colon
-    self.entity_signals = self.entity_signals.lstrip()[:-1]
+    self.instantiate_signals = self.instantiate_signals.lstrip()[:-1]
 
     entity = f"""
 
-{unit_name} : entity work.{entity_name}
-  port(
-    {self.entity_signals}
-  );
+  {unit_name} : entity work.{entity_name}
+    port(
+      {self.instantiate_signals}
+    );
 """
     return entity
 
