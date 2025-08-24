@@ -5,7 +5,7 @@ on:
   # to run workflows by external contributors!
   pull_request:
     branches: ["main"]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
 
 jobs:
   check-format:
@@ -86,8 +86,20 @@ jobs:
         run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
+        if: github.event.pull_request.merged == false
         run: |
-          python tools/integration/generate_perf_report.py >> $GITHUB_STEP_SUMMARY
+          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
+
+      - name: save-performance-report
+        if: github.event.pull_request.merged == true
+        run: |
+          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
+          mv perf_ci_branch.bin perf_ci.bin
+          git config --global user.name 'Eugen Bosnjak'
+          git config --global user.email '11596160+ebosnjak@users.noreply.github.com'
+          git add perf_ci.bin
+          git commit -m "[AUTO][CI] Update performance report"
+          git push
 
       - uses: actions/upload-artifact@v4
         if: steps.build.outputs.exit_code == 0
