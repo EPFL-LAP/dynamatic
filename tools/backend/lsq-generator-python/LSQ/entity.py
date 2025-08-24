@@ -39,7 +39,6 @@ class Entity():
   def __init__(self):
     self.signals = ""
 
-
   def addInputSignal(self, signal_base_name, signal_size):
     self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.INPUT)
 
@@ -81,8 +80,6 @@ class Entity():
 -- {entity_type}
 entity {name} is
   port(
-    rst : in std_logic;
-    clk : in std_logic;
     {self.signals}
   );
 end entity;

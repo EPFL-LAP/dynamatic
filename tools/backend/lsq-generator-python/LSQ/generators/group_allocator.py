@@ -97,6 +97,15 @@ class GroupAllocator:
         entity = Entity()
 
         entity.addInputSignal(
+            "rst",
+            SignalSize(bitwidth=1, number=1)
+        )
+        entity.addInputSignal(
+            "clk",
+            SignalSize(bitwidth=1, number=1)
+        )
+
+        entity.addInputSignal(
            "group_init_valid",
             SignalSize(bitwidth=1, number=config.numGroups)
         )
