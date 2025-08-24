@@ -58,9 +58,7 @@ class Entity():
 
   def _addSignal(self, signal):
     if signal.comment is not None:
-      self.signals += f"""
-    -- {signal.comment}
-""".removeprefix("\n")
+      self.signals += signal.comment
       
     if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(

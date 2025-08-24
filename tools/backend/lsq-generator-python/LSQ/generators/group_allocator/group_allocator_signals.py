@@ -251,7 +251,11 @@ class GroupAllocatorDeclarativeSignals():
                                 number=config.ldq_num_entries()
                                 )
 
-            self.comment = "This signal is not present if there is a single load port into the LSQ."
+            self.comment = f"""
+    -- Load port index for each load queue entry.
+    -- {config.ldq_num_entries()} signals, each {config.ldpAddrW} bits.
+    -- This signal is not present if there is a single load port into the LSQ.
+""".removeprefix("\n")
 
             self.rtl_name = LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME
             
