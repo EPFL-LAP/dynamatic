@@ -93,6 +93,7 @@ def table(header, data):
 
 
 def main():
+    print("## Performance Report")
     print(table(
         ["name", "cycles", "result"],
         parse_results(RESULTS_DIR)
