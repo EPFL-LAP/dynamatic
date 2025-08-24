@@ -28,7 +28,12 @@ class GroupAllocatorDeclarative():
 
             s.LoadQueueWriteEnable(config),
             s.NumNewLoadQueueEntries(config),
-            s.LoadPortIndexPerLoadQueueEntry(config)
+            s.LoadPortIndexPerLoadQueueEntry(config),
+
+            s.StoreQueueWriteEnable(config),
+            s.NumNewStoreQueueEntries(config),
+            s.StorePortIndexPerStoreQueueEntry(config)
+
 
         ]
 

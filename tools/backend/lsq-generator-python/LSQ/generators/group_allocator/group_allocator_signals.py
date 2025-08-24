@@ -59,8 +59,8 @@ class GroupAllocatorDeclarativeSignals():
 
             self.comment = f"""
 
-    -- Group init signals from the dataflow circuit
-    -- {config.num_groups()} signals, one for each group of memory operations.
+    -- Group init channels from the dataflow circuit
+    -- {config.num_groups()} channels, one for each group of memory operations.
 """.removeprefix("\n")
 
     class GroupInitReady():
@@ -97,7 +97,7 @@ class GroupAllocatorDeclarativeSignals():
 
             # The load queue tail pointer is a single, N-bit signal.
             self.signal_size = SignalSize(
-                                bitwidth=config.ldq_idx_w(), 
+                                bitwidth=config.load_queue_idx_bitwidth(), 
                                 number=1
                                 )
 
@@ -119,7 +119,7 @@ class GroupAllocatorDeclarativeSignals():
 
             # The load queue head pointer is a single, N-bit signal.
             self.signal_size = SignalSize(
-                                bitwidth=config.ldq_idx_w(), 
+                                bitwidth=config.load_queue_idx_bitwidth(), 
                                 number=1
                                 )
 
@@ -156,7 +156,7 @@ class GroupAllocatorDeclarativeSignals():
 
             # The store queue tail pointer is a single, N-bit signal.
             self.signal_size = SignalSize(
-                                bitwidth=config.stq_idx_w(), 
+                                bitwidth=config.store_queue_idx_bitwidth(), 
                                 number=1
                                 )
 
@@ -179,7 +179,7 @@ class GroupAllocatorDeclarativeSignals():
 
             # The store queue tail pointer is a single, N-bit signal.
             self.signal_size = SignalSize(
-                                bitwidth=config.stq_idx_w(), 
+                                bitwidth=config.store_queue_idx_bitwidth(), 
                                 number=1
                                 )
 
@@ -210,7 +210,7 @@ class GroupAllocatorDeclarativeSignals():
 
     class LoadQueueWriteEnable():
         """
-        Output: Write enable signals to the load queue, used to allocate entries in the load queue. There are N 1-bit write enable signals, which are an output directly from the store queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
+        Output: Write enable signals to the load queue, used to allocate entries in the load queue. There are N 1-bit write enable signals, which are an output directly to the load queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
         """
         def __init__(self, config : Config):
 
@@ -218,7 +218,7 @@ class GroupAllocatorDeclarativeSignals():
             # As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
             self.signal_size = SignalSize(
                                 bitwidth=1, 
-                                number=config.ldq_num_entries()
+                                number=config.load_queue_num_entries()
                                 )
 
             self.rtl_name = LOAD_QUEUE_WRITE_ENABLE_NAME
@@ -228,7 +228,7 @@ class GroupAllocatorDeclarativeSignals():
             self.comment = f"""
 
     -- Load queue write enable signals
-    -- {config.ldq_num_entries()} signals, one for each queue entry.
+    -- {config.load_queue_num_entries()} signals, one for each queue entry.
 """.removeprefix("\n")
 
     class NumNewLoadQueueEntries():
@@ -242,7 +242,7 @@ class GroupAllocatorDeclarativeSignals():
             # There is a single N-bit "number of load queue entries to allocate" signal
             # and its bitwidth is equal to the bitwidth of the load queue pointers, to allow easy arithmetic between then.
             self.signal_size = SignalSize(
-                                bitwidth=config.ldq_idx_w(), 
+                                bitwidth=config.load_queue_idx_bitwidth(), 
                                 number=1
                                 )
 
@@ -261,23 +261,116 @@ class GroupAllocatorDeclarativeSignals():
         """
         Output: Which load port index to allocate into each load queue entry. The group allocator uses the head pointer from the load queue to place the load port indices in the correct signal, so that they arrive in the correct load queue entries. This is guarded by the load queue entry write enable, so not all of these signals are used.
 
-        If there is only a single load port into the LSQ, this signal is not present.
+        There is one signal per load queue entry, and with the bitwidth required to identify a load port.
+        Not one-hot.
+
+        There is inconsistant code implying this signal should not be present 
+        if there are no load ports.
+        But it is currently added regardless (with bitwidth 1)
         """
         def __init__(self, config : Config):
 
-            # There is 1 N-bit isEmpty? signal
+            # There are N M-bit signals. One per load queue entry
+            # and with the bitdwith required to identify a load port
             self.signal_size = SignalSize(
-                                bitwidth=config.ldpAddrW, 
-                                number=config.ldq_num_entries()
+                                bitwidth=config.load_port_idx_bitwidth(), 
+                                number=config.load_queue_num_entries()
                                 )
 
             self.comment = f"""
 
     -- Load port index to write into each load queue entry.
-    -- {config.ldq_num_entries()} signals, each {config.ldpAddrW} bit(s).
-    -- This signal is not present if there is a single load port into the LSQ.
+    -- {config.load_queue_num_entries()} signals, each {config.load_port_idx_bitwidth} bit(s).
+    -- Not one-hot.
+    -- There is inconsistant code implying this signal should not be present 
+    -- if there are no load ports.
+    -- But it is currently added regardless (with bitwidth 1)
 """.removeprefix("\n")
 
             self.rtl_name = LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME
+            
+            self.direction = EntitySignalType.OUTPUT
+
+
+    class StoreQueueWriteEnable():
+        """
+        Output: Write enable signals to the store queue, used to allocate entries in the store queue. There are N 1-bit write enable signals, which are an output directly to the store queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
+        """
+        def __init__(self, config : Config):
+
+            # There are N 1-bit write enable signals.
+            # As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
+            self.signal_size = SignalSize(
+                                bitwidth=1, 
+                                number=config.stq_num_entries()
+                                )
+
+            self.rtl_name = STORE_QUEUE_WRITE_ENABLE_NAME
+            
+            self.direction = EntitySignalType.OUTPUT
+
+            self.comment = f"""
+
+    -- Store queue write enable signals
+    -- {config.load_queue_num_entries()} signals, one for each queue entry.
+""".removeprefix("\n")
+
+    class NumNewStoreQueueEntries():
+        """
+        Output: Number of store queue entries to allocate, which is output directly to the load queue.
+        Non-handshaked signal. Used by the store queue to update its tail pointer, using update logic appropriate to circular buffers.
+        There is a single "number of store queue entries to allocate" signal, and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
+        """
+        def __init__(self, config : Config):
+
+            # There is a single N-bit "number of store queue entries to allocate" signal
+            # and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
+            self.signal_size = SignalSize(
+                                bitwidth=config.store_queue_idx_bitwidth(), 
+                                number=1
+                                )
+
+            self.rtl_name = NUM_NEW_STORE_QUEUE_ENTRIES_NAME
+            
+            self.direction = EntitySignalType.OUTPUT
+            
+            self.comment = f"""
+
+    -- Number of new store queue entries to allocate.
+    -- Used by the store queue to update its tail pointer.
+    -- Bitwidth equal to the store queue pointer bitwidth.
+""".removeprefix("\n")
+
+    class StorePortIndexPerStoreQueueEntry():
+        """
+        Output: Which load port index to allocate into each load queue entry. The group allocator uses the head pointer from the load queue to place the load port indices in the correct signal, so that they arrive in the correct load queue entries. This is guarded by the load queue entry write enable, so not all of these signals are used.
+
+        There is one signal per load queue entry, and with the bitwidth required to identify a load port.
+        Not one-hot.
+
+        There is inconsistant code implying this signal should not be present 
+        if there are no store ports.
+        But it is currently added regardless (with bitwidth 1)
+        """
+        def __init__(self, config : Config):
+
+            # There are N M-bit signals. One per store queue entry
+            # and with the bitdwidth required to identify a store port
+            self.signal_size = SignalSize(
+                                bitwidth=config.store_port_idx_bitwidth(), 
+                                number=config.load_queue_num_entries()
+                                )
+
+            self.comment = f"""
+
+    -- Store port index to write into each store queue entry.
+    -- {config.load_queue_num_entries()} signals, each {config.store_port_idx_bitwidth} bit(s).
+    -- Not one-hot.
+    -- There is inconsistant code implying this signal should not be present 
+    -- if there are no store ports.
+    -- But it is currently added regardless (with bitwidth 1)
+""".removeprefix("\n")
+
+            self.rtl_name = STORE_PORT_INDEX_PER_STORE_QUEUE_NAME
             
             self.direction = EntitySignalType.OUTPUT

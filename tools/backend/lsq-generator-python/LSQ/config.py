@@ -94,8 +94,12 @@ class Config:
             self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
             self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
             # Check the number of ports, if num*Ports == 0, set it to 1
-            self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
-            self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
+
+            # self.ldpAddrW
+            self._ldp_idx_w = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
+            
+            # self.stpAddrW
+            self._stp_idx_w = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
             self.pipe0 = bool(obj["pipe0En"])
             self.pipe1 = bool(obj["pipe1En"])
@@ -119,22 +123,42 @@ class Config:
         """
         return self._num_groups
     
-    def ldq_idx_w(self) -> int:
+    def load_queue_idx_bitwidth(self) -> int:
         """
         Bitwidth for a pointer into the load queue.
         Calculated by ceil(log2(num_entries))
         """
         return self._ldq_idx_w
     
-    def stq_idx_w(self) -> int:
+    def store_queue_idx_bitwidth(self) -> int:
         """
         Bitwidth for a pointer into the store queue.
         Calculated by ceil(log2(num_entries))
         """
         return self._stq_idx_w
     
-    def ldq_num_entries(self) -> int:
+    def load_queue_num_entries(self) -> int:
         """
         Number of queue entries in the load queue.
         """
         return self._ldq_num_entries
+    
+    def load_port_idx_bitwidth(self) -> int:
+        """
+        Bitwidth required to identify a load port.
+        Calculated by ceil(log2(num_load_ports))
+        Inconsistant code for this: 
+        If there are no load ports, the bitwidth is overriden to 1,
+        but there are checks for if it is equal to 0 across the code
+        """
+        return self._ldp_idx_w
+    
+    def store_port_idx_bitwidth(self) -> int:
+        """
+        Bitwidth required to identify a store port.
+        Calculated by ceil(log2(num_store_ports))
+        Inconsistant code for this: 
+        If there are no load ports, the bitwidth is overriden to 1,
+        but there are checks for if it is equal to 0 across the code
+        """
+        return self._stp_idx_w

@@ -46,5 +46,20 @@ RTL name for the "number of new load queue entries" signal. Output by the group 
 
 LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME = "ldq_port_idx"
 """
-RTL name for index to a load port. If there is only a single load port, this signal is not present in the LSQ.
+RTL name for index to a load port, per load queue entry.
+"""
+
+STORE_QUEUE_WRITE_ENABLE_NAME = "stq_wen"
+"""
+RTL name for the write enables signals of the store queue.
+"""
+
+NUM_NEW_STORE_QUEUE_ENTRIES_NAME = "num_stores"
+"""
+RTL name for the "number of new store queue entries" signal. Output by the group allocator, and used by the store queue to update its tail pointer.
+"""
+
+STORE_PORT_INDEX_PER_STORE_QUEUE_NAME = "stq_port_idx"
+"""
+RTL name for index to a store port, per store queue entry. 
 """
