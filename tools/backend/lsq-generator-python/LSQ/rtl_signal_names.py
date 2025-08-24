@@ -63,3 +63,9 @@ STORE_PORT_INDEX_PER_STORE_QUEUE_NAME = "stq_port_idx"
 """
 RTL name for index to a store port, per store queue entry. 
 """
+
+STORE_POSITION_PER_LOAD_NAME = "ga_ls_order"
+"""
+RTL name for signals which identify whether each of the stores precedes a load.
+There is one of these signals per load queue entry, and 1 bit per store queue entry.
+"""

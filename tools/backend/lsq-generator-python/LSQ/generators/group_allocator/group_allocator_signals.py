@@ -376,3 +376,41 @@ class GroupAllocatorDeclarativeSignals():
             self.rtl_name = STORE_PORT_INDEX_PER_STORE_QUEUE_NAME
             
             self.direction = EntitySignalType.OUTPUT
+
+
+    class StorePositionPerLoad():
+        """
+        Output: Whether the stores in the store queue and ahead or behind
+        each specific entry in the load queue.
+         
+        There is one signal per entry in the load queue,
+        and 1 bit per entry in the store queue.
+        
+        The order of the memory operations, read from the ROM,
+        has been shifted to generate this, 
+        as well as 0s and 1s added correctly to fill out each signal.
+
+        This is done based on the store queue and load queue pointers.
+        """
+        def __init__(self, config : Config):
+
+            # There are N M-bit signals. One per load queue entry
+            # and 1 bit per store queue entry
+            self.signal_size = SignalSize(
+                                bitwidth=config.store_queue_num_entries(), 
+                                number=config.load_queue_num_entries()
+                                )
+
+            self.comment = f"""
+
+    -- Store position per load
+    -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
+    -- One per entry in the load queue, with 1 bit per entry in the store queue.
+    --  The order of the memory operations, read from the ROM, 
+    -- has been shifted to generate this,
+    -- as well as 0s and 1s added correctly to fill out each signal.
+""".removeprefix("\n")
+
+            self.rtl_name = STORE_POSITION_PER_LOAD_NAME
+            
+            self.direction = EntitySignalType.OUTPUT

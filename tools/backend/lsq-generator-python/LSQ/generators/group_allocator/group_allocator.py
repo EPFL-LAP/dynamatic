@@ -32,9 +32,9 @@ class GroupAllocatorDeclarative():
 
             s.StoreQueueWriteEnable(config),
             s.NumNewStoreQueueEntries(config),
-            s.StorePortIndexPerStoreQueueEntry(config)
+            s.StorePortIndexPerStoreQueueEntry(config),
 
-
+            s.StorePositionPerLoad(config)
         ]
 
     
@@ -194,32 +194,32 @@ class GroupAllocator:
         #     SignalSize(bitwidth=config.ldqAddrW, number=1)
         # )
 
-        if(config.ldpAddrW > 0):
-            entity.addOutputSignal(
-                "ldq_port_idx",
-                SignalSize(
-                    bitwidth=config.numLdqEntries, 
-                    number=config.ldpAddrW)
-            )
+        # if(config.ldpAddrW > 0):
+        #     entity.addOutputSignal(
+        #         "ldq_port_idx",
+        #         SignalSize(
+        #             bitwidth=config.numLdqEntries, 
+        #             number=config.ldpAddrW)
+        #     )
         
-        entity.addOutputSignal(
-            "stq_wen",
-            SignalSize(bitwidth=1, number=config.numStqEntries)
-        )
+        # entity.addOutputSignal(
+        #     "stq_wen",
+        #     SignalSize(bitwidth=1, number=config.numStqEntries)
+        # )
 
-        entity.addOutputSignal(
-            "num_stores",
-            SignalSize(bitwidth=config.stqAddrW, number=1)
-        )
+        # entity.addOutputSignal(
+        #     "num_stores",
+        #     SignalSize(bitwidth=config.stqAddrW, number=1)
+        # )
 
-        if (config.stpAddrW > 0):
-            entity.addOutputSignal(
-                "stq_port_idx",
-                SignalSize(
-                    bitwidth=config.numStqEntries,
-                    number=config.stpAddrW
-                    )
-            )
+        # if (config.stpAddrW > 0):
+        #     entity.addOutputSignal(
+        #         "stq_port_idx",
+        #         SignalSize(
+        #             bitwidth=config.numStqEntries,
+        #             number=config.stpAddrW
+        #             )
+        #     )
 
         entity.addOutputSignal(
             "ga_ls_order",
