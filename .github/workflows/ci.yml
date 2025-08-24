@@ -87,6 +87,7 @@ jobs:
 
       - name: performance-report
         run: |
+          rm perf_ci.bin
           git checkout origin/main perf_ci.bin 
           python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
           mv perf_ci_branch.bin perf_ci.bin
