@@ -62,7 +62,10 @@ class Config:
             self.payload_bitwidth = obj["dataWidth"]
             self.addrW = obj["addrWidth"]
             self.idW = obj["indexWidth"]
-            self.numLdqEntries = obj["fifoDepth_L"]
+
+            #self.numLdqEntries
+            self._ldq_num_entries = obj["fifoDepth_L"]
+
             self.numStqEntries = obj["fifoDepth_S"]
             self.numLdPorts = obj["numLoadPorts"]
             self.numStPorts = obj["numStorePorts"]
@@ -85,7 +88,9 @@ class Config:
             #self.ldqAddrW
             self._ldq_idx_w = math.ceil(math.log2(self.numLdqEntries))
             
-            self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
+            #self.sdqAddrW
+            self._stq_idx_w = math.ceil(math.log2(self.numStqEntries))
+            
             self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
             self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
             # Check the number of ports, if num*Ports == 0, set it to 1
@@ -117,6 +122,19 @@ class Config:
     def ldq_idx_w(self) -> int:
         """
         Bitwidth for a pointer into the load queue.
-        Calculated by math.ceil(math.log2(self.numLdqEntries))
+        Calculated by ceil(log2(num_entries))
         """
         return self._ldq_idx_w
+    
+    def stq_idx_w(self) -> int:
+        """
+        Bitwidth for a pointer into the store queue.
+        Calculated by ceil(log2(num_entries))
+        """
+        return self._stq_idx_w
+    
+    def ldq_num_entries(self) -> int:
+        """
+        Number of queue entries in the load queue.
+        """
+        return self._ldq_num_entries

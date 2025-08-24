@@ -17,8 +17,8 @@ class EntitySignalType(Enum):
     OUTPUT = 2
 
 
-def makeEntitySignal(base_name, signal_size, entity_signal_type):
-    match entity_signal_type:
+def makeEntitySignal(base_name, signal):
+    match signal.direction:
         case EntitySignalType.INPUT:
             io_suffix = "i"
             # with space at the end to match witdth of out
@@ -27,13 +27,17 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
             io_suffix = "o"
             direction = "out"
 
-    type_declaration = signalSizeToTypeDeclaration(signal_size)
+    type_declaration = signalSizeToTypeDeclaration(signal.signal_size)
 
     name = f"{base_name}_{io_suffix}".ljust(20)
 
+    full_declaration = f"{name} : {direction} {type_declaration};"
+    if signal.signal_size.bitwidth == 0:
+        full_declaration = f"--{full_declaration}"
     return f"""
-    {name} : {direction} {type_declaration};
+    {full_declaration}
 """.removeprefix("\n")
+    
 
 class Entity():
   def __init__(self):
@@ -42,39 +46,33 @@ class Entity():
   def __init__(self, declaration):
     self.signals = ""
     for signal in declaration.io_signals:
-        self._addSignal(
-          signal.rtl_name,
-          signal.signal_size,
-          signal.direction
-        )
+        self._addSignal(signal)
 
-  def addInputSignal(self, signal_base_name, signal_size):
-    self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.INPUT)
+  # def addInputSignal(self, signal_base_name, signal_size):
+  #   self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.INPUT)
 
 
-  def addOutputSignal(self, signal_base_name, signal_size):
-    self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.OUTPUT)
+  # def addOutputSignal(self, signal_base_name, signal_size):
+  #   self._addSignal(signal_base_name, signal_size, entity_signal_type=EntitySignalType.OUTPUT)
 
 
-  def _addSignal(
-      self,
-      signal_base_name,
-      signal_size,
-      entity_signal_type
-  ):
-    if signal_size.number == 1:
+  def _addSignal(self, signal):
+    if signal.comment is not None:
+      self.signals += f"""
+    -- {signal.comment}
+  """.removeprefix("\n")
+      
+    if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(
-        signal_base_name,
-        signal_size,
-        entity_signal_type
-      )
+         signal.rtl_name,
+          signal
+        )
       self.signals += newSignal
     else:
-      for i in range(signal_size.number):
+      for i in range(signal.signal_size.number):
         newSignal = makeEntitySignal(
-          f"{signal_base_name}_{i}",
-          signal_size,
-          entity_signal_type,
+          f"{signal.rtl_name}_{i}",
+          signal
           )
         self.signals += newSignal
 

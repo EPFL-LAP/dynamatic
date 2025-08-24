@@ -10,10 +10,41 @@ RTL name for the pointer to the tail entry of the load queue.
 
 LOAD_QUEUE_HEAD_POINTER_NAME = "ldq_head"
 """
-RTL name for the pointer to the tail entry of the load queue.
+RTL name for the pointer to the head entry of the load queue.
 """
 
 LOAD_QUEUE_IS_EMPTY_NAME = "ldq_empty"
 """
 RTL name for the isEmpty? signal from the load queue.
+"""
+
+STORE_QUEUE_TAIL_POINTER_NAME = "stq_tail"
+"""
+RTL name for the pointer to the tail entry of the load queue.
+"""
+
+STORE_QUEUE_HEAD_POINTER_NAME = "stq_head"
+"""
+RTL name for the pointer to the head entry of the load queue.
+"""
+
+STORE_QUEUE_IS_EMPTY_NAME = "stq_empty"
+"""
+RTL name for the isEmpty? signal from the load queue.
+"""
+
+
+LOAD_QUEUE_WRITE_ENABLE_NAME = "ldq_wen"
+"""
+RTL name for the write enables signals of the load queue.
+"""
+
+NUM_NEW_LOAD_QUEUE_ENTRIES_NAME = "num_loads"
+"""
+RTL name for the "number of new load queue entries" signal. Output by the group allocator, and used by the load queue to update its tail pointer.
+"""
+
+LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME = "ldq_port_idx"
+"""
+RTL name for index to a load port. If there is only a single load port, this signal is not present in the LSQ.
 """

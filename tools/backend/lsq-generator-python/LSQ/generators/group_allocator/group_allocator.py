@@ -14,10 +14,21 @@ class GroupAllocatorDeclarative():
         self.io_signals = [
             s.Reset(),
             s.Clock(),
+
             s.GroupInitValid(config),
+
             s.LoadQueueTailPointer(config),
             s.LoadQueueHeadPointer(config),
-            s.LoadQueueIsEmpty()
+            s.LoadQueueIsEmpty(),
+
+            s.StoreQueueHeadPointer(config),
+            s.StoreQueueTailPointer(config),
+            s.StoreQueueIsEmpty,
+
+            s.LoadQueueWriteEnable(config),
+            s.NumNewLoadQueueEntries(config),
+            s.LoadPortIndexPerLoadQueueEntry(config)
+
         ]
 
     
@@ -152,30 +163,30 @@ class GroupAllocator:
         #     SignalSize(bitwidth=1, number=1)
         # )
 
-        entity.addInputSignal(
-            "stq_tail",
-            SignalSize(bitwidth=config.stqAddrW, number=1)
-        )
+        # entity.addInputSignal(
+        #     "stq_tail",
+        #     SignalSize(bitwidth=config.stqAddrW, number=1)
+        # )
 
-        entity.addInputSignal(
-            "stq_head",
-            SignalSize(bitwidth=config.stqAddrW, number=1)
-        )
+        # entity.addInputSignal(
+        #     "stq_head",
+        #     SignalSize(bitwidth=config.stqAddrW, number=1)
+        # )
 
-        entity.addInputSignal(
-            "stq_empty",
-            SignalSize(bitwidth=1, number=1)
-        )
+        # entity.addInputSignal(
+        #     "stq_empty",
+        #     SignalSize(bitwidth=1, number=1)
+        # )
 
-        entity.addOutputSignal(
-            "ldq_wen",
-            SignalSize(bitwidth=1, number=config.numLdqEntries)
-        )
+        # entity.addOutputSignal(
+        #     "ldq_wen",
+        #     SignalSize(bitwidth=1, number=config.numLdqEntries)
+        # )
 
-        entity.addOutputSignal(
-            "num_loads",
-            SignalSize(bitwidth=config.ldqAddrW, number=1)
-        )
+        # entity.addOutputSignal(
+        #     "num_loads",
+        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
+        # )
 
         if(config.ldpAddrW > 0):
             entity.addOutputSignal(
