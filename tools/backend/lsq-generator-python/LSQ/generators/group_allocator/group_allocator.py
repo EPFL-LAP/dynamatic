@@ -4,7 +4,23 @@ from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriority
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, SignalSize
+from LSQ.entity import Entity, SignalSize, EntitySignalType
+
+from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeSignals
+
+class GroupAllocatorDeclarative():
+    def __init__(self):
+        s = GroupAllocatorDeclarativeSignals()
+        self.io_signals = [
+            s.Reset(),
+            s.Clock(),
+            s.GroupInitValid(),
+            s.LoadQueueTailPointer(),
+            s.LoadQueueHeadPointer(),
+            s.LoadQueueIsEmpty()
+        ]
+
+    
 
 
 class GroupAllocator:
@@ -48,7 +64,7 @@ class GroupAllocator:
         self.configs = configs
         self.module_name = name + suffix
 
-    def generate(self, path_rtl, config) -> None:
+    def generate(self, path_rtl, config : Config) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 
@@ -94,40 +110,47 @@ class GroupAllocator:
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
 
-        entity = Entity()
+        declaration = GroupAllocatorDeclarative()
 
-        entity.addInputSignal(
-            "rst",
-            SignalSize(bitwidth=1, number=1)
-        )
-        entity.addInputSignal(
-            "clk",
-            SignalSize(bitwidth=1, number=1)
-        )
+        entity = Entity(declaration)
 
-        entity.addInputSignal(
-           "group_init_valid",
-            SignalSize(bitwidth=1, number=config.numGroups)
-        )
-        entity.addOutputSignal(
-            "group_init_ready",
-            SignalSize(bitwidth=1, number=config.numGroups),
-        )
+        entity.get()
+        quit()
 
-        entity.addInputSignal(
-            "ldq_tail",
-            SignalSize(bitwidth=config.ldqAddrW, number=1)
-        )
+        # entity = Entity()
 
-        entity.addInputSignal(
-            "ldq_head",
-            SignalSize(bitwidth=config.ldqAddrW, number=1)
-        )
+        # entity.addInputSignal(
+        #     "rst",
+        #     SignalSize(bitwidth=1, number=1)
+        # )
+        # entity.addInputSignal(
+        #     "clk",
+        #     SignalSize(bitwidth=1, number=1)
+        # )
 
-        entity.addInputSignal(
-            "ldq_empty",
-            SignalSize(bitwidth=1, number=1)
-        )
+        # entity.addInputSignal(
+        #    "group_init_valid",
+        #     SignalSize(bitwidth=1, number=config.num_groups())
+        # )
+        # entity.addOutputSignal(
+        #     "group_init_ready",
+        #     SignalSize(bitwidth=1, number=config.num_groups()),
+        # )
+
+        # entity.addInputSignal(
+        #     "ldq_tail",
+        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
+        # )
+
+        # entity.addInputSignal(
+        #     "ldq_head",
+        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
+        # )
+
+        # entity.addInputSignal(
+        #     "ldq_empty",
+        #     SignalSize(bitwidth=1, number=1)
+        # )
 
         entity.addInputSignal(
             "stq_tail",
@@ -231,11 +254,11 @@ class GroupAllocator:
 
         # Generate handshake signals
         group_init_ready = LogicArray(
-            ctx, 'group_init_ready', 'w', self.configs.numGroups)
+            ctx, 'group_init_ready', 'w', self.configs.num_groups)
         group_init_hs = LogicArray(
-            ctx, 'group_init_hs', 'w', self.configs.numGroups)
+            ctx, 'group_init_hs', 'w', self.configs.num_groups)
 
-        for i in range(0, self.configs.numGroups):
+        for i in range(0, self.configs.num_groups):
             arch += Op(ctx, group_init_ready[i],
                        '\'1\'', 'when',
                        '(', empty_loads,  '>=', (
@@ -246,21 +269,21 @@ class GroupAllocator:
 
         if (self.configs.gaMulti):
             group_init_and = LogicArray(
-                ctx, 'group_init_and', 'w', self.configs.numGroups)
+                ctx, 'group_init_and', 'w', self.configs.num_groups)
             ga_rr_mask = LogicVec(ctx, 'ga_rr_mask', 'r',
-                                  self.configs.numGroups)
+                                  self.configs.num_groups)
             ga_rr_mask.regInit()
-            for i in range(0, self.configs.numGroups):
+            for i in range(0, self.configs.num_groups):
                 arch += Op(ctx, group_init_and[i],
                            group_init_ready[i], 'and', group_init_valid_i[i])
                 arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
             arch += CyclicPriorityMasking(ctx, group_init_hs,
                                           group_init_and, ga_rr_mask)
-            for i in range(0, self.configs.numGroups):
+            for i in range(0, self.configs.num_groups):
                 arch += Op(ctx, (ga_rr_mask, (i+1) %
-                                 self.configs.numGroups), (group_init_hs, i))
+                                 self.configs.num_groups), (group_init_hs, i))
         else:
-            for i in range(0, self.configs.numGroups):
+            for i in range(0, self.configs.num_groups):
                 arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
                 arch += Op(ctx, group_init_hs[i],
                            group_init_ready[i], 'and', group_init_valid_i[i])
@@ -452,10 +475,10 @@ class GroupAllocator:
         arch += ctx.get_current_indent() + f'rst => rst,\n'
         arch += ctx.get_current_indent() + f'clk => clk,\n'
 
-        for i in range(0, self.configs.numGroups):
+        for i in range(0, self.configs.num_groups):
             arch += ctx.get_current_indent() + \
                 f'group_init_valid_{i}_i => {group_init_valid_i.getNameRead(i)},\n'
-        for i in range(0, self.configs.numGroups):
+        for i in range(0, self.configs.num_groups):
             arch += ctx.get_current_indent() + \
                 f'group_init_ready_{i}_o => {group_init_ready_o.getNameWrite(i)},\n'
 

@@ -98,9 +98,9 @@ class LSQ:
 
         # group initialzation signals
         group_init_valid_i = LogicArray(
-            ctx, 'group_init_valid', 'i', self.configs.numGroups)
+            ctx, 'group_init_valid', 'i', self.configs.num_groups)
         group_init_ready_o = LogicArray(
-            ctx, 'group_init_ready', 'o', self.configs.numGroups)
+            ctx, 'group_init_ready', 'o', self.configs.num_groups)
 
         # Memory access ports, i.e., the connection "kernel -> LSQ"
         # Load address channel (addr, valid, ready) from kernel, contains signals:
@@ -113,7 +113,7 @@ class LSQ:
 
         # Load data channel (data, valid, ready) to kernel
         ldp_data_o = LogicVecArray(
-            ctx, 'ldp_data', 'o', self.configs.numLdPorts, self.configs.dataW)
+            ctx, 'ldp_data', 'o', self.configs.numLdPorts, self.configs.payload_bitwidth)
         ldp_data_valid_o = LogicArray(
             ctx, 'ldp_data_valid', 'o', self.configs.numLdPorts)
         ldp_data_ready_i = LogicArray(
@@ -129,7 +129,7 @@ class LSQ:
 
         # Store data channel (data, valid, ready) from kernel
         stp_data_i = LogicVecArray(
-            ctx, 'stp_data', 'i', self.configs.numStPorts, self.configs.dataW)
+            ctx, 'stp_data', 'i', self.configs.numStPorts, self.configs.payload_bitwidth)
         stp_data_valid_i = LogicArray(
             ctx, 'stp_data_valid', 'i', self.configs.numStPorts)
         stp_data_ready_o = LogicArray(
@@ -164,7 +164,7 @@ class LSQ:
         rresp_id_i = LogicVecArray(
             ctx, 'rresp_id', 'i', self.configs.numLdMem, self.configs.idW)
         rresp_data_i = LogicVecArray(
-            ctx, 'rresp_data', 'i', self.configs.numLdMem, self.configs.dataW)
+            ctx, 'rresp_data', 'i', self.configs.numLdMem, self.configs.payload_bitwidth)
 
         wreq_valid_o = LogicArray(
             ctx, 'wreq_valid', 'o', self.configs.numStMem)
@@ -175,7 +175,7 @@ class LSQ:
         wreq_addr_o = LogicVecArray(
             ctx, 'wreq_addr', 'o', self.configs.numStMem, self.configs.addrW)
         wreq_data_o = LogicVecArray(
-            ctx, 'wreq_data', 'o', self.configs.numStMem, self.configs.dataW)
+            ctx, 'wreq_data', 'o', self.configs.numStMem, self.configs.payload_bitwidth)
 
         wresp_valid_i = LogicArray(
             ctx, 'wresp_valid', 'i', self.configs.numStMem)
@@ -245,7 +245,7 @@ class LSQ:
         ldq_data_valid = LogicArray(
             ctx, 'ldq_data_valid', 'r', self.configs.numLdqEntries)
         ldq_data = LogicVecArray(ctx, 'ldq_data', 'r',
-                                 self.configs.numLdqEntries, self.configs.dataW)
+                                 self.configs.numLdqEntries, self.configs.payload_bitwidth)
 
         # Store Queue Entries
         stq_alloc = LogicArray(ctx, 'stq_alloc', 'r',
@@ -265,7 +265,7 @@ class LSQ:
         stq_data_valid = LogicArray(
             ctx, 'stq_data_valid', 'r', self.configs.numStqEntries)
         stq_data = LogicVecArray(ctx, 'stq_data', 'r',
-                                 self.configs.numStqEntries, self.configs.dataW)
+                                 self.configs.numStqEntries, self.configs.payload_bitwidth)
 
         # Order for load-store
         store_is_older = LogicVecArray(
@@ -1456,7 +1456,7 @@ class LSQ:
                     ctx, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
                 read_valid = Logic(ctx, f'read_valid_{i}', 'w')
                 read_data = LogicVec(
-                    ctx, f'read_data_{i}', 'w', self.configs.dataW)
+                    ctx, f'read_data_{i}', 'w', self.configs.payload_bitwidth)
                 for w in range(0, self.configs.numLdMem):
                     arch += Op(ctx, read_idx_oh[w], rresp_valid_i[w], 'when',
                                '(', rresp_id_i[w], '=', (i, self.configs.idW), ')', 'else', '\'0\'')
@@ -1464,7 +1464,7 @@ class LSQ:
                 arch += Reduce(ctx, read_valid, read_idx_oh, 'or')
                 # multiplex from store queue data
                 bypass_data = LogicVec(
-                    ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
+                    ctx, f'bypass_data_{i}', 'w', self.configs.payload_bitwidth)
                 arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh_p1[i])
                 # multiplex from read and bypass data
                 arch += Op(ctx, ldq_data[i], read_data, 'or', bypass_data)
@@ -1524,7 +1524,7 @@ class LSQ:
                     ctx, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
                 read_valid = Logic(ctx, f'read_valid_{i}', 'w')
                 read_data = LogicVec(
-                    ctx, f'read_data_{i}', 'w', self.configs.dataW)
+                    ctx, f'read_data_{i}', 'w', self.configs.payload_bitwidth)
                 for w in range(0, self.configs.numLdMem):
                     arch += Op(ctx, read_idx_oh[w], rresp_valid_i[w], 'when',
                                '(', rresp_id_i[w], '=', (i, self.configs.idW), ')', 'else', '\'0\'')
@@ -1532,7 +1532,7 @@ class LSQ:
                 arch += Reduce(ctx, read_valid, read_idx_oh, 'or')
                 # multiplex from store queue data
                 bypass_data = LogicVec(
-                    ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
+                    ctx, f'bypass_data_{i}', 'w', self.configs.payload_bitwidth)
                 if self.configs.pipe0:
                     arch += Mux1H(ctx, bypass_data, stq_data,
                                   bypass_idx_oh_p0[i])

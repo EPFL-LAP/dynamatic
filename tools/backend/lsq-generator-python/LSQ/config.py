@@ -19,14 +19,14 @@ class Config:
     """
 
     name:          str = 'test'     # Name prefix used for generated VHDL files
-    dataW:         int = 16         # Data width        (Number of bits for load/store data)
+    payload_bitwidth:         int = 16         # Data width        (Number of bits for load/store data)
     addrW:         int = 13         # Address width     (Number of bits for memory address)
     idW:           int = 2          # ID width          (Number of bits for ID in the memory interface)
     numLdqEntries: int = 3          # Load queue size   (Number of entries in the load queue)
     numStqEntries: int = 10         # Store queue size  (Number of entries in the store queue)
     numLdPorts:    int = 3          # Number of load access ports
     numStPorts:    int = 3          # Number of store access ports
-    numGroups:     int = 2          # Number of total Basic Blocks (BBs)
+    num_groups:     int = 2          # Number of total Basic Blocks (BBs)
     numLdMem:      int = 1          # Number of load channels at memory interface (Fixed to 1)
     numStMem:      int = 1          # Number of store channels at memory interface (Fixed to 1)
 
@@ -58,14 +58,17 @@ class Config:
             obj = json.load(f)
             
             self.name = obj["name"]
-            self.dataW = obj["dataWidth"]
+            # self.dataW
+            self.payload_bitwidth = obj["dataWidth"]
             self.addrW = obj["addrWidth"]
             self.idW = obj["indexWidth"]
             self.numLdqEntries = obj["fifoDepth_L"]
             self.numStqEntries = obj["fifoDepth_S"]
             self.numLdPorts = obj["numLoadPorts"]
             self.numStPorts = obj["numStorePorts"]
-            self.numGroups = obj["numBBs"]
+
+            self._num_groups = obj["numBBs"]
+
             self.numLdMem = obj["numLdChannels"]
             self.numStMem = obj["numStChannels"]
             self.master = bool(obj["master"])
@@ -79,7 +82,9 @@ class Config:
             self.gaLdPortIdx = obj["ldPortIdx"]
             self.gaStPortIdx = obj["stPortIdx"]
 
-            self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
+            #self.ldqAddrW
+            self._ldq_idx_w = math.ceil(math.log2(self.numLdqEntries))
+            
             self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
             self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
             self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
@@ -95,8 +100,23 @@ class Config:
             assert (self.idW >= self.ldqAddrW)
 
             # list size checking
-            assert (len(self.gaNumLoads) == self.numGroups)
-            assert (len(self.gaNumStores) == self.numGroups)
-            assert (len(self.gaLdOrder) == self.numGroups)
-            assert (len(self.gaLdPortIdx) == self.numGroups)
-            assert (len(self.gaStPortIdx) == self.numGroups)
+            assert (len(self.gaNumLoads) == self.num_groups)
+            assert (len(self.gaNumStores) == self.num_groups)
+            assert (len(self.gaLdOrder) == self.num_groups)
+            assert (len(self.gaLdPortIdx) == self.num_groups)
+            assert (len(self.gaStPortIdx) == self.num_groups)
+
+    def num_groups(self) -> int:
+        """
+        Number of individual groups in the group allocator.
+        By definition is equal to the number of basic blocks 
+        which have loads or stores to this LSQ.
+        """
+        return self._num_groups
+    
+    def ldq_idx_w(self) -> int:
+        """
+        Bitwidth for a pointer into the load queue.
+        Calculated by math.ceil(math.log2(self.numLdqEntries))
+        """
+        return self._ldq_idx_w
