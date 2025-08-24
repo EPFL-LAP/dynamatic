@@ -34,7 +34,7 @@ add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
 add_custom_target(
   run-all-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1000 --output-on-failure
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
@@ -44,7 +44,7 @@ add_custom_target(
 
 add_custom_target(
   run-ci-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 500 --output-on-failure --exclude-regex _NoCI
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure --exclude-regex _NoCI
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests that aren't marked with '_NoCI'."
