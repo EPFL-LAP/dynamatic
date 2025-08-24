@@ -4,7 +4,8 @@ from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriority
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, SignalSize
+from LSQ.entity import Entity
+from LSQ.architecture import Architecture
 
 from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeSignals
 
@@ -35,6 +36,10 @@ class GroupAllocatorDeclarative():
             s.StorePortIndexPerStoreQueueEntry(config),
 
             s.StorePositionPerLoad(config)
+        ]
+
+        self.internal_signals = [
+            s.NumNewLoadQueueEntries(config)
         ]
 
     
@@ -131,105 +136,13 @@ class GroupAllocator:
 
         entity = Entity(declaration)
 
-        entity.get(self.module_name, "Group Allocator")
-        quit()
-
-        # entity = Entity()
-
-        # entity.addInputSignal(
-        #     "rst",
-        #     SignalSize(bitwidth=1, number=1)
-        # )
-        # entity.addInputSignal(
-        #     "clk",
-        #     SignalSize(bitwidth=1, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #    "group_init_valid",
-        #     SignalSize(bitwidth=1, number=config.num_groups())
-        # )
-        # entity.addOutputSignal(
-        #     "group_init_ready",
-        #     SignalSize(bitwidth=1, number=config.num_groups()),
-        # )
-
-        # entity.addInputSignal(
-        #     "ldq_tail",
-        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #     "ldq_head",
-        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #     "ldq_empty",
-        #     SignalSize(bitwidth=1, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #     "stq_tail",
-        #     SignalSize(bitwidth=config.stqAddrW, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #     "stq_head",
-        #     SignalSize(bitwidth=config.stqAddrW, number=1)
-        # )
-
-        # entity.addInputSignal(
-        #     "stq_empty",
-        #     SignalSize(bitwidth=1, number=1)
-        # )
-
-        # entity.addOutputSignal(
-        #     "ldq_wen",
-        #     SignalSize(bitwidth=1, number=config.numLdqEntries)
-        # )
-
-        # entity.addOutputSignal(
-        #     "num_loads",
-        #     SignalSize(bitwidth=config.ldqAddrW, number=1)
-        # )
-
-        # if(config.ldpAddrW > 0):
-        #     entity.addOutputSignal(
-        #         "ldq_port_idx",
-        #         SignalSize(
-        #             bitwidth=config.numLdqEntries, 
-        #             number=config.ldpAddrW)
-        #     )
-        
-        # entity.addOutputSignal(
-        #     "stq_wen",
-        #     SignalSize(bitwidth=1, number=config.numStqEntries)
-        # )
-
-        # entity.addOutputSignal(
-        #     "num_stores",
-        #     SignalSize(bitwidth=config.stqAddrW, number=1)
-        # )
-
-        # if (config.stpAddrW > 0):
-        #     entity.addOutputSignal(
-        #         "stq_port_idx",
-        #         SignalSize(
-        #             bitwidth=config.numStqEntries,
-        #             number=config.stpAddrW
-        #             )
-        #     )
-
-        entity.addOutputSignal(
-            "ga_ls_order",
-            SignalSize(
-                bitwidth=config.numLdqEntries, 
-                number=config.numStqEntries)
-        )
+        architecture = Architecture(declaration)
 
         entity.get(self.module_name, "Group Allocator")
-        quit()
+
+        architecture = architecture.get(self.module_name)
+
+
 
         # IOs
 

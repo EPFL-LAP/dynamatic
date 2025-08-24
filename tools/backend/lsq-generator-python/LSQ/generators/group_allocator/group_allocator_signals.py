@@ -406,7 +406,7 @@ class GroupAllocatorDeclarativeSignals():
     -- Store position per load
     -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
     -- One per entry in the load queue, with 1 bit per entry in the store queue.
-    --  The order of the memory operations, read from the ROM, 
+    -- The order of the memory operations, read from the ROM, 
     -- has been shifted to generate this,
     -- as well as 0s and 1s added correctly to fill out each signal.
 """.removeprefix("\n")
