@@ -114,7 +114,7 @@ class GroupAllocator:
 
         entity = Entity(declaration)
 
-        entity.get()
+        entity.get(self.module_name, "Group Allocator")
         quit()
 
         # entity = Entity()
