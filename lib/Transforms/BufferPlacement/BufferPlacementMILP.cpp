@@ -183,9 +183,10 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   // Create a variable for the CFDFC's throughput
   cfVars.throughput = createVar("throughput");
 
+  // AYA
   // Create a variable to explore b_c, modeling the number of tokens circulating
   // in a cycle
-  cfVars.bc = createVar("b_c");
+  // cfVars.bc = createVar("b_c");
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
@@ -420,26 +421,28 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
     GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
 
+    // AYA
     // Added b_c as a variable to the exploration that is passed to the
     // constraint if the channel is backedge
-    cfVars.bc.set(GRB_CharAttr_VType, GRB_INTEGER); // Force it to be integer
-    GRBVar &bc = cfVars.bc;
+    // cfVars.bc.set(GRB_CharAttr_VType, GRB_INTEGER); // Force it to be integer
+    // GRBVar &bc = cfVars.bc;
 
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
-    // model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
-    //                 "throughput_channelRetiming");
+    model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
+                    "throughput_channelRetiming");
 
+    // AYA
     // Aya: replace the above code with the following if you want to explore B_c
-    if (cfdfc.backedges.contains(channel))
-      model.addConstr(chTokenOccupancy - bc == retDst - retSrc,
-                      "throughput_channelRetiming");
-    else
-      // subtract 0 in case of non-backward channels
-      model.addConstr(chTokenOccupancy == retDst - retSrc,
-                      "throughput_channelRetiming");
+    // if (cfdfc.backedges.contains(channel))
+    //   model.addConstr(chTokenOccupancy - bc == retDst - retSrc,
+    //                   "throughput_channelRetiming");
+    // else
+    //   // subtract 0 in case of non-backward channels
+    //   model.addConstr(chTokenOccupancy == retDst - retSrc,
+    //                   "throughput_channelRetiming");
   }
 }
 
@@ -481,6 +484,7 @@ void BufferPlacementMILP::
     // The channel's throughput cannot exceed the number of buffer slots.
     model.addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
 
+    // AYA
     // New constraint to ensure that the throughput cannot be more than 1,
     // especially when bc ends up being > 1
     model.addConstr(cfVars.throughput <= 1, "throughput_upper_bound");
@@ -678,6 +682,9 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
         latency == 0.0)
       continue;
 
+    // AYA: Modifying the latency to model inner loops that have latency
+    // operations inside outer loops
+
     // Aya: The idea is that every high-latency operation that belongs to a
     // deeper loop than my current cfdfc should have its latency multiplied by
     // the number of iterations of all loops above it not including my cfdfc,
@@ -691,7 +698,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
     llvm::errs() << "\n\n\t\tInnermost numExec is " << totalNumExecs << "\n\n";
     llvm::errs() << "\n\n\t\tMy cfdfc numExec is " << cfdfc.numExecs << "\n\n";
 
-    latency = latency * (totalNumExecs / cfdfc.numExecs);
+    // latency = latency * (totalNumExecs / cfdfc.numExecs);
 
     // Retrieve the MILP variables corresponding to the unit's fluid retiming
     UnitVars &unitVars = cfVars.unitVars[unit];
@@ -1031,6 +1038,8 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   for (Value channel : channels)
     totalExecs += getChannelNumExecs(channel);
 
+  // AYA: Changed how we calculate the throughput objective...
+
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
   double maxCoefCFDFC = 0.0;
@@ -1038,7 +1047,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
       double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
-      // overallThrObj += coef * vars.cfdfcVars[cfdfc].throughput;
+      overallThrObj += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
   }
@@ -1069,12 +1078,12 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   }
 
   // Change the overall throughput calculation
-  assert(outerCFDFC && "Did not find any outermost loops in the CFG!");
-  double outerProbability = 1.0f / outerCFDFC->numExecs;
-  llvm::errs() << "\n\n\t\t\tNew Coefficient of global throughput is "
-               << outerProbability << "\n";
-  overallThrObj = vars.cfdfcVars[outerCFDFC].throughput * outerProbability;
-  maxCoefCFDFC = outerProbability;
+  // assert(outerCFDFC && "Did not find any outermost loops in the CFG!");
+  // double outerProbability = 1.0f / outerCFDFC->numExecs;
+  // llvm::errs() << "\n\n\t\t\tNew Coefficient of global throughput is "
+  //              << outerProbability << "\n";
+  // overallThrObj = vars.cfdfcVars[outerCFDFC].throughput * outerProbability;
+  // maxCoefCFDFC = outerProbability;
 
   //  For each channel, add a "penalty" in case a buffer is added to the
   //  channel, and another penalty that depends on the number of slots
@@ -1254,8 +1263,9 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-    os << "Throughput of CFDFC #" << idx << ": " << throughput << " and B_c is "
-       << cfVars.bc.get(GRB_DoubleAttr_X) << "\n\n";
+    os << "Throughput of CFDFC #" << idx << ": " << throughput
+       << " and B_c is \n";
+    //  << cfVars.bc.get(GRB_DoubleAttr_X) << "\n\n";
   }
 
   GRBQuadExpr obj = model.getObjective();

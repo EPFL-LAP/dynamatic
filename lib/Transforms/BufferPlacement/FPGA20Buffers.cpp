@@ -248,9 +248,9 @@ void FPGA20Buffers::setup() {
 
       // The outerCfdfcThroughput must = the innerCfdfcThroughput * probability
       // of exiting the inner loop
-      model.addConstr(outerCfdfcThroughput ==
-                          innerCfdfcThroughput * innerProbability,
-                      "nested_throughput");
+      // model.addConstr(outerCfdfcThroughput ==
+      //                     innerCfdfcThroughput * innerProbability,
+      //                 "nested_throughput");
     }
   }
 
@@ -265,9 +265,9 @@ void FPGA20Buffers::setup() {
     GRBVar &cfdfcThroughput = vars.cfdfcVars[cfdfc].throughput;
     double cfdfcProbability = 1.0f / cfdfc->numExecs;
 
-    model.addConstr(cfdfcThroughput * cfdfcProbability ==
-                        firstCfdfcThroughput * firstCfdfcProbability,
-                    "sequential_throughput");
+    // model.addConstr(cfdfcThroughput * cfdfcProbability ==
+    //                     firstCfdfcThroughput * firstCfdfcProbability,
+    //                 "sequential_throughput");
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
