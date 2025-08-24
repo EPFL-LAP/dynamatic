@@ -17,7 +17,7 @@ class GroupAllocatorDeclarativeSignals():
             self.direction = EntitySignalType.INPUT
     
     class Clock():
-        def __init__(self, config):
+        def __init__(self):
             self.description = "Generic RTL clock signal"
 
             # Clock is a single 1-bit signal
@@ -112,7 +112,7 @@ class GroupAllocatorDeclarativeSignals():
         """
         isEmpty? signal from the load queue. There is a single, 1-bit isEmpty? signal, which is an input directly from the load queue.
         """
-        def __init__(self, config : Config):
+        def __init__(self):
 
             # There is a single 1-bit isEmpty? signal
             self.signal_size = SignalSize(

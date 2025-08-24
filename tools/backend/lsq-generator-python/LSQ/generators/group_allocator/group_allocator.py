@@ -9,14 +9,14 @@ from LSQ.entity import Entity, SignalSize, EntitySignalType
 from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeSignals
 
 class GroupAllocatorDeclarative():
-    def __init__(self):
+    def __init__(self, config : Config):
         s = GroupAllocatorDeclarativeSignals()
         self.io_signals = [
             s.Reset(),
             s.Clock(),
-            s.GroupInitValid(),
-            s.LoadQueueTailPointer(),
-            s.LoadQueueHeadPointer(),
+            s.GroupInitValid(config),
+            s.LoadQueueTailPointer(config),
+            s.LoadQueueHeadPointer(config),
             s.LoadQueueIsEmpty()
         ]
 
