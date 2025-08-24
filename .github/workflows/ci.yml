@@ -69,6 +69,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          ref: ${{ github.head_ref }}
 
       - name: build
         run: ls -l # ./build.sh --release --force
@@ -87,7 +88,8 @@ jobs:
 
       - name: performance-report
         run: |
-          git fetch origin main --recurse-submodules=no
+          git status
+          git fetch origin main --no-recurse-submodules
           rm perf_ci.bin
           git checkout FETCH_HEAD -- perf_ci.bin 
           python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
