@@ -28,8 +28,10 @@ def makeEntitySignal(base_name, signal_size, entity_signal_type):
 
     type_declaration = signalSizeToTypeDeclaration(signal_size)
 
+    name = f"{base_name}_{io_suffix}".ljust(20)
+
     return f"""
-    {base_name}_{io_suffix} : {direction} {type_declaration};
+    {name} : {direction} {type_declaration};
 """.removeprefix("\n")
 
 class Entity():
