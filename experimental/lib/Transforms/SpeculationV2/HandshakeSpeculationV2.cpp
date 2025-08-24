@@ -996,21 +996,6 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     }
   }
 
-  // Erase unused PasserOps
-  for (auto passerOp : llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
-    Value result = passerOp.getResult();
-
-    if (result.use_empty())
-      passerOp->erase();
-    else if (result.hasOneUse()) {
-      Operation *user = getUniqueUser(result);
-      if (isa<SinkOp>(user)) {
-        user->erase();
-        passerOp->erase();
-      }
-    }
-  }
-
   DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
   // Convert bbMap to a json file
   std::ofstream csvFile(bbMapping);

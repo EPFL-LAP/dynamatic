@@ -84,6 +84,29 @@ static InitOp moveInitsUp(Value fedValue) {
   return newInit;
 }
 
+bool tryErasePasser(PasserOp passer) {
+  Value result = passer.getResult();
+
+  if (result.use_empty()) {
+    passer->erase();
+    return true;
+  }
+  assert(result.hasOneUse());
+  Operation *user = getUniqueUser(result);
+  if (isa<SinkOp>(user)) {
+    user->erase();
+    passer->erase();
+    return true;
+  }
+  if (auto childPasser = dyn_cast<PasserOp>(user)) {
+    if (tryErasePasser(childPasser)) {
+      passer->erase();
+      return true;
+    }
+  }
+  return false;
+}
+
 void PostSpecV2Pass::runDynamaticPass() {
   // Parse json (jsonPath is a member variable handled by tablegen)
   auto bbOrFailure = readFromJSON(jsonPath);
@@ -108,6 +131,11 @@ void PostSpecV2Pass::runDynamaticPass() {
     if (getLogicBB(init) != headBB)
       continue;
     moveInitsUp(init.getOperand());
-    return;
+    break;
+  }
+
+  // Erase unused PasserOps
+  for (auto passerOp : llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
+    tryErasePasser(passerOp);
   }
 }
