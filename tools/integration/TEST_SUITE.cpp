@@ -113,6 +113,4 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                                          "loop_path", "nested_loop",
                                          "single_loop", "sparse", "subdiag",
                                          "subdiag_fast"),
-                        [](const auto &info) {
-                          return "spec_" + info.param;
-                        });
+                         [](const auto &info) { return "spec_" + info.param; });
