@@ -66,7 +66,9 @@ class Config:
             #self.numLdqEntries
             self._ldq_num_entries = obj["fifoDepth_L"]
 
-            self.numStqEntries = obj["fifoDepth_S"]
+            # numStqEntries
+            self._stq_num_entries = obj["fifoDepth_S"]
+            
             self.numLdPorts = obj["numLoadPorts"]
             self.numStPorts = obj["numStorePorts"]
 
@@ -152,6 +154,12 @@ class Config:
         but there are checks for if it is equal to 0 across the code
         """
         return self._ldp_idx_w
+    
+    def store_queue_num_entries(self) -> int:
+        """
+        Number of queue entries in the store queue.
+        """
+        return self._stq_num_entries
     
     def store_port_idx_bitwidth(self) -> int:
         """
