@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriority
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, SignalSize,
+from LSQ.entity import Entity, SignalSize
 
 
 class GroupAllocator:
