@@ -23,7 +23,7 @@ class GroupAllocatorDeclarative():
 
             s.StoreQueueHeadPointer(config),
             s.StoreQueueTailPointer(config),
-            s.StoreQueueIsEmpty,
+            s.StoreQueueIsEmpty(),
 
             s.LoadQueueWriteEnable(config),
             s.NumNewLoadQueueEntries(config),
