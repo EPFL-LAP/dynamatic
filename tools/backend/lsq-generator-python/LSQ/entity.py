@@ -70,9 +70,8 @@ class Entity():
 
 
   def _addSignal(self, signal):
-    if signal.comment is not None:
-      self.entity_signals += signal.comment
-      self.instantiate_signals += signal.comment
+    if signal.entity_comment is not None:
+      self.entity_signals += signal.entity_comment
       
     if signal.signal_size.number == 1:
       newSignal = makeEntitySignal(

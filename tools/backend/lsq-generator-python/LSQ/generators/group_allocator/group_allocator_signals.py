@@ -16,7 +16,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
     
     class Clock():
         """
@@ -31,7 +31,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
 
     class GroupInitValid():
         """
@@ -57,7 +57,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} channels, one for each group of memory operations.
@@ -86,7 +86,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.OUTPUT
 
-            self.comment = None
+            self.entity_comment = None
 
     class LoadQueueTailPointer():
         """
@@ -105,7 +105,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Input signals from the load queue
 """.removeprefix("\n")
@@ -127,7 +127,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
 
     class LoadQueueIsEmpty():
         """
@@ -145,7 +145,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
 
     class StoreQueueTailPointer():
         """
@@ -165,7 +165,7 @@ class GroupAllocatorDeclarativeIOSignals():
             self.direction = EntitySignalType.INPUT
 
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Input signals from the store queue
 """.removeprefix("\n")
@@ -187,7 +187,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
 
 
     class StoreQueueIsEmpty():
@@ -206,7 +206,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.INPUT
 
-            self.comment = None
+            self.entity_comment = None
 
     class LoadQueueWriteEnable():
         """
@@ -225,7 +225,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.OUTPUT
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Load queue write enable signals
     -- {config.load_queue_num_entries()} signals, one for each queue entry.
@@ -250,7 +250,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.OUTPUT
             
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Number of new load queue entries to allocate.
     -- Used by the load queue to update its tail pointer.
@@ -277,7 +277,7 @@ class GroupAllocatorDeclarativeIOSignals():
                                 number=config.load_queue_num_entries()
                                 )
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Load port index to write into each load queue entry.
     -- {config.load_queue_num_entries()} signals, each {config.load_ports_idx_bitwidth()} bit(s).
@@ -310,7 +310,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.OUTPUT
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Store queue write enable signals
     -- {config.load_queue_num_entries()} signals, one for each queue entry.
@@ -335,7 +335,7 @@ class GroupAllocatorDeclarativeIOSignals():
             
             self.direction = EntitySignalType.OUTPUT
             
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Number of new store queue entries to allocate.
     -- Used by the store queue to update its tail pointer.
@@ -362,7 +362,7 @@ class GroupAllocatorDeclarativeIOSignals():
                                 number=config.store_queue_num_entries()
                                 )
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Store port index to write into each store queue entry.
     -- {config.store_queue_num_entries()} signals, each {config.store_ports_idx_bitwidth()} bit(s).
@@ -401,7 +401,7 @@ class GroupAllocatorDeclarativeIOSignals():
                                 number=config.load_queue_num_entries()
                                 )
 
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Store position per load
     -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
@@ -432,7 +432,7 @@ class GroupAllocatorDeclarativeLocalSignals():
 
             self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
                         
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Intermediate local signal that is the same as the NumNewLoadQueueEntries output.
     -- Used to make the value internally readable
@@ -455,7 +455,7 @@ class GroupAllocatorDeclarativeLocalSignals():
 
             self.rtl_name = NUM_NEW_STORE_QUEUE_ENTRIES_NAME
             
-            self.comment = f"""
+            self.entity_comment = f"""
 
     -- Intermediate local signal that is the same as the NumNewStoreQueueEntries output.
     -- Used to make the value internally readable
@@ -466,25 +466,4 @@ class Empty():
     pass
 
 class GroupAllocatorDeclarativeBody():
-    class GroupHandshaking():
-        def __init__(self, config : Config):
-
-            group_handshaking_declarative = Empty()
-
-            io = GroupAllocatorDeclarativeIOSignals()
-            group_handshaking_declarative.io_signals = [
-                io.LoadQueueTailPointer(config),
-                io.LoadQueueHeadPointer(config),
-                io.StoreQueueTailPointer(config),
-                io.StoreQueueHeadPointer(config),
-                io.GroupInitValid(config),
-                io.GroupInitReady(config)
-            ]
-
-
-            entity = Entity(group_handshaking_declarative)
-
-            self.statement = entity.instantiate(
-                "GroupHandshaking",
-                "GroupHandshaking"
-            )
+    
