@@ -297,11 +297,6 @@ def InitOp : Handshake_Op<"init", [
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
-                                           TIMING_ATTR_NAME = "TIMING";
-  }];
-
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];

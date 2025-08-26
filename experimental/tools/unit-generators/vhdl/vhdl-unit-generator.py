@@ -41,6 +41,7 @@ import generators.handshake.ready_remover as ready_remover
 import generators.handshake.valid_merger as valid_merger
 import generators.handshake.sharing_wrapper as sharing_wrapper
 import generators.handshake.lazy_fork as lazy_fork
+import generators.handshake.tehb as init
 
 
 def generate_code(name, mod_type, parameters):
@@ -115,6 +116,8 @@ def generate_code(name, mod_type, parameters):
             return sitofp.generate_sitofp(name, parameters)
         case "fptosi":
             return fptosi.generate_fptosi(name, parameters)
+        case "init":
+            return init.generate_tehb(name, parameters)
         case "ready_remover":
             return ready_remover.generate_ready_remover(name, parameters)
         case "valid_merger":

@@ -105,7 +105,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -315,7 +315,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -691,6 +691,18 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr =
+            initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+        if (paramsAttr) {
+          auto initTokenAttr =
+              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+          int initialValue =
+              (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else
+          addUnsigned("INITIAL_VALUE", 0);
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -820,7 +832,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1510,7 +1522,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1823,6 +1836,8 @@ public:
                     ConvertToHWInstance<handshake::MuxOp>,
                     ConvertToHWInstance<handshake::JoinOp>,
                     ConvertToHWInstance<handshake::BlockerOp>,
+                    // Fast token delivery operation
+                    ConvertToHWInstance<handshake::InitOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,

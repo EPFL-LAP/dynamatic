@@ -33,7 +33,38 @@ namespace {
 /// Combine redundant init merges. These merges have one constant input and a
 /// condition input. If two merges are identical, then one of them can be
 /// removed
-struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
+struct CombineInits : public OpRewritePattern<handshake::InitOp> {
+  using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::InitOp init,
+                                PatternRewriter &rewriter) const override {
+
+    if (init->getNumOperands() != 1)
+      return failure();
+
+    // If there are other inits fed from the same input
+    DenseSet<handshake::InitOp> redundantInits;
+    for (auto *user : init->getOperand(0).getUsers())
+      if (isa_and_nonnull<handshake::InitOp>(user) && user != init) {
+        handshake::InitOp anotherInit = cast<handshake::InitOp>(user);
+        redundantInits.insert(anotherInit);
+      }
+
+    if (redundantInits.empty())
+      return failure();
+
+    for (auto redun : redundantInits) {
+      rewriter.replaceAllUsesWith(redun.getResult(), init.getResult());
+      rewriter.eraseOp(redun);
+    }
+
+    return success();
+  }
+};
+
+/// Combine redundant init merges. These merges have one constant input and a
+/// condition input. If two merges are identical, then one of them can be
+/// removed
+struct CombineMergeInits : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
                                 PatternRewriter &rewriter) const override {
@@ -394,9 +425,10 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
-                 CombineBranchesSameSign, CombineBranchesOppositeSign,
-                 CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
+    patterns
+        .add<RemoveSinkMuxes, RemoveDoubleSinkBranches, CombineBranchesSameSign,
+             CombineBranchesOppositeSign, CombineInits, CombineMergeInits,
+             CombineMuxes, RemoveNotCondition>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
