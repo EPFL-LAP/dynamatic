@@ -369,12 +369,13 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     // NOTE: in-place type mutate is considered unsafe (see the remarks in the
     // "setType" class method). However, it is safe in CfToHandshake conversion
     // since all the BB arguments will feed the newly created Mux/Merge/CMerge
-    // ops, which will not result in an invalid IR.
+    // ops (all the uses of the mutated values are guaranteed to be replaced by
+    // new uses), which will not result in an invalid IR.
     //
     // The only exception is the memref type produced by alloca, but this is not
     // a problem because:
     // - The memref type produced by alloca should not be a argument of any BBs.
-    // - The channelifyType simpliy bypasses the memref type
+    // - The channelifyType does not channelify memrefs
     arg.setType(channelifyType(arg.getType()));
   }
   for (unsigned i = 0; i < numMemories + 1; i++) {
@@ -392,17 +393,19 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
       //
       // NOTE: in-place type mutate is considered unsafe (see the remarks in the
       // "setType" class method). However, it is safe in CfToHandshake
-      // conversion since all the function arguments will feed the newly created
-      // Mux/Merge/CMerge ops, which will not result in an invalid IR.
+      // conversion since all the BB arguments will feed the newly created
+      // Mux/Merge/CMerge ops (all the uses of the mutated values are guaranteed
+      // to be replaced by new uses), which will not result in an invalid IR.
       //
       // The only exception is memref type produced by alloca, but this is not a
       // problem because:
       // - The memref type produced by alloca should not be a argument of any
       // BBs.
-      // - The channelifyType simpliy bypasses the memref type
+      // - The channelifyType does not channelify memrefs
       arg.setType(channelifyType(arg.getType()));
     }
-    // Add 1 control-only signal.
+    // Add 1 control-only channel: Every BB has a separate control-only channel
+    // to indicate the start of the BB
     block.addArgument(handshake::ControlType::get(rewriter.getContext()),
                       funcOp.getLoc());
   }
@@ -714,7 +717,13 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
   auto firstBlockControl = getBlockControl(firstBlock);
 
   funcOp.walk([&](memref::AllocaOp op) {
+    // Every memory controller needs a start signal to indicate that the BRAM
+    // can safely accept new memory requests. For internally allocated memories
+    // (which will be converted to BRAMs or MUXes) we use the function's control
+    // signal as the memory start signal.
     //
+    // NOTE: Each external memory bank (passed in the function argument)
+    // has a separate block argument as the memory controller's start signal
     Value memref = op->getResult(0);
     memInfo.insert({memref, {firstBlockControl}});
   });
