@@ -12,7 +12,7 @@ def generate_extsi(name, params):
 
     return generate_unary(
         name=name,
-        modType="extsi",
+        op_type="extsi",
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,

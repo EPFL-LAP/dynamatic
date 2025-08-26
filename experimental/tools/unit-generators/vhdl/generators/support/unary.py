@@ -6,7 +6,7 @@ from generators.handshake.buffer import generate_valid_propagation_buffer
 
 def generate_unary(
     name: str,
-    modType: str,
+    op_type: str,
     body: str,
     extra_signals: ExtraSignals,
     signals: str = "",
@@ -29,7 +29,7 @@ def generate_unary(
 
     Args:
         name: Unique name based on MLIR op name (e.g. adder0).
-        modType: More specific name, used in comments only.
+        op_type: Which handshake operation this module corresponds to, used only in comments
         signals: Local signal declarations used in body.
         body: VHDL body of the unit, excluding handshaking.
         dependencies: Dependencies, excluding handshaking.
@@ -55,7 +55,7 @@ def generate_unary(
 
     def generate_inner(name): return _generate_unary(
         name,
-        modType,
+        op_type,
         input_bitwidth,
         output_bitwidth,
         signals,

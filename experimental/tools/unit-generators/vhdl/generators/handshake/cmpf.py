@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 
@@ -21,9 +21,9 @@ def generate_cmpf(name, params):
     else:
         raise ValueError(f"Invalid fpu implementation on cmpf: {impl}")
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType="cmpf",
+        op_type="cmpf",
         lhs_bitwidth=bitwidth,
         rhs_bitwidth=bitwidth,
         output_bitwidth=1,

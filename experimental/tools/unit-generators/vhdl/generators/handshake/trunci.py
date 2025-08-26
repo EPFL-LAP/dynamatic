@@ -6,7 +6,7 @@ def generate_trunci(name, params):
     output_bitwidth = params["output_bitwidth"]
     extra_signals = params.get("extra_signals", None)
 
-    modType = "trunci"
+    op_type = "trunci"
 
     body = f"""
   outs       <= ins({output_bitwidth} - 1 downto 0);
@@ -14,7 +14,7 @@ def generate_trunci(name, params):
 
     return generate_unary(
         name=name,
-        modType=modType,
+        op_type=op_type,
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,

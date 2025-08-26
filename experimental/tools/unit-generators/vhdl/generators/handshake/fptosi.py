@@ -41,7 +41,7 @@ def generate_fptosi(name, params):
 
     return generate_unary(
         name=name,
-        modType="fptosi",
+        op_type="fptosi",
         bitwidth=32,
         signals=signals,
         body=body,

@@ -12,17 +12,17 @@ def generate_mulf(name, params):
     is_double = params.get("is_double", None)
     internal_delay = params.get("internal_delay", None)
 
-    mod_type = "mulf"
+    op_type = "mulf"
 
     if impl == FLOPOCO_IMPL:
         if is_double is None:
-            raise ValueError(f"is_double was missing for generating a flopoco {mod_type}")
+            raise ValueError(f"is_double was missing for generating a flopoco {op_type}")
         if internal_delay is None:
-            raise ValueError(f"internal_delay was missing for generating a flopoco {mod_type}")
+            raise ValueError(f"internal_delay was missing for generating a flopoco {op_type}")
 
         return generate_flopoco_ip_wrapper(
             name=name,
-            mod_type=mod_type,
+            op_type=op_type,
             core_unit="FloatingPointMultiplier",
             latency=latency,
             is_double=is_double,
@@ -32,7 +32,7 @@ def generate_mulf(name, params):
     elif impl == VIVADO_IMPL:
         return generate_vivado_ip_wrapper(
             name=name,
-            mod_type=mod_type,
+            op_type=op_type,
             latency=latency,
             extra_signals=extra_signals
         )

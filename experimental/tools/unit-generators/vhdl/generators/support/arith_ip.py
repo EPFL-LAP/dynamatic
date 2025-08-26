@@ -1,8 +1,8 @@
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 
 
 def generate_flopoco_ip_wrapper(name,
-                                mod_type,
+                                op_type,
                                 core_unit,
                                 latency,
                                 is_double,
@@ -58,9 +58,9 @@ def generate_flopoco_ip_wrapper(name,
         );
     """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType=mod_type,
+        op_type=op_type,
         bitwidth=bitwidth,
         signals=signals,
         body=body,
@@ -70,12 +70,12 @@ def generate_flopoco_ip_wrapper(name,
 
 
 def generate_vivado_ip_wrapper(name,
-                               mod_type,
+                               op_type,
                                latency,
                                extra_signals):
 
     body = f"""
-  {mod_type}_vitis_hls_wrapper_U1 : entity work.{mod_type}_vitis_hls_wrapper
+  {op_type}_vitis_hls_wrapper_U1 : entity work.{op_type}_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -86,9 +86,9 @@ def generate_vivado_ip_wrapper(name,
     );
     """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType=mod_type,
+        op_type=op_type,
         bitwidth=32,
         body=body,
         latency=latency,

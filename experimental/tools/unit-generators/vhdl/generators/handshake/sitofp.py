@@ -41,7 +41,7 @@ def generate_sitofp(name, params):
 
     return generate_unary(
         name=name,
-        modType="sitofp",
+        op_type="sitofp",
         input_bitwidth=32,
         output_bitwidth=32,
         signals=signals,

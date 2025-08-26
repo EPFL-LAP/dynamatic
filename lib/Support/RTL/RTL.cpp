@@ -297,7 +297,6 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
 LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                                   llvm::StringRef modName,
                                                   hw::ModuleType &modType) {
-
   if (
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||

@@ -22,7 +22,7 @@ def generate_divf(name, params):
 
         return generate_flopoco_ip_wrapper(
             name=name,
-            mod_type=mod_type,
+            op_type=mod_type,
             core_unit="FloatingPointDivider",
             latency=latency,
             is_double=is_double,
@@ -32,7 +32,7 @@ def generate_divf(name, params):
     elif impl == VIVADO_IMPL:
         return generate_vivado_ip_wrapper(
             name=name,
-            mod_type=mod_type,
+            op_type=mod_type,
             latency=latency,
             extra_signals=extra_signals
         )

@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 
 
 def generate_cmpi(name, params):
@@ -14,9 +14,9 @@ def generate_cmpi(name, params):
   result(0) <= '1' when ({modifier}(lhs) {comparator} {modifier}(rhs)) else '0';
 """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType="cmpi",
+        op_type="cmpi",
         lhs_bitwidth=bitwidth,
         rhs_bitwidth=bitwidth,
         output_bitwidth=1,

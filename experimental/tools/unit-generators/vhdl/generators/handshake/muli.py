@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 
 
 def generate_muli(name, params):
@@ -33,9 +33,9 @@ def generate_muli(name, params):
   result <= q2;
     """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType="muli",
+        op_type="muli",
         bitwidth=bitwidth,
         signals=signals,
         body=body,

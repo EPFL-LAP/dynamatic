@@ -3,9 +3,9 @@ from generators.support.signal_manager import generate_arith2_signal_manager
 from generators.support.utils import ExtraSignals
 from generators.handshake.buffer import generate_valid_propagation_buffer
 
-def generate_arith2(
+def generate_arith_binary(
     name: str,
-    modType: str,
+    op_type: str,
     extra_signals: ExtraSignals,
     body: str,
     signals: str = "",
@@ -31,7 +31,7 @@ def generate_arith2(
 
     Args:
         name: Unique name based on MLIR op name (e.g. adder0).
-        modType: More specific name, used in comments only.
+        op_type: Which handshake operation this module corresponds to, used only in comments
         extra_signals: Extra signals on input/output channels, from IR.
         body: VHDL body of the unit, excluding handshaking.
         signals: Local signal declarations used in body.
@@ -61,7 +61,7 @@ def generate_arith2(
 
     def generate_inner(name): return _generate_arith2(
         name,
-        modType,
+        op_type,
         lhs_bitwidth,
         rhs_bitwidth,
         output_bitwidth,

@@ -1,5 +1,5 @@
 from generators.support.signal_manager import generate_arith2_signal_manager
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 
 
 def generate_subi(name, params):
@@ -9,9 +9,9 @@ def generate_subi(name, params):
   result <= std_logic_vector(unsigned(lhs) - unsigned(rhs));
     """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType="subi",
+        op_type="subi",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None)

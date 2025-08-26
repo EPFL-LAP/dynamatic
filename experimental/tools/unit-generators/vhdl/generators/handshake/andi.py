@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith2
+from generators.support.arith2 import generate_arith_binary
 
 
 def generate_andi(name, params):
@@ -8,9 +8,9 @@ def generate_andi(name, params):
   result <= lhs and rhs;
     """
 
-    return generate_arith2(
+    return generate_arith_binary(
         name=name,
-        modType="andi",
+        op_type="andi",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None),

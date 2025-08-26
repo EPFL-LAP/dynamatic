@@ -11,7 +11,7 @@ def generate_negf(name, params):
 
     return generate_unary(
         name=name,
-        modType="negf",
+        op_type="negf",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None)

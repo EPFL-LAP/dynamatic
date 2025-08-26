@@ -9,7 +9,7 @@ def generate_divui(name, params):
 
     return generate_vivado_ip_wrapper(
         name=name,
-        mod_type="divui",
+        op_type="divui",
         latency=latency,
         extra_signals=extra_signals
     )
