@@ -10,7 +10,7 @@ def generate_ori(name, params):
 
     return generate_arith_binary(
         name=name,
-        op_type="ori",
+        handshake_op="ori",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None)

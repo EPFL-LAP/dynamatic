@@ -16,7 +16,7 @@ def generate_truncf(name, params):
 
     return generate_unary(
         name=name,
-        op_type="truncf",
+        handshake_op="truncf",
         input_bitwidth=64,
         output_bitwidth=32,
         signals=signals,

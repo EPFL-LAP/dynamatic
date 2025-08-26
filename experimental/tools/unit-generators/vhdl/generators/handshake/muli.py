@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 
 
 def generate_muli(name, params):
@@ -35,7 +35,7 @@ def generate_muli(name, params):
 
     return generate_arith_binary(
         name=name,
-        op_type="muli",
+        handshake_op="muli",
         bitwidth=bitwidth,
         signals=signals,
         body=body,

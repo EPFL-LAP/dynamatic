@@ -11,7 +11,7 @@ def generate_absf(name, params):
 
     return generate_unary(
         name=name,
-        op_type="absf",
+        handshake_op="absf",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None),

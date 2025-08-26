@@ -12,7 +12,7 @@ def generate_extui(name, params):
 
     return generate_unary(
         name=name,
-        op_type="extui",
+        handshake_op="extui",
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,

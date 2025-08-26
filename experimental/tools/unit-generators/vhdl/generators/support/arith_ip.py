@@ -1,13 +1,40 @@
-from generators.support.arith2 import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 
 
 def generate_flopoco_ip_wrapper(name,
-                                op_type,
+                                handshake_op,
                                 core_unit,
                                 latency,
                                 is_double,
                                 internal_delay,
                                 extra_signals):
+    """
+    Generates boilerplate VHDL entity and handshaking code for arithmetic units which
+    are wrappers for IP arithmetic cores, such as floating point units, or integer division.
+
+    For flopoco units, it adds the necessary conversions, and instantiates the unit from
+    flopoco_ip_cores, with a number of clock enable signals based on the operation's latency
+    (The op latency must be provided when calling the backed, no latencies are hardcoded).
+
+    For vitis ips, the unit is instantiated from vitis_ip_wrappers. These are only wrappers,
+    and so these units can only be used if the propetiary IP cores are also present in simulation.
+    The backend does not handle this.
+
+    Args:
+        name: Unique name based on MLIR op name (e.g. adder0).
+        handshake_op: What kind of handshake op this RTL entity corresponds to. Only used in comments.
+        core_unit: What is the name of this unit in the flopoco ip cores
+        latency: Operation latency, used to add clock enables to flopoco units.
+        is_double: Flag to specify either 32 or 64 bit units.
+        internal_delay: internal delay of the unit, currently used to identify the desired flopoco unit.
+        bitwidth: Unit bitwidth (if input/output are the same).
+        extra_signals: Extra signals on input/output channels, from IR.
+
+
+    Returns:
+        VHDL code as a string.
+    """
+
     bitwidth = 64 if is_double else 32
 
     signals = f"""
@@ -60,7 +87,7 @@ def generate_flopoco_ip_wrapper(name,
 
     return generate_arith_binary(
         name=name,
-        op_type=op_type,
+        handshake_op=handshake_op,
         bitwidth=bitwidth,
         signals=signals,
         body=body,
@@ -70,12 +97,12 @@ def generate_flopoco_ip_wrapper(name,
 
 
 def generate_vivado_ip_wrapper(name,
-                               op_type,
+                               handshake_op,
                                latency,
                                extra_signals):
 
     body = f"""
-  {op_type}_vitis_hls_wrapper_U1 : entity work.{op_type}_vitis_hls_wrapper
+  {handshake_op}_vitis_hls_wrapper_U1 : entity work.{handshake_op}_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -88,7 +115,7 @@ def generate_vivado_ip_wrapper(name,
 
     return generate_arith_binary(
         name=name,
-        op_type=op_type,
+        handshake_op=handshake_op,
         bitwidth=32,
         body=body,
         latency=latency,

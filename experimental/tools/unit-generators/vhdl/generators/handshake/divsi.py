@@ -9,7 +9,7 @@ def generate_divsi(name, params):
 
     return generate_vivado_ip_wrapper(
         name=name,
-        op_type="divsi",
+        handshake_op="divsi",
         latency=latency,
         extra_signals=extra_signals
     )

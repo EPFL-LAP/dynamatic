@@ -41,7 +41,7 @@ def generate_sitofp(name, params):
 
     return generate_unary(
         name=name,
-        op_type="sitofp",
+        handshake_op="sitofp",
         input_bitwidth=32,
         output_bitwidth=32,
         signals=signals,

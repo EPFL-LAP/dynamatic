@@ -9,7 +9,7 @@ def generate_remsi(name, params):
 
     return generate_vivado_ip_wrapper(
         name=name,
-        op_type="remsi",
+        handshake_op="remsi",
         latency=latency,
         extra_signals=extra_signals
     )

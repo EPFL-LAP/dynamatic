@@ -1,5 +1,4 @@
-from generators.support.signal_manager import generate_arith2_signal_manager
-from generators.support.arith2 import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 
 
 def generate_subi(name, params):
@@ -11,7 +10,7 @@ def generate_subi(name, params):
 
     return generate_arith_binary(
         name=name,
-        op_type="subi",
+        handshake_op="subi",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None)

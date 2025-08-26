@@ -6,7 +6,7 @@ from generators.handshake.buffer import generate_valid_propagation_buffer
 
 def generate_unary(
     name: str,
-    op_type: str,
+    handshake_op: str,
     body: str,
     extra_signals: ExtraSignals,
     signals: str = "",
@@ -29,7 +29,7 @@ def generate_unary(
 
     Args:
         name: Unique name based on MLIR op name (e.g. adder0).
-        op_type: Which handshake operation this module corresponds to, used only in comments
+        handshake_op: Which handshake operation this module corresponds to, used only in comments
         signals: Local signal declarations used in body.
         body: VHDL body of the unit, excluding handshaking.
         dependencies: Dependencies, excluding handshaking.
@@ -55,7 +55,7 @@ def generate_unary(
 
     def generate_inner(name): return _generate_unary(
         name,
-        op_type,
+        handshake_op,
         input_bitwidth,
         output_bitwidth,
         signals,
@@ -81,7 +81,7 @@ def generate_unary(
 
 def _generate_unary(
         name,
-        modType,
+        handshake_op,
         input_bitwidth,
         output_bitwidth,
         signals,
@@ -97,7 +97,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.float_pkg.all;
 
--- Entity of {modType}
+-- Entity of {handshake_op}
 entity {name} is
   port(
     clk: in std_logic;
@@ -122,7 +122,7 @@ end entity;
     # Handshaking is directly forwarded
     if latency == 0:
         architecture = f"""
--- Architecture of {modType}
+-- Architecture of {handshake_op}
 architecture arch of {name} is
   {signals}
 begin
@@ -141,7 +141,7 @@ end architecture;
         dependencies += generate_valid_propagation_buffer(valid_buffer_name, latency)
 
         architecture = f"""
--- Architecture of {modType}
+-- Architecture of {handshake_op}
 architecture arch of {name} is
   {signals}
   signal valid_buffer_ready : std_logic;

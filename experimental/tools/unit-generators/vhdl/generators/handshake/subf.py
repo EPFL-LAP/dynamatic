@@ -1,5 +1,5 @@
 from generators.handshake.addf import generate_addf
-from generators.support.signal_manager import generate_arith2_signal_manager
+from generators.support.signal_manager import generate_arith_binary_signal_manager
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 
@@ -24,7 +24,7 @@ def generate_subf(name, params):
     def generate(): return generate_inner(name)
 
     if extra_signals:
-        return generate_arith2_signal_manager(
+        return generate_arith_binary_signal_manager(
             name=name,
             bitwidth=bitwidth,
             extra_signals=extra_signals,

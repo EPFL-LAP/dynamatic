@@ -16,7 +16,7 @@ def generate_extf(name, params):
 
     return generate_unary(
         name=name,
-        op_type="extf",
+        handshake_op="extf",
         input_bitwidth=32,
         output_bitwidth=64,
         signals=signals,

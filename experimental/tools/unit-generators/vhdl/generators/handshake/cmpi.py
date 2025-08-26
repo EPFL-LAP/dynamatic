@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 
 
 def generate_cmpi(name, params):
@@ -16,9 +16,8 @@ def generate_cmpi(name, params):
 
     return generate_arith_binary(
         name=name,
-        op_type="cmpi",
-        lhs_bitwidth=bitwidth,
-        rhs_bitwidth=bitwidth,
+        handshake_op="cmpi",
+        input_bitwidth=bitwidth,
         output_bitwidth=1,
         body=body,
         extra_signals=params.get("extra_signals", None)

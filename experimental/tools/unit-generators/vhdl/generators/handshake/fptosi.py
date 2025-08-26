@@ -41,7 +41,7 @@ def generate_fptosi(name, params):
 
     return generate_unary(
         name=name,
-        op_type="fptosi",
+        handshake_op="fptosi",
         bitwidth=32,
         signals=signals,
         body=body,

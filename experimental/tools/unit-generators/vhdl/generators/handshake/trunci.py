@@ -14,7 +14,7 @@ def generate_trunci(name, params):
 
     return generate_unary(
         name=name,
-        op_type=op_type,
+        handshake_op=op_type,
         input_bitwidth=input_bitwidth,
         output_bitwidth=output_bitwidth,
         body=body,

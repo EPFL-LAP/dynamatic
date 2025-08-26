@@ -8,7 +8,7 @@ def generate_logical_not(name, params):
   outs       <= not ins;
     """
 
-    return generate_unarys(
+    return generate_unary(
         name=name,
         modType="not",
         bitwidth=bitwidth,

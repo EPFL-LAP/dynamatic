@@ -1,4 +1,4 @@
-from generators.support.arith2 import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 from generators.support.utils import VIVADO_IMPL, FLOPOCO_IMPL
 
 
@@ -23,9 +23,8 @@ def generate_cmpf(name, params):
 
     return generate_arith_binary(
         name=name,
-        op_type="cmpf",
-        lhs_bitwidth=bitwidth,
-        rhs_bitwidth=bitwidth,
+        handshake_op="cmpf",
+        input_bitwidth=bitwidth,
         output_bitwidth=1,
         signals=signals,
         body=body,
