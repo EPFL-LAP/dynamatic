@@ -714,10 +714,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     }
   }
 
-  // Used to keep consistency betweeen memory access names referenced by memory
-  // dependencies and names of replaced memory operations
-  MemoryOpLowering memOpLowering(namer);
-
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
   // by memory interface placement later)
@@ -754,8 +750,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value data = edgeBuilder.get(channelifyType(dataTy));
               auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
 
-              // Record the memory access replacement
-              memOpLowering.recordReplacement(loadOp, newOp, false);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, newOp);
+              namer.replaceOp(loadOp, newOp);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
 
@@ -780,8 +776,9 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               assert((addr && data) && "failed to remap address or data");
               auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
 
-              // Record the memory access replacement
-              memOpLowering.recordReplacement(storeOp, newOp, false);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp,
+                                                                 newOp);
+              namer.replaceOp(storeOp, newOp);
               rewriter.eraseOp(storeOp);
               return newOp;
             })
@@ -799,7 +796,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
   }
 
-  memOpLowering.renameDependencies(funcOp);
   return success();
 }
 
