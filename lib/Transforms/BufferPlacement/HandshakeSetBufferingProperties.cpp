@@ -38,9 +38,9 @@ static const llvm::StringLiteral
 
 /// Makes the channel unbufferizable.
 static void makeUnbufferizable(Value val) {
-  if (val.use_empty()) {
-    assert(false && "Cannot treat a value without a use as a channel!");
-  }
+  assert(!val.use_empty() &&
+         "Cannot treat a value without a use as a channel!");
+
   Channel channel(val, true);
   channel.props->maxOpaque = 0;
   channel.props->maxTrans = 0;
