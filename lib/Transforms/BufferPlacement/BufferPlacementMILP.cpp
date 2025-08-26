@@ -391,6 +391,11 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  // AYA
+  // New constraint to ensure that the throughput cannot be more than 1,
+  // especially when bc ends up being > 1
+  model.addConstr(cfVars.throughput <= 1, "throughput_upper_bound");
+
   for (Value channel : cfdfc.channels) {
     // Get the ports the channels connect and their retiming MILP variables
     Operation *srcOp = channel.getDefiningOp();
@@ -483,11 +488,6 @@ void BufferPlacementMILP::
 
     // The channel's throughput cannot exceed the number of buffer slots.
     model.addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
-
-    // AYA
-    // New constraint to ensure that the throughput cannot be more than 1,
-    // especially when bc ends up being > 1
-    model.addConstr(cfVars.throughput <= 1, "throughput_upper_bound");
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
@@ -1131,6 +1131,53 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   // Finally, set the MILP objective
   model.setObjective(objective, GRB_MAXIMIZE);
 }
+
+// void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
+//                                                     ArrayRef<CFDFC *> cfdfcs)
+//                                                     {
+//   // Compute the total number of executions over channels that are part of
+//   any
+//   // CFDFC
+//   unsigned totalExecs = 0;
+//   for (Value channel : channels) {
+//     totalExecs += getChannelNumExecs(channel);
+//   }
+
+//   // Create the expression for the MILP objective
+//   GRBLinExpr objective;
+
+//   // For each CFDFC, add a throughput contribution to the objective, weighted
+//   // by the "importance" of the CFDFC
+//   double maxCoefCFDFC = 0.0;
+//   double fTotalExecs = static_cast<double>(totalExecs);
+//   if (totalExecs != 0) {
+//     for (CFDFC *cfdfc : cfdfcs) {
+//       double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+//       objective += coef * vars.cfdfcVars[cfdfc].throughput;
+//       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+//     }
+//   }
+
+//   // In case we ran the MILP without providing any CFDFC, set the maximum
+//   CFDFC
+//   // coefficient to any positive value
+//   if (maxCoefCFDFC == 0.0)
+//     maxCoefCFDFC = 1.0;
+
+//   // For each channel, add a "penalty" in case a buffer is added to the
+//   channel,
+//   // and another penalty that depends on the number of slots
+//   double bufPenaltyMul = 1e-4;
+//   double slotPenaltyMul = 1e-5;
+//   for (Value channel : channels) {
+//     ChannelVars &chVars = vars.channelVars[channel];
+//     objective -= maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
+//     objective -= maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
+//   }
+
+//   // Finally, set the MILP objective
+//   model.setObjective(objective, GRB_MAXIMIZE);
+// }
 
 void BufferPlacementMILP::addBufferAreaAwareObjective(
     ValueRange channels, ArrayRef<CFDFC *> cfdfcs) {
