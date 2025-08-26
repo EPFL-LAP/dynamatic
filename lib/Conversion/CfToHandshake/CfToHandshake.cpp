@@ -712,11 +712,11 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     }
   }
 
-  // Record each alloca operation to memInfo
+  // Record each alloca operation to memInfo.
   Block *firstBlock = &funcOp.getBlocks().front();
-  auto firstBlockControl = getBlockControl(firstBlock);
-
+  auto firstBBControl = getBlockControl(firstBlock);
   funcOp.walk([&](memref::AllocaOp op) {
+    Value memref = op->getResult(0);
     // Every memory controller needs a start signal to indicate that the BRAM
     // can safely accept new memory requests. For internally allocated memories
     // (which will be converted to BRAMs or MUXes) we use the function's control
@@ -724,8 +724,9 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     //
     // NOTE: Each external memory bank (passed in the function argument)
     // has a separate block argument as the memory controller's start signal
-    Value memref = op->getResult(0);
-    memInfo.insert({memref, {firstBlockControl}});
+    memInfo.insert({/* will be managed by a mem_controller */ memref,
+                    /* MemoryAccesses = */ {
+                        /* mem_controller's start signal */ firstBBControl}});
   });
 
   // Replace load and store operations with their corresponding Handshake
