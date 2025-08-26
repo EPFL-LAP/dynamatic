@@ -38,7 +38,6 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 // extra verification conditions.  In particular, each Value must
 // only have a single use.  Also, it defines a Dominance-Free Scope
 def FuncOp : Op<Handshake_Dialect, "func", [
-   AutomaticAllocationScope,
    IsolatedFromAbove,
    FunctionOpInterface,
    Symbol,
