@@ -313,11 +313,12 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
           // Check for duplicate missing-phi operands
           if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
             for (MissingPhi mPhi : operandsMissPhi) {
-              // Two missing-phi operands are considered equal if they target
-              // the same argument of the same phi and have the same producer
-              // block. The value is not compared, which might be problematic.
-              if (mPhi.blockArg.getParentBlock() ==
-                  blockArgC.getParentBlock()) {
+              // Two missing-phi operands are considered equal if they
+              // originated from and target the same argument of the same block.
+              // The value is not compared, which might be problematic.
+              if ((mPhi.blockArg.getParentBlock() ==
+                   blockArgC.getParentBlock()) &&
+                  (mPhi.blockArg.getArgNumber() == blockArgC.getArgNumber())) {
                 mPhi.pi->senders.insert(pred);
                 return true;
               }
@@ -665,7 +666,8 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op : operands) {
+      for (GateInput *&op
+           : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());
