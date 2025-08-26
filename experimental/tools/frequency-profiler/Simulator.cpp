@@ -1,5 +1,5 @@
 //===- Simulator.cpp - std-level simulator ----------------------*- C++ -*-===//
-// 
+//
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -381,9 +381,8 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
   return success();
 }
 
-
 LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
-                        std::vector<Any> &out) {
+                                   std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
@@ -856,19 +855,57 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
     unsigned strat = ExecuteStrategy::Default;
     auto res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<arith::ConstantOp, arith::AddIOp, arith::AddFOp,
-                  arith::CmpIOp, arith::CmpFOp, arith::SubIOp, arith::SubFOp,
-                  arith::MulIOp, arith::MulFOp, arith::DivSIOp, arith::DivUIOp,
-                  arith::DivFOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
-                  arith::SIToFPOp, arith::FPToSIOp, arith::IndexCastOp,
-                  arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
-                  arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
-                  arith::ShRUIOp, arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp,
-                  arith::ExtFOp, math::SqrtOp, math::CosOp, math::ExpOp,
-                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
-                  math::SqrtOp, math::AbsFOp, arith::MaxUIOp, arith::MaxSIOp,
-                  memref::AllocOp, memref::AllocaOp, memref::LoadOp,
-                  memref::StoreOp, memref::GetGlobalOp>([&](auto op) {
+            .Case<
+                // clang-format off
+                LLVM::UndefOp,
+                arith::AddFOp,
+                arith::AddIOp,
+                arith::AndIOp,
+                arith::CmpFOp,
+                arith::CmpIOp,
+                arith::ConstantOp,
+                arith::DivFOp,
+                arith::DivSIOp,
+                arith::DivUIOp,
+                arith::ExtFOp,
+                arith::ExtSIOp,
+                arith::ExtUIOp,
+                arith::FPToSIOp,
+                arith::IndexCastOp,
+                arith::MulFOp,
+                arith::MulIOp,
+                arith::OrIOp,
+                arith::RemFOp,
+                arith::RemSIOp,
+                arith::RemUIOp,
+                arith::SIToFPOp,
+                arith::SelectOp,
+                arith::ShLIOp,
+                arith::ShRSIOp,
+                arith::ShRUIOp,
+                arith::SubFOp,
+                arith::SubIOp,
+                arith::TruncFOp,
+                arith::TruncIOp,
+                arith::XOrIOp,
+                arith::MaxUIOp,
+                arith::MaxSIOp,
+                math::SqrtOp,
+                math::CosOp,
+                math::ExpOp,
+                math::Exp2Op,
+                math::LogOp,
+                math::Log2Op,
+                math::Log10Op,
+                math::SqrtOp,
+                math::AbsFOp,
+                memref::AllocOp,
+                memref::AllocaOp,
+                memref::LoadOp,
+                memref::StoreOp,
+                memref::GetGlobalOp
+                // clang-format on
+                >([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })
@@ -981,7 +1018,8 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
       }
     });
 
-    // If the GlobalOp has a dense initializer, initialize it:
+    // If the GlobalOp has a dense initializer, use it the initialize the memory
+    // content:
     mlir::Attribute initValueAttr = gblOp.getInitialValueAttr();
     if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
       mlir::Type elemType = denseAttr.getElementType();
