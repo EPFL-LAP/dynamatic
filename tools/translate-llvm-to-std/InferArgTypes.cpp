@@ -1,5 +1,4 @@
 
-#include "dynamatic/Conversion/LLVMToControlFlow.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -26,8 +25,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "clang-c/CXString.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/IR/DerivedTypes.h"
 
 #include "clang-c/Index.h"
 #include "llvm/Support/Process.h"
