@@ -1062,8 +1062,18 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
-    if (isa<IndexType>(type))
+    if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
+      // The operand of CastOp might already been channelified. In this case, we
+      // need to use the getDataBitWidth in the ChannelType class to get the
+      // bitwidth
+      //
+      // Example (the operand is already mutated to a channelType):
+      // %89 = arith.index_cast %66 {..} : !handshake.channel<i32> -> index
+      return channelType.getDataBitWidth();
+    }
+    if (isa<IndexType>(type)) {
       return 32;
+    }
     return type.getIntOrFloatBitWidth();
   };
 
