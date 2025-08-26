@@ -281,6 +281,14 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> {
   let summary = "Unsigned integer division.";
 }
 
+def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi"> {
+  let summary = "Outputs the maximum between two input signed integers";
+}
+
+def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
+  let summary = "Outputs the maximum between two input unsigned integers";
+}
+
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
