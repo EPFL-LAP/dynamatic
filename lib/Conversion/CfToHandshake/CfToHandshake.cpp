@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -205,14 +205,6 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
 
-  // Map all memory accesses in the matched function to the index of their
-  // memref in the function's arguments
-  DenseMap<Value, unsigned> memrefToArgIdx;
-  for (auto [idx, arg] : llvm::enumerate(lowerFuncOp.getArguments())) {
-    if (isa<mlir::MemRefType>(arg.getType()))
-      memrefToArgIdx.insert({arg, idx});
-  }
-
   // First lower the parent function itself, without modifying its body (except
   // the block arguments and terminators)
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
@@ -225,13 +217,13 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
   // Stores mapping from each value that passes through a merge-like operation
   // to the data result of that merge operation
   ArgReplacements argReplacements;
+
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo)))
+  if (failed(convertMemoryOps(funcOp, rewriter, edgeBuilder, memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -327,31 +319,6 @@ LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
   return attributes;
 }
 
-static void
-setupEntryBlockConversion(Block *entryBlock, unsigned numMemories,
-                          PatternRewriter &rewriter,
-                          TypeConverter::SignatureConversion &conv) {
-  // All func-level function arguments map one-to-one to the handshake-level
-  // function arguments and get channelified in the process
-  for (auto [idx, type] : llvm::enumerate(entryBlock->getArgumentTypes()))
-    conv.addInputs(idx, channelifyType(type));
-
-  // Add a new control argument for each memory and one for the start signal
-  Type ctrlType = handshake::ControlType::get(rewriter.getContext());
-  conv.addInputs(SmallVector<Type>{numMemories + 1, ctrlType});
-}
-
-static void setupBlockConversion(Block *block, PatternRewriter &rewriter,
-                                 TypeConverter::SignatureConversion &conv) {
-  // All func-level block arguments map one-to-one to the handshake-level
-  // arguments and get channelified in the process
-  for (auto [idx, type] : llvm::enumerate(block->getArgumentTypes()))
-    conv.addInputs(idx, channelifyType(type));
-
-  // Add a new argument for the start in each block
-  conv.addInputs(handshake::ControlType::get(rewriter.getContext()));
-}
-
 FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
   // The Handshake function's first inputs and outputs match the original
@@ -385,30 +352,42 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     return newFuncOp;
   }
 
-  Region *oldBody = &funcOp.getBody();
-
-  const TypeConverter *typeConv = getTypeConverter();
+  // Move the entire func-level body to the handhsake-level function
+  rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
+                              newFuncOp.end());
 
   // Convert the entry block's signature
-  Block *entryBlock = &funcOp.getBody().front();
-  TypeConverter::SignatureConversion entryConversion(
-      entryBlock->getNumArguments());
-  setupEntryBlockConversion(entryBlock, numMemories, rewriter, entryConversion);
-  rewriter.applySignatureConversion(oldBody, entryConversion, typeConv);
+  Block *entryBlock = &newFuncOp.getBody().front();
 
-  // Convert the non entry blocks' signatures
-  SmallVector<TypeConverter::SignatureConversion> nonEntryConversions;
-  for (Block &block : llvm::drop_begin(funcOp)) {
-    auto &conv = nonEntryConversions.emplace_back(block.getNumArguments());
-    setupBlockConversion(&block, rewriter, conv);
+  // ---------------------------------------------------------------------------
+  // Update the block arguments of first
+  // ---------------------------------------------------------------------------
+  for (auto arg : entryBlock->getArguments()) {
+    // Channelify (e.g., convert i32 to channel<i32>) the argument types.
+    arg.setType(channelifyType(arg.getType()));
   }
-  if (failed(rewriter.convertNonEntryRegionTypes(oldBody, *typeConv,
-                                                 nonEntryConversions)))
-    return failure();
+  for (unsigned i = 0; i < numMemories + 1; i++) {
+    // Add one extra argument per memory + one control-only signal.
+    entryBlock->addArgument(handshake::ControlType::get(rewriter.getContext()),
+                            funcOp.getLoc());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Update the arguments of the remaining BBs
+  // ---------------------------------------------------------------------------
+  for (Block &block : llvm::drop_begin(newFuncOp)) {
+    for (auto arg : block.getArguments()) {
+      // Channelify (e.g., convert i32 to channel<i32>) the argument types.
+      arg.setType(channelifyType(arg.getType()));
+    }
+    // Add 1 control-only signal.
+    block.addArgument(handshake::ControlType::get(rewriter.getContext()),
+                      funcOp.getLoc());
+  }
 
   // Modify branch-like terminators to forward the new control value through
   // all blocks
-  for (Block &block : funcOp) {
+  for (Block &block : newFuncOp) {
     Operation *termOp = block.getTerminator();
     Value blockCtrl = block.getArguments().back();
     rewriter.setInsertionPointToEnd(&block);
@@ -438,9 +417,6 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     }
   }
 
-  // Move the entire func-level body to the handhsake-level function
-  Region *newBody = &newFuncOp.getBody();
-  rewriter.inlineRegionBefore(*oldBody, *newBody, newFuncOp.end());
   rewriter.eraseOp(funcOp);
   return newFuncOp;
 }
@@ -478,7 +454,7 @@ static Value getMergeOperand(BlockArgument blockArg, Block *predBlock,
 /// Determines the list of predecessors of the block by iterating over all block
 /// terminators in the parent function. If the terminator is a conditional
 /// branch whose branches both point to the target block, then the owning block
-/// is added twice to the list and the branhc's "false destinatiob" is
+/// is added twice to the list and the branhc's "false destination" is
 /// associated with a false boolean value; in all other situatuions predecessor
 /// blocks are associated a true boolean value.
 static SmallVector<std::pair<Block *, bool>>
@@ -687,14 +663,14 @@ void LowerFuncToHandshake::addBranchOps(
   }
 }
 
-LowerFuncToHandshake::MemAccesses::MemAccesses(BlockArgument memStart)
+LowerFuncToHandshake::MemAccesses::MemAccesses(Value memStart)
     : memStart(memStart) {}
 
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    const DenseMap<Value, unsigned> &memrefIndices,
     BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
+
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -713,6 +689,16 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       memInfo.insert({arg, {funcArgs[memStartIdx]}});
     }
   }
+
+  // Record each alloca operation to memInfo
+  Block *firstBlock = &funcOp.getBlocks().front();
+  auto firstBlockControl = getBlockControl(firstBlock);
+
+  funcOp.walk([&](memref::AllocaOp op) {
+    //
+    Value memref = op->getResult(0);
+    memInfo.insert({memref, {firstBlockControl}});
+  });
 
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
@@ -788,7 +774,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
     // Associate the new operation with the memory region it references and
     // the memory interface it should connect to
-    auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
+    auto *accessesIt = memInfo.find(memref);
     assert(accessesIt != memInfo.end() && "unknown memref");
     if (memAttr.connectsToMC())
       accessesIt->second.mcPorts[block].push_back(portOp);
@@ -1098,13 +1084,13 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   TypeRange resultTypes;
   // Vectors storing indices of classified arguments for placeholder logic
   // handling
-  SmallVector<unsigned> InstanceOpInputIndices;
-  SmallVector<unsigned> InstanceOpOutputIndices;
-  SmallVector<unsigned> InstanceOpParameterIndices;
+  SmallVector<unsigned> instanceOpInputIndices;
+  SmallVector<unsigned> instanceOpOutputIndices;
+  SmallVector<unsigned> instanceOpParameterIndices;
   SmallVector<Operation *> initCalls;
   // OutputConnections: Maps output argument index -> list of operations that
   // consume its value
-  llvm::DenseMap<unsigned, SmallVector<Operation *>> OutputConnections;
+  llvm::DenseMap<unsigned, SmallVector<Operation *>> outputConnections;
   // parameterMap: Maps parameter name to its value
   llvm::DenseMap<StringRef, Attribute> parameterMap;
   // Store and later erase const that are used to define parameters
@@ -1127,13 +1113,13 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       assert(nameAttr && !nameAttr.getValue().empty() &&
              "Argument name attribute is missing or empty");
       if (nameAttr.getValue().starts_with("input_")) {
-        InstanceOpInputIndices.push_back(i);
+        instanceOpInputIndices.push_back(i);
       } else if (nameAttr.getValue().starts_with("output_")) {
-        InstanceOpOutputIndices.push_back(i);
+        instanceOpOutputIndices.push_back(i);
         // For each output argument index, find all operations that consume its
         // value and store the mapping in OutputConnections
         Value outputArg = callOp.getOperand(i);
-        auto &fanouts = OutputConnections[i];
+        auto &fanouts = outputConnections[i];
         for (auto &use : outputArg.getUses()) {
           Operation *user = use.getOwner();
           if (user != callOp) {
@@ -1142,7 +1128,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         }
       } else if (nameAttr.getValue().starts_with("parameter_")) {
         // Extract and Store parameter name and value inside a Dictionary.
-        InstanceOpParameterIndices.push_back(i);
+        instanceOpParameterIndices.push_back(i);
         StringRef parameterName =
             nameAttr.getValue().drop_front(strlen("parameter_"));
         Value operand = callOp.getOperand(i);
@@ -1162,15 +1148,15 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         assert(false && "Invalid argument naming");
       }
     }
-    assert(!InstanceOpOutputIndices.empty() &&
+    assert(!instanceOpOutputIndices.empty() &&
            "Placeholder functions must at least have one output_ argument!");
     // For each operand, check if its index is in the output or parameter index
     // vector. If it is, remove that operand. This ensures that the operands
     // list only contains input arguments. We iterate in reverse to avoid
     // invalidating indices while erasing.
     for (int i = adaptor.getOperands().size() - 1; i >= 0; --i) {
-      if (llvm::is_contained(InstanceOpOutputIndices, i) ||
-          llvm::is_contained(InstanceOpParameterIndices, i)) {
+      if (llvm::is_contained(instanceOpOutputIndices, i) ||
+          llvm::is_contained(instanceOpParameterIndices, i)) {
         operands.erase(operands.begin() + i);
       }
     }
@@ -1185,9 +1171,9 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     SmallVector<Type> newInputs;
     SmallVector<Type> newResults;
     for (unsigned i = 0; i < calledFuncOpType.getNumInputs(); ++i) {
-      if (llvm::is_contained(InstanceOpInputIndices, i)) {
+      if (llvm::is_contained(instanceOpInputIndices, i)) {
         newInputs.push_back(calledFuncOpType.getInput(i));
-      } else if (llvm::is_contained(InstanceOpOutputIndices, i)) {
+      } else if (llvm::is_contained(instanceOpOutputIndices, i)) {
         newResults.push_back(calledFuncOpType.getInput(i));
       }
     }
@@ -1217,12 +1203,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // our called placeholder. All output arguments must originate from __init
     // calls (enforced via assertions). All __init calls are collected so they
     // can be erased after rewiring.
-    for (unsigned outputArgIdx : InstanceOpOutputIndices) {
+    for (unsigned outputArgIdx : instanceOpOutputIndices) {
       assert(outputArgIdx < adaptor.getOperands().size() &&
              "Output index out of bounds");
 
       Value outputVal = adaptor.getOperands()[outputArgIdx];
-      auto definingOp = stripCasts(outputVal);
+      auto *definingOp = stripCasts(outputVal);
       assert(definingOp && "Expected defining op for output value");
 
       auto sourceCallOp = dyn_cast<func::CallOp>(definingOp);
@@ -1243,8 +1229,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       }
     }
     // Erase parameters from callOp
-    llvm::sort(InstanceOpParameterIndices, std::greater<>());
-    for (unsigned id : InstanceOpParameterIndices) {
+    llvm::sort(instanceOpParameterIndices, std::greater<>());
+    for (unsigned id : instanceOpParameterIndices) {
       if (id < callOp->getNumOperands()) {
         callOp->eraseOperand(id);
       }
@@ -1275,23 +1261,23 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   // by the instance, so we update all uses to reference the correct result.
   // This step will be skipped for all non-placeholder function since for them
   // the output index list is empty
-  if (!InstanceOpOutputIndices.empty()) {
-    auto InstanceResults = instOp.getResults();
-    unsigned ResultId = 0;
-    for (auto OutputId : InstanceOpOutputIndices) {
-      for (Operation *user : OutputConnections[OutputId]) {
+  if (!instanceOpOutputIndices.empty()) {
+    auto instanceResults = instOp.getResults();
+    unsigned resultId = 0;
+    for (auto outputId : instanceOpOutputIndices) {
+      for (Operation *user : outputConnections[outputId]) {
         for (OpOperand &operand : user->getOpOperands()) {
           // ASSUMPTION: Data dependencies are acyclic, no output from the
           // instance is used to (directly or indirectly) compute its own input.
           // All uses of placeholder values must occur after the instance is
           // inserted. This avoids SSA violations and preserves correct dataflow
           // semantics.
-          if (operand.get() == callOp.getOperand(OutputId)) {
-            operand.set(InstanceResults[ResultId]);
+          if (operand.get() == callOp.getOperand(outputId)) {
+            operand.set(instanceResults[resultId]);
           }
         }
       }
-      ResultId++;
+      resultId++;
     }
   }
 
@@ -1483,6 +1469,7 @@ struct CfToHandshakePass
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
     target.addLegalDialect<handshake::HandshakeDialect>();
+    target.addLegalOp<memref::AllocOp, memref::AllocaOp>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();

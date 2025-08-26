@@ -48,12 +48,12 @@ public:
   // the constructor of a non-base class.
   LowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
                        mlir::PatternBenefit benefit = 1)
-      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit){};
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit) {};
 
   LowerFuncToHandshake(NameAnalysis &namer, const TypeConverter &typeConverter,
                        MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
       : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
-                                                   benefit){};
+                                                   benefit) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -70,14 +70,14 @@ public:
         lsqPorts;
     /// Function argument corresponding to the memory start signal for that
     /// interface.
-    BlockArgument memStart;
+    Value memStart;
 
-    MemAccesses(BlockArgument memStart);
+    MemAccesses(Value memStart);
   };
 
   /// Stores a mapping between memory regions (identified by the function
-  /// argument they correspond to) and the set of memory operations referencing
-  /// them.
+  /// argument they correspond to or the result of an memref.AllocOp) and the
+  /// set of memory operations referencing them.
   using MemInterfacesInfo = llvm::MapVector<Value, MemAccesses>;
 
   /// Creates a Handshake-level equivalent to the matched func-level function,
@@ -110,12 +110,11 @@ public:
   /// use which interface. The backedge builder is used to create temporary
   /// values for the data input to converted load ports. A flag for FTD is also
   /// introduced to tweak the rewriting process.
-  virtual LogicalResult
-  convertMemoryOps(handshake::FuncOp funcOp,
-                   ConversionPatternRewriter &rewriter,
-                   const DenseMap<Value, unsigned> &memrefIndices,
-                   BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
-                   bool isFtd = false) const;
+  virtual LogicalResult convertMemoryOps(handshake::FuncOp funcOp,
+                                         ConversionPatternRewriter &rewriter,
+                                         BackedgeBuilder &edgeBuilder,
+                                         MemInterfacesInfo &memInfo,
+                                         bool isFtd = false) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group
