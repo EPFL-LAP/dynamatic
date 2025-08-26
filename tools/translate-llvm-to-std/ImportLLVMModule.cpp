@@ -42,7 +42,6 @@ mlir::Type getMLIRType(llvm::Type *llvmType, mlir::MLIRContext *context) {
     return mlir::FloatType::getF64(context);
   }
 
-  llvmType->dump();
   llvm_unreachable("Unhandled scalar type");
 }
 
@@ -117,7 +116,6 @@ void convertInitializerToDenseElemAttrRecursive(
                                                  baseMLIRElemType);
     } else {
       llvm::errs() << "Unhandled constant element type:\n";
-      elem->dump();
       llvm_unreachable("Unhandled base element type.");
     }
   }
@@ -262,7 +260,6 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *callInst = dyn_cast<llvm::CallInst>(inst)) {
     translateCallInst(callInst);
   } else {
-    inst->dump();
     llvm_unreachable("Not implemented");
   }
 }
@@ -536,7 +533,6 @@ void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   int remainingConstZeros = memrefType.getShape().size() - indexOperands.size();
 
   if (remainingConstZeros < 0) {
-    gepInst->dump();
     llvm_unreachable(
         "GEP should only omit indices, but shouldn't have more indices than "
         "the original memref type extracted from the function argument!");
