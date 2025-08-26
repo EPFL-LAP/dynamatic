@@ -817,12 +817,23 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
     // Associate the new operation with the memory region it references and
     // the memory interface it should connect to
-    auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
-    assert(accessesIt != memInfo.end() && "unknown memref");
-    if (memAttr.connectsToMC())
-      accessesIt->second.mcPorts[block].push_back(portOp);
-    else
-      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    if (memrefIndices.count(memref)) {
+      // MemRef is a function argument
+      auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
+      assert(accessesIt != memInfo.end() && "unknown memref");
+      if (memAttr.connectsToMC())
+        accessesIt->second.mcPorts[block].push_back(portOp);
+      else
+        accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    } else {
+      // MemRef is produced by Alloca or GetGlobal
+      auto *accessesIt = memInfo.find(memref);
+      assert(accessesIt != memInfo.end() && "unknown memref");
+      if (memAttr.connectsToMC())
+        accessesIt->second.mcPorts[block].push_back(portOp);
+      else
+        accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    }
   }
 
   return success();
