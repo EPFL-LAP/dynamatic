@@ -1,11 +1,7 @@
 #pragma once
 
-#include "dynamatic/Conversion/LLVMToControlFlow.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
-#include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Conversion/LLVMCommon/VectorPattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -29,12 +25,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
-
-#include "clang-c/Index.h"
-#include "llvm/Support/Process.h"
-#include "llvm/Support/raw_ostream.h"
-#include <cstddef>
-#include <optional>
 
 using namespace mlir;
 
@@ -72,7 +62,7 @@ struct ArgType {
   std::vector<int64_t> arrayDimensions;
   bool isPassedByReference;
 
-  Type getMlirType(OpBuilder &builder) const;
+  mlir::Type getMlirType(OpBuilder &builder) const;
 };
 
 using CFuncArgs = SmallVector<ArgType>;
@@ -84,9 +74,9 @@ using FuncNameToCFuncArgsMap = std::map<std::string, CFuncArgs>;
 
 /// \brief: Read the function arguments in the C source code, and convert them
 /// into the corresponding types in MLIR that we support.
-SmallVector<Type> getFuncArgTypes(const std::string &funcName,
-                                  FuncNameToCFuncArgsMap map,
-                                  OpBuilder &builder);
+SmallVector<mlir::Type> getFuncArgTypes(const std::string &funcName,
+                                        FuncNameToCFuncArgsMap map,
+                                        OpBuilder &builder);
 
 /// \brief: for a given function "funcName", get the corresponding types that
 /// will be used in Dynamatic.

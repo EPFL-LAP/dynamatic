@@ -680,18 +680,37 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("VALUE", bitValue);
         addUnsigned("DATA_WIDTH", bitwidth);
       })
-      .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::DivFOp, handshake::RemSIOp, handshake::DivSIOp,
-            handshake::DivUIOp, handshake::MaximumFOp, handshake::MinimumFOp,
-            handshake::MulFOp, handshake::MulIOp, handshake::NegFOp,
-            handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
-            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
-            handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
-            handshake::FPToSIOp, handshake::AbsFOp, handshake::MaxSIOp>(
-          [&](auto) {
-            // Bitwidth
-            addType("DATA_TYPE", op->getOperand(0));
-          })
+      .Case<
+          // clang-format off
+          handshake::AddFOp,
+          handshake::AddIOp,
+          handshake::AndIOp,
+          handshake::DivFOp,
+          handshake::RemSIOp,
+          handshake::DivSIOp,
+          handshake::DivUIOp,
+          handshake::MaximumFOp,
+          handshake::MinimumFOp,
+          handshake::MulFOp,
+          handshake::MulIOp,
+          handshake::NegFOp,
+          handshake::NotOp,
+          handshake::OrIOp,
+          handshake::ShLIOp,
+          handshake::ShRSIOp,
+          handshake::ShRUIOp,
+          handshake::SubFOp,
+          handshake::SubIOp,
+          handshake::XOrIOp,
+          handshake::SIToFPOp,
+          handshake::FPToSIOp,
+          handshake::AbsFOp,
+          handshake::MaxSIOp
+          // clang-format on
+          >([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
         addType("DATA_TYPE", selectOp.getTrueValue());
@@ -2073,66 +2092,70 @@ public:
     patterns.insert<ConvertFunc, ConvertMemInterface,
                     ConvertMemInterfaceForIntenalArray>(typeConverter, ctx,
                                                         lowerState);
-    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
-                    ConvertToHWInstance<handshake::NDWireOp>,
-                    ConvertToHWInstance<handshake::ConditionalBranchOp>,
-                    ConvertToHWInstance<handshake::BranchOp>,
-                    ConvertToHWInstance<handshake::MergeOp>,
-                    ConvertToHWInstance<handshake::ControlMergeOp>,
-                    ConvertToHWInstance<handshake::MuxOp>,
-                    ConvertToHWInstance<handshake::JoinOp>,
-                    ConvertToHWInstance<handshake::BlockerOp>,
-                    ConvertToHWInstance<handshake::SourceOp>,
-                    ConvertToHWInstance<handshake::ConstantOp>,
-                    ConvertToHWInstance<handshake::SinkOp>,
-                    ConvertToHWInstance<handshake::ForkOp>,
-                    ConvertToHWInstance<handshake::LazyForkOp>,
-                    ConvertToHWInstance<handshake::LoadOp>,
-                    ConvertToHWInstance<handshake::StoreOp>,
-                    ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
-                    ConvertToHWInstance<handshake::ValidMergerOp>,
-                    ConvertToHWInstance<handshake::SharingWrapperOp>,
+    patterns.insert<
+        // clang-format off
+        ConvertInstance,
+        ConvertToHWInstance<handshake::BufferOp>,
+        ConvertToHWInstance<handshake::NDWireOp>,
+        ConvertToHWInstance<handshake::ConditionalBranchOp>,
+        ConvertToHWInstance<handshake::BranchOp>,
+        ConvertToHWInstance<handshake::MergeOp>,
+        ConvertToHWInstance<handshake::ControlMergeOp>,
+        ConvertToHWInstance<handshake::MuxOp>,
+        ConvertToHWInstance<handshake::JoinOp>,
+        ConvertToHWInstance<handshake::BlockerOp>,
+        ConvertToHWInstance<handshake::SourceOp>,
+        ConvertToHWInstance<handshake::ConstantOp>,
+        ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::ForkOp>,
+        ConvertToHWInstance<handshake::LazyForkOp>,
+        ConvertToHWInstance<handshake::LoadOp>,
+        ConvertToHWInstance<handshake::StoreOp>,
+        ConvertToHWInstance<handshake::NotOp>,
+        ConvertToHWInstance<handshake::ReadyRemoverOp>,
+        ConvertToHWInstance<handshake::ValidMergerOp>,
+        ConvertToHWInstance<handshake::SharingWrapperOp>,
 
-                    // Arith operations
-                    ConvertToHWInstance<handshake::AddFOp>,
-                    ConvertToHWInstance<handshake::AddIOp>,
-                    ConvertToHWInstance<handshake::AndIOp>,
-                    ConvertToHWInstance<handshake::CmpFOp>,
-                    ConvertToHWInstance<handshake::CmpIOp>,
-                    ConvertToHWInstance<handshake::DivFOp>,
-                    ConvertToHWInstance<handshake::DivSIOp>,
-                    ConvertToHWInstance<handshake::DivUIOp>,
-                    ConvertToHWInstance<handshake::RemSIOp>,
-                    ConvertToHWInstance<handshake::ExtSIOp>,
-                    ConvertToHWInstance<handshake::ExtUIOp>,
-                    ConvertToHWInstance<handshake::MulFOp>,
-                    ConvertToHWInstance<handshake::MulIOp>,
-                    ConvertToHWInstance<handshake::NegFOp>,
-                    ConvertToHWInstance<handshake::OrIOp>,
-                    ConvertToHWInstance<handshake::SelectOp>,
-                    ConvertToHWInstance<handshake::ShLIOp>,
-                    ConvertToHWInstance<handshake::ShRSIOp>,
-                    ConvertToHWInstance<handshake::ShRUIOp>,
-                    ConvertToHWInstance<handshake::SubFOp>,
-                    ConvertToHWInstance<handshake::SubIOp>,
-                    ConvertToHWInstance<handshake::TruncIOp>,
-                    ConvertToHWInstance<handshake::TruncFOp>,
-                    ConvertToHWInstance<handshake::XOrIOp>,
-                    ConvertToHWInstance<handshake::SIToFPOp>,
-                    ConvertToHWInstance<handshake::FPToSIOp>,
-                    ConvertToHWInstance<handshake::ExtFOp>,
-                    ConvertToHWInstance<handshake::AbsFOp>,
-                    ConvertToHWInstance<handshake::MaxSIOp>,
+        // Arith operations
+        ConvertToHWInstance<handshake::AddFOp>,
+        ConvertToHWInstance<handshake::AddIOp>,
+        ConvertToHWInstance<handshake::AndIOp>,
+        ConvertToHWInstance<handshake::CmpFOp>,
+        ConvertToHWInstance<handshake::CmpIOp>,
+        ConvertToHWInstance<handshake::DivFOp>,
+        ConvertToHWInstance<handshake::DivSIOp>,
+        ConvertToHWInstance<handshake::DivUIOp>,
+        ConvertToHWInstance<handshake::RemSIOp>,
+        ConvertToHWInstance<handshake::ExtSIOp>,
+        ConvertToHWInstance<handshake::ExtUIOp>,
+        ConvertToHWInstance<handshake::MulFOp>,
+        ConvertToHWInstance<handshake::MulIOp>,
+        ConvertToHWInstance<handshake::NegFOp>,
+        ConvertToHWInstance<handshake::OrIOp>,
+        ConvertToHWInstance<handshake::SelectOp>,
+        ConvertToHWInstance<handshake::ShLIOp>,
+        ConvertToHWInstance<handshake::ShRSIOp>,
+        ConvertToHWInstance<handshake::ShRUIOp>,
+        ConvertToHWInstance<handshake::SubFOp>,
+        ConvertToHWInstance<handshake::SubIOp>,
+        ConvertToHWInstance<handshake::TruncIOp>,
+        ConvertToHWInstance<handshake::TruncFOp>,
+        ConvertToHWInstance<handshake::XOrIOp>,
+        ConvertToHWInstance<handshake::SIToFPOp>,
+        ConvertToHWInstance<handshake::FPToSIOp>,
+        ConvertToHWInstance<handshake::ExtFOp>,
+        ConvertToHWInstance<handshake::AbsFOp>,
+        ConvertToHWInstance<handshake::MaxSIOp>,
 
-                    // Speculative operations
-                    ConvertToHWInstance<handshake::SpecCommitOp>,
-                    ConvertToHWInstance<handshake::SpecSaveOp>,
-                    ConvertToHWInstance<handshake::SpecSaveCommitOp>,
-                    ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-                    ConvertToHWInstance<handshake::NonSpecOp>>(
-        typeConverter, funcOp->getContext());
+        // Speculative operations
+        ConvertToHWInstance<handshake::SpecCommitOp>,
+        ConvertToHWInstance<handshake::SpecSaveOp>,
+        ConvertToHWInstance<handshake::SpecSaveCommitOp>,
+        ConvertToHWInstance<handshake::SpeculatorOp>,
+        ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+        ConvertToHWInstance<handshake::NonSpecOp>
+        // clang-format on
+        >(typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
     ConversionTarget target(*ctx);

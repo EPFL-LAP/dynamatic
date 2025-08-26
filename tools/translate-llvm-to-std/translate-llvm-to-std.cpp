@@ -1,3 +1,6 @@
+#include "dynamatic/InitAllDialects.h"
+#include "dynamatic/InitAllPasses.h"
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/Function.h"
