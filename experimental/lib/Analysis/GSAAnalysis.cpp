@@ -254,7 +254,7 @@ llvm:: errs() << "\ni survied22\n\n ~" <<conditionToUse ;
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
                ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(), 
-               BoolExpression::boolVar(conditionToUse));//since condition is one block boolvar is enough
+               BoolExpression::boolVar(conditionToUse), {conditionToUse});//since condition is one block boolvar is enough
   
   // If the Gamma is a result of the expansion of a Mu that has more than two inputs, force its placement in the block of its condition
   // because placing it in the block of the Mu, which is always a loop header, will mess up the control dependence analysis betweem the newly inserted Gamma and its producers that are in the loop body in this case
@@ -356,7 +356,8 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
           if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
             for ( MissingPhi mPhi : operandsMissPhi) {
               // if same argument of the same phi come from the same producer and both are missing phis (doesn't check the value!!)
-              if(mPhi.blockArg.getParentBlock()== blockArgC.getParentBlock()){ 
+              if(mPhi.blockArg.getParentBlock()== blockArgC.getParentBlock()&&
+                (mPhi.blockArg.getArgNumber() == blockArgC.getArgNumber())){ 
                 mPhi.pi->senders.insert(pred);
                 return true;
               }
@@ -642,7 +643,7 @@ BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
 
   return blockCond;
 }
-static BoolExpression* getLoopExitCondition (CFGLoop* loop, mlir::CFGLoopInfo &li, const BlockIndexing &bi){
+static BoolExpression* getLoopExitCondition (CFGLoop* loop,std::vector<std::string>* cofactorList , mlir::CFGLoopInfo &li, const BlockIndexing &bi){
   
   SmallVector<Block *> exitBlocks;
   loop->getExitingBlocks(exitBlocks);
@@ -655,7 +656,7 @@ static BoolExpression* getLoopExitCondition (CFGLoop* loop, mlir::CFGLoopInfo &l
     BoolExpression *blockCond =
         getBlockLoopExitCondition(exitBlock, loop, li, bi);
     fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-    //cofactorList.push_back(bi.getBlockCondition(exitBlock));
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
     fLoopExit = fLoopExit->boolMinimize();
   }
   return fLoopExit;
@@ -719,7 +720,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(initialInputs.size()>1){
 
         Gate *initialPhi =
-            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),true); 
+            new Gate(phi->result, initialInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),{},true); 
         gatesPerBlock[phiBlock].push_back(initialPhi);
 
         operandInit = new GateInput(initialPhi);
@@ -738,7 +739,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
       else if(loopInputs.size()>1){
 
         Gate *loopPhi =
-            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),true);
+            new Gate(phi->result, loopInputs, GateType::PhiGate, ++uniqueGateIndex, nullptr, BoolExpression::boolZero(),{},true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
 
         operandLoop = new GateInput(loopPhi);
@@ -783,8 +784,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
       // Mu condition is the negation of loop exit-> if loop exit == false ? use loop input : use initial input
       phi->condition =
-          getLoopExitCondition(loopInfo.getLoopFor(phiBlock), loopInfo, bi)->boolNegate();
-
+          getLoopExitCondition(loopInfo.getLoopFor(phiBlock), &phi->cofactorList, loopInfo, bi)->boolNegate();
       phi->isRoot = true;
     }
   }
@@ -855,9 +855,12 @@ void experimental::gsa::Gate::print() {
   if ((gsaGateFunction == GammaGate || gsaGateFunction == MuGate)) {
     llvm::errs() << "\tc: "; 
     condition->print();
+    llvm::errs() << "Cofactor List: "; 
+    for (std::string cof :cofactorList)
+      llvm::errs() << cof<< "\t,"; 
   }
 
-  //llvm::errs() << "\n";
+  llvm::errs() << "\n";
 
   for (GateInput *&op : operands) {
     if (op->isTypeValue()) {

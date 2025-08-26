@@ -267,7 +267,10 @@ static BoolExpression *enumeratePaths(Block *start, Block *end,
 
 /// Get a boolean expression representing the exit condition of the current
 /// loop block.
-static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+namespace dynamatic {
+namespace experimental {
+namespace boolean {
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
                                                  CFGLoopInfo &li,
                                                  const ftd::BlockIndexing &bi) {
 
@@ -287,6 +290,9 @@ static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
 
   return blockCond;
 }
+} // namespace boolean
+} // namespace experimental
+} // namespace dynamatic
 
 /// Run the Cytron algorithm to determine, give a set of values, in which blocks
 /// should we add a merge in order for those values to be merged
@@ -808,6 +814,8 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
   } else {
 
+    llvm::errs()<<"\n Entereded else in addSuppressionInLoop\n ";
+
     std::vector<std::string> cofactorList;
     SmallVector<Block *> exitBlocks;
     loop->getExitingBlocks(exitBlocks);
@@ -843,6 +851,7 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().front().getLoc(),
         ftd::getListTypes(connection.getType()), branchCond, connection);
+        llvm::errs()<<"\n finished else in addSuppressionInLoop\n ";
   }
 
   Value newConnection = btlt == MoreProducerThanConsumers
@@ -1112,6 +1121,7 @@ void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
   }
 }
 
+//
 LogicalResult experimental::ftd::addGsaGates(Region &region,
                                              PatternRewriter &rewriter,
                                              const gsa::GSAAnalysis &gsa,
@@ -1132,6 +1142,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
+llvm::errs()<<"\nstart addGsaGates\n";
+  BlockIndexing bi(region);
 
   struct MissingGsa {
     // Index of the GSA function to modify
@@ -1162,7 +1174,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
     ArrayRef<Gate *> phis = gsa.getGatesPerBlock(&block);
     block.printAsOperand(llvm::errs()); llvm::errs()<<"\n";
     for (Gate *phi : phis) {
-phi->print();
+//phi->print();
       if (phi->gsaGateFunction == PhiGate)
         continue;
 
@@ -1197,14 +1209,27 @@ phi->print();
         operandIndex++;
       }
 
-      // The condition value is provided by the `condition` field of the phi
-     // rewriter.setInsertionPointAfterValue(phi->result);
       Value conditionValue =
           phi->conditionBlock->getTerminator()->getOperand(0);
+      conditionValue.print(llvm::errs());
+      // Apply a BDD expansion to the loop exit expression and the list of
+      // cofactors
+      BDD *bdd = buildBDD(phi->condition, phi->cofactorList);
 
+      // Convert the boolean expression obtained through BDD to a circuit
+      conditionValue = bddToCircuit(rewriter, bdd, phi->getBlock(), bi);
+phi->print();
+      llvm::errs()<<"\ncondition Value\n";
+      conditionValue.print(llvm::errs());
+      // The condition value is provided by the `condition` field of the phi
+      // rewriter.setInsertionPointAfterValue(phi->result);
+      //Value conditionValue =
+        //  phi->conditionBlock->getTerminator()->getOperand(0);
+llvm::errs()<<"\nmiddle addGsaGates\n";
       // If the function is MU, then we create a merge
       // and use its result as condition
       if (phi->gsaGateFunction == MuGate) {
+        llvm::errs()<<"\ngate is mu\n";
         mlir::DominanceInfo domInfo;
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
@@ -1233,6 +1258,7 @@ phi->print();
             initMergeOp->getLoc(), cstAttr, startValue);
         constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
         initMergeOp->setOperand(0, constOp.getResult());
+        llvm::errs()<<"\nmu fin\n";
       }
 
       // When a single input gamma is encountered, a mux is inserted as a
@@ -1313,9 +1339,10 @@ phi->print();
       }
     }
   }
-
+llvm::errs()<<"\nfinish addGsaGates\n";
   return success();
 }
+//
 
 LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
                                      PatternRewriter &rewriter) {
