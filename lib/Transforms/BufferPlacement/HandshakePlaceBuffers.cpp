@@ -341,7 +341,13 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
     // all blocks but warn the user
-    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op)) {
+    if (!isa<
+            // clang-format off
+            handshake::SinkOp,
+            handshake::MemoryOpInterface,
+            handshake::RAMOp
+            // clang-format on
+            >(&op)) {
       if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";

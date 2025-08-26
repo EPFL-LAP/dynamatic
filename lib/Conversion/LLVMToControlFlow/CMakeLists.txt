@@ -19,4 +19,6 @@ add_dynamatic_library(DynamaticLLVMToControlFlow
 
   MLIRLLVMDialect
   MLIRArithDialect
+
+  libclang
   )

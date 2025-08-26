@@ -38,6 +38,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 // extra verification conditions.  In particular, each Value must
 // only have a single use.  Also, it defines a Dominance-Free Scope
 def FuncOp : Op<Handshake_Dialect, "func", [
+   AutomaticAllocationScope,
    IsolatedFromAbove,
    FunctionOpInterface,
    Symbol,
@@ -962,6 +963,37 @@ def StoreOp : Handshake_MemPortOp<"store", [
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Memory hierarchy
+//===----------------------------------------------------------------------===//
+
+def RAMOp : Handshake_Op<"ram", []>  {
+  let arguments = (ins 
+    OptionalAttr<MemoryInitialValueAttr>:$initial_value,
+    UnitAttr:$constant
+  );
+
+  let builders = [
+    // With initial value
+    OpBuilder<(ins 
+    "MemRefType":$memrefType,
+    "DenseElementsAttr":$initial_value,
+    "UnitAttr":$constant
+    ), [{
+      $_state.types.push_back(memrefType);
+      $_state.addAttribute("initial_value", MemoryInitialValueAttr::get($_builder.getContext(), initial_value));
+      $_state.addAttribute("constant", UnitAttr::get($_builder.getContext()));
+    }]>,
+    OpBuilder<(ins 
+    "MemRefType":$memrefType
+    ), [{
+      $_state.types.push_back(memrefType);
+    }]>
+  ];
+
+  let results = (outs AnyStaticShapeMemRef:$result);
 }
 
 //===----------------------------------------------------------------------===//

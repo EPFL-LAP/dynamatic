@@ -397,9 +397,10 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     /// stores that are connected to the LSQ and those that are not.
     /// In the new implementation, we use the MemInterfaceAttr to determine
     /// whether the StoreOp is connected to the LSQ or not.
-    if (isa<handshake::StoreOp>(dstOp) &&
-        getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()) {
-      continue;
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(dstOp)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (isa<handshake::LSQOp>(memOp))
+        continue;
     }
 
     /// TODO: The legacy implementation does not add any constraints here for
