@@ -1,5 +1,5 @@
 //===- Simulator.cpp - std-level simulator ----------------------*- C++ -*-===//
-//
+// 
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -71,6 +71,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::ShRSIOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::ShRUIOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::TruncIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::TruncFOp, std::vector<Any> &,
@@ -135,10 +137,18 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::math::AbsFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::MaxUIOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::MaxSIOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(memref::LoadOp, std::vector<Any> &, std::vector<Any> &);
   LogicalResult execute(memref::StoreOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(memref::AllocOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(memref::AllocaOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(memref::GetGlobalOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::cf::BranchOp, std::vector<Any> &,
                         std::vector<Any> &);
@@ -364,6 +374,17 @@ LogicalResult StdExecuter::execute(mlir::arith::ShLIOp, std::vector<Any> &in,
 LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
+  auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+  auto shifted =
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+  out[0] = shifted;
+  return success();
+}
+
+
+LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
+                        std::vector<Any> &out) {
+  auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
       APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
@@ -616,6 +637,22 @@ LogicalResult StdExecuter::execute(mlir::math::AbsFOp op, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::MaxSIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.sgt(in1) ? in0 : in1;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::MaxUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.ugt(in1) ? in0 : in1;
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::memref::LoadOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -676,6 +713,22 @@ LogicalResult StdExecuter::execute(mlir::memref::AllocOp op,
   out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
   unsigned ptr = any_cast<unsigned>(out[0]);
   storeTimes[ptr] = time;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(memref::AllocaOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
+  unsigned ptr = any_cast<unsigned>(out[0]);
+  storeTimes[ptr] = time;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(memref::GetGlobalOp op, std::vector<Any> &,
+                                   std::vector<Any> &out) {
+  // This result is a unsigned type (i.e., the pointer to the memory allocated
+  // for gbl).
+  out[0] = valueMap[op.getResult()];
   return success();
 }
 
@@ -810,11 +863,12 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::SIToFPOp, arith::FPToSIOp, arith::IndexCastOp,
                   arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
                   arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
-                  arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
-                  math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
-                  math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
-                  memref::StoreOp>([&](auto op) {
+                  arith::ShRUIOp, arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp,
+                  arith::ExtFOp, math::SqrtOp, math::CosOp, math::ExpOp,
+                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
+                  math::SqrtOp, math::AbsFOp, arith::MaxUIOp, arith::MaxSIOp,
+                  memref::AllocOp, memref::AllocaOp, memref::LoadOp,
+                  memref::StoreOp, memref::GetGlobalOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })
@@ -909,6 +963,39 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
       timeMap[blockArgs[i]] = 0.0;
     }
   }
+
+  // Allocate memory for each global variable:
+  auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
+  modOp.walk([&](memref::GlobalOp gblOp) {
+    auto memreftype = gblOp.getTypeAttr().getValue().dyn_cast<MemRefType>();
+    std::vector<Any> nothing;
+    std::string x;
+    unsigned buffer = allocateMemRef(memreftype, nothing, store, storeTimes);
+
+    StringRef symName = gblOp.getSymName();
+    // Register all the results of GetGlobal to buffer
+    funcOp.walk([&](memref::GetGlobalOp getGblOp) {
+      if (getGblOp.getNameAttr().getValue() == symName) {
+        valueMap[getGblOp.getResult()] = buffer;
+        timeMap[getGblOp.getResult()] = 0.0;
+      }
+    });
+
+    // If the GlobalOp has a dense initializer, initialize it:
+    mlir::Attribute initValueAttr = gblOp.getInitialValueAttr();
+    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+      mlir::Type elemType = denseAttr.getElementType();
+      if (elemType.isa<mlir::IntegerType>()) {
+        for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APInt>())) {
+          store[buffer][id] = val;
+        }
+      } else if (elemType.isa<mlir::FloatType>()) {
+        for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APFloat>())) {
+          store[buffer][id] = val;
+        }
+      }
+    }
+  });
 
   std::vector<Any> results(numOutputs);
   std::vector<double> resultTimes(numOutputs);

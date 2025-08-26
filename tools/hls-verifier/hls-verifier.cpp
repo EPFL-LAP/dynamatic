@@ -16,6 +16,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -190,7 +191,7 @@ int main(int argc, char **argv) {
 
   // We only need the Handshake dialect
   MLIRContext context;
-  context.loadDialect<handshake::HandshakeDialect>();
+  context.loadDialect<handshake::HandshakeDialect, memref::MemRefDialect>();
   context.allowUnregisteredDialects();
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mlirPathName.c_str());
