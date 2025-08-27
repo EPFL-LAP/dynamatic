@@ -48,7 +48,7 @@ class EntitySignal():
 
         return f"""
     {full_declaration}
-        """.removeprefix("\n")
+""".removeprefix("\n")
 
     def get(self):
         # if item is singular
