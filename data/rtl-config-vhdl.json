@@ -300,6 +300,14 @@
     "dependencies": ["delay_buffer", "oehb"]
   },
   {
+    "name": "handshake.uitofp",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/uitofp.vhd",
+    "dependencies": ["delay_buffer", "oehb"]
+  },
+  {
     "name": "handshake.fptosi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
