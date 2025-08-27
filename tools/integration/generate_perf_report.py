@@ -114,7 +114,10 @@ def table(header, data):
     res += "|\n"
 
     for elem in header:
-        res += "| ---- "
+        res += "| ----"
+        if elem in ["cycles", "old_cycles", "comparison"]:
+            res += ":"
+        res += " "
     res += "|\n"
 
     for row in data:
