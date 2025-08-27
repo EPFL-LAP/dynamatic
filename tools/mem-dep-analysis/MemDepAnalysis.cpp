@@ -229,7 +229,9 @@ class ScopAnalysisInfo {
 
     auto inDimsToBeChecked = currentMap.dim(isl::dim::in);
 
-    assert(!inDimsToBeChecked.is_error());
+    if (inDimsToBeChecked.is_error())
+      llvm::report_fatal_error(
+          "Fail to extraction the input dim of currentMap!");
 
     unsigned inDimValue = static_cast<unsigned>(inDimsToBeChecked);
 
@@ -249,7 +251,8 @@ class ScopAnalysisInfo {
 
     auto nInsToBeChecked = map.dim(isl::dim::in);
 
-    assert(!nInsToBeChecked.is_error());
+    if (nInsToBeChecked.is_error())
+      llvm::report_fatal_error("Cannot extract the input dim of map!");
 
     unsigned nIns = static_cast<unsigned>(nInsToBeChecked);
 
@@ -274,7 +277,8 @@ class ScopAnalysisInfo {
 
     auto nInsToBeChecked = map.dim(isl::dim::in);
 
-    assert(!nInsToBeChecked.is_error());
+    if (nInsToBeChecked.is_error())
+      llvm::report_fatal_error("Cannot extract input dimension of map!");
 
     int nIns = static_cast<unsigned>(nInsToBeChecked) / 2;
     isl::map constrMap = map;
@@ -372,7 +376,8 @@ public:
 
         auto outDim = currentMap.dim(isl::dim::out);
 
-        assert(!outDim.is_error());
+        if (outDim.is_error())
+          llvm::report_fatal_error("Failed to extract output dimension");
 
         domain = domain.add_dims(isl::dim::out, static_cast<unsigned>(outDim));
 
