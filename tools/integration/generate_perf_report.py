@@ -123,7 +123,10 @@ def table(header, data):
     for row in data:
         for elem in header:
             if elem in row:
-                res += f"| {row[elem]} "
+                try:
+                    res += f"| {int(row[elem]):,} "
+                except ValueError:
+                    res += f"| {row[elem]} "
             else:
                 res += f"| N/A "
         res += "|\n"
