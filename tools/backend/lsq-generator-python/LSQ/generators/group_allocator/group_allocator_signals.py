@@ -79,7 +79,7 @@ class GroupAllocatorDeclarativeIOSignals():
                 direction=EntitySignal.Direction.INPUT,
                 size=EntitySignal.Size(
                     bitwidth=1,
-                    number=config.num_groups
+                    number=config.num_groups()
                 )
             )
 
@@ -106,7 +106,7 @@ class GroupAllocatorDeclarativeIOSignals():
                 direction=EntitySignal.Direction.OUTPUT,
                 size=EntitySignal.Size(
                     bitwidth=1,
-                    number=config.num_groups
+                    number=config.num_groups()
                 )
             )
 
