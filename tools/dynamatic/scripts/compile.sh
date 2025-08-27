@@ -193,7 +193,6 @@ $LLVM_TO_STD_TRANSLATION_BIN \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
-  -debug -debug-only="translate-llvm-ir-to-std" \
    -o "$F_CF"
 exit_on_fail "Failed to convert to std dialect" \
   "Converted to std dialect"
