@@ -51,7 +51,7 @@ end entity;
 -- Architecture of ready remover
 architecture arch of {name} is
 begin
-  f{data(potential_assignment, bitwidth)}
+  {data(potential_assignment, bitwidth)}
   outs_valid <= ins_valid;
   ins_ready <= '1';
 end architecture;
