@@ -18,8 +18,8 @@
 
 using json = nlohmann::json;
 
-bool runSubprocess(const std::vector<std::string> &args,
-                   const fs::path &outputPath) {
+static bool runSubprocess(const std::vector<std::string> &args,
+                          const fs::path &outputPath) {
   std::ostringstream command;
   command << args[0];
   for (size_t i = 1; i < args.size(); ++i) {
@@ -72,6 +72,56 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   int status = system(cmd.c_str());
   if (status == 0) {
     fs::path logFilePath = path.parent_path() / "out" / "sim" / "report.txt";
+    outSimTime = getSimulationTime(logFilePath);
+  }
+
+  return status;
+}
+
+int runLLVMFrontendIntegrationTest(const std::string &name, int &outSimTime,
+                                   const std::optional<fs::path> &customPath,
+                                   bool useVerilog) {
+  fs::path path =
+      customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
+      name / (name + ".c");
+
+  std::cout << "[INFO] Running " << name << " with LLVM-IR-based frontend"
+            << std::endl;
+
+  fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
+  fs::path dynamaticOutPath = path.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath = path.parent_path() / "out" / "dynamatic_err.txt";
+
+  auto outputDir = path.parent_path() / "out_clang_frontend";
+
+  fs::create_directories(outputDir);
+
+  fs::path frontendScript =
+      fs::path(DYNAMATIC_ROOT) / "tools" / "frontend" / "llvm-cf-handshake.sh";
+
+  if (!fs::exists(dynamaticOutPath.parent_path())) {
+    fs::create_directories(dynamaticOutPath.parent_path());
+  }
+
+  std::string cmd = std::string("/usr/bin/bash");
+  // Path to the driver script
+  cmd += " " + frontendScript.string();
+  // Path to Dynamatic root
+  cmd += " " + std::string(DYNAMATIC_ROOT);
+  // Path to the C source code
+  cmd += " " + path.string();
+  // Name of the kernel
+  cmd += " " + name;
+  // Path to the output dir
+  cmd += " " + (outputDir).string();
+  cmd += " 1> ";
+  cmd += dynamaticOutPath;
+  cmd += " 2> ";
+  cmd += dynamaticErrPath;
+
+  int status = system(cmd.c_str());
+  if (status == 0) {
+    fs::path logFilePath = outputDir / "sim" / "report.txt";
     outSimTime = getSimulationTime(logFilePath);
   }
 
