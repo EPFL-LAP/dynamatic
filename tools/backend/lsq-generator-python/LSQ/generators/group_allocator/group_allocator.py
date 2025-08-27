@@ -7,7 +7,7 @@ from LSQ.config import Config
 from LSQ.entity import Entity
 # from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals, GroupAllocatorDeclarativeLocalSignals, GroupAllocatorDeclarativeBody
+from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
