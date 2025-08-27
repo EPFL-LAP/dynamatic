@@ -115,12 +115,6 @@ TEST_P(SharingFixture, sharing_NoCI) {
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
-// clang-format off
-class ClangFrontendBasicFixture : public testing::TestWithParam<std::string> {};
-class ClangFrontendMemoryFixture : public testing::TestWithParam<std::string> {};
-class ClangFrontendSharingFixture : public testing::TestWithParam<std::string> {};
-// clang-format on
-
 TEST_P(SpecFixture, spec_NoCI) {
   const std::string &name = GetParam();
   int simTime = -1;
@@ -156,6 +150,10 @@ static auto sharingBenchmarkNames =
 
 INSTANTIATE_TEST_SUITE_P(MiscBenchmarks, BasicFixture, miscBenchmarkNames,
                          [](const auto &info) { return info.param; });
+INSTANTIATE_TEST_SUITE_P(MemoryBenchmarks, MemoryFixture, memoryBenchmarkNames,
+                         [](const auto &info) {
+                           return "memory_" + info.param;
+                         });
 
 // clang-format off
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
