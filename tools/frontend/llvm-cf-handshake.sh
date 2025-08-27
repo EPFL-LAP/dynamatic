@@ -20,9 +20,13 @@ export PATH=$PATH:$LLVM_BINS
 [ -f "$F_SRC" ] || { echo "$F_SRC is not a file!"; exit 1;}
 
 # Will be change to standard path in the future (i.e., out/comp).
-OUT="./out-$FUNC_NAME"
-rm -rf $OUT
+OUT="$(realpath $(dirname $F_SRC))/out"
 mkdir -p $OUT
+
+COMP_DIR="$OUT/comp"
+
+rm -rf "$COMP_DIR"
+mkdir -p "$COMP_DIR"
 
 # ------------------------------------------------------------------------------
 # NOTE:
@@ -35,7 +39,7 @@ $LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm $F_SRC \
   -I "$DYNAMATIC_PATH/include"  \
   -Xclang \
   -ffp-contract=off \
-  -o $OUT/clang.ll
+  -o "$COMP_DIR/clang.ll"
 
 # ------------------------------------------------------------------------------
 # NOTE:
@@ -44,13 +48,13 @@ $LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm $F_SRC \
 # way to ignore it
 # - Clang always adds "noinline" to the IR.
 # ------------------------------------------------------------------------------
-sed -i "s/optnone//g" $OUT/clang.ll
-sed -i "s/noinline//g" $OUT/clang.ll
+sed -i "s/optnone//g" "$COMP_DIR/clang.ll"
+sed -i "s/noinline//g" "$COMP_DIR/clang.ll"
 
 # Strip information that we don't care (and mlir-translate also doesn't know how
 # to handle it).
-sed -i "s/^target datalayout = .*$//g" $OUT/clang.ll
-sed -i "s/^target triple = .*$//g" $OUT/clang.ll
+sed -i "s/^target datalayout = .*$//g" "$COMP_DIR/clang.ll"
+sed -i "s/^target triple = .*$//g" "$COMP_DIR/clang.ll"
 
 # ------------------------------------------------------------------------------
 # NOTE:
@@ -67,8 +71,8 @@ sed -i "s/^target triple = .*$//g" $OUT/clang.ll
 
 $LLVM_BINS/opt -S \
  -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
-  $OUT/clang.ll \
-  > $OUT/clang_loop_canonicalized.ll
+  "$COMP_DIR/clang.ll" \
+  > "$COMP_DIR/clang_loop_canonicalized.ll"
 
 # ------------------------------------------------------------------------------
 # Example (how to unroll loops):
@@ -94,14 +98,14 @@ $LLVM_BINS/opt -S \
 
 $LLVM_BINS/opt -S \
   -passes="loop-unroll" \
-  $OUT/clang_loop_canonicalized.ll \
-  > $OUT/clang_unrolled.ll
+  "$COMP_DIR/clang_loop_canonicalized.ll" \
+  > "$COMP_DIR/clang_unrolled.ll"
 
 $LLVM_BINS/opt -S \
   -passes="loop-simplify,simplifycfg" \
   -strip-debug \
-  $OUT/clang_unrolled.ll \
-  > $OUT/clang_optimized.ll
+  "$COMP_DIR/clang_unrolled.ll" \
+  > "$COMP_DIR/clang_optimized.ll"
 #
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
@@ -129,83 +133,83 @@ $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
-  $OUT/clang_optimized.ll \
-  > $OUT/clang_optimized_dep_marked.ll
+  "$COMP_DIR/clang_optimized.ll" \
+  > "$COMP_DIR/clang_optimized_dep_marked.ll"
 
-# ------------------------------------------------------------------------------
-# This pass computes the set of disjoint accesses to the same baseptr, and
-# replicate the arrays if disjoint sets can be found.
-# Example: consider A[10] and loadA, loadB, loadC, loadD interact with it.
-#
-# - loadA:  accesses 0, 2, 4, 6, 8
-# - loadB:  accesses 1, 3, 5, 7, 9
-# - storeA: accesses 0, 2, 4, 6, 8
-# - storeB: accesses 1, 3, 5, 7, 9
-#
-# We can parition it into {loadA, storeA} and {loadB, storeB}, such that you
-# cannot find two insts in these two sets that access the same array element.
-# ------------------------------------------------------------------------------
-
-# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
-$LLVM_BINS/opt -S \
-  -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
-  -polly-process-unprofitable \
-  -passes="array-partition" \
-  -debug -debug-only="array-partition" \
-  $OUT/clang_optimized_dep_marked.ll \
-  > $OUT/clang_array_partitioned.ll
-
-# Clean up the index calculation logic inserted by the array-partition pass
-$LLVM_BINS/opt -S \
-  -passes="instcombine" \
-  $OUT/clang_array_partitioned.ll \
-  > $OUT/clang_array_partitioned_cleaned.ll
+## # ------------------------------------------------------------------------------
+## # This pass computes the set of disjoint accesses to the same baseptr, and
+## # replicate the arrays if disjoint sets can be found.
+## # Example: consider A[10] and loadA, loadB, loadC, loadD interact with it.
+## #
+## # - loadA:  accesses 0, 2, 4, 6, 8
+## # - loadB:  accesses 1, 3, 5, 7, 9
+## # - storeA: accesses 0, 2, 4, 6, 8
+## # - storeB: accesses 1, 3, 5, 7, 9
+## #
+## # We can parition it into {loadA, storeA} and {loadB, storeB}, such that you
+## # cannot find two insts in these two sets that access the same array element.
+## # ------------------------------------------------------------------------------
+## 
+## # NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
+## $LLVM_BINS/opt -S \
+##   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/array-partition/libArrayPartition.so" \
+##   -polly-process-unprofitable \
+##   -passes="array-partition" \
+##   -debug -debug-only="array-partition" \
+##   $COMP_DIR/clang_optimized_dep_marked.ll \
+##   > $COMP_DIR/clang_array_partitioned.ll
+## 
+## # Clean up the index calculation logic inserted by the array-partition pass
+## $LLVM_BINS/opt -S \
+##   -passes="instcombine" \
+##   $COMP_DIR/clang_array_partitioned.ll \
+##   > $COMP_DIR/clang_array_partitioned_cleaned.ll
 
 $DYNAMATIC_BINS/translate-llvm-to-std \
-  "$OUT/clang_optimized_dep_marked.ll" \
+  "$COMP_DIR/clang_optimized_dep_marked.ll" \
   -function-name "$FUNC_NAME" \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
-   -o $OUT/cf.mlir
-
+  -debug -debug-only="translate-llvm-ir-to-std" \
+   -o "$COMP_DIR/cf.mlir"
 
 # - drop-unlist-functions: Dropping the functions that are not needed in HLS
 # compilation
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/cf.mlir \
+  "$COMP_DIR/cf.mlir" \
   --drop-unlisted-functions="function-names=$FUNC_NAME" \
-  > $OUT/cf_drop_unlisted_functions.mlir \
+  > "$COMP_DIR/cf_drop_unlisted_functions.mlir" \
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/cf_drop_unlisted_functions.mlir \
+  "$COMP_DIR/cf_drop_unlisted_functions.mlir" \
   --func-set-arg-names="source=$F_SRC" \
   --flatten-memref-row-major \
   --canonicalize \
   --push-constants \
   --mark-memory-interfaces \
-  > $OUT/cf_transformed.mlir
+  > "$COMP_DIR/cf_transformed.mlir"
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/cf_transformed.mlir \
+  "$COMP_DIR/cf_transformed.mlir" \
   --lower-cf-to-handshake \
-  > $OUT/handshake.mlir
+  > "$COMP_DIR/handshake.mlir"
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/handshake.mlir \
+  "$COMP_DIR/handshake.mlir" \
   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
-  > $OUT/handshake_transformed.mlir
+  > "$COMP_DIR/handshake_transformed.mlir"
 
 # ------------------------------------------------------------------------------
 # Run simple buffer placement
 # ------------------------------------------------------------------------------
 # $DYNAMATIC_BINS/dynamatic-opt \
-#   $OUT/handshake_transformed.mlir \
+#   $COMP_DIR/handshake_transformed.mlir \
 #   --handshake-mark-fpu-impl="impl=flopoco" \
 #   --handshake-set-buffering-properties="version=fpga20" \
 #   --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
-#   > $OUT/handshake_buffered.mlir
+#   > $COMP_DIR/handshake_buffered.mlir
 
 # ------------------------------------------------------------------------------
 # Run throughput-driven buffer placement (needs a valid Gurobi license)
@@ -213,37 +217,37 @@ $DYNAMATIC_BINS/dynamatic-opt \
 
 "$LLVM_BINS/clang++" "$F_SRC" \
   -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
-  -Wno-deprecated -o "$OUT/profiler_bin.exe"
+  -Wno-deprecated -o "$COMP_DIR/profiler_bin.exe"
 
-"$OUT/profiler_bin.exe" \
-  > "$OUT/profiler.txt"
+"$COMP_DIR/profiler_bin.exe" \
+  > "$COMP_DIR/profiler.txt"
 
 "$DYNAMATIC_BINS/exp-frequency-profiler" \
-  "$OUT/cf_transformed.mlir" \
+  "$COMP_DIR/cf_transformed.mlir" \
   --top-level-function="$FUNC_NAME" \
-  --input-args-file="$OUT/profiler.txt" \
-  > "$OUT/frequencies.csv"
+  --input-args-file="$COMP_DIR/profiler.txt" \
+  > "$COMP_DIR/frequencies.csv"
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/handshake_transformed.mlir \
+  "$COMP_DIR/handshake_transformed.mlir" \
   --handshake-mark-fpu-impl="impl=flopoco" \
   --handshake-set-buffering-properties="version=fpga20" \
-  --handshake-place-buffers="algorithm=fpga20 frequencies=$OUT/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=30" \
-  > $OUT/handshake_buffered.mlir
+  --handshake-place-buffers="algorithm=fpga20 frequencies=$COMP_DIR/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=30" \
+  > "$COMP_DIR/handshake_buffered.mlir"
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/handshake_buffered.mlir \
+  "$COMP_DIR/handshake_buffered.mlir" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
-  > $OUT/handshake_export.mlir
+  > "$COMP_DIR/handshake_export.mlir"
 
 $DYNAMATIC_BINS/dynamatic-opt \
-  $OUT/handshake_export.mlir \
+  "$COMP_DIR/handshake_export.mlir" \
   --lower-handshake-to-hw \
-  > $OUT/hw.mlir
+  > "$COMP_DIR/hw.mlir"
 
 "$DYNAMATIC_BINS/export-rtl" \
-  "$OUT/hw.mlir" "$OUT/hdl" "$DYNAMATIC_PATH/data/rtl-config-vhdl.json" \
+  "$COMP_DIR/hw.mlir" "$OUT/hdl" "$DYNAMATIC_PATH/data/rtl-config-vhdl.json" \
   --dynamatic-path "$DYNAMATIC_PATH" --hdl vhdl
 
 bash "$DYNAMATIC_PATH/tools/frontend/cosim.sh" \
