@@ -48,6 +48,8 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
 /// NOTE: This is taken literally from "mlir/lib/Target/LLVMIR/ModuleImport.cpp"
 ///
 /// Get a topologically sorted list of blocks for the given function.
+/// "for (auto &BB : func)" may give you an instruction before its operand has
+/// been visited.
 static llvm::SetVector<llvm::BasicBlock *>
 getTopologicallySortedBlocks(llvm::Function *func) {
   llvm::SetVector<llvm::BasicBlock *> blocks;
@@ -716,6 +718,10 @@ void ImportLLVMModule::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::fabs) {
+    mlir::Value arg = valueMap[callInst->getArgOperand(0)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<math::AbsFOp>(retType, {arg}, callInst);
   } else {
     llvm_unreachable("Not implemented llvm intrinsic function handling!");
   }
