@@ -59,8 +59,10 @@ sed -i "s/^target triple = .*$//g" "$COMP_DIR/clang.ll"
 # ------------------------------------------------------------------------------
 # NOTE:
 # Here is a brief summary of what each llvm pass does:
-# - mem2reg: Suppresses allocas (allocate memory on the heap) into regs
-# - instcombine: combine operations. Needed to canonicalize a chain of GEPs
+# - inline: Inlines the function calls.
+# - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - lowerswitch: Convert switch case into branches.
+# - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
@@ -70,7 +72,7 @@ sed -i "s/^target triple = .*$//g" "$COMP_DIR/clang.ll"
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
- -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg" \
+ -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
   "$COMP_DIR/clang.ll" \
   > "$COMP_DIR/clang_loop_canonicalized.ll"
 
