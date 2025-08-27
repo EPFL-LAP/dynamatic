@@ -20,11 +20,9 @@ class SharingFixture : public testing::TestWithParam<std::string> {};
 class SpecFixture : public testing::TestWithParam<std::string> {};
 
 TEST_P(BasicFixture, basic) {
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
-
   EXPECT_EQ(runIntegrationTest(name, simTime), 0);
-
   RecordProperty("cycles", std::to_string(simTime));
 }
 
@@ -45,7 +43,7 @@ TEST_P(BasicFixture, basic) {
 
 TEST_P(MemoryFixture, basic) {
   fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
@@ -55,7 +53,7 @@ TEST_P(MemoryFixture, basic) {
 
 TEST_P(SharingFixture, basic) {
   fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
@@ -63,8 +61,37 @@ TEST_P(SharingFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
+// clang-format off
+class ClangFrontendBasicFixture : public testing::TestWithParam<std::string> {};
+class ClangFrontendMemoryFixture : public testing::TestWithParam<std::string> {};
+class ClangFrontendSharingFixture : public testing::TestWithParam<std::string> {};
+// clang-format on
+
+TEST_P(ClangFrontendBasicFixture, basic) {
+  const std::string &name = GetParam();
+  int simTime = -1;
+  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime), 0);
+  RecordProperty("cycles", std::to_string(simTime));
+}
+
+TEST_P(ClangFrontendMemoryFixture, basic) {
+  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
+  const std::string &name = GetParam();
+  int simTime = -1;
+  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime, root), 0);
+  RecordProperty("cycles", std::to_string(simTime));
+}
+
+TEST_P(ClangFrontendSharingFixture, basic) {
+  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
+  const std::string &name = GetParam();
+  int simTime = -1;
+  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime, root), 0);
+  RecordProperty("cycles", std::to_string(simTime));
+}
+
 TEST_P(SpecFixture, spec_NoCI) {
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runSpecIntegrationTest(name, simTime), true);
@@ -72,44 +99,64 @@ TEST_P(SpecFixture, spec_NoCI) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    MiscBenchmarks, BasicFixture,
-    testing::Values("single_loop", "atax", "atax_float", "bicg", "bicg_float",
-                    "binary_search", "factorial", "fir", "float_basic",
-                    "gaussian", "gcd", "gemm", "gemm_float", "gemver",
-                    "gemver_float", "gesummv_float", "get_tanh", "gsum",
-                    "gsumif", "histogram", "if_loop_1", "if_loop_2",
-                    "if_loop_3", "if_loop_add", "if_loop_mul", "iir",
-                    "image_resize", "insertion_sort", "iterative_division",
-                    "iterative_sqrt", "jacobi_1d_imper", "kernel_2mm",
-                    "kernel_2mm_float", "kernel_3mm", "kernel_3mm_float", "kmp",
-                    "loop_array", "lu", "matching", "matching_2", "matrix",
-                    "matrix_power", "matvec", "mul_example", "mvt_float",
-                    "pivot", "polyn_mult", "simple_example_1", "sobel", "spmv",
-                    "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
-                    "test_stdint", "threshold", "triangular", "vector_rescale",
-                    "video_filter", "while_loop_1", "while_loop_3"),
-    [](const auto &info) { return info.param; });
+static auto miscBenchmarkNames = testing::Values(
+    "single_loop", "atax", "atax_float", "bicg", "bicg_float", "binary_search",
+    "factorial", "fir", "float_basic", "gaussian", "gcd", "gemm", "gemm_float",
+    "gemver", "gemver_float", "gesummv_float", "get_tanh", "gsum", "gsumif",
+    "histogram", "if_loop_1", "if_loop_2", "if_loop_3", "if_loop_add",
+    "if_loop_mul", "iir", "image_resize", "insertion_sort",
+    "iterative_division", "iterative_sqrt", "jacobi_1d_imper", "kernel_2mm",
+    "kernel_2mm_float", "kernel_3mm", "kernel_3mm_float", "kmp", "loop_array",
+    "lu", "matching", "matching_2", "matrix", "matrix_power", "matvec",
+    "mul_example", "mvt_float", "pivot", "polyn_mult", "simple_example_1",
+    "sobel", "spmv", "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
+    "test_stdint", "threshold", "triangular", "vector_rescale", "video_filter",
+    "while_loop_1", "while_loop_3");
 
-INSTANTIATE_TEST_SUITE_P(
-    MemoryBenchmarks, MemoryFixture,
-    testing::Values("test_flatten_array", "test_memory_1", "test_memory_2",
-                    "test_memory_3", "test_memory_4", "test_memory_5",
-                    "test_memory_6", "test_memory_7", "test_memory_8",
-                    "test_memory_9", "test_memory_10", "test_memory_11",
-                    "test_memory_12", "test_memory_13", "test_memory_14",
-                    "test_memory_15", "test_memory_16", "test_memory_17",
-                    "test_memory_18", "test_smallbound"),
-    [](const auto &info) { return "memory_" + info.param; });
+static auto memoryBenchmarkNames = testing::Values(
+    "test_flatten_array", "test_memory_1", "test_memory_2", "test_memory_3",
+    "test_memory_4", "test_memory_5", "test_memory_6", "test_memory_7",
+    "test_memory_8", "test_memory_9", "test_memory_10", "test_memory_11",
+    "test_memory_12", "test_memory_13", "test_memory_14", "test_memory_15",
+    "test_memory_16", "test_memory_17", "test_memory_18", "test_smallbound");
 
-INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
-                         testing::Values("share_test_1", "share_test_2"),
+static auto sharingBenchmarkNames =
+    testing::Values("share_test_1", "share_test_2");
+
+INSTANTIATE_TEST_SUITE_P(MiscBenchmarks, BasicFixture, miscBenchmarkNames,
+                         [](const auto &info) { return info.param; });
+INSTANTIATE_TEST_SUITE_P(MemoryBenchmarks, MemoryFixture, memoryBenchmarkNames,
                          [](const auto &info) {
+                           return "memory_" + info.param;
+                         });
+INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+                         sharingBenchmarkNames, [](const auto &info) {
                            return "sharing_" + info.param;
                          });
 
+INSTANTIATE_TEST_SUITE_P(MiscBenchmarks, ClangFrontendBasicFixture,
+                         miscBenchmarkNames,
+                         [](const auto &info) { return info.param; });
+INSTANTIATE_TEST_SUITE_P(MemoryBenchmarks, ClangFrontendMemoryFixture,
+                         memoryBenchmarkNames, [](const auto &info) {
+                           return "memory_" + info.param;
+                         });
+INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, ClangFrontendSharingFixture,
+                         sharingBenchmarkNames, [](const auto &info) {
+                           return "sharing_" + info.param;
+                         });
+
+// clang-format off
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
-                         testing::Values("single_loop", "fixed", "if_convert",
-                                         "loop_path", "nested_loop", "sparse",
-                                         "subdiag", "subdiag_fast"),
-                         [](const auto &info) { return "spec_" + info.param; });
+    testing::Values(
+      "single_loop",
+      "fixed",
+      "if_convert",
+      "loop_path",
+      "nested_loop",
+      "sparse",
+      "subdiag",
+      "subdiag_fast"
+      ),
+    [](const auto &info) { return "spec_" + info.param; });
+// clang-format on
