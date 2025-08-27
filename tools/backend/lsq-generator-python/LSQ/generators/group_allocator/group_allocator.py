@@ -16,6 +16,8 @@ class GroupAllocatorDeclarative():
             io.Reset(),
             io.Clock(),
 
+            io.GroupInitChannelComment(config),
+
             io.GroupInitValid(config),
             io.GroupInitReady(config),
 
