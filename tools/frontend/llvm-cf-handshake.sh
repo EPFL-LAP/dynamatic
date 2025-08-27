@@ -9,6 +9,9 @@ F_SRC=$2
 # Example: "fir"
 FUNC_NAME=$3
 
+# Example: "dynamatic/integration-test/fir"
+OUTPUT_DIR=$4
+
 DYNAMATIC_BINS=$DYNAMATIC_PATH/build/bin
 
 LLVM=$DYNAMATIC_PATH/polygeist/llvm-project
@@ -19,14 +22,16 @@ export PATH=$PATH:$LLVM_BINS
 
 [ -f "$F_SRC" ] || { echo "$F_SRC is not a file!"; exit 1;}
 
-# Will be change to standard path in the future (i.e., out/comp).
-OUT="$(realpath $(dirname $F_SRC))/out"
-mkdir -p $OUT
+mkdir -p $OUTPUT_DIR
 
-COMP_DIR="$OUT/comp"
+COMP_DIR="$OUTPUT_DIR/comp"
 
 rm -rf "$COMP_DIR"
 mkdir -p "$COMP_DIR"
+
+HDL_DIR="$OUTPUT_DIR/hdl"
+
+rm -rf $HDL_DIR/*
 
 # ------------------------------------------------------------------------------
 # NOTE:
@@ -98,17 +103,19 @@ $LLVM_BINS/opt -S \
 # by never used, so it automatically reshapes the array (and the accesses)?
 # ------------------------------------------------------------------------------
 
-$LLVM_BINS/opt -S \
-  -passes="loop-unroll" \
-  "$COMP_DIR/clang_loop_canonicalized.ll" \
-  > "$COMP_DIR/clang_unrolled.ll"
+## # TODO: Loop unrolling fully unrolls test_memory_12 and creates a need for
+## # an LSQ (the LSQ doesn't have a load port, which is a unsupported situation)
+## $LLVM_BINS/opt -S \
+##   -passes="loop-unroll" \
+##   "$COMP_DIR/clang_loop_canonicalized.ll" \
+##   > "$COMP_DIR/clang_unrolled.ll"
+## 
+## $LLVM_BINS/opt -S \
+##   -passes="loop-simplify,simplifycfg" \
+##   -strip-debug \
+##   "$COMP_DIR/clang_unrolled.ll" \
+##   > "$COMP_DIR/clang_optimized.ll"
 
-$LLVM_BINS/opt -S \
-  -passes="loop-simplify,simplifycfg" \
-  -strip-debug \
-  "$COMP_DIR/clang_unrolled.ll" \
-  > "$COMP_DIR/clang_optimized.ll"
-#
 # ------------------------------------------------------------------------------
 # This pass uses polyhedral and alias analysis to determine the dependency
 # between memory operations.
@@ -135,7 +142,7 @@ $LLVM_BINS/opt -S \
   -load-pass-plugin "$DYNAMATIC_PATH/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
-  "$COMP_DIR/clang_optimized.ll" \
+  "$COMP_DIR/clang_loop_canonicalized.ll" \
   > "$COMP_DIR/clang_optimized_dep_marked.ll"
 
 ## # ------------------------------------------------------------------------------
@@ -206,36 +213,36 @@ $DYNAMATIC_BINS/dynamatic-opt \
 # ------------------------------------------------------------------------------
 # Run simple buffer placement
 # ------------------------------------------------------------------------------
-# $DYNAMATIC_BINS/dynamatic-opt \
-#   $COMP_DIR/handshake_transformed.mlir \
-#   --handshake-mark-fpu-impl="impl=flopoco" \
-#   --handshake-set-buffering-properties="version=fpga20" \
-#   --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
-#   > $COMP_DIR/handshake_buffered.mlir
+$DYNAMATIC_BINS/dynamatic-opt \
+  $COMP_DIR/handshake_transformed.mlir \
+  --handshake-mark-fpu-impl="impl=flopoco" \
+  --handshake-set-buffering-properties="version=fpga20" \
+  --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_PATH/data/components.json" \
+  > $COMP_DIR/handshake_buffered.mlir
 
 # ------------------------------------------------------------------------------
 # Run throughput-driven buffer placement (needs a valid Gurobi license)
 # ------------------------------------------------------------------------------
 
-"$LLVM_BINS/clang++" "$F_SRC" \
-  -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
-  -Wno-deprecated -o "$COMP_DIR/profiler_bin.exe"
-
-"$COMP_DIR/profiler_bin.exe" \
-  > "$COMP_DIR/profiler.txt"
-
-"$DYNAMATIC_BINS/exp-frequency-profiler" \
-  "$COMP_DIR/cf_transformed.mlir" \
-  --top-level-function="$FUNC_NAME" \
-  --input-args-file="$COMP_DIR/profiler.txt" \
-  > "$COMP_DIR/frequencies.csv"
-
-$DYNAMATIC_BINS/dynamatic-opt \
-  "$COMP_DIR/handshake_transformed.mlir" \
-  --handshake-mark-fpu-impl="impl=flopoco" \
-  --handshake-set-buffering-properties="version=fpga20" \
-  --handshake-place-buffers="algorithm=fpga20 frequencies=$COMP_DIR/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=30" \
-  > "$COMP_DIR/handshake_buffered.mlir"
+## "$LLVM_BINS/clang++" "$F_SRC" \
+##   -D PRINT_PROFILING_INFO -I "$DYNAMATIC_PATH/include" \
+##   -Wno-deprecated -o "$COMP_DIR/profiler_bin.exe"
+## 
+## "$COMP_DIR/profiler_bin.exe" \
+##   > "$COMP_DIR/profiler.txt"
+## 
+## "$DYNAMATIC_BINS/exp-frequency-profiler" \
+##   "$COMP_DIR/cf_transformed.mlir" \
+##   --top-level-function="$FUNC_NAME" \
+##   --input-args-file="$COMP_DIR/profiler.txt" \
+##   > "$COMP_DIR/frequencies.csv"
+## 
+## $DYNAMATIC_BINS/dynamatic-opt \
+##   "$COMP_DIR/handshake_transformed.mlir" \
+##   --handshake-mark-fpu-impl="impl=flopoco" \
+##   --handshake-set-buffering-properties="version=fpga20" \
+##   --handshake-place-buffers="algorithm=fpga20 frequencies=$COMP_DIR/frequencies.csv timing-models=$DYNAMATIC_PATH/data/components.json target-period=8 timeout=30" \
+##   > "$COMP_DIR/handshake_buffered.mlir"
 
 $DYNAMATIC_BINS/dynamatic-opt \
   "$COMP_DIR/handshake_buffered.mlir" \
@@ -249,12 +256,12 @@ $DYNAMATIC_BINS/dynamatic-opt \
   > "$COMP_DIR/hw.mlir"
 
 "$DYNAMATIC_BINS/export-rtl" \
-  "$COMP_DIR/hw.mlir" "$OUT/hdl" "$DYNAMATIC_PATH/data/rtl-config-vhdl.json" \
+  "$COMP_DIR/hw.mlir" "$HDL_DIR" "$DYNAMATIC_PATH/data/rtl-config-vhdl.json" \
   --dynamatic-path "$DYNAMATIC_PATH" --hdl vhdl
 
 bash "$DYNAMATIC_PATH/tools/frontend/cosim.sh" \
   "$DYNAMATIC_PATH" \
   "$F_SRC" \
   "$FUNC_NAME" \
-  "$OUT" \
-  "$OUT/sim"
+  "$OUTPUT_DIR" \
+  "$OUTPUT_DIR/sim"
