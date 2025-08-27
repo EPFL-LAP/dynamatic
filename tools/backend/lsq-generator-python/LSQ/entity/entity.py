@@ -1,20 +1,20 @@
 
 
 
-def makeEntitySignal(base_name, signal):
+# def makeEntitySignal(base_name, signal):
    
     
 
 
-def makeInstantiationSignal(base_name, signal):
-    name = f"{base_name}"
+# def makeInstantiationSignal(base_name, signal):
+#     name = f"{base_name}"
 
-    full_declaration = f"{name},"
-    if signal.signal_size.bitwidth == 0:
-        full_declaration = f"-- {full_declaration}"
-    return f"""
-      {full_declaration}
-""".removeprefix("\n")
+#     full_declaration = f"{name},"
+#     if signal.signal_size.bitwidth == 0:
+#         full_declaration = f"-- {full_declaration}"
+#     return f"""
+#       {full_declaration}
+# """.removeprefix("\n")
     
 
 class Entity():
