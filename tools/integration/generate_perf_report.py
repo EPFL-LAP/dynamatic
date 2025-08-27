@@ -167,12 +167,13 @@ def main():
 
                 try:
                     diff = int(row["cycles"]) - int(row["old_cycles"])
+                    percent = diff / int(row["old_cycles"]) * 100.0
                     if diff < 0:
-                        row["comparison"] = f"{diff} :heavy_check_mark:"
+                        row["comparison"] = f":heavy_check_mark: {diff:,} ({percent:.2f}%)"
                     elif diff > 0:
-                        row["comparison"] = f"**{diff}** :heavy_exclamation_mark:"
+                        row["comparison"] = f":heavy_exclamation_mark: **{diff:,} ({percent:.2f}%)**"
                     else:
-                        row["comparison"] = f"{diff} :heavy_minus_sign:"
+                        row["comparison"] = f":heavy_minus_sign: {diff:,} ({percent:.2f}%)"
 
                 except ValueError:
                     pass
