@@ -63,7 +63,7 @@ class EntitySignal():
             item_name = f"{self.base_name}_{i}"
             all_items += self._get_single(item_name)
 
-            return all_items
+        return all_items
 
 class EntityComment():
     def __init__(self, comment):
