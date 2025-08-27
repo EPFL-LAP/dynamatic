@@ -26,6 +26,10 @@ namespace fs = std::filesystem;
 int runIntegrationTest(const std::string &name, int &outSimTime,
                        const std::optional<fs::path> &customPath = std::nullopt,
                        bool useVerilog = false);
+int runLLVMFrontendIntegrationTest(
+    const std::string &name, int &outSimTime,
+    const std::optional<fs::path> &customPath = std::nullopt,
+    bool useVerilog = false);
 bool runSpecIntegrationTest(const std::string &name, int &outSimTime);
 int getSimulationTime(const fs::path &logFile);
 
