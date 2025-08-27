@@ -279,7 +279,7 @@ else
   exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling"
 
   # cf-level profiler
-  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
+  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
     --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
