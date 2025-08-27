@@ -53,6 +53,10 @@ def generate_unary(
     elif input_bitwidth is None or output_bitwidth is None:
         raise RuntimeError("If bitwidth is not specified, both input and output bitwidth must be specified")
 
+    # generate inner function takes a name parameter
+    # since the top level name is used for the signal manager wrapper
+    #
+    # the signal manager wrapper will make a new name for the inner unit
     def generate_inner(name): return _generate_unary(
         name,
         handshake_op,
@@ -64,6 +68,8 @@ def generate_unary(
         latency
     )
 
+    # if no signal manager,
+    # the unit uses the top level name
     def generate(): return generate_inner(name)
 
     if extra_signals:
