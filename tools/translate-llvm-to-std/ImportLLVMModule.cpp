@@ -285,7 +285,6 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *callInst = dyn_cast<llvm::CallInst>(inst)) {
     translateCallInst(callInst);
   } else {
-    inst->dump();
     llvm_unreachable("Not implemented");
   }
 }
