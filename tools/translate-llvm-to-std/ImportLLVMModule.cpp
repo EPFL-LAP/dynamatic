@@ -9,6 +9,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/BasicBlock.h"
@@ -20,9 +21,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/Operator.h"
 #include "llvm/IR/Value.h"
-#include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cstdint>
@@ -31,7 +30,8 @@
 #include "dynamatic/Support/MemoryDependency.h"
 
 /// Returns the corresponding scalar MLIR Type from a given LLVM type
-mlir::Type getMLIRType(llvm::Type *llvmType, mlir::MLIRContext *context) {
+static mlir::Type getMLIRType(llvm::Type *llvmType,
+                              mlir::MLIRContext *context) {
   if (llvmType->isIntegerTy()) {
     return mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   }
@@ -45,8 +45,29 @@ mlir::Type getMLIRType(llvm::Type *llvmType, mlir::MLIRContext *context) {
   llvm_unreachable("Unhandled scalar type");
 }
 
-void translateMemDepAndNameAttrs(llvm::Instruction *inst, Operation *op,
-                                 MLIRContext &ctx, OpBuilder &builder) {
+/// NOTE: This is taken literally from "mlir/lib/Target/LLVMIR/ModuleImport.cpp"
+///
+/// Get a topologically sorted list of blocks for the given function.
+static llvm::SetVector<llvm::BasicBlock *>
+getTopologicallySortedBlocks(llvm::Function *func) {
+  llvm::SetVector<llvm::BasicBlock *> blocks;
+  for (llvm::BasicBlock &bb : *func) {
+    if (!blocks.contains(&bb)) {
+      llvm::ReversePostOrderTraversal<llvm::BasicBlock *> traversal(&bb);
+      blocks.insert(traversal.begin(), traversal.end());
+    }
+  }
+
+  // NOTE: This condition is triggered when there are basic blocks with
+  // self-loops. LLVM IR like this should be considered as malformed and
+  // should be rejected.
+  assert(blocks.size() == func->size() && "some blocks are not sorted");
+
+  return blocks;
+}
+
+static void translateMemDepAndNameAttrs(llvm::Instruction *inst, Operation *op,
+                                        MLIRContext &ctx, OpBuilder &builder) {
   // Dynamatic marks memory dependency as metadata nodes in LLVM IR. This
   // function convert them to the corresponding MLIR attributes in MLIR.
   // TODOs:
@@ -66,9 +87,10 @@ void translateMemDepAndNameAttrs(llvm::Instruction *inst, Operation *op,
   }
 }
 
-void convertInitializerToDenseElemAttrRecursive(
-    llvm::Constant *constValue, SmallVector<mlir::Attribute> &values,
-    const mlir::Type &baseMLIRElemType);
+static void
+convertInitializerToDenseElemAttrRecursive(llvm::Constant *constValue,
+                                           SmallVector<mlir::Attribute> &values,
+                                           const mlir::Type &baseMLIRElemType);
 
 // Unlike LLVM, in MLIR the dense data array itself doesn't have a particular
 // shape, so we need to do this flattening conversion for multidimensional
@@ -77,7 +99,7 @@ void convertInitializerToDenseElemAttrRecursive(
 // Converts a LLVM IR multidimension array initialization constant data into an
 // 1D MLIR dense array in row major. This function recursively visits the
 // dimensions and push the scalar elements into a flat array (values).
-DenseElementsAttr
+static DenseElementsAttr
 convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
                                   MLIRContext *ctx) {
   auto *baseElementType = globVar->getInitializer()->getType();
@@ -110,8 +132,7 @@ void convertInitializerToDenseElemAttrRecursive(
     } else if (auto *constFloat = llvm::dyn_cast<llvm::ConstantFP>(elem)) {
       values.push_back(
           mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
-    } else if (auto *constArray =
-                   llvm::dyn_cast<llvm::ConstantDataArray>(elem)) {
+    } else if (llvm::isa<llvm::ConstantDataArray>(elem)) {
       convertInitializerToDenseElemAttrRecursive(elem, values,
                                                  baseMLIRElemType);
     } else {
@@ -160,9 +181,11 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   createConstants(llvmFunc);
   createGetGlobals(llvmFunc);
 
-  for (auto &block : *llvmFunc) {
-    builder.setInsertionPointToEnd(blockMap[&block]);
-    for (auto &inst : block) {
+  llvm::SetVector<llvm::BasicBlock *> blocks =
+      getTopologicallySortedBlocks(llvmFunc);
+  for (auto *block : blocks) {
+    builder.setInsertionPointToEnd(blockMap[block]);
+    for (auto &inst : *block) {
       translateInstruction(&inst);
     }
   }
@@ -232,15 +255,15 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *fcmpInst = dyn_cast<FCmpInst>(inst)) {
     translateFCmpInst(fcmpInst);
   } else if (auto *selInst = dyn_cast<llvm::SelectInst>(inst)) {
-    mlir::Value condition = valueMap[inst->getOperand(0)];
-    mlir::Value trueOperand = valueMap[inst->getOperand(1)];
-    mlir::Value falseOperand = valueMap[inst->getOperand(2)];
-    mlir::Type resType = getMLIRType(inst->getType(), ctx);
+    mlir::Value condition = valueMap[selInst->getOperand(0)];
+    mlir::Value trueOperand = valueMap[selInst->getOperand(1)];
+    mlir::Value falseOperand = valueMap[selInst->getOperand(2)];
+    mlir::Type resType = getMLIRType(selInst->getType(), ctx);
     naiveTranslation<arith::SelectOp>(
         // clang-format off
         resType,
         {condition, trueOperand, falseOperand},
-        inst
+        selInst
         // clang-format on
     );
   } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
@@ -260,6 +283,7 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *callInst = dyn_cast<llvm::CallInst>(inst)) {
     translateCallInst(callInst);
   } else {
+    inst->dump();
     llvm_unreachable("Not implemented");
   }
 }
