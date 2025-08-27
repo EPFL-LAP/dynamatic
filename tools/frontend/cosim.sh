@@ -8,6 +8,7 @@ DYNAMATIC=$1
 SOURCE="$2"
 KERNEL_NAME="$3"
 OUTPUT_DIR=$(realpath "$4")
+COMP_DIR="$OUTPUT_DIR/comp"
 COSIM_DIR=$(realpath "$5")
 
 # Run cosimulation to make sure that the results are ok
@@ -46,5 +47,5 @@ cd "$COSIM_DIR/HLS_VERIFY"
 "$DYNAMATIC/build/bin/hls-verifier" \
   --sim-path="$COSIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
-  --handshake-mlir="$OUTPUT_DIR/handshake_export.mlir" \
+  --handshake-mlir="$COMP_DIR/handshake_export.mlir" \
   > "../report.txt"
