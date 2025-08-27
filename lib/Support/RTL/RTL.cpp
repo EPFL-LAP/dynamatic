@@ -427,7 +427,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (handshakeOp == "handshake.mem_controller" ||
-             handshakeOp == "mem_to_bram" || modName == "handshake.lsq") {
+             handshakeOp == "mem_to_bram" || handshakeOp == "handshake.lsq") {
     // Skip
   } else {
     modOp.emitError("Failed to get extra signals of operation");
