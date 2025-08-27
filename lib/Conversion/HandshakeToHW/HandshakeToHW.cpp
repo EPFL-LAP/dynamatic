@@ -703,6 +703,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::SubIOp,
           handshake::XOrIOp,
           handshake::SIToFPOp,
+          handshake::UIToFPOp,
           handshake::FPToSIOp,
           handshake::AbsFOp,
           handshake::MaxSIOp
@@ -2142,6 +2143,7 @@ public:
         ConvertToHWInstance<handshake::TruncFOp>,
         ConvertToHWInstance<handshake::XOrIOp>,
         ConvertToHWInstance<handshake::SIToFPOp>,
+        ConvertToHWInstance<handshake::UIToFPOp>,
         ConvertToHWInstance<handshake::FPToSIOp>,
         ConvertToHWInstance<handshake::ExtFOp>,
         ConvertToHWInstance<handshake::AbsFOp>,

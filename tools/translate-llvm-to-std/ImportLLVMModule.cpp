@@ -439,9 +439,10 @@ void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
     case Instruction::SIToFP:  naiveTranslation<arith::SIToFPOp>( resType, {arg}, inst); break;
     case Instruction::FPToSI:  naiveTranslation<arith::FPToSIOp>( resType, {arg}, inst); break;
     case Instruction::FPToUI:  naiveTranslation<arith::FPToUIOp>( resType, {arg}, inst); break;
+    case Instruction::UIToFP:  naiveTranslation<arith::UIToFPOp>( resType, {arg}, inst); break;
     // clang-format on
   default: {
-    llvm::errs() << "Not yet handled binary operation type "
+    llvm::errs() << "Not yet handled unary operation type "
                  << inst->getOpcodeName() << "\n";
     llvm_unreachable("Not implemented");
   }

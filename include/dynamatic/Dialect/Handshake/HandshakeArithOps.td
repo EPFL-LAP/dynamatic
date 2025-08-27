@@ -386,6 +386,10 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
 
+def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp"> {
+  let summary = "Converts a unsigned integer to float.";
+}
+
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
   let summary = "Converts a signed integer to float.";
 }
