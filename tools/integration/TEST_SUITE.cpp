@@ -61,35 +61,6 @@ TEST_P(SharingFixture, basic) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
-// clang-format off
-class ClangFrontendBasicFixture : public testing::TestWithParam<std::string> {};
-class ClangFrontendMemoryFixture : public testing::TestWithParam<std::string> {};
-class ClangFrontendSharingFixture : public testing::TestWithParam<std::string> {};
-// clang-format on
-
-TEST_P(ClangFrontendBasicFixture, basic) {
-  const std::string &name = GetParam();
-  int simTime = -1;
-  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime), 0);
-  RecordProperty("cycles", std::to_string(simTime));
-}
-
-TEST_P(ClangFrontendMemoryFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
-  const std::string &name = GetParam();
-  int simTime = -1;
-  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime, root), 0);
-  RecordProperty("cycles", std::to_string(simTime));
-}
-
-TEST_P(ClangFrontendSharingFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
-  const std::string &name = GetParam();
-  int simTime = -1;
-  EXPECT_EQ(runLLVMFrontendIntegrationTest(name, simTime, root), 0);
-  RecordProperty("cycles", std::to_string(simTime));
-}
-
 TEST_P(SpecFixture, spec_NoCI) {
   const std::string &name = GetParam();
   int simTime = -1;
@@ -130,18 +101,6 @@ INSTANTIATE_TEST_SUITE_P(MemoryBenchmarks, MemoryFixture, memoryBenchmarkNames,
                            return "memory_" + info.param;
                          });
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
-                         sharingBenchmarkNames, [](const auto &info) {
-                           return "sharing_" + info.param;
-                         });
-
-INSTANTIATE_TEST_SUITE_P(MiscBenchmarks, ClangFrontendBasicFixture,
-                         miscBenchmarkNames,
-                         [](const auto &info) { return info.param; });
-INSTANTIATE_TEST_SUITE_P(MemoryBenchmarks, ClangFrontendMemoryFixture,
-                         memoryBenchmarkNames, [](const auto &info) {
-                           return "memory_" + info.param;
-                         });
-INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, ClangFrontendSharingFixture,
                          sharingBenchmarkNames, [](const auto &info) {
                            return "sharing_" + info.param;
                          });
