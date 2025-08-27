@@ -93,7 +93,8 @@ jobs:
           git fetch origin main --no-recurse-submodules
           rm perf_ci.bin
           git checkout FETCH_HEAD -- perf_ci.bin 
-          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
+          python tools/integration/generate_perf_report.py \
+            --save perf_ci_branch.bin --compare perf_ci.bin --fail 5 >> $GITHUB_STEP_SUMMARY
           mv perf_ci_branch.bin perf_ci.bin
           git config --global user.name 'Eugen Bosnjak'
           git config --global user.email '11596160+ebosnjak@users.noreply.github.com'

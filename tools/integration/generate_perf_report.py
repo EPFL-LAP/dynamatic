@@ -6,12 +6,66 @@ GoogleTest's .xml outputs.
 import os
 import sys
 import pickle
+import argparse
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
 RESULTS_DIR = DYNAMATIC_ROOT / "build" / "tools" / "integration" / "results"
+
+
+class CLIHandler:
+    """
+    This class parses the script's command line arguments.
+    """
+
+    def __init__(self):
+        self.parser = argparse.ArgumentParser()
+        self.add_arguments()
+
+    def add_arguments(self):
+        """
+        Configures all available command line arguments.
+        """
+        self.parser.add_argument(
+            "-c",
+            "--compare",
+            nargs="?",
+            type=str,
+            default=None,
+            help="Path of another performance report against which to compare the generated one.",
+        )
+        self.parser.add_argument(
+            "-s",
+            "--save",
+            nargs="?",
+            type=str,
+            default=None,
+            help="Path to which the generated performance report should be saved (as binary data).",
+        )
+        self.parser.add_argument(
+            "-f",
+            "--fail",
+            nargs="?",
+            type=float,
+            default=5.0,
+            help="Smallest percent difference between current and old report \
+                that should return a failure exit code. Default is 5, i.e. if any test \
+                has a cycle performance at least 5%% worse than the previous report \
+                (specified with -c), the generator will return non-zero.",
+        )
+
+    def parse_args(self, args=None):
+        """
+        Parses the command-line arguments.
+
+        Arguments:
+        `args` -- List of arguments to parse (default: sys.argv)
+
+        Returns: Parsed arguments namespace
+        """
+        return self.parser.parse_args(args)
 
 
 def find_files_ext(directory, ext):
@@ -137,25 +191,24 @@ def table(header, data):
 def main():
     """
     Entry point.
-
-    Arguments:
-    `save_path` -- Path to which the pickled performance report will be saved.
-    `compare_path` -- Path of perf. report against which this one will be compared.
     """
-    if len(sys.argv) < 3:
-        print("Error: Not enough arguments")
-        exit(-1)
+    cli = CLIHandler()
+    args = cli.parse_args()
 
     data = {
         "columns": ["name", "cycles", "result", "old_cycles", "comparison"],
         "data": parse_results(RESULTS_DIR)
     }
 
-    with open(sys.argv[1], "wb") as f:
-        pickle.dump(data, f)
+    if args.save:
+        with open(args.save, "wb") as f:
+            pickle.dump(data, f)
 
-    with open(sys.argv[2], "rb") as f:
-        old_data = pickle.load(f)
+    if args.compare:
+        with open(args.compare, "rb") as f:
+            old_data = pickle.load(f)
+
+    failed = False
 
     for old_row in old_data["data"]:
         if "fail" in old_row["result"]:
@@ -171,6 +224,10 @@ def main():
                 try:
                     diff = int(row["cycles"]) - int(row["old_cycles"])
                     percent = diff / int(row["old_cycles"]) * 100.0
+
+                    if args.fail and percent >= args.fail:
+                        failed = True
+
                     if diff < 0:
                         row["comparison"] = f":heavy_check_mark: {diff:,} ({percent:.2f}%)"
                     elif diff > 0:
@@ -181,11 +238,17 @@ def main():
                 except ValueError:
                     pass
 
-    print("## Performance Report")
+    if failed:
+        print("## Performance Report :heavy_exclamation_mark:")
+    else:
+        print("## Performance Report :heavy_check_mark:")
     print(table(
         data["columns"],
         data["data"]
     ))
+
+    if failed:
+        sys.exit(-1)
 
 
 if __name__ == "__main__":
