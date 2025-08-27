@@ -312,13 +312,15 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.shrui" || handshakeOp == "handshake.remsi" ||
       // the first input has data bitwidth
-      handshakeOp == "handshake.speculator" || handshakeOp == "handshake.spec_commit" ||
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.sharing_wrapper" ||
       handshakeOp == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
-  } else if (handshakeOp == "handshake.cond_br" || handshakeOp == "handshake.select") {
+  } else if (handshakeOp == "handshake.cond_br" ||
+             handshakeOp == "handshake.select") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
   } else if (handshakeOp == "handshake.constant") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
@@ -327,7 +329,8 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (handshakeOp == "handshake.extsi" || handshakeOp == "handshake.trunci" ||
+  } else if (handshakeOp == "handshake.extsi" ||
+             handshakeOp == "handshake.trunci" ||
              handshakeOp == "handshake.extui") {
     serializedParams["INPUT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
@@ -366,8 +369,10 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
-  } else if (handshakeOp == "handshake.addf" || handshakeOp == "handshake.cmpf" ||
-             handshakeOp == "handshake.mulf" || handshakeOp == "handshake.subf" ||
+  } else if (handshakeOp == "handshake.addf" ||
+             handshakeOp == "handshake.cmpf" ||
+             handshakeOp == "handshake.mulf" ||
+             handshakeOp == "handshake.subf" ||
              handshakeOp == "handshake.divf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
@@ -376,10 +381,13 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["RIGHT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  } else if (handshakeOp == "handshake.source" || handshakeOp == "mem_controller" ||
-             handshakeOp == "handshake.truncf" || handshakeOp == "handshake.extf" ||
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "mem_controller" ||
+             handshakeOp == "handshake.truncf" ||
+             handshakeOp == "handshake.extf" ||
              handshakeOp == "handshake.maximumf" ||
-             handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.join") {
+             handshakeOp == "handshake.minimumf" ||
+             handshakeOp == "handshake.join") {
     // Skip
   } else {
     modOp->emitError("Failed to get bitwidth of operation");
@@ -398,32 +406,35 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.addf" || handshakeOp == "handshake.addi" ||
       handshakeOp == "handshake.andi" || handshakeOp == "handshake.buffer" ||
       handshakeOp == "handshake.cmpf" || handshakeOp == "handshake.cmpi" ||
-      handshakeOp == "handshake.cond_br" || handshakeOp == "handshake.constant" ||
-      handshakeOp == "handshake.extsi" || handshakeOp == "handshake.fork" ||
-      handshakeOp == "handshake.merge" || handshakeOp == "handshake.mulf" ||
-      handshakeOp == "handshake.muli" || handshakeOp == "handshake.select" ||
-      handshakeOp == "handshake.sink" || handshakeOp == "handshake.subf" ||
-      handshakeOp == "handshake.extui" || handshakeOp == "handshake.shli" ||
-      handshakeOp == "handshake.subi" || handshakeOp == "handshake.spec_save_commit" ||
-      handshakeOp == "handshake.speculator" || handshakeOp == "handshake.trunci" ||
-      handshakeOp == "handshake.mux" || handshakeOp == "handshake.control_merge" ||
+      handshakeOp == "handshake.cond_br" ||
+      handshakeOp == "handshake.constant" || handshakeOp == "handshake.extsi" ||
+      handshakeOp == "handshake.fork" || handshakeOp == "handshake.merge" ||
+      handshakeOp == "handshake.mulf" || handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.select" || handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.subf" || handshakeOp == "handshake.extui" ||
+      handshakeOp == "handshake.shli" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.spec_save_commit" ||
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.trunci" || handshakeOp == "handshake.mux" ||
+      handshakeOp == "handshake.control_merge" ||
       handshakeOp == "handshake.blocker" || handshakeOp == "handshake.sitofp" ||
-      handshakeOp == "handshake.fptosi" || handshakeOp == "handshake.lazy_fork" ||
-      handshakeOp == "handshake.divf" || handshakeOp == "handshake.ori" ||
-      handshakeOp == "handshake.shrsi" || handshakeOp == "handshake.xori" ||
-      handshakeOp == "handshake.negf" || handshakeOp == "handshake.truncf" ||
-      handshakeOp == "handshake.divsi" || handshakeOp == "handshake.absf" ||
-      handshakeOp == "handshake.divui" || handshakeOp == "handshake.extf" ||
-      handshakeOp == "handshake.maximumf" || handshakeOp == "handshake.minimumf" ||
-      handshakeOp == "handshake.shrui" || handshakeOp == "handshake.join" ||
-      handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
+      handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.truncf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
+      handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
       // the first input has extra signals
       handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  } else if (handshakeOp == "handshake.source" || handshakeOp == "handshake.non_spec") {
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "handshake.non_spec") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (handshakeOp == "handshake.mem_controller" ||
