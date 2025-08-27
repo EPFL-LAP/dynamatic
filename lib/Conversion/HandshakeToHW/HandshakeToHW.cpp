@@ -1839,7 +1839,7 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::RigidifierOp>,
+                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
