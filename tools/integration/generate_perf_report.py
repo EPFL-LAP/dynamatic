@@ -248,6 +248,10 @@ def main():
     ))
 
     if failed:
+        print(
+            f"Error: Some tests are worse than the given limit ({args.fail})!",
+            file=sys.stderr
+        )
         sys.exit(-1)
 
 
