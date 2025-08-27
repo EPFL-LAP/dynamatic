@@ -103,7 +103,7 @@ jobs:
           git push
 
       - uses: actions/upload-artifact@v4
-        if: steps.build.outputs.exit_code == 0
+        if: success() || failure()
         with: 
           name: integration-report
           path: |
