@@ -688,7 +688,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
-      .Case<handshake::RigidifierOp, handshake::ValidMergerOp>([&](auto) {
+      .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Default([&](auto) {

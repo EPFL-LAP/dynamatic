@@ -1498,7 +1498,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasVerifier = 1;
 }
 
-def RigidifierOp : Handshake_Op<"rigifier",[
+def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
@@ -1506,7 +1506,7 @@ def RigidifierOp : Handshake_Op<"rigifier",[
     Rigidifies a channel to simplify the handshake logic.
   }];
   let description = [{
-    Rigidifies a channel by setting the output valid signal to 1 and input ready
+    Rigidifies a channel by setting the output ready signal to 1 and input ready
     signal to a open. This allows the simplification of redundant handshake logic.
   }];
 

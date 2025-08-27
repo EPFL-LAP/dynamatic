@@ -12,6 +12,9 @@ def generate_cmpf(name, params):
 
     if impl == FLOPOCO_IMPL:
         bitwidth = 64 if is_double else 32
+        if is_double is None:
+            raise ValueError(f"is_double was missing for generating a flopoco cmpf")
+
         signals = _get_flopoco_signals(bitwidth)
         body = _get_flopoco_body(bitwidth, predicate)
     elif impl == VIVADO_IMPL:

@@ -2,11 +2,11 @@ from generators.support.utils import data
 from generators.support.signal_manager import generate_unary_signal_manager
 
 
-def generate_rigidifier(name, params):
+def generate_ready_remover(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params["extra_signals"]
 
-    def generate_inner(name): return _generate_rigidifier(name, bitwidth)
+    def generate_inner(name): return _generate_ready_remover(name, bitwidth)
     def generate(): return generate_inner(name)
 
     if extra_signals:
@@ -20,7 +20,7 @@ def generate_rigidifier(name, params):
         return generate()
 
 
-def _generate_rigidifier(name, bitwidth):
+def _generate_ready_remover(name, bitwidth):
     potential_input = f"ins          : in std_logic_vector({bitwidth} - 1 downto 0);"
     potential_output = f"outs       : out std_logic_vector({bitwidth} - 1 downto 0);"
     potential_assignment = "outs <= ins;"
@@ -30,7 +30,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of rigidifier
+-- Entity of ready remover
 entity {name} is
   port (
     -- inputs
@@ -48,7 +48,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of rigidifier
+-- Architecture of ready remover
 architecture arch of {name} is
 begin
   f{data(potential_assignment, bitwidth)}
