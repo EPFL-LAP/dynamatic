@@ -47,7 +47,7 @@ class EntitySignal():
             full_declaration = f"-- {full_declaration}"
 
         return f"""
-            {full_declaration}
+    {full_declaration}
         """.removeprefix("\n")
 
     def get(self):
