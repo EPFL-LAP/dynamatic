@@ -146,8 +146,6 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
     handshake::FuncOp funcOp, const TimingDatabase &timingDB,
     llvm::MapVector<Value, ChannelBufProps> &channelProps) {
 
-    llvm::errs() << "------------------------1 \n";
-
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
   // properties into the channel map. Fails and marks the MILP unsatisfiable if
@@ -183,48 +181,33 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
     return success();
   };
 
-
-llvm::errs() << "------------------------404 \n";
-
   // Add channels originating from function arguments to the channel map
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
-    llvm::errs() << "[] " << idx << arg << "\n";
-    // if (idx == 7){
-    // for (auto a : arg.getUsers()){
-    //   llvm::errs() << "[] " << a << "\n";
-    //   llvm::errs() << "[] " << *a << "\n";
-    //   for (auto b : (*a).getUsers()){
-    //     llvm::errs() << "[] " << b << "\n";
-    //     llvm::errs() << "[] " << *b << "\n";
-    //     }
-    // }
-    // }
-
+    // Skip arguments with invalid types for buffering
+    if (!isa<handshake::ChannelType, handshake::ControlType>(arg.getType())) {
+      continue;
+    }
       
     Channel channel(arg, funcOp, *arg.getUsers().begin());
     if (failed(deriveBufferingProperties(channel))){
-      llvm::errs() << "------------------------4 \n";
-      exit(0);
+      return failure();
     }
-
   }
-
-  
 
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
-      // llvm::errs() << "[*] " << idx << res << "\n";
+      // Skip results with invalid types for buffering
+      if (!isa<handshake::ChannelType, handshake::ControlType>(res.getType())) {
+        continue;
+      }
+      
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel))){
-
-        llvm::errs() << "------------------------3 \n";
-        exit(0);
+        return failure();
       }
-
     }
   }
 
-  llvm::errs() << " success ?! ------- \n";
   return success();
 }

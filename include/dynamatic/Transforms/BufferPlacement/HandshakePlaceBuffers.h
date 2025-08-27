@@ -64,7 +64,7 @@ protected:
   /// Checks a couple of invariants in the function that are required by our
   /// buffer placement algorithm. Fails when the function does not satisfy at
   /// least one invariant.
-  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
+  virtual LogicalResult checkFuncInvariants(FuncInfo &info, StringRef algorithm);
 
   /// Places buffers in the function, according to the logic dictated by the
   /// algorithm the pass was instantiated with.

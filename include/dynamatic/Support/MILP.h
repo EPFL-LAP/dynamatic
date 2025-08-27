@@ -77,14 +77,18 @@ public:
       model.optimize();
     }
 
-    // Check whether we found an optimal solution or reached the time limit
+    // Check whether we found an optimal solution
     int stat = model.get(GRB_IntAttr_Status);
     if (milpStatus)
       *milpStatus = stat;
-    if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
+    if (stat != GRB_OPTIMAL) {
       state = State::FAILED_TO_OPTIMIZE;
-      llvm::errs() << "Buffer placement MILP failed with status " << stat
-                   << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
+      if (stat == GRB_TIME_LIMIT) {
+        llvm::errs() << "Buffer placement MILP reached time limit without finding optimal solution\n";
+      } else {
+        llvm::errs() << "Buffer placement MILP failed with status " << stat
+                     << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
+      }
       return failure();
     }
     state = State::OPTIMIZED;

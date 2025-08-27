@@ -1,0 +1,3 @@
+set-src integration-test/simple_example_1/simple_example_1.c
+compile --buffer-algorithm on-merges
+exit

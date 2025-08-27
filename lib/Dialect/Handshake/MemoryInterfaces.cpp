@@ -30,6 +30,11 @@
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+
+/// Wraps a type with a handshake channel.
+static handshake::ChannelType wrapChannel(Type type) {
+  return handshake::ChannelType::get(type);
+}
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
@@ -165,14 +170,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   Location loc = memref.getLoc();
 
   if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
-    llvm::errs() << "---MC\n";
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
         mcNumLoads, mcNumStores);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
-    llvm::errs() << "---LSQ\n";
     lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
                                              inputs.lsqInputs, ctrlEnd,
                                              inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
@@ -181,17 +184,18 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // so that the LSQ can forward its loads and stores to the MC. We need
     // load address, store address, and store data channels from the LSQ to
     // the MC and a load data channel from the MC to the LSQ
-    llvm::errs() << "---Both\n";
     MemRefType memrefType = memref.getType().cast<MemRefType>();
-
-    // Create 3 backedges (load address, store address, store data) for the MC
-    // inputs that will eventually come from the LSQ.
     MLIRContext *ctx = builder.getContext();
+
+    // Determine the correct types for the slave LSQ interface outputs
+    // These will be the types when the LSQ is connected to an MC
     Type addrType = handshake::ChannelType::getAddrChannel(ctx);
+    Type dataType = wrapChannel(memrefType.getElementType());
+    
+    // Create 3 backedges using the types that the slave LSQ will produce
     Backedge ldAddr = edgeBuilder.get(addrType);
     Backedge stAddr = edgeBuilder.get(addrType);
-    Backedge stData = edgeBuilder.get(
-        handshake::ChannelType::get(memrefType.getElementType()));
+    Backedge stData = edgeBuilder.get(dataType);
     inputs.mcInputs.push_back(ldAddr);
     inputs.mcInputs.push_back(stAddr);
     inputs.mcInputs.push_back(stData);
@@ -202,19 +206,18 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
         mcNumLoads + 1, mcNumStores);
 
-    // Add the MC's load data result to the LSQ's inputs and create the LSQ,
-    // passing a flag to the builder so that it generates the necessary
-    // outputs that will go to the MC
+    // Add the MC's load data result to the LSQ's inputs 
     ResultRange lastThree = mcOp.getOutputs().take_back(3);
     for (Value last: lastThree){
-      llvm::errs() << "uuu\n";
       inputs.lsqInputs.push_back(last);
     }
+    
+    // Create the LSQ as a slave connected to the MC
     lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
                                              inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
 
     // Resolve the backedges to fully connect the MC and LSQ
-    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
+    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(4);
     ldAddr.setValue(lsqMemResults[0]);
     stAddr.setValue(lsqMemResults[1]);
     stData.setValue(lsqMemResults[2]);

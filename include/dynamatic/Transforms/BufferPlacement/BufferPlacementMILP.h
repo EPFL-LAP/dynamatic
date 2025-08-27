@@ -98,6 +98,59 @@ struct MILPVars {
   llvm::MapVector<Value, ChannelVars> channelVars;
 };
 
+/// Represents a dataflow path that may deviate from the original CFG structure
+/// due to optimizations like fast token delivery.
+struct DataflowPath {
+  /// Source operation of the path.
+  Operation *source;
+  /// Destination operation of the path.
+  Operation *destination;
+  /// Channel that connects source to destination.
+  Value channel;
+  /// Whether this path exists in the original CFG.
+  bool isOriginalCFGPath;
+  /// Whether this path is created by fast token delivery optimization.
+  bool isFastTokenDelivery;
+  /// Estimated timing improvement from this path.
+  double timingBenefit;
+};
+
+/// Represents the control flow layer with original CFG structure.
+struct ControlFlowLayer {
+  /// Original CFG transitions.
+  llvm::MapVector<unsigned, llvm::SmallVector<unsigned, 2>> transitions;
+  /// CFDFCs extracted from the original CFG.
+  llvm::SmallVector<CFDFC *, 4> originalCFDFCs;
+};
+
+/// Represents the dataflow layer with extended connections including fast token delivery.
+struct DataflowLayer {
+  /// All dataflow paths, including fast token delivery.
+  llvm::SmallVector<DataflowPath, 16> allPaths;
+  /// Extended CFDFCs that include fast token delivery paths.
+  llvm::SmallVector<CFDFC *, 4> extendedCFDFCs;
+  /// Mapping from channels to all paths that use them.
+  llvm::MapVector<Value, llvm::SmallVector<DataflowPath *, 4>> channelToPaths;
+};
+
+/// Represents the mapping layer that relates control flow and dataflow layers.
+struct MappingLayer {
+  /// Maps original CFG transitions to corresponding dataflow paths.
+  llvm::MapVector<std::pair<unsigned, unsigned>, llvm::SmallVector<DataflowPath *, 2>> cfgToDataflow;
+  /// Maps fast token delivery paths to their impact on CFG timing.
+  llvm::MapVector<DataflowPath *, double> pathTimingImpact;
+};
+
+/// Extended MILP variables for multi-layer approach.
+struct ExtendedMILPVars : public MILPVars {
+  /// Variables for each dataflow path (binary - whether path is active).
+  llvm::MapVector<DataflowPath *, GRBVar> pathActive;
+  /// Variables for path timing constraints (real - arrival time along path).
+  llvm::MapVector<DataflowPath *, TimeVars> pathTiming;
+  /// Variables for layer interaction (real - timing transfer between layers).
+  llvm::MapVector<std::pair<unsigned, unsigned>, GRBVar> layerInteraction;
+};
+
 /// Abstract class holding the basic logic for the smart buffer placement pass,
 /// which expresses the buffer placement problem in dataflow circuits as an MILP
 /// (mixed-integer linear program) whose solution indicates the location and
@@ -292,11 +345,54 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
+  /// Multi-layer graph modeling methods for handling fast token delivery
+  
+  /// Analyzes the dataflow graph to identify fast token delivery paths that
+  /// deviate from the original CFG structure.
+  void analyzeDataflowPaths(DataflowLayer &dataflowLayer);
+  
+  /// Constructs the control flow layer with original CFG structure and CFDFCs.
+  void buildControlFlowLayer(ControlFlowLayer &controlLayer);
+  
+  /// Constructs the dataflow layer with extended connections including fast token delivery.
+  void buildDataflowLayer(DataflowLayer &dataflowLayer);
+  
+  /// Constructs the mapping layer that relates control flow and dataflow layers.
+  void buildMappingLayer(const ControlFlowLayer &controlLayer,
+                         const DataflowLayer &dataflowLayer,
+                         MappingLayer &mappingLayer);
+  
+  /// Adds multi-layer MILP variables for paths, timing, and layer interactions.
+  void addMultiLayerVars(ExtendedMILPVars &extVars,
+                         const DataflowLayer &dataflowLayer);
+  
+  /// Adds constraints that ensure consistency between control flow and dataflow layers.
+  void addLayerConsistencyConstraints(const ControlFlowLayer &controlLayer,
+                                      const DataflowLayer &dataflowLayer,
+                                      const MappingLayer &mappingLayer,
+                                      ExtendedMILPVars &extVars);
+  
+  /// Adds path-aware timing constraints for all dataflow paths.
+  void addPathAwareTimingConstraints(const DataflowLayer &dataflowLayer,
+                                     ExtendedMILPVars &extVars);
+  
+  /// Adds constraints to handle conflicts when multiple paths affect the same channel.
+  void addPathConflictResolution(const DataflowLayer &dataflowLayer,
+                                 ExtendedMILPVars &extVars);
+  
+  /// Creates adaptive CFDFCs based on actual dataflow cycles rather than just control flow.
+  void createAdaptiveCFDFCs(const DataflowLayer &dataflowLayer,
+                            llvm::SmallVector<CFDFC *, 4> &adaptiveCFDFCs);
+
 private:
   /// Common logic for all constructors. Fills the channel to buffering
   /// properties mapping and defines a large constant used for elasticity
   /// constraints.
   void initialize();
+
+  /// Validates that MILP variables exist for the specified channel and signal type.
+  /// Returns true if the channel variables and signal variables exist, false otherwise.
+  bool hasValidChannelVars(Value channel, SignalType type) const;
 };
 
 } // namespace buffer

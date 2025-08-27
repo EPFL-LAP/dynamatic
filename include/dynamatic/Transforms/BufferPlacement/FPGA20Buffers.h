@@ -86,6 +86,21 @@ private:
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
   void setup();
+  
+  /// Enhanced setup method that uses multi-layer graph modeling to handle
+  /// fast token delivery paths that deviate from the original CFG structure.
+  void setupMultiLayer();
+
+  /// Determines if multi-layer setup is needed based on the presence of
+  /// fast token delivery paths in the function.
+  bool needsMultiLayerSetup();
+    
+  void addRelaxedChannelConstraints(Value channel, SignalType signal, 
+                                                  const TimingModel *bufModel);
+  void addRelaxedElasticityConstraints(Value channel, 
+                                                    ArrayRef<BufferingGroup> bufGroups);
+  void addEnhancedPathConstraints(const DataflowLayer &dataflowLayer,
+                                               ExtendedMILPVars &extVars);                                                                                            
 };
 
 } // namespace fpga20

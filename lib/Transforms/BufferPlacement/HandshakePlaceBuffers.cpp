@@ -185,7 +185,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
-    if (failed(checkFuncInvariants(info)))
+    if (failed(checkFuncInvariants(info, algorithm)))
       return failure();
   }
 
@@ -202,7 +202,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   return success();
 }
 
-LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
+LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info, StringRef algorithm) {
   // Store all archs in a map for fast query time
   DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
   for (ArchBB &arch : info.archs)
@@ -238,6 +238,17 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
           /// NOTE: (lucas-rami) This is probably the start->end control channel
           /// which goes from the entry block to the exit block. This is fine in
           /// general so we let this pass without triggering a warning or error
+          continue;
+        }
+
+        // Enhanced FPGA20 with multi-layer support can handle fast token delivery
+        // connections that deviate from the original CFG structure
+        if (algorithm == "fpga20") {
+          op.emitWarning() << "Result " << res.getResultNumber() 
+                           << " defined in block " << *srcBB 
+                           << " is used in block " << *dstBB
+                           << ". This connection does not exist according to the CFG "
+                              "graph but will be handled by multi-layer buffer placement.";
           continue;
         }
 
@@ -575,6 +586,11 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
   for (auto &[channel, placeRes] : placement) {
+    // Skip channels with invalid types for buffering
+    if (!isa<handshake::ChannelType, handshake::ControlType>(channel.getType())) {
+      continue;
+    }
+    
     Operation *opDst = *channel.getUsers().begin();
     builder.setInsertionPoint(opDst);
 

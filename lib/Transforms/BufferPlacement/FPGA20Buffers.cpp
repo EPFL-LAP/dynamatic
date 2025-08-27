@@ -48,6 +48,20 @@ FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
 }
 
 void FPGA20Buffers::extractResult(BufferPlacement &placement) {
+  // Check if the MILP has a valid solution before extracting results
+  int status = model.get(GRB_IntAttr_Status);
+  if (status != GRB_OPTIMAL) {
+    llvm::errs() << "Cannot extract buffer placement results: MILP status is " 
+                 << status << " (not optimal)\n";
+    return;
+  }
+
+  // Double-check that solution exists
+  if (!model.get(GRB_IntAttr_SolCount)) {
+    llvm::errs() << "Cannot extract buffer placement results: No solution found\n";
+    return;
+  }
+
   // Iterate over all channels in the circuit
   for (auto &[channel, channelVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as

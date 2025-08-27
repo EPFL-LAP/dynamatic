@@ -70,6 +70,19 @@ Backedge::Backedge(Operation *op, PatternRewriter *rewriter)
     : value(op->getResult(0)), rewriter(rewriter) {}
 
 void Backedge::setValue(mlir::Value newValue) {
+  if (value.getType() != newValue.getType()) {
+    llvm::errs() << "Backedge type mismatch:\n";
+    llvm::errs() << "  Original type: " << value.getType() << "\n";
+    llvm::errs() << "  New value type: " << newValue.getType() << "\n";
+    llvm::errs() << "  Original value: " << value << "\n";
+    llvm::errs() << "  New value: " << newValue << "\n";
+    if (auto defOp = value.getDefiningOp()) {
+      llvm::errs() << "  Original defining op: " << *defOp << "\n";
+    }
+    if (auto defOp = newValue.getDefiningOp()) {
+      llvm::errs() << "  New value defining op: " << *defOp << "\n";
+    }
+  }
   assert(value.getType() == newValue.getType() &&
          "incorrect replacement value type");
   assert(!set && "backedge already set to a value!");
