@@ -48,7 +48,8 @@ class GroupAllocatorDeclarativeIOSignals():
             comment = f"""
 
     -- Group init channels from the dataflow circuit
-    -- {config.num_groups()} channels, one for each group of memory operations.
+    -- {config.num_groups()} control channels,
+    -- one for each group of memory operations.
 """.removeprefix("\n")
             
             EntityComment.__init__(
