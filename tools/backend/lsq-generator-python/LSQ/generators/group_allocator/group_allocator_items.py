@@ -560,3 +560,5 @@ class GroupHandshakingDeclarativeLocalItems():
                     number=1
                 )
             )
+
+class GroupHandshakingDeclarativeBodyItems():

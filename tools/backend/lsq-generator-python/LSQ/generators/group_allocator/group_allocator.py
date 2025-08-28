@@ -9,7 +9,7 @@ from LSQ.entity import Entity, Architecture
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import \
+from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorDeclarativePortItems, 
         GroupAllocatorDeclarativeLocalItems,
@@ -42,7 +42,9 @@ class GroupHandshakingDeclarative():
             l.NumEmptyEntries(config, QueueType.LOAD, is_naive = True),
             l.NumEmptyEntries(config, QueueType.STORE, is_naive=True),
             l.NumEmptyEntries(config, QueueType.LOAD, is_naive = False),
-            l.NumEmptyEntries(config, QueueType.STORE, is_naive=False)
+            l.NumEmptyEntries(config, QueueType.STORE, is_naive=False),
+
+            ga_p.GroupInitReady(config)
         ]
 
 class GroupAllocatorDeclarative():
