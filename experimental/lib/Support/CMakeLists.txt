@@ -25,3 +25,4 @@ add_dynamatic_library(DynamaticExperimentalSupport
 )
 
 add_subdirectory(BooleanLogic)
+add_subdirectory(MaterializationUtil)
