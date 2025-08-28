@@ -12,7 +12,9 @@ from pathlib import Path
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
+CLANGXX_BIN = DYNAMATIC_ROOT / "bin" / "clang++"
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
+DYNAMATIC_PROFILER_BIN = DYNAMATIC_ROOT / "bin" / "exp-frequency-profiler"
 LLVM_BINS = DYNAMATIC_ROOT / "polygeist" / "llvm-project" / "build" / "bin"
 EXPORT_DOT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-dot"
 EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
@@ -87,7 +89,6 @@ def main():
 
     # Custom compilation flow
 
-    # Start with copying the .cf file to the out_dir
     clang_file = os.path.join(comp_out_dir, f"clang.ll")
     with open(clang_file, "w") as f:
         result = subprocess.run([
@@ -279,30 +280,30 @@ def main():
                         TermColors.FAIL)
             return False
 
-    # Buffer placement (Simple buffer placement)
-    handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
-    timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
-    with open(handshake_buffered, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_transformed,
-            "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=on-merges timing-models={timing_model}"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Placed simple buffers")
-        else:
-            color_print("Failed to place simple buffers", TermColors.FAIL)
-            return False
+    # # Buffer placement (Simple buffer placement)
+    # handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
+    # timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
+    # with open(handshake_buffered, "w") as f:
+    #     result = subprocess.run([
+    #         DYNAMATIC_OPT_BIN, handshake_transformed,
+    #         "--handshake-set-buffering-properties=version=fpga20",
+    #         f"--handshake-place-buffers=algorithm=on-merges timing-models={timing_model}"
+    #     ],
+    #         stdout=f,
+    #         stderr=sys.stdout
+    #     )
+    #     if result.returncode == 0:
+    #         print("Placed simple buffers")
+    #     else:
+    #         color_print("Failed to place simple buffers", TermColors.FAIL)
+    #         return False
 
     # handshake canonicalization
     handshake_canonicalized = os.path.join(
         comp_out_dir, "handshake_canonicalized.mlir")
     with open(handshake_canonicalized, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_buffered,
+            DYNAMATIC_OPT_BIN, handshake_transformed,
             "--handshake-canonicalize",
             "--handshake-hoist-ext-instances"
         ],
@@ -315,11 +316,11 @@ def main():
             color_print("Failed to canonicalize Handshake", TermColors.FAIL)
             return False
 
-    handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
+    # handshake_speculation = os.path.join(comp_out_dir, "handshake_speculation.mlir")
+    handshake_speculation = os.path.join(
+        comp_out_dir, "handshake_speculation.mlir")
     if spec:
         # Speculation
-        handshake_speculation = os.path.join(
-            comp_out_dir, "handshake_speculation.mlir")
         spec_json = os.path.join(c_file_dir, "spec.json")
         with open(handshake_speculation, "w") as f:
             result = subprocess.run([
@@ -337,33 +338,109 @@ def main():
                 color_print("Failed to add speculative units", TermColors.FAIL)
                 return False
 
-        buffer_json = os.path.join(c_file_dir, "buffer.json")
-        handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-        with open(buffer_json, "r") as f:
-            buffers = json.load(f)
-            buffer_pass_args = []
-            for buffer in buffers:
-                buffer_pass_args.append(
-                    "--handshake-placebuffers-custom=" +
-                    f"pred={buffer['pred']} " +
-                    f"outid={buffer['outid']} " +
-                    f"slots={buffer['slots']} " +
-                    f"type={buffer['type']}")
-            with open(handshake_export, "w") as f:
-                result = subprocess.run([
-                    DYNAMATIC_OPT_BIN, handshake_speculation,
-                    *buffer_pass_args
-                ],
-                    stdout=f,
-                    stderr=sys.stdout
-                )
-                if result.returncode == 0:
-                    print("Exported Handshake")
-                else:
-                    color_print("Failed to export Handshake", TermColors.FAIL)
-                    return False
+        # buffer_json = os.path.join(c_file_dir, "buffer.json")
+        # handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
+        # with open(buffer_json, "r") as f:
+        #     buffers = json.load(f)
+        #     buffer_pass_args = []
+        #     for buffer in buffers:
+        #         buffer_pass_args.append(
+        #             "--handshake-placebuffers-custom=" +
+        #             f"pred={buffer['pred']} " +
+        #             f"outid={buffer['outid']} " +
+        #             f"slots={buffer['slots']} " +
+        #             f"type={buffer['type']}")
+        #     with open(handshake_export, "w") as f:
+        #         result = subprocess.run([
+        #             DYNAMATIC_OPT_BIN, handshake_speculation,
+        #             *buffer_pass_args
+        #         ],
+        #             stdout=f,
+        #             stderr=sys.stdout
+        #         )
+        #         if result.returncode == 0:
+        #             print("Exported Handshake")
+        #         else:
+        #             color_print("Failed to export Handshake", TermColors.FAIL)
+        #             return False
     else:
-        shutil.copy(handshake_canonicalized, handshake_export)
+        shutil.copy(handshake_canonicalized, handshake_speculation)
+
+    # Buffer placement (fpga20)
+    profiler_bin = os.path.join(comp_out_dir, "profile")
+    result = subprocess.run([
+        CLANGXX_BIN, c_file,
+        "-D", "PRINT_PROFILING_INFO",
+        "-I", str(DYNAMATIC_ROOT / "include"),
+        "-Wno-deprecated",
+        "-o", profiler_bin
+    ])
+    if result.returncode == 0:
+        print("Built kernel for profiling")
+    else:
+        print("Failed to place simple buffers")
+
+    profiler_inputs = os.path.join(comp_out_dir, "profiler-inputs.txt")
+    with open(profiler_inputs, "w") as f:
+        result = subprocess.run([profiler_bin],
+                                stdout=f,
+                                stderr=sys.stdout
+                                )
+        if result.returncode == 0:
+            print("Ran kernel for profiling")
+        else:
+            print("Failed to kernel for profiling")
+
+    frequencies = os.path.join(comp_out_dir, "frequencies.csv")
+    with open(frequencies, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_PROFILER_BIN, cf_dyn_transformed,
+            "--top-level-function=" + kernel_name,
+            "--input-args-file=" + profiler_inputs,
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Profiled cf-level")
+        else:
+            print("Failed to profile cf-level")
+
+    # Buffer placement (FPGA20)
+    handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
+    timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
+    with open(handshake_buffered, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_speculation,
+            "--handshake-set-buffering-properties=version=fpga20",
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Placed simple buffers")
+        else:
+            print("Failed to place simple buffers")
+
+    handshake_spec_post_buffer = os.path.join(
+        comp_out_dir, "handshake_spec_post_buffer.mlir")
+    with open(handshake_spec_post_buffer, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_buffered,
+            "--handshake-spec-post-buffer",
+            "--handshake-materialize"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Created handshake spec post buffer")
+        else:
+            print("Failed to create handshake spec post buffer")
+
+    handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
+    shutil.copy(handshake_spec_post_buffer, handshake_export)
 
     # Export dot file
     dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")

@@ -53,6 +53,13 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
+def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
+  let summary = "post buffering spec pass";
+  let description = [{
+  }];
+  let options = [];
+}
+
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of

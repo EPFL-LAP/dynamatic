@@ -1301,6 +1301,71 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }];
 }
 
+def SpecPreBufferOp1 : Handshake_Op<"spec_prebuffer1", [
+  HasValidSpecTag<"dataOut">,
+  IsSimpleHandshake<"SCSaveCtrl">,
+  IsIntSizedChannel<3, "SCSaveCtrl">,
+]> {
+  let summary = "";
+  let description = [{
+  }];
+
+  let arguments = (ins ControlType:$trigger,
+                       UI32Attr:$fifoDepth);
+  let results = (outs ChannelType:$dataOut,
+                      ChannelType:$SCSaveCtrl);
+
+  let assemblyFormat = [{
+    `[` $trigger `]` attr-dict `:` type($trigger) `,`
+    type($dataOut) `,` type($SCSaveCtrl)
+  }];
+
+  // Infer the type of the control signals
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$trigger, "unsigned":$fifoDepth), [{
+    $_state.addOperands({trigger});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
+
+    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+
+    $_state.addTypes({dataOutType, wideControlType});
+  }]>];
+}
+
+def SpecPreBufferOp2 : Handshake_Op<"spec_prebuffer2", [
+  HasValidSpecTag<"dataIn">,
+  IsSimpleHandshake<"saveCtrl">,
+  IsIntSizedChannel<1, "saveCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsIntSizedChannel<1, "commitCtrl">,
+  IsSimpleHandshake<"SCIsMisspec">,
+  IsIntSizedChannel<1, "SCIsMisspec">
+]> {
+  let summary = "";
+  let description = [{
+  }];
+
+  let arguments = (ins ChannelType:$dataIn,
+                       UI32Attr:$fifoDepth);
+  let results = (outs ChannelType:$saveCtrl, ChannelType:$commitCtrl,
+                      ChannelType:$SCIsMisspec);
+
+  let assemblyFormat = [{
+    $dataIn attr-dict `:` type($dataIn) `,`
+    type($saveCtrl) `,` type($commitCtrl) `,`
+    type($SCIsMisspec)
+  }];
+
+  // Infer the type of the control signals
+  let builders = [OpBuilder<(ins "Value":$dataIn, "unsigned":$fifoDepth), [{
+    $_state.addOperands({dataIn});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
+
+    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
+
+    $_state.addTypes({ctrlType, ctrlType, ctrlType});
+  }]>];
+}
+
 def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,

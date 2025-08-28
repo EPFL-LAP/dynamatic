@@ -21,6 +21,7 @@
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
+#include "experimental/Transforms/Speculation/HandshakeSpecPostBuffer.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "experimental/Transforms/SpeculationV2/PostSpecV2.h"
@@ -34,6 +35,7 @@ namespace experimental {
 /// namespace. However, in Dynamatic, some passes are defined in separate child
 /// namespaces, so we explicitly brings those into the current scope here.
 using namespace speculationv2;
+using namespace speculation;
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
