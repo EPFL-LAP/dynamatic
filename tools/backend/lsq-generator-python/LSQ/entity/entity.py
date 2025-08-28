@@ -85,7 +85,7 @@ begin
   {self.body}
 end architecture;
   """
-      print(architecture)
+      return(architecture)
 
 class Instantiation():
     def __init__(self, name, entity_name, port_items):

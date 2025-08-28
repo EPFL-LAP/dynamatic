@@ -199,7 +199,7 @@ class GroupAllocator:
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
         # hs_entity = Entity(handshaking_declaration)
-        # entity = Entity(declaration)
+        entity = Entity(declaration)
 
         arch = Architecture(declaration)
 
@@ -209,7 +209,7 @@ class GroupAllocator:
         # print(hs_arch.get("handshaking", "Group Handshaking"))
 
 
-        # print(entity.get(self.module_name, "Group Allocator"))
+        print(entity.get(self.module_name, "Group Allocator"))
 
         print(arch.get(self.module_name, "Group Allocator"))
 
