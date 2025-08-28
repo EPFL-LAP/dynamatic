@@ -123,7 +123,7 @@ class Signal():
         return self._get_item(self._get_local_single)
 
     def get_inst_item(self, cxn_type : InstCxnType):
-        def get_single(name) : self._get_inst_single(name, cxn_type)
+        def get_single(name) : return self._get_inst_single(name, cxn_type)
         return self._get_item(get_single)
     
 
