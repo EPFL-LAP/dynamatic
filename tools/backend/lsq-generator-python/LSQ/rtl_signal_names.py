@@ -80,3 +80,11 @@ def NUM_EMPTY_ENTRIES_NAIVE_NAME(
     return f"{queue_type.value}_q_num_empty_entries_naive"
 
 GROUP_HANDSHAKING_ENTITY_NAME = "group_handshaking"
+
+def QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the muxed rom signal for the port idx per queue entry
+    """
+    return f"{queue_type.value}_port_idx_for_q_entry"
