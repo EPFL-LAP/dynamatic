@@ -21,6 +21,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -49,6 +50,9 @@ struct GateInput {
   /// Depending on the type of the input, it might be a reference to a value on
   /// the IR, another gate or empty.
   std::variant<Value, Gate *> input;
+
+  /// Set of all blocks that forward this gateInput to the gate.
+  std::unordered_set<Block *> senders;
 
   /// Constructor a gate input being the result of an operation.
   GateInput(Value v) : input(v) {};
@@ -103,6 +107,13 @@ struct Gate {
   /// Block whose terminator is used to drive the condition of the gate.
   Block *conditionBlock;
 
+  /// Block in which the gate is placed
+  Block *gateBlock;
+
+  /// True if this gate was generated as part of expanding a Mu gate.
+  /// Allows special handling when splitting multi-input Mu structures.
+  bool muGenerated;
+
   /// Index of the current gate, which uniquely identifies it.
   unsigned index;
 
@@ -112,15 +123,15 @@ struct Gate {
 
   /// Initialize the values of the gate.
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
-       Block *c = nullptr)
+       Block *c = nullptr, bool muGen = false)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
-        index(i) {}
+        gateBlock(v.getParentBlock()), muGenerated(muGen), index(i) {}
 
   /// Print the information about the gate.
   void print();
 
   /// Get the block the gate refers to.
-  inline Block *getBlock() { return result.getParentBlock(); }
+  inline Block *getBlock() { return gateBlock; }
 
   /// Get the argument numebr the gate refers to. If the value is not a block
   /// argument, return 0
