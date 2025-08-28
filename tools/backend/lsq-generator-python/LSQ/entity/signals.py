@@ -82,7 +82,8 @@ class Signal():
         
     def _get_inst_single(self, name):
         io_suffix = self._get_io_suffix(name)
-        full_declaration = f"{name}{io_suffix} => {name},"
+        io_name = f"{name}{io_suffix}".ljust(20)
+        full_declaration = f"{io_name} => {name},"
 
         # comment out if bitwidth is 0
         if self.size.bitwidth == 0:
