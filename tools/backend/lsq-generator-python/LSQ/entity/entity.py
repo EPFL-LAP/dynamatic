@@ -32,7 +32,8 @@ class Entity():
     # remove leading whitespace
     # the required leading whitespace is present in the string
     # and remove final character, which is a semi-colon
-    self.entity_port_items = self.entity_port_items.lstrip()[:-1]
+    self.entity_port_items = self.entity_port_items.strip()
+    self.entity_port_items = self.entity_port_items[:-1]
 
     entity = f"""
 -- {entity_type}
