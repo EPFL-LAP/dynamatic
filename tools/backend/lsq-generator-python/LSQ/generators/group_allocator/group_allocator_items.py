@@ -8,6 +8,33 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth
 
 from LSQ.operators.arithmetic import WrapSub
 
+class PortIdxPerQueueEntryRomMuxPortItems():
+    class GroupInitTransfer(Signal):
+        """
+        Input
+        
+        Bitwidth = 1
+
+        Number = N
+
+        Whether a particular group init channel transfers this cycle.
+         
+        1-bit signal, 1 signal per group of memory accesses
+        """
+
+        def __init__(self, 
+                     config : Config,
+                     ):
+
+            Signal.__init__(
+                self,
+                base_name=GROUP_INIT_TRANSFER_NAME,
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
+                    bitwidth=1,
+                    number=config.num_groups()
+                )
+            )
 
 
 class GroupAllocatorDeclarativePortItems():
@@ -464,7 +491,7 @@ class GroupAllocatorDeclarativePortItems():
     -- The order of the memory operations, read from the ROM, 
     -- has been shifted to generate this,
     -- as well as 0s and 1s added correctly to fill out each signal.
-    
+
 """.removeprefix("\n")
             EntityComment.__init__(
                 self,
@@ -507,6 +534,7 @@ class GroupAllocatorDeclarativePortItems():
                     number=config.load_queue_num_entries()
                 )
             )
+
 
 class GroupAllocatorDeclarativeBodyItems():
     class HandshakingInstantiation(Instantiation):
@@ -571,6 +599,8 @@ class GroupHandshakingDeclarativePortItems():
                     number=config.num_groups()
                 )
             )
+
+
 class GroupHandshakingDeclarativeLocalItems():
     class NumEmptyEntries(Signal):
         """
@@ -601,6 +631,7 @@ class GroupHandshakingDeclarativeLocalItems():
                     number=1
                 )
             )
+
 
 class GroupHandshakingDeclarativeBodyItems():
     class Body(Signal):

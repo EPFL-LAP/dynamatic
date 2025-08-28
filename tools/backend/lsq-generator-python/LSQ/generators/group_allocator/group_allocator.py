@@ -15,8 +15,21 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupAllocatorDeclarativeBodyItems,
         GroupHandshakingDeclarativePortItems,
         GroupHandshakingDeclarativeLocalItems,
-        GroupHandshakingDeclarativeBodyItems
+        GroupHandshakingDeclarativeBodyItems,
+        PortIdxPerQueueEntryRomMuxPortItems
     )
+
+
+class PortIdxPerQueueEntryMuxDeclarative():
+    def __init__(self, config : Config):
+        p = PortIdxPerQueueEntryRomMuxPortItems()
+
+        ga_p = GroupAllocatorDeclarativePortItems()
+    
+        self.entity_port_items = [
+            p.GroupInitTransfer(config),
+            ga_p.PortIndexPerQueueEntry(config, QueueType.LOAD)
+        ]
 
 class GroupHandshakingDeclarative():
     def __init__(self, config : Config):
@@ -198,6 +211,14 @@ class GroupAllocator:
         declaration = GroupAllocatorDeclarative(config)
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
+        port_idx_mux = PortIdxPerQueueEntryMuxDeclarative(config)
+
+        port_idx_mux_entity = Entity(declaration)
+
+        print(port_idx_mux_entity.get("port_mux", "port_mux"))
+
+        quit()
+
         # hs_entity = Entity(handshaking_declaration)
         entity = Entity(declaration)
 
@@ -209,88 +230,13 @@ class GroupAllocator:
         # print(hs_arch.get("handshaking", "Group Handshaking"))
 
 
-        print(entity.get(self.module_name, "Group Allocator"))
+        # print(entity.get(self.module_name, "Group Allocator"))
 
-        print(arch.get(self.module_name, "Group Allocator"))
+        # print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()
 
-        # IOs
-
-        # ldq_wen_o = LogicArray(ctx, 'ldq_wen', 'o', self.configs.numLdqEntries)
-        # num_loads_o = LogicVec(ctx, 'num_loads', 'o', self.configs.ldqAddrW)
-        # num_loads = LogicVec(ctx, 'num_loads', 'w', self.configs.ldqAddrW)
-        # if (self.configs.ldpAddrW > 0):
-        #     ldq_port_idx_o = LogicVecArray(
-        #         ctx, 'ldq_port_idx', 'o', self.configs.numLdqEntries, self.configs.ldpAddrW)
-
-        # stq_wen_o = LogicArray(ctx, 'stq_wen', 'o', self.configs.numStqEntries)
-        # num_stores_o = LogicVec(ctx, 'num_stores', 'o', self.configs.stqAddrW)
-        # # num_stores = LogicVec(ctx, 'num_stores', 'w', self.configs.stqAddrW)
-        # if (self.configs.stpAddrW > 0):
-        #     stq_port_idx_o = LogicVecArray(
-        #         ctx, 'stq_port_idx', 'o', self.configs.numStqEntries, self.configs.stpAddrW)
-
-        # ga_ls_order_o = LogicVecArray(
-        #     ctx, 'ga_ls_order', 'o', self.configs.numLdqEntries, self.configs.numStqEntries)
-
-        # The number of empty load and store is calculated with cyclic subtraction.
-        # If the empty signal is high, then set the number to max value.
-
-        loads_sub = LogicVec(ctx, 'loads_sub', 'w', self.configs.ldqAddrW)
-
-        stores_sub = LogicVec(ctx, 'stores_sub', 'w', self.configs.stqAddrW)
-        empty_loads = LogicVec(ctx, 'empty_loads', 'w',
-                               self.configs.emptyLdAddrW)
-        empty_stores = LogicVec(ctx, 'empty_stores', 'w',
-                                self.configs.emptyStAddrW)
-
-        arch += WrapSub_old(ctx, loads_sub, ldq_head_i,
-                        ldq_tail_i, self.configs.numLdqEntries)
-        arch += WrapSub_old(ctx, stores_sub, stq_head_i,
-                        stq_tail_i, self.configs.numStqEntries)
-
-        arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
-                   '(', '\'0\'', '&', loads_sub, ')')
-        arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
-                   '(', '\'0\'', '&', stores_sub, ')')
-
-        # Generate handshake signals
-        group_init_ready = LogicArray(
-            ctx, 'group_init_ready', 'w', self.configs.num_groups)
-        group_init_hs = LogicArray(
-            ctx, 'group_init_hs', 'w', self.configs.num_groups)
-
-        for i in range(0, self.configs.num_groups):
-            arch += Op(ctx, group_init_ready[i],
-                       '\'1\'', 'when',
-                       '(', empty_loads,  '>=', (
-                self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
-                '(', empty_stores, '>=', (
-                self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
-                'else', '\'0\'')
-
-        if (self.configs.gaMulti):
-            group_init_and = LogicArray(
-                ctx, 'group_init_and', 'w', self.configs.num_groups)
-            ga_rr_mask = LogicVec(ctx, 'ga_rr_mask', 'r',
-                                  self.configs.num_groups)
-            ga_rr_mask.regInit()
-            for i in range(0, self.configs.num_groups):
-                arch += Op(ctx, group_init_and[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i])
-                arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
-            arch += CyclicPriorityMasking(ctx, group_init_hs,
-                                          group_init_and, ga_rr_mask)
-            for i in range(0, self.configs.num_groups):
-                arch += Op(ctx, (ga_rr_mask, (i+1) %
-                                 self.configs.num_groups), (group_init_hs, i))
-        else:
-            for i in range(0, self.configs.num_groups):
-                arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
-                arch += Op(ctx, group_init_hs[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i])
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
