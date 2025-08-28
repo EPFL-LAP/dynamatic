@@ -53,7 +53,7 @@ class GroupHandshakingDeclarative():
 
         b = GroupHandshakingDeclarativeBodyItems()
 
-        self.body = b.Body().item
+        self.body = b.Body(config).item
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
