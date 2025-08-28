@@ -448,8 +448,10 @@ class GroupAllocatorDeclarativePortItems():
             match queue_type:
                 case QueueType.LOAD:
                     bitwidth = config.load_ports_idx_bitwidth()
+                    number = config.load_queue_num_entries()
                 case QueueType.STORE:
                     bitwidth = config.store_queue_idx_bitwidth()
+                    number = config.store_queue_num_entries()
 
             Signal.__init__(
                 self,
@@ -457,7 +459,7 @@ class GroupAllocatorDeclarativePortItems():
                 direction=Signal.Direction.OUTPUT,
                 size=Signal.Size(
                     bitwidth=bitwidth,
-                    number=1
+                    number=number
                 )
             )
 
