@@ -618,6 +618,8 @@ class GroupHandshakingDeclarativeBodyItems():
 
             for i in range(config.num_groups()):
                 init_ready_name = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
+                init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}"
+                init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 num_loads = config.group_num_loads(i)
                 num_stores = config.group_num_stores(i)
@@ -678,4 +680,10 @@ class GroupHandshakingDeclarativeBodyItems():
         {init_ready_name} <= '1';
     end if;
   end process;
+
+ -- drive the ready output
+  {init_ready_name}_o <= {init_ready_name};
+
+ -- drive the transfer output
+ {init_transfer_name} <= {init_valid_name} and {init_ready_name};
 """.removeprefix("\n")
