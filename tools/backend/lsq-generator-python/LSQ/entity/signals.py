@@ -87,7 +87,7 @@ class Signal():
         
     def _get_inst_single(self, name, cxn_type):
         io_suffix = self._get_io_suffix(name)
-        io_name = f"{name}{io_suffix}".ljust(30)
+        io_name = f"{name}{io_suffix}".ljust(25)
 
         cxn_name = f"{name}{cxn_type.value}"
 
