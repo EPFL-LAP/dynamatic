@@ -38,17 +38,17 @@ class PortIdxPerQueueEntryRomMuxPortItems():
 class PortIdxPerQueueEntryRomMuxBodyItems():
     class Body():
 
-        def _get_default_value(self, idx, bitwidth):
+        def _get_default_value(self, queue_type, idx, bitwidth):
             return f"""
-    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY}_{idx} <= {get_as_binary_string_padded(0, bitwidth)}
+    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)}
 """.removeprefix("\n")
 
-        def __init__(self, config : Config):
+        def __init__(self, config : Config, queue_type : QueueType):
             
             self.default_assignments = ""
 
             for i in range(config.load_queue_num_entries()):
-                self.default_assignments += self._get_default_value(i, config.load_ports_idx_bitwidth())
+                self.default_assignments += self._get_default_value(queue_type, i, config.load_ports_idx_bitwidth())
 
             self.default_assignments = self.default_assignments.strip()
 

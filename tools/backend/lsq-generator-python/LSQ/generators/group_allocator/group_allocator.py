@@ -38,7 +38,7 @@ class PortIdxPerQueueEntryMuxDeclarative():
 
         b = PortIdxPerQueueEntryRomMuxBodyItems()
         self.body = [
-            b.Body(config)
+            b.Body(config, QueueType.LOAD)
         ]
 
 class GroupHandshakingDeclarative():
