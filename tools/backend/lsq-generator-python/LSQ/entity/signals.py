@@ -50,7 +50,7 @@ class Signal():
     {full_declaration}
 """.removeprefix("\n")
 
-    def get_entity_signal(self):
+    def get_entity_item(self):
         # if item is singular
         # just generate it using the base name
         if self.size.number == 1:
@@ -85,5 +85,5 @@ class EntityComment():
     def __init__(self, comment):
         self.comment = comment
     
-    def get(self):
+    def get_entity_item(self):
         return self.comment

@@ -25,7 +25,7 @@ class Entity():
     self.entity_port_items = ""
 
     for item in declaration.entity_port_items:
-        self.entity_port_items += item.get()
+        self.entity_port_items += item.get_entity_item()
 
 
   def get(self, name, entity_type):
