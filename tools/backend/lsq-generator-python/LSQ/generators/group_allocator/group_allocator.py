@@ -211,9 +211,9 @@ class GroupAllocator:
         declaration = GroupAllocatorDeclarative(config)
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
-        port_idx_mux = PortIdxPerQueueEntryMuxDeclarative(config)
+        port_idx_mux_dec = PortIdxPerQueueEntryMuxDeclarative(config)
 
-        port_idx_mux_entity = Entity(declaration)
+        port_idx_mux_entity = Entity(port_idx_mux_dec)
 
         print(port_idx_mux_entity.get("port_mux", "port_mux"))
 
