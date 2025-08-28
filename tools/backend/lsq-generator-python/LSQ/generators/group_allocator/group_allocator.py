@@ -105,17 +105,7 @@ class GroupAllocatorDeclarative():
             hs_p.GroupInitTransfer(config)
         ]
 
-        # l = GroupAllocatorDeclarativeLocalSignals()
-        # self.local_signals = [
-        #     l.NumNewLoadQueueEntries(config),
-        #     l.NumNewStoreQueueEntries(config)
-        # ]
-
-        # b = GroupAllocatorDeclarativeBody()
-        # self.body = [
-        #     b.GroupHandshaking(config)
-        # ]
-
+        self.body = ""
     
 
 
