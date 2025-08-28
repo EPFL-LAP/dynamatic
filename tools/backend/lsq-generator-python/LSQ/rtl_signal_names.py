@@ -92,5 +92,5 @@ def NUM_EMPTY_IF_QUEUE_EMPTY_NAME(
     RTL name for the number of entries in a queue if it the queue is empty.
     """
 
-    return f"{queue_type.value}_q_num_emp_if_q_empty"
+    return f"{queue_type.value}_q_num_empty_if_q_empty"
 
