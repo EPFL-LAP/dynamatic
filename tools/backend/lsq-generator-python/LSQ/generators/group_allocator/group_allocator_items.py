@@ -618,7 +618,7 @@ class GroupHandshakingDeclarativeBodyItems():
 
             for i in range(config.num_groups()):
                 init_ready_name = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
-                init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}"
+                init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}_i"
                 init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 num_loads = config.group_num_loads(i)
