@@ -644,7 +644,7 @@ class GroupHandshakingDeclarativeBodyItems():
 
             for i in range(config.num_groups()):
                 init_ready_name = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
-                item += f"""
+                self.item += f"""
 
   process(all)
   begin
