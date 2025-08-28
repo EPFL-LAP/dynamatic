@@ -198,7 +198,7 @@ class GroupAllocator:
         print(hs_entity.get("handshaking", "Group Handshaking"))
         print(entity.get(self.module_name, "Group Allocator"))
 
-        print(arch.get("self.module_name", "Group Allocator"))
+        print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()
