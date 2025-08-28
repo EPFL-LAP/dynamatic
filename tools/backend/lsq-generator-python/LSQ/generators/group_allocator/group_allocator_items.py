@@ -609,8 +609,9 @@ class GroupHandshakingDeclarativeBodyItems():
 
             
             return f"""
+
   {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
-  """.removeprefix("\n")
+""".removeprefix("\n")
         
 
         def get_num_empty_if_fully_empty_assignment(
@@ -629,6 +630,7 @@ class GroupHandshakingDeclarativeBodyItems():
             num_if_fully_empty_bin = get_as_binary_string(num_if_fully_empty)
 
             return f"""
+
   {num_empty_if_fully_empty_name} <= {num_if_fully_empty_bin};
 """.removeprefix("\n")
 
@@ -643,6 +645,7 @@ class GroupHandshakingDeclarativeBodyItems():
             num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
 
             return f"""
+
   {empty_entries_name} <= {num_empty_if_fully_empty_name} when {is_empty_name} else {empty_entries_naive_name};
 """.removeprefix("\n")
 
