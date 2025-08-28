@@ -78,6 +78,27 @@ protected:
   /// `filter` function.
   void addUnitMixedPathConstraints(Operation *unit,
                                    ChannelFilter filter = nullFilter);
+
+protected:
+  /// Enhanced setup method that uses multi-layer graph modeling to handle
+  /// fast token delivery paths that deviate from the original CFG structure.
+  void setupMultiLayer();
+
+  /// Determines if multi-layer setup is needed based on the presence of
+  /// fast token delivery paths in the function.
+  bool needsMultiLayerSetup();
+  
+  /// Adds relaxed channel constraints that work with multi-layer paths.
+  void addRelaxedChannelConstraints(Value channel, SignalType signal, 
+                                   const TimingModel *bufModel);
+  
+  /// Adds relaxed elasticity constraints for multi-layer approach.
+  void addRelaxedElasticityConstraints(Value channel, 
+                                      ArrayRef<BufferingGroup> bufGroups);
+  
+  /// Adds enhanced path constraints for the multi-layer dataflow approach.
+  void addEnhancedPathConstraints(const DataflowLayer &dataflowLayer,
+                                 ExtendedMILPVars &extVars);
 };
 
 /// This MILP operates on the channels and units from a single CFDFC union

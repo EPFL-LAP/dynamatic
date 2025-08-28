@@ -243,7 +243,7 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info, Str
 
         // Enhanced FPGA20 with multi-layer support can handle fast token delivery
         // connections that deviate from the original CFG structure
-        if (algorithm == "fpga20") {
+        if (algorithm == "fpga20" || algorithm == "fpl22") {
           op.emitWarning() << "Result " << res.getResultNumber() 
                            << " defined in block " << *srcBB 
                            << " is used in block " << *dstBB

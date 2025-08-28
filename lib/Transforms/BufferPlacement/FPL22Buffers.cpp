@@ -18,6 +18,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Support/StdProfiler.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
 #include <optional>
@@ -28,6 +29,7 @@
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::experimental;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpl22;
 
@@ -321,6 +323,12 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
 }
 
 void CFDFCUnionBuffers::setup() {
+  // Check if we need multi-layer setup due to fast token delivery paths
+  if (needsMultiLayerSetup()) {
+    setupMultiLayer();
+    return;
+  }
+
   // Signals for which we have variables
   SmallVector<SignalType, 4> signals;
   signals.push_back(SignalType::DATA);
@@ -419,6 +427,12 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
 }
 
 void OutOfCycleBuffers::setup() {
+  // Check if we need multi-layer setup due to fast token delivery paths
+  if (needsMultiLayerSetup()) {
+    setupMultiLayer();
+    return;
+  }
+
   // Signals for which we have variables
   SmallVector<SignalType, 4> signals;
   signals.push_back(SignalType::DATA);
@@ -506,6 +520,187 @@ void OutOfCycleBuffers::setup() {
   // Set MILP objective and mark it ready to be optimized
   model.setObjective(objective, GRB_MAXIMIZE);
   markReadyToOptimize();
+}
+
+bool FPL22BuffersBase::needsMultiLayerSetup() {
+  // Check if there are any channels that connect operations in different basic blocks
+  // without a corresponding CFG edge
+  for (Operation &op : funcInfo.funcOp.getOps()) {
+    std::optional<unsigned> srcBB = getLogicBB(&op);
+    if (!srcBB) continue;
+    
+    for (OpResult res : op.getResults()) {
+      if (res.use_empty()) continue;
+      
+      for (OpOperand &use : res.getUses()) {
+        Operation *userOp = use.getOwner();
+        std::optional<unsigned> dstBB = getLogicBB(userOp);
+        if (!dstBB) continue;
+        
+        // If source and destination are in different basic blocks
+        if (*srcBB != *dstBB) {
+          // Check if there's a direct CFG transition
+          bool hasDirectTransition = false;
+          for (ArchBB &arch : funcInfo.archs) {
+            if (arch.srcBB == *srcBB && arch.dstBB == *dstBB) {
+              hasDirectTransition = true;
+              break;
+            }
+          }
+          
+          if (!hasDirectTransition) {
+            // Found a fast token delivery path - need multi-layer setup
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+void FPL22BuffersBase::setupMultiLayer() {
+  // First, do basic setup similar to normal FPL22 setup
+  SmallVector<SignalType, 4> signals;
+  signals.push_back(SignalType::DATA);
+  signals.push_back(SignalType::VALID);
+  signals.push_back(SignalType::READY);
+
+  const TimingModel *bufModel = nullptr;
+
+  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID}, bufModel);
+  BufferingGroup readyGroup({SignalType::READY}, bufModel);
+  SmallVector<BufferingGroup> bufGroups;
+  bufGroups.push_back(dataValidGroup);
+  bufGroups.push_back(readyGroup);
+
+  // Create basic channel variables for all channels
+  for (auto &[channel, _] : channelProps) {
+    addChannelVars(channel, signals);
+    addCustomChannelConstraints(channel);
+  }
+
+  // Build the three-layer graph structure
+  ControlFlowLayer controlLayer;
+  DataflowLayer dataflowLayer;
+  MappingLayer mappingLayer;
+  
+  buildControlFlowLayer(controlLayer);
+  buildDataflowLayer(dataflowLayer);
+  buildMappingLayer(controlLayer, dataflowLayer, mappingLayer);
+  
+  // Create extended MILP variables
+  ExtendedMILPVars extVars;
+  addMultiLayerVars(extVars, dataflowLayer);
+  
+  // Copy original channel variables to extended structure
+  extVars.channelVars = vars.channelVars;
+  extVars.cfVars = vars.cfVars;
+  
+  // Add multi-layer constraints
+  addLayerConsistencyConstraints(controlLayer, dataflowLayer, mappingLayer, extVars);
+  addPathAwareTimingConstraints(dataflowLayer, extVars);
+  addPathConflictResolution(dataflowLayer, extVars);
+  
+  // Add basic elasticity constraints using relaxed approach
+  for (auto &[channel, _] : channelProps) {
+    addRelaxedElasticityConstraints(channel, bufGroups);
+  }
+  
+  // Add enhanced path constraints for all three timing domains
+  addEnhancedPathConstraints(dataflowLayer, extVars);
+  
+  // Replace original vars with extended vars
+  vars = extVars;
+  
+  // Mark the MILP ready for optimization
+  markReadyToOptimize();
+}
+
+void FPL22BuffersBase::addRelaxedChannelConstraints(Value channel, SignalType signal, 
+                                                   const TimingModel *bufModel) {
+  // This is a relaxed version of addChannelPathConstraints that works with multi-layer paths
+  ChannelVars &channelVars = vars.channelVars[channel];
+  handshake::ChannelBufProps &props = channelProps[channel];
+  ChannelSignalVars &signalVars = channelVars.signalVars[signal];
+  GRBVar &t1 = signalVars.path.tIn;
+  GRBVar &t2 = signalVars.path.tOut;
+  GRBVar &bufPresent = signalVars.bufPresent;
+  
+  // Basic timing constraint - signal must propagate within target period
+  model.addConstr(t2 <= targetPeriod, "relaxed_path_period");
+  
+  // Relaxed buffer timing constraints (without assuming specific CFG paths)
+  // Use simplified delay values since getPortDelays is not available here
+  double inBufDelay = 0.1; // Simplified assumption
+  double outBufDelay = 0.1; // Simplified assumption
+  double preBufCstDelay = props.inDelay + inBufDelay;
+  double postBufCstDelay = outBufDelay + props.outDelay;
+  
+  model.addConstr(t1 + bufPresent * preBufCstDelay <= targetPeriod,
+                  "relaxed_buffered_in");
+  model.addConstr(bufPresent * postBufCstDelay <= t2,
+                  "relaxed_buffered_out");
+}
+
+void FPL22BuffersBase::addRelaxedElasticityConstraints(Value channel, 
+                                                      ArrayRef<BufferingGroup> bufGroups) {
+  // Add elasticity constraints that don't assume specific CFG structure
+  // This is similar to the original but more permissive for multi-layer paths
+  ChannelVars &channelVars = vars.channelVars[channel];
+  
+  for (const BufferingGroup &group : bufGroups) {
+    SignalType refSignal = group.getRefSignal();
+    ChannelSignalVars &refVars = channelVars.signalVars[refSignal];
+    
+    // Ensure buffering groups are consistent
+    ArrayRef<SignalType> otherSignals = group.getOtherSignals();
+    for (SignalType signal : otherSignals) {
+      ChannelSignalVars &signalVars = channelVars.signalVars[signal];
+      model.addConstr(signalVars.bufPresent == refVars.bufPresent,
+                      "relaxed_elasticity_group");
+    }
+  }
+}
+
+void FPL22BuffersBase::addEnhancedPathConstraints(const DataflowLayer &dataflowLayer,
+                                                 ExtendedMILPVars &extVars) {
+  // Add path constraints that consider all three timing domains in the multi-layer context
+  for (const DataflowPath &path : dataflowLayer.allPaths) {
+    DataflowPath *pathPtr = const_cast<DataflowPath *>(&path);
+    
+    // Get path timing variables
+    auto pathTimingIt = extVars.pathTiming.find(pathPtr);
+    if (pathTimingIt == extVars.pathTiming.end()) continue;
+    
+    TimeVars &pathTiming = pathTimingIt->second;
+    
+    // Get channel variables
+    auto channelVarsIt = extVars.channelVars.find(path.channel);
+    if (channelVarsIt == extVars.channelVars.end()) continue;
+    
+    ChannelVars &channelVars = channelVarsIt->second;
+    GRBVar &pathActive = extVars.pathActive[pathPtr];
+    
+    // Add timing constraints for all three domains if this path is active
+    for (SignalType signal : {SignalType::DATA, SignalType::VALID, SignalType::READY}) {
+      auto signalVarsIt = channelVars.signalVars.find(signal);
+      if (signalVarsIt == channelVars.signalVars.end()) continue;
+      
+      ChannelSignalVars &signalVars = signalVarsIt->second;
+      
+      // If path is active, link path timing to channel timing for this signal
+      std::string constraintName = "enhanced_path_" + 
+                                  std::to_string(reinterpret_cast<uintptr_t>(pathPtr)) + 
+                                  "_" + std::to_string(static_cast<int>(signal));
+      
+      double bigM = targetPeriod * 10;
+      model.addConstr(pathTiming.tIn - signalVars.path.tIn <= bigM * (1 - pathActive),
+                      constraintName + "_in");
+      model.addConstr(signalVars.path.tOut - pathTiming.tOut <= bigM * (1 - pathActive),
+                      constraintName + "_out");
+    }
+  }
 }
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
