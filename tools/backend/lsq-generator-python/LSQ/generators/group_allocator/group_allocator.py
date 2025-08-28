@@ -13,7 +13,8 @@ from LSQ.generators.group_allocator.group_allocator_signals import \
     (
         GroupAllocatorDeclarativePortItems, 
         GroupAllocatorDeclarativeLocalItems,
-        GroupHandshakingDeclarativePortItems
+        GroupHandshakingDeclarativePortItems,
+        GroupHandshakingDeclarativeLocalItems
     )
 
 class GroupHandshakingDeclarative():
@@ -34,6 +35,14 @@ class GroupHandshakingDeclarative():
             ga_p.QueueIsEmpty(QueueType.STORE),
 
             p.GroupInitTransfer(config)
+        ]
+
+        l = GroupHandshakingDeclarativeLocalItems()
+        self.local_items = [
+            l.NumEmptyEntries(config, QueueType.LOAD, is_naive = True),
+            l.NumEmptyEntries(config, QueueType.STORE, is_naive=True),
+            l.NumEmptyEntries(config, QueueType.LOAD, is_naive = False),
+            l.NumEmptyEntries(config, QueueType.STORE, is_naive=False)
         ]
 
 class GroupAllocatorDeclarative():
@@ -195,10 +204,15 @@ class GroupAllocator:
 
         arch = Architecture(declaration)
 
-        print(hs_entity.get("handshaking", "Group Handshaking"))
-        print(entity.get(self.module_name, "Group Allocator"))
+        hs_arch = Architecture(handshaking_declaration)
 
-        print(arch.get(self.module_name, "Group Allocator"))
+        print(hs_entity.get("handshaking", "Group Handshaking"))
+        print(hs_arch.get("handshaking", "Group Handshaking"))
+
+
+        # print(entity.get(self.module_name, "Group Allocator"))
+
+        # print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()

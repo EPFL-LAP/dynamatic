@@ -529,56 +529,34 @@ class GroupHandshakingDeclarativePortItems():
                     number=config.num_groups()
                 )
             )
+class GroupHandshakingDeclarativeLocalItems():
+    class NumEmptyEntries(Signal):
+        """
+        Bitwidth = N
 
-# class GroupAllocatorDeclarativeLocalSignals():
-#     class NumNewLoadQueueEntries():
-#         """
-#         Intermediate local signal that is the same as the NumNewLoadQueueEntries output.
-#         Used to make the value internally readable, to shift the load queue write enables.
-#         """
-#         def __init__(self, config : Config):
+        Number = 1
 
-#             # There is a single N-bit "number of load queue entries to allocate" signal
-#             # and its bitwidth is equal to the bitwidth of the load queue pointers, to allow easy arithmetic between then.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.load_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
+        Number of empty entries in a queue.
+        
+        If naive, needs to be combined with isEmpty? to get the real value.
+        """
 
-#             self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
-                        
-#             self.entity_comment = f"""
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     is_naive
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_queue_idx_bitwidth()
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth()
 
-#     -- Intermediate local signal that is the same as the NumNewLoadQueueEntries output.
-#     -- Used to make the value internally readable
-#     -- to shift the load queue write enables.
-# """.removeprefix("\n")
-            
-#     class NumNewStoreQueueEntries():
-#         """
-#         Intermediate local signal that is the same as the NumNewStoreQueueEntries output.
-#         Used to make the value internally readable, to shift the store queue write enables.
-#         """
-#         def __init__(self, config : Config):
-
-#             # There is a single N-bit "number of store queue entries to allocate" signal
-#             # and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = NUM_NEW_STORE_QUEUE_ENTRIES_NAME
-            
-#             self.entity_comment = f"""
-
-#     -- Intermediate local signal that is the same as the NumNewStoreQueueEntries output.
-#     -- Used to make the value internally readable
-#     -- to shift the store queue write enables.
-# """.removeprefix("\n")
-
-# class Empty():
-#     pass
-
-# class GroupAllocatorDeclarativeBody():
-    
+            Signal.__init__(
+                self,
+                base_name=NUM_EMPTY_ENTRIES(queue_type, is_naive),
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )

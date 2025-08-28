@@ -68,3 +68,19 @@ RTL name for signals which identify whether a
 particular group init channel is 'transfer' in this cycle.
 There is one of these 1-bit signals per group of memory operations.
 """
+
+
+def NUM_EMPTY_ENTRIES(
+        queue_type : QueueType, 
+        is_naive
+        ):
+    """
+    RTL name for the calculcated number of empty queue entries.
+    If naive, needs to be combined with isEmpty? to calculate the true value
+    """
+    if(is_naive):
+        suffix = "_naive"
+    else:
+        suffix = ""
+    return f"num_{queue_type.value}_empty_entries{suffix}"
+
