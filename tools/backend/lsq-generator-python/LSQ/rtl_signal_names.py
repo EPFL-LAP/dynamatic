@@ -16,36 +16,28 @@ def QUEUE_POINTER_NAME(
 
     return f"{queue_type.value}_queue_{queue_pointer_type.value}"
 
-LOAD_QUEUE_HEAD_POINTER_NAME = "ldq_head"
-"""
-RTL name for the pointer to the head entry of the load queue.
-"""
 
-LOAD_QUEUE_IS_EMPTY_NAME = "ldq_empty"
-"""
-RTL name for the isEmpty? signal from the load queue.
-"""
+def IS_EMPTY_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the isEmpty? signal from the (load/store) queue.
+    """
 
-STORE_QUEUE_TAIL_POINTER_NAME = "stq_tail"
-"""
-RTL name for the pointer to the tail entry of the load queue.
-"""
-
-STORE_QUEUE_HEAD_POINTER_NAME = "stq_head"
-"""
-RTL name for the pointer to the head entry of the load queue.
-"""
-
-STORE_QUEUE_IS_EMPTY_NAME = "stq_empty"
-"""
-RTL name for the isEmpty? signal from the load queue.
-"""
+    return f"{queue_type.value}_empty"
 
 
-LOAD_QUEUE_WRITE_ENABLE_NAME = "ldq_wen"
-"""
-RTL name for the write enables signals of the load queue.
-"""
+
+def WRITE_ENABLE_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the write enables signals of the load queue.
+    """
+
+    return f"{queue_type.value}_write_enable"
+
+
 
 NUM_NEW_LOAD_QUEUE_ENTRIES_NAME = "num_loads"
 """

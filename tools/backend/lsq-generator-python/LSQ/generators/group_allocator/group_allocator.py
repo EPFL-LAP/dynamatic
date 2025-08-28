@@ -26,11 +26,18 @@ class GroupAllocatorDeclarative():
             p.QueueInputsComment(queue_type=QueueType.LOAD),
             p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
             p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+            p.QueueIsEmpty(QueueType.LOAD),
 
             p.QueueInputsComment(queue_type=QueueType.STORE),
             p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-            p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL)
+            p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
+            p.QueueIsEmpty(QueueType.STORE),
 
+            p.QueueWriteEnableComment(config, QueueType.LOAD),
+            p.QueueWriteEnable(config, QueueType.LOAD),
+
+            p.QueueWriteEnableComment(config, QueueType.STORE),
+            p.QueueWriteEnable(config, QueueType.STORE)
 
 
             # io.LoadQueueTailPointer(config),

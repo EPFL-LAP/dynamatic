@@ -134,8 +134,8 @@ class GroupAllocatorDeclarativePortItems():
         def __init__(self, queue_type : QueueType):
             comment = f"""
 
-#     -- Input signals from the {queue_type} queue
-# """.removeprefix("\n")
+    -- Input signals from the {queue_type} queue
+""".removeprefix("\n")
             
             EntityComment.__init__(
                 self,
@@ -152,7 +152,6 @@ class GroupAllocatorDeclarativePortItems():
         Number = 1
 
         Pointer to the (head/tail) entry of a queue.
-        Input to the group allocator directly from the queue.
         There is only 1 queue (head/tail) pointer. 
         Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
         """
@@ -178,103 +177,88 @@ class GroupAllocatorDeclarativePortItems():
             )
 
 
-#     class LoadQueueHeadPointer():
-#         """
-#         Input: pointer to the head entry of the load queue, which is an input to the group allocator directly from the load queue.
-#         There is only 1 load queue head pointer. Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
-#         """
-#         def __init__(self, config : Config):
+    class QueueIsEmpty(EntitySignal):
+        """
+        Input
 
-#             # The load queue head pointer is a single, N-bit signal.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.load_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
+        Bitwidth = 1
 
-#             self.rtl_name = LOAD_QUEUE_HEAD_POINTER_NAME
+        Number = 1
+
+        isEmpty? signal for the (load/store) queue
+        """
+        def __init__(self, 
+                     queue_type : QueueType
+                     ):
+            EntitySignal.__init__(
+                self,
+                base_name=IS_EMPTY_NAME(queue_type),
+                direction=EntitySignal.Direction.INPUT,
+                size=EntitySignal.Size(
+                    bitwidth=1,
+                    number=1
+                )
+            )
+
+    class QueueWriteEnableComment(EntityComment):
+        """
+        RTL comment:
             
-#             self.direction = EntitySignalType.INPUT
-
-#             self.entity_comment = None
-
-#     class LoadQueueIsEmpty():
-#         """
-#         Input: isEmpty? signal from the load queue. There is a single, 1-bit isEmpty? signal, which is an input directly from the load queue.
-#         """
-#         def __init__(self):
-
-#             # There is a single 1-bit isEmpty? signal
-#             self.signal_size = SignalSize(
-#                                 bitwidth=1, 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = LOAD_QUEUE_IS_EMPTY_NAME
+        -- {queue_type.value} queue write enable signals
+        
+        -- {number} signals, one for each queue entry.
+        """
+        def __init__(
+                self, 
+                config: Config, 
+                queue_type : QueueType
+                ):
             
-#             self.direction = EntitySignalType.INPUT
+            match queue_type:
+                case QueueType.LOAD:
+                    number = config.load_queue_idx_bitwidth
+                case QueueType.STORE:
+                    number = config.store_queue_num_entries
 
-#             self.entity_comment = None
+            comment = f"""
 
-#     class StoreQueueTailPointer():
-#         """
-#         Input: pointer to the tail entry of the store queue, which is an input to the group allocator directly from the store queue.
-#         There is only 1 store queue tail pointer. Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
-#         """
-#         def __init__(self, config : Config):
-
-#             # The store queue tail pointer is a single, N-bit signal.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = STORE_QUEUE_TAIL_POINTER_NAME
+    -- {queue_type.value} queue write enable signals
+    -- {number} signals, one for each queue entry.
+""".removeprefix("\n")
             
-#             self.direction = EntitySignalType.INPUT
+            EntityComment.__init__(
+                self,
+                comment
+            )
 
+    class QueueWriteEnable(EntitySignal):
+        """
+        Output.
+        
+        Write enable signals to the (load/store) queue, used to allocate entries in the load queue. 
+        There are N 1-bit write enable signals.
+        As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    number = config.load_queue_num_entries
+                case QueueType.STORE:
+                    number = config.store_queue_num_entries
 
-#             self.entity_comment = f"""
+            EntitySignal.__init__(
+                self,
+                base_name=WRITE_ENABLE_NAME(queue_type),
+                direction=EntitySignal.Direction.OUTPUT,
+                size=EntitySignal.Size(
+                    bitwidth=1,
+                    number=number
+                )
+            )
 
-#     -- Input signals from the store queue
-# """.removeprefix("\n")
-
-#     class StoreQueueHeadPointer():
-#         """
-#         Input: pointer to the head entry of the store queue, which is an input to the group allocator directly from the store queue.
-#         There is only 1 store queue head pointer. Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
-#         """
-#         def __init__(self, config : Config):
-
-#             # The store queue tail pointer is a single, N-bit signal.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = STORE_QUEUE_HEAD_POINTER_NAME
-            
-#             self.direction = EntitySignalType.INPUT
-
-#             self.entity_comment = None
-
-
-#     class StoreQueueIsEmpty():
-#         """
-#         Input: isEmpty? signal from the store queue. There is a single, 1-bit isEmpty? signal, which is an input directly from the store queue.
-#         """
-#         def __init__(self):
-
-#             # There is a single 1-bit isEmpty? signal
-#             self.signal_size = SignalSize(
-#                                 bitwidth=1, 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = STORE_QUEUE_IS_EMPTY_NAME
-            
-#             self.direction = EntitySignalType.INPUT
-
-#             self.entity_comment = None
 
 #     class LoadQueueWriteEnable():
 #         """
