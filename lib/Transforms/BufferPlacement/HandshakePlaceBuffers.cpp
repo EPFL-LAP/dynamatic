@@ -312,6 +312,7 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
     os << "- Number of channels: " << cf->channels.size() << "\n";
     os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
     os.unindent();
+    cf->writeDot(log.getLogDir() + "/cfdfc_" + std::to_string(idx) + ".dot");
   }
 
   os.flush();
