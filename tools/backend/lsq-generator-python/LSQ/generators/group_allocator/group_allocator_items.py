@@ -508,8 +508,8 @@ class GroupAllocatorDeclarativeBodyItems():
             p = GroupAllocatorDeclarativePortItems()
             hs_p = GroupHandshakingDeclarativePortItems()
             port_items = [
-                p.GroupInitValid(),
-                p.GroupInitReady(),
+                p.GroupInitValid(config),
+                p.GroupInitReady(config),
 
                 p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
                 p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
