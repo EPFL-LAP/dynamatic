@@ -108,13 +108,13 @@ class Signal():
         return all_items
 
     def get_entity_item(self):
-        self._get_item(self._get_entity_single)
+        return self._get_item(self._get_entity_single)
 
     def get_local_item(self):
-        self._get_item(self._get_local_single)
+        return self._get_item(self._get_local_single)
 
     def get_inst_item(self):
-        self._get_item(self._get_inst_single)
+        return self._get_item(self._get_inst_single)
     
 
 
