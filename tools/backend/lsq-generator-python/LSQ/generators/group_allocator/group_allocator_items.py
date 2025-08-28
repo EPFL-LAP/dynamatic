@@ -47,7 +47,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             
             self.default_assignments = ""
 
-            for i in range(config.load_queue_num_entries):
+            for i in range(config.load_queue_num_entries()):
                 self.default_assignments += self._get_default_value(i, config.load_ports_idx_bitwidth())
 
             self.default_assignments = self.default_assignments.strip()
