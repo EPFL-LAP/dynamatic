@@ -235,6 +235,10 @@ class GroupAllocatorDeclarativePortItems():
         """
         Output.
         
+        Bitwidth = 1
+
+        Number = N
+
         Write enable signals to the (load/store) queue, used to allocate entries in the load queue. 
         There are N 1-bit write enable signals.
         As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
@@ -259,29 +263,73 @@ class GroupAllocatorDeclarativePortItems():
                 )
             )
 
-
-#     class LoadQueueWriteEnable():
-#         """
-#         Output: Write enable signals to the load queue, used to allocate entries in the load queue. There are N 1-bit write enable signals, which are an output directly to the load queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
-#         """
-#         def __init__(self, config : Config):
-
-#             # There are N 1-bit write enable signals.
-#             # As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=1, 
-#                                 number=config.load_queue_num_entries()
-#                                 )
-
-#             self.rtl_name = LOAD_QUEUE_WRITE_ENABLE_NAME
+    class NumNewQueueEntriesComment(EntityComment):
+        """
+        RTL comment:
             
-#             self.direction = EntitySignalType.OUTPUT
+        -- Number of new {queue_type_str} queue entries to allocate.
 
-#             self.entity_comment = f"""
+        -- Used by the {queue_type_str} queue to update its tail pointer.
+        
+        -- Bitwidth equal to the {queue_type_str} queue pointer bitwidth.
+        """
+        def __init__(
+                self, 
+                queue_type : QueueType
+                ):
 
-#     -- Load queue write enable signals
-#     -- {config.load_queue_num_entries()} signals, one for each queue entry.
-# """.removeprefix("\n")
+            queue_type_str = queue_type.value
+            comment = f"""
+
+    -- Number of new {queue_type_str} queue entries to allocate.
+    -- Used by the {queue_type_str} queue to update its tail pointer.
+    -- Bitwidth equal to the {queue_type_str} queue pointer bitwidth.
+""".removeprefix("\n")
+            EntityComment.__init__(
+                self,
+                comment
+            )
+
+
+    class NumNewQueueEntries(EntitySignal):
+        """
+        Output.
+        
+        Bitwidth = N
+
+        Number = 1
+
+        Number of (load/store) queue entries to allocate,
+        which is output directly to the (load/store) queue.
+
+        Non-handshaked signal. 
+        
+        Used by the load queue to update its tail pointer, 
+        using update logic appropriate to circular buffers.
+        
+        There is a single "number of load queue entries to allocate" signal,
+        and its bitwidth is equal to the bitwidth of the load queue pointers, 
+        to allow easy arithmetic between then.
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_ports_idx_bitwidth()
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth()
+
+            EntitySignal.__init__(
+                self,
+                base_name=WRITE_ENABLE_NAME(queue_type),
+                direction=EntitySignal.Direction.OUTPUT,
+                size=EntitySignal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )
 
 #     class NumNewLoadQueueEntries():
 #         """

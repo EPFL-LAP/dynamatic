@@ -36,8 +36,17 @@ class GroupAllocatorDeclarative():
             p.QueueWriteEnableComment(config, QueueType.LOAD),
             p.QueueWriteEnable(config, QueueType.LOAD),
 
+            p.NumNewQueueEntriesComment(QueueType.LOAD),
+            p.NumNewQueueEntries(config, QueueType.LOAD),
+
             p.QueueWriteEnableComment(config, QueueType.STORE),
-            p.QueueWriteEnable(config, QueueType.STORE)
+            p.QueueWriteEnable(config, QueueType.STORE),
+
+            p.NumNewQueueEntriesComment(QueueType.STORE),
+            p.NumNewQueueEntries(config, QueueType.STORE)
+
+
+
 
 
             # io.LoadQueueTailPointer(config),
