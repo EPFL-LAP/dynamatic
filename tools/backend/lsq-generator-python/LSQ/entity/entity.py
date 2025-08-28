@@ -70,15 +70,13 @@ class Architecture():
     def get(self, name, entity_type):
       # remove leading whitespace
       # the required leading whitespace is present in the string
-      # and remove final character, which is a semi-colon
       self.local_items = self.local_items.strip()
-      self.local_items = self.local_items[:-1]
 
       architecture = f"""
   -- {entity_type}
 architecture arch of {name} is
   {self.local_items}
-begin architecture
+begin
 end architecture;
   """
       print(architecture)

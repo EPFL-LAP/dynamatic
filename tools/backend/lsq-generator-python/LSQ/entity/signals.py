@@ -74,7 +74,7 @@ class Signal():
 
         type_declaration = self.signalSizeToTypeDeclaration()
 
-        name = f"{name}".ljust(30)
+        name = f"{name}".ljust(35)
 
         full_declaration = f"signal {name} : {type_declaration};"
 
