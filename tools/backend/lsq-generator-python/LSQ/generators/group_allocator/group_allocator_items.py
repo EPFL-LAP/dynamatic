@@ -638,7 +638,7 @@ class GroupHandshakingDeclarativeBodyItems():
     --      {num_loads} load(s)
     --      {num_stores} store(s)
     elsif {load_empty_entries_naive} < {num_loads} or 
-          {store_empty_entries_naive} < {num_stores}
+          {store_empty_entries_naive} < {num_stores} then
         {init_ready_name} <= '0';
     else
         {init_ready_name} <= '1';
