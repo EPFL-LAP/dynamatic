@@ -629,7 +629,7 @@ class GroupHandshakingDeclarativeBodyItems():
                 num_stores_binary_bitwidth = get_required_bitwidth(num_stores)
 
                 group_num_loads_binary = get_as_binary_string_padded(num_loads, load_pointer_bitwidth)
-                group_num_stores_binary = get_as_binary_string_padded(num_loads, store_pointer_bitwidth)
+                group_num_stores_binary = get_as_binary_string_padded(num_stores, store_pointer_bitwidth)
 
 
                 load_empty_entries_naive_use = load_empty_entries_naive
