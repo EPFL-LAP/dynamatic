@@ -20,8 +20,8 @@ import math
 from enum import Enum
 
 class QueueType(Enum):
-    LOAD = "load"
-    STORE = "store"
+    LOAD = "ld"
+    STORE = "st"
 
 class QueuePointerType(Enum):
     HEAD = "head"

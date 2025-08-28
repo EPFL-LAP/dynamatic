@@ -14,7 +14,7 @@ def QUEUE_POINTER_NAME(
     RTL name for the pointer to the (head/tail) entry of the (load/store) queue.
     """
 
-    return f"{queue_type.value}_queue_{queue_pointer_type.value}"
+    return f"{queue_type.value}_q_{queue_pointer_type.value}"
 
 
 def IS_EMPTY_NAME(
@@ -35,7 +35,7 @@ def WRITE_ENABLE_NAME(
     RTL name for the write enables signals of the load queue.
     """
 
-    return f"{queue_type.value}_write_enable"
+    return f"{queue_type.value}_write_en"
 
 def NUM_NEW_QUEUE_ENTRIES_NAME(
         queue_type : QueueType, 
@@ -45,7 +45,7 @@ def NUM_NEW_QUEUE_ENTRIES_NAME(
     Output by the group allocator, and used by the load queue to update its tail pointer.
     """
 
-    return f"num_new_{queue_type.value}_queue_entries"
+    return f"num_new_{queue_type.value}_q_entries"
 
 def PORT_INDEX_PER_ENTRY_NAME(
         queue_type : QueueType, 
@@ -82,15 +82,15 @@ def NUM_EMPTY_ENTRIES_NAME(
         suffix = "_naive"
     else:
         suffix = ""
-    return f"{queue_type.value}_queue_num_empty_entries{suffix}"
+    return f"{queue_type.value}_q_num_empty_entries{suffix}"
 
 
-def NUM_EMPTY_IF_FULLY_EMPTY_NAME(
+def NUM_EMPTY_IF_QUEUE_EMPTY_NAME(
         queue_type : QueueType
         ):
     """
-    RTL name for the number of entries in a queue if it is fully empty.
+    RTL name for the number of entries in a queue if it the queue is empty.
     """
 
-    return f"{queue_type.value}_num_empty_if_fully_empty"
+    return f"{queue_type.value}_q_num_emp_if_q_empty"
 

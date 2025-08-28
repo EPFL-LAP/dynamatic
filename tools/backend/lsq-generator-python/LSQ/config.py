@@ -96,8 +96,12 @@ class Config:
             #self.sdqAddrW
             self._stq_idx_w = math.ceil(math.log2(self.numStqEntries))
             
-            self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
-            self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
+            # emptyLdAddrW
+            self._empty_ldw_idx_w = math.ceil(math.log2(self.numLdqEntries+1))
+
+            # emptyStAddrW
+            self._empty_stq_idx_w = math.ceil(math.log2(self.numStqEntries+1))
+            
             # Check the number of ports, if num*Ports == 0, set it to 1
 
             # self.ldpAddrW

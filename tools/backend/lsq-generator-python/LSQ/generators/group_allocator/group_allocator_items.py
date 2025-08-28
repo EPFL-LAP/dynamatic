@@ -566,13 +566,13 @@ class GroupHandshakingDeclarativeLocalItems():
                 )
             )
 
-    class NumEmptyIfFullyEmpty(Signal):
+    class NumEmptyIfQueueEmpty(Signal):
         """
         Bitwidth = N
 
         Number = 1
 
-        Number of empty entries if a queue is fully empty.
+        Number of empty entries if a queue is queue empty.
         """
 
         def __init__(self, 
@@ -590,7 +590,7 @@ class GroupHandshakingDeclarativeLocalItems():
 
             Signal.__init__(
                 self,
-                base_name=NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type),
+                base_name=NUM_EMPTY_IF_QUEUE_EMPTY_NAME(queue_type),
                 size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
@@ -607,12 +607,12 @@ class GroupHandshakingDeclarativeBodyItems():
             ):
             match queue_type:
                 case QueueType.LOAD:
-                    num_if_fully_empty = config.load_queue_num_entries()
+                    num_if_queue_empty = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    num_if_fully_empty = config.store_queue_num_entries()
+                    num_if_queue_empty = config.store_queue_num_entries()
 
-            num_if_fully_empty_bin = get_as_binary_string(num_if_fully_empty)
-            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
+            num_if_queue_empty_bin = get_as_binary_string(num_if_queue_empty)
+            num_empty_if_queue_empty_name = NUM_EMPTY_IF_QUEUE_EMPTY_NAME(queue_type)
 
             empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
             empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
@@ -625,10 +625,10 @@ class GroupHandshakingDeclarativeBodyItems():
 
             return f"""
 
-  {num_empty_if_fully_empty_name} <= {num_if_fully_empty_bin};
-
+  {num_empty_if_queue_empty_name} <= {num_if_queue_empty_bin};
   {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
-  {empty_entries_name} <= {num_empty_if_fully_empty_name} when {is_empty_name} else {empty_entries_naive_name};
+
+  {empty_entries_name} <= {num_empty_if_queue_empty_name} when {is_empty_name} else {empty_entries_naive_name};
 """.removeprefix("\n")
 
 
