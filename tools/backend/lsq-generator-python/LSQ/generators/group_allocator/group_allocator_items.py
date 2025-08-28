@@ -40,7 +40,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
         def _get_default_value(self, queue_type, idx, bitwidth):
             return f"""
-    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)}
+    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
 """.removeprefix("\n")
 
         def __init__(self, config : Config, queue_type : QueueType):
@@ -59,11 +59,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             for i in range(config.num_groups()):
                 if i == 0:
                     self.group_assignments += f"""
-    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1'
+    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """ .removeprefix("\n")
                 else:
                     self.group_assignments += f"""
-    elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1'
+    elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """.removeprefix("\n")
 
                 for j, idx in enumerate(config.gaLdPortIdx[i]):
