@@ -3,6 +3,8 @@ from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
+from LSQ.utils import get_as_binary_string
+
 from enum import Enum
 
 
@@ -546,15 +548,49 @@ class GroupHandshakingDeclarativeLocalItems():
                      queue_type : QueueType,
                      is_naive
                      ):
+            
+            # takes 1 more bit to represent the number of slots
+            # compared to required for a pointer
             match queue_type:
                 case QueueType.LOAD:
-                    bitwidth = config.load_queue_idx_bitwidth()
+                    bitwidth = config.load_queue_idx_bitwidth() + 1
                 case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth()
+                    bitwidth = config.store_queue_idx_bitwidth() + 1
 
             Signal.__init__(
                 self,
-                base_name=NUM_EMPTY_ENTRIES(queue_type, is_naive),
+                base_name=NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive),
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )
+
+    class NumEmptyIfFullyEmpty(Signal):
+        """
+        Bitwidth = N
+
+        Number = 1
+
+        Number of empty entries if a queue is fully empty.
+        """
+
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     ):
+            
+            # takes 1 more bit to represent the number of slots
+            # compared to required for a pointer
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_queue_idx_bitwidth() + 1
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth() + 1
+
+            Signal.__init__(
+                self,
+                base_name=NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type),
                 size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
@@ -562,3 +598,53 @@ class GroupHandshakingDeclarativeLocalItems():
             )
 
 class GroupHandshakingDeclarativeBodyItems():
+    class Body(Signal):
+        def get_empty_entries_naive_assignment(config : Config, queue_type : QueueType):
+            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
+            head_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)}_i"
+            tail_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)}_i"
+
+            
+            return f"""
+  {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
+  """.removeprefix("\n")
+        
+
+        def get_num_empty_if_fully_empty_assignment(config : Config, queue_type : QueueType):
+            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
+
+            match queue_type:
+                case QueueType.LOAD:
+                    num_if_fully_empty = config.load_queue_num_entries()
+                case QueueType.STORE:
+                    num_if_fully_empty = config.store_queue_num_entries()
+
+            num_if_fully_empty_bin = get_as_binary_string(num_if_fully_empty)
+
+            return f"""
+  {num_empty_if_fully_empty_name} <= {num_if_fully_empty_bin};
+""".removeprefix("\n")
+
+
+        def get_empty_entries_assignment(config : Config, queue_type : QueueType):
+            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
+            empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
+            is_empty_name = f"{IS_EMPTY_NAME(queue_type)}_i"
+            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
+
+            return f"""
+  {empty_entries_name} <= {num_empty_if_fully_empty_name} when {is_empty_name} else {empty_entries_naive_name};
+""".removeprefix("\n")
+
+
+
+        def __init__(self, config : Config):
+            self.item = ""
+            self.item += self.get_empty_entries_naive_assignment(config, QueueType.LOAD)
+            self.item += self.get_empty_entries_naive_assignment(config, QueueType.STORE)
+
+            self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.STORE)
+            self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.LOAD)
+
+            self.item += self.get_empty_entries_assignment(config, QueueType.LOAD)
+            self.item += self.get_empty_entries_assignment(config, QueueType.STORE)

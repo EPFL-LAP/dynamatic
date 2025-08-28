@@ -64,19 +64,22 @@ class Architecture():
     def __init__(self, declaration):
       self.local_items = ""
 
+      self.body = declaration.body.strip()
+
       for item in declaration.local_items:
           self.local_items += item.get_local_item()
 
-    def get(self, name, entity_type):
       # remove leading whitespace
       # the required leading whitespace is present in the string
-      self.local_items = self.local_items.strip()
+      self.local_items = self.local_items.lstrip()
 
+    def get(self, name, entity_type):
       architecture = f"""
   -- {entity_type}
 architecture arch of {name} is
   {self.local_items}
 begin
+  {self.body}
 end architecture;
   """
       print(architecture)

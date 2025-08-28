@@ -10,7 +10,7 @@ class Signal():
         INPUT = 1
         OUTPUT = 2
 
-    def signalSizeToTypeDeclaration(self):
+    def signal_size_to_type_declaration(self):
         if self.size.bitwidth == 1:
             return "std_logic"
         else:
@@ -30,6 +30,8 @@ class Signal():
         self.size = size
         self.direction = direction
 
+
+
     def _get_entity_single(self, name):
         match self.direction:
             case Signal.Direction.INPUT:
@@ -40,7 +42,7 @@ class Signal():
                 io_suffix = "o"
                 direction = "out"
 
-        type_declaration = self.signalSizeToTypeDeclaration()
+        type_declaration = self.signal_size_to_type_declaration()
 
         name = f"{name}_{io_suffix}".ljust(30)
 
@@ -72,7 +74,7 @@ class Signal():
     def _get_local_single(self, name):
 
 
-        type_declaration = self.signalSizeToTypeDeclaration()
+        type_declaration = self.signal_size_to_type_declaration()
 
         name = f"{name}".ljust(35)
 

@@ -27,6 +27,8 @@ class QueuePointerType(Enum):
     HEAD = "head"
     TAIL = "tail"
 
+def get_as_binary_string(val: int) -> str:
+    return f"\"{bin(val)[2:]}\""
 
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic

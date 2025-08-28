@@ -14,7 +14,8 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupAllocatorDeclarativePortItems, 
         GroupAllocatorDeclarativeLocalItems,
         GroupHandshakingDeclarativePortItems,
-        GroupHandshakingDeclarativeLocalItems
+        GroupHandshakingDeclarativeLocalItems,
+        GroupHandshakingDeclarativeBodyItems
     )
 
 class GroupHandshakingDeclarative():
@@ -44,8 +45,15 @@ class GroupHandshakingDeclarative():
             l.NumEmptyEntries(config, QueueType.LOAD, is_naive = False),
             l.NumEmptyEntries(config, QueueType.STORE, is_naive=False),
 
+            l.NumEmptyIfFullyEmpty(config, QueueType.LOAD),
+            l.NumEmptyIfFullyEmpty(config, QueueType.STORE),
+
             ga_p.GroupInitReady(config)
         ]
+
+        b = GroupHandshakingDeclarativeBodyItems()
+
+        self.body = b.Body().item
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):

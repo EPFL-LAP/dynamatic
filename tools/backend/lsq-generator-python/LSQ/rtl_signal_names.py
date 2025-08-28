@@ -70,7 +70,7 @@ There is one of these 1-bit signals per group of memory operations.
 """
 
 
-def NUM_EMPTY_ENTRIES(
+def NUM_EMPTY_ENTRIES_NAME(
         queue_type : QueueType, 
         is_naive
         ):
@@ -83,4 +83,14 @@ def NUM_EMPTY_ENTRIES(
     else:
         suffix = ""
     return f"{queue_type.value}_queue_num_empty_entries{suffix}"
+
+
+def NUM_EMPTY_IF_FULLY_EMPTY_NAME(
+        queue_type : QueueType
+        ):
+    """
+    RTL name for the number of entries in a queue if it is fully empty.
+    """
+
+    return f"{queue_type.value}_num_empty_if_fully_empty"
 
