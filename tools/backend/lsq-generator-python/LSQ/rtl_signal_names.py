@@ -14,7 +14,7 @@ def QUEUE_POINTER_NAME(
     RTL name for the pointer to the (head/tail) entry of the (load/store) queue.
     """
 
-    return f"{queue_type}_queue_{queue_pointer_type}"
+    return f"{queue_type.value}_queue_{queue_pointer_type.value}"
 
 LOAD_QUEUE_HEAD_POINTER_NAME = "ldq_head"
 """

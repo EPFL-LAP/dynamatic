@@ -96,6 +96,7 @@ class GroupAllocatorDeclarativePortItems():
                 )
             )
 
+
     class GroupInitReady(EntitySignal):
         """
         Output.
@@ -123,6 +124,7 @@ class GroupAllocatorDeclarativePortItems():
                 )
             )
 
+
     class QueueInputsComment(EntityComment):
         """
         RTL comment:
@@ -130,8 +132,6 @@ class GroupAllocatorDeclarativePortItems():
         -- Input signals from the (load/store) queue
         """
         def __init__(self, queue_type : QueueType):
-
-
             comment = f"""
 
 #     -- Input signals from the {queue_type} queue
@@ -141,6 +141,7 @@ class GroupAllocatorDeclarativePortItems():
                 self,
                 comment
             )
+
 
     class QueuePointer(EntitySignal):
         """
@@ -162,9 +163,9 @@ class GroupAllocatorDeclarativePortItems():
                      ):
             match queue_type:
                 case QueueType.LOAD:
-                    bitwidth = config.load_queue_idx_bitwidth
+                    bitwidth = config.load_queue_idx_bitwidth()
                 case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth
+                    bitwidth = config.store_queue_idx_bitwidth()
 
             EntitySignal.__init__(
                 self,
