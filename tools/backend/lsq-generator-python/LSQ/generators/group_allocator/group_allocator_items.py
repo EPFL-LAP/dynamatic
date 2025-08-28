@@ -630,6 +630,10 @@ class GroupHandshakingDeclarativeBodyItems():
                 group_num_stores_binary = get_as_binary_string_padded(num_loads, store_pointer_bitwidth)
 
 
+                load_empty_entries_naive_use = load_empty_entries_naive
+                store_empty_entries_naive_use = store_empty_entries_naive_use
+
+
                 # load_empty_entries is the size of the load queue pointers
                 # which may be 1 bit too small to compare to the number of required loads
                 if load_pointer_bitwidth + 1 == num_loads_binary_bitwidth:
