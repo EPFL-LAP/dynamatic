@@ -180,7 +180,7 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 # we need to first attach analysis results to memory ops and then apply memory
 # bank partition.
 $LLVM_BINS/opt -S \
-  -load-pass-plugin "$DYNAMATIC_DIR/build/tools/mem-dep-analysis/libMemDepAnalysis.so" \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
   "$F_CLANG_OPTIMIZED" \

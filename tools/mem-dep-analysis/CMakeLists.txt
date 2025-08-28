@@ -1,8 +1,7 @@
-add_library(MemDepAnalysis SHARED MemDepAnalysis.cpp)
-
 # Link to required LLVM and Polly libraries
-target_link_libraries(MemDepAnalysis
-  PRIVATE
+add_llvm_pass_plugin(MemDepAnalysis
+  MemDepAnalysis.cpp
+  DEPENDS
   LLVMCore
   LLVMSupport
   LLVMAnalysis
@@ -11,6 +10,3 @@ target_link_libraries(MemDepAnalysis
   MLIRIR
   MLIRSupport
 )
-
-# Required for plugins using new PassManager
-target_compile_definitions(MemDepAnalysis PRIVATE LLVM_PLUGIN_EXPORT=1)
