@@ -40,10 +40,8 @@ class GroupHandshakingDeclarative():
 
         l = GroupHandshakingDeclarativeLocalItems()
         self.local_items = [
-            l.NumEmptyEntries(config, QueueType.LOAD, is_naive=True),
-            l.NumEmptyEntries(config, QueueType.STORE, is_naive=True),
-            l.NumEmptyEntries(config, QueueType.LOAD, is_naive=False),
-            l.NumEmptyEntries(config, QueueType.STORE, is_naive=False),
+            l.NumEmptyEntries(config, QueueType.LOAD),
+            l.NumEmptyEntries(config, QueueType.STORE),
 
             ga_p.GroupInitReady(config)
         ]

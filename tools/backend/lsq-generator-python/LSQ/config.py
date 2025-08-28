@@ -138,6 +138,7 @@ class Config:
     def load_queue_idx_bitwidth(self) -> int:
         """
         Bitwidth for a pointer into the load queue.
+        
         Calculated by ceil(log2(num_entries))
         """
         return self._ldq_idx_w
@@ -145,6 +146,7 @@ class Config:
     def store_queue_idx_bitwidth(self) -> int:
         """
         Bitwidth for a pointer into the store queue.
+
         Calculated by ceil(log2(num_entries))
         """
         return self._stq_idx_w
@@ -174,14 +176,18 @@ class Config:
     def load_queue_size_w(self) -> int:
         """
         Bitwidth required to represent 
-        the total number of queue entries
+        the total number of queue entries.
+
+        Calculated by ceil(log2(num_entries + 1))
         """
         return self._ldq_size_w
 
     def store_queue_size_w(self) -> int:
         """
         Bitwidth required to represent 
-        the total number of queue entries
+        the total number of queue entries.
+
+        Calculated by Calculated by ceil(log2(num_entries + 1))
         """
         return self._stq_size_w
 
