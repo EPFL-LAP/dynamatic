@@ -66,6 +66,7 @@ class GroupAllocatorDeclarativePortItems():
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} control channels,
     -- one for each group of memory operations.
+
 """.removeprefix("\n")
             
             EntityComment.__init__(
@@ -139,6 +140,7 @@ class GroupAllocatorDeclarativePortItems():
             comment = f"""
 
     -- Input signals from the {queue_type} queue
+
 """.removeprefix("\n")
             
             EntityComment.__init__(
@@ -228,6 +230,7 @@ class GroupAllocatorDeclarativePortItems():
 
     -- {queue_type.value} queue write enable signals
     -- {number} signals, one for each queue entry.
+
 """.removeprefix("\n")
             
             EntityComment.__init__(
@@ -288,6 +291,7 @@ class GroupAllocatorDeclarativePortItems():
     -- Number of new {queue_type_str} queue entries to allocate.
     -- Used by the {queue_type_str} queue to update its tail pointer.
     -- Bitwidth equal to the {queue_type_str} queue pointer bitwidth.
+
 """.removeprefix("\n")
             EntityComment.__init__(
                 self,
@@ -378,6 +382,7 @@ class GroupAllocatorDeclarativePortItems():
     -- if there are no load ports.
     -- But it is currently added regardless (with bitwidth 1)
     -- Actual number of load ports: {actual_num_ports}
+
 """.removeprefix("\n")
             EntityComment.__init__(
                 self,
@@ -459,6 +464,7 @@ class GroupAllocatorDeclarativePortItems():
     -- The order of the memory operations, read from the ROM, 
     -- has been shifted to generate this,
     -- as well as 0s and 1s added correctly to fill out each signal.
+    
 """.removeprefix("\n")
             EntityComment.__init__(
                 self,
