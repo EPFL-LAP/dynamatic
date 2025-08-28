@@ -205,7 +205,7 @@ class GroupAllocatorDeclarativePortItems():
         RTL comment:
             
         -- {queue_type.value} queue write enable signals
-        
+
         -- {number} signals, one for each queue entry.
         """
         def __init__(
@@ -216,9 +216,9 @@ class GroupAllocatorDeclarativePortItems():
             
             match queue_type:
                 case QueueType.LOAD:
-                    number = config.load_queue_idx_bitwidth
+                    number = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    number = config.store_queue_num_entries
+                    number = config.store_queue_num_entries()
 
             comment = f"""
 
@@ -245,9 +245,9 @@ class GroupAllocatorDeclarativePortItems():
                      ):
             match queue_type:
                 case QueueType.LOAD:
-                    number = config.load_queue_num_entries
+                    number = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    number = config.store_queue_num_entries
+                    number = config.store_queue_num_entries()
 
             EntitySignal.__init__(
                 self,
