@@ -599,7 +599,10 @@ class GroupHandshakingDeclarativeLocalItems():
 
 class GroupHandshakingDeclarativeBodyItems():
     class Body(Signal):
-        def get_empty_entries_naive_assignment(config : Config, queue_type : QueueType):
+        def get_empty_entries_naive_assignment(
+                self,
+                queue_type : QueueType
+            ):
             empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
             head_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)}_i"
             tail_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)}_i"
@@ -610,7 +613,11 @@ class GroupHandshakingDeclarativeBodyItems():
   """.removeprefix("\n")
         
 
-        def get_num_empty_if_fully_empty_assignment(config : Config, queue_type : QueueType):
+        def get_num_empty_if_fully_empty_assignment(
+                self,
+                config : Config, 
+                queue_type : QueueType
+            ):
             num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
 
             match queue_type:
@@ -626,7 +633,10 @@ class GroupHandshakingDeclarativeBodyItems():
 """.removeprefix("\n")
 
 
-        def get_empty_entries_assignment(config : Config, queue_type : QueueType):
+        def get_empty_entries_assignment(
+                self,
+                queue_type : QueueType
+            ):
             empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
             empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
             is_empty_name = f"{IS_EMPTY_NAME(queue_type)}_i"
@@ -640,11 +650,11 @@ class GroupHandshakingDeclarativeBodyItems():
 
         def __init__(self, config : Config):
             self.item = ""
-            self.item += self.get_empty_entries_naive_assignment(config, QueueType.LOAD)
-            self.item += self.get_empty_entries_naive_assignment(config, QueueType.STORE)
+            self.item += self.get_empty_entries_naive_assignment(QueueType.LOAD)
+            self.item += self.get_empty_entries_naive_assignment(QueueType.STORE)
 
             self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.STORE)
             self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.LOAD)
 
-            self.item += self.get_empty_entries_assignment(config, QueueType.LOAD)
-            self.item += self.get_empty_entries_assignment(config, QueueType.STORE)
+            self.item += self.get_empty_entries_assignment(QueueType.LOAD)
+            self.item += self.get_empty_entries_assignment(QueueType.STORE)
