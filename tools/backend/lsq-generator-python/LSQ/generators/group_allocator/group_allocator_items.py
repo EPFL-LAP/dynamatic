@@ -1,4 +1,4 @@
-from LSQ.entity import Signal, EntityComment
+from LSQ.entity import Signal, EntityComment, Instantiation
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
@@ -6,7 +6,8 @@ from LSQ.rtl_signal_names import *
 from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth
 
 
-from LSQ.operators.arithmetic import WrapSub, WrapSubReturn
+from LSQ.operators.arithmetic import WrapSub
+
 
 class GroupAllocatorDeclarativePortItems():
     class Reset(Signal):
@@ -500,10 +501,35 @@ class GroupAllocatorDeclarativePortItems():
                 )
             )
 
-class GroupAllocatorDeclarativeLocalItems():
-    pass
+class GroupAllocatorDeclarativeBodyItems():
+    class HandshakingInstantiation(Instantiation):
+        def __init__(self, config : Config):
 
+            p = GroupAllocatorDeclarativePortItems()
+            hs_p = GroupHandshakingDeclarativePortItems()
+            port_items = [
+                p.GroupInitValid(),
+                p.GroupInitReady(),
 
+                p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+                p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
+                p.QueueIsEmpty(config, QueueType.LOAD),
+
+                p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
+                p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
+                p.QueueIsEmpty(config, QueueType.STORE),
+
+                hs_p.GroupInitTransfer(config)
+            ]
+
+            Instantiation.__init__(
+                self,
+                name=GROUP_HANDSHAKING_ENTITY_NAME,
+                entity_name=GROUP_HANDSHAKING_ENTITY_NAME,
+                port_items=port_items
+            )
+
+            
 class GroupHandshakingDeclarativePortItems():
     class GroupInitTransfer(Signal):
         """

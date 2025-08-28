@@ -64,7 +64,9 @@ class Architecture():
     def __init__(self, declaration):
       self.local_items = ""
 
-      self.body = declaration.body.strip()
+      self.body = ""
+      for body_item in declaration.body:
+        self.body += body_item.get()
 
       for item in declaration.local_items:
           self.local_items += item.get_local_item()
@@ -84,3 +86,22 @@ begin
 end architecture;
   """
       print(architecture)
+
+class Instantiation():
+    def __init__(self, name, entity_name, port_items):
+      self.port_items = ""
+      self.name = name
+      self.entity_name = entity_name
+      for port_item in port_items:
+         self.port_items += port_item.get_inst_item()
+
+      self.port_items = self.port_items.strip()[:-1]
+    
+    def get(self):
+       inst = f"""
+  {self.name} : work.{self.entity_name}
+    port map(
+      {self.port_items}
+    );
+"""
+       print(inst)

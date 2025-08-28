@@ -30,21 +30,29 @@ class Signal():
         self.size = size
         self.direction = direction
 
+    def _get_io_suffix(self, name):
+        if name == "rst" or name == "clk":
+            return ""
+        match self.direction:
+            case Signal.Direction.INPUT:
+                return "_i"
+            case Signal.Direction.OUTPUT:
+                return "_o"
 
 
     def _get_entity_single(self, name):
         match self.direction:
             case Signal.Direction.INPUT:
-                io_suffix = "i"
                 # with space at the end to match witdth of out
                 direction = "in "
             case Signal.Direction.OUTPUT:
-                io_suffix = "o"
                 direction = "out"
+
+        io_suffix = self._get_io_suffix(name)
 
         type_declaration = self.signal_size_to_type_declaration()
 
-        name = f"{name}_{io_suffix}".ljust(30)
+        name = f"{name}{io_suffix}".ljust(30)
 
         full_declaration = f"{name} : {direction} {type_declaration};"
 
@@ -55,25 +63,8 @@ class Signal():
         return f"""
     {full_declaration}
 """.removeprefix("\n")
-
-    def get_entity_item(self):
-        # if item is singular
-        # just generate it using the base name
-        if self.size.number == 1:
-            return self._get_entity_single(self.base_name)
-        
-        # if this item is actually multiple items
-        # generate all of them, using indexed names
-        all_items = ""
-        for i in range(self.size.number):
-            item_name = f"{self.base_name}_{i}"
-            all_items += self._get_entity_single(item_name)
-
-        return all_items
     
     def _get_local_single(self, name):
-
-
         type_declaration = self.signal_size_to_type_declaration()
 
         name = f"{name}".ljust(35)
@@ -87,21 +78,45 @@ class Signal():
         return f"""
   {full_declaration}
 """.removeprefix("\n")
+    
+        
+    def _get_inst_single(self, name):
+        io_suffix = self._get_io_suffix(name)
+        full_declaration = f"{name}{io_suffix} => {name},"
 
-    def get_local_item(self):
+        # comment out if bitwidth is 0
+        if self.size.bitwidth == 0:
+            full_declaration = f"-- {full_declaration}"
+
+        return f"""
+      {full_declaration}
+""".removeprefix("\n")
+    
+    def _get_item(self, get_single):
         # if item is singular
         # just generate it using the base name
         if self.size.number == 1:
-            return self._get_local_single(self.base_name)
+            return get_single(self.base_name)
         
         # if this item is actually multiple items
         # generate all of them, using indexed names
         all_items = ""
         for i in range(self.size.number):
             item_name = f"{self.base_name}_{i}"
-            all_items += self._get_local_single(item_name)
+            all_items += get_single(item_name)
 
         return all_items
+
+    def get_entity_item(self):
+        self._get_item(self._get_entity_single)
+
+    def get_local_item(self):
+        self._get_item(self._get_local_single)
+
+    def get_inst_item(self):
+        self._get_item(self._get_inst_single)
+    
+
 
 class UnsignedSignal(Signal):
     def signal_size_to_type_declaration(self):

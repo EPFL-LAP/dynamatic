@@ -78,3 +78,5 @@ def NUM_EMPTY_ENTRIES_NAIVE_NAME(
     """
 
     return f"{queue_type.value}_q_num_empty_entries_naive"
+
+GROUP_HANDSHAKING_ENTITY_NAME = "group_handshaking"

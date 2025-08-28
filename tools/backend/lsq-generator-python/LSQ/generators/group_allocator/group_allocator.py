@@ -12,7 +12,7 @@ from LSQ.utils import QueueType, QueuePointerType
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorDeclarativePortItems, 
-        GroupAllocatorDeclarativeLocalItems,
+        GroupAllocatorDeclarativeBodyItems,
         GroupHandshakingDeclarativePortItems,
         GroupHandshakingDeclarativeLocalItems,
         GroupHandshakingDeclarativeBodyItems
@@ -46,9 +46,9 @@ class GroupHandshakingDeclarative():
             ga_p.GroupInitReady(config)
         ]
 
-        b = GroupHandshakingDeclarativeBodyItems()
+        # b = GroupHandshakingDeclarativeBodyItems()
 
-        self.body = b.Body(config).item
+        # self.body_items = []
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
@@ -100,7 +100,11 @@ class GroupAllocatorDeclarative():
             hs_p.GroupInitTransfer(config)
         ]
 
-        self.body = ""
+        b = GroupAllocatorDeclarativeBodyItems
+
+        self.body = [
+            b.HandshakingInstantiation(config)
+        ]
     
 
 
@@ -194,20 +198,20 @@ class GroupAllocator:
         declaration = GroupAllocatorDeclarative(config)
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
-        hs_entity = Entity(handshaking_declaration)
-        entity = Entity(declaration)
+        # hs_entity = Entity(handshaking_declaration)
+        # entity = Entity(declaration)
 
         arch = Architecture(declaration)
 
-        hs_arch = Architecture(handshaking_declaration)
+        # hs_arch = Architecture(handshaking_declaration)
 
-        print(hs_entity.get("handshaking", "Group Handshaking"))
-        print(hs_arch.get("handshaking", "Group Handshaking"))
+        # print(hs_entity.get("handshaking", "Group Handshaking"))
+        # print(hs_arch.get("handshaking", "Group Handshaking"))
 
 
         # print(entity.get(self.module_name, "Group Allocator"))
 
-        # print(arch.get(self.module_name, "Group Allocator"))
+        print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()
