@@ -121,8 +121,8 @@ class Config:
             assert (self.idW >= self.ldqAddrW)
 
             # list size checking
-            assert (len(self.gaNumLoads) == self.num_groups())
-            assert (len(self.gaNumStores) == self.num_groups())
+            assert (len(self._group_num_loads) == self.num_groups())
+            assert (len(self._group_num_stores) == self.num_groups())
             assert (len(self.gaLdOrder) == self.num_groups())
             assert (len(self.gaLdPortIdx) == self.num_groups())
             assert (len(self.gaStPortIdx) == self.num_groups())
