@@ -98,10 +98,9 @@ class Instantiation():
       self.port_items = self.port_items.strip()[:-1]
     
     def get(self):
-       inst = f"""
+       return f"""
   {self.name} : work.{self.entity_name}
     port map(
       {self.port_items}
     );
 """
-       print(inst)
