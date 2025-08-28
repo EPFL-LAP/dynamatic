@@ -16,7 +16,8 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupHandshakingDeclarativePortItems,
         GroupHandshakingDeclarativeLocalItems,
         GroupHandshakingDeclarativeBodyItems,
-        PortIdxPerQueueEntryRomMuxPortItems
+        PortIdxPerQueueEntryRomMuxPortItems,
+        PortIdxPerQueueEntryRomMuxBodyItems
     )
 
 
@@ -29,6 +30,15 @@ class PortIdxPerQueueEntryMuxDeclarative():
         self.entity_port_items = [
             p.GroupInitTransfer(config),
             ga_p.PortIndexPerQueueEntry(config, QueueType.LOAD)
+        ]
+
+        self.local_items = [
+
+        ]
+
+        b = PortIdxPerQueueEntryRomMuxBodyItems()
+        self.body = [
+            b.Body(config)
         ]
 
 class GroupHandshakingDeclarative():
@@ -215,7 +225,10 @@ class GroupAllocator:
 
         port_idx_mux_entity = Entity(port_idx_mux_dec)
 
+        port_idx_mux_arch = Architecture(port_idx_mux_dec)
+
         print(port_idx_mux_entity.get("port_mux", "port_mux"))
+        print(port_idx_mux_arch.get("port_mux", "port_mux"))
 
         quit()
 

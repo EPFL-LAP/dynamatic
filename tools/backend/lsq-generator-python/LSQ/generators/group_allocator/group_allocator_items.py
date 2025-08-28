@@ -25,7 +25,6 @@ class PortIdxPerQueueEntryRomMuxPortItems():
         def __init__(self, 
                      config : Config,
                      ):
-
             Signal.__init__(
                 self,
                 base_name=GROUP_INIT_TRANSFER_NAME,
@@ -36,6 +35,20 @@ class PortIdxPerQueueEntryRomMuxPortItems():
                 )
             )
 
+class PortIdxPerQueueEntryRomMuxBodyItems():
+    class Body():
+        def __init__(self, config : Config):
+            print(config.gaLdPortIdx)
+            quit()
+            self.item = f"""
+  process(all)
+  begin
+    
+  end process
+"""
+        
+        def get():
+            pass
 
 class GroupAllocatorDeclarativePortItems():
     class Reset(Signal):
