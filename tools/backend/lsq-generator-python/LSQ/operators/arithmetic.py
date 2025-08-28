@@ -107,11 +107,11 @@ def WrapSubUnsigned(out, a, b, max) -> WrapSubReturn:
     """
 
     if isPow2(max):
-        line1 = f"{out} <= unsigned({a})) - unsigned({b});"
+        line1 = f"{out} <= unsigned({a}) - unsigned({b});"
         return WrapSubReturn(single_line=True, line1=line1)
     else:
         line1 = f"{out} <="
-        line2 = "unsigned({a}) - unsigned({b})"
+        line2 = f"unsigned({a}) - unsigned({b})"
         line3 = f"when {a} >= b else"
         line4 = f"'{max}' + unsigned({a}) - unsigned({b})" 
 
