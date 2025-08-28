@@ -82,5 +82,5 @@ def NUM_EMPTY_ENTRIES(
         suffix = "_naive"
     else:
         suffix = ""
-    return f"num_{queue_type.value}_empty_entries{suffix}"
+    return f"{queue_type.value}_queue_num_empty_entries{suffix}"
 
