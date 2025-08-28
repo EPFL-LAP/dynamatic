@@ -86,7 +86,7 @@ class Signal():
     {full_declaration}
 """.removeprefix("\n")
 
-    def get_local_signal(self):
+    def get_local_item(self):
         # if item is singular
         # just generate it using the base name
         if self.size.number == 1:
