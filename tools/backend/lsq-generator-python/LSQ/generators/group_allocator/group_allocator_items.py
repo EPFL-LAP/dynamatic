@@ -59,11 +59,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             for i in range(config.num_groups()):
                 if i == 0:
                     self.group_assignments += f"""
-    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
+    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1'
 """ .removeprefix("\n")
                 else:
                     self.group_assignments += f"""
-    elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
+    elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1'
 """.removeprefix("\n")
 
                 for j, idx in enumerate(config.gaLdPortIdx[i]):
@@ -72,7 +72,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 """.removeprefix("\n")
                 
             self.group_assignments += f"""
-    endif
+    end if;
 """.removeprefix("\n")
 
             self.group_assignments = self.group_assignments.strip()
