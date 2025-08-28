@@ -1,12 +1,9 @@
-from LSQ.entity import Signal, EntityComment
+from LSQ.entity import Signal, EntityComment, UnsignedSignal
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth
-
-
-from LSQ.operators.arithmetic import WrapSub, WrapSubReturn
+from LSQ.operators.arithmetic import WrapSubUnsigned
 
 class GroupAllocatorDeclarativePortItems():
     class Reset(Signal):
@@ -532,7 +529,7 @@ class GroupHandshakingDeclarativePortItems():
                 )
             )
 class GroupHandshakingDeclarativeLocalItems():
-    class NumEmptyEntries(Signal):
+    class NumEmptyEntries(UnsignedSignal):
         """
         Bitwidth = N
 
@@ -583,7 +580,7 @@ class GroupHandshakingDeclarativeBodyItems():
                     num_entries = config.store_queue_num_entries()
 
 
-            wrap_sub_return = WrapSub(empty_entries_naive, head_pointer, tail_pointer, num_entries)
+            wrap_sub_return = WrapSubUnsigned(empty_entries_naive, head_pointer, tail_pointer, num_entries)
             if wrap_sub_return.single_line:
                 return f"""
 
@@ -640,8 +637,8 @@ class GroupHandshakingDeclarativeBodyItems():
     -- Group {i} has:
     --      {num_loads} load(s)
     --      {num_stores} store(s)
-    elsif unsigned({load_empty_entries_naive}) < {num_loads} or 
-          unsigned({store_empty_entries_naive}) < {num_stores}
+    elsif {load_empty_entries_naive} < {num_loads} or 
+          {store_empty_entries_naive} < {num_stores}
         {init_ready_name} <= '0';
     else
         {init_ready_name} <= '1';
