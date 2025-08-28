@@ -665,6 +665,8 @@ class GroupHandshakingDeclarativeBodyItems():
   process(all)
   begin
     -- if both queues are empty, the group allocator is ready
+    if {load_is_empty_name} = '1' and {store_is_empty_name} = '1' then
+        {init_ready_name} <= '1';
     -- otherwise, we must compare the number of loads and stores in this group
     -- to the number of empty entries in each queue.
     -- if either queue does not have enough space, the group allocator is not ready
@@ -672,9 +674,8 @@ class GroupHandshakingDeclarativeBodyItems():
     -- Group {i} has:
     --      {num_loads} load(s)
     --      {num_stores} store(s)
-    if ({load_is_empty_name} = '1' and {store_is_empty_name} = '1') or
-       ({load_empty_entries_naive_use} >= {group_num_loads_binary} and
-        {store_empty_entries_naive_use} >= {group_num_stores_binary}) then
+    elsif {load_empty_entries_naive_use} >= {group_num_loads_binary} or 
+          {store_empty_entries_naive_use} >= {group_num_stores_binary}
         {init_ready_name} <= '1';
     else
         {init_ready_name} <= '0';
