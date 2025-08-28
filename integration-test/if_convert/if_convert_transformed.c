@@ -9,15 +9,19 @@ void if_convert(in_int_t a[N], inout_int_t b[N]) {
     int pred_i = i;
     while (pred_i < N2 && pred_i == i) {
       int tmp = a[pred_i];
+
+      // Manual CSE
+      int plus_1 = pred_i + 1;
+
       if (pred_i * tmp < 10000) {
         i = pred_i + 2;
       } else {
-        i = pred_i + 1;
+        i = plus_1;
       }
       b[i] = 1;
 
       // Prediction
-      pred_i = pred_i + 1;
+      pred_i = plus_1;
     }
   }
 }
