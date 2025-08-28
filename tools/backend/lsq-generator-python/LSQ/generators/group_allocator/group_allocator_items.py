@@ -513,11 +513,11 @@ class GroupAllocatorDeclarativeBodyItems():
 
                 p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
                 p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
-                p.QueueIsEmpty(config, QueueType.LOAD),
+                p.QueueIsEmpty(QueueType.LOAD),
 
                 p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
                 p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-                p.QueueIsEmpty(config, QueueType.STORE),
+                p.QueueIsEmpty(QueueType.STORE),
 
                 hs_p.GroupInitTransfer(config)
             ]
