@@ -1,4 +1,4 @@
-from LSQ.entity import Signal, EntityComment, Instantiation
+from LSQ.entity import Signal, EntityComment, Instantiation, SimpleInstantiation, InstCxnType
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
@@ -7,6 +7,7 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth
 
 
 from LSQ.operators.arithmetic import WrapSub
+
 
 
 class GroupAllocatorDeclarativePortItems():
@@ -507,19 +508,26 @@ class GroupAllocatorDeclarativeBodyItems():
 
             p = GroupAllocatorDeclarativePortItems()
             hs_p = GroupHandshakingDeclarativePortItems()
+            c = InstCxnType
+
+            si = SimpleInstantiation
             port_items = [
-                p.GroupInitValid(config),
-                p.GroupInitReady(config),
+                si(p.GroupInitValid(config), c.INPUT),
+                si(p.GroupInitReady(config), c.OUTPUT),
 
-                p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-                p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
-                p.QueueIsEmpty(QueueType.LOAD),
+                si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL), c.INPUT),
+                si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD), c.INPUT),
+                si(p.QueueIsEmpty(QueueType.LOAD), c.INPUT),
 
-                p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-                p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-                p.QueueIsEmpty(QueueType.STORE),
+                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL), c.INPUT),
+                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD), c.INPUT),
+                si(p.QueueIsEmpty(QueueType.STORE), c.INPUT),
 
-                hs_p.GroupInitTransfer(config)
+                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL), c.INPUT),
+                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD), c.INPUT),
+                si(p.QueueIsEmpty(QueueType.STORE), c.INPUT),
+
+                si(hs_p.GroupInitTransfer(config), c.LOCAL)
             ]
 
             Instantiation.__init__(

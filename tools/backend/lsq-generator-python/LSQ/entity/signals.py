@@ -1,5 +1,10 @@
 from enum import Enum
 
+class InstCxnType(Enum):
+    INPUT = "_i"
+    OUTPUT = "_o"
+    LOCAL = ""
+
 class Signal():
     class Size():
         def __init__(self, bitwidth, number):
@@ -80,10 +85,13 @@ class Signal():
 """.removeprefix("\n")
     
         
-    def _get_inst_single(self, name):
+    def _get_inst_single(self, name, cxn_type):
         io_suffix = self._get_io_suffix(name)
         io_name = f"{name}{io_suffix}".ljust(30)
-        full_declaration = f"{io_name} => {name},"
+
+        cxn_name = f"{name}{cxn_type.value}"
+
+        full_declaration = f"{io_name} => {cxn_name},"
 
         # comment out if bitwidth is 0
         if self.size.bitwidth == 0:
@@ -114,14 +122,19 @@ class Signal():
     def get_local_item(self):
         return self._get_item(self._get_local_single)
 
-    def get_inst_item(self):
-        return self._get_item(self._get_inst_single)
+    def get_inst_item(self, cxn_type : InstCxnType):
+        def get_single(name) : self._get_inst_single(name, cxn_type)
+        return self._get_item(get_single)
     
 
 
-class UnsignedSignal(Signal):
-    def signal_size_to_type_declaration(self):
-        return f"unsigned({self.size.bitwidth} - 1 downto 0)"
+class SimpleInstantiation():
+    def __init__(self, signal : Signal, cxn_type : InstCxnType):
+        self.signal = signal
+        self.cxn_type = cxn_type
+
+    def get_inst_item(self):
+        return self.signal.get_inst_item(self.cxn_type)
 
 class EntityComment():
     def __init__(self, comment):
