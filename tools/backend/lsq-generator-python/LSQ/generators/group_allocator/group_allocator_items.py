@@ -66,7 +66,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
 """.removeprefix("\n")
 
-                for j, idx in enumerate(range(config.gaLdPortIdx[i])):
+                for j, idx in enumerate(config.gaLdPortIdx[i]):
                     self.group_assignments += f"""
     {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{j} <= {get_as_binary_string_padded(idx, idx_bitwidth)}
 """.removeprefix("\n")
