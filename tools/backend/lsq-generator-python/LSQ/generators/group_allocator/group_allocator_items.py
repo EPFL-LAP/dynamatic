@@ -52,6 +52,18 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             self.default_assignments = self.default_assignments.strip()
 
+            self.group_assignments = ""
+
+            for i in range(config.num_groups):
+                if i == 0:
+                    self.group_assignments += f"""
+    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
+""" 
+                else:
+                    self.group_assignments += f"""
+    elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
+""" 
+
             self.item = f"""
   process(all)
   begin
