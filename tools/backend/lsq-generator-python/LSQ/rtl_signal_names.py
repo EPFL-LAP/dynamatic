@@ -1,12 +1,20 @@
+from LSQ.utils import QueueType, QueuePointerType
+
 GROUP_INIT_CHANNEL_NAME = "group_init"
 """
 RTL name for the channel from the dataflow circuit representing a request to allocate a group of memory accesses.
 """
 
-LOAD_QUEUE_TAIL_POINTER_NAME = "ldq_tail"
-"""
-RTL name for the pointer to the tail entry of the load queue.
-"""
+
+def QUEUE_POINTER_NAME(
+        queue_type : QueueType, 
+        queue_pointer_type : QueuePointerType
+        ):
+    """
+    RTL name for the pointer to the (head/tail) entry of the (load/store) queue.
+    """
+
+    return f"{queue_type}_queue_{queue_pointer_type}"
 
 LOAD_QUEUE_HEAD_POINTER_NAME = "ldq_head"
 """

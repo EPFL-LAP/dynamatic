@@ -17,6 +17,17 @@ import math
 #
 
 
+from enum import Enum
+
+class QueueType(Enum):
+    LOAD = "load"
+    STORE = "store"
+
+class QueuePointerType(Enum):
+    HEAD = "head"
+    TAIL = "tail"
+
+
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic
     Instead of storing the string in a global variable,

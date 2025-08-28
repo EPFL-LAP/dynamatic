@@ -3,7 +3,10 @@ from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-class GroupAllocatorDeclarativeIOSignals():
+from enum import Enum
+
+
+class GroupAllocatorDeclarativePortItems():
     class Reset(EntitySignal):
         """
         Input.
@@ -44,6 +47,15 @@ class GroupAllocatorDeclarativeIOSignals():
             )
 
     class GroupInitChannelComment(EntityComment):
+        """
+        RTL comment:
+        
+        -- Group init channels from the dataflow circuit
+
+        -- {config.num_groups()} control channels,
+
+        -- one for each group of memory operations.
+        """
         def __init__(self, config : Config):
             comment = f"""
 
@@ -111,27 +123,59 @@ class GroupAllocatorDeclarativeIOSignals():
                 )
             )
 
-#     class LoadQueueTailPointer():
-#         """
-#         Input: pointer to the tail entry of the load queue, which is an input to the group allocator directly from the load queue.
-#         There is only 1 load queue tail pointer. Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
-#         """
-#         def __init__(self, config : Config):
+    class QueueInputsComment(EntityComment):
+        """
+        RTL comment:
+        
+        -- Input signals from the (load/store) queue
+        """
+        def __init__(self, queue_type : QueueType):
 
-#             # The load queue tail pointer is a single, N-bit signal.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.load_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
 
-#             self.rtl_name = LOAD_QUEUE_TAIL_POINTER_NAME
-            
-#             self.direction = EntitySignalType.INPUT
+            comment = f"""
 
-#             self.entity_comment = f"""
-
-#     -- Input signals from the load queue
+#     -- Input signals from the {queue_type} queue
 # """.removeprefix("\n")
+            
+            EntityComment.__init__(
+                self,
+                comment
+            )
+
+    class QueuePointer(EntitySignal):
+        """
+        Input
+
+        Bitwidth = N
+
+        Number = 1
+
+        Pointer to the (head/tail) entry of a queue.
+        Input to the group allocator directly from the queue.
+        There is only 1 queue (head/tail) pointer. 
+        Like all queue pointers, its bitwidth is equal to ceil(log2(num_queue_entries))
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     queue_pointer_type : QueuePointerType
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_queue_idx_bitwidth
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth
+
+            EntitySignal.__init__(
+                self,
+                base_name=QUEUE_POINTER_NAME(queue_type, queue_pointer_type),
+                direction=EntitySignal.Direction.INPUT,
+                size=EntitySignal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )
+
 
 #     class LoadQueueHeadPointer():
 #         """

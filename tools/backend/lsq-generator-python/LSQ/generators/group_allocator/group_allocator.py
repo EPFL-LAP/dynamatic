@@ -5,21 +5,33 @@ from LSQ.utils import MaskLess
 from LSQ.config import Config
 
 from LSQ.entity import Entity
+
+from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativeIOSignals
+from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativePortItems
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
-        io = GroupAllocatorDeclarativeIOSignals()
+        p = GroupAllocatorDeclarativePortItems()
         self.entity_port_items = [
-            io.Reset(),
-            io.Clock(),
+            p.Reset(),
+            p.Clock(),
 
-            io.GroupInitChannelComment(config),
+            p.GroupInitChannelComment(config),
 
-            io.GroupInitValid(config),
-            io.GroupInitReady(config),
+            p.GroupInitValid(config),
+            p.GroupInitReady(config),
+
+            p.QueueInputsComment(queue_type=QueueType.LOAD),
+            p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
+            p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+
+            p.QueueInputsComment(queue_type=QueueType.STORE),
+            p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
+            p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL)
+
+
 
             # io.LoadQueueTailPointer(config),
             # io.LoadQueueHeadPointer(config),
