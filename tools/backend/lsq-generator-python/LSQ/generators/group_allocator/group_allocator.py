@@ -9,7 +9,32 @@ from LSQ.entity import Entity
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
 
-from LSQ.generators.group_allocator.group_allocator_signals import GroupAllocatorDeclarativePortItems
+from LSQ.generators.group_allocator.group_allocator_signals import \
+    (
+        GroupAllocatorDeclarativePortItems, 
+        GroupAllocatorDeclarativeLocalItems,
+        GroupHandshakingDeclarativePortItems
+    )
+
+class GroupHandshakingDeclarative():
+    def __init__(self, config : Config):
+        ga_p = GroupAllocatorDeclarativePortItems()
+
+        p = GroupHandshakingDeclarativePortItems()
+        self.entity_port_items = [
+            ga_p.GroupInitValid(config),
+            ga_p.GroupInitReady(config),
+
+            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
+            ga_p.QueueIsEmpty(QueueType.LOAD),
+
+            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
+            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
+            ga_p.QueueIsEmpty(QueueType.STORE),
+
+            p.GroupInitTransfer(config)
+        ]
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
@@ -54,6 +79,12 @@ class GroupAllocatorDeclarative():
             p.StorePositionPerLoadComment(config),
             p.StorePositionPerLoad(config)
         ]
+
+        # l = GroupAllocatorDeclarativeLocalItems()
+
+        # self.local_items = [
+        #     l.GroupInitTransfer(config)
+        # ]
 
         # l = GroupAllocatorDeclarativeLocalSignals()
         # self.local_signals = [
@@ -157,11 +188,14 @@ class GroupAllocator:
         arch = ''
 
         declaration = GroupAllocatorDeclarative(config)
+        handshaking_declaration = GroupHandshakingDeclarative(config)
 
+        hs_entity = Entity(handshaking_declaration)
         entity = Entity(declaration)
 
         # architecture = Architecture(declaration)
 
+        print(hs_entity.get("handshaking", "Group Handshaking"))
         print(entity.get(self.module_name, "Group Allocator"))
 
         # architecture = architecture.get(self.module_name)

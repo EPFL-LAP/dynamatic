@@ -20,11 +20,15 @@ class Signal():
     direction: Direction
     size: Size
 
-    def __init__(self, base_name: str, direction : Direction, size : Size):
+    def __init__(
+            self, 
+            base_name: str, 
+            size : Size, 
+            direction : Direction = None
+        ):
         self.base_name = base_name
-        self.direction = direction
         self.size = size
-
+        self.direction = direction
 
     def _get_entity_single(self, name):
         match self.direction:

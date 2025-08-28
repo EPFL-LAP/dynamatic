@@ -498,42 +498,37 @@ class GroupAllocatorDeclarativePortItems():
                 )
             )
 
-#     class StorePositionPerLoad():
-#         """
-#         Output: Whether the stores in the store queue and ahead or behind
-#         each specific entry in the load queue.
-         
-#         There is one signal per entry in the load queue,
-#         and 1 bit per entry in the store queue.
+class GroupAllocatorDeclarativeLocalItems():
+    pass
+
+
+class GroupHandshakingDeclarativePortItems():
+    class GroupInitTransfer(Signal):
+        """
+        Output
         
-#         The order of the memory operations, read from the ROM,
-#         has been shifted to generate this, 
-#         as well as 0s and 1s added correctly to fill out each signal.
+        Bitwidth = 1
 
-#         This is done based on the store queue and load queue pointers.
-#         """
-#         def __init__(self, config : Config):
+        Number = N
 
-#             # There are N M-bit signals. One per load queue entry
-#             # and 1 bit per store queue entry
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_queue_num_entries(), 
-#                                 number=config.load_queue_num_entries()
-#                                 )
+        Whether a particular group init channel transfers this cycle.
+         
+        1-bit signal, 1 signal per group of memory accesses
+        """
 
-#             self.entity_comment = f"""
+        def __init__(self, 
+                     config : Config,
+                     ):
 
-#     -- Store position per load
-#     -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
-#     -- One per entry in the load queue, with 1 bit per entry in the store queue.
-#     -- The order of the memory operations, read from the ROM, 
-#     -- has been shifted to generate this,
-#     -- as well as 0s and 1s added correctly to fill out each signal.
-# """.removeprefix("\n")
-
-#             self.rtl_name = STORE_POSITION_PER_LOAD_NAME
-            
-#             self.direction = EntitySignalType.OUTPUT
+            Signal.__init__(
+                self,
+                base_name=GROUP_INIT_TRANSFER_NAME,
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
+                    bitwidth=1,
+                    number=config.num_groups()
+                )
+            )
 
 # class GroupAllocatorDeclarativeLocalSignals():
 #     class NumNewLoadQueueEntries():
