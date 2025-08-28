@@ -538,30 +538,24 @@ class GroupHandshakingDeclarativeLocalItems():
 
         Number = 1
 
-        Number of empty entries in a queue.
+        Number of empty entries in a queue, naively calculated.
+        Needs to be combined with isEmpty to calculate the real value.
         """
 
         def __init__(self, 
                      config : Config,
                      queue_type : QueueType,
-                     is_naive,
                      ):
             
             match queue_type:
                 case QueueType.LOAD:
-                    if is_naive:
                         bitwidth = config.load_queue_idx_bitwidth()
-                    else:
-                        bitwidth = config.load_queue_size_w() 
                 case QueueType.STORE:
-                    if is_naive:
                         bitwidth = config.store_queue_idx_bitwidth()
-                    else:
-                        bitwidth = config.store_queue_size_w() 
 
             Signal.__init__(
                 self,
-                base_name=NUM_EMPTY_ENTRIES_NAIVE_NAME(queue_type, is_naive),
+                base_name=NUM_EMPTY_ENTRIES_NAIVE_NAME(queue_type),
                 size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
@@ -576,7 +570,7 @@ class GroupHandshakingDeclarativeBodyItems():
                 config : Config,
                 queue_type : QueueType
             ):
-            empty_entries_naive = NUM_EMPTY_ENTRIES_NAIVE_NAME(queue_type, is_naive=True)
+            empty_entries_naive = NUM_EMPTY_ENTRIES_NAIVE_NAME(queue_type)
         
             head_pointer = QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)
             tail_pointer = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
