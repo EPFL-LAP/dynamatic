@@ -68,19 +68,36 @@ class Signal():
             all_items += self._get_entity_single(item_name)
 
         return all_items
+    
+    def _get_local_single(self, name):
+
+
+        type_declaration = self.signalSizeToTypeDeclaration()
+
+        name = f"{name}".ljust(30)
+
+        full_declaration = f"signal {name} : {type_declaration};"
+
+        # comment out if bitwidth is 0
+        if self.size.bitwidth == 0:
+            full_declaration = f"-- {full_declaration}"
+
+        return f"""
+    {full_declaration}
+""".removeprefix("\n")
 
     def get_local_signal(self):
         # if item is singular
         # just generate it using the base name
         if self.size.number == 1:
-            return self._get_entity_single(self.base_name)
+            return self._get_local_single(self.base_name)
         
         # if this item is actually multiple items
         # generate all of them, using indexed names
         all_items = ""
         for i in range(self.size.number):
             item_name = f"{self.base_name}_{i}"
-            all_items += self._get_entity_single(item_name)
+            all_items += self._get_local_single(item_name)
 
         return all_items
 

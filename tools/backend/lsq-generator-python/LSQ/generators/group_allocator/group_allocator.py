@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriority
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity
+from LSQ.entity import Entity, Architecture
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -80,11 +80,11 @@ class GroupAllocatorDeclarative():
             p.StorePositionPerLoad(config)
         ]
 
-        # l = GroupAllocatorDeclarativeLocalItems()
+        hs_p = GroupHandshakingDeclarativePortItems()
 
-        # self.local_items = [
-        #     l.GroupInitTransfer(config)
-        # ]
+        self.local_items = [
+            hs_p.GroupInitTransfer(config)
+        ]
 
         # l = GroupAllocatorDeclarativeLocalSignals()
         # self.local_signals = [
@@ -193,12 +193,13 @@ class GroupAllocator:
         hs_entity = Entity(handshaking_declaration)
         entity = Entity(declaration)
 
-        # architecture = Architecture(declaration)
+        arch = Architecture(declaration)
 
         print(hs_entity.get("handshaking", "Group Handshaking"))
         print(entity.get(self.module_name, "Group Allocator"))
 
-        # architecture = architecture.get(self.module_name)
+        print(arch.get("self.module_name", "Group Allocator"))
+
 
         quit()
 
