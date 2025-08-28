@@ -38,7 +38,7 @@ class EntitySignal():
 
         type_declaration = self.signalSizeToTypeDeclaration()
 
-        name = f"{name}_{io_suffix}".ljust(20)
+        name = f"{name}_{io_suffix}".ljust(25)
 
         full_declaration = f"{name} : {direction} {type_declaration};"
 
