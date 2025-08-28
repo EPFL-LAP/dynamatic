@@ -46,6 +46,7 @@ import generators.handshake.passer as passer
 import generators.handshake.spec_v2.resolver as spec_v2_resolver
 import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
 import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
+import generators.handshake.shrui as shrui
 
 
 def generate_code(name, mod_type, parameters):
@@ -100,6 +101,8 @@ def generate_code(name, mod_type, parameters):
             return subf.generate_subf(name, parameters)
         case "subi":
             return subi.generate_subi(name, parameters)
+        case "shrui":
+            return shrui.generate_shrui(name, parameters)
         case "trunci":
             return trunci.generate_trunci(name, parameters)
         case "spec_commit":

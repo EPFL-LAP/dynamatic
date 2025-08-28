@@ -71,6 +71,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::ShRSIOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::ShRUIOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::TruncIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::TruncFOp, std::vector<Any> &,
@@ -364,6 +366,16 @@ LogicalResult StdExecuter::execute(mlir::arith::ShLIOp, std::vector<Any> &in,
 LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
+  auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+  auto shifted =
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+  out[0] = shifted;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
       APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
@@ -810,10 +822,10 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::SIToFPOp, arith::FPToSIOp, arith::IndexCastOp,
                   arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
                   arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
-                  arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
-                  math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
-                  math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
+                  arith::ShRUIOp, arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp,
+                  arith::ExtFOp, math::SqrtOp, math::CosOp, math::ExpOp,
+                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
+                  math::SqrtOp, math::AbsFOp, memref::AllocOp, memref::LoadOp,
                   memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);

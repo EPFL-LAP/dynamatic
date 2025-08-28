@@ -669,6 +669,8 @@ using DivSIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::SDivOp, arith::D
 using DivUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::UDivOp, arith::DivUIOp>;
 using RemSIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::SRemOp, arith::RemSIOp>;
 using RemUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::URemOp, arith::RemUIOp>;
+using ShRUIOpConversion   = LLVMToArithBinaryOpConversion<LLVM::LShrOp, arith::ShRUIOp>;
+using XOrIOpConversion    = LLVMToArithBinaryOpConversion<LLVM::XOrOp, arith::XOrIOp>;
 
 // Floating point arithmetic
 using AddFOpConversion    = LLVMToArithBinaryOpConversion<LLVM::FAddOp, arith::AddFOp>;
@@ -782,6 +784,8 @@ void LLVMToControlFlowPass::runOnOperation() {
       DivUIOpConversion,
       RemSIOpConversion,
       RemUIOpConversion,
+      ShRUIOpConversion,
+      XOrIOpConversion,
       AddFOpConversion,
       SubFOpConversion,
       MulFOpConversion,

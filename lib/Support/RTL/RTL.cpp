@@ -301,10 +301,10 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.lazy_fork" || modName == "handshake.merge" ||
       modName == "handshake.muli" || modName == "handshake.not" ||
       modName == "handshake.sink" || modName == "handshake.subi" ||
-      modName == "handshake.shli" || modName == "handshake.blocker" ||
-      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
-      modName == "handshake.ndwire" || modName == "handshake.blocker" ||
-      modName == "handshake.ready_remover" ||
+      modName == "handshake.shli" || modName == "handshake.shrui" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" || modName == "handshake.ndwire" ||
+      modName == "handshake.blocker" || modName == "handshake.ready_remover" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -390,8 +390,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.muli" || modName == "handshake.not" ||
       modName == "handshake.select" || modName == "handshake.sink" ||
       modName == "handshake.subf" || modName == "handshake.extui" ||
-      modName == "handshake.shli" || modName == "handshake.subi" ||
-      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.shli" || modName == "handshake.shrui" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
