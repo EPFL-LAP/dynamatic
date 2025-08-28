@@ -323,7 +323,7 @@ class GroupAllocatorDeclarativePortItems():
 
             EntitySignal.__init__(
                 self,
-                base_name=WRITE_ENABLE_NAME(queue_type),
+                base_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
                 direction=EntitySignal.Direction.OUTPUT,
                 size=EntitySignal.Size(
                     bitwidth=bitwidth,

@@ -45,7 +45,7 @@ class GroupAllocatorDeclarative():
             p.NumNewQueueEntriesComment(QueueType.STORE),
             p.NumNewQueueEntries(config, QueueType.STORE)
 
-
+    
 
 
 

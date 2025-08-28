@@ -37,12 +37,19 @@ def WRITE_ENABLE_NAME(
 
     return f"{queue_type.value}_write_enable"
 
+def NUM_NEW_QUEUE_ENTRIES_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the "number of new (load/store) queue entries" signal. 
+    Output by the group allocator, and used by the load queue to update its tail pointer.
+    """
+
+    return f"num_new_{queue_type.value}_queue_entries"
+
 
 
 NUM_NEW_LOAD_QUEUE_ENTRIES_NAME = "num_loads"
-"""
-RTL name for the "number of new load queue entries" signal. Output by the group allocator, and used by the load queue to update its tail pointer.
-"""
 
 LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME = "ldq_port_idx"
 """
