@@ -30,6 +30,9 @@ class QueuePointerType(Enum):
 def get_as_binary_string(val: int) -> str:
     return f"\"{bin(val)[2:]}\""
 
+def get_as_binary_string_padded(val: int, width: int) -> str:
+    return f"\"{bin(val)[2:].zfill(width)}\""
+
 def get_required_bitwidth(val: int) -> int:
     math.ceil(math.log2(val))
 
