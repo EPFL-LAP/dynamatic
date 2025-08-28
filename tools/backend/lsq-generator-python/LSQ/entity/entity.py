@@ -79,6 +79,7 @@ class Architecture():
 architecture arch of {name} is
   {self.local_items}
 begin
+
   {self.body}
 end architecture;
   """
