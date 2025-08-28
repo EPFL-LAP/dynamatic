@@ -76,9 +76,9 @@ class Architecture():
 
       architecture = f"""
   -- {entity_type}
-  architecture arch of {name} is
-      {self.local_items}
-  begin architecture
-  end architecture;
+architecture arch of {name} is
+    {self.local_items}
+begin architecture
+end architecture;
   """
       print(architecture)
