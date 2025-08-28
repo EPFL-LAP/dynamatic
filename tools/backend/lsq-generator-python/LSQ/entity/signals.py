@@ -105,8 +105,7 @@ class Signal():
 
 class UnsignedSignal(Signal):
     def signal_size_to_type_declaration(self):
-        type_declaration = f"unsigned({self.size.bitwidth} - 1 downto 0)".ljust(16)
-        return f"{type_declaration} := (others => '0')"
+        return f"unsigned({self.size.bitwidth} - 1 downto 0)"
 
 class EntityComment():
     def __init__(self, comment):

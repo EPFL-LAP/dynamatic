@@ -75,7 +75,7 @@ class Architecture():
 
     def get(self, name, entity_type):
       architecture = f"""
-  -- {entity_type}
+-- {entity_type}
 architecture arch of {name} is
   {self.local_items}
 begin
