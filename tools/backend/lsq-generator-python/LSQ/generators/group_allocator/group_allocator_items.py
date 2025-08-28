@@ -677,7 +677,7 @@ class GroupHandshakingDeclarativeBodyItems():
         {store_empty_entries_naive_use} >= {group_num_stores_binary}) then
         {init_ready_name} <= '1';
     else
-        {init_ready_name} <= '1';
+        {init_ready_name} <= '0';
     end if;
   end process;
 """.removeprefix("\n")
