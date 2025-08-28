@@ -38,7 +38,7 @@ class PortIdxPerQueueEntryRomMuxPortItems():
 class PortIdxPerQueueEntryRomMuxBodyItems():
     class Body():
 
-        def _get_default_value(idx, bitwidth):
+        def _get_default_value(self, idx, bitwidth):
             return f"""
     {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY}_{idx} <= {get_as_binary_string_padded(0, bitwidth)}
 """.removeprefix("\n")
