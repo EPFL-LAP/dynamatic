@@ -84,8 +84,11 @@ class Config:
             self.stResp = bool(obj["stResp"])
             self.gaMulti = bool(obj["groupMulti"])
 
-            self.gaNumLoads = obj["numLoads"]
-            self.gaNumStores = obj["numStores"]
+            #gaNumLoads
+            self._group_num_loads = obj["numLoads"]
+            #gaNumStores
+            self._group_num_stores = obj["numStores"]
+
             self.gaLdOrder = obj["ldOrder"]
             self.gaLdPortIdx = obj["ldPortIdx"]
             self.gaStPortIdx = obj["stPortIdx"]
@@ -97,10 +100,10 @@ class Config:
             self._stq_idx_w = math.ceil(math.log2(self._stq_num_entries))
             
             # emptyLdAddrW
-            self._empty_ldw_idx_w = math.ceil(math.log2(self.numLdqEntries+1))
+            self._ldq_size_w = math.ceil(math.log2(self._ldq_num_entries+1))
 
             # emptyStAddrW
-            self._empty_stq_idx_w = math.ceil(math.log2(self.numStqEntries+1))
+            self._stq_size_w = math.ceil(math.log2(self._stq_num_entries+1))
 
             # Check the number of ports, if num*Ports == 0, set it to 1
 
@@ -168,6 +171,20 @@ class Config:
         """
         return self._stq_num_entries
     
+    def load_queue_size_w(self) -> int:
+        """
+        Bitwidth required to represent 
+        the total number of queue entries
+        """
+        return self._ldq_size_w
+
+    def store_queue_size_w(self) -> int:
+        """
+        Bitwidth required to represent 
+        the total number of queue entries
+        """
+        return self._stq_size_w
+
     def store_ports_idx_bitwidth(self) -> int:
         """
         Bitwidth required to identify a store port.
@@ -189,3 +206,15 @@ class Config:
         Number of load ports.
         """
         return self._num_ld_ports
+    
+    def group_num_loads(self, group_idx) -> int:
+        """
+        Number of loads in a group
+        """
+        return self._group_num_loads[group_idx]
+    
+    def group_num_stores(self, group_idx) -> int:
+        """
+        Number of stores in a group
+        """
+        return self._group_num_stores[group_idx]

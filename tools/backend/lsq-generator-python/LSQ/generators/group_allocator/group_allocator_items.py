@@ -5,8 +5,8 @@ from LSQ.rtl_signal_names import *
 
 from LSQ.utils import get_as_binary_string
 
-from enum import Enum
 
+from LSQ.operators.arithmetic import WrapSub, WrapSubReturn
 
 class GroupAllocatorDeclarativePortItems():
     class Reset(Signal):
@@ -539,58 +539,29 @@ class GroupHandshakingDeclarativeLocalItems():
         Number = 1
 
         Number of empty entries in a queue.
-        
-        If naive, needs to be combined with isEmpty? to get the real value.
         """
 
         def __init__(self, 
                      config : Config,
                      queue_type : QueueType,
-                     is_naive
+                     is_naive,
                      ):
             
-            # takes 1 more bit to represent the number of slots
-            # compared to required for a pointer
             match queue_type:
                 case QueueType.LOAD:
-                    bitwidth = config.load_queue_idx_bitwidth() + 1
+                    if is_naive:
+                        bitwidth = config.load_queue_idx_bitwidth()
+                    else:
+                        bitwidth = config.load_queue_size_w() 
                 case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth() + 1
+                    if is_naive:
+                        bitwidth = config.store_queue_idx_bitwidth()
+                    else:
+                        bitwidth = config.store_queue_size_w() 
 
             Signal.__init__(
                 self,
                 base_name=NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive),
-                size=Signal.Size(
-                    bitwidth=bitwidth,
-                    number=1
-                )
-            )
-
-    class NumEmptyIfQueueEmpty(Signal):
-        """
-        Bitwidth = N
-
-        Number = 1
-
-        Number of empty entries if a queue is queue empty.
-        """
-
-        def __init__(self, 
-                     config : Config,
-                     queue_type : QueueType,
-                     ):
-            
-            # takes 1 more bit to represent the number of slots
-            # compared to required for a pointer
-            match queue_type:
-                case QueueType.LOAD:
-                    bitwidth = config.load_queue_idx_bitwidth() + 1
-                case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth() + 1
-
-            Signal.__init__(
-                self,
-                base_name=NUM_EMPTY_IF_QUEUE_EMPTY_NAME(queue_type),
                 size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
@@ -605,31 +576,56 @@ class GroupHandshakingDeclarativeBodyItems():
                 config : Config,
                 queue_type : QueueType
             ):
+            empty_entries_naive = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
+            empty_entries = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
+        
+            head_pointer = QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)
+            tail_pointer = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+
+
+
+
+            is_empty = f"{IS_EMPTY_NAME(queue_type)}_i"
+
             match queue_type:
                 case QueueType.LOAD:
-                    num_if_queue_empty = config.load_queue_num_entries()
+                    empty_entries_bitwidth = config.load_queue_size_w()
+                    fully_empty_value = get_as_binary_string(config.load_queue_num_entries())
+                    num_entries = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    num_if_queue_empty = config.store_queue_num_entries()
-
-            num_if_queue_empty_bin = get_as_binary_string(num_if_queue_empty)
-            num_empty_if_queue_empty_name = NUM_EMPTY_IF_QUEUE_EMPTY_NAME(queue_type)
-
-            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
-            empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
-
-            head_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)}_i"
-            tail_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)}_i"
-
-            is_empty_name = f"{IS_EMPTY_NAME(queue_type)}_i"
+                    empty_entries_bitwidth = config.store_queue_size_w()
+                    fully_empty_value = get_as_binary_string(config.store_queue_num_entries())
+                    num_entries = config.store_queue_num_entries()
 
 
-            return f"""
-
-  {num_empty_if_queue_empty_name} <= {num_if_queue_empty_bin};
-  {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
-
-  {empty_entries_name} <= {num_empty_if_queue_empty_name} when {is_empty_name} else {empty_entries_naive_name};
+            wrap_sub_return = WrapSub(empty_entries_naive, head_pointer, tail_pointer, num_entries)
+            if wrap_sub_return.single_line:
+                empty_entries_naive_assignment = f"""
+  {wrap_sub_return.line1}
 """.removeprefix("\n")
+            else:
+                empty_entries_naive_assignment = f"""
+  {wrap_sub_return.line1}
+    {wrap_sub_return.line2}
+    {wrap_sub_return.line3}
+    {wrap_sub_return.line4}
+"""
+
+            empty_entries_assignment = f"""
+  process(all):
+    -- if empty
+    if {is_empty} = "1" then
+        -- assign number of entries in the entire queue
+        {empty_entries} <= {fully_empty_value};
+    else
+        -- otherwise, assign naively calculated number of empty entries
+        -- (resized to allow number of entries comparison instead of pointer comparison)
+        -- since it is correct
+        {empty_entries} <= resize({empty_entries_naive}, {empty_entries_bitwidth});
+    end                
+""".removeprefix("\n")
+            
+            return empty_entries_naive_assignment + empty_entries_assignment
 
 
 
@@ -638,3 +634,26 @@ class GroupHandshakingDeclarativeBodyItems():
             self.item = ""
             self.item += self.get_empty_entries_assignment(config, QueueType.LOAD)
             self.item += self.get_empty_entries_assignment(config, QueueType.STORE)
+
+            load_is_empty_name = f"{IS_EMPTY_NAME(QueueType.LOAD)}_i"
+            store_is_empty_name = f"{IS_EMPTY_NAME(QueueType.STORE)}_i"
+
+            load_empty_entries = NUM_EMPTY_ENTRIES_NAME(QueueType.LOAD, is_naive=False)
+            store_empty_entries = NUM_EMPTY_ENTRIES_NAME(QueueType.STORE, is_naive=False)
+
+
+            for i in range(config.num_groups()):
+                init_ready_name = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
+                item += f"""
+
+  process(all)
+  begin
+    if {load_is_empty_name}='1' or {store_is_empty_name}='1' then
+        {init_ready_name} <= '1';
+    elsif {load_empty_entries} < {config.group_num_loads(i)} or {store_empty_entries} < {config.group_num_stores(i)} then 
+        {init_ready_name} <= '0';
+    else
+        {init_ready_name} <= '1';
+    end if;
+  end process;
+""".removeprefix("\n")

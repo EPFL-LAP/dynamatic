@@ -72,25 +72,13 @@ There is one of these 1-bit signals per group of memory operations.
 
 def NUM_EMPTY_ENTRIES_NAME(
         queue_type : QueueType, 
-        is_naive
+        is_naive,
         ):
     """
-    RTL name for the calculcated number of empty queue entries.
-    If naive, needs to be combined with isEmpty? to calculate the true value
+    RTL name for the number of empty queue entries.
     """
-    if(is_naive):
+    if is_naive:
         suffix = "_naive"
     else:
         suffix = ""
     return f"{queue_type.value}_q_num_empty_entries{suffix}"
-
-
-def NUM_EMPTY_IF_QUEUE_EMPTY_NAME(
-        queue_type : QueueType
-        ):
-    """
-    RTL name for the number of entries in a queue if it the queue is empty.
-    """
-
-    return f"{queue_type.value}_q_num_empty_if_q_empty"
-

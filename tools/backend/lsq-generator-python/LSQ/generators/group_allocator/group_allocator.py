@@ -1,6 +1,6 @@
 from LSQ.context import VHDLContext
 from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from LSQ.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
@@ -40,13 +40,10 @@ class GroupHandshakingDeclarative():
 
         l = GroupHandshakingDeclarativeLocalItems()
         self.local_items = [
-            l.NumEmptyEntries(config, QueueType.LOAD, is_naive = True),
+            l.NumEmptyEntries(config, QueueType.LOAD, is_naive=True),
             l.NumEmptyEntries(config, QueueType.STORE, is_naive=True),
-            l.NumEmptyEntries(config, QueueType.LOAD, is_naive = False),
+            l.NumEmptyEntries(config, QueueType.LOAD, is_naive=False),
             l.NumEmptyEntries(config, QueueType.STORE, is_naive=False),
-
-            l.NumEmptyIfQueueEmpty(config, QueueType.LOAD),
-            l.NumEmptyIfQueueEmpty(config, QueueType.STORE),
 
             ga_p.GroupInitReady(config)
         ]
@@ -247,9 +244,9 @@ class GroupAllocator:
         empty_stores = LogicVec(ctx, 'empty_stores', 'w',
                                 self.configs.emptyStAddrW)
 
-        arch += WrapSub(ctx, loads_sub, ldq_head_i,
+        arch += WrapSub_old(ctx, loads_sub, ldq_head_i,
                         ldq_tail_i, self.configs.numLdqEntries)
-        arch += WrapSub(ctx, stores_sub, stq_head_i,
+        arch += WrapSub_old(ctx, stores_sub, stq_head_i,
                         stq_tail_i, self.configs.numStqEntries)
 
         arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',

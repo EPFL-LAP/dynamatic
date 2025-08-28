@@ -63,7 +63,7 @@ def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
     return str_ret
 
 
-def WrapSub(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
+def WrapSub_old(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
     """
     if "max" is power of 2:
         out = in_a - in_b
@@ -86,3 +86,39 @@ def WrapSub(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
             f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));\n'
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
+
+class WrapSubReturn():
+    def __init__(self, single_line : bool, line1, line2=None, line3=None, line4=None):
+        self.single_line = single_line
+        self.line1 = line1
+        self.line2 = line2
+        self.line3 = line3
+        self.line4 = line4
+
+def WrapSub(out, a, b, max) -> WrapSubReturn:
+    """
+    if "max" is power of 2:
+        in_a - in_b
+    else:
+        if in_a >= in_b:
+            out = in_a - in_b
+        else:
+            out = (in_a + max) - in_b
+    """
+
+    if isPow2(max):
+        line1 = f"{out} <= std_logic_vector(unsigned({a})) - unsigned({b}));"
+        return WrapSubReturn(single_line=True, line1=line1)
+    else:
+        line1 = f"{out} <="
+        line2 = "std_logic_vector(unsigned({a})) - unsigned({b}))"
+        line3 = f"when {a} >= b else"
+        line4 = f"std_logic_vector({max} + unsigned({a}) - unsigned({b}))" 
+        
+        return WrapSubReturn(
+            single_line=False, 
+            line1=line1, 
+            line2=line2, 
+            line3=line3, 
+            line4=line4
+            )
