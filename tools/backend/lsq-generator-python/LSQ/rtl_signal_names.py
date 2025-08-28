@@ -47,11 +47,14 @@ def NUM_NEW_QUEUE_ENTRIES_NAME(
 
     return f"num_new_{queue_type.value}_queue_entries"
 
+def PORT_INDEX_PER_ENTRY_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for index to a (load/store) port, per (load/store) queue entry.
+    """
+    return f"{queue_type.value}_port_idx_per_entry"
 
-
-NUM_NEW_LOAD_QUEUE_ENTRIES_NAME = "num_loads"
-
-LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME = "ldq_port_idx"
 """
 RTL name for index to a load port, per load queue entry.
 """

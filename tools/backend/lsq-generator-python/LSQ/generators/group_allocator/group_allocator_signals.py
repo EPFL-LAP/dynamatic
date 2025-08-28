@@ -1,4 +1,4 @@
-from LSQ.entity import EntitySignal, EntityComment
+from LSQ.entity import Signal, EntityComment
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
@@ -7,7 +7,7 @@ from enum import Enum
 
 
 class GroupAllocatorDeclarativePortItems():
-    class Reset(EntitySignal):
+    class Reset(Signal):
         """
         Input.
 
@@ -16,18 +16,18 @@ class GroupAllocatorDeclarativePortItems():
         Bitwidth=1, Number=1
         """
         def __init__(self):
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name="rst",
-                direction=EntitySignal.Direction.INPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=1
                 )
             )
 
     
-    class Clock(EntitySignal):
+    class Clock(Signal):
         """
         Input.
 
@@ -36,11 +36,11 @@ class GroupAllocatorDeclarativePortItems():
         Bitwidth=1, Number=1
         """
         def __init__(self):
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name="clk",
-                direction=EntitySignal.Direction.INPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=1
                 )
@@ -69,7 +69,7 @@ class GroupAllocatorDeclarativePortItems():
                 comment
             )
 
-    class GroupInitValid(EntitySignal):
+    class GroupInitValid(Signal):
         """
         Input
 
@@ -86,18 +86,18 @@ class GroupAllocatorDeclarativePortItems():
         group_init_ready_N_i : in std_logic;
         """
         def __init__(self, config : Config):
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=f"{GROUP_INIT_CHANNEL_NAME}_valid",
-                direction=EntitySignal.Direction.INPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=config.num_groups()
                 )
             )
 
 
-    class GroupInitReady(EntitySignal):
+    class GroupInitReady(Signal):
         """
         Output.
          
@@ -114,11 +114,11 @@ class GroupAllocatorDeclarativePortItems():
         group_init_ready_N_i : out std_logic;
         """
         def __init__(self, config : Config):
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=f"{GROUP_INIT_CHANNEL_NAME}_ready",
-                direction=EntitySignal.Direction.OUTPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=config.num_groups()
                 )
@@ -143,7 +143,7 @@ class GroupAllocatorDeclarativePortItems():
             )
 
 
-    class QueuePointer(EntitySignal):
+    class QueuePointer(Signal):
         """
         Input
 
@@ -166,18 +166,18 @@ class GroupAllocatorDeclarativePortItems():
                 case QueueType.STORE:
                     bitwidth = config.store_queue_idx_bitwidth()
 
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=QUEUE_POINTER_NAME(queue_type, queue_pointer_type),
-                direction=EntitySignal.Direction.INPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
                 )
             )
 
 
-    class QueueIsEmpty(EntitySignal):
+    class QueueIsEmpty(Signal):
         """
         Input
 
@@ -190,11 +190,11 @@ class GroupAllocatorDeclarativePortItems():
         def __init__(self, 
                      queue_type : QueueType
                      ):
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=IS_EMPTY_NAME(queue_type),
-                direction=EntitySignal.Direction.INPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=1
                 )
@@ -231,7 +231,7 @@ class GroupAllocatorDeclarativePortItems():
                 comment
             )
 
-    class QueueWriteEnable(EntitySignal):
+    class QueueWriteEnable(Signal):
         """
         Output.
         
@@ -253,11 +253,11 @@ class GroupAllocatorDeclarativePortItems():
                 case QueueType.STORE:
                     number = config.store_queue_num_entries()
 
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=WRITE_ENABLE_NAME(queue_type),
-                direction=EntitySignal.Direction.OUTPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
                     bitwidth=1,
                     number=number
                 )
@@ -291,7 +291,7 @@ class GroupAllocatorDeclarativePortItems():
             )
 
 
-    class NumNewQueueEntries(EntitySignal):
+    class NumNewQueueEntries(Signal):
         """
         Output.
         
@@ -321,162 +321,182 @@ class GroupAllocatorDeclarativePortItems():
                 case QueueType.STORE:
                     bitwidth = config.store_queue_idx_bitwidth()
 
-            EntitySignal.__init__(
+            Signal.__init__(
                 self,
                 base_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
-                direction=EntitySignal.Direction.OUTPUT,
-                size=EntitySignal.Size(
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
                     bitwidth=bitwidth,
                     number=1
                 )
             )
 
-#     class NumNewLoadQueueEntries():
-#         """
-#         Output: Number of load queue entries to allocate, which is output directly to the load queue.
-#         Non-handshaked signal. Used by the load queue to update its tail pointer, using update logic appropriate to circular buffers.
-#         There is a single "number of load queue entries to allocate" signal, and its bitwidth is equal to the bitwidth of the load queue pointers, to allow easy arithmetic between then.
-#         """
-#         def __init__(self, config : Config):
-
-#             # There is a single N-bit "number of load queue entries to allocate" signal
-#             # and its bitwidth is equal to the bitwidth of the load queue pointers, to allow easy arithmetic between then.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.load_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
-
-#             self.rtl_name = NUM_NEW_LOAD_QUEUE_ENTRIES_NAME
+    class PortIndexPerQueueEntryComment(EntityComment):
+        """
+        RTL comment:
             
-#             self.direction = EntitySignalType.OUTPUT
+        -- Load port index to write into each load queue entry.
+
+        -- {number} signals, each {bitwidth} bit(s).
+
+        -- Not one-hot.
+
+        -- There is inconsistant code implying this signal should not be present 
+
+        -- if there are no load ports.
+
+        -- But it is currently added regardless (with bitwidth 1)
+
+        -- Actual number of load ports: {actual_num_ports}
+        """
+        def __init__(
+                self, 
+                config : Config,
+                queue_type : QueueType
+                ):
+
+            match queue_type:
+                case QueueType.LOAD:
+                    number = config.load_queue_num_entries(),
+                    bitwidth = config.load_ports_idx_bitwidth()
+                    actual_num_ports = config.load_ports_num()
+                case QueueType.STORE:
+                    number = config.store_queue_num_entries(),
+                    bitwidth = config.store_ports_idx_bitwidth()
+                    actual_num_ports = config.store_ports_num()
+
+            comment = f"""
+
+    -- Load port index to write into each load queue entry.
+    -- {number} signals, each {bitwidth} bit(s).
+    -- Not one-hot.
+    -- There is inconsistant code implying this signal should not be present 
+    -- if there are no load ports.
+    -- But it is currently added regardless (with bitwidth 1)
+    -- Actual number of load ports: {actual_num_ports}
+""".removeprefix("\n")
+            EntityComment.__init__(
+                self,
+                comment
+            )
+
+
+    class PortIndexPerQueueEntry(Signal):
+        """
+        Output 
+        
+        Bitwidth = N
+
+        Number = M
+
+        Which (load/store) port index to allocate into each (load/store) queue entry. 
+        
+        The group allocator uses the head pointer from the (load/store) queue 
+        to place the (load/store) port indices in the correct signal, 
+        so that they arrive in the correct (load/store) queue entries. 
+        
+        This is guarded by the (load/store) queue entry write enable, 
+        so not all of these signals are used.
+
+        There is one signal per load queue entry, with the bitwidth required to identify a load port.
+        Not one-hot.
+
+        There is inconsistant code implying this signal should not be present 
+        if there are no load ports.
+        But it is currently added regardless (with bitwidth 1)
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_ports_idx_bitwidth()
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth()
+
+            Signal.__init__(
+                self,
+                base_name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )
+
+    class StorePositionPerLoadComment(EntityComment):
+        """
+        RTL comment:
             
-#             self.entity_comment = f"""
+        -- Store position per load
 
-#     -- Number of new load queue entries to allocate.
-#     -- Used by the load queue to update its tail pointer.
-#     -- Bitwidth equal to the load queue pointer bitwidth.
-# """.removeprefix("\n")
+        -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
 
-#     class LoadPortIndexPerLoadQueueEntry():
-#         """
-#         Output: Which load port index to allocate into each load queue entry. The group allocator uses the head pointer from the load queue to place the load port indices in the correct signal, so that they arrive in the correct load queue entries. This is guarded by the load queue entry write enable, so not all of these signals are used.
+        -- One per entry in the load queue, with 1 bit per entry in the store queue.
 
-#         There is one signal per load queue entry, and with the bitwidth required to identify a load port.
-#         Not one-hot.
+        -- The order of the memory operations, read from the ROM, 
 
-#         There is inconsistant code implying this signal should not be present 
-#         if there are no load ports.
-#         But it is currently added regardless (with bitwidth 1)
-#         """
-#         def __init__(self, config : Config):
+        -- has been shifted to generate this,
 
-#             # There are N M-bit signals. One per load queue entry
-#             # and with the bitdwith required to identify a load port
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.load_ports_idx_bitwidth(), 
-#                                 number=config.load_queue_num_entries()
-#                                 )
-
-#             self.entity_comment = f"""
-
-#     -- Load port index to write into each load queue entry.
-#     -- {config.load_queue_num_entries()} signals, each {config.load_ports_idx_bitwidth()} bit(s).
-#     -- Not one-hot.
-#     -- There is inconsistant code implying this signal should not be present 
-#     -- if there are no load ports.
-#     -- But it is currently added regardless (with bitwidth 1)
-#     -- Actual number of load ports: {config.load_ports_num()}
-# """.removeprefix("\n")
-
-#             self.rtl_name = LOAD_PORT_INDEX_PER_LOAD_QUEUE_NAME
-            
-#             self.direction = EntitySignalType.OUTPUT
+        -- as well as 0s and 1s added correctly to fill out each signal.
+        """
+        def __init__(
+                self, 
+                config : Config,
+                ):
 
 
-#     class StoreQueueWriteEnable():
-#         """
-#         Output: Write enable signals to the store queue, used to allocate entries in the store queue. There are N 1-bit write enable signals, which are an output directly to the store queue. As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
-#         """
-#         def __init__(self, config : Config):
+            comment = f"""
 
-#             # There are N 1-bit write enable signals.
-#             # As expected for write enable signals to queue entries, there is 1 write enable signal per queue entry.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=1, 
-#                                 number=config.store_queue_num_entries()
-#                                 )
+    -- Store position per load
+    -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
+    -- One per entry in the load queue, with 1 bit per entry in the store queue.
+    -- The order of the memory operations, read from the ROM, 
+    -- has been shifted to generate this,
+    -- as well as 0s and 1s added correctly to fill out each signal.
+""".removeprefix("\n")
+            EntityComment.__init__(
+                self,
+                comment
+            )
 
-#             self.rtl_name = STORE_QUEUE_WRITE_ENABLE_NAME
-            
-#             self.direction = EntitySignalType.OUTPUT
 
-#             self.entity_comment = f"""
 
-#     -- Store queue write enable signals
-#     -- {config.load_queue_num_entries()} signals, one for each queue entry.
-# """.removeprefix("\n")
+    class StorePositionPerLoad(Signal):
+        """
+        Output
+        
+        Bitwidth = N
 
-#     class NumNewStoreQueueEntries():
-#         """
-#         Output: Number of store queue entries to allocate, which is output directly to the store queue.
-#         Non-handshaked signal. Used by the store queue to update its tail pointer, using update logic appropriate to circular buffers.
-#         There is a single "number of store queue entries to allocate" signal, and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
-#         """
-#         def __init__(self, config : Config):
+        Number = N
 
-#             # There is a single N-bit "number of store queue entries to allocate" signal
-#             # and its bitwidth is equal to the bitwidth of the store queue pointers, to allow easy arithmetic between then.
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_queue_idx_bitwidth(), 
-#                                 number=1
-#                                 )
+        Whether the stores in the store queue and ahead or behind
+        each specific entry in the load queue.
+         
+        There is one signal per entry in the load queue,
+        and 1 bit per entry in the store queue.
+        
+        The order of the memory operations, read from the ROM,
+        has been shifted to generate this, 
+        as well as 0s and 1s added correctly to fill out each signal.
 
-#             self.rtl_name = NUM_NEW_STORE_QUEUE_ENTRIES_NAME
-            
-#             self.direction = EntitySignalType.OUTPUT
-            
-#             self.entity_comment = f"""
+        This is done based on the store queue and load queue pointers.
+        """
 
-#     -- Number of new store queue entries to allocate.
-#     -- Used by the store queue to update its tail pointer.
-#     -- Bitwidth equal to the store queue pointer bitwidth.
-# """.removeprefix("\n")
+        def __init__(self, 
+                     config : Config,
+                     ):
 
-#     class StorePortIndexPerStoreQueueEntry():
-#         """
-#         Output: Which store port index to allocate into each store queue entry. The group allocator uses the head pointer from the store queue to place the store port indices in the correct signal, so that they arrive in the correct store queue entries. This is guarded by the store queue entry write enable, so not all of these signals are used.
-
-#         There is one signal per store queue entry, and with the bitwidth required to identify a store port.
-#         Not one-hot.
-
-#         There is inconsistant code implying this signal should not be present 
-#         if there are no store ports.
-#         But it is currently added regardless (with bitwidth 1)
-#         """
-#         def __init__(self, config : Config):
-
-#             # There are N M-bit signals. One per store queue entry
-#             # and with the bitdwidth required to identify a store port
-#             self.signal_size = SignalSize(
-#                                 bitwidth=config.store_ports_idx_bitwidth(), 
-#                                 number=config.store_queue_num_entries()
-#                                 )
-
-#             self.entity_comment = f"""
-
-#     -- Store port index to write into each store queue entry.
-#     -- {config.store_queue_num_entries()} signals, each {config.store_ports_idx_bitwidth()} bit(s).
-#     -- Not one-hot.
-#     -- There is inconsistant code implying this signal should not be present 
-#     -- if there are no store ports.
-#     -- But it is currently added regardless (with bitwidth 1)
-#     -- Actual number of store ports: {config.store_ports_num()}
-# """.removeprefix("\n")
-
-#             self.rtl_name = STORE_PORT_INDEX_PER_STORE_QUEUE_NAME
-            
-#             self.direction = EntitySignalType.OUTPUT
-
+            Signal.__init__(
+                self,
+                base_name=STORE_POSITION_PER_LOAD_NAME,
+                direction=Signal.Direction.OUTPUT,
+                size=Signal.Size(
+                    bitwidth=config.store_queue_num_entries(), 
+                    number=config.load_queue_num_entries()
+                )
+            )
 
 #     class StorePositionPerLoad():
 #         """

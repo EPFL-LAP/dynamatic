@@ -39,33 +39,20 @@ class GroupAllocatorDeclarative():
             p.NumNewQueueEntriesComment(QueueType.LOAD),
             p.NumNewQueueEntries(config, QueueType.LOAD),
 
+            p.PortIndexPerQueueEntryComment(config, QueueType.LOAD),
+            p.PortIndexPerQueueEntry(config, QueueType.LOAD),
+
             p.QueueWriteEnableComment(config, QueueType.STORE),
             p.QueueWriteEnable(config, QueueType.STORE),
 
             p.NumNewQueueEntriesComment(QueueType.STORE),
-            p.NumNewQueueEntries(config, QueueType.STORE)
+            p.NumNewQueueEntries(config, QueueType.STORE),
 
+            p.PortIndexPerQueueEntryComment(config, QueueType.STORE),
+            p.PortIndexPerQueueEntry(config, QueueType.STORE),
     
-
-
-
-            # io.LoadQueueTailPointer(config),
-            # io.LoadQueueHeadPointer(config),
-            # io.LoadQueueIsEmpty(),
-
-            # io.StoreQueueTailPointer(config),
-            # io.StoreQueueHeadPointer(config),
-            # io.StoreQueueIsEmpty(),
-
-            # io.LoadQueueWriteEnable(config),
-            # io.NumNewLoadQueueEntries(config),
-            # io.LoadPortIndexPerLoadQueueEntry(config),
-
-            # io.StoreQueueWriteEnable(config),
-            # io.NumNewStoreQueueEntries(config),
-            # io.StorePortIndexPerStoreQueueEntry(config),
-
-            # io.StorePositionPerLoad(config)
+            p.StorePositionPerLoadComment(config),
+            p.StorePositionPerLoad(config)
         ]
 
         # l = GroupAllocatorDeclarativeLocalSignals()

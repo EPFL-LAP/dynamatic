@@ -1,6 +1,6 @@
 from enum import Enum
 
-class EntitySignal():
+class Signal():
     class Size():
         def __init__(self, bitwidth, number):
             self.bitwidth = bitwidth
@@ -26,13 +26,13 @@ class EntitySignal():
         self.size = size
 
 
-    def _get_single(self, name):
+    def _get_entity_single(self, name):
         match self.direction:
-            case EntitySignal.Direction.INPUT:
+            case Signal.Direction.INPUT:
                 io_suffix = "i"
                 # with space at the end to match witdth of out
                 direction = "in "
-            case EntitySignal.Direction.OUTPUT:
+            case Signal.Direction.OUTPUT:
                 io_suffix = "o"
                 direction = "out"
 
@@ -50,20 +50,36 @@ class EntitySignal():
     {full_declaration}
 """.removeprefix("\n")
 
-    def get(self):
+    def get_entity_signal(self):
         # if item is singular
         # just generate it using the base name
         if self.size.number == 1:
-            return self._get_single(self.base_name)
+            return self._get_entity_single(self.base_name)
         
         # if this item is actually multiple items
         # generate all of them, using indexed names
         all_items = ""
         for i in range(self.size.number):
             item_name = f"{self.base_name}_{i}"
-            all_items += self._get_single(item_name)
+            all_items += self._get_entity_single(item_name)
 
         return all_items
+
+    def get_local_signal(self):
+        # if item is singular
+        # just generate it using the base name
+        if self.size.number == 1:
+            return self._get_entity_single(self.base_name)
+        
+        # if this item is actually multiple items
+        # generate all of them, using indexed names
+        all_items = ""
+        for i in range(self.size.number):
+            item_name = f"{self.base_name}_{i}"
+            all_items += self._get_entity_single(item_name)
+
+        return all_items
+
 
 class EntityComment():
     def __init__(self, comment):

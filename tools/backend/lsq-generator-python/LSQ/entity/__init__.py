@@ -1,4 +1,4 @@
 from .entity import Entity
-from .entity_signals import EntitySignal, EntityComment
+from .signals import Signal, EntityComment
 
-__all__ = ["Entity", "EntitySignal", EntityComment]
+__all__ = [Entity, Signal, EntityComment]
