@@ -631,7 +631,7 @@ class GroupHandshakingDeclarativeBodyItems():
 
 
                 load_empty_entries_naive_use = load_empty_entries_naive
-                store_empty_entries_naive_use = store_empty_entries_naive_use
+                store_empty_entries_naive_use = store_empty_entries_naive
 
 
                 # load_empty_entries is the size of the load queue pointers
