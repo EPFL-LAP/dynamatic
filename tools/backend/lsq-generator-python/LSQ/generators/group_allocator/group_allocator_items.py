@@ -667,6 +667,7 @@ class GroupHandshakingDeclarativeBodyItems():
     -- if both queues are empty, the group allocator is ready
     if {load_is_empty_name} = '1' and {store_is_empty_name} = '1' then
         {init_ready_name} <= '1';
+        
     -- otherwise, we must compare the number of loads and stores in this group
     -- to the number of empty entries in each queue.
     -- if either queue does not have enough space, the group allocator is not ready
