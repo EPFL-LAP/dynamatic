@@ -70,6 +70,9 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                     self.group_assignments += f"""
       {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{j} <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
+                self.group_assignments += f"""
+
+""".removeprefix("\n")
                 
             self.group_assignments += f"""
     end if;
