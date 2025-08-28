@@ -599,28 +599,12 @@ class GroupHandshakingDeclarativeLocalItems():
 
 class GroupHandshakingDeclarativeBodyItems():
     class Body(Signal):
-        def get_empty_entries_naive_assignment(
+
+        def get_empty_entries_assignment(
                 self,
+                config : Config,
                 queue_type : QueueType
             ):
-            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
-            head_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)}_i"
-            tail_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)}_i"
-
-            
-            return f"""
-
-  {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
-""".removeprefix("\n")
-        
-
-        def get_num_empty_if_fully_empty_assignment(
-                self,
-                config : Config, 
-                queue_type : QueueType
-            ):
-            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
-
             match queue_type:
                 case QueueType.LOAD:
                     num_if_fully_empty = config.load_queue_num_entries()
@@ -628,36 +612,29 @@ class GroupHandshakingDeclarativeBodyItems():
                     num_if_fully_empty = config.store_queue_num_entries()
 
             num_if_fully_empty_bin = get_as_binary_string(num_if_fully_empty)
+            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
+
+            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
+            empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
+
+            head_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.HEAD)}_i"
+            tail_pointer = f"{QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)}_i"
+
+            is_empty_name = f"{IS_EMPTY_NAME(queue_type)}_i"
+
 
             return f"""
 
   {num_empty_if_fully_empty_name} <= {num_if_fully_empty_bin};
-""".removeprefix("\n")
 
-
-        def get_empty_entries_assignment(
-                self,
-                queue_type : QueueType
-            ):
-            empty_entries_naive_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=True)
-            empty_entries_name = NUM_EMPTY_ENTRIES_NAME(queue_type, is_naive=False)
-            is_empty_name = f"{IS_EMPTY_NAME(queue_type)}_i"
-            num_empty_if_fully_empty_name = NUM_EMPTY_IF_FULLY_EMPTY_NAME(queue_type)
-
-            return f"""
-
+  {empty_entries_naive_name} <= '0' & std_logic_vector(unsigned({head_pointer}) - unsigned({tail_pointer}));
   {empty_entries_name} <= {num_empty_if_fully_empty_name} when {is_empty_name} else {empty_entries_naive_name};
 """.removeprefix("\n")
 
 
 
+
         def __init__(self, config : Config):
             self.item = ""
-            self.item += self.get_empty_entries_naive_assignment(QueueType.LOAD)
-            self.item += self.get_empty_entries_naive_assignment(QueueType.STORE)
-
-            self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.STORE)
-            self.item += self.get_num_empty_if_fully_empty_assignment(config, QueueType.LOAD)
-
-            self.item += self.get_empty_entries_assignment(QueueType.LOAD)
-            self.item += self.get_empty_entries_assignment(QueueType.STORE)
+            self.item += self.get_empty_entries_assignment(config, QueueType.LOAD)
+            self.item += self.get_empty_entries_assignment(config, QueueType.STORE)
