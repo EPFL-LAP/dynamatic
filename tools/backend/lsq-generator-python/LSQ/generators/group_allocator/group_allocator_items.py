@@ -650,7 +650,7 @@ class GroupHandshakingDeclarativeBodyItems():
                         f" num stores bitwidth is {num_stores_binary_bitwidth}"
                         )
 
-                self.items += f"""
+                self.item += f"""
   -- process to generate the ready signals for group init channel {i}
   -- by checking the number of empty elements vs. 
   -- the number of loads and stores in that group of memory operations
