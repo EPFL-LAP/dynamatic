@@ -111,10 +111,10 @@ def WrapSub(out, a, b, max) -> WrapSubReturn:
         return WrapSubReturn(single_line=True, line1=line1)
     else:
         line1 = f"{out} <="
-        line2 = "std_logic_vector(unsigned({a})) - unsigned({b}))"
+        line2 = "std_logic_vector(unsigned({a}) - unsigned({b}))"
         line3 = f"when {a} >= b else"
         line4 = f"std_logic_vector({max} + unsigned({a}) - unsigned({b}))" 
-        
+
         return WrapSubReturn(
             single_line=False, 
             line1=line1, 

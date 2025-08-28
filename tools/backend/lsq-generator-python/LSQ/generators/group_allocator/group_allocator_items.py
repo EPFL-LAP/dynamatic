@@ -622,40 +622,6 @@ class GroupHandshakingDeclarativeBodyItems():
                 num_loads = config.group_num_loads(i)
                 num_stores = config.group_num_stores(i)
 
-                load_pointer_bitwidth = config.load_queue_idx_bitwidth()
-                store_pointer_bitwidth = config.store_queue_idx_bitwidth()
-
-                num_loads_binary_bitwidth = get_required_bitwidth(num_loads)
-                num_stores_binary_bitwidth = get_required_bitwidth(num_stores)
-
-                group_num_loads_binary = get_as_binary_string_padded(num_loads, load_pointer_bitwidth)
-                group_num_stores_binary = get_as_binary_string_padded(num_stores, store_pointer_bitwidth)
-
-
-                load_empty_entries_naive_use = load_empty_entries_naive
-                store_empty_entries_naive_use = store_empty_entries_naive
-
-
-                # load_empty_entries is the size of the load queue pointers
-                # which may be 1 bit too small to compare to the number of required loads
-                if load_pointer_bitwidth + 1 == num_loads_binary_bitwidth:
-                    load_empty_entries_naive_use = f"0 & {load_empty_entries_naive}"
-                elif load_pointer_bitwidth < num_loads_binary_bitwidth:
-                    raise RuntimeError(
-                        f"Unexpected comparison bitwidths. Pointer is {load_pointer_bitwidth} bits, " + \
-                        f" num stores bitwidth is {num_loads_binary_bitwidth}"
-                        )
-
-                # store_empty_entries is the size of the store queue pointers
-                # which may be 1 bit too small to compare to the number of required stores
-                if config.store_queue_idx_bitwidth() + 1 == num_stores_binary_bitwidth:
-                    store_empty_entries_naive_use = f"0 & {store_empty_entries_naive}"
-                elif store_pointer_bitwidth < num_stores_binary_bitwidth:
-                    raise RuntimeError(
-                        f"Unexpected comparison bitwidths. Pointer is {store_pointer_bitwidth} bits, " + \
-                        f" num stores bitwidth is {num_stores_binary_bitwidth}"
-                        )
-
                 self.item += f"""
 
   -- process to generate the ready signals for group init channel {i}
@@ -672,10 +638,10 @@ class GroupHandshakingDeclarativeBodyItems():
     -- if either queue does not have enough space, the group allocator is not ready
     --
     -- Group {i} has:
-    --      {num_loads} loads
-    --      {num_stores} stores
-    elsif {load_empty_entries_naive_use} < {group_num_loads_binary} or 
-          {store_empty_entries_naive_use} < {group_num_stores_binary}
+    --      {num_loads} load(s)
+    --      {num_stores} store(s)
+    elsif unsigned({load_empty_entries_naive}) < {num_loads} or 
+          unsigned({store_empty_entries_naive}) < {num_stores}
         {init_ready_name} <= '0';
     else
         {init_ready_name} <= '1';
