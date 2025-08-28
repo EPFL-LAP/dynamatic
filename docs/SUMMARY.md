@@ -33,6 +33,10 @@
     - [2. Writing A Simple Pass](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/2.WritingASimplePass.md)
     - [3. Greedy Pattern Rewriting](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/3.GreedyPatternRewriting.md)
 
+- [Testing & CI]()
+  - [Integration Tests](DeveloperGuide/TestingCI/IntegrationTests.md)
+  - [Formatting Checks](DeveloperGuide/TestingCI/Formatting.md)
+  - [GitHub Actions](DeveloperGuide/TestingCI/Actions.md)
   
 - [Compiler Intrinsics]()
   - [Backend](DeveloperGuide/CompilerIntrinsics/Backend.md)
