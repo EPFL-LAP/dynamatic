@@ -1,11 +1,9 @@
-#include "polly/DependenceInfo.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -14,12 +12,12 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
-#include <stdexcept>
 #include <stdlib.h>
 #include <utility>
 
 #include "llvm/Analysis/ValueTracking.h"
 
+#include "MemDepAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/MemoryDependency.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -169,8 +167,6 @@ bool InstructionDependenceInfo::hasGlobalInOrderInstrDependency(
 }
 
 } // namespace
-
-using InstPairType = std::pair<Instruction *, Instruction *>;
 
 /// \brief: An data container class that represents the analysis data from the
 /// Scop.
@@ -491,38 +487,13 @@ public:
   iterator end() { return memInsts.end(); }
 };
 
-struct IndexAnalysis {
-
-  IndexAnalysis() : otherInsts() {}
-  ~IndexAnalysis() = default;
-
-  /// Returns all memory instructions in SCoPs which do not require an LSQ
-  /// connection
-  std::vector<Instruction *> &getOtherInsts() { return otherInsts; }
-
-  /// Query whether any SCoP contains BB
-  bool isInScop(BasicBlock *bb) { return bbList.find(bb) != bbList.end(); }
-
-  /// Returns an integer uniquely identifying the SCoP which contains BB
-  int getScopID(BasicBlock *bb) {
-    return (isInScop(bb)) ? bbToScopMap[bb] : -1;
-  }
-
-  std::vector<Instruction *> otherInsts;
-  std::set<InstPairType> instRAWlist;
-  std::set<InstPairType> instWAWlist;
-  std::set<BasicBlock *> bbList;
-  std::map<BasicBlock *, int> bbToScopMap;
-  std::map<Instruction *, Value *> instToBase;
-};
-
-void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
+static void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
   rq.push_back(&r);
   for (const auto &e : r)
     getAllRegions(*e, rq);
 }
 
-bool hasMemoryReadOrWrite(ScopStmt &stmt) {
+static bool hasMemoryReadOrWrite(ScopStmt &stmt) {
   bool hasRdWr = false;
   for (auto *inst : stmt.getInstructions()) {
     hasRdWr |= inst->mayReadOrWriteMemory();
@@ -532,7 +503,7 @@ bool hasMemoryReadOrWrite(ScopStmt &stmt) {
 
 // Returns the base address produced by the alloca instruction or the global
 // constant declaration.
-Value *findBaseInternal(Value *addr) {
+static Value *findBaseInternal(Value *addr) {
   if (auto *arg = dyn_cast<Argument>(addr)) {
     if (!arg->getType()->isPointerTy())
       llvm_unreachable("Only pointer arguments are considered addresses");
@@ -564,7 +535,7 @@ Value *findBaseInternal(Value *addr) {
   llvm_unreachable("Cannot  determine base array, aborting...");
 }
 
-Value *findBase(Instruction *inst) {
+static Value *findBase(Instruction *inst) {
   Value *addr;
   if (auto *loadInst = dyn_cast<LoadInst>(inst)) {
     addr = loadInst->getPointerOperand();
@@ -577,49 +548,9 @@ Value *findBase(Instruction *inst) {
   return findBaseInternal(addr);
 }
 
-bool equalBase(Instruction *a, Instruction *b) {
+static bool equalBase(Instruction *a, Instruction *b) {
   return findBase(a) == findBase(b);
 }
-
-namespace {
-
-struct FunctionInfo {
-  std::map<Instruction *, int> instToScopId;
-  std::vector<Instruction *> loadInsts;
-  std::vector<Instruction *> storeInsts;
-  bool sameScop(Instruction *a, Instruction *b) const {
-    if (instToScopId.count(a) == 0)
-      return false;
-    if (instToScopId.count(b) == 0)
-      return false;
-    return (instToScopId.at(a) == instToScopId.at(b));
-  }
-};
-
-/// \brief: an LLVM pass that combines polyhedral and alias analysis to compute
-/// a set of dependency edges from the LLVM IR. It further uses dataflow
-/// analysis to eliminate dependency edges enforced by the dataflow.
-struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
-
-  IndexAnalysis indexAnalysis;
-  AAManager::Result *aliasAnalysis;
-  unsigned memCount = 0;
-
-  /// \brief: Loops through the scop regions in the IR and applies index and
-  /// dataflow analysis to compute the minimum set of dependency edges.
-  void processScop(Scop &s, std::vector<ScopAnalysisInfo> &scopMeta);
-
-  /// \brief: Loops through the loops in the IR and collect the loads and
-  /// stores.
-  void processLoop(Loop *l, std::vector<struct LoopMetaData> &loopMetaInfos);
-  PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
-
-  /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
-  /// or WAW conflict.
-  std::vector<InstPairType>
-  getDependencyPairs(const FunctionInfo &functionInfo);
-  std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
-};
 
 std::map<Instruction *, std::string>
 MemDepAnalysisPass::nameAllLoadStores(Function &f) {
@@ -834,24 +765,23 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
   return PreservedAnalyses::all();
 }
 
-} // end anonymous namespace
-
-// Register the pass for opt-style loading
-// Important note: you need to enable shared libarary in LLVM to load pass
-// plugin:
+// // Register the pass for opt-style loading
+// // Important note: you need to enable shared libarary in LLVM to load pass
+// // plugin:
+// //
 // https://stackoverflow.com/questions/51474188/using-shared-object-so-by-command-opt-in-llvm
-extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
-llvmGetPassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "MemDepAnalysis", LLVM_VERSION_STRING,
-          [](PassBuilder &pb) {
-            pb.registerPipelineParsingCallback(
-                [](StringRef name, FunctionPassManager &fpm,
-                   ArrayRef<PassBuilder::PipelineElement>) {
-                  if (name == "mem-dep-analysis") {
-                    fpm.addPass(MemDepAnalysisPass());
-                    return true;
-                  }
-                  return false;
-                });
-          }};
-}
+// extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+// llvmGetPassPluginInfo() {
+//   return {LLVM_PLUGIN_API_VERSION, "MemDepAnalysis", LLVM_VERSION_STRING,
+//           [](PassBuilder &pb) {
+//             pb.registerPipelineParsingCallback(
+//                 [](StringRef name, FunctionPassManager &fpm,
+//                    ArrayRef<PassBuilder::PipelineElement>) {
+//                   if (name == "mem-dep-analysis") {
+//                     fpm.addPass(MemDepAnalysisPass());
+//                     return true;
+//                   }
+//                   return false;
+//                 });
+//           }};
+// }
