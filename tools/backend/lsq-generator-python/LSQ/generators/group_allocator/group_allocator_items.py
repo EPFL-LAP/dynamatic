@@ -47,8 +47,10 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             
             self.default_assignments = ""
 
+            idx_bitwidth = config.load_ports_idx_bitwidth()
+
             for i in range(config.load_queue_num_entries()):
-                self.default_assignments += self._get_default_value(queue_type, i, config.load_ports_idx_bitwidth())
+                self.default_assignments += self._get_default_value(queue_type, i, idx_bitwidth)
 
             self.default_assignments = self.default_assignments.strip()
 
@@ -58,11 +60,20 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                 if i == 0:
                     self.group_assignments += f"""
     if {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
-""" 
+""" .removeprefix("\n")
                 else:
                     self.group_assignments += f"""
     elif {GROUP_INIT_TRANSFER_NAME}_{i}_i = "1":
-""" 
+""".removeprefix("\n")
+
+                for j, idx in enumerate(range(config.gaLdPortIdx(i))):
+                    self.group_assignments += f"""
+    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{j} <= {get_as_binary_string_padded(idx, idx_bitwidth)}
+""".removeprefix("\n")
+                
+            self.group_assignments += f"""
+    endif
+""".removeprefix("\n")
 
             self.group_assignments = self.group_assignments.strip()
 
