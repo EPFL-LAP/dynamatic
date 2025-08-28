@@ -34,7 +34,7 @@ def get_as_binary_string_padded(val: int, width: int) -> str:
     return f"\"{bin(val)[2:].zfill(width)}\""
 
 def get_required_bitwidth(val: int) -> int:
-    math.ceil(math.log2(val))
+    return math.ceil(math.log2(val))
 
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic
