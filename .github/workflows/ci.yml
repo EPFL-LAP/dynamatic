@@ -87,11 +87,10 @@ jobs:
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
-        run: echo skip this # ninja -C build run-ci-integration-tests
+        run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
         run: |
-          echo $HOME
           if [ -f $HOME/perf_ci_saved.json ]; then
             echo "Found saved performance report"
             ls -lh $HOME/perf_ci_saved.json
