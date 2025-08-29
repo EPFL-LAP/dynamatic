@@ -48,7 +48,7 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << path.string() << std::endl
              << "set-clock-period 5" << std::endl
-             << "compile --buffer-algorithm fpga20" << std::endl
+             << "compile" << std::endl
              << "write-hdl --hdl " << (useVerilog ? "verilog" : "vhdl")
              << std::endl
              << "simulate" << std::endl
