@@ -32,6 +32,9 @@ Value getForkTop(Value value) {
   if (auto fork = dyn_cast<ForkOp>(value.getDefiningOp())) {
     return getForkTop(fork.getOperand());
   }
+  if (auto buf = dyn_cast<BufferOp>(value.getDefiningOp())) {
+    return getForkTop(buf.getOperand());
+  }
   return value;
 }
 
@@ -42,6 +45,8 @@ void iterateUsersOverNestedForkResults(Value result,
       for (Value forkResult : forkOp.getResults()) {
         iterateUsersOverNestedForkResults(forkResult, users);
       }
+    } else if (auto bufOp = dyn_cast<BufferOp>(user)) {
+      iterateUsersOverNestedForkResults(bufOp.getResult(), users);
     } else {
       users.push_back(user);
     }
@@ -55,6 +60,8 @@ void iterateUsesOverNestedForkResults(Value result,
       for (Value forkResult : forkOp.getResults()) {
         iterateUsesOverNestedForkResults(forkResult, uses);
       }
+    } else if (auto bufOp = dyn_cast<BufferOp>(use.getOwner())) {
+      iterateUsesOverNestedForkResults(bufOp.getResult(), uses);
     } else {
       uses.push_back(&use);
     }
@@ -127,6 +134,8 @@ void eraseMaterializedOperation(Operation *op) {
       sinkOp->erase();
     } else if (auto forkOp = dyn_cast<ForkOp>(user)) {
       eraseMaterializedOperation(forkOp);
+    } else if (auto bufOp = dyn_cast<BufferOp>(user)) {
+      eraseMaterializedOperation(bufOp);
     } else {
       op->emitError("Op has still uses, cannot be erased");
       llvm_unreachable("MaterializationUtil failed");
