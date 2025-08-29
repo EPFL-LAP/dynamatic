@@ -96,7 +96,7 @@ jobs:
             echo "Found saved performance report"
             ls -lh $HOME/perf_ci_saved.json
             python tools/integration/generate_perf_report.py \
-              --save perf_ci_branch.json --compare perf_ci_saved.json --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
+              --save perf_ci_branch.json --compare $HOME/perf_ci_saved.json --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
           else
             echo "Note: Saved performance report not found"
             python tools/integration/generate_perf_report.py \
@@ -106,7 +106,7 @@ jobs:
       - name: save-perf-report
         if: github.event_name == 'push'
         run: |
-          cp perf_ci_branch.json ~/perf_ci_saved.json
+          cp perf_ci_branch.json $HOME/perf_ci_saved.json
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
