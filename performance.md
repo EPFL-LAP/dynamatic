@@ -61,7 +61,7 @@
 | MiscBenchmarks/BasicFixture.basic/matvec | 11,007 | pass :heavy_check_mark: | 100,010 | :heavy_check_mark: -89,003 (-88.99%) |
 | MiscBenchmarks/BasicFixture.basic/kernel_3mm_float | 16,491 | pass :heavy_check_mark: | 32,009 | :heavy_check_mark: -15,518 (-48.48%) |
 | MiscBenchmarks/BasicFixture.basic/gaussian | 5,834 | pass :heavy_check_mark: | 5,898 | :heavy_check_mark: -64 (-1.09%) |
-| MiscBenchmarks/BasicFixture.basic/lu | 374 | pass :heavy_check_mark: | 515 | :heavy_check_mark: -141 (-27.38%) |
+| MiscBenchmarks/BasicFixture.basic/lu | 377 | pass :heavy_check_mark: | 515 | :heavy_check_mark: -138 (-26.80%) |
 | MiscBenchmarks/BasicFixture.basic/single_loop | 3,013 | pass :heavy_check_mark: | 3,514 | :heavy_check_mark: -501 (-14.26%) |
 | MiscBenchmarks/BasicFixture.basic/gesummv_float | 5,888 | pass :heavy_check_mark: | 12,618 | :heavy_check_mark: -6,730 (-53.34%) |
 | MiscBenchmarks/BasicFixture.basic/mvt_float | 10,503 | pass :heavy_check_mark: | 25,204 | :heavy_check_mark: -14,701 (-58.33%) |
