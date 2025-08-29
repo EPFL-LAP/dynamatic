@@ -263,6 +263,18 @@ class IsFloatChannel<string name> : PredOpTrait<
   ]>
 >;
 
+/// Ensures an operand/result is of ChannelType carrying FloatType data of the
+/// specified width.
+class IsFloatSizedChannel<int width, string name> : PredOpTrait<
+  name # " should be of ChannelType carrying FloatType data of width " # width,
+  And<[
+    IsChannelPred<name>,
+    IsFloatChannelPred<name>,
+    IsSizedChannelPred<width, name>
+  ]>
+>;
+
+
 /// Constraint to ensure an operand/result shouldn't have any extra signals.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
