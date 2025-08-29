@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
+  
+  push:
+    branches: ["main"]
 
 jobs:
   check-format:
@@ -89,20 +92,19 @@ jobs:
       - name: performance-report
         if: success() || failure()
         run: |
-          git status
-          git fetch origin main --no-recurse-submodules
-          rm perf_ci.bin
-          git checkout FETCH_HEAD -- perf_ci.bin 
-          python tools/integration/generate_perf_report.py \
-            --save perf_ci_branch.bin --compare perf_ci.bin --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
-          STATUS=$?
-          mv perf_ci_branch.bin perf_ci.bin
-          git config --global user.name 'Eugen Bosnjak'
-          git config --global user.email '11596160+ebosnjak@users.noreply.github.com'
-          git add perf_ci.bin performance.md
-          git diff-index --quiet HEAD || git commit -m "[AUTO][CI] Update performance report"
-          git push
-          exit $STATUS
+          if [ -f ~/perf_ci_saved.json ]; then
+            ls -lh ~/perf_ci_saved.json
+            python tools/integration/generate_perf_report.py \
+              --save perf_ci_branch.json --compare perf_ci_saved.json --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
+          else
+            python tools/integration/generate_perf_report.py \
+              --save perf_ci_branch.json | tee performance.md >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: save-perf-report
+        if: github.event_name == 'push'
+        run: |
+          cp perf_ci_branch.json ~/perf_ci_saved.json
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
