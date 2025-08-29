@@ -148,16 +148,23 @@ begin
       outs_spec <= "0";
     elsif ctrl_valid = '1' and ctrl = "100" then
       -- NO_CMP
-      -- TODO: When Empty = '1', input data should be bypassed,
-      --       just like when PASS or PASS_KILL, for better performance.
       -- Head = Curr is assumed from the specification.
-      -- `not Empty` ensures Curr < Tail.
-      CurrEn <= outs_ready and not Empty;
-      HeadEn <= outs_ready and not Empty;
+      if Empty = '1' then
+        CurrEn <= outs_ready and ins_valid and not Full;
+        HeadEn <= outs_ready and ins_valid and not Full;
 
-      ctrl_ready <= outs_ready and not Empty;
-      outs_valid <= not Empty;
-      {data("outs <= Memory(Head);", bitwidth)}
+        ctrl_ready <= outs_ready and ins_valid and not Full;
+        outs_valid <= ins_valid and not Full;
+        {data("outs <= ins;", bitwidth)}
+      else
+        -- `Empty = '0'` ensures Curr < Tail.
+        CurrEn <= outs_ready;
+        HeadEn <= outs_ready;
+
+        ctrl_ready <= outs_ready;
+        outs_valid <= '1';
+        {data("outs <= Memory(Head);", bitwidth)}
+      end if;
       outs_spec <= "0";
     end if;
   end process;
@@ -245,7 +252,7 @@ begin
         -- if only filling but not emptying
         if (TailEn = '1') and (HeadEn = '0') then
           -- if new tail index will reach head index
-          if ((Tail +1) mod {fifo_depth} = Head) then
+          if ((Tail + 2) mod {fifo_depth} = Head) then
             Full  <= '1';
           end if;
         elsif (TailEn = '0') and (HeadEn = '1') then
@@ -269,7 +276,7 @@ begin
         -- if only emptying but not filling
         if (TailEn = '0') and (HeadEn = '1') then
           -- if new head index will reach tail index
-          if ((Head +1) mod {fifo_depth} = Tail) then
+          if ((Head + 1) mod {fifo_depth} = Tail) then
             Empty  <= '1';
           end if;
         elsif (TailEn = '1') and (HeadEn = '0') then
@@ -293,7 +300,7 @@ begin
         -- if only emptying but not filling
         if (TailEn = '0') and (CurrEn = '1') then
           -- if new head index will reach tail index
-          if ((Curr +1) mod {fifo_depth} = Tail) then
+          if ((Curr + 1) mod {fifo_depth} = Tail) then
             CurrEmpty  <= '1';
           end if;
         elsif (TailEn = '1') and (CurrEn = '0') then
