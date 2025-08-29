@@ -90,7 +90,6 @@ jobs:
         run: ninja -C build run-ci-integration-tests
 
       - name: performance-report
-        if: false
         run: |
           if [ -f ~/perf_ci_saved.json ]; then
             ls -lh ~/perf_ci_saved.json
