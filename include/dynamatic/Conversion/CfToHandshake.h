@@ -48,12 +48,12 @@ public:
   // the constructor of a non-base class.
   LowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
                        mlir::PatternBenefit benefit = 1)
-      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit){};
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit) {};
 
   LowerFuncToHandshake(NameAnalysis &namer, const TypeConverter &typeConverter,
                        MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
       : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
-                                                   benefit){};
+                                                   benefit) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -70,9 +70,9 @@ public:
         lsqPorts;
     /// Function argument corresponding to the memory start signal for that
     /// interface.
-    BlockArgument memStart;
+    Value memStart;
 
-    MemAccesses(BlockArgument memStart);
+    MemAccesses(Value memStart);
   };
 
   /// Stores a mapping between memory regions (identified by the function
