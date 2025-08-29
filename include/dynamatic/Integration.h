@@ -39,14 +39,14 @@
 // 1. Statically-sized arrays are supported only up to 5 dimensions. Adding
 // support for higher-dimensional arrays is as simple as adding more `dumpArg`
 // functions similar to those already present.
-// 2. Kernels must have a maximum of 16 arguments. Adding support for kernels
+// 2. Kernels must have a maximum of 32 arguments. Adding support for kernels
 // with more arguments requires modifying a couple macros.
-//   - HAS_ARGS_IMPL (before argument N, add _17, _18, ... )
+//   - HAS_ARGS_IMPL (before argument N, add _33, _34, ... )
 //   - HAS_ARGS (add ARGS as many times as the number of extra arguments you
 //   want to support before NO_ARGS)
-//   - VA_NUM_ARGS_IMPL (before argument N, add _17, _18, ... )
-//   - VA_NUM_ARGS (after variadic argument in expansion, add ..., 18, 17)
-//   - DUMP_ARG_* (add DUMP_ARG_17, DUMP_ARG_18, ...)
+//   - VA_NUM_ARGS_IMPL (before argument N, add _33, _34, ... )
+//   - VA_NUM_ARGS (after variadic argument in expansion, add ..., 34, 33)
+//   - DUMP_ARG_* (add DUMP_ARG_33, DUMP_ARG_34, ...)
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,14 +61,18 @@
 
 /// Expands to the 18th macro argument.
 #define HAS_ARGS_IMPL(_kernel, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11,   \
-                      _12, _13, _14, _15, _16, N, ...)                         \
+                      _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22,   \
+                      _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, N,     \
+                      ...)                                                     \
   N
 
 /// HAS_ARGS will expand to NO_ARGS if kernelAndArgs has size 1 (just the kernel
 /// name). Otherwise it will expand to ARGS.
 #define HAS_ARGS(kernelAndArgs...)                                             \
   HAS_ARGS_IMPL(kernelAndArgs, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, \
-                ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, NO_ARGS)
+                ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS,    \
+                ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS,    \
+                ARGS, ARGS, ARGS, ARGS, NO_ARGS)
 
 //===----------------------------------------------------------------------===//
 // PRINT_PROFILING_INFO/HLS_VERIFICATION - Common code
@@ -344,15 +348,18 @@ static void callKernel(Res (*kernel)(void)) {
 // Following macro definitions strongly inspired by
 // https://stackoverflow.com/questions/46725369/how-to-get-name-for-each-argument-in-variadic-macros
 
-// This works for kernels with at most 16 arguments, but can be trivially
+// This works for kernels with at most 32 arguments, but can be trivially
 // extended to more if needed.
 
 #define VA_NUM_ARGS_IMPL(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12,    \
-                         _13, _14, _15, _16, N, ...)                           \
+                         _13, _14, _15, _16, _17, _18, _19, _20, _21, _22,     \
+                         _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, N,  \
+                         ...)                                                  \
   N
 #define VA_NUM_ARGS(...)                                                       \
-  VA_NUM_ARGS_IMPL(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4,  \
-                   3, 2, 1, 0)
+  VA_NUM_ARGS_IMPL(__VA_ARGS__, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22,    \
+                   21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, \
+                   5, 4, 3, 2, 1, 0)
 
 #define HLS_DUMP(arg) dumpHLSArg(arg, #arg);
 #define DUMP_ARG_0
@@ -372,6 +379,22 @@ static void callKernel(Res (*kernel)(void)) {
 #define DUMP_ARG_14(arg, ...) HLS_DUMP(arg) DUMP_ARG_13(__VA_ARGS__)
 #define DUMP_ARG_15(arg, ...) HLS_DUMP(arg) DUMP_ARG_14(__VA_ARGS__)
 #define DUMP_ARG_16(arg, ...) HLS_DUMP(arg) DUMP_ARG_15(__VA_ARGS__)
+#define DUMP_ARG_17(arg, ...) HLS_DUMP(arg) DUMP_ARG_16(__VA_ARGS__)
+#define DUMP_ARG_18(arg, ...) HLS_DUMP(arg) DUMP_ARG_17(__VA_ARGS__)
+#define DUMP_ARG_19(arg, ...) HLS_DUMP(arg) DUMP_ARG_18(__VA_ARGS__)
+#define DUMP_ARG_20(arg, ...) HLS_DUMP(arg) DUMP_ARG_19(__VA_ARGS__)
+#define DUMP_ARG_21(arg, ...) HLS_DUMP(arg) DUMP_ARG_20(__VA_ARGS__)
+#define DUMP_ARG_22(arg, ...) HLS_DUMP(arg) DUMP_ARG_21(__VA_ARGS__)
+#define DUMP_ARG_23(arg, ...) HLS_DUMP(arg) DUMP_ARG_22(__VA_ARGS__)
+#define DUMP_ARG_24(arg, ...) HLS_DUMP(arg) DUMP_ARG_23(__VA_ARGS__)
+#define DUMP_ARG_25(arg, ...) HLS_DUMP(arg) DUMP_ARG_24(__VA_ARGS__)
+#define DUMP_ARG_26(arg, ...) HLS_DUMP(arg) DUMP_ARG_25(__VA_ARGS__)
+#define DUMP_ARG_27(arg, ...) HLS_DUMP(arg) DUMP_ARG_26(__VA_ARGS__)
+#define DUMP_ARG_28(arg, ...) HLS_DUMP(arg) DUMP_ARG_27(__VA_ARGS__)
+#define DUMP_ARG_29(arg, ...) HLS_DUMP(arg) DUMP_ARG_28(__VA_ARGS__)
+#define DUMP_ARG_30(arg, ...) HLS_DUMP(arg) DUMP_ARG_29(__VA_ARGS__)
+#define DUMP_ARG_31(arg, ...) HLS_DUMP(arg) DUMP_ARG_30(__VA_ARGS__)
+#define DUMP_ARG_32(arg, ...) HLS_DUMP(arg) DUMP_ARG_31(__VA_ARGS__)
 #define DUMP_ARGS(args...) CONCAT(DUMP_ARG_, VA_NUM_ARGS(args))(args)
 
 #define CALL_NO_ARGS(kernel)                                                   \
