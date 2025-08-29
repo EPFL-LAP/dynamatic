@@ -1,17 +1,20 @@
-#include "subdiag.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
 #include "stdlib.h"
+#include "subdiag.h"
 
 int subdiag(in_float_t d[N], in_float_t e[N]) {
   int i = 0;
+  int next_i = 0;
   bool cond_break = false;
+  // Require code transformation into a single BB loop
   do {
+    i = next_i;
     float dd = d[i] + d[i + 1];
     float x = 0.001;
-    i++;
+    next_i = i + 1;
     cond_break = (e[i]) <= x * dd;
-  } while (i < N_DEC && !cond_break);
+  } while (next_i < N_DEC && !cond_break);
   return i;
 }
 

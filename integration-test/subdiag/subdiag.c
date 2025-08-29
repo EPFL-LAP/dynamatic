@@ -12,7 +12,7 @@ int subdiag(in_float_t d[N], in_float_t e[N]) {
       break;
   }
 
-  return 0;
+  return i;
 }
 
 int main(void) {
