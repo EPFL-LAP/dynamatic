@@ -63,6 +63,8 @@ def main():
         "--disable-spec", action="store_false", dest="spec",
         help="Run without speculation (but with custom compilation flow)")
     parser.add_argument(
+        "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
+    parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
 
     args = parser.parse_args()
@@ -76,6 +78,11 @@ def main():
     # Get the c_file directory
     c_file_dir = os.path.dirname(c_file)
     kernel_name = os.path.splitext(os.path.basename(c_file))[0]
+
+    if args.transformed_code:
+        transformed_code = c_file_dir + f"/{args.transformed_code}"
+    else:
+        transformed_code = c_file
 
     # Get out dir name
     out_dir = os.path.join(c_file_dir, args.out)
@@ -92,7 +99,7 @@ def main():
     clang_file = os.path.join(comp_out_dir, f"clang.ll")
     with open(clang_file, "w") as f:
         result = subprocess.run([
-            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", c_file,
+            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", transformed_code,
             "-I", DYNAMATIC_ROOT / "include",
             "-Xclang", "-ffp-contract=off",
             "-o", clang_file
@@ -177,7 +184,7 @@ def main():
     with open(cf_file, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, remove_polygeist_attr,
-            f"--convert-llvm-to-cf=source={c_file} dynamatic-path={DYNAMATIC_ROOT}",
+            f"--convert-llvm-to-cf=source={transformed_code} dynamatic-path={DYNAMATIC_ROOT}",
             "--remove-polygeist-attributes"
         ],
             stdout=f,
@@ -193,7 +200,7 @@ def main():
     with open(cf_file_2, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, cf_file,
-            f"--func-set-arg-names=source={c_file}",
+            f"--func-set-arg-names=source={transformed_code}",
             "--mark-memory-dependencies",
             "--flatten-memref-row-major",
             "--mark-memory-interfaces"
@@ -369,7 +376,7 @@ def main():
     # Buffer placement (fpga20)
     profiler_bin = os.path.join(comp_out_dir, "profile")
     result = subprocess.run([
-        CLANGXX_BIN, c_file,
+        CLANGXX_BIN, transformed_code,
         "-D", "PRINT_PROFILING_INFO",
         "-I", str(DYNAMATIC_ROOT / "include"),
         "-Wno-deprecated",
