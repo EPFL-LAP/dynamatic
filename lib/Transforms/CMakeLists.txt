@@ -23,6 +23,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
   LLVMMarkMemoryDependencies.cpp
+  HandshakeTreeHeightReduction.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

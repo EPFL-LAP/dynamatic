@@ -191,9 +191,13 @@ $DYNAMATIC_BINS/dynamatic-opt \
 
 $DYNAMATIC_BINS/dynamatic-opt \
   $OUT/handshake.mlir \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
+  --handshake-analyze-lsq-usage \
+  --handshake-replace-memory-interfaces \
+  --handshake-minimize-cst-width \
+  --handshake-tree-height-reduction \
+  --handshake-optimize-bitwidths \
+  --handshake-materialize \
+  --handshake-infer-basic-blocks \
   > $OUT/handshake_transformed.mlir
 
 # ------------------------------------------------------------------------------
