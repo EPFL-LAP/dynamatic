@@ -12,6 +12,7 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -117,27 +118,25 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   auto specBranch =
       cast<SpeculatingBranchOp>(getDefiningOpSkippingBuffersAndFork(
           branchDiscardCondNonMisspec.getDataOperand()));
-  ConditionalBranchOp controlBranch = nullptr;
+  bool branchFound = false;
   for (Operation *user :
        iterateOverPossiblyIndirectUsers(specBranch.getDataOperand())) {
     if (auto branch = dyn_cast<ConditionalBranchOp>(user)) {
-      controlBranch = branch;
-      break;
+      if (isBranchBackedge(branch.getTrueResult())) {
+        mergeOperands.push_back(branchReplicated.getTrueResult());
+        branchFound = true;
+        break;
+      }
+      // Check if falseResult of controlBranch leads to a backedge (loop)
+      if (isBranchBackedge(branch.getFalseResult())) {
+        mergeOperands.push_back(branchReplicated.getFalseResult());
+        branchFound = true;
+        break;
+      }
     }
   }
-
-  if (isBranchBackedge(controlBranch.getTrueResult())) {
-    mergeOperands.push_back(branchReplicated.getTrueResult());
-  }
-  // Check if falseResult of controlBranch leads to a backedge (loop)
-  else if (isBranchBackedge(controlBranch.getFalseResult())) {
-    mergeOperands.push_back(branchReplicated.getFalseResult());
-  }
-  // If neither trueResult nor falseResult leads to a backedge, handle the error
-  else {
-    unsigned bb = getLogicBB(speculator).value();
-    controlBranch->emitError()
-        << "Could not find the backedge in the Control Branch " << bb << "\n";
+  if (!branchFound) {
+    llvm::report_fatal_error("No valid branch found");
     return signalPassFailure();
   }
 
@@ -171,5 +170,33 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
                                  1, BufferType::FIFO_BREAK_NONE);
     inheritBB(commitOp, bufOp2);
     bufOp2.getOperand().replaceAllUsesExcept(bufOp2.getResult(), bufOp2);
+  }
+
+  for (auto specBranchOp : funcOp.getOps<SpeculatingBranchOp>()) {
+    Value specResult = specBranchOp.getTrueResult();
+    for (Operation *user : iterateOverPossiblyIndirectUsers(specResult)) {
+      if (isa<SinkOp>(user))
+        continue;
+      if (auto branch = dyn_cast<ConditionalBranchOp>(user)) {
+        Value delayedOperand;
+        if (equalsIndirectly(branch.getDataOperand(), specResult))
+          delayedOperand = branch.getDataOperand();
+        else if (equalsIndirectly(branch.getConditionOperand(), specResult))
+          delayedOperand = branch.getConditionOperand();
+        else
+          llvm::report_fatal_error(
+              "Could not find the correct operand to delay");
+
+        builder.setInsertionPoint(branch);
+        // Create a buffer to hold the delayed operand
+        auto bufOp =
+            builder.create<BufferOp>(builder.getUnknownLoc(), delayedOperand, 1,
+                                     BufferType::FIFO_BREAK_NONE);
+        inheritBB(branch, bufOp);
+        bufOp.getOperand().replaceAllUsesExcept(bufOp.getResult(), bufOp);
+      } else {
+        user->emitError() << "Unexpected user of speculative branch: " << *user;
+      }
+    }
   }
 }
