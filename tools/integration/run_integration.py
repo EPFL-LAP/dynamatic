@@ -70,7 +70,7 @@ SCRIPT_CONTENT = (
     + """
 set-src {src_path}
 compile
-write-hdl verilog-beta
+write-hdl --hdl verilog-beta
 simulate
 exit
 """

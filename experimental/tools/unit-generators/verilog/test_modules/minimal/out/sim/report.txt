@@ -1,0 +1,358 @@
+[INFO  HLS_VERIFIER] Executing modelsim: [vsim -c -do simulation.do]
+Reading pref.tcl
+
+# 10.7b_1
+
+# do simulation.do
+# QuestaSim-64 vmap 10.7b_1 Lib Mapping Utility 2018.07 Jul 26 2018
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/minimal.v 
+# -- Compiling module minimal
+# 
+# Top level modules:
+# 	minimal
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of minimal.v was successful.
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/minimal_wrapper.v 
+# -- Compiling module minimal_wrapper
+# 
+# Top level modules:
+# 	minimal_wrapper
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of minimal_wrapper.v was successful.
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/one_slot_break_dvr.v 
+# -- Compiling module one_slot_break_dvr_dataless
+# -- Compiling module one_slot_break_dvr
+# 
+# Top level modules:
+# 	one_slot_break_dvr
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of one_slot_break_dvr.v was successful.
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/shift_reg_break_dv.v 
+# -- Compiling module shift_reg_break_dv_dataless
+# -- Compiling module shift_reg_break_dv
+# 
+# Top level modules:
+# 	shift_reg_break_dv
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of shift_reg_break_dv.v was successful.
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tfifo_dataless.v 
+# -- Compiling module elastic_fifo_inner_dataless
+# -- Compiling module dataless_tfifo
+# 
+# Top level modules:
+# 	dataless_tfifo
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tfifo_dataless.v was successful.
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vlog -work work -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tfifo.v 
+# -- Compiling module elastic_fifo_inner
+# -- Compiling module tfifo
+# 
+# Top level modules:
+# 	tfifo
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tfifo.v was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 11:48:47 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:47 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading package vl_types
+# -- Loading entity minimal
+# ** Error: (vcom-11) Could not find work.single_argument.
+# ** Error (suppressible): /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(69): (vcom-1195) Cannot find expanded name "work.single_argument".
+# ** Error: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(69): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.single_argument.
+# ** Error (suppressible): /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(87): (vcom-1195) Cannot find expanded name "work.single_argument".
+# ** Error: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(87): Unknown expanded name.
+# -- Loading entity tb_join
+# ** Note: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(273): VHDL Compiler exiting
+# End time: 11:48:48 on Aug 25,2025, Elapsed time: 0:00:01
+# Errors: 6, Warnings: 1
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:48 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:48:48 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:48 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 11:48:48 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 11:48:48 on Aug 25,2025
+# vcom -work work -2008 -explicit -vopt /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading package vl_types
+# -- Loading entity minimal
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# End time: 11:48:48 on Aug 25,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of tb_minimal.vhd was successful.
+# All compile dependencies have been resolved.vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/minimal.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module minimal
+# 
+# Top level modules:
+# 	minimal
+QuestaSim> # vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/minimal_wrapper.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module minimal_wrapper
+# 
+# Top level modules:
+# 	minimal_wrapper
+QuestaSim> # vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/one_slot_break_dvr.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module one_slot_break_dvr_dataless
+# -- Compiling module one_slot_break_dvr
+# 
+# Top level modules:
+# 	one_slot_break_dvr
+QuestaSim> # vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/shift_reg_break_dv.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module shift_reg_break_dv_dataless
+# -- Compiling module shift_reg_break_dv
+# 
+# Top level modules:
+# 	shift_reg_break_dv
+QuestaSim> # vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tfifo_dataless.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module elastic_fifo_inner_dataless
+# -- Compiling module dataless_tfifo
+# 
+# Top level modules:
+# 	dataless_tfifo
+QuestaSim> # vlog -work work -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tfifo.v
+# QuestaSim-64 vlog 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Compiling module elastic_fifo_inner
+# -- Compiling module tfifo
+# 
+# Top level modules:
+# 	tfifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_join.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/simpackage.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd(50): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading package vl_types
+# -- Loading entity minimal
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+QuestaSim> # 11 compiles, 0 failed with no errors.
+# vsim tb 
+# Start time: 11:48:49 on Aug 25,2025
+# ** Note: (vsim-3812) Design is being optimized...
+# //  Questa Sim-64
+# //  Version 10.7b_1 linux_x86_64 Jul 26 2018
+# //
+# //  Copyright 1991-2018 Mentor Graphics Corporation
+# //  All Rights Reserved.
+# //
+# //  QuestaSim and its associated documentation contain trade
+# //  secrets and commercial or financial information that are the property of
+# //  Mentor Graphics Corporation and are privileged, confidential,
+# //  and exempt from disclosure under the Freedom of Information Act,
+# //  5 U.S.C. Section 552. Furthermore, this information
+# //  is prohibited from disclosure under the Trade Secrets Act,
+# //  18 U.S.C. Section 1905.
+# //
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading verilog.vl_types(body)
+# Loading work.tb(behavior)#1
+# Loading work.minimal(fast)
+# Loading work.single_argument(behav)#1
+# Loading work.tb_join(arch)#1
+# ** Note: Simulation done! Latency = 7 cycles
+#    Time: 38 ns  Iteration: 1  Instance: /tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 38 ns  Iteration: 1  Process: /tb/generate_sim_done_proc File: /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd
+# Break in Process generate_sim_done_proc at /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd line 192
+# Stopped at /home/iaganz/devian/dynamatic/experimental/tools/unit-generators/verilog/test_modules/minimal/out/sim/HDL_SRC/tb_minimal.vhd line 192
+# End time: 11:48:50 on Aug 25,2025, Elapsed time: 0:00:01
+# Errors: 1, Warnings: 0
+Comparison of [x] : Pass
+Comparison of [out0] : Pass
+[INFO  HLS_VERIFIER] C and VHDL outputs match
