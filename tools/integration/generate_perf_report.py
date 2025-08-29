@@ -204,11 +204,10 @@ def main():
         with open(args.save, "w") as f:
             json.dump(data, f)
 
+    failed = False
     if args.compare:
         with open(args.compare, "r") as f:
             old_data = json.load(f)
-
-        failed = False
 
         for old_row in old_data["data"]:
             if "fail" in old_row["result"]:
