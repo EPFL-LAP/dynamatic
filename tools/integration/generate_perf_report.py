@@ -5,7 +5,7 @@ GoogleTest's .xml outputs.
 
 import os
 import sys
-import pickle
+import json
 import argparse
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -202,41 +202,41 @@ def main():
 
     if args.save:
         with open(args.save, "wb") as f:
-            pickle.dump(data, f)
+            json.dump(data, f)
 
     if args.compare:
         with open(args.compare, "rb") as f:
-            old_data = pickle.load(f)
+            old_data = json.load(f)
 
-    failed = False
+        failed = False
 
-    for old_row in old_data["data"]:
-        if "fail" in old_row["result"]:
-            continue
+        for old_row in old_data["data"]:
+            if "fail" in old_row["result"]:
+                continue
 
-        test_name = old_row["name"]
-        old_cycles = old_row["cycles"]
+            test_name = old_row["name"]
+            old_cycles = old_row["cycles"]
 
-        for row in data["data"]:
-            if row["name"] == test_name:
-                row["old_cycles"] = old_cycles
+            for row in data["data"]:
+                if row["name"] == test_name:
+                    row["old_cycles"] = old_cycles
 
-                try:
-                    diff = int(row["cycles"]) - int(row["old_cycles"])
-                    percent = diff / int(row["old_cycles"]) * 100.0
+                    try:
+                        diff = int(row["cycles"]) - int(row["old_cycles"])
+                        percent = diff / int(row["old_cycles"]) * 100.0
 
-                    if args.fail and percent >= args.fail:
-                        failed = True
+                        if args.fail and percent >= args.fail:
+                            failed = True
 
-                    if diff < 0:
-                        row["comparison"] = f":heavy_check_mark: {diff:,} ({percent:.2f}%)"
-                    elif diff > 0:
-                        row["comparison"] = f":heavy_exclamation_mark: **{diff:,} ({percent:.2f}%)**"
-                    else:
-                        row["comparison"] = f":heavy_minus_sign: {diff:,} ({percent:.2f}%)"
+                        if diff < 0:
+                            row["comparison"] = f":heavy_check_mark: {diff:,} ({percent:.2f}%)"
+                        elif diff > 0:
+                            row["comparison"] = f":heavy_exclamation_mark: **{diff:,} ({percent:.2f}%)**"
+                        else:
+                            row["comparison"] = f":heavy_minus_sign: {diff:,} ({percent:.2f}%)"
 
-                except ValueError:
-                    pass
+                    except ValueError:
+                        pass
 
     if failed:
         print("## Performance Report :heavy_exclamation_mark:")
