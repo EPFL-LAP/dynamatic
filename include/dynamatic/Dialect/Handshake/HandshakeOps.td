@@ -225,7 +225,8 @@ def BufferOp : Handshake_Op<"buffer", [
   
   let arguments = (ins HandshakeType:$operand, 
                         Handshake_BufferTypeAttr:$bufferType,
-                        ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
+                        ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots,
+                        BoolAttr:$debugCounter
                         );
 
   let results = (outs HandshakeType:$result);
@@ -274,6 +275,7 @@ def BufferOp : Handshake_Op<"buffer", [
       $_state.addTypes(operand.getType());
       $_state.addAttribute("bufferType", ::dynamatic::handshake::BufferTypeAttr::get($_builder.getContext(), bufferType));
       $_state.addAttribute("numSlots", $_builder.getI64IntegerAttr(numSlots));
+      $_state.addAttribute("debugCounter", $_builder.getBoolAttr(false));
     }]>
   ];
 
