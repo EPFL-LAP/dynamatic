@@ -201,11 +201,11 @@ def main():
     }
 
     if args.save:
-        with open(args.save, "wb") as f:
+        with open(args.save, "w") as f:
             json.dump(data, f)
 
     if args.compare:
-        with open(args.compare, "rb") as f:
+        with open(args.compare, "r") as f:
             old_data = json.load(f)
 
         failed = False
