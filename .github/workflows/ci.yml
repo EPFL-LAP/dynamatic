@@ -90,7 +90,9 @@ jobs:
         run: |
           git status
           git fetch origin main --no-recurse-submodules
-          rm perf_ci.json
+          if [ -f perf_ci.json ]; then
+            rm perf_ci.json
+          fi
           git checkout FETCH_HEAD -- perf_ci.json 
           python tools/integration/generate_perf_report.py perf_ci_branch.json perf_ci.json >> $GITHUB_STEP_SUMMARY
           mv perf_ci_branch.json perf_ci.json
