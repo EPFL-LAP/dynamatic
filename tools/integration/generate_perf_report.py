@@ -5,7 +5,7 @@ GoogleTest's .xml outputs.
 
 import os
 import sys
-import pickle
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -133,7 +133,7 @@ def main():
     Entry point.
 
     Arguments:
-    `save_path` -- Path to which the pickled performance report will be saved.
+    `save_path` -- Path to which the json performance report will be saved.
     `compare_path` -- Path of perf. report against which this one will be compared.
     """
     if len(sys.argv) < 3:
@@ -145,11 +145,11 @@ def main():
         "data": parse_results(RESULTS_DIR)
     }
 
-    with open(sys.argv[1], "wb") as f:
-        pickle.dump(data, f)
+    with open(sys.argv[1], "w") as f:
+        json.dump(data, f)
 
-    with open(sys.argv[2], "rb") as f:
-        old_data = pickle.load(f)
+    with open(sys.argv[2], "r") as f:
+        old_data = json.load(f)
 
     for old_row in old_data["data"]:
         if "fail" in old_row["result"]:
