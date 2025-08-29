@@ -1,23 +1,27 @@
-
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.support.buffer_counter import generate_buffer_counter, generate_buffer_counter_embedding
 
 
 def generate_shift_reg_break_dv(name, params):
     bitwidth = params["bitwidth"]
     num_slots = params["num_slots"]
-
     extra_signals = params.get("extra_signals", None)
+    debug_counter = params.get("debug_counter", False)
 
     if extra_signals:
-        return _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals)
+        return _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals, debug_counter)
     if bitwidth == 0:
-        return _generate_shift_reg_break_dv_dataless(name, num_slots)
+        return _generate_shift_reg_break_dv_dataless(name, num_slots, debug_counter)
     else:
-        return _generate_shift_reg_break_dv(name, num_slots, bitwidth)
+        return _generate_shift_reg_break_dv(name, num_slots, bitwidth, debug_counter)
 
 
-def _generate_shift_reg_break_dv_dataless(name, num_slots):
+def _generate_shift_reg_break_dv_dataless(name, num_slots, debug_counter):
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies = generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
+
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -38,8 +42,8 @@ end entity;
 """
 
     architecture = f"""
-    -- Architecture of shift_reg_break_dv_dataless
-    architecture arch of {name} is
+-- Architecture of shift_reg_break_dv_dataless
+architecture arch of {name} is
 
     signal regEn      : std_logic;
     type REG_VALID is array (0 to {num_slots} - 1) of std_logic;
@@ -62,24 +66,29 @@ end entity;
                 valid_reg(i) <= valid_reg(i - 1);
             end loop;
             valid_reg(0) <= ins_valid;
-            end if;               
+            end if;
         end if;
         end if;
-    end process; 
+    end process;
 
     outs_valid <= valid_reg({num_slots} - 1);
     regEn <= not outs_valid or outs_ready;
     ins_ready <= regEn;
 
-    end architecture;
-    """
-    return entity + architecture
+    {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
+end architecture;
+"""
+
+    return dependencies + entity + architecture
 
 
-def _generate_shift_reg_break_dv(name, num_slots, bitwidth):
+def _generate_shift_reg_break_dv(name, num_slots, bitwidth, debug_counter):
     inner_name = f"{name}_inner"
+    dependencies = _generate_shift_reg_break_dv_dataless(inner_name, False)
 
-    dependencies = _generate_shift_reg_break_dv_dataless(inner_name)
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies += generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
 
     entity = f"""
 
@@ -153,13 +162,15 @@ begin
   ins_ready <= inputReady;
   outs <= Memory({num_slots} - 1);
 
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
+
 end architecture;
 """
 
     return dependencies + entity + architecture
 
 
-def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals):
+def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals, debug_counter):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -174,4 +185,4 @@ def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_shift_reg_break_dv(name, num_slots, bitwidth + extra_signals_bitwidth))
+        lambda name: _generate_shift_reg_break_dv(name, num_slots, bitwidth + extra_signals_bitwidth, debug_counter))
