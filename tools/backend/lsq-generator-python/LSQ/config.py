@@ -20,6 +20,12 @@ class Config:
     they are one of possible default configurations.
     """
 
+    num_groups: int
+    """
+    Number of individual groups in the group allocator.
+    By definition is equal to the number of basic blocks 
+    which have loads or stores to this LSQ.
+    """
     name:          str = 'test'     # Name prefix used for generated VHDL files
     payload_bitwidth:         int = 16         # Data width        (Number of bits for load/store data)
     addrW:         int = 13         # Address width     (Number of bits for memory address)
