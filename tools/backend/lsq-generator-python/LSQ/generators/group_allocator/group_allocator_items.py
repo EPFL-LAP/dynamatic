@@ -30,6 +30,8 @@ class NumAccessesRomMuxBodyItems():
                     self.has_items = has_items
 
         def __init__(self, config : Config, queue_type : QueueType):
+            self._set_params(config, queue_type)
+
             ############################
             # Build mux inner pieces
             ############################
