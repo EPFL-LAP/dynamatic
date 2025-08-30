@@ -104,7 +104,7 @@ class Signal():
     def _get_item(self, get_single):
         # if item is singular
         # just generate it using the base name
-        if self.size.number == 1:
+        if self.size.number == 1 and not self.always_number:
             return get_single(self.base_name)
         
         # if this item is actually multiple items

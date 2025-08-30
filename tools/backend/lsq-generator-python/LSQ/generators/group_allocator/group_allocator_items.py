@@ -286,13 +286,13 @@ class StoreOrderPerEntryBodyItems():
             shifted = STORE_ORDER_PER_ENTRY_NAME
             unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
             shifted_assignments = f"""
-      for i in 0 to {config.load_queue_num_entries()} loop
-        for j in 0 to {config.store_queue_num_entries()} loop
-          row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()}
-          col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()}
+      for i in 0 to {config.load_queue_num_entries()} - 1 loop
+        for j in 0 to {config.store_queue_num_entries()} - 1 loop
+          row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
+          col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
 
           -- assign shifted value
-          {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j)
+          {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j);
         end loop;
       end loop;
 """.strip()
@@ -318,14 +318,14 @@ class StoreOrderPerEntryBodyItems():
 
   process(all)
     -- tail pointers as integers for indexing
-    variable {load_pointer_name}_int, {store_pointer_name}  : natural;
+    variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
 
     -- where to shift a value to
     variable row_idx, col_idx : natural;
   begin
     -- convert q tail pointers to integer
-    {load_pointer_name}_int = integer(unsigned({load_pointer_name}_i)
-    {store_pointer_name}_int = integer(unsigned({store_pointer_name}_i)
+    {load_pointer_name}_int = to_integer(unsigned({load_pointer_name}_i));
+    {store_pointer_name}_int = to_integer(unsigned({store_pointer_name}_i));
 
     {unshifted_assignments}
 
@@ -940,6 +940,8 @@ class GroupAllocatorLocalItems():
                     number=config.num_groups()
                 )
             )
+
+            self.always_number = True
 
 
 class GroupHandshakingLocalItems():
