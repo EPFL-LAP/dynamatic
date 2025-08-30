@@ -128,6 +128,9 @@ class NumAccessesRomMuxBodyItems():
 
     end case;
 """.strip()
+            
+        def get(self):
+            return self.item
 
 
 class PortIdxPerEntryLocalItems():
