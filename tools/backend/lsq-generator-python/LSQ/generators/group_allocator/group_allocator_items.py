@@ -349,13 +349,19 @@ class NaiveStoreOrderPerEntryBodyItems():
                 self.item = f"""  
   -- Naive store orders are all zeros
   -- Since within each BB, no store ever precedes a load
-  
+
 """.removeprefix("\n")
 
                 zeros = mask_until(0, config.store_queue_num_entries())
                 for i in range(config.load_queue_num_entries()):
+                    name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_0"
+                    
+                    # pad for <= alignment
+                    if i < 9:
+                        name += " "
+
                     self.item += f"""
-  {NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_0 = {zeros};
+  {name} <= {zeros};
 """.removeprefix("\n")
                     
                 self.item = self.item.strip()
