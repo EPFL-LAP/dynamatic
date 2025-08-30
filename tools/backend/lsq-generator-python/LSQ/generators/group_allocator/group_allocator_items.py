@@ -232,7 +232,7 @@ class StoreOrderPerEntryBodyItems():
         def __init__(self, config : Config):
             needs_order_shift = False
             for group_orders in range(config.num_groups()):
-                for order in group_orders(group_orders):
+                for order in config.group_store_order(group_orders):
                     if order > 1:
                         print(order)
                         needs_order_shift = True
