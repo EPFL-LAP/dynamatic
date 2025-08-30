@@ -66,8 +66,8 @@ struct getValueTypeImpl {
   using type = T;
 };
 
-template <typename T, size_t N>
-struct getValueTypeImpl<T[N]> {
+template <typename T, size_t TSize>
+struct getValueTypeImpl<T[TSize]> {
   using type = typename getValueTypeImpl<T>::type;
 };
 
