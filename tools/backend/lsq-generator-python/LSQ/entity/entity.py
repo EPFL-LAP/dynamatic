@@ -43,7 +43,7 @@ entity {name} is
   );
 end entity;
 """
-    print(entity)
+    return entity
 
   def instantiate(self, unit_name, entity_name):
     # remove leading whitespace
@@ -85,7 +85,7 @@ begin
   {self.body}
 end architecture;
   """
-      return(architecture)
+      return architecture
 
 class Instantiation():
     def __init__(self, name, entity_name, port_items):
