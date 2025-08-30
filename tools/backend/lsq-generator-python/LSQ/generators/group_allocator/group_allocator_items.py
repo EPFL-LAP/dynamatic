@@ -119,7 +119,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """.removeprefix("\n")
 
-                for j, idx in enumerate(ports):
+                for j, idx in enumerate(ports(i)):
                     self.unshifted_assignments += f"""
       {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
