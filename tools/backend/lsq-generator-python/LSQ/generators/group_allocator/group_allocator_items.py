@@ -130,7 +130,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 """.removeprefix("\n")
                     for j, idx in enumerate(ports(i)):
                         cases += f"""
-      -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
+        -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
         {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 
 """.removeprefix("\n")
@@ -140,17 +140,19 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
 """.removeprefix("\n")
 
-            cases = cases.lstrip()
+            cases = cases.strip()
 
             unshifted_assignments = f"""
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
-    
+
+    -- Using case statement to help infer one-hot mux
     case
       {case_input}
     is
       {cases}
+
     end
 """.removeprefix("\n").strip()
 
