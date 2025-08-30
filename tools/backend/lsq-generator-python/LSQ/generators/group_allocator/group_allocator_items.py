@@ -8,7 +8,7 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 
 from LSQ.operators.arithmetic import WrapSub
 
-class PortIdxPerQueueEntryRomMuxPortItems():
+class PortIdxPerEntryPortItems():
     class GroupInitTransfer(Signal):
         """
         Input
@@ -35,7 +35,7 @@ class PortIdxPerQueueEntryRomMuxPortItems():
                 )
             )
 
-class PortIdxPerQueueEntryRomMuxLocalItems():
+class PortIdxPerEntryLocalItems():
     class PortIndexPerQueueEntry(Signal2D):
         """
         Bitwidth = N
@@ -76,7 +76,7 @@ class PortIdxPerQueueEntryRomMuxLocalItems():
                 )
             )
 
-class PortIdxPerQueueEntryRomMuxBodyItems():
+class PortIdxPerEntryBodyItems():
     class Body():
 
         def _get_default_value(self, queue_type, idx, bitwidth):
@@ -98,18 +98,15 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                     def has_items(group_idx): return config.group_num_stores(group_idx) > 0
                     num_entries = config.store_queue_num_entries()
 
-            self.default_assignments = ""
+            default_assignments = ""
 
-
-
-
-            self.default_assignments += f"""
+            default_assignments += f"""
     -- If a group has less than {num_entries} {queue_type.value}s
     -- set the other port indices to 0
     {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
 """
 
-            self.default_assignments = self.default_assignments.strip()
+            default_assignments = default_assignments.strip()
 
             case_input = ""
             num_cases = 0
@@ -156,11 +153,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     is
       {cases}
 
-    end
+    end case;
 """.removeprefix("\n").strip()
 
 
-            self.shifted_assignments = f"""
+            shifted_assignments = f"""
     -- {queue_type.value} port indices must be mod left shifted based on queue tail
     for i in {num_entries} - 1 downto 0 loop
 """.removeprefix("\n")
@@ -168,20 +165,20 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
             pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
-            self.shifted_assignments += f"""
+            shifted_assignments += f"""
       {port_idx}(i) <=
         {unsh_port_idx(queue_type)}(
           (i + integer(unsigned({pointer_name}_i))) mod {num_entries}
         );
 """.removeprefix("\n")
 
-            self.shifted_assignments += f"""
+            shifted_assignments += f"""
     end loop;
 """.removeprefix("\n")
             
-            self.shifted_assignments = self.shifted_assignments.lstrip()
+            shifted_assignments = shifted_assignments.lstrip()
 
-            self.output_assignments = ""
+            output_assignments = ""
 
             for i in range(num_entries):
                 output_name = f"{PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o"
@@ -194,25 +191,25 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
   {output_name} <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
 """.removeprefix("\n")
             
-            self.output_assignments = self.output_assignments.strip()
+            output_assignments = output_assignments.strip()
 
             self.item = f"""
   process(all)
   begin
-    {self.default_assignments}
+    {default_assignments}
 
     {unshifted_assignments}
 
-    {self.shifted_assignments}
+    {shifted_assignments}
   end process;
 
-  {self.output_assignments}
+  {output_assignments}
 """.removeprefix("\n").strip()
 
         def get(self):
             return self.item
 
-class GroupAllocatorDeclarativePortItems():
+class GroupAllocatorPortItems():
     class Reset(Signal):
         """
         Input.
@@ -713,12 +710,12 @@ class GroupAllocatorDeclarativePortItems():
             )
 
 
-class GroupAllocatorDeclarativeBodyItems():
-    class HandshakingInstantiation(Instantiation):
+class GroupAllocatorBodyItems():
+    class HandshakingInst(Instantiation):
         def __init__(self, config : Config):
 
-            p = GroupAllocatorDeclarativePortItems()
-            hs_p = GroupHandshakingDeclarativePortItems()
+            p = GroupAllocatorPortItems()
+            hs_p = GroupHandshakingPortItems()
             c = InstCxnType
 
             si = SimpleInstantiation
@@ -748,8 +745,40 @@ class GroupAllocatorDeclarativeBodyItems():
                 port_items=port_items
             )
 
+    class PortIdxPerEntryInst(Instantiation):
+        def __init__(self, config : Config, queue_type : QueueType):
+
+            p = PortIdxPerEntryPortItems()
+            ga_p = GroupAllocatorPortItems()
+            c = InstCxnType
+
+            si = SimpleInstantiation
+            port_items = [
+                si(p.GroupInitTransfer(config), c.LOCAL),
+
+                si(ga_p.QueuePointer(
+                    config, 
+                    queue_type, 
+                    QueuePointerType.TAIL),
+                    c.INPUT
+                ),
+
+                si(ga_p.PortIndexPerQueueEntry(
+                    config, 
+                    queue_type),
+                    c.OUTPUT
+                )
+            ]
+
+            Instantiation.__init__(
+                self,
+                name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+                entity_name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+                port_items=port_items
+            )
+
             
-class GroupHandshakingDeclarativePortItems():
+class GroupHandshakingPortItems():
     class GroupInitTransfer(Signal):
         """
         Output
@@ -778,7 +807,7 @@ class GroupHandshakingDeclarativePortItems():
             )
 
 
-class GroupHandshakingDeclarativeLocalItems():
+class GroupHandshakingLocalItems():
     class NumEmptyEntries(Signal):
         """
         Bitwidth = N

@@ -11,22 +11,22 @@ from LSQ.utils import QueueType, QueuePointerType
 
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
-        GroupAllocatorDeclarativePortItems, 
-        GroupAllocatorDeclarativeBodyItems,
-        GroupHandshakingDeclarativePortItems,
-        GroupHandshakingDeclarativeLocalItems,
+        GroupAllocatorPortItems, 
+        GroupAllocatorBodyItems,
+        GroupHandshakingPortItems,
+        GroupHandshakingLocalItems,
         GroupHandshakingDeclarativeBodyItems,
-        PortIdxPerQueueEntryRomMuxPortItems,
-        PortIdxPerQueueEntryRomMuxBodyItems,
-        PortIdxPerQueueEntryRomMuxLocalItems
+        PortIdxPerEntryPortItems,
+        PortIdxPerEntryBodyItems,
+        PortIdxPerEntryLocalItems
     )
 
 
-class PortIdxPerQueueEntryMuxDeclarative():
+class PortIdxPerEntryDeclarative():
     def __init__(self, config : Config, queue_type : QueueType):
-        p = PortIdxPerQueueEntryRomMuxPortItems()
+        p = PortIdxPerEntryPortItems()
 
-        ga_p = GroupAllocatorDeclarativePortItems()
+        ga_p = GroupAllocatorPortItems()
     
         self.entity_port_items = [
             p.GroupInitTransfer(config),
@@ -34,23 +34,23 @@ class PortIdxPerQueueEntryMuxDeclarative():
             ga_p.PortIndexPerQueueEntry(config, queue_type)
         ]
 
-        l = PortIdxPerQueueEntryRomMuxLocalItems()
+        l = PortIdxPerEntryLocalItems()
 
         self.local_items = [
             l.PortIndexPerQueueEntry(config, queue_type, shifted=False),
             l.PortIndexPerQueueEntry(config, queue_type, shifted=True)
         ]
 
-        b = PortIdxPerQueueEntryRomMuxBodyItems()
+        b = PortIdxPerEntryBodyItems()
         self.body = [
             b.Body(config, queue_type)
         ]
 
 class GroupHandshakingDeclarative():
     def __init__(self, config : Config):
-        ga_p = GroupAllocatorDeclarativePortItems()
+        ga_p = GroupAllocatorPortItems()
 
-        p = GroupHandshakingDeclarativePortItems()
+        p = GroupHandshakingPortItems()
         self.entity_port_items = [
             ga_p.GroupInitValid(config),
             ga_p.GroupInitReady(config),
@@ -66,7 +66,7 @@ class GroupHandshakingDeclarative():
             p.GroupInitTransfer(config)
         ]
 
-        l = GroupHandshakingDeclarativeLocalItems()
+        l = GroupHandshakingLocalItems()
         self.local_items = [
             l.NumEmptyEntries(config, QueueType.LOAD),
             l.NumEmptyEntries(config, QueueType.STORE),
@@ -80,7 +80,7 @@ class GroupHandshakingDeclarative():
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
-        p = GroupAllocatorDeclarativePortItems()
+        p = GroupAllocatorPortItems()
         self.entity_port_items = [
             p.Reset(),
             p.Clock(),
@@ -122,16 +122,18 @@ class GroupAllocatorDeclarative():
             p.StorePositionPerLoad(config)
         ]
 
-        hs_p = GroupHandshakingDeclarativePortItems()
+        hs_p = GroupHandshakingPortItems()
 
         self.local_items = [
             hs_p.GroupInitTransfer(config)
         ]
 
-        b = GroupAllocatorDeclarativeBodyItems
+        b = GroupAllocatorBodyItems
 
         self.body = [
-            b.HandshakingInstantiation(config)
+            b.HandshakingInst(config),
+            b.PortIdxPerEntryInst(config, QueueType.LOAD),
+            b.PortIdxPerEntryInst(config, QueueType.STORE),
         ]
     
 
@@ -226,21 +228,19 @@ class GroupAllocator:
         declaration = GroupAllocatorDeclarative(config)
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
-        port_idx_mux_dec = PortIdxPerQueueEntryMuxDeclarative(config, QueueType.LOAD)
+        # port_idx_mux_dec = PortIdxPerEntryDeclarative(config, QueueType.LOAD)
 
-        port_idx_mux_entity = Entity(port_idx_mux_dec)
+        # port_idx_mux_entity = Entity(port_idx_mux_dec)
 
-        port_idx_mux_arch = Architecture(port_idx_mux_dec)
+        # port_idx_mux_arch = Architecture(port_idx_mux_dec)
 
-        print(port_idx_mux_entity.get("port_mux", "port_mux"))
-        print(port_idx_mux_arch.get("port_mux", "port_mux"))
 
-        quit()
 
         # hs_entity = Entity(handshaking_declaration)
         entity = Entity(declaration)
 
         arch = Architecture(declaration)
+        
 
         # hs_arch = Architecture(handshaking_declaration)
 
@@ -248,9 +248,9 @@ class GroupAllocator:
         # print(hs_arch.get("handshaking", "Group Handshaking"))
 
 
-        # print(entity.get(self.module_name, "Group Allocator"))
+        print(entity.get(self.module_name, "Group Allocator"))
 
-        # print(arch.get(self.module_name, "Group Allocator"))
+        print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()
