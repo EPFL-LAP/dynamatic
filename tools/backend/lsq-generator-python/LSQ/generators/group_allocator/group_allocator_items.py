@@ -111,35 +111,56 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             self.default_assignments = self.default_assignments.strip()
 
+            case_input = ""
+            for i in range(config.num_groups()):
+                if has_items(i):        
+                    case_input += f"""
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+""" .removeprefix("\n").strip()[:-1]
+
+            cases = ""
+            pad_to = get_required_bitwidth(config.num_groups() -1)
+
+            for i in range(config.num_groups()):
+                group_bin = get_as_binary_string_padded(i, pad_to)
+                cases += f"""
+      when {group_bin} =>
+""".removeprefix("\n").strip()
+                if has_items(i):       
+                    for j, idx in enumerate(ports(i)):
+                        self.unshifted_assignments += f"""
+      -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
+        {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+
+""".removeprefix("\n")
+
             self.unshifted_assignments = f"""
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
-
+    
+    case
+      {case_input}
+    is
+      {cases}
+    end
 """.removeprefix("\n")
 
-            first = True
+            
+            
+            self.unshifted_assignments += f"""
+    is
+""".removeprefix("\n")
+
             for i in range(config.num_groups()):
-                if has_items(i):        
-                    if first:
-                        first = False
-                        self.unshifted_assignments += f"""
-    if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
-""" .removeprefix("\n")
-                    else:
-                        self.unshifted_assignments += f"""
-    elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
-""".removeprefix("\n")
-                    for j, idx in enumerate(ports(i)):
-                        self.unshifted_assignments += f"""
-      -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
-      {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+                if has_items(i):
+                    self.unshifted_assignments += f"""
 
-""".removeprefix("\n")
+"""
+                   
                 else:
                     self.unshifted_assignments += f"""
     -- Group {i} has no {queue_type.value}s
-    
 """.removeprefix("\n")
 
             self.unshifted_assignments += f"""
