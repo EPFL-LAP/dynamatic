@@ -90,10 +90,12 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                 case QueueType.LOAD:
                     idx_bitwidth = config.load_ports_idx_bitwidth()
                     def ports(group_idx) : return config.group_load_ports(group_idx)
+                    def has_items(group_idx): return config.group_num_loads(group_idx) > 0
                     num_entries = config.load_queue_num_entries()
                 case QueueType.STORE:
                     idx_bitwidth = config.store_ports_idx_bitwidth()
                     def ports(group_idx) : return config.group_store_ports(group_idx)
+                    def has_items(group_idx): return config.group_num_stores(group_idx) > 0
                     num_entries = config.store_queue_num_entries()
 
             self.default_assignments = ""
@@ -125,15 +127,10 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """.removeprefix("\n")
 
+            if has_items(i):
                 for j, idx in enumerate(ports(i)):
                     self.unshifted_assignments += f"""
       -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
-""".removeprefix("\n")
-                    if j == 0 and len(ports(i) == 1):
-                        self.unshifted_assignments += f"""
-      -- (or this group has no {queue_type.value}s)
-"""
-                    self.unshifted_assignments += f"""
       {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
                 self.unshifted_assignments += f"""
