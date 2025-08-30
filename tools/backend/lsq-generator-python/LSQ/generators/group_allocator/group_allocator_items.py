@@ -230,50 +230,58 @@ class StoreOrderPerEntryBodyItems():
     class Body():
 
         def __init__(self, config : Config):
-            load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
-            store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
+            needs_order_shift = False
+            for group_orders in config.group_store_order():
+                for order in group_orders:
+                    if order > 1:
+                        needs_order_shift = True
+            
+            if needs_order_shift:
 
-            case_input = ""
-            num_cases = 0
-            for i in range(config.num_groups()):
-                if config.group_num_loads(i) > 0:
-                    case_input += f"""
+                load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
+                store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
+
+                case_input = ""
+                num_cases = 0
+                for i in range(config.num_groups()):
+                    if config.group_num_loads(i) > 0:
+                        case_input += f"""
       {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """.removeprefix("\n")
-                    num_cases = num_cases + 1
-            case_input = case_input.strip()[:-1]
+                        num_cases = num_cases + 1
+                case_input = case_input.strip()[:-1]
 
-            cases = ""
+                cases = ""
 
-            case_number = 0
-            for i in range(config.num_groups()):
-                if config.group_num_loads(i) > 0:      
-                    group_one_hot = one_hot(case_number, num_cases)
-                    case_number = case_number + 1
-                    cases += f"""
+                case_number = 0
+                for i in range(config.num_groups()):
+                    if config.group_num_loads(i) > 0:      
+                        group_one_hot = one_hot(case_number, num_cases)
+                        case_number = case_number + 1
+                        cases += f"""
       when {group_one_hot} =>
 """.removeprefix("\n")
-                    for j, store_order in enumerate(config.group_store_order(i)):
-                        if store_order > 0:
-                            cases += f"""
+                        for j, store_order in enumerate(config.group_store_order(i)):
+                            if store_order > 0:
+                                cases += f"""
         -- Ld {j} of group {i}'s store order
         {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
 
 """.removeprefix("\n")
-                        else:
-                            cases += f"""
+                            else:
+                                cases += f"""
         -- Ld {j} of group {i} has no preceding stores, use default value
 
 """.removeprefix("\n")
-                else:
-                    cases += f"""
+                    else:
+                        cases += f"""
       -- Group {i} has no loads
 
 """.removeprefix("\n")
-                    
-            cases = cases.strip()
+                        
+                cases = cases.strip()
 
-            unshifted_assignments = f"""
+                unshifted_assignments = f"""
   {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
     case 
@@ -283,9 +291,9 @@ class StoreOrderPerEntryBodyItems():
     end case;
 """.strip()
 
-            shifted = STORE_ORDER_PER_ENTRY_NAME
-            unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
-            shifted_assignments = f"""
+                shifted = STORE_ORDER_PER_ENTRY_NAME
+                unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
+                shifted_assignments = f"""
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
         for j in 0 to {config.store_queue_num_entries()} - 1 loop
           row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
@@ -297,23 +305,23 @@ class StoreOrderPerEntryBodyItems():
       end loop;
 """.strip()
 
-            output_assignments = ""
+                output_assignments = ""
 
-            for i in range(config.load_queue_num_entries()):
-                output_name = f"{STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+                for i in range(config.load_queue_num_entries()):
+                    output_name = f"{STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
 
-                # pad single digit output names
-                if i < 10:
-                    output_name += " "
+                    # pad single digit output names
+                    if i < 10:
+                        output_name += " "
 
 
-                output_assignments += f"""
+                    output_assignments += f"""
   {output_name} <= {STORE_ORDER_PER_ENTRY_NAME}({i});
 """.removeprefix("\n")
             
-            output_assignments = output_assignments.strip()
+                output_assignments = output_assignments.strip()
 
-            self.item = f"""
+                self.item = f"""
 
 
   process(all)
@@ -336,6 +344,14 @@ class StoreOrderPerEntryBodyItems():
 
   {output_assignments}
 """.removeprefix("\n").strip()
+            else:
+                self.item = ""
+
+                zeros = mask_until(0, config.store_queue_num_entries())
+                for i in range(config.load_queue_num_entries()):
+                    self.item += f"""
+  {STORE_ORDER_PER_ENTRY_NAME}_{i}_0 = {zeros};
+""".removeprefix("\n")
 
         def get(self):
             return self.item
