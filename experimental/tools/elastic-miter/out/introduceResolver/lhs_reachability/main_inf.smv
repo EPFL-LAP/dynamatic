@@ -1,0 +1,34 @@
+#include "introduceResolver_lhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_loopContinue : bool_input_inf(introduceResolver_lhs.loopContinue_ready);
+  VAR seq_generator_confirmSpec_backedge : bool_input_inf(introduceResolver_lhs.confirmSpec_backedge_ready);
+
+  VAR introduceResolver_lhs : introduceResolver_lhs (seq_generator_loopContinue.outs, seq_generator_loopContinue.outs_valid, seq_generator_confirmSpec_backedge.outs, seq_generator_confirmSpec_backedge.outs_valid, sink_confirmSpec.ins_ready);
+
+  VAR sink_confirmSpec : sink_main(introduceResolver_lhs.confirmSpec_valid);
+
+INVAR introduceResolver_lhs.backedge_eq_confirmSpec.result_valid -> introduceResolver_lhs.backedge_eq_confirmSpec.result;
+VAR last_token_confirmSpec : boolean;
+ASSIGN init(last_token_confirmSpec) := TRUE;
+ASSIGN next(last_token_confirmSpec) := case
+  introduceResolver_lhs.backedge_constant_confirmSpec.result_valid : introduceResolver_lhs.backedge_constant_confirmSpec.result;
+  TRUE : last_token_confirmSpec;
+esac;
+FAIRNESS !last_token_confirmSpec;

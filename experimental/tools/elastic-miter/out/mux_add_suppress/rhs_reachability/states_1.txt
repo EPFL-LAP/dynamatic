@@ -1054,4 +1054,4 @@ reachable states: 104 (2^6.70044) out of 131072 (2^17)
   mux_add_suppress_rhs.vm_fork_1.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.04 seconds, total: 0.04 seconds
+elapse: 0.03 seconds, total: 0.03 seconds

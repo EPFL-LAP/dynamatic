@@ -1,10 +1,11 @@
--- handshake_buffer_2 : buffer(['num_slots=1', 'bitwidth=1', 'buffer_type="FIFO_BREAK_NONE"'])
+-- handshake_buffer_2 : buffer(['num_slots=1', 'bitwidth=1', 'buffer_type="FIFO_BREAK_NONE"', 'debug_counter=0'])
 
 
 MODULE handshake_buffer_2(ins, ins_valid, outs_ready)
     VAR 
     reg : boolean;
     full : boolean;
+    
 
     ASSIGN
     init(reg) := FALSE;
@@ -17,4 +18,5 @@ MODULE handshake_buffer_2(ins, ins_valid, outs_ready)
     outs := full ? reg : ins;
     outs_valid := full | ins_valid;
     ins_ready := (!full) | outs_ready;
+
 

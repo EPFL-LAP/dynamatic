@@ -1,14 +1,14 @@
-#include "handshake_lazy_fork_1.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_buffer_1.smv"
-#include "handshake_andi_0.smv"
-#include "handshake_sink_0.smv"
-#include "handshake_blocker_0.smv"
-#include "handshake_constant_0.smv"
-#include "handshake_source_0.smv"
 #include "handshake_buffer_0.smv"
 #include "handshake_cmpi_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_andi_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_blocker_0.smv"
 
 
 MODULE elastic_miter_and_false_lhs_and_false_rhs_wrapper (ins, ins_valid, EQ_out_ready)

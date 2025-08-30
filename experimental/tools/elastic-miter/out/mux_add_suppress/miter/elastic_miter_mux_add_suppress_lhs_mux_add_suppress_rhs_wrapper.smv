@@ -1,15 +1,15 @@
 #include "handshake_ndsource_0.smv"
-#include "handshake_buffer_1.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
 #include "handshake_lazy_fork_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_constant_0.smv"
-#include "handshake_blocker_0.smv"
-#include "handshake_source_0.smv"
 #include "handshake_lazy_fork_1.smv"
 #include "handshake_mux_0.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_source_0.smv"
 
 
 MODULE elastic_miter_mux_add_suppress_lhs_mux_add_suppress_rhs_wrapper (ins, ins_valid, sel, sel_valid, EQ_out_ready)

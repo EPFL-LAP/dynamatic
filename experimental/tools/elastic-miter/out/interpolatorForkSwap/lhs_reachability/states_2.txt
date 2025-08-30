@@ -6926,4 +6926,4 @@ reachable states: 576 (2^9.16993) out of 524288 (2^19)
   interpolatorForkSwap_lhs.fork.inner_fork.inner_reg_block_1.reg_value = FALSE
   -------------------------
 ######################################################################
-elapse: 0.09 seconds, total: 0.09 seconds
+elapse: 0.11 seconds, total: 0.11 seconds

@@ -1,0 +1,32 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "A_in" ["style"="solid", "shape"="diamond", "label"="A_in", "mlir_op"="handshake.func"]
+  "B_in" ["style"="solid", "shape"="diamond", "label"="B_in", "mlir_op"="handshake.func"]
+  "Cond" ["style"="solid", "shape"="diamond", "label"="Cond", "mlir_op"="handshake.func"]
+  "C_out" ["style"="solid", "shape"="diamond", "label"="C_out", "mlir_op"="handshake.func"]
+  "A_in" -> "ndw_in_A_in" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="A_in", "to_idx"="0"]
+  "B_in" -> "ndw_in_B_in" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="B_in", "to_idx"="0"]
+  "Cond" -> "ndw_in_Cond" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="2", "to"="ins", "arrowtail"="none", "from"="Cond", "to_idx"="0"]
+  "ndw_in_A_in" -> "andi" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_B_in" -> "andi" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="rhs", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "ndw_in_Cond" -> "passer1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "ndw_out_C_out" -> "C_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="C_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "passer1" -> "ndw_out_C_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_A_in" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_B_in" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_Cond" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster3 {
+    graph ["label"="BB 3"]
+    "ndw_out_C_out" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster2 {
+    graph ["label"="BB 2"]
+    "andi" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="&", "mlir_op"="handshake.andi"]
+    "passer1" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "andi" -> "passer1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  }
+}

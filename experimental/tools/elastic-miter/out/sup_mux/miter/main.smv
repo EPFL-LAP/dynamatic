@@ -26,16 +26,16 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_loopLiveIn : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.loopLiveIn_ready, 31);
-  VAR seq_generator_iterLiveOut : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.iterLiveOut_ready, 31);
-  VAR seq_generator_oldContinue : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.oldContinue_ready, 31);
+  VAR seq_generator_loopLiveIn : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.loopLiveIn_ready, 3);
+  VAR seq_generator_iterLiveOut : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.iterLiveOut_ready, 3);
+  VAR seq_generator_oldContinue : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.oldContinue_ready, 3);
 
   VAR elastic_miter_sup_mux_lhs_sup_mux_rhs : elastic_miter_sup_mux_lhs_sup_mux_rhs (seq_generator_loopLiveIn.outs, seq_generator_loopLiveIn.outs_valid, seq_generator_iterLiveOut.outs, seq_generator_iterLiveOut.outs_valid, seq_generator_oldContinue.outs, seq_generator_oldContinue.outs_valid, sink_EQ_iterLiveIn.ins_ready);
 
   VAR sink_EQ_iterLiveIn : sink_main(elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn_valid);
 
 INVARSPEC (elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn_valid -> elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn);
-CTLSPEC AF (AG ((elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_loopLiveIn.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_loopLiveIn.inner_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_iterLiveOut.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_iterLiveOut.inner_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_oldContinue.inner_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_oldContinue.inner_counter.counter) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_out_bl_iterLiveIn.outs_valid) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_out_bl_iterLiveIn.outs_valid)));
+CTLSPEC AF (AG ((elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_loopLiveIn.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_loopLiveIn.debug_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_iterLiveOut.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_iterLiveOut.debug_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_oldContinue.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_oldContinue.debug_counter.counter) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_out_bl_iterLiveIn.outs_valid) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_out_bl_iterLiveIn.outs_valid)));
 
 INVAR  seq_generator_iterLiveOut.exact_tokens = seq_generator_oldContinue.exact_tokens ;
 INVAR  seq_generator_iterLiveOut.exact_tokens = elastic_miter_sup_mux_lhs_sup_mux_rhs.out_nds_iterLiveIn.exact_tokens ;

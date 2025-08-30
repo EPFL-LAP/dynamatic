@@ -46,4 +46,4 @@ reachable states: 8 (2^3) out of 8 (2^3)
   and_false_lhs.ndw_out_out.inner_ndwire.state = SLEEPING
   -------------------------
 ######################################################################
-elapse: 0.00 seconds, total: 0.00 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

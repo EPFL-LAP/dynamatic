@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_A_in : bool_input(elastic_miter_sup_fork_lhs_sup_fork_rhs.A_in_ready, 31);
-  VAR seq_generator_Cond : bool_input(elastic_miter_sup_fork_lhs_sup_fork_rhs.Cond_ready, 31);
+  VAR seq_generator_A_in : bool_input(elastic_miter_sup_fork_lhs_sup_fork_rhs.A_in_ready, 1);
+  VAR seq_generator_Cond : bool_input(elastic_miter_sup_fork_lhs_sup_fork_rhs.Cond_ready, 1);
 
   VAR elastic_miter_sup_fork_lhs_sup_fork_rhs : elastic_miter_sup_fork_lhs_sup_fork_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_Cond.outs, seq_generator_Cond.outs_valid, sink_EQ_B_out.ins_ready, sink_EQ_C_out.ins_ready);
 
@@ -36,5 +36,5 @@ MODULE main
 
 INVARSPEC (elastic_miter_sup_fork_lhs_sup_fork_rhs.EQ_B_out_valid -> elastic_miter_sup_fork_lhs_sup_fork_rhs.EQ_B_out);
 INVARSPEC (elastic_miter_sup_fork_lhs_sup_fork_rhs.EQ_C_out_valid -> elastic_miter_sup_fork_lhs_sup_fork_rhs.EQ_C_out);
-CTLSPEC AF (AG ((elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_in_buf_A_in.inner_counter.counter = elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_in_buf_A_in.inner_counter.counter) & (elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_in_buf_Cond.inner_counter.counter = elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_in_buf_Cond.inner_counter.counter) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_out_buf_B_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_out_buf_B_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_out_buf_C_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_out_buf_C_out.outs_valid)));
+CTLSPEC AF (AG ((elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_in_buf_A_in.debug_counter.counter = elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_in_buf_A_in.debug_counter.counter) & (elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_in_buf_Cond.debug_counter.counter = elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_in_buf_Cond.debug_counter.counter) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_out_buf_B_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_out_buf_B_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.lhs_out_buf_C_out.outs_valid) & (!elastic_miter_sup_fork_lhs_sup_fork_rhs.rhs_out_buf_C_out.outs_valid)));
 

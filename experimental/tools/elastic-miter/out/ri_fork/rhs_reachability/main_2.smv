@@ -1,0 +1,34 @@
+#include "ri_fork_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_A_in : bool_input_exact(ri_fork_rhs.A_in_ready, 2);
+
+  VAR ri_fork_rhs : ri_fork_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, sink_B_out.ins_ready, sink_C_out.ins_ready);
+
+  VAR sink_B_out : sink_main(ri_fork_rhs.B_out_valid);
+  VAR sink_C_out : sink_main(ri_fork_rhs.C_out_valid);
+

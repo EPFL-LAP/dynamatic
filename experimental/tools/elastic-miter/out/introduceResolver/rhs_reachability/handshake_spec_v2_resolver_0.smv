@@ -1,0 +1,35 @@
+-- handshake_spec_v2_resolver_0 : spec_v2_resolver(None)
+
+
+MODULE handshake_spec_v2_resolver_0(actualCondition, actualCondition_valid, generatedCondition, generatedCondition_valid, confirmSpec_ready)
+  VAR
+  inner_join : handshake_spec_v2_resolver_0__join(actualCondition_valid, generatedCondition_valid, confirmSpec_ready);
+  idle : boolean;
+  ASSIGN
+  init(idle) := TRUE;
+  next(idle) := case
+    transfer & idle & !actualCondition & generatedCondition : FALSE;
+    transfer & !idle & !generatedCondition : TRUE;
+    TRUE : idle;
+  esac;
+  DEFINE
+  transfer := actualCondition_valid & generatedCondition_valid & confirmSpec_ready;
+  // output
+  confirmSpec := idle;
+  confirmSpec_valid := inner_join.outs_valid;
+  actualCondition_ready := inner_join.ins_0_ready;
+  generatedCondition_ready := inner_join.ins_1_ready;
+
+
+MODULE handshake_spec_v2_resolver_0__join(ins_0_valid, ins_1_valid, outs_ready)
+
+  DEFINE
+  all_valid := ins_0_valid & ins_1_valid;
+
+  -- output
+  DEFINE
+  ins_0_ready := outs_ready & ins_1_valid;
+  ins_1_ready := outs_ready & ins_0_valid;
+  outs_valid := all_valid;
+
+

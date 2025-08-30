@@ -1,0 +1,27 @@
+#include "handshake_passer_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+
+
+MODULE suppressorInduction_lhs_wrapper (short, short_valid, A_in, A_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := suppressorInduction_lhs_wrapped.B_out;
+DEFINE B_out_valid := suppressorInduction_lhs_wrapped.B_out_valid;
+DEFINE suppressorInduction_lhs_wrapped_B_out_ready := B_out_ready;
+DEFINE suppressorInduction_lhs_wrapped_short := short;
+DEFINE suppressorInduction_lhs_wrapped_short_valid := short_valid;
+DEFINE short_ready := suppressorInduction_lhs_wrapped.short_ready;
+DEFINE suppressorInduction_lhs_wrapped_A_in := A_in;
+DEFINE suppressorInduction_lhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := suppressorInduction_lhs_wrapped.A_in_ready;
+
+
+VAR suppressorInduction_lhs_wrapped : suppressorInduction_lhs(suppressorInduction_lhs_wrapped_short, suppressorInduction_lhs_wrapped_short_valid, suppressorInduction_lhs_wrapped_A_in, suppressorInduction_lhs_wrapped_A_in_valid, suppressorInduction_lhs_wrapped_B_out_ready);
+
+-- properties

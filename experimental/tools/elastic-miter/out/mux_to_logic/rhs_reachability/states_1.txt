@@ -3342,4 +3342,4 @@ reachable states: 256 (2^8) out of 1.67772e+07 (2^24)
   mux_to_logic_rhs.vm_fork_2.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.07 seconds, total: 0.07 seconds
+elapse: 0.06 seconds, total: 0.06 seconds

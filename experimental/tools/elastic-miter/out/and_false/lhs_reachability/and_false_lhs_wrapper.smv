@@ -1,7 +1,7 @@
-#include "handshake_andi_0.smv"
 #include "handshake_source_0.smv"
 #include "handshake_constant_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_andi_0.smv"
 
 
 MODULE and_false_lhs_wrapper (ins, ins_valid, out_ready)

@@ -1,0 +1,22 @@
+#include "handshake_passer_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE introduceIdentInterpolator_lhs_wrapper (val, val_valid, A_in, A_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := introduceIdentInterpolator_lhs_wrapped.B_out;
+DEFINE B_out_valid := introduceIdentInterpolator_lhs_wrapped.B_out_valid;
+DEFINE introduceIdentInterpolator_lhs_wrapped_B_out_ready := B_out_ready;
+DEFINE introduceIdentInterpolator_lhs_wrapped_val := val;
+DEFINE introduceIdentInterpolator_lhs_wrapped_val_valid := val_valid;
+DEFINE val_ready := introduceIdentInterpolator_lhs_wrapped.val_ready;
+DEFINE introduceIdentInterpolator_lhs_wrapped_A_in := A_in;
+DEFINE introduceIdentInterpolator_lhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := introduceIdentInterpolator_lhs_wrapped.A_in_ready;
+
+
+VAR introduceIdentInterpolator_lhs_wrapped : introduceIdentInterpolator_lhs(introduceIdentInterpolator_lhs_wrapped_val, introduceIdentInterpolator_lhs_wrapped_val_valid, introduceIdentInterpolator_lhs_wrapped_A_in, introduceIdentInterpolator_lhs_wrapped_A_in_valid, introduceIdentInterpolator_lhs_wrapped_B_out_ready);
+
+-- properties

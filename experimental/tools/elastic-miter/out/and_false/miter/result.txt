@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_and_false_lhs_and_false_rhs.EQ_out_valid -> elastic_miter_and_false_lhs_and_false_rhs.EQ_out)  is true
 -- specification AF (AG ((!elastic_miter_and_false_lhs_and_false_rhs.lhs_in_buf_ins.outs_valid & !elastic_miter_and_false_lhs_and_false_rhs.lhs_out_bl_out.outs_valid) & !elastic_miter_and_false_lhs_and_false_rhs.rhs_out_bl_out.outs_valid))  is true
-elapse: 0.04 seconds, total: 0.04 seconds
+elapse: 0.02 seconds, total: 0.02 seconds

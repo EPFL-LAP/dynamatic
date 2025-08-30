@@ -1,0 +1,31 @@
+#include "handshake_andi_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_passer_0.smv"
+
+
+MODULE sup_and_rhs (A_in, A_in_valid, B_in, B_in_valid, Cond, Cond_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := ndw_out_C_out.outs;
+DEFINE C_out_valid := ndw_out_C_out.outs_valid;
+DEFINE ndw_out_C_out_outs_ready := C_out_ready;
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+DEFINE ndw_in_B_in_ins := B_in;
+DEFINE ndw_in_B_in_ins_valid := B_in_valid;
+DEFINE B_in_ready := ndw_in_B_in.ins_ready;
+DEFINE ndw_in_Cond_ins := Cond;
+DEFINE ndw_in_Cond_ins_valid := Cond_valid;
+DEFINE Cond_ready := ndw_in_Cond.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, andi.lhs_ready);
+VAR ndw_in_B_in : handshake_ndwire_0(ndw_in_B_in_ins, ndw_in_B_in_ins_valid, andi.rhs_ready);
+VAR ndw_in_Cond : handshake_ndwire_0(ndw_in_Cond_ins, ndw_in_Cond_ins_valid, passer1.ctrl_ready);
+VAR ndw_out_C_out : handshake_ndwire_0(passer1.result, passer1.result_valid, ndw_out_C_out_outs_ready);
+VAR andi : handshake_andi_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, ndw_in_B_in.outs, ndw_in_B_in.outs_valid, passer1.data_ready);
+VAR passer1 : handshake_passer_0(andi.result, andi.result_valid, ndw_in_Cond.outs, ndw_in_Cond.outs_valid, ndw_out_C_out.ins_ready);
+
+-- properties

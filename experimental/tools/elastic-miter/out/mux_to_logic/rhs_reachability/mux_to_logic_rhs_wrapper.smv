@@ -1,6 +1,6 @@
+#include "handshake_fork_0.smv"
 #include "handshake_andi_0.smv"
 #include "handshake_ori_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_ndwire_0.smv"
 #include "handshake_not_0.smv"
 
