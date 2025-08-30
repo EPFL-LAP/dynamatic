@@ -155,6 +155,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     {self.default_assignments}
 
     {self.unshifted_assignments}
+
+    {self.shifted_assignments}
   end process
 """
         
