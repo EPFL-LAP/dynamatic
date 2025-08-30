@@ -30,6 +30,7 @@ class PortIdxPerQueueEntryMuxDeclarative():
     
         self.entity_port_items = [
             p.GroupInitTransfer(config),
+            ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
             ga_p.PortIndexPerQueueEntry(config, queue_type)
         ]
 
