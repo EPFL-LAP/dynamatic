@@ -17,28 +17,32 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupHandshakingDeclarativeLocalItems,
         GroupHandshakingDeclarativeBodyItems,
         PortIdxPerQueueEntryRomMuxPortItems,
-        PortIdxPerQueueEntryRomMuxBodyItems
+        PortIdxPerQueueEntryRomMuxBodyItems,
+        PortIdxPerQueueEntryRomMuxLocalItems
     )
 
 
 class PortIdxPerQueueEntryMuxDeclarative():
-    def __init__(self, config : Config):
+    def __init__(self, config : Config, queue_type : QueueType):
         p = PortIdxPerQueueEntryRomMuxPortItems()
 
         ga_p = GroupAllocatorDeclarativePortItems()
     
         self.entity_port_items = [
             p.GroupInitTransfer(config),
-            ga_p.PortIndexPerQueueEntry(config, QueueType.LOAD)
+            ga_p.PortIndexPerQueueEntry(config, queue_type)
         ]
 
-        self.local_items = [
+        l = PortIdxPerQueueEntryRomMuxLocalItems()
 
+        self.local_items = [
+            l.PortIndexPerQueueEntry(config, queue_type, shifted=False),
+            l.PortIndexPerQueueEntry(config, queue_type, shifted=True)
         ]
 
         b = PortIdxPerQueueEntryRomMuxBodyItems()
         self.body = [
-            b.Body(config, QueueType.LOAD)
+            b.Body(config, queue_type)
         ]
 
 class GroupHandshakingDeclarative():
@@ -221,7 +225,7 @@ class GroupAllocator:
         declaration = GroupAllocatorDeclarative(config)
         handshaking_declaration = GroupHandshakingDeclarative(config)
 
-        port_idx_mux_dec = PortIdxPerQueueEntryMuxDeclarative(config)
+        port_idx_mux_dec = PortIdxPerQueueEntryMuxDeclarative(config, QueueType.LOAD)
 
         port_idx_mux_entity = Entity(port_idx_mux_dec)
 

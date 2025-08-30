@@ -126,7 +126,13 @@ class Signal():
         def get_single(name) : return self._get_inst_single(name, cxn_type)
         return self._get_item(get_single)
     
+class Signal2D(Signal):
+    def _get_item(self, get_single):
+        # 2D items are always singular
+        return get_single(self.base_name)
 
+    def signal_size_to_type_declaration(self):
+        return f"data_array({self.size.number} - 1 downto 0)({self.size.bitwidth} - 1 downto 0)"
 
 class SimpleInstantiation():
     def __init__(self, signal : Signal, cxn_type : InstCxnType):

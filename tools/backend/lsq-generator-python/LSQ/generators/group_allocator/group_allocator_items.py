@@ -1,4 +1,4 @@
-from LSQ.entity import Signal, EntityComment, Instantiation, SimpleInstantiation, InstCxnType
+from LSQ.entity import Signal, EntityComment, Instantiation, SimpleInstantiation, InstCxnType, Signal2D
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
@@ -35,12 +35,53 @@ class PortIdxPerQueueEntryRomMuxPortItems():
                 )
             )
 
+class PortIdxPerQueueEntryRomMuxLocalItems():
+    class PortIndexPerQueueEntry(Signal2D):
+        """
+        Bitwidth = N
+        Number = M
+
+        Local 2D input vector storing the 
+        (unshifted/shifted) port index per queue entry
+         
+        Bitwidth is bitwidth required to present port_idx
+        Number is equal to the number of queue entries
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     shifted = False
+                     ):
+            
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_ports_idx_bitwidth()
+                    number = config.load_queue_num_entries()
+                case QueueType.STORE:
+                    bitwidth = config.store_ports_idx_bitwidth()
+                    number = config.store_queue_num_entries()
+
+            if shifted:
+                base_name = QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)
+            else:
+                base_name = UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)
+
+            Signal2D.__init__(
+                self,
+                base_name=base_name,
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=number
+                )
+            )
+
 class PortIdxPerQueueEntryRomMuxBodyItems():
     class Body():
 
         def _get_default_value(self, queue_type, idx, bitwidth):
             return f"""
-    {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
+    {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
 """.removeprefix("\n")
 
         def __init__(self, config : Config, queue_type : QueueType):
@@ -49,8 +90,9 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             idx_bitwidth = config.load_ports_idx_bitwidth()
 
-            for i in range(config.load_queue_num_entries()):
-                self.default_assignments += self._get_default_value(queue_type, i, idx_bitwidth)
+            self.default_assignments += f"""
+    {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)} <= (others => (others => '0'));
+"""
 
             self.default_assignments = self.default_assignments.strip()
 
@@ -68,7 +110,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
                 for j, idx in enumerate(config.gaLdPortIdx[i]):
                     self.group_assignments += f"""
-      {QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{j} <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+      {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
                 self.group_assignments += f"""
 
