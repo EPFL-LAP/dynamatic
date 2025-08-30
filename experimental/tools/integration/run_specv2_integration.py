@@ -446,7 +446,7 @@ def main():
 
     # Buffer placement (FPGA20)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
-    timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
+    timing_model = DYNAMATIC_ROOT / "data" / "components.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_post_speculation,
