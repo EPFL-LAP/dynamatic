@@ -252,7 +252,7 @@ class StoreOrderPerEntryBodyItems():
                     group_one_hot = one_hot(case_number, num_cases)
                     case_number = case_number + 1
                     cases += f"""
-      when {group_one_hot} =>
+    when {group_one_hot} =>
 """.removeprefix("\n")
                     for j, store_order in enumerate(config.group_store_order(i)):
                         if store_order > 0:
@@ -263,12 +263,12 @@ class StoreOrderPerEntryBodyItems():
 """.removeprefix("\n")
                         else:
                             cases += f"""
-        -- Ld {j} of group {i} has no preceding stores, use default value
+    -- Ld {j} of group {i} has no preceding stores, use default value
 
 """.removeprefix("\n")
                 else:
                     cases += f"""
-      -- Group {i} has no loads
+    -- Group {i} has no loads
 
 """.removeprefix("\n")
                     
