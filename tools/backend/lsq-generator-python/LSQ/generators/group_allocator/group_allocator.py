@@ -268,10 +268,10 @@ class GroupAllocator:
             ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         if (self.configs.ldpAddrW > 0):
             arch += Mux1HROM(ctx, ldq_port_idx_rom,
-                             self.configs.gaLdPortIdx, group_init_hs)
+                             self.configs._group_load_port_idxs, group_init_hs)
         if (self.configs.stpAddrW > 0):
             arch += Mux1HROM(ctx, stq_port_idx_rom,
-                             self.configs.gaStPortIdx, group_init_hs)
+                             self.configs._group_store_port_idxs, group_init_hs)
         arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
                          group_init_hs, MaskLess)
         arch += Mux1HROM(ctx, num_loads,

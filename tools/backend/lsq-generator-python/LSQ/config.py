@@ -7,6 +7,8 @@
 import math
 import json
 
+from typing import List
+
 class Config:
     """
     Configuration object for LSQ code generation.
@@ -36,9 +38,9 @@ class Config:
                            [0]]     # Outer list (Row): Index for each BB
     # Inner list (Column): List of store counts ahead of each load
     # In this example -> BB0=[st0,st1,ld0,ld1], BB1=[ld2,st2]
-    gaLdPortIdx:   list = [[0, 1],   # The related access port index for each load in BB
+    _group_load_port_idxs:   list = [[0, 1],   # The related access port index for each load in BB
                            [2]]
-    gaStPortIdx:   list = [[0, 1],   # The related access port index for each store in BB
+    _group_store_port_idxs:   list = [[0, 1],   # The related access port index for each store in BB
                            [2]]
     ldqAddrW:      int = 2          # Load queue address width
     stqAddrW:      int = 4          # Store queue address width
@@ -90,8 +92,8 @@ class Config:
             self._group_num_stores = obj["numStores"]
 
             self.gaLdOrder = obj["ldOrder"]
-            self.gaLdPortIdx = obj["ldPortIdx"]
-            self.gaStPortIdx = obj["stPortIdx"]
+            self._group_load_port_idxs = obj["ldPortIdx"]
+            self._group_store_port_idxs = obj["stPortIdx"]
 
             #self.ldqAddrW
             self._ldq_idx_w = math.ceil(math.log2(self._ldq_num_entries))
@@ -124,8 +126,8 @@ class Config:
             assert (len(self._group_num_loads) == self.num_groups())
             assert (len(self._group_num_stores) == self.num_groups())
             assert (len(self.gaLdOrder) == self.num_groups())
-            assert (len(self.gaLdPortIdx) == self.num_groups())
-            assert (len(self.gaStPortIdx) == self.num_groups())
+            assert (len(self._group_load_port_idxs) == self.num_groups())
+            assert (len(self._group_store_port_idxs) == self.num_groups())
 
     def num_groups(self) -> int:
         """
@@ -224,3 +226,15 @@ class Config:
         Number of stores in a group
         """
         return self._group_num_stores[group_idx]
+    
+    def group_load_ports(self, group_idx) -> List[int]:
+        """
+        List of load port indices (1 per load) in a group
+        """
+        return self._group_load_port_idxs[group_idx]
+    
+    def group_store_ports(self, group_idx) -> List[int]:
+        """
+        List of store port indices (1 per store) in a group
+        """
+        return self._group_store_port_idxs[group_idx]

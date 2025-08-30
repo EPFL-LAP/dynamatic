@@ -62,9 +62,9 @@ class PortIdxPerQueueEntryRomMuxLocalItems():
                     number = config.store_queue_num_entries()
 
             if shifted:
-                base_name = QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)
+                base_name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
             else:
-                base_name = UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)
+                base_name = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)
 
             Signal2D.__init__(
                 self,
@@ -81,53 +81,80 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
         def _get_default_value(self, queue_type, idx, bitwidth):
             return f"""
-    {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
+    {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
 """.removeprefix("\n")
 
         def __init__(self, config : Config, queue_type : QueueType):
             
+            match queue_type:
+                case QueueType.LOAD:
+                    idx_bitwidth = config.load_ports_idx_bitwidth()
+                    def ports(group_idx) : config.group_load_ports(group_idx)
+                    num_entries = config.load_queue_num_entries()
+                case QueueType.STORE:
+                    idx_bitwidth = config.store_ports_idx_bitwidth()
+                    def ports(group_idx) : config.group_store_ports(group_idx)
+                    num_entries = config.store_queue_num_entries()
+
             self.default_assignments = ""
 
-            idx_bitwidth = config.load_ports_idx_bitwidth()
+
+
 
             self.default_assignments += f"""
-    {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)} <= (others => (others => '0'));
+    {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
 """
 
             self.default_assignments = self.default_assignments.strip()
 
-            self.group_assignments = ""
+            self.unshifted_assignments = ""
 
             for i in range(config.num_groups()):
                 if i == 0:
-                    self.group_assignments += f"""
+                    self.unshifted_assignments += f"""
     if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """ .removeprefix("\n")
                 else:
-                    self.group_assignments += f"""
+                    self.unshifted_assignments += f"""
     elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """.removeprefix("\n")
 
-                for j, idx in enumerate(config.gaLdPortIdx[i]):
-                    self.group_assignments += f"""
-      {UNSHIFTED_QUEUE_PORT_IDX_FOR_QUEUE_ENTRY(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+                for j, idx in enumerate(ports):
+                    self.unshifted_assignments += f"""
+      {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
-                self.group_assignments += f"""
+                self.unshifted_assignments += f"""
 
 """.removeprefix("\n")
                 
-            self.group_assignments += f"""
+            self.unshifted_assignments += f"""
     end if;
 """.removeprefix("\n")
 
-            self.group_assignments = self.group_assignments.strip()
+            self.unshifted_assignments = self.unshifted_assignments.strip()
+
+            self.shifted_assignments = f"""
+    for i in {num_entries} - 1 downto 0 loop
+""".removeprefix("\n")
+            for i in range(num_entries):
+                port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
+                unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
+                pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+                self.shifted_assignments += f"""
+      {port_idx}(i) <= {unsh_port_idx(queue_type)}(integer(i + {pointer_name}) mod {num_entries})
+
+""".removeprefix("\n")
+
+            self.shifted_assignments += f"""
+    end loop;
+""".removeprefix("\n")
 
             self.item = f"""
   process(all)
   begin
     {self.default_assignments}
 
-    {self.group_assignments}
+    {self.unshifted_assignments}
   end process
 """
         
