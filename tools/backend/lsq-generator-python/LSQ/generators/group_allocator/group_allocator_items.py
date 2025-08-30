@@ -140,6 +140,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
 """.removeprefix("\n")
 
+            case_input = case_input.strip()
+
             unshifted_assignments = f"""
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
