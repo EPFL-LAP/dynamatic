@@ -1,0 +1,31 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "Addr_in" ["style"="solid", "shape"="diamond", "label"="Addr_in", "mlir_op"="handshake.func"]
+  "Cond" ["style"="solid", "shape"="diamond", "label"="Cond", "mlir_op"="handshake.func"]
+  "Data_out" ["style"="solid", "shape"="diamond", "label"="Data_out", "mlir_op"="handshake.func"]
+  "Addr_in" -> "ndw_in_Addr_in" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="Addr_in", "to_idx"="0"]
+  "Cond" -> "ndw_in_Cond" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="Cond", "to_idx"="0"]
+  "ndw_in_Addr_in" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_Cond" -> "passer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "ndw_out_Data_out" -> "Data_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="Data_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "load0" -> "ndw_out_Data_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="dataOut", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_Addr_in" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_Cond" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster3 {
+    graph ["label"="BB 3"]
+    "ndw_out_Data_out" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster2 {
+    graph ["label"="BB 2"]
+    "passer" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "load0" ["style"="filled", "fillcolor"="coral", "shape"="box", "label"="LD", "mlir_op"="handshake.load"]
+    "mc_buffer" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="ONE_SLOT_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
+    "passer" -> "load0" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="addrIn", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "load0" -> "mc_buffer" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="addrOut", "to_idx"="0"]
+    "mc_buffer" -> "load0" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="dataFromMem", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  }
+}

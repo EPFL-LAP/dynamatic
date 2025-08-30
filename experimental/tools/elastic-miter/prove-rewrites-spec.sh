@@ -23,6 +23,7 @@ run suppressorInduction --custom-context="$REWRITES/suppressorInduction_ctx.mlir
 run introduceResolver --disable_ndwire --disable_decoupling --custom-context="$REWRITES/introduceResolver_ctx.mlir" --allow_nonacceptance --seq_length_enhanced="{in:0}={out:0}"
 run sup_and --seq_length="0=1" --allow_nonacceptance --disable_ndwire --disable_decoupling
 run sup_fork --allow_nonacceptance
+run sup_load --allow_nonacceptance --disable_ndwire --disable_decoupling --seq_length_enhanced="{in:0}={in:1}&{in:0}={out:0}"
 run unify_sup --seq_length="0=1" --allow_nonacceptance --disable_ndwire --disable_decoupling
 run interpolatorForkSwap --allow_nonacceptance --disable_ndwire --disable_decoupling
 run andForkSwap --allow_nonacceptance --disable_ndwire --disable_decoupling

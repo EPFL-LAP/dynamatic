@@ -1,0 +1,24 @@
+#include "handshake_passer_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_load_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_load_rhs_wrapper (Addr_in, Addr_in_valid, Cond, Cond_valid, Data_out_ready)
+
+
+-- input and output
+DEFINE Data_out := sup_load_rhs_wrapped.Data_out;
+DEFINE Data_out_valid := sup_load_rhs_wrapped.Data_out_valid;
+DEFINE sup_load_rhs_wrapped_Data_out_ready := Data_out_ready;
+DEFINE sup_load_rhs_wrapped_Addr_in := Addr_in;
+DEFINE sup_load_rhs_wrapped_Addr_in_valid := Addr_in_valid;
+DEFINE Addr_in_ready := sup_load_rhs_wrapped.Addr_in_ready;
+DEFINE sup_load_rhs_wrapped_Cond := Cond;
+DEFINE sup_load_rhs_wrapped_Cond_valid := Cond_valid;
+DEFINE Cond_ready := sup_load_rhs_wrapped.Cond_ready;
+
+
+VAR sup_load_rhs_wrapped : sup_load_rhs(sup_load_rhs_wrapped_Addr_in, sup_load_rhs_wrapped_Addr_in_valid, sup_load_rhs_wrapped_Cond, sup_load_rhs_wrapped_Cond_valid, sup_load_rhs_wrapped_Data_out_ready);
+
+-- properties

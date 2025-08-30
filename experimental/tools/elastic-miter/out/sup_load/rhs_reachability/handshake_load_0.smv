@@ -1,0 +1,88 @@
+-- handshake_load_0 : load(['data_bitwidth=1', 'addr_bitwidth=1'])
+
+
+MODULE handshake_load_0(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_ready, dataOut_ready)
+  VAR
+  inner_addr_one_slot_break_r : handshake_load_0__addr_one_slot_break_r(addrIn, addrIn_valid, addrOut_ready);
+  inner_data_one_slot_break_r : handshake_load_0__data_one_slot_break_r(dataFromMem, dataFromMem_valid, dataOut_ready);
+
+  -- outputs
+  DEFINE
+  addrIn_ready := inner_addr_one_slot_break_r.ins_ready;
+  addrOut := inner_addr_one_slot_break_r.outs;
+  addrOut_valid := inner_addr_one_slot_break_r.outs_valid;
+  dataFromMem_ready := inner_data_one_slot_break_r.ins_ready;
+  dataOut := inner_data_one_slot_break_r.outs;
+  dataOut_valid := inner_data_one_slot_break_r.outs_valid;
+
+
+MODULE handshake_load_0__addr_one_slot_break_r(ins, ins_valid, outs_ready)
+  VAR
+  inner_one_slot_break_r : handshake_load_0__addr_one_slot_break_r__one_slot_break_r_dataless(ins_valid, outs_ready);
+  data : boolean;
+  
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+
+  -- output
+  DEFINE
+  ins_ready := inner_one_slot_break_r.ins_ready;
+  outs_valid := inner_one_slot_break_r.outs_valid;
+  outs := inner_one_slot_break_r.full ? data : ins;
+
+
+MODULE handshake_load_0__addr_one_slot_break_r__one_slot_break_r_dataless(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+  
+
+  ASSIGN
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
+
+  -- output
+  DEFINE
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
+
+
+
+
+
+MODULE handshake_load_0__data_one_slot_break_r(ins, ins_valid, outs_ready)
+  VAR
+  inner_one_slot_break_r : handshake_load_0__data_one_slot_break_r__one_slot_break_r_dataless(ins_valid, outs_ready);
+  data : boolean;
+  
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+
+  -- output
+  DEFINE
+  ins_ready := inner_one_slot_break_r.ins_ready;
+  outs_valid := inner_one_slot_break_r.outs_valid;
+  outs := inner_one_slot_break_r.full ? data : ins;
+
+
+MODULE handshake_load_0__data_one_slot_break_r__one_slot_break_r_dataless(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+  
+
+  ASSIGN
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
+
+  -- output
+  DEFINE
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
+
+
+
+
+
