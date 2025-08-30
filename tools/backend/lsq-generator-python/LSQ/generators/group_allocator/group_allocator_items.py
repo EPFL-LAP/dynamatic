@@ -156,7 +156,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             for i in range(num_entries):
                 self.output_assignments += f"""
-    {PORT_INDEX_PER_ENTRY_NAME}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME}(i);
+    {PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}(i);
 """.removeprefix("\n")
 
             self.item = f"""
