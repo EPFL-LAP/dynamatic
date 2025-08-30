@@ -136,7 +136,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 """.removeprefix("\n")
                 else:
                     cases += f"""
-    -- Group {i} has no {queue_type.value}s
+      -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
 
