@@ -159,7 +159,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
     {self.shifted_assignments}
   end process
-"""
+""".removeprefix("\n")
         
         def get(self):
             return self.item
