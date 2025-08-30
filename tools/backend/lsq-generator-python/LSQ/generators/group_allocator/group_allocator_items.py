@@ -323,6 +323,8 @@ class StoreOrderPerEntryBodyItems():
         for j in 0 to {config.store_queue_num_entries()} loop
           row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()}
           col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()}
+
+          -- assign shifted value
           {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j)
         end loop;
       end loop;
@@ -348,6 +350,7 @@ class StoreOrderPerEntryBodyItems():
   process(all)
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}  : natural;
+
     -- where to shift a value to
     variable row_idx, col_idx : natural;
   begin
@@ -355,7 +358,6 @@ class StoreOrderPerEntryBodyItems():
     {load_pointer_name}_int = integer(unsigned({load_pointer_name}_i)
     {store_pointer_name}_int = integer(unsigned({store_pointer_name}_i)
 
-    
     {shifted_assignments}
 
   end process;
