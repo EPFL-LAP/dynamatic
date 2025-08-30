@@ -6,14 +6,18 @@
   },
   {
     "name": "handshake.buffer",
-   "parameters": [
-    {"name": "NUM_SLOTS", "type": "unsigned"},
-    {
-      "name": "BUFFER_TYPE",
-      "type": "string"
-    }
-  ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH  buffer_type='\"$BUFFER_TYPE\"'",
+    "parameters": [
+      {"name": "NUM_SLOTS", "type": "unsigned"},
+      {
+        "name": "BUFFER_TYPE",
+        "type": "string"
+      },
+      {
+        "name": "DEBUG_COUNTER",
+        "type": "boolean"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH  buffer_type='\"$BUFFER_TYPE\"' debug_counter=$DEBUG_COUNTER",
     "hdl": "smv"
   },
   {

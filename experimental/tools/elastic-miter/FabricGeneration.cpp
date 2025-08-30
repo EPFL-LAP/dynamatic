@@ -735,6 +735,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       BufferOp lhsBufferOp = builder.create<BufferOp>(
           forkOp.getLoc(), forkOp.getResult()[0], inputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      lhsBufferOp.setDebugCounter(true);
       setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
       lhsNDWireInput = lhsBufferOp.getResult();
     }
@@ -746,6 +747,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       BufferOp rhsBufferOp = builder.create<BufferOp>(
           forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+      rhsBufferOp.setDebugCounter(true);
       setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
       rhsNDWireInput = rhsBufferOp.getResult();
     }
@@ -880,6 +882,9 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
       setHandshakeAttributes(builder, lhsEndBufferOp, bbOut, lhsBufName);
       setHandshakeAttributes(builder, rhsEndBufferOp, bbOut, rhsBufName);
+
+      lhsEndBufferOp.setDebugCounter(true);
+      rhsEndBufferOp.setDebugCounter(true);
 
       lhsInput = lhsEndBufferOp.getResult();
       rhsInput = rhsEndBufferOp.getResult();
