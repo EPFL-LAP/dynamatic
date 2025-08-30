@@ -89,11 +89,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             match queue_type:
                 case QueueType.LOAD:
                     idx_bitwidth = config.load_ports_idx_bitwidth()
-                    def ports(group_idx) : config.group_load_ports(group_idx)
+                    def ports(group_idx) : return config.group_load_ports(group_idx)
                     num_entries = config.load_queue_num_entries()
                 case QueueType.STORE:
                     idx_bitwidth = config.store_ports_idx_bitwidth()
-                    def ports(group_idx) : config.group_store_ports(group_idx)
+                    def ports(group_idx) : return config.group_store_ports(group_idx)
                     num_entries = config.store_queue_num_entries()
 
             self.default_assignments = ""
