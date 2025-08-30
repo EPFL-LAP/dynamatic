@@ -268,8 +268,8 @@ class GroupAllocator:
         entity = Entity(declaration)
         arch = Architecture(declaration)
 
-        print(entity.get("store order", "store order"))
-        print(arch.get("store order", "store order"))
+        print(entity.get("store_order", "store order"))
+        print(arch.get("store_order", "store order"))
 
 
         # hs_entity = Entity(handshaking_declaration)
