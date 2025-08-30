@@ -29,11 +29,13 @@ class Signal():
             self, 
             base_name: str, 
             size : Size, 
-            direction : Direction = None
+            direction : Direction = None,
+            always_number : bool = False
         ):
         self.base_name = base_name
         self.size = size
         self.direction = direction
+        self.always_number = always_number
 
     def _get_io_suffix(self, name):
         if name == "rst" or name == "clk":
