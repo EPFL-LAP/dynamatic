@@ -229,7 +229,7 @@ class StoreOrderPerEntryLocalItems():
 class StoreOrderPerEntryBodyItems():
     class Body():
 
-        def __init__(self, config : Config, queue_type : QueueType):
+        def __init__(self, config : Config):
             
             load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
             store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
