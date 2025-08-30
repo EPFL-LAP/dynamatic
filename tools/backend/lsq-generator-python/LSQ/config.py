@@ -38,8 +38,8 @@ class Config:
     numLdMem:      int = 1          # Number of load channels at memory interface (Fixed to 1)
     numStMem:      int = 1          # Number of store channels at memory interface (Fixed to 1)
 
-    gaNumLoads:    list = [2, 1]    # Number of loads in each BB
-    gaNumStores:   list = [2, 1]    # Number of stores in each BB
+    _group_num_loads:    list = [2, 1]    # Number of loads in each BB
+    _group_num_stores:   list = [2, 1]    # Number of stores in each BB
     _group_store_order:     list = [[2, 2],  # The order matrix for each group
                            [0]]     # Outer list (Row): Index for each BB
     # Inner list (Column): List of store counts ahead of each load
@@ -250,3 +250,15 @@ class Config:
         List of store orders (1 per load) in a group
         """
         return self._group_store_order[group_idx]
+    
+    def group_num_loads(self, group_idx) -> int:
+        """
+        Number of loads in a group
+        """
+        return self._group_num_loads[group_idx]
+    
+    def group_num_stores(self, group_idx) -> int:
+        """
+        Number of stores in a group
+        """
+        return self._group_num_stores[group_idx]

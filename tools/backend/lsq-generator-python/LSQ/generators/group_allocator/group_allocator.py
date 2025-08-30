@@ -19,8 +19,20 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
-        NaiveStoreOrderPerEntryBodyItems
+        NaiveStoreOrderPerEntryBodyItems,
+        NumAccessesRomMuxBodyItems
     )
+
+class NumAccessesRomMux():
+    def __init__(self, config : Config, queue_type : QueueType):
+        self.entity_port_items = []
+
+        self.local_items = []
+
+        b = NumAccessesRomMuxBodyItems()
+        self.body_items = [
+            b.Body(config, queue_type)
+        ]
 
 class StoreOrderPerEntryDeclarative():
     def __init__(self, config: Config):
@@ -259,17 +271,27 @@ class GroupAllocator:
 
         # port_idx_mux_dec = PortIdxPerEntryDeclarative(config, QueueType.LOAD)
 
-        # port_idx_mux_entity = Entity(port_idx_mux_dec)
+        # entity = Entity(port_idx_mux_dec)
 
-        # port_idx_mux_arch = Architecture(port_idx_mux_dec)
+        # arch = Architecture(port_idx_mux_dec)
 
-        declaration = StoreOrderPerEntryDeclarative(config)
+        # print(entity.get("port_idx", "port index"))
+        # print(arch.get("port_idx", "port index"))
 
-        entity = Entity(declaration)
-        arch = Architecture(declaration)
+        num_access_rom_mux = NumAccessesRomMux(config, QueueType.LOAD)
 
-        print(entity.get("store_order", "store order"))
-        print(arch.get("store_order", "store order"))
+        arch = Architecture(num_access_rom_mux)
+
+        # print(entity.get("port_idx", "port index"))
+        print(arch.get("num_access_rom_mux", "num_access_rom_mux"))
+
+        # declaration = StoreOrderPerEntryDeclarative(config)
+
+        # entity = Entity(declaration)
+        # arch = Architecture(declaration)
+
+        # print(entity.get("store_order", "store order"))
+        # print(arch.get("store_order", "store order"))
 
 
         # hs_entity = Entity(handshaking_declaration)
@@ -312,9 +334,9 @@ class GroupAllocator:
         arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs._group_store_order,
                          group_init_hs, MaskLess)
         arch += Mux1HROM(ctx, num_loads,
-                         self.configs.gaNumLoads, group_init_hs)
+                         self.configs._group_num_loads, group_init_hs)
         arch += Mux1HROM(ctx, num_stores,
-                         self.configs.gaNumStores, group_init_hs)
+                         self.configs._group_num_stores, group_init_hs)
         arch += Op(ctx, num_loads_o, num_loads)
         arch += Op(ctx, num_stores_o, num_stores)
 

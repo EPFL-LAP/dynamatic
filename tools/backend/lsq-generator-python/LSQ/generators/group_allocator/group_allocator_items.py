@@ -8,6 +8,119 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 
 from LSQ.operators.arithmetic import WrapSub
 
+class NumAccessesRomMuxBodyItems():
+    class Body():
+        def _set_params(self, config : Config, queue_type : QueueType):
+            match queue_type:
+                case QueueType.LOAD:
+                    def new_entries(idx) : config.group_num_loads(idx)
+                    self.new_entries = new_entries
+
+                    self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
+                case QueueType.STORE:
+                    def new_entries(idx): config.group_num_stores(idx)
+                    self.new_entries = new_entries
+
+                    self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
+
+        def __init__(self, config : Config, queue_type : QueueType):
+            ############################
+            # Build mux inner pieces
+            ############################
+
+            # case input is the std_logic_vector of concatenated bits
+            # we pass to the mux's case statement
+            case_input = ""
+
+            # not all groups have loads/store
+            # if the group does not have any of 
+            # the relevant memory op,
+            # we do not pass its transfer signal to the mux
+            #
+            # num_cases tracks how many groups 
+            # are passed to the mux
+            num_cases = 0
+
+            # add each group to the mux's case statement input
+            # if it has he relevant memory op
+            for i in range(config.num_groups()):
+                if self.has_items(i):      
+                    num_cases = num_cases + 1  
+                    case_input += f"""
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+""" .removeprefix("\n")
+                    
+            case_input = case_input.strip()[:-1]
+
+            # example case input:
+            #
+
+            # cases are the mux's data inputs
+            # each is associated with one of the inputs
+            # by a 'when' statement
+            # and then a set of assignments
+            cases = ""
+
+            # not all groups are in the mux, 
+            # so we need to track how many 'when' statements
+            # we have added
+            case_number = 0
+            for i in range(config.num_groups()):
+                # if it has at least one of the relevant ops
+                if self.has_items(i):      
+                    # get the case number one-hot encoded
+                    # (not the group number, since not all groups are in the mux)
+                    group_one_hot = one_hot(case_number, num_cases)
+                    case_number = case_number + 1
+                    
+                    new_entries = self.new_entries(i)
+
+                    assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}"
+                    new_entries_bin = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
+                    
+
+                    # map assignments to a select input
+                    cases += f"""
+      when {group_one_hot} =>
+        -- Group {i} has {new_entries} {queue_type.value}s
+        {assign_to} <= {new_entries_bin};
+
+""".removeprefix("\n")
+
+                # if there are no loads/stores
+                else:
+                    cases += f"""
+      -- Group {i} has no {queue_type.value}s
+
+""".removeprefix("\n")
+
+            # format correctly
+            cases = cases.strip()
+
+
+            ############################
+            # Actual mux statement
+            ############################
+
+            self.item = f"""
+    -- If a group has less than {self.num_entries} {queue_type.value}s
+    -- set the other port indices to 0
+    {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)} <= (others => '0');
+
+    -- This LSQ was generated without multi-group allocation
+    -- and so assumes the dataflow circuit will only ever 
+    -- have 1 group valid signal in a given cycle
+
+    -- Using case statement to help infer one-hot mux
+    case
+      {case_input}
+    is
+      {cases}
+
+    end case;
+""".strip()
+
+
 class PortIdxPerEntryLocalItems():
     class PortIdxPerQueueEntry(Signal2D):
         """
@@ -51,74 +164,128 @@ class PortIdxPerEntryLocalItems():
 
 class PortIdxPerEntryBodyItems():
     class Body():
-
-        def _get_default_value(self, queue_type, idx, bitwidth):
-            return f"""
-    {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{idx} <= {get_as_binary_string_padded(0, bitwidth)};
-""".removeprefix("\n")
-
-        def __init__(self, config : Config, queue_type : QueueType):
-            
-            pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+        def _set_parameters(self, config : Config, queue_type : QueueType):
+            self.pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
 
             match queue_type:
                 case QueueType.LOAD:
-                    idx_bitwidth = config.load_ports_idx_bitwidth()
+                    self.idx_bitwidth = config.load_ports_idx_bitwidth()
                     def ports(group_idx) : return config.group_load_ports(group_idx)
+                    self.ports = ports
+
                     def has_items(group_idx): return config.group_num_loads(group_idx) > 0
-                    num_entries = config.load_queue_num_entries()
+                    self.has_items = has_items
+
+                    self.num_entries = config.load_queue_num_entries()
                     
                 case QueueType.STORE:
-                    idx_bitwidth = config.store_ports_idx_bitwidth()
+                    self.idx_bitwidth = config.store_ports_idx_bitwidth()
+
                     def ports(group_idx) : return config.group_store_ports(group_idx)
+                    self.ports = ports
+
                     def has_items(group_idx): return config.group_num_stores(group_idx) > 0
-                    num_entries = config.store_queue_num_entries()
+                    self.has_items = has_items
 
-            default_assignments = ""
+                    self.num_entries = config.store_queue_num_entries()
 
-            default_assignments += f"""
-    -- If a group has less than {num_entries} {queue_type.value}s
-    -- set the other port indices to 0
-    {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
-"""
+        def _mux_rom(self, config : Config, queue_type):
+            """
+            Sets the VHDL for the one-hot mux from a ROM
+            into self.unshifted_assignments
 
-            default_assignments = default_assignments.strip()
+            The ROM values are the port indices per group.
+            """
 
+
+            ############################
+            # Build mux inner pieces
+            ############################
+
+            # case input is the std_logic_vector of concatenated bits
+            # we pass to the mux's case statement
             case_input = ""
+
+            # not all groups have loads/store
+            # if the group does not have any of 
+            # the relevant memory op,
+            # we do not pass its transfer signal to the mux
+            #
+            # num_cases tracks how many groups 
+            # are passed to the mux
             num_cases = 0
+
+            # add each group to the mux's case statement input
+            # if it has he relevant memory op
             for i in range(config.num_groups()):
-                if has_items(i):      
+                if self.has_items(i):      
                     num_cases = num_cases + 1  
                     case_input += f"""
       {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """ .removeprefix("\n")
+                    
             case_input = case_input.strip()[:-1]
 
+            # example case input:
+            #
+
+            # cases are the mux's data inputs
+            # each is associated with one of the inputs
+            # by a 'when' statement
+            # and then a set of assignments
             cases = ""
 
+            # not all groups are in the mux, 
+            # so we need to track how many 'when' statements
+            # we have added
             case_number = 0
             for i in range(config.num_groups()):
-                if has_items(i):      
+                # if it has at least one of the relevant ops
+                if self.has_items(i):      
+                    # get the case number one-hot encoded
+                    # (not the group number, since not all groups are in the mux)
                     group_one_hot = one_hot(case_number, num_cases)
                     case_number = case_number + 1
+                    
+                    # map assignments to a select input
                     cases += f"""
       when {group_one_hot} =>
 """.removeprefix("\n")
-                    for j, idx in enumerate(ports(i)):
+                    
+                    # each group can have many loads or stores
+                    # up to the maximum queue size
+                    # each store or load in the group must be
+                    # correctly associated with a port
+                    for j, idx in enumerate(self.ports(i)):
+                        assign_to = f"{UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j})"
+                        idx_bin = get_as_binary_string_padded(idx, self.idx_bitwidth)
+
                         cases += f"""
         -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
-        {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+        {assign_to} <= {idx_bin};
 
 """.removeprefix("\n")
+                        
+                # if there are no loads/stores
                 else:
                     cases += f"""
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
 
+            # format correctly
             cases = cases.strip()
 
-            unshifted_assignments = f"""
+
+            ############################
+            # Actual mux statement
+            ############################
+
+            self.unshifted_assignments = f"""
+    -- If a group has less than {self.num_entries} {queue_type.value}s
+    -- set the other port indices to 0
+    {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
+
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
@@ -131,59 +298,64 @@ class PortIdxPerEntryBodyItems():
 
     end case;
 """.removeprefix("\n").strip()
-
-
-            shifted_assignments = f"""
-    -- {queue_type.value} port indices must be mod left shifted based on queue tail
-    for i in 0 to {num_entries} - 1 loop
-""".removeprefix("\n")
             
+        def _shift(self, queue_type : QueueType):
+            """
+            Use indexing into data_array to infer barrel shift
+            based on queue tail.
+            """
             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-            unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
-            shifted_assignments += f"""
+            unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)
+
+            self.shifted_assignments = f"""
+    -- {queue_type.value} port indices must be mod left shifted based on queue tail
+    for i in 0 to {self.num_entries} - 1 loop
       {port_idx}(i) <=
-        {unsh_port_idx(queue_type)}(
-          (i + {pointer_name}_int)) mod {num_entries}
+        {unsh_port_idx}(
+          (i + {self.pointer_name}_int)) mod {self.num_entries}
         );
-""".removeprefix("\n")
-
-            shifted_assignments += f"""
     end loop;
-""".removeprefix("\n")
-            
-            shifted_assignments = shifted_assignments.lstrip()
+""".strip()
 
-            output_assignments = ""
+        def _outputs(self, queue_type : QueueType):
+            """
+            Convert back from the shifted outputs as a data array,
+            to individual signals
+            """
+            self.output_assignments = ""
 
-            for i in range(num_entries):
+            for i in range(self.num_entries):
                 output_name = f"{PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o"
 
                 # pad single digit output names
                 if i < 10:
                     output_name += " "
 
-
-                output_assignments += f"""
+                self.output_assignments += f"""
   {output_name} <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
-""".removeprefix("\n")
+""".strip()
             
-            output_assignments = output_assignments.strip()
+
+        def __init__(self, config : Config, queue_type : QueueType):
+
+            self._mux_rom(config, queue_type)
+            self._shift(queue_type)
+            self._outputs(queue_type)
+
 
             self.item = f"""
   process(all)
     variable offset : natural;
   begin
     -- convert q tail pointer to integer
-    {pointer_name}_int = integer(unsigned({pointer_name}_i)
+    {self.pointer_name}_int = integer(unsigned({self.pointer_name}_i)
 
-    {default_assignments}
+    {self.unshifted_assignments}
 
-    {unshifted_assignments}
-
-    {shifted_assignments}
+    {self.shifted_assignments}
   end process;
 
-  {output_assignments}
+  {self.output_assignments}
 """.removeprefix("\n").strip()
 
         def get(self):
