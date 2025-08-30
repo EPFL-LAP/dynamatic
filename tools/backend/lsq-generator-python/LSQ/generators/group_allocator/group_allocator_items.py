@@ -121,6 +121,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
                 for j, idx in enumerate(ports(i)):
                     self.unshifted_assignments += f"""
+      -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
       {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
                 self.unshifted_assignments += f"""
@@ -134,6 +135,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             self.unshifted_assignments = self.unshifted_assignments.strip()
 
             self.shifted_assignments = f"""
+    -- {queue_type.value} port indices must be mod left shifted based on queue tail
     for i in {num_entries} - 1 downto 0 loop
 """.removeprefix("\n")
             
