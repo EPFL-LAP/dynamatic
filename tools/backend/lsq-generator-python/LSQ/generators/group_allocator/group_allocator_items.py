@@ -112,7 +112,7 @@ class NumAccessesRomMuxBodyItems():
 
             self.item = f"""
     -- If no group is transferring,
-    -- or the group has no {queue_type.val}s,
+    -- or the group has no {queue_type.value}s,
     -- then set to zero
     {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)} <= (others => '0');
 
