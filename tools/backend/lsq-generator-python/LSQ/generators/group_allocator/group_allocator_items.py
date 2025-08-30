@@ -116,7 +116,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                 if has_items(i):        
                     case_input += f"""
       {GROUP_INIT_TRANSFER_NAME}_{i}_i &
-""" .removeprefix("\n").strip()[:-1]
+""" .removeprefix("\n")
+            case_input = case_input.strip()[:-1]
 
             cases = ""
             pad_to = get_required_bitwidth(config.num_groups() -1)
