@@ -42,7 +42,7 @@ def one_hot(i: int, width: int) -> str:
     return f"\"{1 << (width-i-1):0{width}b}\""
 
 def mask_until(max_masked, width):
-    return '\"' + '0'*(width-max) + '1'*max + '\"'
+    return '\"' + '0'*(width-max_masked) + '1'*max_masked + '\"'
 
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic
