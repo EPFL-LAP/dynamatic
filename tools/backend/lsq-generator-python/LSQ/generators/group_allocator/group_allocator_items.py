@@ -122,19 +122,24 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             pad_to = get_required_bitwidth(config.num_groups() -1)
 
             for i in range(config.num_groups()):
-                group_bin = get_as_binary_string_padded(i, pad_to)
-                cases += f"""
+                if has_items(i):      
+                    group_bin = get_as_binary_string_padded(i, pad_to)
+                    cases += f"""
       when {group_bin} =>
-""".removeprefix("\n").strip()
-                if has_items(i):       
+""".removeprefix("\n").strip() 
                     for j, idx in enumerate(ports(i)):
-                        self.unshifted_assignments += f"""
+                        cases += f"""
       -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
         {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 
 """.removeprefix("\n")
+                else:
+                    cases += f"""
+    -- Group {i} has no {queue_type.value}s
 
-            self.unshifted_assignments = f"""
+""".removeprefix("\n")
+
+            unshifted_assignments = f"""
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
@@ -144,30 +149,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     is
       {cases}
     end
-""".removeprefix("\n")
+""".removeprefix("\n").strip()
 
-            
-            
-            self.unshifted_assignments += f"""
-    is
-""".removeprefix("\n")
-
-            for i in range(config.num_groups()):
-                if has_items(i):
-                    self.unshifted_assignments += f"""
-
-"""
-                   
-                else:
-                    self.unshifted_assignments += f"""
-    -- Group {i} has no {queue_type.value}s
-""".removeprefix("\n")
-
-            self.unshifted_assignments += f"""
-    end if;
-""".removeprefix("\n")
-
-            self.unshifted_assignments = self.unshifted_assignments.strip()
 
             self.shifted_assignments = f"""
     -- {queue_type.value} port indices must be mod left shifted based on queue tail
@@ -210,7 +193,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
   begin
     {self.default_assignments}
 
-    {self.unshifted_assignments}
+    {unshifted_assignments}
 
     {self.shifted_assignments}
   end process;
