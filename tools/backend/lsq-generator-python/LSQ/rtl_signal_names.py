@@ -56,7 +56,7 @@ def PORT_INDEX_PER_ENTRY_NAME(
     return f"{queue_type.value}_port_idx_per_entry"
 
 
-STORE_ORDER_PER_ENTRY_NAME = "ga_ls_order"
+STORE_ORDER_PER_ENTRY_NAME = "store_order"
 """
 RTL name for signals which identify whether each of the stores precedes a load.
 There is one of these signals per load queue entry, and 1 bit per store queue entry.
