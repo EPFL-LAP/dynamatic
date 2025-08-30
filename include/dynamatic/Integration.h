@@ -43,6 +43,7 @@
 #if defined(PRINT_PROFILING_INFO) || defined(HLS_VERIFICATION)
 #include <cstddef>
 #include <ostream>
+#include <type_traits>
 
 using OS = std::basic_ostream<char>;
 
@@ -52,42 +53,39 @@ static void scalarPrinter(const T &arg, OS &os);
 template <typename T>
 static void arrayPrinter(const T *arrayPtr, size_t size, OS &os);
 
+template <typename T>
+constexpr size_t getArraySize() {
+  if constexpr (std::rank_v<T> == 1)
+    return std::extent_v<T>;
+  else
+    return std::extent_v<T> * getArraySize<std::remove_extent_t<T>>();
+}
+
+template <typename T>
+struct getValueTypeImpl {
+  using type = T;
+};
+
+template <typename T, size_t N>
+struct getValueTypeImpl<T[N]> {
+  using type = typename getValueTypeImpl<T>::type;
+};
+
+template <typename T>
+using getValueType = typename getValueTypeImpl<T>::type;
+
 /// Dumps the contents of a scalar type.
 template <typename T>
-static void dumpArg(const T &arg, OS &os) {
+static std::enable_if_t<std::rank_v<T> == 0> dumpArg(const T &arg, OS &os) {
   scalarPrinter(arg, os);
 }
 
-/// Dumps the contents of a statically sized 1-dimensional array.
-template <typename T, size_t Size1>
-static void dumpArg(const T (&arrayArg)[Size1], OS &os) {
-  arrayPrinter((T *)arrayArg, Size1, os);
-}
-
-/// Dumps the contents of a statically sized 2-dimensional array.
-template <typename T, size_t Size1, size_t Size2>
-static void dumpArg(const T (&arrayArg)[Size1][Size2], OS &os) {
-  arrayPrinter((T *)arrayArg, Size1 * Size2, os);
-}
-
-/// Dumps the contents of a statically sized 3-dimensional array.
-template <typename T, size_t Size1, size_t Size2, size_t Size3>
-static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3], OS &os) {
-  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3, os);
-}
-
-/// Dumps the contents of a statically sized 4-dimensional array.
-template <typename T, size_t Size1, size_t Size2, size_t Size3, size_t Size4>
-static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4], OS &os) {
-  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3 * Size4, os);
-}
-
-/// Dumps the contents of a statically sized 5-dimensional array.
-template <typename T, size_t Size1, size_t Size2, size_t Size3, size_t Size4,
-          size_t Size5>
-static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4][Size5],
-                    OS &os) {
-  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3 * Size4 * Size5, os);
+/// Dumps the contents of a statically sized n-dimensional array.
+template <typename T>
+static std::enable_if_t<std::rank_v<T> != 0> dumpArg(const T &argArray,
+                                                     OS &os) {
+  constexpr size_t totalSize = getArraySize<T>();
+  arrayPrinter((getValueType<T> *)argArray, totalSize, os);
 }
 
 /// And on and on... Go further with higher-dimensional arrays if you want!
