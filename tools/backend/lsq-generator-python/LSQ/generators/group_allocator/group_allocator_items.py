@@ -83,7 +83,7 @@ class NumAccessesRomMuxBodyItems():
                     
                     new_entries = self.new_entries(i)
 
-                    assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}"
+                    assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
                     new_entries_bin = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
                     
 
@@ -116,7 +116,7 @@ class NumAccessesRomMuxBodyItems():
     -- If no group is transferring,
     -- or the group has no {queue_type.value}s,
     -- then set to zero
-    {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)} <= (others => '0');
+    {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o <= (others => '0');
 
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
