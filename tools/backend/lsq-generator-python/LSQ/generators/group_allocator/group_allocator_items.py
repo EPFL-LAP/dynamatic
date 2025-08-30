@@ -102,6 +102,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
 
             self.default_assignments += f"""
+    -- If a group has less than {num_entries} {queue_type.value}s
+    -- set the other port indices to 0
     {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
 """
 
@@ -176,6 +178,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
   end process;
 
   {self.output_assignments}
+
 """.removeprefix("\n").strip()
 
         def get(self):
