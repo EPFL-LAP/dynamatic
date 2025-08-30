@@ -117,22 +117,27 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     -- have 1 group valid signal in a given cycle
 """.removeprefix("\n")
 
+            first = True
             for i in range(config.num_groups()):
-                if i == 0:
-                    self.unshifted_assignments += f"""
+                if has_items(i):        
+                    if first:
+                        first = False
+                        self.unshifted_assignments += f"""
     if {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """ .removeprefix("\n")
-                else:
-                    self.unshifted_assignments += f"""
+                    else:
+                        self.unshifted_assignments += f"""
     elsif {GROUP_INIT_TRANSFER_NAME}_{i}_i = '1' then
 """.removeprefix("\n")
-
-                if has_items(i):
                     for j, idx in enumerate(ports(i)):
                         self.unshifted_assignments += f"""
       -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
       {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 
+""".removeprefix("\n")
+                else:
+                    self.unshifted_assignments += f"""
+    -- Group {i} has no {queue_type.value}s
 """.removeprefix("\n")
 
             self.unshifted_assignments += f"""
