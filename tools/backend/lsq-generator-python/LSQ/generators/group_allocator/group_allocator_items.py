@@ -140,7 +140,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
 """.removeprefix("\n")
 
-            case_input = case_input.strip()
+            cases = cases.strip()
 
             unshifted_assignments = f"""
     -- This LSQ was generated without multi-group allocation
