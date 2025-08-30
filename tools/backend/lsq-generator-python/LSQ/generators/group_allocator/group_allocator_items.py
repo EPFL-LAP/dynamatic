@@ -128,6 +128,12 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                 for j, idx in enumerate(ports(i)):
                     self.unshifted_assignments += f"""
       -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
+""".removeprefix("\n")
+                    if j == 0 and len(ports(i) == 1):
+                        self.unshifted_assignments += f"""
+      -- (or this group has no {queue_type.value}s)
+"""
+                    self.unshifted_assignments += f"""
       {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
 """.removeprefix("\n")
                 self.unshifted_assignments += f"""
