@@ -127,7 +127,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                     group_bin = get_as_binary_string_padded(i, pad_to)
                     cases += f"""
       when {group_bin} =>
-""".removeprefix("\n").strip() 
+""".removeprefix("\n")
                     for j, idx in enumerate(ports(i)):
                         cases += f"""
       -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
