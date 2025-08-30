@@ -95,7 +95,7 @@ create_generator_symlink() {
 
 create_include_symlink() {
     local src=$1
-    local dst="build/include/polygeist"
+    local dst="build/include/clang_headers"
     echo "$dst -> $src"
     ln -fT --symbolic "$src" "$dst"
 }
