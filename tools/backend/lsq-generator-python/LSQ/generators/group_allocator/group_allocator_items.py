@@ -135,7 +135,7 @@ class PortIdxPerEntryBodyItems():
 
             shifted_assignments = f"""
     -- {queue_type.value} port indices must be mod left shifted based on queue tail
-    for i in {num_entries} - 1 downto 0 loop
+    for i in 0 to {num_entries} - 1 loop
 """.removeprefix("\n")
             
             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
@@ -214,7 +214,7 @@ class StoreOrderPerEntryLocalItems():
             if shifted:
                 base_name = STORE_ORDER_PER_ENTRY_NAME
             else:
-                base_name = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME()
+                base_name = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
 
             Signal2D.__init__(
                 self,
@@ -316,6 +316,18 @@ class StoreOrderPerEntryBodyItems():
             
 #             shifted_assignments = shifted_assignments.lstrip()
 
+            shifted = STORE_ORDER_PER_ENTRY_NAME
+            unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
+            shifted_assignments = f"""
+    for i in 0 to {config.load_queue_num_entries} loop
+      for j in 0 to {config.store_queue_num_entries} loop
+        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries}
+        col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries}
+        {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j)
+      end loop;
+    end loop;
+""".strip()
+
             output_assignments = ""
 
             for i in range(config.load_queue_num_entries()):
@@ -344,6 +356,8 @@ class StoreOrderPerEntryBodyItems():
     {store_pointer_name}_int = integer(unsigned({store_pointer_name}_i)
 
   end process;
+
+  {shifted_assignments}
 
   {output_assignments}
 """.removeprefix("\n").strip()

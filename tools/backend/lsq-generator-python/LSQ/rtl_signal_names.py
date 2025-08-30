@@ -90,8 +90,8 @@ def UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(
     return f"unshifted_{PORT_INDEX_PER_ENTRY_NAME(queue_type)}"
 
 
-def UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME():
-    """
-    RTL name for the unshifted store position per queue entry
-    """
-    return f"unshifted_{STORE_ORDER_PER_ENTRY_NAME}"
+UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME = f"unshifted_{STORE_ORDER_PER_ENTRY_NAME}"
+"""
+RTL name for the unshifted store position per queue entry
+"""
+     
