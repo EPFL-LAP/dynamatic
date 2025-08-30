@@ -32,7 +32,7 @@ class StoreOrderPerEntryDeclarative():
         self.entity_port_items = [
             ga_l.GroupInitTransfer(config, d.INPUT),
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL)
+            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
             ga_p.StoreOrderPerEntry(config)
         ]
 
