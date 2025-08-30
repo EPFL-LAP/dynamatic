@@ -160,8 +160,10 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             for i in range(num_entries):
                 self.output_assignments += f"""
-    {PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
+  {PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
 """.removeprefix("\n")
+            
+            self.output_assignments = self.output_assignments.lstrip()
 
             self.item = f"""
   process(all)
@@ -171,9 +173,9 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     {self.unshifted_assignments}
 
     {self.shifted_assignments}
-
-    {self.output_assignments}
   end process;
+
+  {self.output_assignments}
 """.removeprefix("\n").lstrip()
 
         def get(self):
