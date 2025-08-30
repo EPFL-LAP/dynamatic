@@ -178,7 +178,6 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
   end process;
 
   {self.output_assignments}
-
 """.removeprefix("\n").strip()
 
         def get(self):

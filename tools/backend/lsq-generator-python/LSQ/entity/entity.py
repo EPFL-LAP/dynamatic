@@ -83,6 +83,7 @@ architecture arch of {name} is
 begin
 
   {self.body}
+  
 end architecture;
   """
       return architecture
