@@ -115,6 +115,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
+
 """.removeprefix("\n")
 
             first = True
@@ -138,6 +139,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
                 else:
                     self.unshifted_assignments += f"""
     -- Group {i} has no {queue_type.value}s
+    
 """.removeprefix("\n")
 
             self.unshifted_assignments += f"""
