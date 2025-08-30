@@ -111,6 +111,8 @@ class NumAccessesRomMuxBodyItems():
             ############################
 
             self.item = f"""
+  process(all)
+  begin
     -- If no group is transferring,
     -- or the group has no {queue_type.value}s,
     -- then set to zero
@@ -127,6 +129,7 @@ class NumAccessesRomMuxBodyItems():
       {cases}
 
     end case;
+  end process;
 """.strip()
             
         def get(self):
