@@ -136,11 +136,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             self.shifted_assignments = f"""
     for i in {num_entries} - 1 downto 0 loop
 """.removeprefix("\n")
-            for i in range(num_entries):
-                port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-                unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
-                pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
-                self.shifted_assignments += f"""
+            
+            port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
+            unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
+            pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+            self.shifted_assignments += f"""
       {port_idx}(i) <= {unsh_port_idx(queue_type)}(integer(i + {pointer_name}_i) mod {num_entries})
 """.removeprefix("\n")
 
