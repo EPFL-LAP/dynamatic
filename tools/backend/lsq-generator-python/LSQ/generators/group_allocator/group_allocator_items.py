@@ -234,6 +234,7 @@ class StoreOrderPerEntryBodyItems():
             for group_orders in config.group_store_order():
                 for order in group_orders:
                     if order > 1:
+                        print(order)
                         needs_order_shift = True
             
             if needs_order_shift:
