@@ -234,88 +234,6 @@ class StoreOrderPerEntryBodyItems():
             load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
             store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
 
-
-
-
-#             default_assignments = ""
-
-#             default_assignments += f"""
-#     -- If a group has less than {num_entries} {queue_type.value}s
-#     -- set the other port indices to 0
-#     {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
-# """
-
-#             default_assignments = default_assignments.strip()
-
-#             case_input = ""
-#             num_cases = 0
-#             for i in range(config.num_groups()):
-#                 if has_items(i):      
-#                     num_cases = num_cases + 1  
-#                     case_input += f"""
-#       {GROUP_INIT_TRANSFER_NAME}_{i}_i &
-# """ .removeprefix("\n")
-#             case_input = case_input.strip()[:-1]
-
-#             cases = ""
-
-#             case_number = 0
-#             for i in range(config.num_groups()):
-#                 if has_items(i):      
-#                     group_one_hot = one_hot(case_number, num_cases)
-#                     case_number = case_number + 1
-#                     cases += f"""
-#       when {group_one_hot} =>
-# """.removeprefix("\n")
-#                     for j, idx in enumerate(ports(i)):
-#                         cases += f"""
-#         -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
-#         {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
-
-# """.removeprefix("\n")
-#                 else:
-#                     cases += f"""
-#       -- Group {i} has no {queue_type.value}s
-
-# """.removeprefix("\n")
-
-#             cases = cases.strip()
-
-#             unshifted_assignments = f"""
-#     -- This LSQ was generated without multi-group allocation
-#     -- and so assumes the dataflow circuit will only ever 
-#     -- have 1 group valid signal in a given cycle
-
-#     -- Using case statement to help infer one-hot mux
-#     case
-#       {case_input}
-#     is
-#       {cases}
-
-#     end case;
-# """.removeprefix("\n").strip()
-
-
-#             shifted_assignments = f"""
-#     -- {queue_type.value} port indices must be mod left shifted based on queue tail
-#     for i in {num_entries} - 1 downto 0 loop
-# """.removeprefix("\n")
-            
-#             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-#             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
-#             shifted_assignments += f"""
-#       {port_idx}(i) <=
-#         {unsh_port_idx(queue_type)}(
-#           (i + offset)) mod {num_entries}
-#         );
-# """.removeprefix("\n")
-
-#             shifted_assignments += f"""
-#     end loop;
-# """.removeprefix("\n")
-            
-#             shifted_assignments = shifted_assignments.lstrip()
-
             case_input = ""
             num_cases = 0
             for i in range(config.num_groups()):
@@ -336,7 +254,7 @@ class StoreOrderPerEntryBodyItems():
                     cases += f"""
       when {group_one_hot} =>
 """.removeprefix("\n")
-                    for j, store_order in enumerate(config.group_store_order()):
+                    for j, store_order in enumerate(config.group_store_order(i)):
                         cases += f"""
         -- Ld {j} of group {i}'s store order
         {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {store_order};
@@ -344,6 +262,8 @@ class StoreOrderPerEntryBodyItems():
 """.removeprefix("\n")
 
             unshifted_assignments = f"""
+  {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
+
   case 
     {case_input}
   is
