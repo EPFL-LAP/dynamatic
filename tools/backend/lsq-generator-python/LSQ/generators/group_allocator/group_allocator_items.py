@@ -13,7 +13,7 @@ class NumAccessesRomMuxBodyItems():
         def _set_params(self, config : Config, queue_type : QueueType):
             match queue_type:
                 case QueueType.LOAD:
-                    def new_entries(idx) : config.group_num_loads(idx)
+                    def new_entries(idx) : return config.group_num_loads(idx)
                     self.new_entries = new_entries
 
                     self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
@@ -21,7 +21,7 @@ class NumAccessesRomMuxBodyItems():
                     def has_items(group_idx): return config.group_num_loads(group_idx) > 0
                     self.has_items = has_items
                 case QueueType.STORE:
-                    def new_entries(idx): config.group_num_stores(idx)
+                    def new_entries(idx): return config.group_num_stores(idx)
                     self.new_entries = new_entries
 
                     self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
