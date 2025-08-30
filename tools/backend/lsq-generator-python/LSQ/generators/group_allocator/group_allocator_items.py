@@ -230,7 +230,6 @@ class StoreOrderPerEntryBodyItems():
     class Body():
 
         def __init__(self, config : Config):
-            
             load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
             store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
 
@@ -239,7 +238,7 @@ class StoreOrderPerEntryBodyItems():
             for i in range(config.num_groups()):
                 if config.group_num_loads(i) > 0:
                     case_input += f"""
-      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+    {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """.removeprefix("\n")
                     num_cases = num_cases + 1
             case_input = case_input.strip()[:-1]
@@ -257,13 +256,13 @@ class StoreOrderPerEntryBodyItems():
                     for j, store_order in enumerate(config.group_store_order(i)):
                         if store_order > 0:
                             cases += f"""
-        -- Ld {j} of group {i}'s store order
-        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
+      -- Ld {j} of group {i}'s store order
+      {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
 
 """.removeprefix("\n")
                         else:
                             cases += f"""
-    -- Ld {j} of group {i} has no preceding stores, use default value
+      -- Ld {j} of group {i} has no preceding stores, use default value
 
 """.removeprefix("\n")
                 else:
