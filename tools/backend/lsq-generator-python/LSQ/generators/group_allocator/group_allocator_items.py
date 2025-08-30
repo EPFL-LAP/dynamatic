@@ -238,7 +238,7 @@ class StoreOrderPerEntryBodyItems():
             for i in range(config.num_groups()):
                 if config.group_num_loads(i) > 0:
                     case_input += f"""
-    {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """.removeprefix("\n")
                     num_cases = num_cases + 1
             case_input = case_input.strip()[:-1]
@@ -251,23 +251,23 @@ class StoreOrderPerEntryBodyItems():
                     group_one_hot = one_hot(case_number, num_cases)
                     case_number = case_number + 1
                     cases += f"""
-    when {group_one_hot} =>
+      when {group_one_hot} =>
 """.removeprefix("\n")
                     for j, store_order in enumerate(config.group_store_order(i)):
                         if store_order > 0:
                             cases += f"""
-      -- Ld {j} of group {i}'s store order
-      {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
+        -- Ld {j} of group {i}'s store order
+        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
 
 """.removeprefix("\n")
                         else:
                             cases += f"""
-      -- Ld {j} of group {i} has no preceding stores, use default value
+        -- Ld {j} of group {i} has no preceding stores, use default value
 
 """.removeprefix("\n")
                 else:
                     cases += f"""
-    -- Group {i} has no loads
+      -- Group {i} has no loads
 
 """.removeprefix("\n")
                     
@@ -276,11 +276,11 @@ class StoreOrderPerEntryBodyItems():
             unshifted_assignments = f"""
   {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
-  case 
-    {case_input}
-  is
-    {cases}
-  end case;
+    case 
+      {case_input}
+    is
+      {cases}
+    end case;
 """.strip()
 
             shifted = STORE_ORDER_PER_ENTRY_NAME
