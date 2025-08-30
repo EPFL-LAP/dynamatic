@@ -39,7 +39,7 @@ def get_required_bitwidth(val: int) -> int:
     return math.ceil(math.log2(val))
 
 def one_hot(i: int, width: int) -> str:
-    return f"\"{1 << i:0{width}b}\""
+    return f"\"{1 << (width-i):0{width}b}\""
 
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic
