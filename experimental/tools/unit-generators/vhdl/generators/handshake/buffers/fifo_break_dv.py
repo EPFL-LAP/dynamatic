@@ -1,24 +1,31 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.support.buffer_counter import generate_buffer_counter, generate_buffer_counter_embedding
 from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+
 
 def generate_fifo_break_dv(name, params):
     bitwidth = params["bitwidth"]
     num_slots = params["num_slots"]
     extra_signals = params.get("extra_signals", None)
+    debug_counter = params.get("debug_counter", False)
 
     if num_slots == 1:
         return generate_one_slot_break_dv(name, params)
 
     if extra_signals:
-        return _generate_fifo_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals)
+        return _generate_fifo_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals, debug_counter)
     elif bitwidth == 0:
-        return _generate_fifo_break_dv_dataless(name, num_slots)
+        return _generate_fifo_break_dv_dataless(name, num_slots, debug_counter)
     else:
-        return _generate_fifo_break_dv(name, num_slots, bitwidth)
+        return _generate_fifo_break_dv(name, num_slots, bitwidth, debug_counter)
 
 
-def _generate_fifo_break_dv_dataless(name, num_slots):
+def _generate_fifo_break_dv_dataless(name, num_slots, debug_counter):
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies = generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
+
     entity = f"""
 
 library ieee;
@@ -156,14 +163,19 @@ begin
       end if;
     end if;
   end process;
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
-    return entity + architecture
+    return dependencies + entity + architecture
 
 
+def _generate_fifo_break_dv(name, num_slots, bitwidth, debug_counter):
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies = generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
 
-def _generate_fifo_break_dv(name, num_slots, bitwidth):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -318,13 +330,15 @@ begin
       end if;
     end if;
   end process;
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
-    return entity + architecture
+    return dependencies + entity + architecture
 
 
-def _generate_fifo_break_dv_signal_manager(name, size, bitwidth, extra_signals):
+def _generate_fifo_break_dv_signal_manager(name, size, bitwidth, extra_signals, debug_counter):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -339,4 +353,4 @@ def _generate_fifo_break_dv_signal_manager(name, size, bitwidth, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_fifo_break_dv(name, size, bitwidth + extra_signals_bitwidth))
+        lambda name: _generate_fifo_break_dv(name, size, bitwidth + extra_signals_bitwidth, debug_counter))

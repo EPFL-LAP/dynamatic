@@ -47,6 +47,7 @@ import generators.handshake.spec_v2.resolver as spec_v2_resolver
 import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
 import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
 import generators.handshake.shrui as shrui
+import generators.handshake.sharing_wrapper as sharing_wrapper
 
 
 def generate_code(name, mod_type, parameters):
@@ -141,6 +142,8 @@ def generate_code(name, mod_type, parameters):
             return spec_v2_repeating_init.generate_spec_v2_repeating_init(name, parameters)
         case "spec_v2_interpolator":
             return spec_v2_interpolator.generate_spec_v2_interpolator(name, parameters)
+        case "sharing_wrapper":
+            return sharing_wrapper.generate_sharing_wrapper(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 

@@ -22,25 +22,26 @@ class BufferType(Enum):
 def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
     bitwidth = params[ATTR_BITWIDTH]
+    debug_counter = params.get(ATTR_DEBUG_COUNTER, False)
 
     buffer_type = try_enum_cast(params[ATTR_BUFFER_TYPE], BufferType)
 
     match buffer_type:
         case BufferType.ONE_SLOT_BREAK_R:
-            return generate_one_slot_break_r(name, {ATTR_BITWIDTH: bitwidth})
+            return generate_one_slot_break_r(name, {ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case BufferType.FIFO_BREAK_NONE:
-            return generate_fifo_break_none(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_fifo_break_none(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case BufferType.ONE_SLOT_BREAK_DV:
-            return generate_one_slot_break_dv(name, {ATTR_BITWIDTH: bitwidth})
+            return generate_one_slot_break_dv(name, {ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case BufferType.FIFO_BREAK_DV:
-            return generate_fifo_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_fifo_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case BufferType.ONE_SLOT_BREAK_DVR:
             # this is wrong
             # but it is what was being generated based on the previous code
-            return generate_one_slot_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_one_slot_break_dv(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case BufferType.SHIFT_REG_BREAK_DV:
             # this is wrong
             # but it is what was being generated based on the previous code
-            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth, ATTR_DEBUG_COUNTER: debug_counter})
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")

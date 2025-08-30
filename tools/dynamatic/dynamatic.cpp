@@ -90,7 +90,6 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
-  std::string polygeistPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
@@ -221,17 +220,6 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
-class SetPolygeistPath : public Command {
-public:
-  SetPolygeistPath(FrontendState &state)
-      : Command("set-polygeist-path",
-                "Sets the path to Polygeist installation directory", state) {
-    addPositionalArg({"path", "path to Polygeist installation directory"});
-  }
-
-  CommandResult execute(CommandArguments &args) override;
-};
-
 class SetVivadoPath : public Command {
 public:
   SetVivadoPath(FrontendState &state)
@@ -277,6 +265,8 @@ public:
 
 class Compile : public Command {
 public:
+  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
+      "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
@@ -292,8 +282,12 @@ public:
                "'on-merges' (default option: minimum buffering for "
                "correctness), 'fpga20' (throughput-driven buffering), "
                "'fpl22' (throughput- and timing-driven buffering), or "
-               "costaware (throughput- and area-driven buffering)"});
+               "costaware (throughput- and area-driven buffering), or "
+               "'mapbuf' (simultaneous technology mapping and buffer "
+               "placement)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
+    addFlag({FAST_TOKEN_DELIVERY,
+             "Use fast token delivery strategy to build the circuit"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
@@ -518,23 +512,22 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
-  // Check whether the path makes sense
-  if (!fs::exists(dynamaticPath + sep + "polygeist")) {
-    llvm::outs() << ERR << "'" << dynamaticPath
-                 << "' doesn't seem to point to Dynamatic, expected to "
-                    "find, for example, a directory named 'polygeist' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(dynamaticPath + sep + "bin")) {
-    llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Dynamatic doesn't "
-                    "seem to have been built.\n";
+  if (!fs::exists(dynamaticPath + sep + "bin" + sep + "dynamatic")) {
+    llvm::outs()
+        << ERR
+        << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
+           "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
@@ -542,33 +535,14 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetPolygeistPath::execute(CommandArguments &args) {
-  // Remove the separator at the end of the path if there is one
-  StringRef sep = sys::path::get_separator();
-  std::string polygeistPath = args.positionals.front().str();
-  if (StringRef(polygeistPath).ends_with(sep))
-    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
-
-  // Check whether the path makes sense
-  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
-    llvm::outs()
-        << ERR << "'" << polygeistPath
-        << "' doesn't seem to point to Polygeist, expected to "
-           "find, for example, a directory named 'llvm-project/' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
-    llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Polygeist doesn't "
-                    "seem to have been built.\n";
-    return CommandResult::FAIL;
-  }
-
-  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
-  return CommandResult::SUCCESS;
-}
-
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR
+                 << "Please specify a valid path such as\n "
+                    "/home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -577,6 +551,14 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
+  if (!fs::exists(vivadoPath)) {
+    llvm::outs() << ERR
+                 << "The path to Vivado does not exist, "
+                    "please specify a valid top-level Vivado directory such "
+                    "as\n /home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+  }
+
   if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
@@ -589,19 +571,36 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
-  StringRef generator = args.positionals.front();
-  if (generator == "flopoco" || generator == "vivado") {
-    state.fpUnitsGenerator = generator.str();
-    return CommandResult::SUCCESS;
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a valid FP unit generator.\n"
+                 << "Options: flopoco, vivado\n";
+    return CommandResult::FAIL;
   }
-  llvm::outs() << ERR << "Unknown floating-point units generator '" << generator
-               << "', possible options are 'flopoco' and 'vivado'.\n";
-  return CommandResult::FAIL;
-}
 
+  StringRef generator = args.positionals.front();
+
+  if (generator.empty()) {
+    llvm::outs() << ERR << "Please specify a floating-point units generator.\n"
+                 << "Options: flopoco, vivado\n";
+    return CommandResult::FAIL;
+  }
+  state.fpUnitsGenerator = generator.str();
+  return CommandResult::SUCCESS;
+}
 CommandResult SetSrc::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty source\n";
+    return CommandResult::FAIL;
+  }
+
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
+  if (!fs::exists(sourcePath)) {
+    llvm::outs() << ERR << "Source path <<" << sourcePath
+                 << ">> does not exist. Kindly enter a valid source path\n";
+    return CommandResult::FAIL;
+  }
+
   if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
                  << "Expected source file to have .c extension, but got '"
@@ -614,6 +613,11 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 }
 
 CommandResult SetCP::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
+    return CommandResult::FAIL;
+  }
+
   // Parse the float argument and check if the argument is legal.
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
@@ -631,18 +635,22 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string fastTokenDelivery =
+      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22" || it->second == "costaware") {
+        it->second == "fpl22" || it->second == "costaware" ||
+        it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
           << "Unknown buffer placement algorithm " << it->second
           << "! Possible options are 'on-merges' (minimum buffering for "
-             "correctness), 'fpga20' (throughput-driven buffering), 'fpl22' "
+             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
              "(throughput- and timing-driven buffering), or 'costaware' "
-             "(throughput- and area-driven buffering).";
+             "(throughput- and area-driven buffering), or 'mapbuf' "
+             "(simultaneous technology mapping and buffer placement).";
       return CommandResult::FAIL;
     }
   }
@@ -650,13 +658,11 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
-  state.polygeistPath = state.polygeistPath.empty()
-                            ? state.dynamaticPath + getSeparator() + "polygeist"
-                            : state.polygeistPath;
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ);
+
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -683,7 +689,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl, state.fpUnitsGenerator);
+                 state.getKernelName(), hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -778,7 +784,6 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
-  commands.add<SetPolygeistPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);

@@ -33,55 +33,6 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
-// MemoryOpLowering
-//===----------------------------------------------------------------------===//
-
-void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp,
-                                         bool forwardInterface) {
-  copyDialectAttr<MemDependenceArrayAttr>(oldOp, newOp);
-  if (forwardInterface)
-    copyDialectAttr<MemInterfaceAttr>(oldOp, newOp);
-  nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
-}
-
-bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
-  MLIRContext *ctx = topLevelOp->getContext();
-  bool anyChange = false;
-  topLevelOp->walk([&](Operation *memOp) {
-    // We only care about supported load/store memory accesses
-    if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
-             affine::AffineStoreOp, handshake::LoadOp, handshake::StoreOp>(
-            memOp))
-      return;
-
-    // Read potential memory dependencies stored on the memory operation
-    auto oldMemDeps = getDialectAttr<MemDependenceArrayAttr>(memOp);
-    if (!oldMemDeps)
-      return;
-
-    // Copy memory dependence attributes one-by-one, replacing the name of
-    // replaced destination memory operations along the way if necessary
-    SmallVector<MemDependenceAttr> newMemDeps;
-    for (MemDependenceAttr oldDep : oldMemDeps.getDependencies()) {
-      StringRef oldName = oldDep.getDstAccess();
-      auto replacedName = nameChanges.find(oldName);
-      bool opWasReplaced = replacedName != nameChanges.end();
-      anyChange |= opWasReplaced;
-      if (opWasReplaced) {
-        StringAttr newName = StringAttr::get(ctx, replacedName->second);
-        newMemDeps.push_back(MemDependenceAttr::get(
-            ctx, newName, oldDep.getLoopDepth(), oldDep.getComponents()));
-      } else {
-        newMemDeps.push_back(oldDep);
-      }
-    }
-    setDialectAttr<MemDependenceArrayAttr>(memOp, ctx, newMemDeps);
-  });
-
-  return anyChange;
-}
-
-//===----------------------------------------------------------------------===//
 // MemoryInterfaceBuilder
 //===----------------------------------------------------------------------===//
 

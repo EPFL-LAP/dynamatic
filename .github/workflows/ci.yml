@@ -5,27 +5,27 @@ on:
   # to run workflows by external contributors!
   pull_request:
     branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  integration:
-    if: github.event.pull_request.draft == false
-    runs-on: self-hosted
+  check-format:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: sync-submodules
-        run: |
-          git submodule update --recursive .
-          git submodule sync --recursive .
-          echo "polygeist/llvm-project url: " $(git -C ./polygeist/llvm-project remote get-url origin)
 
       - name: check-format-cpp
         run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo apt-get -y update
+          sudo apt-get -y install clang-format-20
+          sudo rm /usr/bin/clang-format
+          sudo ln -s $(which clang-format-20) /usr/bin/clang-format
+          clang-format --version
           git fetch origin main --no-recurse-submodules
-          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+          git clang-format-20 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         if: success() || failure()
@@ -36,7 +36,7 @@ jobs:
           echo "Running autopep8..."
           git fetch origin main --no-recurse-submodules
           git reset FETCH_HEAD
-          FILES=$(git ls-files '*.py' --modified)
+          FILES=$(comm -23 <(git ls-files '*.py' --modified | sort) <(git ls-files '*.py' --deleted | sort))
           STATUS=$?
           if [[ $FILES ]]; then
             exec 3>&1
@@ -54,29 +54,59 @@ jobs:
           deactivate
           exit $STATUS
 
+  integration:
+    if: github.event.pull_request.draft == false
+    runs-on: self-hosted
+
+    steps:
+      - name: cleanup
+        run: |
+          echo "Emptying folder"
+          rm -rf * .*
+          echo "Folder contents"
+          ls -la
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.head_ref }}
+
       - name: build
-        if: success() || failure()
-        run: ./build.sh --release
+        run: ./build.sh --release --force
 
       - name: check-dynamatic
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
-        if: success() || failure()
+        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
-        if: success() || failure()
-        run: | 
-          cd tools/integration
-          python3 run_integration.py --ignore ignored_tests.txt
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-ci-integration-tests
+
+      - name: performance-report
+        if: false
+        run: |
+          git status
+          git fetch origin main --no-recurse-submodules
+          rm perf_ci.bin
+          git checkout FETCH_HEAD -- perf_ci.bin 
+          python tools/integration/generate_perf_report.py perf_ci_branch.bin perf_ci.bin >> $GITHUB_STEP_SUMMARY
+          mv perf_ci_branch.bin perf_ci.bin
+          git config --global user.name 'Eugen Bosnjak'
+          git config --global user.email '11596160+ebosnjak@users.noreply.github.com'
+          git add perf_ci.bin
+          git diff-index --quiet HEAD || git commit -m "[AUTO][CI] Update performance report"
+          git push
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with: 
           name: integration-report
           path: |
-            integration-test/*/out/sim/report.txt
-            integration-test/*/out/dynamatic_*.txt
+            integration-test/*/out*/comp
+            integration-test/*/out*/sim/report.txt
+            integration-test/*/out/dynamatic_out.txt
 

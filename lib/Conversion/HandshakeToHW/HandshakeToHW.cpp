@@ -553,6 +553,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
+        addBoolean("DEBUG_COUNTER", bufferOp.getDebugCounter());
+      })
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
+        // Bitwidth
+        addType("DATA_TYPE", bufferOp.getOperand());
+
+        addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
@@ -648,13 +656,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", bitwidth);
       })
       .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
-            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
-            handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
-            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
-            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp>([&](auto) {
+            handshake::DivFOp, handshake::RemSIOp, handshake::DivSIOp,
+            handshake::DivUIOp, handshake::MaximumFOp, handshake::MinimumFOp,
+            handshake::MulFOp, handshake::MulIOp, handshake::NegFOp,
+            handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
+            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
+            handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
+            handshake::FPToSIOp, handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -722,6 +730,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
     auto delayAttr = internalDelayInterface.getInternalDelay();
     addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    auto impl = fpuImplInterface.getFPUImpl();
+    addString("FPU_IMPL", stringifyEnum(impl));
   }
 }
 
@@ -1868,6 +1882,7 @@ public:
                     ConvertToHWInstance<handshake::DivFOp>,
                     ConvertToHWInstance<handshake::DivSIOp>,
                     ConvertToHWInstance<handshake::DivUIOp>,
+                    ConvertToHWInstance<handshake::RemSIOp>,
                     ConvertToHWInstance<handshake::ExtSIOp>,
                     ConvertToHWInstance<handshake::ExtUIOp>,
                     ConvertToHWInstance<handshake::MulFOp>,

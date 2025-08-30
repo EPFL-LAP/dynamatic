@@ -1,11 +1,18 @@
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.logic import generate_and_n
 
 
 def generate_lazy_fork(name, params):
+    # Number of output ports
     size = params["size"]
 
     bitwidth = params["bitwidth"]
-    if bitwidth == 0:
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
         return _generate_lazy_fork_dataless(name, size)
     else:
         return _generate_lazy_fork(name, size, bitwidth)
@@ -13,12 +20,15 @@ def generate_lazy_fork(name, params):
 
 def _generate_lazy_fork_dataless(name, size):
     and_n_name = f"{name}_and_n"
-    dependencies = generate_and_n(and_n_name, {"size": size})
 
-    return dependencies + f"""
+    dependencies = generate_and_n(
+        and_n_name, {"size": size}
+    )
+
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
-
+use ieee.numeric_std.all;
 -- Entity of lazy_fork_dataless
 entity {name} is
   port (
@@ -31,14 +41,18 @@ entity {name} is
     outs_ready : in  std_logic_vector({size} - 1 downto 0)
   );
 end entity;
+"""
 
+    architecture = f"""
 -- Architecture of lazy_fork_dataless
 architecture arch of {name} is
   signal allnReady : std_logic;
 begin
-  genericAnd : entity work.{and_n_name}
-    port map(outs_ready, allnReady);
-
+  readyAnd : entity work.{and_n_name}
+    port map(
+      outs_ready,
+      allnReady
+      );
   valids : process (ins_valid, outs_ready)
     variable tmp_ready : std_logic_vector({size} - 1 downto 0);
   begin
@@ -54,21 +68,22 @@ begin
       outs_valid(i) <= ins_valid and tmp_ready(i);
     end loop;
   end process;
-
   ins_ready <= allnReady;
 end architecture;
 """
 
+    return dependencies + entity + architecture
+
 
 def _generate_lazy_fork(name, size, bitwidth):
     inner_name = f"{name}_inner"
+
     dependencies = _generate_lazy_fork_dataless(inner_name, size)
 
-    return dependencies + f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
-
 -- Entity of lazy_fork
 entity {name} is
   port (
@@ -83,7 +98,9 @@ entity {name} is
     outs_ready : in  std_logic_vector({size} - 1 downto 0)
   );
 end entity;
+"""
 
+    architecture = f"""
 -- Architecture of lazy_fork
 architecture arch of {name} is
 begin
@@ -96,7 +113,6 @@ begin
       outs_valid => outs_valid,
       outs_ready => outs_ready
     );
-
   process (ins)
   begin
     for i in 0 to {size} - 1 loop
@@ -105,3 +121,24 @@ begin
   end process;
 end architecture;
 """
+
+    return dependencies + entity + architecture
+
+
+def _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        extra_signals,
+        lambda name: _generate_lazy_fork(name, size, bitwidth + extra_signals_bitwidth))

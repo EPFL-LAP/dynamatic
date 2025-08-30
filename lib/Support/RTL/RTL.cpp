@@ -308,7 +308,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
-      modName == "handshake.non_spec" || modName == "handshake.passer") {
+      modName == "handshake.non_spec" || modName == "handshake.passer" ||
+      modName == "handshake.sharing_wrapper") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
@@ -395,7 +396,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
-      modName == "handshake.fptosi" ||
+      modName == "handshake.fptosi" || modName == "handshake.lazy_fork" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

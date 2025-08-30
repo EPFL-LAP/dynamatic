@@ -13,6 +13,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
+  HandshakeMarkFPUImpl.cpp
   MarkMemoryDependencies.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp
@@ -21,6 +22,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
+  LLVMMarkMemoryDependencies.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

@@ -15,14 +15,16 @@
 #define EXPERIMENTAL_INITALLPASSES_H
 
 #include "experimental/Analysis/Passes.h"
+#include "experimental/Conversion/Passes.h"
 #include "experimental/Transforms/Passes.h"
 
 namespace dynamatic {
 namespace experimental {
 
 inline void registerAllPasses() {
-  registerAnalysisPasses();
   dynamatic::experimental::registerPasses();
+  registerConversionPasses();
+  registerAnalysisPasses();
 }
 
 } // namespace experimental

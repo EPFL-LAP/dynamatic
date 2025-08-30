@@ -1,9 +1,11 @@
-
-#include "test_memory_4.h"
+#define N 4
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void test_memory_4(inout_int_t a[N], in_int_t n) {
+// Needs an LSQ:
+// RAW: "write(a[i+1]) @ iter. i" --> "read(a[i+1]) @ iter. i + 1"
+
+void test_memory_4(int a[N], int n) {
   int x = 0;
   for (int i = 0; i < n - 1; i++) {
     a[i] = x;
@@ -12,8 +14,8 @@ void test_memory_4(inout_int_t a[N], in_int_t n) {
 }
 
 int main(void) {
-  inout_int_t a[N];
-  in_int_t n = N;
+  int a[N];
+  int n = N;
 
   srand(13);
   for (unsigned j = 0; j < N; ++j)

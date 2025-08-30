@@ -183,19 +183,6 @@ def MemInterfaceAttr : Handshake_Attr<"MemInterface", "mem_interface"> {
   }];
 }
 
-def DependenceComponentAttr : Handshake_Attr<"DependenceComponent", "dep_comp"> {
-  let summary = "Information about the direction of a dependence for an AffineForOp";
-  let description = [{
-    Holds the same information as a `mlir::affine::DependenceComponent` (except 
-    the `op` it refers to, since this would typically be attached to the
-    operation in question or to one that would reference it through a
-    `::dynamatic::handshake::MemDependenceAttr`).
-  }];
-
-  let parameters = (ins "::std::optional<int64_t>":$lb, "::std::optional<int64_t>":$ub);
-  let assemblyFormat = "`[` $lb `,` $ub `]`";
-}
-
 def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let summary = "A memory dependence with respect to another memory access";
   let description = [{
@@ -206,36 +193,15 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     represents a RAW memory dependency. 
     
     The dependency is furthermore characterized by the loop depth at which the
-    dependency is (`loopDepth`) and a list of dependence components
-    (`components`) whose size indicates the number of commom loops surrounding
-    both operations.
+    dependency is (`loopDepth`).
   }];
   
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
-    "unsigned":$loopDepth,
-    ArrayRefParameter<"::dynamatic::handshake::DependenceComponentAttr">:$components
+    "unsigned":$loopDepth
   );
 
-  let builders = [
-    AttrBuilder<(ins  "::mlir::StringRef":$dstAccess, 
-                      "unsigned":$loopDepth,
-                      "::mlir::ArrayRef<::mlir::affine::DependenceComponent>":$components), [{
-      SmallVector<::dynamatic::handshake::DependenceComponentAttr> compAttrs;
-      for (auto &comp : components)
-        compAttrs.push_back(::dynamatic::handshake::DependenceComponentAttr::get(
-          context, comp.lb, comp.ub));
-      return $_get(context, ::mlir::StringAttr::get(context, dstAccess), 
-        loopDepth, compAttrs);  
-    }]>
-  ];
-
-  let hasCustomAssemblyFormat = 1;
-  let extraClassDeclaration = [{
-    size_t getNumCommonLoops() {
-      return getComponents().size();
-    }
-  }];
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `]`";
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
@@ -447,5 +413,34 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
   let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
 }
 
+
+//===----------------------------------------------------------------------===//
+// FPU Implementation
+//===----------------------------------------------------------------------===//
+
+// Enum Tablegen declaration structure taken from the test enum in TestOps.td
+// in https://reviews.llvm.org/D115181, which is the PR which introduced
+// the version of enums we use in Dynamatic
+//
+// this weird structure has been removed in up-to-date MLIR
+//
+// I64EnumAttrs can be used directly,
+// but they serialize as integers when in the attribute dictionary
+// which makes the IR difficult for humans to interpret.
+
+// Declare the underlying C++ enum and accompanying utility functions
+// by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
+// which tells tablegen not to actually generate the attribute
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
+  // C++ value is FPUImpl::FLOPOCO, string version is "flopoco"
+  I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+  // C++ value is FPUImpl::VIVADO, string version is "vivado"
+  I64EnumAttrCase<"VIVADO", 1, "vivado">
+]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
+}
+// and then we pass that "fake" attribute to this, which is the real attribute
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
