@@ -315,7 +315,6 @@ class StoreOrderPerEntryBodyItems():
 
             self.item = f"""
 
-  {unshifted_assignments}
 
   process(all)
     -- tail pointers as integers for indexing
@@ -327,6 +326,8 @@ class StoreOrderPerEntryBodyItems():
     -- convert q tail pointers to integer
     {load_pointer_name}_int = integer(unsigned({load_pointer_name}_i)
     {store_pointer_name}_int = integer(unsigned({store_pointer_name}_i)
+
+    {unshifted_assignments}
 
     {shifted_assignments}
 
