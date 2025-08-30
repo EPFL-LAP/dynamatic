@@ -191,8 +191,8 @@ class PortIdxPerEntryBodyItems():
         
 
 
-class StoreOrderPerEntryLocalItems():
-    class StoreOrderPerEntry(Signal2D):
+class NaiveStoreOrderPerEntryLocalItems():
+    class NaiveStoreOrderPerEntry(Signal2D):
         """
         Bitwidth = N
         Number = M
@@ -212,9 +212,9 @@ class StoreOrderPerEntryLocalItems():
             number = config.load_queue_num_entries()
 
             if shifted:
-                base_name = STORE_ORDER_PER_ENTRY_NAME
+                base_name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
             else:
-                base_name = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
+                base_name = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
 
             Signal2D.__init__(
                 self,
@@ -226,7 +226,7 @@ class StoreOrderPerEntryLocalItems():
                 )
             )
 
-class StoreOrderPerEntryBodyItems():
+class NaiveStoreOrderPerEntryBodyItems():
     class Body():
 
         def __init__(self, config : Config):
@@ -266,7 +266,7 @@ class StoreOrderPerEntryBodyItems():
                             if store_order > 0:
                                 cases += f"""
         -- Ld {j} of group {i}'s store order
-        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
+        {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
 
 """.removeprefix("\n")
                             else:
@@ -283,7 +283,7 @@ class StoreOrderPerEntryBodyItems():
                 cases = cases.strip()
 
                 unshifted_assignments = f"""
-  {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
+  {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
     case 
       {case_input}
@@ -292,8 +292,8 @@ class StoreOrderPerEntryBodyItems():
     end case;
 """.strip()
 
-                shifted = STORE_ORDER_PER_ENTRY_NAME
-                unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
+                shifted = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+                unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 shifted_assignments = f"""
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
         for j in 0 to {config.store_queue_num_entries()} - 1 loop
@@ -309,7 +309,7 @@ class StoreOrderPerEntryBodyItems():
                 output_assignments = ""
 
                 for i in range(config.load_queue_num_entries()):
-                    output_name = f"{STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+                    output_name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
 
                     # pad single digit output names
                     if i < 10:
@@ -317,7 +317,7 @@ class StoreOrderPerEntryBodyItems():
 
 
                     output_assignments += f"""
-  {output_name} <= {STORE_ORDER_PER_ENTRY_NAME}({i});
+  {output_name} <= {NAIVE_STORE_ORDER_PER_ENTRY_NAME}({i});
 """.removeprefix("\n")
             
                 output_assignments = output_assignments.strip()
@@ -346,13 +346,19 @@ class StoreOrderPerEntryBodyItems():
   {output_assignments}
 """.removeprefix("\n").strip()
             else:
-                self.item = ""
+                self.item = f"""  
+  -- Naive store orders are all zeros
+  -- Since within each BB, no store ever precedes a load
+  
+""".removeprefix("\n")
 
                 zeros = mask_until(0, config.store_queue_num_entries())
                 for i in range(config.load_queue_num_entries()):
                     self.item += f"""
-  {STORE_ORDER_PER_ENTRY_NAME}_{i}_0 = {zeros};
+  {NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_0 = {zeros};
 """.removeprefix("\n")
+                    
+                self.item = self.item.strip()
 
         def get(self):
             return self.item
@@ -783,7 +789,7 @@ class GroupAllocatorPortItems():
                 )
             )
 
-    class StoreOrderPerEntryComment(EntityComment):
+    class NaiveStoreOrderPerEntryComment(EntityComment):
         """
         RTL comment:
             
@@ -797,7 +803,7 @@ class GroupAllocatorPortItems():
 
         -- has been shifted to generate this,
 
-        -- as well as 0s and 1s added correctly to fill out each signal.
+        -- It is naive, however, as 1s for already allocated stores are not present.
         """
         def __init__(
                 self, 
@@ -812,7 +818,7 @@ class GroupAllocatorPortItems():
     -- One per entry in the load queue, with 1 bit per entry in the store queue.
     -- The order of the memory operations, read from the ROM, 
     -- has been shifted to generate this,
-    -- as well as 0s and 1s added correctly to fill out each signal.
+    -- It is naive, however, as 1s for already allocated stores are not present.
 
 """.removeprefix("\n")
             EntityComment.__init__(
@@ -822,7 +828,7 @@ class GroupAllocatorPortItems():
 
 
 
-    class StoreOrderPerEntry(Signal):
+    class NaiveStoreOrderPerEntry(Signal):
         """
         Output
         
@@ -838,9 +844,10 @@ class GroupAllocatorPortItems():
         
         The order of the memory operations, read from the ROM,
         has been shifted to generate this, 
-        as well as 0s and 1s added correctly to fill out each signal.
-
+        
         This is done based on the store queue and load queue pointers.
+
+        It is naive, however, as 1s for already allocated stores are not present.
         """
 
         def __init__(self, 
@@ -849,7 +856,7 @@ class GroupAllocatorPortItems():
 
             Signal.__init__(
                 self,
-                base_name=STORE_ORDER_PER_ENTRY_NAME,
+                base_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
                 direction=Signal.Direction.OUTPUT,
                 size=Signal.Size(
                     bitwidth=config.store_queue_num_entries(), 

@@ -56,10 +56,11 @@ def PORT_INDEX_PER_ENTRY_NAME(
     return f"{queue_type.value}_port_idx_per_entry"
 
 
-STORE_ORDER_PER_ENTRY_NAME = "store_order"
+NAIVE_STORE_ORDER_PER_ENTRY_NAME = "naive_store_order"
 """
 RTL name for signals which identify whether each of the stores precedes a load.
 There is one of these signals per load queue entry, and 1 bit per store queue entry.
+It is naive as it only considers loads and stores currently being allocated, not previous stores.
 """
 
 GROUP_INIT_TRANSFER_NAME = f"{GROUP_INIT_CHANNEL_NAME}_transfer"
@@ -90,8 +91,9 @@ def UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(
     return f"unshifted_{PORT_INDEX_PER_ENTRY_NAME(queue_type)}"
 
 
-UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME = f"unshifted_{STORE_ORDER_PER_ENTRY_NAME}"
+UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME = f"unshifted_{NAIVE_STORE_ORDER_PER_ENTRY_NAME}"
 """
-RTL name for the unshifted store position per queue entry
+RTL name for the unshifted naive store position per queue entry.
+It is naive as it only considers loads and stores currently being allocated, not previous stores.
 """
      

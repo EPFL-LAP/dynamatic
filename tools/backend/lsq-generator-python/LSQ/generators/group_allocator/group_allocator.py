@@ -18,8 +18,8 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupHandshakingDeclarativeBodyItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
-        StoreOrderPerEntryLocalItems,
-        StoreOrderPerEntryBodyItems
+        NaiveStoreOrderPerEntryLocalItems,
+        NaiveStoreOrderPerEntryBodyItems
     )
 
 class StoreOrderPerEntryDeclarative():
@@ -33,17 +33,17 @@ class StoreOrderPerEntryDeclarative():
             ga_l.GroupInitTransfer(config, d.INPUT),
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
             ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-            ga_p.StoreOrderPerEntry(config)
+            ga_p.NaiveStoreOrderPerEntry(config)
         ]
 
-        l = StoreOrderPerEntryLocalItems()
+        l = NaiveStoreOrderPerEntryLocalItems()
 
         self.local_items = [
-            l.StoreOrderPerEntry(config, shifted=False),
-            l.StoreOrderPerEntry(config, shifted=True)
+            l.NaiveStoreOrderPerEntry(config, shifted=False),
+            l.NaiveStoreOrderPerEntry(config, shifted=True)
         ]
 
-        b = StoreOrderPerEntryBodyItems()
+        b = NaiveStoreOrderPerEntryBodyItems()
         self.body = [
             b.Body(config)
         ]
@@ -147,8 +147,8 @@ class GroupAllocatorDeclarative():
             p.PortIdxPerQueueEntryComment(config, QueueType.STORE),
             p.PortIdxPerQueueEntry(config, QueueType.STORE),
     
-            p.StoreOrderPerEntryComment(config),
-            p.StoreOrderPerEntry(config)
+            p.NaiveStoreOrderPerEntryComment(config),
+            p.NaiveStoreOrderPerEntry(config)
         ]
 
         l = GroupAllocatorLocalItems()
