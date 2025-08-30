@@ -1,9 +1,9 @@
 #include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
 #include "handshake_constant_0.smv"
 #include "handshake_source_0.smv"
-#include "handshake_mux_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_fork_0.smv"
 
 
 MODULE mux_add_suppress_rhs_wrapper (ins, ins_valid, sel, sel_valid, out_ready)

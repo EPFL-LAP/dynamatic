@@ -5454,4 +5454,4 @@ reachable states: 320 (2^8.32193) out of 1.67772e+07 (2^24)
   suppressorInduction_lhs.buffer.full = TRUE
   -------------------------
 ######################################################################
-elapse: 0.11 seconds, total: 0.11 seconds
+elapse: 0.10 seconds, total: 0.10 seconds

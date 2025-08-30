@@ -1,8 +1,8 @@
 #include "handshake_ndwire_0.smv"
-#include "handshake_mux_0.smv"
-#include "handshake_passer_0.smv"
-#include "handshake_not_0.smv"
 #include "handshake_fork_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_not_0.smv"
+#include "handshake_passer_0.smv"
 
 
 MODULE mux_to_logic_lhs_wrapper (in1, in1_valid, in2, in2_valid, sel, sel_valid, out_ready)

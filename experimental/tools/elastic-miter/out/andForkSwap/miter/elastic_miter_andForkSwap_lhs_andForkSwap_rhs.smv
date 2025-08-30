@@ -1,12 +1,12 @@
 #include "handshake_lazy_fork_1.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_lazy_fork_0.smv"
+#include "handshake_blocker_0.smv"
 #include "handshake_andi_0.smv"
 #include "handshake_buffer_1.smv"
-#include "handshake_blocker_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_fork_0.smv"
 #include "handshake_cmpi_0.smv"
 #include "handshake_buffer_0.smv"
-#include "handshake_fork_0.smv"
+#include "handshake_lazy_fork_0.smv"
 
 
 MODULE elastic_miter_andForkSwap_lhs_andForkSwap_rhs (in1, in1_valid, in2, in2_valid, EQ_out1_ready, EQ_out2_ready)

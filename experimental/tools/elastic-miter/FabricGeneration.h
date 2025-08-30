@@ -83,7 +83,7 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
 // contain exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   ModuleOp contextModule, size_t bufferSlots, bool ndSpec,
+                   ModuleOp contextModule, size_t bufferSlots,
                    bool allowNonacceptance, bool disableNDWire,
                    bool disableDecoupling);
 
@@ -103,7 +103,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpece, bool allowNonacceptance, bool disableNDWire,
+                  bool allowNonacceptance, bool disableNDWire,
                   bool disableDecoupling);
 
 LogicalResult

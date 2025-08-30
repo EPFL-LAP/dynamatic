@@ -1614,4 +1614,4 @@ reachable states: 160 (2^7.32193) out of 512 (2^9)
   ri_fork_lhs.fork.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.02 seconds, total: 0.02 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

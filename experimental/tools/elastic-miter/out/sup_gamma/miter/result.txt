@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_sup_gamma_lhs_sup_gamma_rhs.EQ_b_valid -> elastic_miter_sup_gamma_lhs_sup_gamma_rhs.EQ_b)  is true
 -- specification AF (AG (((((elastic_miter_sup_gamma_lhs_sup_gamma_rhs.lhs_in_buf_a1.debug_counter.counter = elastic_miter_sup_gamma_lhs_sup_gamma_rhs.rhs_in_buf_a1.debug_counter.counter & elastic_miter_sup_gamma_lhs_sup_gamma_rhs.lhs_in_buf_a2.debug_counter.counter = elastic_miter_sup_gamma_lhs_sup_gamma_rhs.rhs_in_buf_a2.debug_counter.counter) & elastic_miter_sup_gamma_lhs_sup_gamma_rhs.lhs_in_buf_c1.debug_counter.counter = elastic_miter_sup_gamma_lhs_sup_gamma_rhs.rhs_in_buf_c1.debug_counter.counter) & elastic_miter_sup_gamma_lhs_sup_gamma_rhs.lhs_in_buf_c2.debug_counter.counter = elastic_miter_sup_gamma_lhs_sup_gamma_rhs.rhs_in_buf_c2.debug_counter.counter) & !elastic_miter_sup_gamma_lhs_sup_gamma_rhs.lhs_out_bl_b.outs_valid) & !elastic_miter_sup_gamma_lhs_sup_gamma_rhs.rhs_out_bl_b.outs_valid))  is true
-elapse: 1.19 seconds, total: 1.19 seconds
+elapse: 1.24 seconds, total: 1.24 seconds

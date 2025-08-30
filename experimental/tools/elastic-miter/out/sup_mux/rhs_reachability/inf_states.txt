@@ -39182,4 +39182,4 @@ reachable states: 2176 (2^11.0875) out of 131072 (2^17)
   sup_mux_rhs.buffer2.full = TRUE
   -------------------------
 ######################################################################
-elapse: 0.23 seconds, total: 0.23 seconds
+elapse: 0.18 seconds, total: 0.18 seconds

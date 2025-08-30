@@ -4,7 +4,7 @@ module {
     %1 = ndconstant %0 {handshake.bb = 0 : ui32, handshake.name = "backedge_constant_confirmSpec"} : <>, <i1>
     %2:2 = fork [2] %1 {handshake.bb = 0 : ui32, handshake.name = "backedge_lf_start_confirmSpec"} : <i1>
     sink %arg1 {handshake.bb = 0 : ui32, handshake.name = "backedge_sink_start_confirmSpec"} : <i1>
-    %3:2 = lazy_fork [2] %23 {handshake.bb = 4 : ui32, handshake.name = "backedge_lf_end_confirmSpec"} : <i1>
+    %3:2 = lazy_fork [2] %24 {handshake.bb = 4 : ui32, handshake.name = "backedge_lf_end_confirmSpec"} : <i1>
     %4 = cmpi eq, %2#1, %3#1 {handshake.bb = 4 : ui32, handshake.name = "backedge_eq_confirmSpec"} : <i1>
     sink %4 {handshake.bb = 4 : ui32, handshake.name = "backedge_sink_end_confirmSpec"} : <i1>
     %5:2 = fork [2] %arg0 {handshake.bb = 1 : ui32, handshake.name = "ctx_fork"} : <i1>
@@ -21,19 +21,20 @@ module {
     %16 = buffer %14#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 1 : ui32, handshake.name = "rhs_in_buf_specLoopContinue"} : <i1>
     %17:2 = lazy_fork [2] %6#1 {handshake.bb = 1 : ui32, handshake.name = "in_fork_confirmSpec_backedge"} : <i1>
     %18 = buffer %17#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 1 : ui32, handshake.name = "lhs_in_buf_confirmSpec_backedge"} : <i1>
-    %19 = ndsource {handshake.bb = 4 : ui32, handshake.name = "out_nds_confirmSpec"} : <>
-    %20:2 = lazy_fork [2] %19 {handshake.bb = 4 : ui32, handshake.name = "out_lf_confirmSpec"} : <>
-    %21 = buffer %20#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 4 : ui32, handshake.name = "out_buf_lhs_nds_confirmSpec"} : <>
-    %22 = buffer %20#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 4 : ui32, handshake.name = "out_buf_rhs_nds_confirmSpec"} : <>
-    %23 = blocker %29[%21] {handshake.bb = 4 : ui32, handshake.name = "lhs_out_bl_confirmSpec"} : <i1>, <>
-    %24 = blocker %30[%22] {handshake.bb = 4 : ui32, handshake.name = "rhs_out_bl_confirmSpec"} : <i1>, <>
-    %25 = cmpi eq, %3#0, %24 {handshake.bb = 4 : ui32, handshake.name = "out_eq_confirmSpec"} : <i1>
-    %26 = passer %12[%18] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer"} : <i1>, <i1>
-    %27 = spec_v2_repeating_init %26 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
-    %28 = buffer %27, bufferType = FIFO_BREAK_NONE, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
-    %29 = spec_v2_interpolator %28, %15 {handshake.bb = 2 : ui32, handshake.name = "lhs_interpolate"} : <i1>
-    sink %17#1 {handshake.bb = 3 : ui32, handshake.name = "rhs_vm_sink_2"} : <i1>
-    %30 = spec_v2_resolver %13, %16 {handshake.bb = 3 : ui32, handshake.name = "rhs_resolver"} : <i1>
-    end {handshake.bb = 4 : ui32, handshake.name = "end"} %25 : <i1>
+    %19 = buffer %17#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 1 : ui32, handshake.name = "rhs_in_buf_confirmSpec_backedge"} : <i1>
+    %20 = ndsource {handshake.bb = 4 : ui32, handshake.name = "out_nds_confirmSpec"} : <>
+    %21:2 = lazy_fork [2] %20 {handshake.bb = 4 : ui32, handshake.name = "out_lf_confirmSpec"} : <>
+    %22 = buffer %21#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 4 : ui32, handshake.name = "out_buf_lhs_nds_confirmSpec"} : <>
+    %23 = buffer %21#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 4 : ui32, handshake.name = "out_buf_rhs_nds_confirmSpec"} : <>
+    %24 = blocker %30[%22] {handshake.bb = 4 : ui32, handshake.name = "lhs_out_bl_confirmSpec"} : <i1>, <>
+    %25 = blocker %31[%23] {handshake.bb = 4 : ui32, handshake.name = "rhs_out_bl_confirmSpec"} : <i1>, <>
+    %26 = cmpi eq, %3#0, %25 {handshake.bb = 4 : ui32, handshake.name = "out_eq_confirmSpec"} : <i1>
+    %27 = passer %12[%18] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer"} : <i1>, <i1>
+    %28 = spec_v2_repeating_init %27 {handshake.bb = 2 : ui32, handshake.name = "lhs_ri", initToken = 1 : ui1} : <i1>
+    %29 = buffer %28, bufferType = FIFO_BREAK_NONE, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "lhs_buffer"} : <i1>
+    %30 = spec_v2_interpolator %29, %15 {handshake.bb = 2 : ui32, handshake.name = "lhs_interpolate"} : <i1>
+    sink %19 {handshake.bb = 3 : ui32, handshake.name = "rhs_vm_sink_2"} : <i1>
+    %31 = spec_v2_resolver %13, %16 {handshake.bb = 3 : ui32, handshake.name = "rhs_resolver"} : <i1>
+    end {handshake.bb = 4 : ui32, handshake.name = "end"} %26 : <i1>
   }
 }

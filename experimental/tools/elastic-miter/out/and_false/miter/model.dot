@@ -4,8 +4,8 @@ Digraph G {
   "ins" ["style"="solid", "shape"="diamond", "label"="ins", "mlir_op"="handshake.func"]
   "EQ_out" ["style"="solid", "shape"="diamond", "label"="EQ_out", "mlir_op"="handshake.func"]
   "ins" -> "in_fork_ins" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="ins", "to_idx"="0"]
-  "in_fork_ins" -> "rhs_sink" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
   "lhs_in_buf_ins" -> "lhs_and" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="lhs", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "rhs_in_buf_ins" -> "rhs_sink" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
   "out_eq_out" -> "EQ_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="EQ_out", "arrowtail"="none", "from"="result", "to_idx"="0"]
   "lhs_and" -> "lhs_out_bl_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
   "rhs_constant" -> "rhs_out_bl_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
@@ -13,7 +13,9 @@ Digraph G {
     graph ["label"="BB 0"]
     "in_fork_ins" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
     "lhs_in_buf_ins" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
+    "rhs_in_buf_ins" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "in_fork_ins" -> "lhs_in_buf_ins" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+    "in_fork_ins" -> "rhs_in_buf_ins" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
   }
   subgraph cluster3 {
     graph ["label"="BB 3"]

@@ -136,10 +136,6 @@ static cl::opt<bool>
                           cl::init(false), cl::cat(generalCategory));
 
 static cl::opt<bool>
-    ndSpec("nd_spec", cl::desc("Use non-deterministic speculator context"),
-           cl::init(false), cl::cat(constraintsCategory));
-
-static cl::opt<bool>
     allowNonacceptance("allow_nonacceptance",
                        cl::desc("Outputs might not be accepted"),
                        cl::init(false), cl::cat(constraintsCategory));
@@ -234,7 +230,7 @@ static FailureOr<bool> checkEquivalence(
   // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
       context, lhsPath, rhsPath, contextFilePath, miterDir.string(), nrOfTokens,
-      ndSpec, allowNonacceptance, disableNDWire, disableDecoupling);
+      allowNonacceptance, disableNDWire, disableDecoupling);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();

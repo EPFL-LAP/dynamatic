@@ -583,7 +583,7 @@ createReachabilityCircuit(MLIRContext &context,
 // exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   ModuleOp contextModule, size_t bufferSlots, bool ndSpec,
+                   ModuleOp contextModule, size_t bufferSlots,
                    bool allowNonacceptance, bool disableNDWire,
                    bool disableDecoupling) {
 
@@ -668,11 +668,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   builder.setInsertionPointToStart(newBlock);
 
-  if (ndSpec) {
-    assert(lhsFuncOp.getNumArguments() == 2 &&
-           "The ND speculator context only supports two arguments.");
-  }
-
   // Create the input side auxillary logic:
   // Every primary input of the LHS/RHS circuits is connected to a fork, which
   // splits the data for both sides under test. Both output sides of the fork
@@ -693,31 +688,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
           "control inputs.");
     }
 
-    if (ndSpec && i == 1) {
-      LazyForkOp forkOp = builder.create<LazyForkOp>(
-          newFuncOp.getLoc(), newFuncOp.getArgument(0), 2);
-      setHandshakeAttributes(builder, forkOp, bbIn, "in_nd_fork");
-      newFuncOp.getArgument(0).replaceAllUsesExcept(forkOp.getResult()[0],
-                                                    forkOp);
-
-      BufferOp ndSpecPreBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
-          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-      setHandshakeAttributes(builder, ndSpecPreBufferOp, bbIn,
-                             "in_nd_spec_pre_buffer");
-      SpecV2NDSpeculatorOp ndSpecOp = builder.create<SpecV2NDSpeculatorOp>(
-          newFuncOp.getLoc(), ndSpecPreBufferOp.getResult());
-      setHandshakeAttributes(builder, ndSpecOp, bbIn, "in_nd_speculator");
-      SpecV2RepeatingInitOp riOp = builder.create<SpecV2RepeatingInitOp>(
-          newFuncOp.getLoc(), ndSpecOp.getResult());
-      setHandshakeAttributes(builder, riOp, bbIn, "in_ri");
-      miterArg = riOp.getResult();
-
-      SinkOp sinkOp =
-          builder.create<SinkOp>(newFuncOp.getLoc(), newFuncOp.getArgument(1));
-      setHandshakeAttributes(builder, sinkOp, bbIn, "in_sink");
-    }
-
     std::string forkName = "in_fork_" + lhsFuncOp.getArgName(i).str();
     std::string lhsBufName = "lhs_in_buf_" + lhsFuncOp.getArgName(i).str();
     std::string rhsBufName = "rhs_in_buf_" + lhsFuncOp.getArgName(i).str();
@@ -728,29 +698,19 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, forkOp, bbIn, forkName);
     config.inputForks.push_back(forkName);
 
-    Value lhsNDWireInput = forkOp.getResult()[0];
-    if (isa<SinkOp>(*lhsArg.getUsers().begin())) {
-      lhsBufName = "";
-    } else {
-      BufferOp lhsBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[0], inputBufferSlots,
-          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-      lhsBufferOp.setDebugCounter(true);
-      setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
-      lhsNDWireInput = lhsBufferOp.getResult();
-    }
+    BufferOp lhsBufferOp = builder.create<BufferOp>(
+        forkOp.getLoc(), forkOp.getResult()[0], inputBufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    lhsBufferOp.setDebugCounter(true);
+    setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
+    Value lhsNDWireInput = lhsBufferOp.getResult();
 
-    Value rhsNDWireInput = forkOp.getResult()[1];
-    if (isa<SinkOp>(*rhsArg.getUsers().begin())) {
-      rhsBufName = "";
-    } else {
-      BufferOp rhsBufferOp = builder.create<BufferOp>(
-          forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
-          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-      rhsBufferOp.setDebugCounter(true);
-      setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
-      rhsNDWireInput = rhsBufferOp.getResult();
-    }
+    BufferOp rhsBufferOp = builder.create<BufferOp>(
+        forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    rhsBufferOp.setDebugCounter(true);
+    setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
+    Value rhsNDWireInput = rhsBufferOp.getResult();
 
     Value lhsInput = lhsNDWireInput;
     Value rhsInput = rhsNDWireInput;
@@ -883,9 +843,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       setHandshakeAttributes(builder, lhsEndBufferOp, bbOut, lhsBufName);
       setHandshakeAttributes(builder, rhsEndBufferOp, bbOut, rhsBufName);
 
-      lhsEndBufferOp.setDebugCounter(true);
-      rhsEndBufferOp.setDebugCounter(true);
-
       lhsInput = lhsEndBufferOp.getResult();
       rhsInput = rhsEndBufferOp.getResult();
     }
@@ -953,7 +910,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpec, bool allowNonacceptance, bool disableNDWire,
+                  bool allowNonacceptance, bool disableNDWire,
                   bool disableDecoupling) {
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
@@ -980,8 +937,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   ModuleOp contextModule = contextModuleRef.get();
 
   auto ret = createElasticMiter(context, lhsModule, rhsModule, contextModule,
-                                nrOfTokens, ndSpec, allowNonacceptance,
-                                disableNDWire, disableDecoupling);
+                                nrOfTokens, allowNonacceptance, disableNDWire,
+                                disableDecoupling);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();

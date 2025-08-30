@@ -33,6 +33,6 @@ MODULE main
   VAR sink_EQ_out : sink_main(elastic_miter_and_false_lhs_and_false_rhs.EQ_out_valid);
 
 INVARSPEC (elastic_miter_and_false_lhs_and_false_rhs.EQ_out_valid -> elastic_miter_and_false_lhs_and_false_rhs.EQ_out);
-CTLSPEC AF (AG ((!elastic_miter_and_false_lhs_and_false_rhs.lhs_in_buf_ins.outs_valid) & (!elastic_miter_and_false_lhs_and_false_rhs.lhs_out_bl_out.outs_valid) & (!elastic_miter_and_false_lhs_and_false_rhs.rhs_out_bl_out.outs_valid)));
+CTLSPEC AF (AG ((elastic_miter_and_false_lhs_and_false_rhs.lhs_in_buf_ins.debug_counter.counter = elastic_miter_and_false_lhs_and_false_rhs.rhs_in_buf_ins.debug_counter.counter) & (!elastic_miter_and_false_lhs_and_false_rhs.lhs_out_bl_out.outs_valid) & (!elastic_miter_and_false_lhs_and_false_rhs.rhs_out_bl_out.outs_valid)));
 
 INVAR  seq_generator_ins.exact_tokens = elastic_miter_and_false_lhs_and_false_rhs.out_nds_out.exact_tokens ;

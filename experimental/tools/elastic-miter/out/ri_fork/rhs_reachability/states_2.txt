@@ -16030,4 +16030,4 @@ reachable states: 1144 (2^10.1599) out of 131072 (2^17)
   ri_fork_rhs.buffer2.full = FALSE
   -------------------------
 ######################################################################
-elapse: 0.14 seconds, total: 0.14 seconds
+elapse: 0.12 seconds, total: 0.12 seconds

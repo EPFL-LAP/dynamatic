@@ -1,7 +1,7 @@
-#include "handshake_ndwire_0.smv"
 #include "handshake_sink_0.smv"
 #include "handshake_constant_0.smv"
 #include "handshake_source_0.smv"
+#include "handshake_ndwire_0.smv"
 
 
 MODULE and_false_rhs (ins, ins_valid, out_ready)

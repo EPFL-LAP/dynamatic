@@ -21518,4 +21518,4 @@ reachable states: 1536 (2^10.585) out of 5.36871e+08 (2^29)
   sup_gamma_rhs.ndw_out_b.inner_ndwire.state = SLEEPING
   -------------------------
 ######################################################################
-elapse: 0.46 seconds, total: 0.46 seconds
+elapse: 0.42 seconds, total: 0.42 seconds

@@ -18,8 +18,8 @@ module {
     %15 = blocker %36[%13] {handshake.bb = 5 : ui32, handshake.name = "rhs_out_bl_B_out"} : <i1>, <>
     %16 = ndwire %14 {handshake.bb = 5 : ui32, handshake.name = "lhs_out_ndw_B_out"} : <i1>
     %17 = ndwire %15 {handshake.bb = 5 : ui32, handshake.name = "rhs_out_ndw_B_out"} : <i1>
-    %18 = buffer %16, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 5 : ui32, handshake.name = "lhs_out_buf_B_out"} : <i1>
-    %19 = buffer %17, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 5 : ui32, handshake.name = "rhs_out_buf_B_out"} : <i1>
+    %18 = buffer %16, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "lhs_out_buf_B_out"} : <i1>
+    %19 = buffer %17, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "rhs_out_buf_B_out"} : <i1>
     %20 = cmpi eq, %18, %19 {handshake.bb = 5 : ui32, handshake.name = "out_eq_B_out"} : <i1>
     %21 = ndsource {handshake.bb = 5 : ui32, handshake.name = "out_nds_C_out"} : <>
     %22:2 = lazy_fork [2] %21 {handshake.bb = 5 : ui32, handshake.name = "out_lf_C_out"} : <>
@@ -29,8 +29,8 @@ module {
     %26 = blocker %37[%24] {handshake.bb = 5 : ui32, handshake.name = "rhs_out_bl_C_out"} : <i1>, <>
     %27 = ndwire %25 {handshake.bb = 5 : ui32, handshake.name = "lhs_out_ndw_C_out"} : <i1>
     %28 = ndwire %26 {handshake.bb = 5 : ui32, handshake.name = "rhs_out_ndw_C_out"} : <i1>
-    %29 = buffer %27, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 5 : ui32, handshake.name = "lhs_out_buf_C_out"} : <i1>
-    %30 = buffer %28, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 5 : ui32, handshake.name = "rhs_out_buf_C_out"} : <i1>
+    %29 = buffer %27, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "lhs_out_buf_C_out"} : <i1>
+    %30 = buffer %28, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "rhs_out_buf_C_out"} : <i1>
     %31 = cmpi eq, %29, %30 {handshake.bb = 5 : ui32, handshake.name = "out_eq_C_out"} : <i1>
     %32 = passer %3[%8] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer1"} : <i1>, <i1>
     %33:2 = fork [2] %32 {handshake.bb = 2 : ui32, handshake.name = "lhs_fork"} : <i1>

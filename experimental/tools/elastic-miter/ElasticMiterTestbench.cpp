@@ -61,38 +61,24 @@ static std::string createMiterProperties(const std::string &moduleName,
       continue;
 
     const auto &[lhsBuffer, rhsBuffer] = buffers;
-    if (lhsBuffer == "" && rhsBuffer == "") {
-      auto inputFork = config.inputForks[i];
-      bufferProperties.push_back(
-          llvm::formatv("({0}.{1}.outs_0_valid = {0}.{1}.outs_1_valid)",
-                        moduleName, inputFork)
-              .str());
-    } else if (lhsBuffer == "") {
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBuffer).str());
-    } else if (rhsBuffer == "") {
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
-    } else {
-      bufferProperties.push_back(
-          llvm::formatv("({0}.{1}.debug_counter.counter = "
-                        "{0}.{2}.debug_counter.counter)",
-                        moduleName, lhsBuffer, rhsBuffer)
-              .str());
-    }
+    bufferProperties.push_back(llvm::formatv("({0}.{1}.debug_counter.counter = "
+                                             "{0}.{2}.debug_counter.counter)",
+                                             moduleName, lhsBuffer, rhsBuffer)
+                                   .str());
   }
 
   // Make sure the output buffers will be empty.
   // This means both circuits produce the same number of output tokens.
   for (const auto &[i, buffers] : llvm::enumerate(config.outputBuffers)) {
     const auto &[lhsBuffer, rhsBuffer] = buffers;
-    if (lhsBuffer == "" || rhsBuffer == "") {
+    if (lhsBuffer == "" && rhsBuffer == "") {
       auto [lhsBlocker, rhsBlocker] = config.outputBlockers[i];
       bufferProperties.push_back(
           llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBlocker).str());
       bufferProperties.push_back(
           llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBlocker).str());
     } else {
+      assert(lhsBuffer != "" && rhsBuffer != "");
       // When outs_valid is false, the buffer is empty.
       bufferProperties.push_back(
           llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());

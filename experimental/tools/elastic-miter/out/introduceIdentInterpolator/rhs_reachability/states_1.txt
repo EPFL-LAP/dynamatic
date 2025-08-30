@@ -718,4 +718,4 @@ reachable states: 64 (2^6) out of 262144 (2^18)
   introduceIdentInterpolator_rhs.interpolate.interpolate = FALSE
   -------------------------
 ######################################################################
-elapse: 0.03 seconds, total: 0.03 seconds
+elapse: 0.02 seconds, total: 0.02 seconds

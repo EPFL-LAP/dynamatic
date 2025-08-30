@@ -21902,4 +21902,4 @@ reachable states: 912 (2^9.83289) out of 2.14748e+09 (2^31)
   last_token_confirmSpec = TRUE
   -------------------------
 ######################################################################
-elapse: 0.25 seconds, total: 0.25 seconds
+elapse: 0.29 seconds, total: 0.29 seconds

@@ -18670,4 +18670,4 @@ reachable states: 848 (2^9.72792) out of 2.09715e+06 (2^21)
   last_token_confirmSpec = TRUE
   -------------------------
 ######################################################################
-elapse: 0.11 seconds, total: 0.11 seconds
+elapse: 0.12 seconds, total: 0.12 seconds

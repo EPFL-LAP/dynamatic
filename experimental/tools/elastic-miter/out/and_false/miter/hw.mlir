@@ -2,6 +2,7 @@ module {
   hw.module @elastic_miter_and_false_lhs_and_false_rhs(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out EQ_out : !handshake.channel<i1>) {
     %in_fork_ins.outs_0, %in_fork_ins.outs_1 = hw.instance "in_fork_ins" @handshake_lazy_fork_0(ins: %ins: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %lhs_in_buf_ins.outs = hw.instance "lhs_in_buf_ins" @handshake_buffer_0(ins: %in_fork_ins.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %rhs_in_buf_ins.outs = hw.instance "rhs_in_buf_ins" @handshake_buffer_0(ins: %in_fork_ins.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %out_nds_out.result = hw.instance "out_nds_out" @handshake_ndsource_0(clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.control<>)
     %out_lf_out.outs_0, %out_lf_out.outs_1 = hw.instance "out_lf_out" @handshake_lazy_fork_1(ins: %out_nds_out.result: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.control<>, outs_1: !handshake.control<>)
     %out_buf_lhs_nds_out.outs = hw.instance "out_buf_lhs_nds_out" @handshake_buffer_1(ins: %out_lf_out.outs_0: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
@@ -12,7 +13,7 @@ module {
     %lhs_source.outs = hw.instance "lhs_source" @handshake_source_0(clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
     %lhs_constant.outs = hw.instance "lhs_constant" @handshake_constant_0(ctrl: %lhs_source.outs: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %lhs_and.result = hw.instance "lhs_and" @handshake_andi_0(lhs: %lhs_in_buf_ins.outs: !handshake.channel<i1>, rhs: %lhs_constant.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
-    hw.instance "rhs_sink" @handshake_sink_0(ins: %in_fork_ins.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> ()
+    hw.instance "rhs_sink" @handshake_sink_0(ins: %rhs_in_buf_ins.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> ()
     %rhs_source.outs = hw.instance "rhs_source" @handshake_source_0(clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
     %rhs_constant.outs = hw.instance "rhs_constant" @handshake_constant_0(ctrl: %rhs_source.outs: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     hw.output %out_eq_out.result : !handshake.channel<i1>

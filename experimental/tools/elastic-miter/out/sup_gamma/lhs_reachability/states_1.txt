@@ -33294,4 +33294,4 @@ reachable states: 1664 (2^10.7004) out of 3.43597e+10 (2^35)
   sup_gamma_lhs.vm_fork_3.inner_fork.inner_reg_block_2.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.79 seconds, total: 0.79 seconds
+elapse: 0.65 seconds, total: 0.65 seconds

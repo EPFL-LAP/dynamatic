@@ -21,6 +21,7 @@ module {
     %rhs_in_buf_specLoopContinue.outs = hw.instance "rhs_in_buf_specLoopContinue" @handshake_buffer_1(ins: %in_fork_specLoopContinue.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %in_fork_confirmSpec_backedge.outs_0, %in_fork_confirmSpec_backedge.outs_1 = hw.instance "in_fork_confirmSpec_backedge" @handshake_lazy_fork_0(ins: %ctx_fork_cs.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %lhs_in_buf_confirmSpec_backedge.outs = hw.instance "lhs_in_buf_confirmSpec_backedge" @handshake_buffer_1(ins: %in_fork_confirmSpec_backedge.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
+    %rhs_in_buf_confirmSpec_backedge.outs = hw.instance "rhs_in_buf_confirmSpec_backedge" @handshake_buffer_1(ins: %in_fork_confirmSpec_backedge.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %out_nds_confirmSpec.result = hw.instance "out_nds_confirmSpec" @handshake_ndsource_0(clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.control<>)
     %out_lf_confirmSpec.outs_0, %out_lf_confirmSpec.outs_1 = hw.instance "out_lf_confirmSpec" @handshake_lazy_fork_1(ins: %out_nds_confirmSpec.result: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.control<>, outs_1: !handshake.control<>)
     %out_buf_lhs_nds_confirmSpec.outs = hw.instance "out_buf_lhs_nds_confirmSpec" @handshake_buffer_2(ins: %out_lf_confirmSpec.outs_0: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
@@ -32,7 +33,7 @@ module {
     %lhs_ri.outs = hw.instance "lhs_ri" @handshake_spec_v2_repeating_init_0(ins: %lhs_passer.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %lhs_buffer.outs = hw.instance "lhs_buffer" @handshake_buffer_0(ins: %lhs_ri.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %lhs_interpolate.result = hw.instance "lhs_interpolate" @handshake_spec_v2_interpolator_0(short: %lhs_buffer.outs: !handshake.channel<i1>, long: %lhs_in_buf_specLoopContinue.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
-    hw.instance "rhs_vm_sink_2" @handshake_sink_0(ins: %in_fork_confirmSpec_backedge.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> ()
+    hw.instance "rhs_vm_sink_2" @handshake_sink_0(ins: %rhs_in_buf_confirmSpec_backedge.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> ()
     %rhs_resolver.confirmSpec = hw.instance "rhs_resolver" @handshake_spec_v2_resolver_0(actualCondition: %rhs_in_buf_loopContinue.outs: !handshake.channel<i1>, generatedCondition: %rhs_in_buf_specLoopContinue.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (confirmSpec: !handshake.channel<i1>)
     hw.output %out_eq_confirmSpec.result : !handshake.channel<i1>
   }

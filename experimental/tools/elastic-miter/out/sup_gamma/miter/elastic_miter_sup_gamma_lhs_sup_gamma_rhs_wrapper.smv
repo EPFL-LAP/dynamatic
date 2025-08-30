@@ -1,14 +1,14 @@
-#include "handshake_ndsource_0.smv"
+#include "handshake_not_0.smv"
 #include "handshake_lazy_fork_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_not_0.smv"
 #include "handshake_buffer_1.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
+#include "handshake_blocker_0.smv"
 #include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_ndsource_0.smv"
 #include "handshake_lazy_fork_1.smv"
 #include "handshake_mux_0.smv"
-#include "handshake_blocker_0.smv"
 
 
 MODULE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapper (a1, a1_valid, a2, a2_valid, c1, c1_valid, c2, c2_valid, EQ_b_ready)
