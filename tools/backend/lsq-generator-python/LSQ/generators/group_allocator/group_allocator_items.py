@@ -147,6 +147,8 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             self.shifted_assignments += f"""
     end loop;
 """.removeprefix("\n")
+            
+            self.shifted_assignments = self.shifted_assignments.lstrip()
 
             self.item = f"""
   process(all)
