@@ -107,7 +107,11 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             self.default_assignments = self.default_assignments.strip()
 
-            self.unshifted_assignments = ""
+            self.unshifted_assignments = f"""
+    -- This LSQ was generated without multi-group allocation
+    -- and so assumes the dataflow circuit will only ever 
+    -- have 1 group valid signal in a given cycle
+""".removeprefix("\n")
 
             for i in range(config.num_groups()):
                 if i == 0:
@@ -143,7 +147,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
             pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
             self.shifted_assignments += f"""
-      {port_idx}(i) <= {unsh_port_idx(queue_type)}(integer(i + {pointer_name}_i) mod {num_entries})
+      {port_idx}(i) <= {unsh_port_idx(queue_type)}((i + integer(unsigned({pointer_name}_i))) mod {num_entries});
 """.removeprefix("\n")
 
             self.shifted_assignments += f"""
@@ -156,7 +160,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
 
             for i in range(num_entries):
                 self.output_assignments += f"""
-    {PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}(i);
+    {PORT_INDEX_PER_ENTRY_NAME(queue_type)}_{i}_o <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
 """.removeprefix("\n")
 
             self.item = f"""
@@ -169,7 +173,7 @@ class PortIdxPerQueueEntryRomMuxBodyItems():
     {self.shifted_assignments}
 
     {self.output_assignments}
-  end process
+  end process;
 """.removeprefix("\n").lstrip()
 
         def get(self):
