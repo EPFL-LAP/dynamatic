@@ -41,6 +41,9 @@ def get_required_bitwidth(val: int) -> int:
 def one_hot(i: int, width: int) -> str:
     return f"\"{1 << (width-i-1):0{width}b}\""
 
+def mask_until(max_masked, width):
+    return '\"' + '0'*(width-max) + '1'*max + '\"'
+
 class VHDLLogicType:
     """The functionality of this class is similar to Class Logic
     Instead of storing the string in a global variable,

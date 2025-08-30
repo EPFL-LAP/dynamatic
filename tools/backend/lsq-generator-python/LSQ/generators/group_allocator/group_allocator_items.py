@@ -3,7 +3,7 @@ from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_hot
+from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_hot, mask_until
 
 
 from LSQ.operators.arithmetic import WrapSub
@@ -255,11 +255,24 @@ class StoreOrderPerEntryBodyItems():
       when {group_one_hot} =>
 """.removeprefix("\n")
                     for j, store_order in enumerate(config.group_store_order(i)):
-                        cases += f"""
+                        if store_order > 0:
+                            cases += f"""
         -- Ld {j} of group {i}'s store order
-        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {store_order};
+        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
 
 """.removeprefix("\n")
+                        else:
+                            cases += f"""
+        -- Ld {j} of group {i} has no preceding stores, use default value
+
+""".removeprefix("\n")
+                else:
+                    cases += f"""
+      -- Group {i} has no loads
+
+""".removeprefix("\n")
+                    
+            cases = cases.strip()
 
             unshifted_assignments = f"""
   {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
