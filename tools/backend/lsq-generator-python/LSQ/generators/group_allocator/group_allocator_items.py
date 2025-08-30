@@ -8,35 +8,8 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 
 from LSQ.operators.arithmetic import WrapSub
 
-class PortIdxPerEntryPortItems():
-    class GroupInitTransfer(Signal):
-        """
-        Input
-        
-        Bitwidth = 1
-
-        Number = N
-
-        Whether a particular group init channel transfers this cycle.
-         
-        1-bit signal, 1 signal per group of memory accesses
-        """
-
-        def __init__(self, 
-                     config : Config,
-                     ):
-            Signal.__init__(
-                self,
-                base_name=GROUP_INIT_TRANSFER_NAME,
-                direction=Signal.Direction.INPUT,
-                size=Signal.Size(
-                    bitwidth=1,
-                    number=config.num_groups()
-                )
-            )
-
 class PortIdxPerEntryLocalItems():
-    class PortIndexPerQueueEntry(Signal2D):
+    class PortIdxPerQueueEntry(Signal2D):
         """
         Bitwidth = N
         Number = M
@@ -86,12 +59,15 @@ class PortIdxPerEntryBodyItems():
 
         def __init__(self, config : Config, queue_type : QueueType):
             
+            pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+
             match queue_type:
                 case QueueType.LOAD:
                     idx_bitwidth = config.load_ports_idx_bitwidth()
                     def ports(group_idx) : return config.group_load_ports(group_idx)
                     def has_items(group_idx): return config.group_num_loads(group_idx) > 0
                     num_entries = config.load_queue_num_entries()
+                    
                 case QueueType.STORE:
                     idx_bitwidth = config.store_ports_idx_bitwidth()
                     def ports(group_idx) : return config.group_store_ports(group_idx)
@@ -164,11 +140,10 @@ class PortIdxPerEntryBodyItems():
             
             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
-            pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
             shifted_assignments += f"""
       {port_idx}(i) <=
         {unsh_port_idx(queue_type)}(
-          (i + integer(unsigned({pointer_name}_i))) mod {num_entries}
+          (i + {pointer_name}_int)) mod {num_entries}
         );
 """.removeprefix("\n")
 
@@ -187,7 +162,8 @@ class PortIdxPerEntryBodyItems():
                 if i < 10:
                     output_name += " "
 
-                self.output_assignments += f"""
+
+                output_assignments += f"""
   {output_name} <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
 """.removeprefix("\n")
             
@@ -195,12 +171,178 @@ class PortIdxPerEntryBodyItems():
 
             self.item = f"""
   process(all)
+    variable offset : natural;
   begin
+    -- convert q tail pointer to integer
+    {pointer_name}_int = integer(unsigned({pointer_name}_i)
+
     {default_assignments}
 
     {unshifted_assignments}
 
     {shifted_assignments}
+  end process;
+
+  {output_assignments}
+""".removeprefix("\n").strip()
+
+        def get(self):
+            return self.item
+        
+
+
+class StoreOrderPerEntryLocalItems():
+    class StoreOrderPerEntry(Signal2D):
+        """
+        Bitwidth = N
+        Number = M
+
+        Local 2D input vector storing the 
+        (unshifted/shifted) store order per queue entry
+         
+        Bitwidth is equal to the number of store queue entriews
+        Number is equal to the number of load queue entries
+        """
+        def __init__(self, 
+                     config : Config,
+                     shifted = False
+                     ):
+            
+            bitwidth = config.store_queue_num_entries()
+            number = config.load_queue_num_entries()
+
+            if shifted:
+                base_name = STORE_ORDER_PER_ENTRY_NAME
+            else:
+                base_name = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME()
+
+            Signal2D.__init__(
+                self,
+                base_name=base_name,
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=number
+                )
+            )
+
+class StoreOrderPerEntryBodyItems():
+    class Body():
+
+        def __init__(self, config : Config, queue_type : QueueType):
+            
+            load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
+            store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
+
+
+
+
+#             default_assignments = ""
+
+#             default_assignments += f"""
+#     -- If a group has less than {num_entries} {queue_type.value}s
+#     -- set the other port indices to 0
+#     {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
+# """
+
+#             default_assignments = default_assignments.strip()
+
+#             case_input = ""
+#             num_cases = 0
+#             for i in range(config.num_groups()):
+#                 if has_items(i):      
+#                     num_cases = num_cases + 1  
+#                     case_input += f"""
+#       {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+# """ .removeprefix("\n")
+#             case_input = case_input.strip()[:-1]
+
+#             cases = ""
+
+#             case_number = 0
+#             for i in range(config.num_groups()):
+#                 if has_items(i):      
+#                     group_one_hot = one_hot(case_number, num_cases)
+#                     case_number = case_number + 1
+#                     cases += f"""
+#       when {group_one_hot} =>
+# """.removeprefix("\n")
+#                     for j, idx in enumerate(ports(i)):
+#                         cases += f"""
+#         -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
+#         {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j}) <= {get_as_binary_string_padded(idx, idx_bitwidth)};
+
+# """.removeprefix("\n")
+#                 else:
+#                     cases += f"""
+#       -- Group {i} has no {queue_type.value}s
+
+# """.removeprefix("\n")
+
+#             cases = cases.strip()
+
+#             unshifted_assignments = f"""
+#     -- This LSQ was generated without multi-group allocation
+#     -- and so assumes the dataflow circuit will only ever 
+#     -- have 1 group valid signal in a given cycle
+
+#     -- Using case statement to help infer one-hot mux
+#     case
+#       {case_input}
+#     is
+#       {cases}
+
+#     end case;
+# """.removeprefix("\n").strip()
+
+
+#             shifted_assignments = f"""
+#     -- {queue_type.value} port indices must be mod left shifted based on queue tail
+#     for i in {num_entries} - 1 downto 0 loop
+# """.removeprefix("\n")
+            
+#             port_idx = PORT_INDEX_PER_ENTRY_NAME(queue_type)
+#             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME
+#             shifted_assignments += f"""
+#       {port_idx}(i) <=
+#         {unsh_port_idx(queue_type)}(
+#           (i + offset)) mod {num_entries}
+#         );
+# """.removeprefix("\n")
+
+#             shifted_assignments += f"""
+#     end loop;
+# """.removeprefix("\n")
+            
+#             shifted_assignments = shifted_assignments.lstrip()
+
+            output_assignments = ""
+
+            for i in range(config.load_queue_num_entries()):
+                output_name = f"{STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+
+                # pad single digit output names
+                if i < 10:
+                    output_name += " "
+
+
+                output_assignments += f"""
+  {output_name} <= {STORE_ORDER_PER_ENTRY_NAME}({i});
+""".removeprefix("\n")
+            
+            output_assignments = output_assignments.strip()
+
+            self.item = f"""
+  process(all)
+    -- tail pointers as integers for indexing
+    variable {load_pointer_name}_int, {store_pointer_name}  : natural;
+    -- where to shift a value to
+    variable row_idx, col_idx : natural;
+  begin
+    -- convert q tail pointers to integer
+    {load_pointer_name}_int = integer(unsigned({load_pointer_name}_i)
+    {store_pointer_name}_int = integer(unsigned({store_pointer_name}_i)
+
   end process;
 
   {output_assignments}
@@ -538,7 +680,7 @@ class GroupAllocatorPortItems():
                 )
             )
 
-    class PortIndexPerQueueEntryComment(EntityComment):
+    class PortIdxPerQueueEntryComment(EntityComment):
         """
         RTL comment:
             
@@ -589,7 +731,7 @@ class GroupAllocatorPortItems():
             )
 
 
-    class PortIndexPerQueueEntry(Signal):
+    class PortIdxPerQueueEntry(Signal):
         """
         Output 
         
@@ -635,11 +777,11 @@ class GroupAllocatorPortItems():
                 )
             )
 
-    class StorePositionPerLoadComment(EntityComment):
+    class StoreOrderPerEntryComment(EntityComment):
         """
         RTL comment:
             
-        -- Store position per load
+        -- Store order per load queue entry
 
         -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
 
@@ -659,7 +801,7 @@ class GroupAllocatorPortItems():
 
             comment = f"""
 
-    -- Store position per load
+    -- Store order per load queue entry
     -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
     -- One per entry in the load queue, with 1 bit per entry in the store queue.
     -- The order of the memory operations, read from the ROM, 
@@ -674,7 +816,7 @@ class GroupAllocatorPortItems():
 
 
 
-    class StorePositionPerLoad(Signal):
+    class StoreOrderPerEntry(Signal):
         """
         Output
         
@@ -701,7 +843,7 @@ class GroupAllocatorPortItems():
 
             Signal.__init__(
                 self,
-                base_name=STORE_POSITION_PER_LOAD_NAME,
+                base_name=STORE_ORDER_PER_ENTRY_NAME,
                 direction=Signal.Direction.OUTPUT,
                 size=Signal.Size(
                     bitwidth=config.store_queue_num_entries(), 
@@ -715,8 +857,10 @@ class GroupAllocatorBodyItems():
         def __init__(self, config : Config):
 
             p = GroupAllocatorPortItems()
-            hs_p = GroupHandshakingPortItems()
+            l = GroupAllocatorLocalItems()
             c = InstCxnType
+
+            d = Signal.Direction
 
             si = SimpleInstantiation
             port_items = [
@@ -735,7 +879,7 @@ class GroupAllocatorBodyItems():
                 si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD), c.INPUT),
                 si(p.QueueIsEmpty(QueueType.STORE), c.INPUT),
 
-                si(hs_p.GroupInitTransfer(config), c.LOCAL)
+                si(l.GroupInitTransfer(config, d.OUTPUT), c.LOCAL)
             ]
 
             Instantiation.__init__(
@@ -748,13 +892,14 @@ class GroupAllocatorBodyItems():
     class PortIdxPerEntryInst(Instantiation):
         def __init__(self, config : Config, queue_type : QueueType):
 
-            p = PortIdxPerEntryPortItems()
+            ga_l = GroupAllocatorLocalItems()
             ga_p = GroupAllocatorPortItems()
             c = InstCxnType
+            d = Signal.Direction
 
             si = SimpleInstantiation
             port_items = [
-                si(p.GroupInitTransfer(config), c.LOCAL),
+                si(ga_l.GroupInitTransfer(config, d.INPUT), c.LOCAL),
 
                 si(ga_p.QueuePointer(
                     config, 
@@ -763,7 +908,7 @@ class GroupAllocatorBodyItems():
                     c.INPUT
                 ),
 
-                si(ga_p.PortIndexPerQueueEntry(
+                si(ga_p.PortIdxPerQueueEntry(
                     config, 
                     queue_type),
                     c.OUTPUT
@@ -778,10 +923,10 @@ class GroupAllocatorBodyItems():
             )
 
             
-class GroupHandshakingPortItems():
+class GroupAllocatorLocalItems():
     class GroupInitTransfer(Signal):
         """
-        Output
+        Local signal
         
         Bitwidth = 1
 
@@ -794,12 +939,13 @@ class GroupHandshakingPortItems():
 
         def __init__(self, 
                      config : Config,
+                     direction : Signal.Direction = None
                      ):
 
             Signal.__init__(
                 self,
                 base_name=GROUP_INIT_TRANSFER_NAME,
-                direction=Signal.Direction.OUTPUT,
+                direction=direction,
                 size=Signal.Size(
                     bitwidth=1,
                     number=config.num_groups()

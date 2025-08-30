@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPrio
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture
+from LSQ.entity import Entity, Architecture, Signal
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -13,32 +13,58 @@ from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorPortItems, 
         GroupAllocatorBodyItems,
-        GroupHandshakingPortItems,
+        GroupAllocatorLocalItems,
         GroupHandshakingLocalItems,
         GroupHandshakingDeclarativeBodyItems,
-        PortIdxPerEntryPortItems,
         PortIdxPerEntryBodyItems,
-        PortIdxPerEntryLocalItems
+        PortIdxPerEntryLocalItems,
+        StoreOrderPerEntryLocalItems,
+        StoreOrderPerEntryBodyItems
     )
 
+class StoreOrderPerEntryDeclarative():
+    def __init__(self, config: Config):
+        ga_p = GroupAllocatorPortItems()
+        ga_l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
+    
+        self.entity_port_items = [
+            ga_l.GroupInitTransfer(config, d.INPUT),
+            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+            ga_p.StoreOrderPerEntry(config, QueueType.LOAD)
+        ]
+
+        l = StoreOrderPerEntryLocalItems()
+
+        self.local_items = [
+            l.StoreOrderPerEntry(config, shifted=False),
+            l.StoreOrderPerEntry(config, shifted=True)
+        ]
+
+        b = StoreOrderPerEntryBodyItems()
+        self.body = [
+            b.Body(config)
+        ]
 
 class PortIdxPerEntryDeclarative():
     def __init__(self, config : Config, queue_type : QueueType):
-        p = PortIdxPerEntryPortItems()
-
         ga_p = GroupAllocatorPortItems()
+        ga_l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
     
         self.entity_port_items = [
-            p.GroupInitTransfer(config),
+            ga_l.GroupInitTransfer(config, d.INPUT),
             ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
-            ga_p.PortIndexPerQueueEntry(config, queue_type)
+            ga_p.PortIdxPerQueueEntry(config, queue_type)
         ]
 
         l = PortIdxPerEntryLocalItems()
 
         self.local_items = [
-            l.PortIndexPerQueueEntry(config, queue_type, shifted=False),
-            l.PortIndexPerQueueEntry(config, queue_type, shifted=True)
+            l.PortIdxPerQueueEntry(config, queue_type, shifted=False),
+            l.PortIdxPerQueueEntry(config, queue_type, shifted=True)
         ]
 
         b = PortIdxPerEntryBodyItems()
@@ -50,7 +76,9 @@ class GroupHandshakingDeclarative():
     def __init__(self, config : Config):
         ga_p = GroupAllocatorPortItems()
 
-        p = GroupHandshakingPortItems()
+        ga_l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
         self.entity_port_items = [
             ga_p.GroupInitValid(config),
             ga_p.GroupInitReady(config),
@@ -63,7 +91,7 @@ class GroupHandshakingDeclarative():
             ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
             ga_p.QueueIsEmpty(QueueType.STORE),
 
-            p.GroupInitTransfer(config)
+            ga_l.GroupInitTransfer(config, d.OUTPUT)
         ]
 
         l = GroupHandshakingLocalItems()
@@ -106,8 +134,8 @@ class GroupAllocatorDeclarative():
             p.NumNewQueueEntriesComment(QueueType.LOAD),
             p.NumNewQueueEntries(config, QueueType.LOAD),
 
-            p.PortIndexPerQueueEntryComment(config, QueueType.LOAD),
-            p.PortIndexPerQueueEntry(config, QueueType.LOAD),
+            p.PortIdxPerQueueEntryComment(config, QueueType.LOAD),
+            p.PortIdxPerQueueEntry(config, QueueType.LOAD),
 
             p.QueueWriteEnableComment(config, QueueType.STORE),
             p.QueueWriteEnable(config, QueueType.STORE),
@@ -115,17 +143,17 @@ class GroupAllocatorDeclarative():
             p.NumNewQueueEntriesComment(QueueType.STORE),
             p.NumNewQueueEntries(config, QueueType.STORE),
 
-            p.PortIndexPerQueueEntryComment(config, QueueType.STORE),
-            p.PortIndexPerQueueEntry(config, QueueType.STORE),
+            p.PortIdxPerQueueEntryComment(config, QueueType.STORE),
+            p.PortIdxPerQueueEntry(config, QueueType.STORE),
     
-            p.StorePositionPerLoadComment(config),
-            p.StorePositionPerLoad(config)
+            p.StoreOrderPerEntryComment(config),
+            p.StoreOrderPerEntry(config)
         ]
 
-        hs_p = GroupHandshakingPortItems()
+        l = GroupAllocatorLocalItems()
 
         self.local_items = [
-            hs_p.GroupInitTransfer(config)
+            l.GroupInitTransfer(config)
         ]
 
         b = GroupAllocatorBodyItems
@@ -234,12 +262,19 @@ class GroupAllocator:
 
         # port_idx_mux_arch = Architecture(port_idx_mux_dec)
 
+        declaration = StoreOrderPerEntryDeclarative(config)
+
+        entity = Entity(declaration)
+        arch = Architecture(declaration)
+
+        print(entity)
+        print(arch)
 
 
         # hs_entity = Entity(handshaking_declaration)
-        entity = Entity(declaration)
+        # entity = Entity(declaration)
 
-        arch = Architecture(declaration)
+        # arch = Architecture(declaration)
         
 
         # hs_arch = Architecture(handshaking_declaration)
@@ -248,21 +283,21 @@ class GroupAllocator:
         # print(hs_arch.get("handshaking", "Group Handshaking"))
 
 
-        print(entity.get(self.module_name, "Group Allocator"))
+        # print(entity.get(self.module_name, "Group Allocator"))
 
-        print(arch.get(self.module_name, "Group Allocator"))
+        # print(arch.get(self.module_name, "Group Allocator"))
 
 
         quit()
 
 
-        # ROM value
-        if (self.configs.ldpAddrW > 0):
-            ldq_port_idx_rom = LogicVecArray(
-                ctx, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
-        if (self.configs.stpAddrW > 0):
-            stq_port_idx_rom = LogicVecArray(
-                ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
+        # # ROM value
+        # if (self.configs.ldpAddrW > 0):
+        #     ldq_port_idx_rom = LogicVecArray(
+        #         ctx, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
+        # if (self.configs.stpAddrW > 0):
+        #     stq_port_idx_rom = LogicVecArray(
+        #         ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
         ga_ls_order_rom = LogicVecArray(
             ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         ga_ls_order_temp = LogicVecArray(
