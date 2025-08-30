@@ -319,10 +319,10 @@ class StoreOrderPerEntryBodyItems():
             shifted = STORE_ORDER_PER_ENTRY_NAME
             unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
             shifted_assignments = f"""
-    for i in 0 to {config.load_queue_num_entries} loop
-      for j in 0 to {config.store_queue_num_entries} loop
-        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries}
-        col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries}
+    for i in 0 to {config.load_queue_num_entries()} loop
+      for j in 0 to {config.store_queue_num_entries()} loop
+        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()}
+        col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()}
         {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j)
       end loop;
     end loop;
