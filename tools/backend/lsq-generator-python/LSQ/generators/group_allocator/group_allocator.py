@@ -30,7 +30,7 @@ class NumAccessesRomMux():
         self.local_items = []
 
         b = NumAccessesRomMuxBodyItems()
-        self.body_items = [
+        self.body = [
             b.Body(config, queue_type)
         ]
 
