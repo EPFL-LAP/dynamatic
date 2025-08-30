@@ -88,7 +88,6 @@ static std::enable_if_t<std::rank_v<T> != 0> dumpArg(const T &argArray,
   arrayPrinter((getValueType<T> *)argArray, totalSize, os);
 }
 
-/// And on and on... Go further with higher-dimensional arrays if you want!
 #endif // defined(PRINT_PROFILING_INFO) || defined (HLS_VERIFICATION)
 
 //===----------------------------------------------------------------------===//
