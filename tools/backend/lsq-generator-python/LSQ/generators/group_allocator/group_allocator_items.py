@@ -336,7 +336,7 @@ class StoreOrderPerEntryBodyItems():
                     cases += f"""
       when {group_one_hot} =>
 """.removeprefix("\n")
-                    for j, store_order in enumerate(config.group_store_order):
+                    for j, store_order in enumerate(config.group_store_order()):
                         cases += f"""
         -- Ld {j} of group {i}'s store order
         {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {store_order};
