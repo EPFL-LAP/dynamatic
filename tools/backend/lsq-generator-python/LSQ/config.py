@@ -40,7 +40,7 @@ class Config:
 
     gaNumLoads:    list = [2, 1]    # Number of loads in each BB
     gaNumStores:   list = [2, 1]    # Number of stores in each BB
-    gaLdOrder:     list = [[2, 2],  # The order matrix for each group
+    _group_store_order:     list = [[2, 2],  # The order matrix for each group
                            [0]]     # Outer list (Row): Index for each BB
     # Inner list (Column): List of store counts ahead of each load
     # In this example -> BB0=[st0,st1,ld0,ld1], BB1=[ld2,st2]
@@ -97,7 +97,7 @@ class Config:
             #gaNumStores
             self._group_num_stores = obj["numStores"]
 
-            self.gaLdOrder = obj["ldOrder"]
+            self._group_store_order = obj["ldOrder"]
             self._group_load_port_idxs = obj["ldPortIdx"]
             self._group_store_port_idxs = obj["stPortIdx"]
 
@@ -131,7 +131,7 @@ class Config:
             # list size checking
             assert (len(self._group_num_loads) == self.num_groups())
             assert (len(self._group_num_stores) == self.num_groups())
-            assert (len(self.gaLdOrder) == self.num_groups())
+            assert (len(self._group_store_order) == self.num_groups())
             assert (len(self._group_load_port_idxs) == self.num_groups())
             assert (len(self._group_store_port_idxs) == self.num_groups())
 
@@ -244,3 +244,9 @@ class Config:
         List of store port indices (1 per store) in a group
         """
         return self._group_store_port_idxs[group_idx]
+    
+    def group_store_order(self, group_idx) -> List[int]:
+        """
+        List of store orders (1 per load) in a group
+        """
+        return self._group_store_order[group_idx]

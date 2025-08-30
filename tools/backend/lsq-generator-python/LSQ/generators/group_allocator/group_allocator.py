@@ -32,6 +32,7 @@ class StoreOrderPerEntryDeclarative():
         self.entity_port_items = [
             ga_l.GroupInitTransfer(config, d.INPUT),
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
+            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL)
             ga_p.StoreOrderPerEntry(config)
         ]
 
@@ -308,7 +309,7 @@ class GroupAllocator:
         if (self.configs.stpAddrW > 0):
             arch += Mux1HROM(ctx, stq_port_idx_rom,
                              self.configs._group_store_port_idxs, group_init_hs)
-        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
+        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs._group_store_order,
                          group_init_hs, MaskLess)
         arch += Mux1HROM(ctx, num_loads,
                          self.configs.gaNumLoads, group_init_hs)

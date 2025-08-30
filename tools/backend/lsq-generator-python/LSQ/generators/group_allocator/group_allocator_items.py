@@ -316,6 +316,41 @@ class StoreOrderPerEntryBodyItems():
             
 #             shifted_assignments = shifted_assignments.lstrip()
 
+            case_input = ""
+            num_cases = 0
+            for i in range(config.num_groups()):
+                if config.group_num_loads(i) > 0:
+                    case_input += f"""
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+""".removeprefix("\n")
+                    num_cases = num_cases + 1
+            case_input = case_input.strip()[:-1]
+
+            cases = ""
+
+            case_number = 0
+            for i in range(config.num_groups()):
+                if config.group_num_loads(i) > 0:      
+                    group_one_hot = one_hot(case_number, num_cases)
+                    case_number = case_number + 1
+                    cases += f"""
+      when {group_one_hot} =>
+""".removeprefix("\n")
+                    for j, store_order in enumerate(config.group_store_order):
+                        cases += f"""
+        -- Ld {j} of group {i}'s store order
+        {UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {store_order};
+
+""".removeprefix("\n")
+
+            unshifted_assignments = f"""
+  case 
+    {case_input}
+  is
+    {cases}
+  end case;
+""".strip()
+
             shifted = STORE_ORDER_PER_ENTRY_NAME
             unshifted = UNSHIFTED_STORE_ORDER_PER_ENTRY_NAME
             shifted_assignments = f"""
@@ -347,6 +382,9 @@ class StoreOrderPerEntryBodyItems():
             output_assignments = output_assignments.strip()
 
             self.item = f"""
+
+  {unshifted_assignments}
+
   process(all)
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}  : natural;
