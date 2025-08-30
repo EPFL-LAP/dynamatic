@@ -111,8 +111,9 @@ class NumAccessesRomMuxBodyItems():
             ############################
 
             self.item = f"""
-    -- If a group has less than {self.num_entries} {queue_type.value}s
-    -- set the other port indices to 0
+    -- If no group is transferring,
+    -- or the group has no {queue_type.val}s,
+    -- then set to zero
     {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)} <= (others => '0');
 
     -- This LSQ was generated without multi-group allocation
