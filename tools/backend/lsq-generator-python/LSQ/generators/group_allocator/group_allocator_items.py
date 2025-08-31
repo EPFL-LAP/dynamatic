@@ -69,7 +69,7 @@ class WriteEnableBodyItems():
     {new_entries}_int := to_integer(unsigned({new_entries}_i));
 
     for i in 0 to {self.num_entries} - 1 loop
-      {unshf_wen}(i) <= "1" when i < {new_entries}_int else "0";
+      {unshf_wen}(i) <= '1' when i < {new_entries}_int else '0';
     end loop;
   end process;
 """.strip()
@@ -131,7 +131,7 @@ class WriteEnableBodyItems():
         def get(self):
             return self.item
 
-class NumAccessesRomMuxBodyItems():
+class NumNewQueueEntriesBody():
     class Body():
         def _set_params(self, config : Config, queue_type : QueueType):
             match queue_type:
@@ -1210,6 +1210,104 @@ class GroupAllocatorBodyItems():
                 port_items=port_items
             )
 
+    class NaiveStoreOrderPerEntry(Instantiation):
+        def __init__(self, config : Config):
+
+            ga_l = GroupAllocatorLocalItems()
+            ga_p = GroupAllocatorPortItems()
+            c = InstCxnType
+            d = Signal.Direction
+
+            si = SimpleInstantiation
+            port_items = [
+                si(ga_l.GroupInitTransfer(config, d.INPUT), c.LOCAL),
+
+                si(ga_p.QueuePointer(
+                    config, 
+                    QueueType.LOAD, 
+                    QueuePointerType.TAIL),
+                    c.INPUT
+                ),
+
+                si(ga_p.QueuePointer(
+                    config, 
+                    QueueType.STORE, 
+                    QueuePointerType.TAIL),
+                    c.INPUT
+                ),
+
+                si(ga_p.NaiveStoreOrderPerEntry(
+                    config),
+                    c.OUTPUT
+                )
+            ]
+
+            Instantiation.__init__(
+                self,
+                name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
+                entity_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
+                port_items=port_items
+            )
+
+    class NumNewQueueEntriesInst(Instantiation):
+        def __init__(self, config : Config, queue_type : QueueType):
+
+            ga_l = GroupAllocatorLocalItems()
+            c = InstCxnType
+            d = Signal.Direction
+
+            si = SimpleInstantiation
+            port_items = [
+                si(ga_l.GroupInitTransfer(config, d.INPUT), c.LOCAL),
+
+                si(ga_l.NumNewQueueEntries(
+                    config, 
+                    queue_type),
+                    c.LOCAL
+                )
+            ]
+
+            Instantiation.__init__(
+                self,
+                name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+                entity_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+                port_items=port_items
+            )
+
+    class WriteEnablesInst(Instantiation):
+        def __init__(self, config : Config, queue_type : QueueType):
+
+            ga_l = GroupAllocatorLocalItems()
+            ga_p = GroupAllocatorPortItems()
+
+            c = InstCxnType
+            d = Signal.Direction
+
+            # self.entity_port_items = [
+            #     ga_l.NumNewQueueEntries(config, queue_type, d.INPUT),
+            #     ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
+            #     ga_p.QueueWriteEnable(config, queue_type)
+            # ]
+
+
+            si = SimpleInstantiation
+            port_items = [
+                si(ga_l.NumNewQueueEntries(config, d.INPUT), c.LOCAL),
+
+                si(ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL), c.INPUT),
+                si(ga_p.QueueWriteEnable(
+                    config, 
+                    queue_type),
+                    c.OUTPUT
+                )
+            ]
+
+            Instantiation.__init__(
+                self,
+                name=WRITE_ENABLE_NAME(queue_type),
+                entity_name=WRITE_ENABLE_NAME(queue_type),
+                port_items=port_items
+            )
             
 class GroupAllocatorLocalItems():
     class NumNewQueueEntries(Signal):
@@ -1282,7 +1380,7 @@ class GroupAllocatorLocalItems():
 
 
 class GroupHandshakingLocalItems():
-    class NumEmptyEntries(Signal):
+    class NaiveNumEmptyEntries(Signal):
         """
         Bitwidth = N
 
@@ -1438,3 +1536,6 @@ class GroupHandshakingDeclarativeBodyItems():
  -- drive the transfer output
  {init_transfer_name} <= {init_valid_name} and {init_ready_name};
 """.removeprefix("\n")
+                
+        def get(self):
+            return self.item()

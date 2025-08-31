@@ -20,12 +20,12 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
         NaiveStoreOrderPerEntryBodyItems,
-        NumAccessesRomMuxBodyItems,
+        NumNewQueueEntriesBody,
         WriteEnableLocalItems,
         WriteEnableBodyItems
     )
 
-class WriteEnable():
+class WriteEnableDecl():
     def __init__(self, config : Config, queue_type : QueueType):
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
@@ -51,7 +51,7 @@ class WriteEnable():
             b.Body(config, queue_type)
         ]
 
-class NumAccessesRomMux():
+class NumNewQueueEntries():
     def __init__(self, config : Config, queue_type : QueueType):
         ga_l = GroupAllocatorLocalItems()
 
@@ -63,12 +63,12 @@ class NumAccessesRomMux():
 
         self.local_items = []
 
-        b = NumAccessesRomMuxBodyItems()
+        b = NumNewQueueEntriesBody()
         self.body = [
             b.Body(config, queue_type)
         ]
 
-class StoreOrderPerEntryDeclarative():
+class NaiveStoreOrderPerEntryDeclarative():
     def __init__(self, config: Config):
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
@@ -119,7 +119,7 @@ class PortIdxPerEntryDeclarative():
             b.Body(config, queue_type)
         ]
 
-class GroupHandshakingDeclarative():
+class GroupHandshaking():
     def __init__(self, config : Config):
         ga_p = GroupAllocatorPortItems()
 
@@ -143,15 +143,17 @@ class GroupHandshakingDeclarative():
 
         l = GroupHandshakingLocalItems()
         self.local_items = [
-            l.NumEmptyEntries(config, QueueType.LOAD),
-            l.NumEmptyEntries(config, QueueType.STORE),
+            l.NaiveNumEmptyEntries(config, QueueType.LOAD),
+            l.NaiveNumEmptyEntries(config, QueueType.STORE),
 
             ga_p.GroupInitReady(config)
         ]
 
-        # b = GroupHandshakingDeclarativeBodyItems()
+        b = GroupHandshakingDeclarativeBodyItems()
 
-        # self.body_items = []
+        self.body_items = [
+            b.Body(config)
+        ]
 
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
@@ -212,11 +214,26 @@ class GroupAllocatorDeclarative():
 
         self.body = [
             b.HandshakingInst(config),
+
             b.PortIdxPerEntryInst(config, QueueType.LOAD),
             b.PortIdxPerEntryInst(config, QueueType.STORE),
+
+            b.NumNewQueueEntriesInst(config, QueueType.LOAD),
+            b.NumNewQueueEntriesInst(config, QueueType.STORE),
+
+            b.NaiveStoreOrderPerEntry(config),
+
+            b.WriteEnablesInst(config, QueueType.LOAD),
+            b.WriteEnablesInst(config, QueueType.STORE)
+
         ]
     
+def print_dec(dec, name):
+    entity = Entity(dec)
+    arch = Entity(arch)
 
+    print(entity.get(name, name))
+    print(arch.get(name, name))
 
 class GroupAllocator:
     def __init__(
@@ -305,59 +322,8 @@ class GroupAllocator:
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
 
-        declaration = GroupAllocatorDeclarative(config)
-        handshaking_declaration = GroupHandshakingDeclarative(config)
-
-        # port_idx_mux_dec = PortIdxPerEntryDeclarative(config, QueueType.LOAD)
-
-        # entity = Entity(port_idx_mux_dec)
-
-        # arch = Architecture(port_idx_mux_dec)
-
-        # print(entity.get("port_idx", "port index"))
-        # print(arch.get("port_idx", "port index"))
-
-        # num_access_rom_mux = NumAccessesRomMux(config, QueueType.LOAD)
-
-        # arch = Architecture(num_access_rom_mux)
-
-        # # print(entity.get("port_idx", "port index"))
-        # print(arch.get("num_access_rom_mux", "num_access_rom_mux"))
-
-        write_enable_load = WriteEnable(config, QueueType.LOAD)
-
-        entity = Entity(write_enable_load)
-        arch = Architecture(write_enable_load)
-
-        print(entity.get("wen", "wen"))
-        print(arch.get("wen", "wen"))
-
-        quit()
-
-        # declaration = StoreOrderPerEntryDeclarative(config)
-
-        # entity = Entity(declaration)
-        # arch = Architecture(declaration)
-
-        # print(entity.get("store_order", "store order"))
-        # print(arch.get("store_order", "store order"))
-
-
-        # hs_entity = Entity(handshaking_declaration)
-        # entity = Entity(declaration)
-
-        # arch = Architecture(declaration)
-        
-
-        # hs_arch = Architecture(handshaking_declaration)
-
-        # print(hs_entity.get("handshaking", "Group Handshaking"))
-        # print(hs_arch.get("handshaking", "Group Handshaking"))
-
-
-        # print(entity.get(self.module_name, "Group Allocator"))
-
-        # print(arch.get(self.module_name, "Group Allocator"))
+        print_dec(WriteEnableDecl(config, QueueType.LOAD), "wen_load")
+        print_dec(WriteEnableDecl(config, QueueType.STORE), "wen_store")
 
 
         quit()
