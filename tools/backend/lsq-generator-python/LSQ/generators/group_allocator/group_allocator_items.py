@@ -147,7 +147,7 @@ class NumNewQueueEntriesBody():
                     def new_entries(idx): return config.group_num_stores(idx)
                     self.new_entries = new_entries
 
-                    self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
+                    self.new_entries_bitwidth = config.store_queue_idx_bitwidth()
 
                     def has_items(group_idx): return config.group_num_stores(group_idx) > 0
                     self.has_items = has_items
@@ -1333,7 +1333,7 @@ class GroupAllocatorLocalItems():
                      ):
             match queue_type:
                 case QueueType.LOAD:
-                    bitwidth = config.load_ports_idx_bitwidth()
+                    bitwidth = config.load_queue_idx_bitwidth()
                 case QueueType.STORE:
                     bitwidth = config.store_queue_idx_bitwidth()
 
