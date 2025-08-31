@@ -67,21 +67,28 @@ class Config:
             
             self.name = obj["name"]
             # self.dataW
+            
             self.payload_bitwidth = obj["dataWidth"]
+            self.dataW = self.payload_bitwidth
+
             self.addrW = obj["addrWidth"]
             self.idW = obj["indexWidth"]
 
             #self.numLdqEntries
             self._ldq_num_entries = obj["fifoDepth_L"]
+            self.numLdqEntries = self._ldq_num_entries
 
             # numStqEntries
             self._stq_num_entries = obj["fifoDepth_S"]
+            self.numStqEntries = self._stq_num_entries
 
             # numLdPorts
             self._num_ld_ports = obj["numLoadPorts"]
+            self.numLdPorts = self._num_ld_ports
             
             # numStPorts
             self._num_st_ports = obj["numStorePorts"]
+            self.numStPorts = self._num_st_ports
 
             self._num_groups = obj["numBBs"]
 
@@ -94,8 +101,11 @@ class Config:
 
             #gaNumLoads
             self._group_num_loads = obj["numLoads"]
+            self.gaNumLoads = self._group_num_loads
+
             #gaNumStores
             self._group_num_stores = obj["numStores"]
+            self.gaNumStores = self._group_num_stores
 
             self._group_store_order = obj["ldOrder"]
             self._group_load_port_idxs = obj["ldPortIdx"]
@@ -103,23 +113,29 @@ class Config:
 
             #self.ldqAddrW
             self._ldq_idx_w = math.ceil(math.log2(self._ldq_num_entries))
+            self.ldqAddrW = self.ldq_idx_w
             
-            #self.sdqAddrW
+            #self.stqAddrW
             self._stq_idx_w = math.ceil(math.log2(self._stq_num_entries))
+            self.stqAddrW = self._stq_idx_w
             
             # emptyLdAddrW
             self._ldq_size_w = math.ceil(math.log2(self._ldq_num_entries+1))
+            self.emptyLdAddrW = self._ldq_size_w
 
             # emptyStAddrW
             self._stq_size_w = math.ceil(math.log2(self._stq_num_entries+1))
+            self.emptyStAddrW = self._stq_size_w
 
             # Check the number of ports, if num*Ports == 0, set it to 1
 
             # self.ldpAddrW
             self._ldp_idx_w = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
+            self.ldpAddrW = self._ldp_idx_w
             
             # self.stpAddrW
             self._stp_idx_w = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
+            self.stpAddrW = self._stp_idx_w
 
             self.pipe0 = bool(obj["pipe0En"])
             self.pipe1 = bool(obj["pipe1En"])
