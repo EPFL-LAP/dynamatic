@@ -14,7 +14,7 @@ def codeGen(path_rtl, configs):
 
     # Group Allocator
     ga = group_allocator.GroupAllocator(
-        name=name, suffix='_ga', configs=configs)
+        name=name, configs=configs)
     ga.generate(path_rtl, configs)
     lsq_submodules.group_allocator = ga
 

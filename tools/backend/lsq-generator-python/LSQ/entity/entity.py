@@ -26,9 +26,12 @@ class Entity():
 
     for item in declaration.entity_port_items:
         self.entity_port_items += item.get_entity_item()
+      
+    self.name = declaration.name
+    self.prefix = declaration.prefix
 
 
-  def get(self, name, entity_type):
+  def get(self):
     # remove leading whitespace
     # the required leading whitespace is present in the string
     # and remove final character, which is a semi-colon
@@ -36,8 +39,7 @@ class Entity():
     self.entity_port_items = self.entity_port_items[:-1]
 
     entity = f"""
--- {entity_type}
-entity {name} is
+entity {self.prefix}_{self.name} is
   port(
     {self.entity_port_items}
   );
@@ -62,6 +64,10 @@ end entity;
 
 class Architecture():
     def __init__(self, declaration):
+      self.name = declaration.name
+
+      self.prefix = declaration.prefix
+
       self.local_items = ""
 
       self.body = ""
@@ -77,10 +83,9 @@ class Architecture():
       # the required leading whitespace is present in the string
       self.local_items = self.local_items.lstrip()
 
-    def get(self, name, entity_type):
+    def get(self):
       architecture = f"""
--- {entity_type}
-architecture arch of {name} is
+architecture arch of {self.prefix}_{self.name} is
   {self.local_items}
 begin
 

@@ -9,6 +9,8 @@ from LSQ.entity import Entity, Architecture, Signal
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
 
+from LSQ.rtl_signal_names import *
+
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorPortItems, 
@@ -26,7 +28,10 @@ from LSQ.generators.group_allocator.group_allocator_items import \
     )
 
 class WriteEnableDecl():
-    def __init__(self, config : Config, queue_type : QueueType):
+    def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.name = WRITE_ENABLE_NAME(queue_type)
+        self.prefix = prefix
+
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
 
@@ -52,7 +57,10 @@ class WriteEnableDecl():
         ]
 
 class NumNewQueueEntriesDecl():
-    def __init__(self, config : Config, queue_type : QueueType):
+    def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.name = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
+        self.prefix = prefix
+
         ga_l = GroupAllocatorLocalItems()
 
         d = Signal.Direction
@@ -69,7 +77,11 @@ class NumNewQueueEntriesDecl():
         ]
 
 class NaiveStoreOrderPerEntryDecl():
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, prefix):
+        self.name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+
+        self.prefix = prefix
+
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
 
@@ -95,7 +107,10 @@ class NaiveStoreOrderPerEntryDecl():
         ]
 
 class PortIdxPerEntryDecl():
-    def __init__(self, config : Config, queue_type : QueueType):
+    def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
+        self.prefix = prefix
+
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
 
@@ -120,7 +135,10 @@ class PortIdxPerEntryDecl():
         ]
 
 class GroupHandshakingDecl():
-    def __init__(self, config : Config):
+    def __init__(self, config : Config, prefix):
+        self.name = GROUP_HANDSHAKING_NAME
+        self.prefix = prefix
+
         ga_p = GroupAllocatorPortItems()
 
         ga_l = GroupAllocatorLocalItems()
@@ -156,9 +174,12 @@ class GroupHandshakingDecl():
         ]
 
 class GroupAllocatorDecl():
-    def __init__(self, config : Config):
+    def __init__(self, config : Config, prefix):
         p = GroupAllocatorPortItems()
         l = GroupAllocatorLocalItems()
+
+        self.name = GROUP_ALLOCATOR_NAME
+        self.prefix = prefix
 
         d = Signal.Direction
 
@@ -231,19 +252,18 @@ class GroupAllocatorDecl():
             b.WriteEnableInst(config, QueueType.STORE)
 
         ]
-    
-def print_dec(dec, name):
-    entity = Entity(dec)
-    arch = Architecture(dec)
-
-    print(entity.get(name, name))
-    print(arch.get(name, name))
 
 class GroupAllocator:
+    def print_dec(self, dec):
+        entity = Entity(dec)
+        arch = Architecture(dec)
+
+        print(entity.get())
+        print(arch.get())
+
     def __init__(
         self,
         name: str,
-        suffix: str,
         configs: Config
     ):
         """
@@ -278,7 +298,7 @@ class GroupAllocator:
 
         self.name = name
         self.configs = configs
-        self.module_name = name + suffix
+        self.prefix = name
 
     def generate(self, path_rtl, config : Config) -> None:
         """
@@ -326,20 +346,22 @@ class GroupAllocator:
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
 
-        print_dec(WriteEnableDecl(config, QueueType.LOAD), "wen_load")
-        print_dec(WriteEnableDecl(config, QueueType.STORE), "wen_store")
+        subunit_prefix = self.name + "_ga"
 
-        print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD), "num_new_entries_load")
-        print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE), "num_new_entries_store")
+        self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
+        self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
 
-        print_dec(NaiveStoreOrderPerEntryDecl(config), "naive_store_order_per_entry")
+        self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
+        self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
 
-        print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD), "port_idx_per_entry_load")
-        print_dec(PortIdxPerEntryDecl(config, QueueType.STORE), "port_idx_per_entry_store")
+        self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        print_dec(GroupHandshakingDecl(config), "group_handshaking")
+        self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
+        self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
-        print_dec(GroupAllocatorDecl(config), "group_allocator")
+        self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
+
+        self.print_dec(GroupAllocatorDecl(config, self.name))
 
         quit()
 

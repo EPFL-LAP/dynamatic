@@ -1,5 +1,10 @@
 from LSQ.utils import QueueType, QueuePointerType
 
+GROUP_ALLOCATOR_NAME = "group_allocator"
+"""
+RTL name for the group allocator
+"""
+
 GROUP_INIT_CHANNEL_NAME = "group_init"
 """
 RTL name for the channel from the dataflow circuit representing a request to allocate a group of memory accesses.
@@ -80,7 +85,7 @@ def NUM_EMPTY_ENTRIES_NAIVE_NAME(
 
     return f"{queue_type.value}_q_num_empty_entries_naive"
 
-GROUP_HANDSHAKING_ENTITY_NAME = "group_handshaking"
+GROUP_HANDSHAKING_NAME = "group_handshaking"
 
 def UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(
         queue_type : QueueType, 

@@ -1144,7 +1144,7 @@ class GroupAllocatorPortItems():
 
 class GroupAllocatorBodyItems():
     class HandshakingInst(Instantiation):
-        def __init__(self, config : Config):
+        def __init__(self, config : Config, prefix):
 
             p = GroupAllocatorPortItems()
             l = GroupAllocatorLocalItems()
@@ -1172,15 +1172,16 @@ class GroupAllocatorBodyItems():
                 si(l.GroupInitTransfer(config, d.OUTPUT), c.LOCAL)
             ]
 
+
             Instantiation.__init__(
                 self,
-                name=GROUP_HANDSHAKING_ENTITY_NAME,
-                entity_name=GROUP_HANDSHAKING_ENTITY_NAME,
+                name=GROUP_HANDSHAKING_NAME,
+                prefix = prefix,
                 port_items=port_items
             )
 
     class PortIdxPerEntryInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType):
+        def __init__(self, config : Config, queue_type : QueueType, prefix):
 
             ga_l = GroupAllocatorLocalItems()
             ga_p = GroupAllocatorPortItems()
@@ -1208,12 +1209,12 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
-                entity_name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+                prefix = prefix,
                 port_items=port_items
             )
 
     class NaiveStoreOrderPerEntry(Instantiation):
-        def __init__(self, config : Config):
+        def __init__(self, config : Config, prefix):
 
             ga_l = GroupAllocatorLocalItems()
             ga_p = GroupAllocatorPortItems()
@@ -1247,12 +1248,12 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
-                entity_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
+                prefix = prefix,
                 port_items=port_items
             )
 
     class NumNewQueueEntriesInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType):
+        def __init__(self, config : Config, queue_type : QueueType, prefix):
 
             ga_l = GroupAllocatorLocalItems()
             c = InstCxnType
@@ -1272,26 +1273,19 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
-                entity_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+                name=f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_unit",
+                prefix = prefix,
                 port_items=port_items
             )
 
     class WriteEnableInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType):
+        def __init__(self, config : Config, queue_type : QueueType, prefix):
 
             ga_l = GroupAllocatorLocalItems()
             ga_p = GroupAllocatorPortItems()
 
             c = InstCxnType
             d = Signal.Direction
-
-            # self.entity_port_items = [
-            #     ga_l.NumNewQueueEntries(config, queue_type, d.INPUT),
-            #     ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
-            #     ga_p.QueueWriteEnable(config, queue_type)
-            # ]
-
 
             si = SimpleInstantiation
             port_items = [
@@ -1308,7 +1302,7 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=WRITE_ENABLE_NAME(queue_type),
-                entity_name=WRITE_ENABLE_NAME(queue_type),
+                prefix=prefix,
                 port_items=port_items
             )
             
