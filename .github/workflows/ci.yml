@@ -91,6 +91,7 @@ jobs:
 
       - name: performance-report
         run: |
+          STATUS=0
           if [ -f $HOME/perf_ci_saved.json ]; then
             echo "Found saved performance report"
             ls -lh $HOME/perf_ci_saved.json
@@ -103,6 +104,7 @@ jobs:
               --save perf_ci_branch.json | tee performance.md >> $GITHUB_STEP_SUMMARY
             STATUS=$?
           fi
+          echo "Perf report generator exited with" $STATUS
           exit $STATUS
       
       - name: save-perf-report
