@@ -114,12 +114,11 @@ def NUM_NEW_QUEUE_ENTRIES_NAME(
 #     """
 #     return f"{queue_type.value}_port_idx_per_entry"
 
-def NUM_NEW_QUEUE_ENTRIES_NAME(
+def PORT_INDEX_PER_ENTRY_NAME(
         queue_type : QueueType, 
         ):
     """
-    RTL name for the "number of new (load/store) queue entries" signal. 
-    Output by the group allocator, and used by the load queue to update its tail pointer.
+    RTL name for index to a (load/store) port, per (load/store) queue entry.
     """
 
     match queue_type:
