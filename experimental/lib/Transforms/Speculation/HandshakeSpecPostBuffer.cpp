@@ -115,24 +115,20 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   // the branch in the SaveCommit control path.
 
   // Check if trueResult of controlBranch leads to a backedge (loop)
-  auto specBranch =
-      cast<SpeculatingBranchOp>(getDefiningOpSkippingBuffersAndFork(
-          branchDiscardCondNonMisspec.getDataOperand()));
   bool branchFound = false;
-  for (Operation *user :
-       iterateOverPossiblyIndirectUsers(specBranch.getDataOperand())) {
-    if (auto branch = dyn_cast<ConditionalBranchOp>(user)) {
-      if (isBranchBackedge(branch.getTrueResult())) {
-        mergeOperands.push_back(branchReplicated.getTrueResult());
-        branchFound = true;
-        break;
-      }
-      // Check if falseResult of controlBranch leads to a backedge (loop)
-      if (isBranchBackedge(branch.getFalseResult())) {
-        mergeOperands.push_back(branchReplicated.getFalseResult());
-        branchFound = true;
-        break;
-      }
+  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+    if (getLogicBB(branch) != getLogicBB(speculator))
+      continue;
+    if (isBranchBackedge(branch.getTrueResult())) {
+      mergeOperands.push_back(branchReplicated.getTrueResult());
+      branchFound = true;
+      break;
+    }
+    // Check if falseResult of controlBranch leads to a backedge (loop)
+    if (isBranchBackedge(branch.getFalseResult())) {
+      mergeOperands.push_back(branchReplicated.getFalseResult());
+      branchFound = true;
+      break;
     }
   }
   if (!branchFound) {
