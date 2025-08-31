@@ -132,13 +132,13 @@ class Signal():
             inst_comment = "inst output driving"
         
         if cxn_type == InstCxnType.INPUT:
-            cxn_comment = " top-level input"
+            cxn_comment = "top-level input"
         elif cxn_type == InstCxnType.OUTPUT:
             cxn_comment = "top-level output"
         else:
             cxn_comment = "local signal"
 
-        signal_dec = self._get_item(get_single).lstrip()
+        signal_dec = self._get_item(get_single).strip()
 
         return f"""
       -- {inst_comment} {cxn_comment}
