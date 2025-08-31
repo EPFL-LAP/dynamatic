@@ -11,6 +11,16 @@ RTL name for the channel from the dataflow circuit representing a request to all
 """
 
 
+# def QUEUE_POINTER_NAME(
+#         queue_type : QueueType, 
+#         queue_pointer_type : QueuePointerType
+#         ):
+#     """
+#     RTL name for the pointer to the (head/tail) entry of the (load/store) queue.
+#     """
+
+#     return f"{queue_type.value}_q_{queue_pointer_type.value}"
+
 def QUEUE_POINTER_NAME(
         queue_type : QueueType, 
         queue_pointer_type : QueuePointerType
@@ -18,9 +28,22 @@ def QUEUE_POINTER_NAME(
     """
     RTL name for the pointer to the (head/tail) entry of the (load/store) queue.
     """
+    match queue_type:
+        case QueueType.LOAD:
+            return f"ldq_{queue_pointer_type.value}"
+        case QueueType.STORE:
+            return f"stq_{queue_pointer_type.value}"
 
-    return f"{queue_type.value}_q_{queue_pointer_type.value}"
 
+
+# def IS_EMPTY_NAME(
+#         queue_type : QueueType, 
+#         ):
+#     """
+#     RTL name for the isEmpty? signal from the (load/store) queue.
+#     """
+
+#     return f"{queue_type.value}_empty"
 
 def IS_EMPTY_NAME(
         queue_type : QueueType, 
@@ -28,10 +51,22 @@ def IS_EMPTY_NAME(
     """
     RTL name for the isEmpty? signal from the (load/store) queue.
     """
+    match queue_type:
+        case QueueType.LOAD:
+            return f"load_empty"
+        case QueueType.STORE:
+            return f"store_empty"
 
-    return f"{queue_type.value}_empty"
 
 
+# def WRITE_ENABLE_NAME(
+#         queue_type : QueueType, 
+#         ):
+#     """
+#     RTL name for the write enables signals of the (load/store) queue.
+#     """
+
+#     return f"{queue_type.value}_write_en"
 
 def WRITE_ENABLE_NAME(
         queue_type : QueueType, 
@@ -39,8 +74,23 @@ def WRITE_ENABLE_NAME(
     """
     RTL name for the write enables signals of the (load/store) queue.
     """
+    match queue_type:
+        case QueueType.LOAD:
+            return f"ldq_wen"
+        case QueueType.STORE:
+            return f"stq_wen"
 
-    return f"{queue_type.value}_write_en"
+
+
+# def NUM_NEW_QUEUE_ENTRIES_NAME(
+#         queue_type : QueueType, 
+#         ):
+#     """
+#     RTL name for the "number of new (load/store) queue entries" signal. 
+#     Output by the group allocator, and used by the load queue to update its tail pointer.
+#     """
+
+#     return f"num_new_{queue_type.value}_q_entries"
 
 def NUM_NEW_QUEUE_ENTRIES_NAME(
         queue_type : QueueType, 
@@ -50,23 +100,50 @@ def NUM_NEW_QUEUE_ENTRIES_NAME(
     Output by the group allocator, and used by the load queue to update its tail pointer.
     """
 
-    return f"num_new_{queue_type.value}_q_entries"
+    match queue_type:
+        case QueueType.LOAD:
+            return f"num_loads"
+        case QueueType.STORE:
+            return f"num_stores"
 
-def PORT_INDEX_PER_ENTRY_NAME(
+# def PORT_INDEX_PER_ENTRY_NAME(
+#         queue_type : QueueType, 
+#         ):
+#     """
+#     RTL name for index to a (load/store) port, per (load/store) queue entry.
+#     """
+#     return f"{queue_type.value}_port_idx_per_entry"
+
+def NUM_NEW_QUEUE_ENTRIES_NAME(
         queue_type : QueueType, 
         ):
     """
-    RTL name for index to a (load/store) port, per (load/store) queue entry.
+    RTL name for the "number of new (load/store) queue entries" signal. 
+    Output by the group allocator, and used by the load queue to update its tail pointer.
     """
-    return f"{queue_type.value}_port_idx_per_entry"
+
+    match queue_type:
+        case QueueType.LOAD:
+            return f"ldq_port_idx"
+        case QueueType.STORE:
+            return f"stq_port_idx"
 
 
-NAIVE_STORE_ORDER_PER_ENTRY_NAME = "naive_store_order"
+
+# NAIVE_STORE_ORDER_PER_ENTRY_NAME = "naive_store_order"
+# """
+# RTL name for signals which identify whether each of the stores precedes a load.
+# There is one of these signals per load queue entry, and 1 bit per store queue entry.
+# It is naive as it only considers loads and stores currently being allocated, not previous stores.
+# """
+
+NAIVE_STORE_ORDER_PER_ENTRY_NAME = "ga_ls_order"
 """
 RTL name for signals which identify whether each of the stores precedes a load.
 There is one of these signals per load queue entry, and 1 bit per store queue entry.
 It is naive as it only considers loads and stores currently being allocated, not previous stores.
 """
+
 
 GROUP_INIT_TRANSFER_NAME = f"{GROUP_INIT_CHANNEL_NAME}_transfer"
 """
