@@ -450,7 +450,7 @@ class PortIdxPerEntryBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {port_idx}(i) <=
         {unsh_port_idx}(
-          (i + {self.pointer_name}_int)) mod {self.num_entries}
+          (i + {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
 """.strip()
