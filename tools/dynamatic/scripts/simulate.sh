@@ -70,7 +70,7 @@ cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
 
 # Compile kernel's main function to generate inputs and golden outputs for the
 # simulation
-"$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D HLS_VERIFICATION \
+clang++ "$SRC_DIR/$KERNEL_NAME.c" -D HLS_VERIFICATION \
   -DHLS_VERIFICATION_PATH="$SIM_DIR" -I "$DYNAMATIC_DIR/include" \
   -Wno-deprecated -o "$IO_GEN_BIN"
 exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen." 
