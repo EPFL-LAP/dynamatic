@@ -223,8 +223,8 @@ class GroupAllocatorDecl():
 
             b.NaiveStoreOrderPerEntry(config),
 
-            b.WriteEnablesInst(config, QueueType.LOAD),
-            b.WriteEnablesInst(config, QueueType.STORE)
+            b.WriteEnableInst(config, QueueType.LOAD),
+            b.WriteEnableInst(config, QueueType.STORE)
 
         ]
     

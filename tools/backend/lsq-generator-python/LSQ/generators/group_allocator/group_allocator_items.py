@@ -1276,7 +1276,7 @@ class GroupAllocatorBodyItems():
                 port_items=port_items
             )
 
-    class WriteEnablesInst(Instantiation):
+    class WriteEnableInst(Instantiation):
         def __init__(self, config : Config, queue_type : QueueType):
 
             ga_l = GroupAllocatorLocalItems()
@@ -1294,7 +1294,7 @@ class GroupAllocatorBodyItems():
 
             si = SimpleInstantiation
             port_items = [
-                si(ga_l.NumNewQueueEntries(config, d.INPUT), c.LOCAL),
+                si(ga_l.NumNewQueueEntries(config, queue_type, d.INPUT), c.LOCAL),
 
                 si(ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL), c.INPUT),
                 si(ga_p.QueueWriteEnable(
