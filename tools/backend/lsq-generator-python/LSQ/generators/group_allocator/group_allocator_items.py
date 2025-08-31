@@ -1463,8 +1463,6 @@ class GroupHandshakingBodyItems():
 
             for i in range(config.num_groups()):
                 init_ready = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
-                init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}_i"
-                init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 num_loads = config.group_num_loads(i)
                 num_stores = config.group_num_stores(i)
@@ -1497,12 +1495,24 @@ class GroupHandshakingBodyItems():
     end if;
   end process;
 
+""".removeprefix("\n")
+                
+            for i in range(config.num_groups()):
+                init_ready = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
+                init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}_i"
+                init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
+
+                self.item += f"""
  -- drive the ready output
   {init_ready}_o <= {init_ready};
 
  -- drive the transfer output
  {init_transfer_name} <= {init_valid_name} and {init_ready};
+
 """.removeprefix("\n")
+                
+                
+
                 
         def get(self):
             return self.item
