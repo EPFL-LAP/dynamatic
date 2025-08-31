@@ -178,7 +178,7 @@ class NumNewQueueEntriesBody():
                 if self.has_items(i):      
                     num_cases = num_cases + 1  
                     case_input += f"""
-      {GROUP_INIT_TRANSFER_NAME}_{i}_i,
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """ .removeprefix("\n")
                     
             case_input = case_input.strip()[:-1]
@@ -368,7 +368,7 @@ class PortIdxPerEntryBodyItems():
                 if self.has_items(i):      
                     num_cases = num_cases + 1  
                     case_input += f"""
-      {GROUP_INIT_TRANSFER_NAME}_{i}_i,
+      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """ .removeprefix("\n")
                     
             case_input = case_input.strip()[:-1]
@@ -577,7 +577,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                 for i in range(config.num_groups()):
                     if config.group_num_loads(i) > 0:
                         case_input += f"""
-    {GROUP_INIT_TRANSFER_NAME}_{i}_i,
+    {GROUP_INIT_TRANSFER_NAME}_{i}_i &
 """.removeprefix("\n")
                         num_cases = num_cases + 1
 
