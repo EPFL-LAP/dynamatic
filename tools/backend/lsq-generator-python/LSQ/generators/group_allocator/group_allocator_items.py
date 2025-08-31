@@ -1055,7 +1055,7 @@ class GroupAllocatorPortItems():
                     bitwidth = config.load_ports_idx_bitwidth()
                     number = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth()
+                    bitwidth = config.store_ports_idx_bitwidth()
                     number = config.store_queue_num_entries()
 
             Signal.__init__(
