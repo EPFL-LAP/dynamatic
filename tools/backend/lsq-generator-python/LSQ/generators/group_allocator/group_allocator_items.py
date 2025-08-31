@@ -1086,7 +1086,8 @@ class GroupAllocatorPortItems():
                 size=Signal.Size(
                     bitwidth=bitwidth,
                     number=number
-                )
+                ),
+                always_vector=True
             )
 
     class NaiveStoreOrderPerEntryComment(EntityComment):

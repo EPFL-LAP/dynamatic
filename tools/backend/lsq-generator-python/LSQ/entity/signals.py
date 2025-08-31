@@ -16,7 +16,7 @@ class Signal():
         OUTPUT = 2
 
     def signal_size_to_type_declaration(self):
-        if self.size.bitwidth == 1:
+        if self.size.bitwidth == 1 and not self.always_vector:
             return "std_logic"
         else:
             return f"std_logic_vector({self.size.bitwidth} - 1 downto 0)"
@@ -30,12 +30,14 @@ class Signal():
             base_name: str, 
             size : Size, 
             direction : Direction = None,
-            always_number : bool = False
+            always_number : bool = False,
+            always_vector : bool = False
         ):
         self.base_name = base_name
         self.size = size
         self.direction = direction
         self.always_number = always_number
+        self.always_vector = always_vector
 
     def _get_io_suffix(self, name):
         if name == "rst" or name == "clk":
