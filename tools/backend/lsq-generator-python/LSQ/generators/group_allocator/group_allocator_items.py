@@ -810,7 +810,7 @@ class GroupAllocatorPortItems():
         def __init__(self, queue_type : QueueType):
             comment = f"""
 
-    -- Input signals from the {queue_type} queue
+    -- Input signals from the {queue_type.value} queue
 
 """.removeprefix("\n")
             
@@ -1078,7 +1078,7 @@ class GroupAllocatorPortItems():
 
         -- The order of the memory operations, read from the ROM, 
 
-        -- has been shifted to generate this,
+        -- has been shifted to generate this.
 
         -- It is naive, however, as 1s for already allocated stores are not present.
         """
@@ -1094,7 +1094,7 @@ class GroupAllocatorPortItems():
     -- {config.load_queue_num_entries()} signals, each {config.store_queue_num_entries()} bit(s).
     -- One per entry in the load queue, with 1 bit per entry in the store queue.
     -- The order of the memory operations, read from the ROM, 
-    -- has been shifted to generate this,
+    -- has been shifted to generate this.
     -- It is naive, however, as 1s for already allocated stores are not present.
 
 """.removeprefix("\n")
@@ -1120,7 +1120,7 @@ class GroupAllocatorPortItems():
         and 1 bit per entry in the store queue.
         
         The order of the memory operations, read from the ROM,
-        has been shifted to generate this, 
+        has been shifted to generate this.
         
         This is done based on the store queue and load queue pointers.
 

@@ -104,4 +104,5 @@ class Instantiation():
     port map(
       {self.port_items}
     );
-"""
+
+""".lstrip()
