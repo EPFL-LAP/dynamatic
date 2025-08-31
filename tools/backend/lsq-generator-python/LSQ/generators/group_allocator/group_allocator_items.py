@@ -177,10 +177,12 @@ class NumNewQueueEntriesBody():
             # if it has he relevant memory op
             for i in range(config.num_groups()):
                 if self.has_items(i):      
-                    num_cases = num_cases + 1  
+                    
                     case_input += f"""
-    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{num_cases}_i;
 """ .removeprefix("\n")
+                    
+                    num_cases = num_cases + 1  
                     
             case_input = case_input.strip()
                     
@@ -366,10 +368,12 @@ class PortIdxPerEntryBodyItems():
             # if it has he relevant memory op
             for i in range(config.num_groups()):
                 if self.has_items(i):      
-                    self.num_cases = self.num_cases + 1  
+                     
                     case_inputs += f"""
-    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{self.num_cases}_i;
 """ .removeprefix("\n")
+                    
+                    self.num_cases = self.num_cases + 1 
                     
             case_inputs = case_inputs.strip()
 
@@ -579,7 +583,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                 for i in range(config.num_groups()):
                     if config.group_num_loads(i) > 0:
                         case_inputs += f"""
-    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{num_cases}_i;
 """.removeprefix("\n")
                         num_cases = num_cases + 1
 
