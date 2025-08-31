@@ -155,19 +155,6 @@ class NumNewQueueEntriesBody():
         def __init__(self, config : Config, queue_type : QueueType):
             self._set_params(config, queue_type)
 
-            # not all groups have loads/store
-            # if the group does not have any of 
-            # the relevant memory op,
-            # we do not pass its transfer signal to the mux
-            #
-            # num_cases tracks how many groups 
-            # are passed to the mux
-            num_cases = 0
-
-            for i in range(config.num_groups()):
-                if self.has_items(i):      
-                    num_cases = num_cases + 1  
-
             ############################
             # Build mux inner pieces
             ############################
@@ -176,13 +163,26 @@ class NumNewQueueEntriesBody():
             # we pass to the mux's case statement
             case_input = ""
 
+            # not all groups have loads/store
+            # if the group does not have any of 
+            # the relevant memory op,
+            # we do not pass its transfer signal to the mux
+            #
+            # num_cases tracks how many groups 
+            # are passed to the mux
+            
+            num_cases = 0
+
             # add each group to the mux's case statement input
             # if it has he relevant memory op
             for i in range(config.num_groups()):
                 if self.has_items(i):      
+                    num_cases = num_cases + 1  
                     case_input += f"""
     case_input({i}) <= {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """ .removeprefix("\n")
+                    
+            case_input.strip()
                     
 
             # cases are the mux's data inputs
@@ -248,13 +248,15 @@ class NumNewQueueEntriesBody():
     -- then set to zero
     {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o <= (others => '0');
 
+    {case_input}
+
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
     case
-      case_input;
+      case_input
     is
       {cases}
 
