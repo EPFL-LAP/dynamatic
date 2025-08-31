@@ -299,6 +299,8 @@ class GroupAllocator:
         self.configs = configs
         self.prefix = name
 
+        self.module_name = f"{self.prefix}_{GROUP_ALLOCATOR_NAME}"
+
     def generate(self, path_rtl, config : Config) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
