@@ -105,4 +105,4 @@ class Instantiation():
       {self.port_items}
     );
 
-""".lstrip()
+""".removeprefix("\n")
