@@ -1027,11 +1027,11 @@ class GroupAllocatorPortItems():
 
             match queue_type:
                 case QueueType.LOAD:
-                    number = config.load_queue_num_entries(),
+                    number = config.load_queue_num_entries()
                     bitwidth = config.load_ports_idx_bitwidth()
                     actual_num_ports = config.load_ports_num()
                 case QueueType.STORE:
-                    number = config.store_queue_num_entries(),
+                    number = config.store_queue_num_entries()
                     bitwidth = config.store_ports_idx_bitwidth()
                     actual_num_ports = config.store_ports_num()
 

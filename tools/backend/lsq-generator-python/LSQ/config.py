@@ -135,6 +135,7 @@ class Config:
             
             # self.stpAddrW
             self._stp_idx_w = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
+            print("Store port index:", self._stp_idx_w)
             self.stpAddrW = self._stp_idx_w
 
             self.pipe0 = bool(obj["pipe0En"])
