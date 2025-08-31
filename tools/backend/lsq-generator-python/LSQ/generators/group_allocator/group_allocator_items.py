@@ -225,7 +225,7 @@ class NumNewQueueEntriesBody():
 
 """.removeprefix("\n")
                     
-                    cases += f"""
+                cases += f"""
       -- defaults handled at top of process
       when others => null;
 """.removeprefix("\n")
