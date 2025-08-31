@@ -476,6 +476,8 @@ class PortIdxPerEntryBodyItems():
 
         def __init__(self, config : Config, queue_type : QueueType):
 
+            self._set_parameters(config, queue_type)
+
             self._mux_rom(config, queue_type)
             self._shift(queue_type)
             self._outputs(queue_type)
