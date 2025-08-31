@@ -230,7 +230,7 @@ class GroupAllocatorDeclarative():
     
 def print_dec(dec, name):
     entity = Entity(dec)
-    arch = Entity(arch)
+    arch = Entity(dec)
 
     print(entity.get(name, name))
     print(arch.get(name, name))
