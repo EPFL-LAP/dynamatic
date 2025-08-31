@@ -116,6 +116,7 @@ class WriteEnableBodyItems():
 
             self._unshifted_assignments(queue_type)
             self._shifted_assignments(queue_type)
+            self._output_assignments(queue_type)
 
 
             self.item = f"""
