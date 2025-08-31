@@ -667,7 +667,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                 zeros = mask_until(0, config.store_queue_num_entries())
                 for i in range(config.load_queue_num_entries()):
-                    name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_0"
+                    name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
 
                     # pad for <= alignment
                     if i < 10:
