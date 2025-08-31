@@ -90,6 +90,7 @@ route_design
 phys_opt_design
 report_utilization > $F_UTILIZATION_PR
 report_timing > $F_TIMING_PR
+write_checkpoint -force $SYNTH_DIR/impl.dcp
 exit" > "$F_SCRIPT"
 
 echo -e \
