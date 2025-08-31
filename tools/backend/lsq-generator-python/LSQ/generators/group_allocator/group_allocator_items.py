@@ -246,9 +246,9 @@ class NumNewQueueEntriesBody():
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
-    case
+    case std_logic_vector(
       {case_input}
-    is
+    ) is
       {cases}
 
     end case;
@@ -429,9 +429,9 @@ class PortIdxPerEntryBodyItems():
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
-    case
+    case std_logic_vector(
       {case_input}
-    is
+    ) is
       {cases}
 
     end case;
@@ -598,9 +598,9 @@ class NaiveStoreOrderPerEntryBodyItems():
                 unshifted_assignments = f"""
   {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
-    case 
+    case std_logic_vector(
       {case_input}
-    is
+    ) is
       {cases}
     end case;
 """.strip()
