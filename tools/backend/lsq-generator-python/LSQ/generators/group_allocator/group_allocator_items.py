@@ -9,7 +9,7 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 from LSQ.operators.arithmetic import WrapSub
 
 class WriteEnableLocalItems():
-    class WriteEnable(Signal):
+    class WriteEnable(Signal2D):
         """
         Bitwidth = 1
         Number = N
@@ -69,7 +69,7 @@ class WriteEnableBodyItems():
     {new_entries}_int := to_integer(unsigned({new_entries}_i));
 
     for i in 0 to {self.num_entries} - 1 loop
-      {unshf_wen}(i) <= '1' when i < {new_entries}_int else '0';
+      {unshf_wen}(i) <= '1' when i < {new_entries} else '0';
     end loop;
   end process;
 """.strip()
