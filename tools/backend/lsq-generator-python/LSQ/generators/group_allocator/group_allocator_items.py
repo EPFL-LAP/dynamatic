@@ -806,6 +806,7 @@ class GroupAllocatorPortItems():
                     bitwidth=1,
                     number=config.num_groups()
                 )
+                always_number=True
             )
 
 
@@ -834,6 +835,7 @@ class GroupAllocatorPortItems():
                     bitwidth=1,
                     number=config.num_groups()
                 )
+                always_number=True
             )
 
 
