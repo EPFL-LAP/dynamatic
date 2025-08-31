@@ -486,10 +486,10 @@ class PortIdxPerEntryBodyItems():
 
             self.item = f"""
   process(all)
-    variable offset : natural;
+    variable {self.pointer_name}_int : natural;
   begin
     -- convert q tail pointer to integer
-    {self.pointer_name}_int = integer(unsigned({self.pointer_name}_i)
+    {self.pointer_name}_int := to_integer(unsigned({self.pointer_name}_i));
 
     {self.unshifted_assignments}
 
