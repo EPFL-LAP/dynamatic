@@ -1272,7 +1272,7 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_unit",
+                name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
                 prefix=prefix,
                 port_items=port_items
             )

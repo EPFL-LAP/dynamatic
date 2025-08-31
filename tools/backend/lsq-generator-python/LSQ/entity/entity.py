@@ -45,7 +45,7 @@ use ieee.numeric_std.all;
 
 use work.types.all;
 
-entity {self.prefix}_{self.name} is
+entity {self.prefix}_{self.name}_unit is
   port(
     {self.entity_port_items}
   );
@@ -114,7 +114,7 @@ class Instantiation():
     
     def get(self):
        return f"""
-  {self.name} : work.{self.prefix}_{self.name}
+  {self.name} : work.{self.prefix}_{self.name}_unit
     port map(
       {self.port_items}
     );
