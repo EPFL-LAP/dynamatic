@@ -1540,4 +1540,4 @@ class GroupHandshakingBodyItems():
 """.removeprefix("\n")
                 
         def get(self):
-            return self.item()
+            return self.item
