@@ -92,6 +92,7 @@ jobs:
       - name: performance-report
         run: |
           STATUS=0
+          set -o pipefail
           if [ -f $HOME/perf_ci_saved.json ]; then
             echo "Found saved performance report"
             ls -lh $HOME/perf_ci_saved.json
