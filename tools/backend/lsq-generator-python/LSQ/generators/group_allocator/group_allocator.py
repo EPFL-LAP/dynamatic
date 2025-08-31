@@ -209,7 +209,9 @@ class GroupAllocatorDecl():
 
 
         self.local_items = [
-            l.GroupInitTransfer(config)
+            l.GroupInitTransfer(config),
+            l.NumNewQueueEntries(config, QueueType.LOAD),
+            l.NumNewQueueEntries(config, QueueType.STORE)
         ]
 
         b = GroupAllocatorBodyItems
