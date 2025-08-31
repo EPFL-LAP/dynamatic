@@ -5,8 +5,9 @@ import LSQ.generators.core as core
 
 import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
+from LSQ.config import Config
 
-def codeGen(path_rtl, configs):
+def codeGen(path_rtl, configs : Config):
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()
 
@@ -26,7 +27,7 @@ def codeGen(path_rtl, configs):
 
     # Load Data Port Dispatcher
     qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
-        name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.dataW, configs.ldpAddrW)
+        name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.payload_bitwidth, configs.ldpAddrW)
     qtp_dispatcher_ldd.generate(path_rtl)
     lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
 
@@ -38,7 +39,7 @@ def codeGen(path_rtl, configs):
 
     # Store Data Port Dispatcher
     ptq_dispatcher_std = dispatchers.PortToQueueDispatcher(
-        name, '_std', configs.numStPorts, configs.numStqEntries, configs.dataW, configs.stpAddrW)
+        name, '_std', configs.numStPorts, configs.numStqEntries, configs.payload_bitwidth, configs.stpAddrW)
     ptq_dispatcher_std.generate(path_rtl)
     lsq_submodules.ptq_dispatcher_std = ptq_dispatcher_std
 
