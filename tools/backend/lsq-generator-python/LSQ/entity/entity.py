@@ -114,7 +114,7 @@ class Instantiation():
     
     def get(self):
        return f"""
-  {self.name}_unit : work.{self.prefix}_{self.name}_unit
+  {self.name}_unit : entity work.{self.prefix}_{self.name}_unit
     port map(
       {self.port_items}
     );
