@@ -224,6 +224,9 @@ class NumNewQueueEntriesBody():
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
+                
+            if case_number == 1:
+                cases = cases.replace("\"", "'")
                     
             cases += f"""
       -- defaults handled at top of process
@@ -252,9 +255,9 @@ class NumNewQueueEntriesBody():
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
-    case std_logic_vector'((
+    case
       {case_input}
-    )) is
+    is
       {cases}
 
     end case;
@@ -416,7 +419,9 @@ class PortIdxPerEntryBodyItems():
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
-                    
+            if case_number == 1:
+                cases = cases.replace("\"", "'")
+
             cases += f"""
       -- defaults handled at top of process
       when others =>
@@ -441,9 +446,9 @@ class PortIdxPerEntryBodyItems():
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
-    case std_logic_vector'((
+    case
       {case_input}
-    )) is
+    is
       {cases}
 
     end case;
@@ -605,7 +610,9 @@ class NaiveStoreOrderPerEntryBodyItems():
       -- Group {i} has no loads
 
 """.removeprefix("\n")
-                        
+                if case_number == 1:
+                    cases = cases.replace("\"", "'") 
+
                 cases += f"""
       -- defaults handled at top of process
       when others =>
@@ -618,9 +625,9 @@ class NaiveStoreOrderPerEntryBodyItems():
                 unshifted_assignments = f"""
   {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
-    case std_logic_vector'((
+    case
       {case_input}
-    )) is
+    is
       {cases}
     end case;
 """.strip()
