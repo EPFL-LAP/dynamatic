@@ -99,13 +99,13 @@ class WriteEnableBodyItems():
             self.output_assignments = ""
 
             for i in range(self.num_entries):
-                assign_to = f"{WRITE_ENABLE_NAME(queue_type)}_o"
+                assign_to = f"{WRITE_ENABLE_NAME(queue_type)}_{i}_o"
 
                 if i < 10:
                     assign_to += " "
 
                 self.output_assignments += f"""
-   {assign_to} <= {WRITE_ENABLE_NAME(queue_type)};
+   {assign_to} <= {WRITE_ENABLE_NAME(queue_type)}({i});
 """.removeprefix("\n")
                 
             self.output_assignments = self.output_assignments.strip()
@@ -120,11 +120,11 @@ class WriteEnableBodyItems():
 
 
             self.item = f"""
-    {self.unshifted_assignments}
+  {self.unshifted_assignments}
 
-    {self.shifted_assignments}
+  {self.shifted_assignments}
 
-    {self.output_assignments}
+  {self.output_assignments}
     
 """.strip()
             
