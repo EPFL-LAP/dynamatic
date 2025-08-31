@@ -1483,8 +1483,8 @@ class GroupHandshakingBodyItems():
     variable {load_empty_entries}_int : natural;
     variable {store_empty_entries}_int : natural;
   begin
-    {load_empty_entries}_int := to_integer(unsigned({load_empty_entries}))
-    {store_empty_entries}_int := to_integer(unsigned({store_empty_entries}))
+    {load_empty_entries}_int := to_integer(unsigned({load_empty_entries}));
+    {store_empty_entries}_int := to_integer(unsigned({store_empty_entries}));
 
     -- if the load queue does not have space
     if {load_is_empty} = '0' and {load_empty_entries}_int < {num_loads} then
