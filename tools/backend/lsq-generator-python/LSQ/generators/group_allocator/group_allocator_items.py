@@ -179,10 +179,10 @@ class NumNewQueueEntriesBody():
                 if self.has_items(i):      
                     num_cases = num_cases + 1  
                     case_input += f"""
-    case_input({i}) <= {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """ .removeprefix("\n")
                     
-            case_input.strip()
+            case_input = case_input.strip()
                     
 
             # cases are the mux's data inputs
@@ -351,7 +351,7 @@ class PortIdxPerEntryBodyItems():
 
             # case input is the std_logic_vector of concatenated bits
             # we pass to the mux's case statement
-            case_input = ""
+            case_inputs = ""
 
             # not all groups have loads/store
             # if the group does not have any of 
@@ -360,18 +360,18 @@ class PortIdxPerEntryBodyItems():
             #
             # num_cases tracks how many groups 
             # are passed to the mux
-            num_cases = 0
+            self.num_cases = 0
 
             # add each group to the mux's case statement input
             # if it has he relevant memory op
             for i in range(config.num_groups()):
                 if self.has_items(i):      
-                    num_cases = num_cases + 1  
-                    case_input += f"""
-      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+                    self.num_cases = self.num_cases + 1  
+                    case_inputs += f"""
+      case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """ .removeprefix("\n")
                     
-            case_input = case_input.strip()[:-1]
+            case_inputs = case_inputs.strip()[:-1]
 
             # example case input:
             #
@@ -391,7 +391,7 @@ class PortIdxPerEntryBodyItems():
                 if self.has_items(i):      
                     # get the case number one-hot encoded
                     # (not the group number, since not all groups are in the mux)
-                    group_one_hot = one_hot(case_number, num_cases)
+                    group_one_hot = one_hot(case_number, self.num_cases)
                     case_number = case_number + 1
                     
                     # map assignments to a select input
@@ -439,13 +439,15 @@ class PortIdxPerEntryBodyItems():
     -- set the other port indices to 0
     {UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)} <= (others => (others => '0'));
 
+    {case_inputs}
+
     -- This LSQ was generated without multi-group allocation
     -- and so assumes the dataflow circuit will only ever 
     -- have 1 group valid signal in a given cycle
 
     -- Using case statement to help infer one-hot mux
     case
-      {case_input}
+      case_input
     is
       {cases}
 
@@ -502,6 +504,8 @@ class PortIdxPerEntryBodyItems():
             self.item = f"""
   process(all)
     variable {self.pointer_name}_int : natural;
+
+    variable case_input : std_logic_vector({self.num_cases} - 1 downto 0);
   begin
     -- convert q tail pointer to integer
     {self.pointer_name}_int := to_integer(unsigned({self.pointer_name}_i));
@@ -570,16 +574,16 @@ class NaiveStoreOrderPerEntryBodyItems():
                 load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
                 store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
 
-                case_input = ""
+                case_inputs = ""
                 num_cases = 0
                 for i in range(config.num_groups()):
                     if config.group_num_loads(i) > 0:
-                        case_input += f"""
-    {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+                        case_inputs += f"""
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """.removeprefix("\n")
                         num_cases = num_cases + 1
 
-                case_input = case_input.strip()[:-1]
+                case_inputs = case_inputs.strip()
 
                 cases = ""
 
@@ -621,8 +625,10 @@ class NaiveStoreOrderPerEntryBodyItems():
                 unshifted_assignments = f"""
   {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
 
+    {case_inputs}
+
     case
-      {case_input}
+      case_input
     is
       {cases}
     end case;
@@ -667,6 +673,8 @@ class NaiveStoreOrderPerEntryBodyItems():
 
     -- where to shift a value to
     variable row_idx, col_idx : natural;
+
+    variable case_input : std_logic_vector({num_cases} - 1 downto 0);
   begin
     -- convert q tail pointers to integer
     {load_pointer_name}_int = to_integer(unsigned({load_pointer_name}_i));

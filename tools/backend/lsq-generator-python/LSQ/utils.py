@@ -39,7 +39,7 @@ def get_required_bitwidth(val: int) -> int:
     return math.ceil(math.log2(val))
 
 def one_hot(i: int, width: int) -> str:
-    return f"\"{1 << (width-i-1):0{width}b}\""
+    return f"\"{1 << i:0{width}b}\""
 
 def mask_until(max_masked, width):
     return '\"' + '0'*(width-max_masked) + '1'*max_masked + '\"'
