@@ -227,7 +227,8 @@ class NumNewQueueEntriesBody():
                     
                 cases += f"""
       -- defaults handled at top of process
-      when others => null;
+      when others =>
+        null;
 """.removeprefix("\n")
 
             # format correctly
@@ -418,7 +419,8 @@ class PortIdxPerEntryBodyItems():
                     
                 cases += f"""
       -- defaults handled at top of process
-      when others => null;
+      when others =>
+        null;
 """.removeprefix("\n")
 
             # format correctly
@@ -606,7 +608,8 @@ class NaiveStoreOrderPerEntryBodyItems():
                         
                     cases += f"""
       -- defaults handled at top of process
-      when others => null;
+      when others =>
+        null;
 """.removeprefix("\n")
 
 
