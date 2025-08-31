@@ -805,7 +805,7 @@ class GroupAllocatorPortItems():
                 size=Signal.Size(
                     bitwidth=1,
                     number=config.num_groups()
-                )
+                ),
                 always_number=True
             )
 
@@ -834,7 +834,7 @@ class GroupAllocatorPortItems():
                 size=Signal.Size(
                     bitwidth=1,
                     number=config.num_groups()
-                )
+                ),
                 always_number=True
             )
 
