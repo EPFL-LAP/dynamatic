@@ -480,10 +480,10 @@ class GroupAllocator:
         arch += ctx.get_current_indent() + f'rst => rst,\n'
         arch += ctx.get_current_indent() + f'clk => clk,\n'
 
-        for i in range(0, self.configs.num_groups):
+        for i in range(0, self.configs.num_groups()):
             arch += ctx.get_current_indent() + \
                 f'group_init_valid_{i}_i => {group_init_valid_i.getNameRead(i)},\n'
-        for i in range(0, self.configs.num_groups):
+        for i in range(0, self.configs.num_groups()):
             arch += ctx.get_current_indent() + \
                 f'group_init_ready_{i}_o => {group_init_ready_o.getNameWrite(i)},\n'
 
