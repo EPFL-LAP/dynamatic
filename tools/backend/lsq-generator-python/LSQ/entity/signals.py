@@ -126,7 +126,22 @@ class Signal():
 
     def get_inst_item(self, cxn_type : InstCxnType):
         def get_single(name) : return self._get_inst_single(name, cxn_type)
-        return self._get_item(get_single)
+        if self.direction == Signal.Direction.INPUT:
+            inst_comment = "inst input driven by"
+        else:
+            inst_comment = "inst output driving"
+        
+        if cxn_type == InstCxnType.INPUT:
+            cxn_comment = " top-level input"
+        elif cxn_type == InstCxnType.OUTPUT:
+            cxn_comment = "top-level output"
+        else:
+            cxn_comment = "local signal"
+        output = f"""
+      -- {inst_comment} {cxn_comment}
+        """
+
+        return (output + self._get_item(get_single)).strip()
     
 class Signal2D(Signal):
     def _get_item(self, get_single):
