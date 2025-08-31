@@ -174,7 +174,7 @@ class GroupHandshakingDecl():
         ]
 
 class GroupAllocatorDecl():
-    def __init__(self, config : Config, prefix):
+    def __init__(self, config : Config, prefix, subunit_prefix):
         p = GroupAllocatorPortItems()
         l = GroupAllocatorLocalItems()
 
@@ -238,18 +238,18 @@ class GroupAllocatorDecl():
         b = GroupAllocatorBodyItems
 
         self.body = [
-            b.HandshakingInst(config),
+            b.HandshakingInst(config, subunit_prefix),
 
-            b.PortIdxPerEntryInst(config, QueueType.LOAD),
-            b.PortIdxPerEntryInst(config, QueueType.STORE),
+            b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix),
+            b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix),
 
-            b.NumNewQueueEntriesInst(config, QueueType.LOAD),
-            b.NumNewQueueEntriesInst(config, QueueType.STORE),
+            b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix),
+            b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix),
 
-            b.NaiveStoreOrderPerEntry(config),
+            b.NaiveStoreOrderPerEntry(config, subunit_prefix),
 
-            b.WriteEnableInst(config, QueueType.LOAD),
-            b.WriteEnableInst(config, QueueType.STORE)
+            b.WriteEnableInst(config, QueueType.LOAD, subunit_prefix),
+            b.WriteEnableInst(config, QueueType.STORE, subunit_prefix)
 
         ]
 
@@ -346,7 +346,7 @@ class GroupAllocator:
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
         arch = ''
 
-        subunit_prefix = self.name + "_ga"
+        subunit_prefix = self.prefix + "_ga"
 
         self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
         self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
@@ -361,7 +361,7 @@ class GroupAllocator:
 
         self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
 
-        self.print_dec(GroupAllocatorDecl(config, self.name))
+        self.print_dec(GroupAllocatorDecl(config, self.prefix, subunit_prefix))
 
         quit()
 
