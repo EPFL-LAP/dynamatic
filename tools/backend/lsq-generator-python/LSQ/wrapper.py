@@ -1,5 +1,7 @@
 from LSQ.utils import VHDLLogicType, VHDLLogicTypeArray, VHDLLogicVecType, VHDLLogicVecTypeArray, OpTab
 
+from LSQ.config import Config
+
 class Wrapper:
     """This class adapts the LSQ core module to handle the following:
       - The naming difference between the IOs of the core module and in dataflow circuits.
@@ -86,11 +88,18 @@ class Wrapper:
 
     """
 
-    def __init__(self, config):
+    def __init__(self, path_rtl: str, configs: Config):
         # Store the global information
+        self.output_folder = path_rtl
+        self.lsq_name = configs.name
+        self.module_suffix = ""
+        self.lsq_config = configs
 
-        self.lsq_config = config
-
+        # Define information needed for VHDL file generation
+        # This part is inherited from the design of the original lsq_generator
+        self.library_header = (
+            "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n"
+        )
         self.tab_level = 1
         self.temp_count = 0
         self.signal_init_str = ""
@@ -102,23 +111,7 @@ class Wrapper:
         # Define the final output string
         self.lsq_wrapper_str = "\n\n"
 
-    def genWrapper(self, name):
-
-        wrapper_name = f"{name}_wrapper"
-
-        entity = f"""
-library IEEE;
-use IEEE.std_logic_1164.all;
-use IEEE.numeric_std.all;
-
--- LSQ Entity
-entity {name} is
-port (
-    reset : in std_logic;
-    clock : in std_logic;
-
-)
-"""
+    def genWrapper(self):
         """This function generates the desired wrapper for the LSQ"""
 
         # PART 1: Add library information to the VHDL module
