@@ -213,7 +213,7 @@ class NumNewQueueEntriesBody():
                     # map assignments to a select input
                     cases += f"""
       when {group_one_hot} =>
-        -- Group {i} has {new_entries} {queue_type.value}s
+        -- Group {i} has {new_entries} {queue_type.value}(s)
         {assign_to} <= {new_entries_bin};
 
 """.removeprefix("\n")
@@ -473,6 +473,7 @@ class PortIdxPerEntryBodyItems():
   {output_name} <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
 """.removeprefix("\n")
             
+            self.output_assignments = self.output_assignments.strip()
 
         def __init__(self, config : Config, queue_type : QueueType):
 

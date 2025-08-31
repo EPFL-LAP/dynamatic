@@ -258,8 +258,7 @@ class GroupAllocator:
         entity = Entity(dec)
         arch = Architecture(dec)
 
-        print(entity.get())
-        print(arch.get())
+        return entity.get() + arch.get()
 
     def __init__(
         self,
@@ -348,100 +347,26 @@ class GroupAllocator:
 
         subunit_prefix = self.prefix + "_ga"
 
-        self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
-        self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
+        unit = self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
+        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
 
-        self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
-        self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
+        unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
+        unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
 
-        self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
+        unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
-        self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
+        unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
+        unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
-        self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
+        unit += self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
 
-        self.print_dec(GroupAllocatorDecl(config, self.prefix, subunit_prefix))
+        unit += self.print_dec(GroupAllocatorDecl(config, self.prefix, subunit_prefix))
 
-        quit()
-
-
-        # # ROM value
-        # if (self.configs.ldpAddrW > 0):
-        #     ldq_port_idx_rom = LogicVecArray(
-        #         ctx, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
-        # if (self.configs.stpAddrW > 0):
-        #     stq_port_idx_rom = LogicVecArray(
-        #         ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
-        ga_ls_order_rom = LogicVecArray(
-            ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        ga_ls_order_temp = LogicVecArray(
-            ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        if (self.configs.ldpAddrW > 0):
-            arch += Mux1HROM(ctx, ldq_port_idx_rom,
-                             self.configs._group_load_port_idxs, group_init_hs)
-        if (self.configs.stpAddrW > 0):
-            arch += Mux1HROM(ctx, stq_port_idx_rom,
-                             self.configs._group_store_port_idxs, group_init_hs)
-        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs._group_store_order,
-                         group_init_hs, MaskLess)
-        arch += Mux1HROM(ctx, num_loads,
-                         self.configs._group_num_loads, group_init_hs)
-        arch += Mux1HROM(ctx, num_stores,
-                         self.configs._group_num_stores, group_init_hs)
-        arch += Op(ctx, num_loads_o, num_loads)
-        arch += Op(ctx, num_stores_o, num_stores)
-
-        ldq_wen_unshifted = LogicArray(
-            ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
-        stq_wen_unshifted = LogicArray(
-            ctx, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_loads, '>', (i, self.configs.ldqAddrW),
-                       'else', '\'0\''
-                       )
-        for i in range(0, self.configs.numStqEntries):
-            arch += Op(ctx, stq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_stores, '>', (i, self.configs.stqAddrW),
-                       'else', '\'0\''
-                       )
-
-        # Shift the arrays
-        if (self.configs.ldpAddrW > 0):
-            arch += CyclicLeftShift(ctx, ldq_port_idx_o,
-                                    ldq_port_idx_rom, ldq_tail_i)
-        if (self.configs.stpAddrW > 0):
-            arch += CyclicLeftShift(ctx, stq_port_idx_o,
-                                    stq_port_idx_rom, stq_tail_i)
-        arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
-        arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
-        for i in range(0, self.configs.numLdqEntries):
-            arch += CyclicLeftShift(ctx,
-                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
-        arch += CyclicLeftShift(ctx, ga_ls_order_o,
-                                ga_ls_order_temp, ldq_tail_i)
-
-        ######   Write To File  ######
-        ctx.portInitString += '\n\t);'
-        if (self.configs.gaMulti):
-            ctx.regInitString += '\tend process;\n'
-        else:
-            ctx.regInitString = ''
+    
 
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
-            file.write('\n\n')
-            file.write(ctx.library)
-            file.write(f'entity {self.module_name} is\n')
-            file.write(ctx.portInitString)
-            file.write('\nend entity;\n\n')
-            file.write(f'architecture arch of {self.module_name} is\n')
-            file.write(ctx.signalInitString)
-            file.write('begin\n' + arch + '\n')
-            file.write(ctx.regInitString + 'end architecture;\n')
+            file.write(unit)
 
 
     def instantiate(
