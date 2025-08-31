@@ -28,9 +28,9 @@ class WriteEnableLocalItems():
             
             match queue_type:
                 case QueueType.LOAD:
-                    number = config.load_queue_num_entries()
+                    bitwidth = config.load_queue_num_entries()
                 case QueueType.STORE:
-                    number = config.store_queue_num_entries()
+                    bitwidth = config.store_queue_num_entries()
 
             if shifted:
                 base_name = WRITE_ENABLE_NAME(queue_type)
@@ -42,8 +42,8 @@ class WriteEnableLocalItems():
                 base_name=base_name,
                 direction=Signal.Direction.INPUT,
                 size=Signal.Size(
-                    bitwidth=1,
-                    number=number
+                    bitwidth=bitwidth,
+                    number=1
                 )
             )
 
