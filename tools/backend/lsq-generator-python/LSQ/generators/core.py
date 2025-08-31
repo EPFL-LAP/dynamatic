@@ -98,9 +98,9 @@ class LSQ:
 
         # group initialzation signals
         group_init_valid_i = LogicArray(
-            ctx, 'group_init_valid', 'i', self.configs.num_groups)
+            ctx, 'group_init_valid', 'i', self.configs.num_groups())
         group_init_ready_o = LogicArray(
-            ctx, 'group_init_ready', 'o', self.configs.num_groups)
+            ctx, 'group_init_ready', 'o', self.configs.num_groups())
 
         # Memory access ports, i.e., the connection "kernel -> LSQ"
         # Load address channel (addr, valid, ready) from kernel, contains signals:
