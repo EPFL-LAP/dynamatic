@@ -257,6 +257,9 @@ class GroupAllocatorDecl():
 
         ]
 
+        print(self.body, config.store_ports_num(), [b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix)] \
+                  if config.store_ports_num() > 1 else [])
+
 class GroupAllocator:
     def print_dec(self, dec):
         entity = Entity(dec)
