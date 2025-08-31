@@ -53,9 +53,9 @@ def IS_EMPTY_NAME(
     """
     match queue_type:
         case QueueType.LOAD:
-            return f"load_empty"
+            return f"ldq_empty"
         case QueueType.STORE:
-            return f"store_empty"
+            return f"stq_empty"
 
 
 
