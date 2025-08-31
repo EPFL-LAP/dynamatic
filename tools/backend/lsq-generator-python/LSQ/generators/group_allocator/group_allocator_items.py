@@ -155,14 +155,6 @@ class NumNewQueueEntriesBody():
         def __init__(self, config : Config, queue_type : QueueType):
             self._set_params(config, queue_type)
 
-            ############################
-            # Build mux inner pieces
-            ############################
-
-            # case input is the std_logic_vector of concatenated bits
-            # we pass to the mux's case statement
-            case_input = ""
-
             # not all groups have loads/store
             # if the group does not have any of 
             # the relevant memory op,
@@ -172,19 +164,26 @@ class NumNewQueueEntriesBody():
             # are passed to the mux
             num_cases = 0
 
+            for i in range(config.num_groups()):
+                if self.has_items(i):      
+                    num_cases = num_cases + 1  
+
+            ############################
+            # Build mux inner pieces
+            ############################
+
+            # case input is the std_logic_vector of concatenated bits
+            # we pass to the mux's case statement
+            case_input = ""
+
             # add each group to the mux's case statement input
             # if it has he relevant memory op
             for i in range(config.num_groups()):
                 if self.has_items(i):      
-                    num_cases = num_cases + 1  
                     case_input += f"""
-      {GROUP_INIT_TRANSFER_NAME}_{i}_i &
+    case_input({i}) <= {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """ .removeprefix("\n")
                     
-            case_input = case_input.strip()[:-1]
-
-            # example case input:
-            #
 
             # cases are the mux's data inputs
             # each is associated with one of the inputs
@@ -225,8 +224,6 @@ class NumNewQueueEntriesBody():
 
 """.removeprefix("\n")
                 
-            if case_number == 1:
-                cases = cases.replace("\"", "'")
                     
             cases += f"""
       -- defaults handled at top of process
@@ -244,6 +241,7 @@ class NumNewQueueEntriesBody():
 
             self.item = f"""
   process(all)
+    variable case_input : std_logic_vector({num_cases} - 1 downto 0);
   begin
     -- If no group is transferring,
     -- or the group has no {queue_type.value}s,
@@ -256,7 +254,7 @@ class NumNewQueueEntriesBody():
 
     -- Using case statement to help infer one-hot mux
     case
-      {case_input}
+      case_input;
     is
       {cases}
 
@@ -419,8 +417,6 @@ class PortIdxPerEntryBodyItems():
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
-            if case_number == 1:
-                cases = cases.replace("\"", "'")
 
             cases += f"""
       -- defaults handled at top of process
@@ -610,8 +606,6 @@ class NaiveStoreOrderPerEntryBodyItems():
       -- Group {i} has no loads
 
 """.removeprefix("\n")
-                if case_number == 1:
-                    cases = cases.replace("\"", "'") 
 
                 cases += f"""
       -- defaults handled at top of process
