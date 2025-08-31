@@ -68,6 +68,8 @@ class Architecture():
       for body_item in declaration.body:
         self.body += body_item.get()
 
+      self.body = self.body.strip()
+
       for item in declaration.local_items:
           self.local_items += item.get_local_item()
 
