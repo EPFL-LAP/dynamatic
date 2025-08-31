@@ -96,10 +96,11 @@ end architecture;
       return architecture
 
 class Instantiation():
-    def __init__(self, name, entity_name, port_items):
+    def __init__(self, name, prefix, port_items):
       self.port_items = ""
       self.name = name
-      self.entity_name = entity_name
+      self.prefix = prefix
+      
       for port_item in port_items:
          self.port_items += port_item.get_inst_item()
 
@@ -107,7 +108,7 @@ class Instantiation():
     
     def get(self):
        return f"""
-  {self.name} : work.{self.entity_name}
+  {self.name} : work.{self.prefix}_{self.entity_name}
     port map(
       {self.port_items}
     );

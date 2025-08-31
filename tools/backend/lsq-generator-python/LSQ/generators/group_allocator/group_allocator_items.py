@@ -1176,7 +1176,7 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=GROUP_HANDSHAKING_NAME,
-                prefix = prefix,
+                prefix=prefix,
                 port_items=port_items
             )
 
@@ -1209,7 +1209,7 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
-                prefix = prefix,
+                prefix=prefix,
                 port_items=port_items
             )
 
@@ -1248,7 +1248,7 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
-                prefix = prefix,
+                prefix=prefix,
                 port_items=port_items
             )
 
@@ -1274,7 +1274,7 @@ class GroupAllocatorBodyItems():
             Instantiation.__init__(
                 self,
                 name=f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_unit",
-                prefix = prefix,
+                prefix=prefix,
                 port_items=port_items
             )
 
