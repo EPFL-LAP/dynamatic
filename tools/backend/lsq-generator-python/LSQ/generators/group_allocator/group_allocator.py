@@ -299,7 +299,7 @@ class GroupAllocator:
         self.configs = configs
         self.prefix = name
 
-        self.module_name = f"{self.prefix}_{GROUP_ALLOCATOR_NAME}"
+        self.module_name = f"{self.prefix}_{GROUP_ALLOCATOR_NAME}_unit"
 
     def generate(self, path_rtl, config : Config) -> None:
         """
