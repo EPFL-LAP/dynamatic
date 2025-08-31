@@ -224,6 +224,11 @@ class NumNewQueueEntriesBody():
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
+                    
+                    cases += f"""
+      -- defaults handled at top of process
+      when others => null;
+""".removeprefix("\n")
 
             # format correctly
             cases = cases.strip()
@@ -410,6 +415,11 @@ class PortIdxPerEntryBodyItems():
       -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
+                    
+                cases += f"""
+      -- defaults handled at top of process
+      when others => null;
+""".removeprefix("\n")
 
             # format correctly
             cases = cases.strip()
@@ -594,6 +604,12 @@ class NaiveStoreOrderPerEntryBodyItems():
 
 """.removeprefix("\n")
                         
+                    cases += f"""
+      -- defaults handled at top of process
+      when others => null;
+""".removeprefix("\n")
+
+
                 cases = cases.strip()
 
                 unshifted_assignments = f"""
