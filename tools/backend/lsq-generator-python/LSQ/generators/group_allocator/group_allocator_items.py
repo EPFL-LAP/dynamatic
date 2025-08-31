@@ -1522,11 +1522,11 @@ class GroupHandshakingBodyItems():
                 init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 self.item += f"""
- -- drive the ready output
+  -- drive the ready output
   {init_ready}_o <= {init_ready};
 
- -- drive the transfer output
- {init_transfer_name} <= {init_valid_name} and {init_ready};
+  -- drive the transfer output
+  {init_transfer_name} <= {init_valid_name} and {init_ready};
 
 """.removeprefix("\n")
                 
