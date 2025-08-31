@@ -158,13 +158,13 @@ class Wrapper:
 
         # io_ctrl_*_ready: output
         io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+            "io_ctrl_ready", "o", self.lsq_config.num_groups()
         )
         self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
         io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+            "io_ctrl_valid", "i", self.lsq_config.num_groups()
         )
         self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
@@ -491,7 +491,7 @@ class Wrapper:
             + f"memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n"
         )
 
-        for i in range(self.lsq_config.numGroups):
+        for i in range(self.lsq_config.num_groups()):
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
                 + f"group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n"
@@ -641,13 +641,13 @@ class Wrapper:
 
         # io_ctrl_*_ready: output
         io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+            "io_ctrl_ready", "o", self.lsq_config.num_groups()
         )
         self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
         io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+            "io_ctrl_valid", "i", self.lsq_config.num_groups()
         )
         self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
@@ -950,7 +950,7 @@ class Wrapper:
             + f"rreq_valid_0_o => {io_loadEn.getNameWrite()},\n"
         )
 
-        for i in range(self.lsq_config.numGroups):
+        for i in range(self.lsq_config.num_groups()):
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
                 + f"group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n"
