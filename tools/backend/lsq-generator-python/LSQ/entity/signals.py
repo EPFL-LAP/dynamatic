@@ -141,8 +141,8 @@ class Signal():
         signal_dec = self._get_item(get_single).lstrip()
 
         return f"""
-        -- {inst_comment} {cxn_comment}
-        {signal_dec}
+      -- {inst_comment} {cxn_comment}
+      {signal_dec}
 
 """.removeprefix("\n")
     
