@@ -118,7 +118,7 @@ class Wrapper:
         self.lsq_wrapper_str += self.library_header
 
         # PART 2: Define the entity
-        self.lsq_wrapper_str += f"entity {self.lsq_config.lsq_name} is\n"
+        self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
 
         # PART 3: Add the module port definition
         self.lsq_wrapper_str += self.port_init_str
@@ -127,7 +127,7 @@ class Wrapper:
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         # io_storeData: output
-        io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.dataW)
+        io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.payload_bitwidth)
 
         self.lsq_wrapper_str += io_storeData.signalInit()
 
@@ -142,7 +142,7 @@ class Wrapper:
         self.lsq_wrapper_str += io_storeEn.signalInit()
 
         # io_loadData: input
-        io_loadData = VHDLLogicVecType("io_loadData", "i", self.lsq_config.dataW)
+        io_loadData = VHDLLogicVecType("io_loadData", "i", self.lsq_config.payload_bitwidth)
 
         self.lsq_wrapper_str += io_loadData.signalInit()
 
@@ -200,7 +200,7 @@ class Wrapper:
 
         # io_ldData_*_bits: output
         io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
@@ -236,7 +236,7 @@ class Wrapper:
 
         # io_stData_bits: input
         io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_stData_bits.signalInit()
 
@@ -618,7 +618,7 @@ class Wrapper:
 
         # io_stDataToMC_bits: output
         io_storeData = VHDLLogicVecType(
-            "io_stDataToMC_bits", "o", self.lsq_config.dataW
+            "io_stDataToMC_bits", "o", self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_storeData.signalInit()
 
@@ -630,7 +630,7 @@ class Wrapper:
 
         # io_ldDataFromMC_bits: input
         io_loadData = VHDLLogicVecType(
-            "io_ldDataFromMC_bits", "i", self.lsq_config.dataW
+            "io_ldDataFromMC_bits", "i", self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_loadData.signalInit()
 
@@ -683,7 +683,7 @@ class Wrapper:
 
         # io_ldData_*_bits: output
         io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
@@ -719,7 +719,7 @@ class Wrapper:
 
         # io_stData_bits: input
         io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.payload_bitwidth
         )
         self.lsq_wrapper_str += io_stData_bits.signalInit()
 
