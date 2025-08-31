@@ -329,8 +329,8 @@ class GroupAllocator:
         entity = Entity(write_enable_load)
         arch = Architecture(write_enable_load)
 
-        print(entity.get())
-        print(arch.get())
+        print(entity.get("wen", "wen"))
+        print(arch.get("wen", "wen"))
 
         quit()
 
