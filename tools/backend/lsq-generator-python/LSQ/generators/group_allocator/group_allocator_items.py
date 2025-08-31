@@ -1413,7 +1413,7 @@ class GroupHandshakingLocalItems():
             )
 
 
-class GroupHandshakingDeclarativeBodyItems():
+class GroupHandshakingBodyItems():
     class Body(Signal):
 
         def get_empty_entries_assignment(

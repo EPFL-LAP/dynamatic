@@ -15,7 +15,7 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         GroupAllocatorBodyItems,
         GroupAllocatorLocalItems,
         GroupHandshakingLocalItems,
-        GroupHandshakingDeclarativeBodyItems,
+        GroupHandshakingBodyItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
@@ -149,9 +149,9 @@ class GroupHandshakingDecl():
             ga_p.GroupInitReady(config)
         ]
 
-        b = GroupHandshakingDeclarativeBodyItems()
+        b = GroupHandshakingBodyItems()
 
-        self.body_items = [
+        self.body = [
             b.Body(config)
         ]
 
