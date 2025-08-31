@@ -455,7 +455,7 @@ class PortIdxPerEntryBodyItems():
     end loop;
 """.strip()
 
-        def _outputs(self, queue_type : QueueType):
+        def _output_assigments(self, queue_type : QueueType):
             """
             Convert back from the shifted outputs as a data array,
             to individual signals
@@ -471,7 +471,7 @@ class PortIdxPerEntryBodyItems():
 
                 self.output_assignments += f"""
   {output_name} <= {PORT_INDEX_PER_ENTRY_NAME(queue_type)}({i});
-""".strip()
+""".removeprefix("\n")
             
 
         def __init__(self, config : Config, queue_type : QueueType):
@@ -480,7 +480,7 @@ class PortIdxPerEntryBodyItems():
 
             self._mux_rom(config, queue_type)
             self._shift(queue_type)
-            self._outputs(queue_type)
+            self._output_assigments(queue_type)
 
 
             self.item = f"""
