@@ -8,6 +8,128 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 
 from LSQ.operators.arithmetic import WrapSub
 
+class WriteEnableLocalItems():
+    class WriteEnable(Signal2D):
+        """
+        Bitwidth = 1
+        Number = N
+
+        Local 2D input vector storing the 
+        (unshifted/shifted) write enable per queue entry
+         
+        Bitwidth is 1
+        Number is equal to the number of queue entries
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     shifted = False
+                     ):
+            
+            match queue_type:
+                case QueueType.LOAD:
+                    number = config.load_queue_num_entries()
+                case QueueType.STORE:
+                    number = config.store_queue_num_entries()
+
+            if shifted:
+                base_name = WRITE_ENABLE_NAME(queue_type)
+            else:
+                base_name = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
+
+            Signal2D.__init__(
+                self,
+                base_name=base_name,
+                direction=Signal.Direction.INPUT,
+                size=Signal.Size(
+                    bitwidth=1,
+                    number=number
+                )
+            )
+
+class WriteEnableBodyItems():
+    class Body():
+        def _set_params(self, config : Config, queue_type : QueueType):
+            self.pointer_name = QUEUE_POINTER_NAME(queue_type, QueuePointerType.TAIL)
+
+            match queue_type:
+                case QueueType.LOAD:
+                    self.num_entries = config.load_queue_num_entries()
+                case QueueType.STORE:
+                    self.num_entries = config.store_queue_num_entries()
+
+        def _unshifted_assignments(self, queue_type : QueueType):
+            unshf_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
+            new_entries = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
+
+            self.unshifted_assignments = f"""
+  process(all)
+    variable {new_entries}_int : natural;
+  begin
+    {new_entries}_int := to_integer(unsigned({new_entries}_i));
+
+    for i in 0 to {self.num_entries} loop
+      {unshf_wen}(i) <= '1' when i < {new_entries} else '0'
+    end loop;
+  end process;
+""".strip()
+
+        def _shifted_assignments(self, queue_type : QueueType):
+            wen = WRITE_ENABLE_NAME(queue_type)
+            unsh_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
+
+            self.shifted_assignments = f"""
+  process
+    variable {self.pointer_name}_int : natural;
+  begin
+    {self.pointer_name}_int := to_integer(unsigned({self.pointer_name}_i))
+
+    -- {queue_type.value} write enables must be mod left shifted based on queue tail
+    for i in 0 to {self.num_entries} - 1 loop
+      {wen}(i) <=
+        {unsh_wen}(
+          (i + {self.pointer_name}_int)) mod {self.num_entries}
+        );
+    end loop;
+  end process;
+""".strip()
+
+
+        def _output_assignments(self, queue_type):
+            self.output_assignments = ""
+
+            for i in range(self.num_entries):
+                assign_to = f"{WRITE_ENABLE_NAME(queue_type)}_o"
+
+                if i < 10:
+                    assign_to += " "
+
+                self.output_assignments += f"""
+   {assign_to} <= {WRITE_ENABLE_NAME(queue_type)};
+""".removeprefix("\n")
+                
+            self.output_assignments = self.output_assignments.strip()
+
+
+        def __init__(self, config : Config, queue_type : QueueType):
+            self._set_params(config, queue_type)
+
+            self._unshifted_assignments(queue_type)
+            self._shifted_assignments(queue_type)
+
+
+            self.item = f"""
+    {self.unshifted_assignments}
+
+    {self.shifted_assignments}
+
+    {self.output_assignments}
+    
+""".strip()
+            
+        def get(self):
+            return self.item
+
 class NumAccessesRomMuxBodyItems():
     class Body():
         def _set_params(self, config : Config, queue_type : QueueType):
@@ -844,47 +966,6 @@ class GroupAllocatorPortItems():
                 comment
             )
 
-
-    class NumNewQueueEntries(Signal):
-        """
-        Output.
-        
-        Bitwidth = N
-
-        Number = 1
-
-        Number of (load/store) queue entries to allocate,
-        which is output directly to the (load/store) queue.
-
-        Non-handshaked signal. 
-        
-        Used by the load queue to update its tail pointer, 
-        using update logic appropriate to circular buffers.
-        
-        There is a single "number of load queue entries to allocate" signal,
-        and its bitwidth is equal to the bitwidth of the load queue pointers, 
-        to allow easy arithmetic between then.
-        """
-        def __init__(self, 
-                     config : Config,
-                     queue_type : QueueType
-                     ):
-            match queue_type:
-                case QueueType.LOAD:
-                    bitwidth = config.load_ports_idx_bitwidth()
-                case QueueType.STORE:
-                    bitwidth = config.store_queue_idx_bitwidth()
-
-            Signal.__init__(
-                self,
-                base_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
-                direction=Signal.Direction.OUTPUT,
-                size=Signal.Size(
-                    bitwidth=bitwidth,
-                    number=1
-                )
-            )
-
     class PortIdxPerQueueEntryComment(EntityComment):
         """
         RTL comment:
@@ -1130,6 +1211,45 @@ class GroupAllocatorBodyItems():
 
             
 class GroupAllocatorLocalItems():
+    class NumNewQueueEntries(Signal):
+        """       
+        Bitwidth = N
+
+        Number = 1
+
+        Number of (load/store) queue entries to allocate,
+        which is output directly to the (load/store) queue.
+
+        Non-handshaked signal. 
+        
+        Used by the (load/store) queue to update its tail pointer, 
+        using update logic appropriate to circular buffers.
+        
+        There is a single "number of (load/store) queue entries to allocate" signal,
+        and its bitwidth is equal to the bitwidth of the (load/store) queue pointers, 
+        to allow easy arithmetic between then.
+        """
+        def __init__(self, 
+                     config : Config,
+                     queue_type : QueueType,
+                     direction : Signal.Direction = None
+                     ):
+            match queue_type:
+                case QueueType.LOAD:
+                    bitwidth = config.load_ports_idx_bitwidth()
+                case QueueType.STORE:
+                    bitwidth = config.store_queue_idx_bitwidth()
+
+            Signal.__init__(
+                self,
+                base_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+                direction=direction,
+                size=Signal.Size(
+                    bitwidth=bitwidth,
+                    number=1
+                )
+            )
+
     class GroupInitTransfer(Signal):
         """
         Local signal

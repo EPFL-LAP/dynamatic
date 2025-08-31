@@ -32,7 +32,7 @@ def WRITE_ENABLE_NAME(
         queue_type : QueueType, 
         ):
     """
-    RTL name for the write enables signals of the load queue.
+    RTL name for the write enables signals of the (load/store) queue.
     """
 
     return f"{queue_type.value}_write_en"
@@ -96,4 +96,13 @@ UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME = f"unshifted_{NAIVE_STORE_ORDER_PER_
 RTL name for the unshifted naive store position per queue entry.
 It is naive as it only considers loads and stores currently being allocated, not previous stores.
 """
-     
+    
+
+def UNSHIFTED_WRITE_ENABLE_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the unshifted write enables signals of the (load/store) queue.
+    """
+
+    return f"unshifted_{WRITE_ENABLE_NAME(queue_type)}"

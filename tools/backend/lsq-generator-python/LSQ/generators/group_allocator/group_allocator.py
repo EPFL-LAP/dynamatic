@@ -20,12 +20,46 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
         NaiveStoreOrderPerEntryBodyItems,
-        NumAccessesRomMuxBodyItems
+        NumAccessesRomMuxBodyItems,
+        WriteEnableLocalItems,
+        WriteEnableBodyItems
     )
+
+class WriteEnable():
+    def __init__(self, config : Config, queue_type : QueueType):
+        ga_p = GroupAllocatorPortItems()
+        ga_l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
+        self.entity_port_items = [
+            ga_l.NumNewQueueEntries(config, queue_type, d.INPUT),
+            ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
+            ga_p.QueueWriteEnable(config, queue_type)
+        ]
+
+
+        l = WriteEnableLocalItems()
+
+        self.local_items = [
+            l.WriteEnable(config, queue_type, shifted=False),
+            l.WriteEnable(config, queue_type, shifted=True)
+        ]
+
+        b = WriteEnableBodyItems()
+
+        self.body = [
+            b.Body(config, queue_type)
+        ]
 
 class NumAccessesRomMux():
     def __init__(self, config : Config, queue_type : QueueType):
-        self.entity_port_items = []
+        ga_l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
+        self.entity_port_items = [
+            ga_l.GroupInitTransfer(config, d.INPUT),
+            ga_l.NumNewQueueEntries(config, queue_type, direction=d.OUTPUT)
+        ]
 
         self.local_items = []
 
@@ -122,6 +156,10 @@ class GroupHandshakingDeclarative():
 class GroupAllocatorDeclarative():
     def __init__(self, config : Config):
         p = GroupAllocatorPortItems()
+        l = GroupAllocatorLocalItems()
+
+        d = Signal.Direction
+
         self.entity_port_items = [
             p.Reset(),
             p.Clock(),
@@ -145,7 +183,7 @@ class GroupAllocatorDeclarative():
             p.QueueWriteEnable(config, QueueType.LOAD),
 
             p.NumNewQueueEntriesComment(QueueType.LOAD),
-            p.NumNewQueueEntries(config, QueueType.LOAD),
+            l.NumNewQueueEntries(config, QueueType.LOAD,),
 
             p.PortIdxPerQueueEntryComment(config, QueueType.LOAD),
             p.PortIdxPerQueueEntry(config, QueueType.LOAD),
@@ -154,7 +192,9 @@ class GroupAllocatorDeclarative():
             p.QueueWriteEnable(config, QueueType.STORE),
 
             p.NumNewQueueEntriesComment(QueueType.STORE),
-            p.NumNewQueueEntries(config, QueueType.STORE),
+            # since this is both a local signal and an output
+            # the class is placed in local signals
+            l.NumNewQueueEntries(config, QueueType.STORE, d.OUTPUT),
 
             p.PortIdxPerQueueEntryComment(config, QueueType.STORE),
             p.PortIdxPerQueueEntry(config, QueueType.STORE),
@@ -163,7 +203,6 @@ class GroupAllocatorDeclarative():
             p.NaiveStoreOrderPerEntry(config)
         ]
 
-        l = GroupAllocatorLocalItems()
 
         self.local_items = [
             l.GroupInitTransfer(config)
@@ -278,12 +317,22 @@ class GroupAllocator:
         # print(entity.get("port_idx", "port index"))
         # print(arch.get("port_idx", "port index"))
 
-        num_access_rom_mux = NumAccessesRomMux(config, QueueType.LOAD)
+        # num_access_rom_mux = NumAccessesRomMux(config, QueueType.LOAD)
 
-        arch = Architecture(num_access_rom_mux)
+        # arch = Architecture(num_access_rom_mux)
 
-        # print(entity.get("port_idx", "port index"))
-        print(arch.get("num_access_rom_mux", "num_access_rom_mux"))
+        # # print(entity.get("port_idx", "port index"))
+        # print(arch.get("num_access_rom_mux", "num_access_rom_mux"))
+
+        write_enable_load = WriteEnable(config, QueueType.LOAD)
+
+        entity = Entity(write_enable_load)
+        arch = Architecture(write_enable_load)
+
+        print(entity.get())
+        print(arch.get())
+
+        quit()
 
         # declaration = StoreOrderPerEntryDeclarative(config)
 
