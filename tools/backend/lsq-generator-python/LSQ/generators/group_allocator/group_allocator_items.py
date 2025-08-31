@@ -105,7 +105,7 @@ class WriteEnableBodyItems():
                     assign_to += " "
 
                 self.output_assignments += f"""
-   {assign_to} <= {WRITE_ENABLE_NAME(queue_type)}({i});
+  {assign_to} <= {WRITE_ENABLE_NAME(queue_type)}({i});
 """.removeprefix("\n")
                 
             self.output_assignments = self.output_assignments.strip()
