@@ -137,11 +137,14 @@ class Signal():
             cxn_comment = "top-level output"
         else:
             cxn_comment = "local signal"
-        output = f"""
-      -- {inst_comment} {cxn_comment}
-""".removeprefix("\n")
 
-        return output + self._get_item(get_single)
+        signal_dec = self._get_item(get_single).lstrip()
+
+        return f"""
+        -- {inst_comment} {cxn_comment}
+        {signal_dec}
+
+""".removeprefix("\n")
     
 class Signal2D(Signal):
     def _get_item(self, get_single):
