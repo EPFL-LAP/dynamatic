@@ -361,10 +361,10 @@ class GroupAllocator:
 
         unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        if config.load_ports_num > 1:
+        if config.load_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
 
-        if config.store_ports_num > 1:
+        if config.store_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
         unit += self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
