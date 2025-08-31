@@ -243,8 +243,12 @@ class GroupAllocatorDecl():
             b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix),
             b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix),
 
-            b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix),
-            b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix),
+            *([b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix)] \
+                  if config.load_ports_num() > 1 else []),
+
+            *([b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix)] \
+                  if config.store_ports_num() > 1 else []),
+            
 
             b.NaiveStoreOrderPerEntry(config, subunit_prefix),
 
@@ -357,8 +361,11 @@ class GroupAllocator:
 
         unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
-        unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
+        if config.load_ports_num > 1:
+            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
+
+        if config.store_ports_num > 1:
+            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
         unit += self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
 

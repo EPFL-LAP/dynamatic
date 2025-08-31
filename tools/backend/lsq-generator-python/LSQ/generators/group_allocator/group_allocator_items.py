@@ -1005,19 +1005,13 @@ class GroupAllocatorPortItems():
         """
         RTL comment:
             
-        -- Load port index to write into each load queue entry.
+        -- (Load/store) port index to write into each load queue entry.
 
         -- {number} signals, each {bitwidth} bit(s).
 
         -- Not one-hot.
 
-        -- There is inconsistant code implying this signal should not be present 
-
-        -- if there are no load ports.
-
-        -- But it is currently added regardless (with bitwidth 1)
-
-        -- Actual number of load ports: {actual_num_ports}
+        -- Absent is there is only 1 (load/store) port
         """
         def __init__(
                 self, 
@@ -1029,21 +1023,16 @@ class GroupAllocatorPortItems():
                 case QueueType.LOAD:
                     number = config.load_queue_num_entries()
                     bitwidth = config.load_ports_idx_bitwidth()
-                    actual_num_ports = config.load_ports_num()
                 case QueueType.STORE:
                     number = config.store_queue_num_entries()
                     bitwidth = config.store_ports_idx_bitwidth()
-                    actual_num_ports = config.store_ports_num()
 
             comment = f"""
 
-    -- Load port index to write into each load queue entry.
+    -- {queue_type.value} port index to write into each {queue_type.value} queue entry.
     -- {number} signals, each {bitwidth} bit(s).
     -- Not one-hot.
-    -- There is inconsistant code implying this signal should not be present 
-    -- if there are no load ports.
-    -- But it is currently added regardless (with bitwidth 1)
-    -- Actual number of load ports: {actual_num_ports}
+    -- Absent if there is only one {queue_type.value} port
 
 """.removeprefix("\n")
             EntityComment.__init__(
@@ -1072,9 +1061,7 @@ class GroupAllocatorPortItems():
         There is one signal per load queue entry, with the bitwidth required to identify a load port.
         Not one-hot.
 
-        There is inconsistant code implying this signal should not be present 
-        if there are no load ports.
-        But it is currently added regardless (with bitwidth 1)
+        Absent is there is only 1 (load/store) port
         """
         def __init__(self, 
                      config : Config,
