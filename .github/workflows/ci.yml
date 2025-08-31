@@ -96,11 +96,14 @@ jobs:
             ls -lh $HOME/perf_ci_saved.json
             python tools/integration/generate_perf_report.py \
               --save perf_ci_branch.json --compare $HOME/perf_ci_saved.json --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
+            STATUS=$?
           else
             echo "Note: Saved performance report not found"
             python tools/integration/generate_perf_report.py \
               --save perf_ci_branch.json | tee performance.md >> $GITHUB_STEP_SUMMARY
+            STATUS=$?
           fi
+          exit $STATUS
       
       - name: save-perf-report
         if: github.event_name == 'push'
