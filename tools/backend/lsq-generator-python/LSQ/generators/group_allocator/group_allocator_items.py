@@ -1452,56 +1452,22 @@ class GroupHandshakingBodyItems():
             self.item += self.get_empty_entries_assignment(config, QueueType.LOAD)
             self.item += self.get_empty_entries_assignment(config, QueueType.STORE)
 
-            load_is_empty_name = f"{IS_EMPTY_NAME(QueueType.LOAD)}_i"
-            store_is_empty_name = f"{IS_EMPTY_NAME(QueueType.STORE)}_i"
+            load_is_empty = f"{IS_EMPTY_NAME(QueueType.LOAD)}_i"
+            store_is_empty = f"{IS_EMPTY_NAME(QueueType.STORE)}_i"
 
-            load_empty_entries_naive = NUM_EMPTY_ENTRIES_NAIVE_NAME(QueueType.LOAD)
-            store_empty_entries_naive = NUM_EMPTY_ENTRIES_NAIVE_NAME(QueueType.STORE)
+            load_empty_entries = NUM_EMPTY_ENTRIES_NAIVE_NAME(QueueType.LOAD)
+            store_empty_entries = NUM_EMPTY_ENTRIES_NAIVE_NAME(QueueType.STORE)
 
 
 
 
             for i in range(config.num_groups()):
-                init_ready_name = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
+                init_ready = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
                 init_valid_name = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}_i"
                 init_transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 num_loads = config.group_num_loads(i)
                 num_stores = config.group_num_stores(i)
-
-                load_pointer_bitwidth = config.load_queue_idx_bitwidth()
-                store_pointer_bitwidth = config.store_queue_idx_bitwidth()
-
-                num_loads_binary_bitwidth = get_required_bitwidth(num_loads)
-                num_stores_binary_bitwidth = get_required_bitwidth(num_stores)
-
-                group_num_loads_binary = get_as_binary_string_padded(num_loads, load_pointer_bitwidth)
-                group_num_stores_binary = get_as_binary_string_padded(num_stores, store_pointer_bitwidth)
-
-
-                load_empty_entries_naive_use = load_empty_entries_naive
-                store_empty_entries_naive_use = store_empty_entries_naive
-
-
-                # load_empty_entries is the size of the load queue pointers
-                # which may be 1 bit too small to compare to the number of required loads
-                if load_pointer_bitwidth + 1 == num_loads_binary_bitwidth:
-                    load_empty_entries_naive_use = f"0 & {load_empty_entries_naive}"
-                elif load_pointer_bitwidth < num_loads_binary_bitwidth:
-                    raise RuntimeError(
-                        f"Unexpected comparison bitwidths. Pointer is {load_pointer_bitwidth} bits, " + \
-                        f" num stores bitwidth is {num_loads_binary_bitwidth}"
-                        )
-
-                # store_empty_entries is the size of the store queue pointers
-                # which may be 1 bit too small to compare to the number of required stores
-                if config.store_queue_idx_bitwidth() + 1 == num_stores_binary_bitwidth:
-                    store_empty_entries_naive_use = f"0 & {store_empty_entries_naive}"
-                elif store_pointer_bitwidth < num_stores_binary_bitwidth:
-                    raise RuntimeError(
-                        f"Unexpected comparison bitwidths. Pointer is {store_pointer_bitwidth} bits, " + \
-                        f" num stores bitwidth is {num_stores_binary_bitwidth}"
-                        )
 
                 self.item += f"""
 
@@ -1514,23 +1480,28 @@ class GroupHandshakingBodyItems():
   --      {num_loads} load(s)
   --      {num_stores} store(s)
   process(all)
+    variable {load_empty_entries}_int : natural;
+    variable {store_empty_entries}_int : natural;
   begin
+    {load_empty_entries}_int := to_integer(unsigned({load_empty_entries}))
+    {store_empty_entries}_int := to_integer(unsigned({store_empty_entries}))
+
     -- if the load queue does not have space
-    if {load_is_empty_name} = '0' and {load_empty_entries_naive_use} < {group_num_loads_binary} then
-        {init_ready_name} <= '0';
+    if {load_is_empty} = '0' and {load_empty_entries}_int < {num_loads} then
+        {init_ready} <= '0';
     -- if the store queue does not have space
-    elsif {store_is_empty_name} = '0' and {store_empty_entries_naive_use} < {group_num_stores_binary} then
-        {init_ready_name} <= '0';
+    elsif {store_is_empty} = '0' and {store_empty_entries}_int < {num_stores} then
+        {init_ready} <= '0';
     else 
-        {init_ready_name} <= '1';
+        {init_ready} <= '1';
     end if;
   end process;
 
  -- drive the ready output
-  {init_ready_name}_o <= {init_ready_name};
+  {init_ready}_o <= {init_ready};
 
  -- drive the transfer output
- {init_transfer_name} <= {init_valid_name} and {init_ready_name};
+ {init_transfer_name} <= {init_valid_name} and {init_ready};
 """.removeprefix("\n")
                 
         def get(self):
