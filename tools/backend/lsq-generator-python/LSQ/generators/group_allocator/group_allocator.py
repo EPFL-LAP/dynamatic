@@ -240,15 +240,15 @@ class GroupAllocatorDecl():
         self.body = [
             b.GroupHandshakingInst(config, subunit_prefix),
 
-            b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix),
-            b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix),
 
-            *([b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix)] \
+            *([b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix)] \
                   if config.load_ports_num() > 1 else []),
 
-            *([b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix)] \
+            *([b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix)] \
                   if config.store_ports_num() > 1 else []),
-            
+
+            b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix),
+            b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix),
 
             b.NaiveStoreOrderPerEntry(config, subunit_prefix),
 
@@ -256,9 +256,6 @@ class GroupAllocatorDecl():
             b.WriteEnableInst(config, QueueType.STORE, subunit_prefix)
 
         ]
-
-        print(self.body, config.store_ports_num(), [b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix)] \
-                  if config.store_ports_num() > 1 else [])
 
 class GroupAllocator:
     def print_dec(self, dec):
