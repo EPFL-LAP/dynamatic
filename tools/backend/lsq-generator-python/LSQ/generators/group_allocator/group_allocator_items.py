@@ -9,16 +9,16 @@ from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_ho
 from LSQ.operators.arithmetic import WrapSub
 
 class WriteEnableLocalItems():
-    class WriteEnable(Signal2D):
+    class WriteEnable(Signal):
         """
-        Bitwidth = 1
-        Number = N
+        Bitwidth = N
+        Number = 1
 
-        Local 2D input vector storing the 
+        Single vector storing the 
         (unshifted/shifted) write enable per queue entry
          
-        Bitwidth is 1
-        Number is equal to the number of queue entries
+        Bitwidth is equal to the number of queue entries
+        Number is 1
         """
         def __init__(self, 
                      config : Config,
@@ -69,7 +69,7 @@ class WriteEnableBodyItems():
     {new_entries}_int := to_integer(unsigned({new_entries}_i));
 
     for i in 0 to {self.num_entries} - 1 loop
-      {unshf_wen}(i) <= '1' when i < {new_entries} else '0';
+      {unshf_wen}(i) <= "1" when i < {new_entries}_int else "0";
     end loop;
   end process;
 """.strip()
@@ -79,7 +79,7 @@ class WriteEnableBodyItems():
             unsh_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
 
             self.shifted_assignments = f"""
-  process
+  process(all)
     variable {self.pointer_name}_int : natural;
   begin
     {self.pointer_name}_int := to_integer(unsigned({self.pointer_name}_i));
@@ -88,7 +88,7 @@ class WriteEnableBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {wen}(i) <=
         {unsh_wen}(
-          (i + {self.pointer_name}_int)) mod {self.num_entries}
+          (i + {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
   end process;
