@@ -185,7 +185,9 @@ class GroupAllocatorDecl():
             p.QueueWriteEnable(config, QueueType.LOAD),
 
             p.NumNewQueueEntriesComment(QueueType.LOAD),
-            l.NumNewQueueEntries(config, QueueType.LOAD,),
+            # since this is both a local signal and an output
+            # the class is placed in local signals
+            l.NumNewQueueEntries(config, QueueType.LOAD, d.OUTPUT),
 
             p.PortIdxPerQueueEntryComment(config, QueueType.LOAD),
             p.PortIdxPerQueueEntry(config, QueueType.LOAD),
