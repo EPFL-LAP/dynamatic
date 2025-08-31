@@ -91,7 +91,7 @@ class Architecture():
 
     def get(self):
       architecture = f"""
-architecture arch of {self.prefix}_{self.name} is
+architecture arch of {self.prefix}_{self.name}_unit is
   {self.local_items}
 begin
 
@@ -114,7 +114,7 @@ class Instantiation():
     
     def get(self):
        return f"""
-  {self.name} : work.{self.prefix}_{self.name}_unit
+  {self.name}_unit : work.{self.prefix}_{self.name}_unit
     port map(
       {self.port_items}
     );
