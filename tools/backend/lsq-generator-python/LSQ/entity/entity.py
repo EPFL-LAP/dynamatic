@@ -39,6 +39,8 @@ class Entity():
     self.entity_port_items = self.entity_port_items[:-1]
 
     entity = f"""
+use work.types.all;
+
 entity {self.prefix}_{self.name} is
   port(
     {self.entity_port_items}
