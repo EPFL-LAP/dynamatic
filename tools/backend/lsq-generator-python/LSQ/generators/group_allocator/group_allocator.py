@@ -238,7 +238,7 @@ class GroupAllocatorDecl():
         b = GroupAllocatorBodyItems
 
         self.body = [
-            b.HandshakingInst(config, subunit_prefix),
+            b.GroupHandshakingInst(config, subunit_prefix),
 
             b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix),
             b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix),

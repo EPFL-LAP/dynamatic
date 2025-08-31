@@ -1144,7 +1144,7 @@ class GroupAllocatorPortItems():
 
 
 class GroupAllocatorBodyItems():
-    class HandshakingInst(Instantiation):
+    class GroupHandshakingInst(Instantiation):
         def __init__(self, config : Config, prefix):
 
             p = GroupAllocatorPortItems()
@@ -1161,10 +1161,6 @@ class GroupAllocatorBodyItems():
                 si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL), c.INPUT),
                 si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD), c.INPUT),
                 si(p.QueueIsEmpty(QueueType.LOAD), c.INPUT),
-
-                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL), c.INPUT),
-                si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD), c.INPUT),
-                si(p.QueueIsEmpty(QueueType.STORE), c.INPUT),
 
                 si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL), c.INPUT),
                 si(p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD), c.INPUT),
