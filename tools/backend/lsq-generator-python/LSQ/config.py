@@ -113,7 +113,7 @@ class Config:
 
             #self.ldqAddrW
             self._ldq_idx_w = math.ceil(math.log2(self._ldq_num_entries))
-            self.ldqAddrW = self.ldq_idx_w
+            self.ldqAddrW = self._ldq_idx_w
             
             #self.stqAddrW
             self._stq_idx_w = math.ceil(math.log2(self._stq_num_entries))
