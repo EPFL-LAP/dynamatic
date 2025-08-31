@@ -1264,7 +1264,8 @@ class GroupAllocatorBodyItems():
 
                 si(ga_l.NumNewQueueEntries(
                     config, 
-                    queue_type),
+                    queue_type,
+                    d.OUTPUT),
                     c.LOCAL
                 )
             ]
