@@ -368,10 +368,10 @@ class PortIdxPerEntryBodyItems():
                 if self.has_items(i):      
                     self.num_cases = self.num_cases + 1  
                     case_inputs += f"""
-      case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+    case_input({i}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
 """ .removeprefix("\n")
                     
-            case_inputs = case_inputs.strip()[:-1]
+            case_inputs = case_inputs.strip()
 
             # example case input:
             #
