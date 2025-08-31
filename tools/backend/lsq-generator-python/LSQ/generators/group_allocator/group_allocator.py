@@ -51,7 +51,7 @@ class WriteEnableDecl():
             b.Body(config, queue_type)
         ]
 
-class NumNewQueueEntries():
+class NumNewQueueEntriesDecl():
     def __init__(self, config : Config, queue_type : QueueType):
         ga_l = GroupAllocatorLocalItems()
 
@@ -68,7 +68,7 @@ class NumNewQueueEntries():
             b.Body(config, queue_type)
         ]
 
-class NaiveStoreOrderPerEntryDeclarative():
+class NaiveStoreOrderPerEntryDecl():
     def __init__(self, config: Config):
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
@@ -94,7 +94,7 @@ class NaiveStoreOrderPerEntryDeclarative():
             b.Body(config)
         ]
 
-class PortIdxPerEntryDeclarative():
+class PortIdxPerEntryDecl():
     def __init__(self, config : Config, queue_type : QueueType):
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
@@ -119,7 +119,7 @@ class PortIdxPerEntryDeclarative():
             b.Body(config, queue_type)
         ]
 
-class GroupHandshaking():
+class GroupHandshakingDecl():
     def __init__(self, config : Config):
         ga_p = GroupAllocatorPortItems()
 
@@ -155,7 +155,7 @@ class GroupHandshaking():
             b.Body(config)
         ]
 
-class GroupAllocatorDeclarative():
+class GroupAllocatorDecl():
     def __init__(self, config : Config):
         p = GroupAllocatorPortItems()
         l = GroupAllocatorLocalItems()
@@ -325,6 +325,17 @@ class GroupAllocator:
         print_dec(WriteEnableDecl(config, QueueType.LOAD), "wen_load")
         print_dec(WriteEnableDecl(config, QueueType.STORE), "wen_store")
 
+        print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD), "num_new_entries_load")
+        print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE), "num_new_entries_store")
+
+        print_dec(NaiveStoreOrderPerEntryDecl(config), "naive_store_order_per_entry")
+
+        print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD), "port_idx_per_entry_load")
+        print_dec(PortIdxPerEntryDecl(config, QueueType.STORE), "port_idx_per_entry_store")
+
+        print_dec(GroupHandshakingDecl(config), "group_handshaking")
+
+        print_dec(GroupAllocatorDecl(config), "group_allocator")
 
         quit()
 
