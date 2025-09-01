@@ -84,6 +84,8 @@ def main():
     parser.add_argument(
         "--disable-spec", action='store_true',
         help="Disable speculation")
+    parser.add_argument(
+        "--cp", type=str, help="clock period", default="10.000")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -451,7 +453,7 @@ def main():
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_post_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout
