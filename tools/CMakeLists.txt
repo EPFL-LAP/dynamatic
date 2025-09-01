@@ -1,4 +1,5 @@
 add_subdirectory(backend)
+add_subdirectory(buf-analysis)
 add_subdirectory(dynamatic)
 add_subdirectory(dynamatic-mlir-lsp-server)
 add_subdirectory(dynamatic-opt)
