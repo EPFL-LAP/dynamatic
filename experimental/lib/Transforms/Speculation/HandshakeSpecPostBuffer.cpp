@@ -82,6 +82,9 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
       specOp1.getTrigger(), specOp1.getFifoDepth());
   inheritBB(specOp1, speculator);
 
+  speculator.setConstant(constant);
+  speculator.setDefaultValue(defaultValue);
+
   specOp1.getDataOut().replaceAllUsesWith(speculator.getDataOut());
   specOp2.getSaveCtrl().replaceAllUsesWith(speculator.getSaveCtrl());
   specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());

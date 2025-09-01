@@ -66,6 +66,10 @@ def main():
         "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
     parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
+    parser.add_argument(
+        "--cp", type=str, help="clock period", default="10.000")
+    parser.add_argument(
+        "--default-value", type=str, help="default speculated value", default="1")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -420,7 +424,7 @@ def main():
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -435,7 +439,7 @@ def main():
     with open(handshake_spec_post_buffer, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_buffered,
-            "--handshake-spec-post-buffer",
+            f"--handshake-spec-post-buffer=default-value={args.default_value}",
             "--handshake-materialize"
         ],
             stdout=f,

@@ -7,12 +7,14 @@ from generators.support.signal_manager.utils.concat import get_concat_extra_sign
 def generate_speculator(name, params):
     bitwidth = params["bitwidth"]
     fifo_depth = params["fifo_depth"]
+    constant = params["constant"]
+    default_value = params["default_value"]
     extra_signals = params["extra_signals"]
 
     # Always contains spec signal
     if len(extra_signals) > 1:
-        return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-    return _generate_speculator(name, bitwidth, fifo_depth)
+        return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, constant, default_value, extra_signals)
+    return _generate_speculator(name, bitwidth, fifo_depth, constant, default_value)
 
 
 def _generate_specGen_core(name, bitwidth):
@@ -541,7 +543,52 @@ end architecture;
     return entity + architecture
 
 
-def _generate_predictor(name, bitwidth):
+def _predictor_variable(name, bitwidth, default_value):
+    return f"""
+-- Architecture of predictor (variable)
+architecture arch of {name} is
+  signal data_reg: std_logic_vector({bitwidth}-1 downto 0);
+begin
+  -- Predicted value is 1 by default and updated to the latest real value
+  process(clk, rst) is
+  begin
+    if (rst = '1') then
+      data_reg <= std_logic_vector(to_unsigned({default_value}, {bitwidth}))
+    elsif (rising_edge(clk)) then
+      if (data_in_valid = '1') then
+        data_reg <= data_in;
+      end if;
+    end if;
+  end process;
+
+  data_in_ready <= '1';
+
+  data_out <= data_reg;
+  data_out_valid <= trigger_valid;
+  trigger_ready <= data_out_ready;
+
+  data_out_spec <= trigger_spec;
+end architecture;
+"""
+
+
+def _predictor_constant(name, bitwidth, default_value):
+    return f"""
+-- Architecture of predictor (constant)
+architecture arch of {name} is
+begin
+  data_in_ready <= '1';
+
+  data_out <= std_logic_vector(to_unsigned({default_value}, {bitwidth}));
+  data_out_valid <= trigger_valid;
+  trigger_ready <= data_out_ready;
+
+  data_out_spec <= trigger_spec;
+end architecture;
+"""
+
+
+def _generate_predictor(name, bitwidth, constant, default_value):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -571,40 +618,15 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
--- Architecture of predictor
-architecture arch of {name} is
-  signal zeros : std_logic_vector({bitwidth}-2 downto 0);
-  signal data_reg: std_logic_vector({bitwidth}-1 downto 0);
-begin
-  zeros <= (others => '0');
-
-  -- Predicted value is 1 by default and updated to the latest real value
-  process(clk, rst) is
-  begin
-    if (rst = '1') then
-      data_reg <= zeros & '1';
-    elsif (rising_edge(clk)) then
-      if (data_in_valid = '1') then
-        data_reg <= data_in;
-      end if;
-    end if;
-  end process;
-
-  data_in_ready <= '1';
-
-  data_out <= data_reg;
-  data_out_valid <= trigger_valid;
-  trigger_ready <= data_out_ready;
-
-  data_out_spec <= trigger_spec;
-end architecture;
-"""
+    if constant:
+        architecture = _predictor_constant(name, bitwidth, default_value)
+    else:
+        architecture = _predictor_variable(name, bitwidth, default_value)
 
     return entity + architecture
 
 
-def _generate_predFifo(name, bitwidth, fifo_depth):
+def _generate_predFifo(name, bitwidth, fifo_depth, constant, default_value):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -626,9 +648,18 @@ entity {name} is
   );
 end entity;
 """
-
+#     if constant:
+#         architecture = f"""
+# -- Architecture of predFifo (constant)
+# architecture arch of {name} is
+# begin
+#   data_in_ready <= '1';
+#   data_out <= std_logic_vector(to_unsigned({default_value}, {bitwidth}));
+#   data_out_valid <= '1';
+# end architecture;
+# """
     architecture = f"""
--- Architecture of predFifo
+-- Architecture of predFifo (variable)
 architecture arch of {name} is
   signal HeadEn   : std_logic := '0';
   signal TailEn  : std_logic := '0';
@@ -755,7 +786,7 @@ end architecture;
     return entity + architecture
 
 
-def _generate_speculator(name, bitwidth, fifo_depth):
+def _generate_speculator(name, bitwidth, fifo_depth, constant, default_value):
     data_fork_name = f"{name}_data_fork"
     specGen_name = f"{name}_specGen"
     predictor_name = f"{name}_predictor"
@@ -775,8 +806,8 @@ def _generate_speculator(name, bitwidth, fifo_depth):
             "extra_signals": {"spec": 1}
         }) + \
         _generate_specGen_core(specGen_name, bitwidth) + \
-        _generate_predictor(predictor_name, bitwidth) + \
-        _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
+        _generate_predictor(predictor_name, bitwidth, constant, default_value) + \
+        _generate_predFifo(predFifo_name, bitwidth, fifo_depth, constant, default_value) + \
         generate_fork(control_fork_name, {
             "size": 5,
             "bitwidth": 3
@@ -1039,7 +1070,7 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals):
+def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, constant, default_value, extra_signals):
     extra_signals_without_spec = extra_signals.copy()
     extra_signals_without_spec.pop("spec")
 
@@ -1084,4 +1115,4 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
         extra_signals_without_spec,
         ["ctrl_save", "ctrl_commit", "ctrl_sc_save",
          "ctrl_sc_commit", "ctrl_sc_branch"],
-        lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+        lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth, constant, default_value),)

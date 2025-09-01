@@ -226,9 +226,17 @@
       {
         "name": "FIFO_DEPTH",
         "type": "unsigned"
+      },
+      {
+        "name": "DEFAULT_VALUE",
+        "type": "unsigned"
+      },
+      {
+        "name": "CONSTANT",
+        "type": "boolean"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS constant=$CONSTANT default_value=$DEFAULT_VALUE",
     "dependencies": [
       "types"
     ]

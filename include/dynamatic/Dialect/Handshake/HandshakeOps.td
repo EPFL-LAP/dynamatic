@@ -1252,7 +1252,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins ChannelType:$dataIn,
                        ControlType:$trigger,
-                       UI32Attr:$fifoDepth);
+                       UI32Attr:$fifoDepth,
+                       BoolAttr:$constant,
+                       // TODO: bitwidth match with dataIn/dataOut
+                       UI32Attr:$defaultValue);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,

@@ -688,6 +688,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpeculatorOp>([&](handshake::SpeculatorOp speculatorOp) {
         addUnsigned("FIFO_DEPTH", speculatorOp.getFifoDepth());
+        addUnsigned("DEFAULT_VALUE", speculatorOp.getDefaultValue());
+        addBoolean("CONSTANT", speculatorOp.getConstant());
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
             handshake::SpeculatingBranchOp, handshake::NonSpecOp>([&](auto) {

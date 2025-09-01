@@ -57,7 +57,12 @@ def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
   let summary = "post buffering spec pass";
   let description = [{
   }];
-  let options = [];
+  let options = [
+    Option<"defaultValue", "default-value", "unsigned", "1",
+           "Default speculated value">,
+    Option<"constant", "constant", "bool", "true",
+           "Constant speculation">,
+  ];
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
