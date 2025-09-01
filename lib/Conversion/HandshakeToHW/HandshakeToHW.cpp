@@ -883,7 +883,7 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
     } else {
       assert(false && "Unsupported constant type!");
     }
-    addString("CONSTANT_VALUES", llvm::join(strValues, ","));
+    addString("CONSTANT_VALUES", llvm::join(strValues, " "));
   }
 }
 

@@ -1,4 +1,5 @@
 from typing import List
+import argparse
 from sys import argv, stderr
 
 
@@ -115,7 +116,7 @@ def gen_ram(
     if hdl == "verilog":
         for id, val in enumerate(init_vals):
             init_strings.append(
-                "ram[" + str(id) + "] = " + data_width + "'b" + to_twos_complement(int(val), int(data_width)) + ";")
+                "ram[" + str(id) + "] = " + str(data_width) + "'b" + to_twos_complement(int(val), int(data_width)) + ";")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - init_vals):
@@ -141,26 +142,40 @@ def gen_ram(
     return (
         (RAM_VERILOG_TEMPLATE if hdl == "verilog" else RAM_VHDL_TEMPLATE).replace(
             "MODULE_NAME", module_name)
-        .replace("DATA_WIDTH", data_width)
-        .replace("ADDR_WIDTH", addr_width)
-        .replace("SIZE", size)
+        .replace("DATA_WIDTH", str(data_width))
+        .replace("ADDR_WIDTH", str(addr_width))
+        .replace("SIZE", str(size))
         .replace("INITIAL_BLOCK", init_str)
     )
 
 
 if __name__ == "__main__":
-    if len(argv) < 7:
-        raise ValueError(
-            "Too few arguments: Usage module_name output_file data_width addr_with size values"
+    parser = argparse.ArgumentParser(
+        description="Generate a RAM HDL module."
+    )
+
+    parser.add_argument("--module-name", required=True, help="Name of the generated module")
+    parser.add_argument("--hdl", required=True, help="Target HDL (e.g., verilog, vhdl)")
+    parser.add_argument("--output", required=True, help="Path to output HDL file")
+    parser.add_argument("--data-width", type=int, required=True, help="Data bus width")
+    parser.add_argument("--addr-width", type=int, required=True, help="Address bus width")
+    parser.add_argument("--size", type=int, required=True, help="Number of memory elements")
+    parser.add_argument( "--values", nargs="*", default=[],
+        help="List of initial values (space separated, e.g. --values 1 2 3 4)",
+    )
+
+    args = parser.parse_args()
+
+    # values = args.values.split(",")
+
+    with open(args.output, "w") as f:
+        f.write(
+            gen_ram(
+                args.module_name,
+                args.hdl,
+                args.data_width,
+                args.addr_width,
+                args.size,
+                args.values,
+            )
         )
-
-    module_name = argv[1]
-    hdl = argv[2]
-    output_file = argv[3]
-    data_width = argv[4]
-    addr_width = argv[5]
-    size = argv[6]
-    values = argv[7].split(",")
-
-    with open(output_file, "w") as f:
-        f.write(gen_ram(module_name, hdl, data_width, addr_width, size, values))
