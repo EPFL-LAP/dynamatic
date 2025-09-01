@@ -35,12 +35,11 @@ always@(posedge clk) begin
   end
 end
 
-// NOTE: ROM should not be written
-// always@(posedge clk) begin
-//   if (storeEn) begin
-//     ram[storeAddr] <= storeData;
-//   end
-// end
+always@(posedge clk) begin
+  if (storeEn) begin
+    ram[storeAddr] <= storeData;
+  end
+end
 assign loadData = load_data_reg;
 endmodule
 """
@@ -77,15 +76,15 @@ begin
       end if;
     end if;
   end process;
-  -- NOTE: ROM should not be written
-  -- write_proc : process(clk)
-  -- begin
-  --   if (rising_edge(clk)) then
-  --     if (storeEn = '1') then
-  --       ram(to_integer(unsigned(storeAddr))) <= storeData;
-  --     end if;
-  --   end if;
-  -- end process;
+
+  write_proc : process(clk)
+  begin
+    if (rising_edge(clk)) then
+      if (storeEn = '1') then
+        ram(to_integer(unsigned(storeAddr))) <= storeData;
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -110,6 +109,7 @@ def gen_ram(
 ) -> str:
 
     init_strings = []
+    init_str = ""
 
     assert len(init_vals) <= int(size)
 
