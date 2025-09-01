@@ -821,7 +821,7 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "CONSTANT_VALUES", "type": "string" }
     ],
-    "generator": "\"python3\" \"$DYNAMATIC/tools/backend/ram-generator/ram_generator.py\" \"$MODULE_NAME\" vhdl \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $DATA_WIDTH $ADDR_WIDTH $SIZE $CONSTANT_VALUES",
+    "generator": "\"python3\" \"$DYNAMATIC/tools/backend/ram-generator/ram_generator.py\" --module-name \"$MODULE_NAME\" --hdl vhdl --output \"$OUTPUT_DIR/$MODULE_NAME.vhd\" --data-width $DATA_WIDTH --addr-width $ADDR_WIDTH --size $SIZE --values $CONSTANT_VALUES",
     "hdl": "vhdl"
   },
   {
