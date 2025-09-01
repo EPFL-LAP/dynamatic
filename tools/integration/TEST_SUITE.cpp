@@ -85,11 +85,30 @@ static auto miscBenchmarkNames = testing::Values(
     "while_loop_1", "while_loop_3");
 
 static auto memoryBenchmarkNames = testing::Values(
-    "test_flatten_array", "test_memory_1", "test_memory_2", "test_memory_3",
-    "test_memory_4", "test_memory_5", "test_memory_6", "test_memory_7",
-    "test_memory_8", "test_memory_9", "test_memory_10", "test_memory_11",
-    "test_memory_12", "test_memory_13", "test_memory_14", "test_memory_15",
-    "test_memory_16", "test_memory_17", "test_memory_18", "test_smallbound");
+    // clang-format off
+    "test_flatten_array",
+    "test_constant_array",
+    "test_memory_1",
+    "test_memory_2",
+    "test_memory_3",
+    "test_memory_4",
+    "test_memory_5",
+    "test_memory_6",
+    "test_memory_7",
+    "test_memory_8",
+    "test_memory_9",
+    "test_memory_10",
+    "test_memory_11",
+    "test_memory_12",
+    "test_memory_13",
+    "test_memory_14",
+    "test_memory_15",
+    "test_memory_16",
+    "test_memory_17",
+    "test_memory_18",
+    "test_smallbound"
+    // clang-format on
+);
 
 static auto sharingBenchmarkNames =
     testing::Values("share_test_1", "share_test_2");
