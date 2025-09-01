@@ -88,6 +88,7 @@ static auto memoryBenchmarkNames = testing::Values(
     // clang-format off
     "test_flatten_array",
     "test_constant_array",
+    "test_internal_array",
     "test_memory_1",
     "test_memory_2",
     "test_memory_3",
