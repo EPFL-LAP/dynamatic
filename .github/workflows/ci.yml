@@ -91,16 +91,22 @@ jobs:
 
       - name: performance-report
         run: |
+          STATUS=0
+          set -o pipefail
           if [ -f $HOME/perf_ci_saved.json ]; then
             echo "Found saved performance report"
             ls -lh $HOME/perf_ci_saved.json
             python tools/integration/generate_perf_report.py \
               --save perf_ci_branch.json --compare $HOME/perf_ci_saved.json --fail 5 | tee performance.md >> $GITHUB_STEP_SUMMARY
+            STATUS=$?
           else
             echo "Note: Saved performance report not found"
             python tools/integration/generate_perf_report.py \
               --save perf_ci_branch.json | tee performance.md >> $GITHUB_STEP_SUMMARY
+            STATUS=$?
           fi
+          echo "Perf report generator exited with" $STATUS
+          exit $STATUS
       
       - name: save-perf-report
         if: github.event_name == 'push'
