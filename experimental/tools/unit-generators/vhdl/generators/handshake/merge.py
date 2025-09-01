@@ -1,22 +1,22 @@
-def generate_merge_notehb(name, params):
+def generate_merge(name, params):
     # Number of input ports
     size = params["size"]
 
     bitwidth = params.get("bitwidth", 0)
 
     if bitwidth == 0:
-        return _generate_merge_notehb_dataless(name, size)
+        return _generate_merge_dataless(name, size)
     else:
-        return _generate_merge_notehb(name, size, bitwidth)
+        return _generate_merge(name, size, bitwidth)
 
 
-def _generate_merge_notehb_dataless(name, size):
+def _generate_merge_dataless(name, size):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of merge_notehb_dataless
+-- Entity of merge_dataless
 entity {name} is
   port (
     clk : in std_logic;
@@ -32,7 +32,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of merge_notehb_dataless
+-- Architecture of merge_dataless
 architecture arch of {name} is
 begin
   process (ins_valid, outs_ready)
@@ -60,14 +60,14 @@ end architecture;
     return entity + architecture
 
 
-def _generate_merge_notehb(name, size, bitwidth):
+def _generate_merge(name, size, bitwidth):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
--- Entity of merge_notehb
+-- Entity of merge
 entity {name} is
   port (
     clk : in std_logic;
@@ -85,7 +85,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of merge_notehb
+-- Architecture of merge
 architecture arch of {name} is
 begin
   process (ins_valid, ins, outs_ready)

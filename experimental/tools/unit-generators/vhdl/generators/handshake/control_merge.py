@@ -4,7 +4,7 @@ from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake
 from generators.support.signal_manager.utils.types import ExtraSignals
 from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
-from generators.handshake.merge_notehb import generate_merge_notehb
+from generators.handshake.merge import generate_merge
 from generators.handshake.fork import generate_fork
 
 
@@ -31,7 +31,7 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
     one_slot_break_r_name = f"{name}_one_slot_break_r"
     fork_name = f"{name}_fork"
 
-    dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
+    dependencies = generate_merge(merge_name, {"size": size}) + \
         generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_bitwidth}) + \
         generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
