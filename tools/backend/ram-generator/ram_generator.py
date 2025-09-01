@@ -119,8 +119,8 @@ def gen_ram(
                 "ram[" + str(id) + "] = " + str(data_width) + "'b" + to_twos_complement(int(val), int(data_width)) + ";")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
-            for _ in range(int(size) - init_vals):
-                init_strings.append(
+            for _ in range(int(size) - len(init_vals)):
+                init_items.append(
                     "ram[" + str(id) + "] = " + data_width + "'b0;")
         init_str = "\n".join(init_strings)
     elif hdl == "vhdl":
@@ -131,11 +131,14 @@ def gen_ram(
                 "\"" + f"{to_twos_complement(int(val), int(data_width))}" + "\"")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
-            for _ in range(int(size) - init_vals):
-                init_strings.append("\"" + f"{0:0{data_width}b}" + "\"")
+            for _ in range(int(size) - len(init_vals)):
+                init_items.append("\"" + f"{0:0{data_width}b}" + "\"")
         init_strings.append(",\n".join(init_items))
         init_strings.append(");")
         init_str = "\n".join(init_strings)
+
+        if (init_items == []):
+            init_str = "signal ram : ram_type\n"
     else:
         raise ValueError("Unknown HDL type!")
 
