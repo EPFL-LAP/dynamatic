@@ -89,6 +89,9 @@ class NumNewQueueEntriesDecl():
 --
 -- This is used by the {queue_type.value} queue to update its tail pointer,
 -- based on circular buffer pointer update logic.
+--
+-- It is also used to generate the write enable signals
+-- for the {queue_type.value} queue.
 """.strip()
 
         self.name = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
