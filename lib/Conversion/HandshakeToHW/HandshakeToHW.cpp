@@ -866,8 +866,7 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
   addUnsigned("ADDR_WIDTH", ports.addrWidth);
   addUnsigned("SIZE", resType.getNumElements());
 
-  if (auto initialValueAttr =
-          getDialectAttr<MemoryInitialValueAttr>(op->getOperation())) {
+  if (auto initialValueAttr = op->getInitialValueAttr()) {
     Type elemType = initialValueAttr.getConstant().getElementType();
     std::vector<std::string> strValues;
     strValues.reserve(initialValueAttr.getConstant().getNumElements());
