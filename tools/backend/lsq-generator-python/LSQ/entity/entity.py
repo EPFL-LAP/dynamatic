@@ -30,6 +30,9 @@ class Entity():
     self.name = declaration.name
     self.prefix = declaration.prefix
 
+    self.top_level_comment = declaration.top_level_comment
+    
+
 
   def get(self):
     # remove leading whitespace
@@ -45,6 +48,7 @@ use ieee.numeric_std.all;
 
 use work.types.all;
 
+{self.top_level_comment}
 entity {self.prefix}_{self.name}_unit is
   port(
     {self.entity_port_items}

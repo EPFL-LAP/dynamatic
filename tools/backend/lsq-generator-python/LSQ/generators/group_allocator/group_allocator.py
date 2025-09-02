@@ -29,6 +29,19 @@ from LSQ.generators.group_allocator.group_allocator_items import \
 
 class WriteEnableDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.top_level_comment = f"""
+-- Sub-unit of the Group Allocator.
+-- Generates the write enable signals for the {queue_type.value} queue
+-- based on the group init channels from the dataflow circuit
+-- and the tail pointers of the {queue_type.value} queue.
+--
+-- First, the number of write enable signals to set high is decided
+-- based on which group is being initialized.
+--
+-- Then they are shifted into the correct place for the internal circular buffer,
+-- based on the {queue_type.value} tail pointer.
+""".strip()
+
         self.name = WRITE_ENABLE_NAME(queue_type)
         self.prefix = prefix
 
@@ -41,6 +54,8 @@ class WriteEnableDecl():
             ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
             ga_p.QueueWriteEnable(config, queue_type)
         ]
+
+
 
 
         l = WriteEnableLocalItems()
@@ -58,6 +73,14 @@ class WriteEnableDecl():
 
 class NumNewQueueEntriesDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.top_level_comment = f"""
+-- Sub-unit of the Group Allocator.
+-- Generates the number of newly allocated {queue_type.value} queue entries.
+--
+-- This is used by the {queue_type.value} queue to update its tail pointer,
+-- based on circular buffer pointer update logic.
+""".strip()
+
         self.name = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
         self.prefix = prefix
 
@@ -78,9 +101,28 @@ class NumNewQueueEntriesDecl():
 
 class NaiveStoreOrderPerEntryDecl():
     def __init__(self, config: Config, prefix):
+        self.top_level_comment = f"""
+-- Sub-unit of the Group Allocator.
+-- Generates the naive store orders.
+--
+-- There is one naive store order per entry in the load queue.
+-- Each store order has 1 bit per entry in the store queue.
+--
+-- For the a load entry's store order, if the value is 1
+-- the store must happen before that load.
+--
+-- These are the naive store orders, and so only contain the order
+-- between stores and loads in the group currently being allocated
+--
+-- Information on already allocated stores is added to this later.
+""".strip()
+
         self.name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
 
         self.prefix = prefix
+
+
+
 
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
@@ -109,6 +151,20 @@ class NaiveStoreOrderPerEntryDecl():
 
 class PortIdxPerEntryDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.top_level_comment = f"""
+-- Sub-unit of the Group Allocator.
+-- Generates the {queue_type.value} port index per {queue_type.value} entry.
+--
+-- Each {queue_type.value} queue entry must know which {queue_type.value} port
+-- it exchanges data with.
+--
+-- First, the port indices are selected based on 
+-- which group is currently being allocated.
+--
+-- Then they are shifted into the correct place for the internal circular buffer,
+-- based on the {queue_type.value} tail pointer.
+""".strip()
+
         self.name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
         self.prefix = prefix
 
@@ -137,6 +193,21 @@ class PortIdxPerEntryDecl():
 
 class GroupHandshakingDecl():
     def __init__(self, config : Config, prefix):
+        self.top_level_comment = f"""
+-- Sub-unit of the Group Allocator.
+-- Generates the local "group init channel transfer" signals
+-- as well as the output "group init channel ready" signals
+--
+-- Without multi-group assignment enabled,
+-- the ready signal to a group is based on how empty/full the current
+-- load and store queue are.
+--
+-- If there is enough space to allocate the group,
+-- the ready signal is set high.
+--
+-- The transfer signal is the "and" of the ready and valid signals.
+""".strip()
+        
         self.name = GROUP_HANDSHAKING_NAME
         self.prefix = prefix
 
@@ -176,6 +247,10 @@ class GroupHandshakingDecl():
 
 class GroupAllocatorDecl():
     def __init__(self, config : Config, prefix, subunit_prefix):
+        self.top_level_comment = f"""
+-- Group Allocator.
+""".strip()
+
         p = GroupAllocatorPortItems()
         l = GroupAllocatorLocalItems()
 
