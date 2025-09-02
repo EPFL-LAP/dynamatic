@@ -1418,12 +1418,12 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
 
 namespace {
 
-class ConvertMemInterfaceForIntenalArray
+class ConvertMemInterfaceForInternalArray
     : public OpInterfaceConversionPattern<handshake::MemoryOpInterface> {
 public:
-  ConvertMemInterfaceForIntenalArray(ChannelTypeConverter &typeConverter,
-                                     MLIRContext *ctx,
-                                     LoweringState &lowerState)
+  ConvertMemInterfaceForInternalArray(ChannelTypeConverter &typeConverter,
+                                      MLIRContext *ctx,
+                                      LoweringState &lowerState)
       : OpInterfaceConversionPattern<handshake::MemoryOpInterface>(
             typeConverter, ctx),
         lowerState(lowerState) {}
@@ -1444,7 +1444,7 @@ private:
 // instantiated as a dual-port, single cycle latency BRAM).
 // 2. Replace the memory interface op.
 // 3. Erase the old memory interface op and the ramOp.
-LogicalResult ConvertMemInterfaceForIntenalArray::matchAndRewrite(
+LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
 
@@ -2089,8 +2089,8 @@ public:
     // Create pattern set
     RewritePatternSet patterns(ctx);
     patterns.insert<ConvertFunc, ConvertMemInterface,
-                    ConvertMemInterfaceForIntenalArray>(typeConverter, ctx,
-                                                        lowerState);
+                    ConvertMemInterfaceForInternalArray>(typeConverter, ctx,
+                                                         lowerState);
     patterns.insert<
         // clang-format off
         ConvertInstance,
