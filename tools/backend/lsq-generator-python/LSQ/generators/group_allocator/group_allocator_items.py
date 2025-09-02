@@ -88,7 +88,7 @@ class WriteEnableBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {wen}(i) <=
         {unsh_wen}(
-          (i + {self.num_entries} - {self.pointer_name}_int) mod {self.num_entries}
+          (i + {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
   end process;
@@ -471,7 +471,7 @@ class PortIdxPerEntryBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {port_idx}(i) <=
         {unsh_port_idx}(
-          (i + {self.num_entries} - {self.pointer_name}_int) mod {self.num_entries}
+          (i + {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
 """.strip()
@@ -1398,6 +1398,63 @@ class GroupAllocatorLocalItems():
                 always_number=True
             )
 
+class GroupHandshakingLocalItemsOld():
+    class PointerSub(Signal):
+        """
+        Local signal
+        
+        Bitwidth = N
+
+        Number = 1
+
+        Number of empty entries in a queue
+        """
+
+        def init(self,
+                 config : Config,
+                 queue_type : QueueType
+                 ):
+
+            Signal.__init__(
+                self,
+                base_name=POINTER_SUB_NAME(queue_type),
+                size=Signal.Size(
+                    bitwidth=config.store_queue_idx_bitwidth(),
+                    number=
+                ),
+                always_number=True
+            )
+
+    class Empty(Signal):
+        """
+        Local signal
+        
+        Bitwidth = N
+
+        Number = 1
+
+        Bitwidth required for number of empty elements in queue
+        """
+
+        def init(self,
+                 config : Config,
+                 queue_type : QueueType
+                 ):
+
+            Signal.__init__(
+                self,
+                base_name=POINTER_SUB_NAME(queue_type),
+                size=Signal.Size(
+                    bitwidth=1,
+                    number=config.num_groups()
+                ),
+                always_number=True
+            )
+            
+
+class GroupHandshakingBodyItems():
+    class Body():
+
 
 class GroupHandshakingLocalItems():
     class NaiveNumEmptyEntries(Signal):
@@ -1430,9 +1487,11 @@ class GroupHandshakingLocalItems():
                 )
             )
 
+    
+
 
 class GroupHandshakingBodyItems():
-    class Body(Signal):
+    class Body():
 
         def get_empty_entries_assignment(
                 self,

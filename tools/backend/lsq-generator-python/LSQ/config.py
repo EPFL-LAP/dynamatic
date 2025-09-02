@@ -9,6 +9,8 @@ import json
 
 from typing import List
 
+from LSQ.utils import QueueType
+
 class Config:
     """
     Configuration object for LSQ code generation.
@@ -174,6 +176,16 @@ class Config:
         Calculated by ceil(log2(num_entries))
         """
         return self._stq_idx_w
+    
+        
+    def queue_idx_bitwidth(self, queue_type : QueueType) -> int:
+        """
+        Bitwidth for a pointer into the store queue.
+
+        Calculated by ceil(log2(num_entries))
+        """
+        return self._stq_idx_w
+    
     
     def load_queue_num_entries(self) -> int:
         """

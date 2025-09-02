@@ -187,3 +187,13 @@ def UNSHIFTED_WRITE_ENABLE_NAME(
     """
 
     return f"unshifted_{WRITE_ENABLE_NAME(queue_type)}"
+
+
+def POINTER_SUB_NAME(
+        queue_type : QueueType
+    ):
+    match queue_type:
+        case QueueType.LOAD:
+            return "load_sub"
+        case QueueType.STORE:
+            return "store_sub"
