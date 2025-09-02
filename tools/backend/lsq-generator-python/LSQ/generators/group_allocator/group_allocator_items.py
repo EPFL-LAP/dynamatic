@@ -87,7 +87,7 @@ class WriteEnableBodyItems():
     -- {queue_type.value} write enables must be mod left-shifted based on queue tail
     for i in 0 to {self.num_entries} - 1 loop
       {wen}((i + {self.pointer_name}_int) mod {self.num_entries}) <=
-        {unsh_wen}(0);
+        {unsh_wen}(i);
     end loop;
   end process;
 """.strip()
