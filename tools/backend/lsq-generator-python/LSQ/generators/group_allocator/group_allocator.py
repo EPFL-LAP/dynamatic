@@ -408,58 +408,58 @@ class GroupAllocator:
 
         # The number of empty load and store is calculated with cyclic subtraction.
         # If the empty signal is high, then set the number to max value.
-        loads_sub = LogicVec(ctx, 'loads_sub', 'w', self.configs.ldqAddrW)
-        stores_sub = LogicVec(ctx, 'stores_sub', 'w', self.configs.stqAddrW)
-        empty_loads = LogicVec(ctx, 'empty_loads', 'w',
-                               self.configs.emptyLdAddrW)
-        empty_stores = LogicVec(ctx, 'empty_stores', 'w',
-                                self.configs.emptyStAddrW)
+        # loads_sub = LogicVec(ctx, 'loads_sub', 'w', self.configs.ldqAddrW)
+        # stores_sub = LogicVec(ctx, 'stores_sub', 'w', self.configs.stqAddrW)
+        # empty_loads = LogicVec(ctx, 'empty_loads', 'w',
+                            #    self.configs.emptyLdAddrW)
+        # empty_stores = LogicVec(ctx, 'empty_stores', 'w',
+                                # self.configs.emptyStAddrW)
 
-        arch += WrapSub_old(ctx, loads_sub, ldq_head_i,
-                        ldq_tail_i, self.configs.numLdqEntries)
-        arch += WrapSub_old(ctx, stores_sub, stq_head_i,
-                        stq_tail_i, self.configs.numStqEntries)
+        # arch += WrapSub_old(ctx, loads_sub, ldq_head_i,
+                        # ldq_tail_i, self.configs.numLdqEntries)
+        # arch += WrapSub_old(ctx, stores_sub, stq_head_i,
+                        # stq_tail_i, self.configs.numStqEntries)
 
-        arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
-                   '(', '\'0\'', '&', loads_sub, ')')
-        arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
-                   '(', '\'0\'', '&', stores_sub, ')')
+        # arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
+                #    '(', '\'0\'', '&', loads_sub, ')')
+        # arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
+                #    '(', '\'0\'', '&', stores_sub, ')')
 
         # Generate handshake signals
-        group_init_ready = LogicArray(
-            ctx, 'group_init_ready', 'w', self.configs.numGroups)
+        # group_init_ready = LogicArray(
+            # ctx, 'group_init_ready', 'w', self.configs.numGroups)
         group_init_hs = LogicArray(
             ctx, 'group_init_hs', 'w', self.configs.numGroups)
 
-        for i in range(0, self.configs.numGroups):
-            arch += Op(ctx, group_init_ready[i],
-                       '\'1\'', 'when',
-                       '(', empty_loads,  '>=', (
-                self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
-                '(', empty_stores, '>=', (
-                self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
-                'else', '\'0\'')
+        # for i in range(0, self.configs.numGroups):
+        #     arch += Op(ctx, group_init_ready[i],
+        #                '\'1\'', 'when',
+        #                '(', empty_loads,  '>=', (
+        #         self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
+        #         '(', empty_stores, '>=', (
+        #         self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
+        #         'else', '\'0\'')
 
-        if (self.configs.gaMulti):
-            group_init_and = LogicArray(
-                ctx, 'group_init_and', 'w', self.configs.numGroups)
-            ga_rr_mask = LogicVec(ctx, 'ga_rr_mask', 'r',
-                                  self.configs.numGroups)
-            ga_rr_mask.regInit()
-            for i in range(0, self.configs.numGroups):
-                arch += Op(ctx, group_init_and[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i])
-                arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
-            arch += CyclicPriorityMasking(ctx, group_init_hs,
-                                          group_init_and, ga_rr_mask)
-            for i in range(0, self.configs.numGroups):
-                arch += Op(ctx, (ga_rr_mask, (i+1) %
-                                 self.configs.numGroups), (group_init_hs, i))
-        else:
-            for i in range(0, self.configs.numGroups):
-                arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
-                arch += Op(ctx, group_init_hs[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i])
+        # if (self.configs.gaMulti):
+        #     group_init_and = LogicArray(
+        #         ctx, 'group_init_and', 'w', self.configs.numGroups)
+        #     ga_rr_mask = LogicVec(ctx, 'ga_rr_mask', 'r',
+        #                           self.configs.numGroups)
+        #     ga_rr_mask.regInit()
+        #     for i in range(0, self.configs.numGroups):
+        #         arch += Op(ctx, group_init_and[i],
+        #                    group_init_ready[i], 'and', group_init_valid_i[i])
+        #         arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
+        #     arch += CyclicPriorityMasking(ctx, group_init_hs,
+        #                                   group_init_and, ga_rr_mask)
+        #     for i in range(0, self.configs.numGroups):
+        #         arch += Op(ctx, (ga_rr_mask, (i+1) %
+        #                          self.configs.numGroups), (group_init_hs, i))
+        # else:
+        #     for i in range(0, self.configs.numGroups):
+        #         arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
+        #         arch += Op(ctx, group_init_hs[i],
+        #                    group_init_ready[i], 'and', group_init_valid_i[i])
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
@@ -535,12 +535,14 @@ class GroupAllocator:
             file.write('\nend entity;\n\n')
             file.write(f'architecture arch of {self.module_name} is\n')
             file.write(ctx.signalInitString)
-            file.write('begin\n' + arch + '\n')
+            file.write('begin\n')
 
             b = GroupAllocatorBodyItems
 
-            hs = b.GroupHandshakingInst(config, self.prefix+"_ga")
+            hs = b.GroupHandshakingInst(config, self.prefix + "_ga")
             file.write(hs.get())
+
+            file.write(arch + '\n')
 
             file.write(ctx.regInitString + 'end architecture;\n')
 
