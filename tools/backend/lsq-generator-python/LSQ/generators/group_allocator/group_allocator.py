@@ -32,7 +32,7 @@ class WriteEnableDecl():
         self.top_level_comment = f"""
 -- Sub-unit of the Group Allocator.
 -- Generates the write enable signals for the {queue_type.value} queue
--- based on the group init channels from the dataflow circuit
+-- based on the number of {queue_type.value} queue entries being allocated
 -- and the tail pointers of the {queue_type.value} queue.
 --
 -- First, the number of write enable signals to set high is decided

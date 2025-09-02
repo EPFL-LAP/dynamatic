@@ -1355,7 +1355,7 @@ class GroupAllocatorBodyItems():
     -- Here we drive the outputs with them
     {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)};
     {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)};
-    
+
 """.removeprefix("\n")
                     
 class GroupAllocatorLocalItems():
@@ -1524,7 +1524,7 @@ class GroupHandshakingBodyItems():
 
                 self.item += f"""
 
-  -- process to generate the ready signals for group init channel {i}
+  -- process to generate the ready signal for group init channel {i}
   -- by checking the number of empty elements vs. 
   -- the number of loads and stores in that group of memory operations
   -- to see if there is space to allocate them.
