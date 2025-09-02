@@ -171,6 +171,10 @@ class GroupHandshakingBody():
     -- Group {i} has:
     --      {num_loads} load(s)
     --      {num_stores} store(s)
+    -- 
+    -- To be ready to allocate a group,
+    -- both queues must have enough space 
+    -- for the group's memory operations
     if 
       ({load_is_empty} = '0' and {load_empty_entries}_int < {num_loads})
         or
