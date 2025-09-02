@@ -41,12 +41,10 @@ class GroupHandshaking():
 
         d = Signal.Direction
         self.entity_port_items = [
-            EntityComment(f"""
-                          
+            EntityComment(f"""  
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} control channels,
     -- One for each group of memory operations.
-
 
 """),
 
@@ -54,37 +52,34 @@ class GroupHandshaking():
             ds.GroupInitReady(config),
 
             EntityComment(f"""
-                          
     -- Inputs from the load queue.
     -- Used to see if there is enough space to allocate
     -- each group
 
-""".removeprefix("\n").removesuffix("\n")),
+"""),
 
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
             ga_p.QueueIsEmpty(QueueType.LOAD),
 
-            EntityComment(f"""
-                          
+            EntityComment(f"""    
     -- Inputs from the store queue.
     -- Used to see if there is enough space to allocate
     -- each group
 
-""".removeprefix("\n").removesuffix("\n")),
+"""),
 
             ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
             ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
             ga_p.QueueIsEmpty(QueueType.STORE),
 
-            EntityComment(f"""
-                          
+            EntityComment(f"""             
     -- A boolean per group init channel
     -- to see if the group is being allocated this cycle.
     -- Used to decide what the group allocator writes
     -- to the load and store queue.
 
-""".removeprefix("\n").removesuffix("\n")),
+"""),
 
             ga_l.GroupInitTransfer(config, d.OUTPUT)
         ]
