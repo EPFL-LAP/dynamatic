@@ -734,33 +734,6 @@ class GroupAllocatorPortItems():
 
 
 
-    class GroupInitReady(Signal):
-        """
-        Output.
-         
-        Bitwidth = 1, Number = N
-
-        1-bit ready signals for the "group init" channels, from the dataflow circuit. 
-        For N groups, there are N "group init" channels, which results in
-
-        group_init_ready_0_i : out std_logic;
-        group_init_ready_1_i : out std_logic;
-        .
-        .
-        .
-        group_init_ready_N_i : out std_logic;
-        """
-        def __init__(self, config : Config):
-            Signal.__init__(
-                self,
-                base_name=f"{GROUP_INIT_CHANNEL_NAME}_ready",
-                direction=Signal.Direction.OUTPUT,
-                size=Signal.Size(
-                    bitwidth=1,
-                    number=config.num_groups()
-                ),
-                always_number=True
-            )
 
 
     class QueueInputsComment(EntityComment):
@@ -1105,7 +1078,7 @@ class GroupAllocatorBodyItems():
             si = SimpleInstantiation
             port_items = [
                 si(ds.GroupInitValid(config), c.INPUT),
-                si(p.GroupInitReady(config), c.OUTPUT),
+                si(ds.GroupInitReady(config), c.OUTPUT),
 
                 si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL), c.INPUT),
                 si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD), c.INPUT),

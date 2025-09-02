@@ -42,7 +42,7 @@ class GroupHandshaking():
         d = Signal.Direction
         self.entity_port_items = [
             ds.GroupInitValid(config),
-            ga_p.GroupInitReady(config),
+            ds.GroupInitReady(config),
 
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
@@ -60,7 +60,7 @@ class GroupHandshaking():
             NaiveNumEmptyEntries(config, QueueType.LOAD),
             NaiveNumEmptyEntries(config, QueueType.STORE),
 
-            ga_p.GroupInitReady(config)
+            ds.GroupInitReady(config)
         ]
 
         self.body = [

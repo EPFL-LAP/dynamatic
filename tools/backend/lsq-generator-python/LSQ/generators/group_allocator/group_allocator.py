@@ -225,10 +225,17 @@ class GroupAllocatorDecl():
             ds.Reset(),
             ds.Clock(),
 
-            EntityComment(ds.GroupInitValid.comment(config)),
-            ds.GroupInitValid(config),
+            EntityComment(f"""
+                          
+    -- Group init channels from the dataflow circuit
+    -- {config.num_groups()} control channels,
+    -- One for each group of memory operations.
 
-            p.GroupInitReady(config),
+
+""".removeprefix("\n").removesuffix("\n")),
+
+            ds.GroupInitValid(config),
+            ds.GroupInitReady(config),
 
             p.QueueInputsComment(queue_type=QueueType.LOAD),
             p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),

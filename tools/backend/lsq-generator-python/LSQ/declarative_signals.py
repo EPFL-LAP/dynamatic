@@ -82,8 +82,33 @@ class GroupInitValid(Signal):
     def comment(config: Config) -> str:
         return f"""
 
-    -- Group init channels from the dataflow circuit
-    -- {config.num_groups()} control channels,
-    -- one for each group of memory operations.
-
 """.removeprefix("\n").removesuffix("\n")
+    
+
+class GroupInitReady(Signal):
+    """
+    Output.
+        
+    Bitwidth = 1, Number = N
+
+    1-bit ready signals for the "group init" channels, from the dataflow circuit. 
+    For N groups, there are N "group init" channels, which results in
+
+    group_init_ready_0_i : out std_logic;
+    group_init_ready_1_i : out std_logic;
+    .
+    .
+    .
+    group_init_ready_N_i : out std_logic;
+    """
+    def __init__(self, config : Config):
+        Signal.__init__(
+            self,
+            base_name=f"{GROUP_INIT_CHANNEL_NAME}_ready",
+            direction=Signal.Direction.OUTPUT,
+            size=Signal.Size(
+                bitwidth=1,
+                number=config.num_groups()
+            ),
+            always_number=True
+        )
