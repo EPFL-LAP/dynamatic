@@ -489,6 +489,9 @@ def LLVMMarkMemoryDependencies : Pass<"llvm-mark-memory-dependencies"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
-
+def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
+  let summary = "Optimizes the arithmetic operation depth in handshake IR.";
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
