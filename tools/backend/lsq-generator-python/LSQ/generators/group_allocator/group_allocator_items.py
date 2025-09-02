@@ -569,10 +569,7 @@ class NaiveStoreOrderPerEntryBodyItems():
             needs_order_shift = False
             for group_orders in range(config.num_groups()):
                 for order in config.group_store_order(group_orders):
-                    print(order)
-                    quit()
-                    if order > 1:
-                        print(order)
+                    if order > 0:
                         needs_order_shift = True
             
             if needs_order_shift:
