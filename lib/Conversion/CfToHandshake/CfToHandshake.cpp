@@ -817,6 +817,14 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
     // Associate the new operation with the memory region it references and
     // the memory interface it should connect to
+    //
+    // NOTE: Why do we need to do this weird conversion (
+    // memInfo.find(funcArgs[memrefIndices.at(memref)]);) here:
+    // - "memref" points to the original argument in the CF function.
+    // - "memInfo" points to the new arguments in the handshake function.
+    // - We need to do this convoluted mapping ("arg in the
+    // original CF func" -> "position in the argument" -> "arg in the
+    // handshake func.".
     if (memrefIndices.count(memref)) {
       // MemRef is a function argument
       auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
