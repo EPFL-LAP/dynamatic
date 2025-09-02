@@ -88,7 +88,7 @@ class WriteEnableBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {wen}(i) <=
         {unsh_wen}(
-          (i + {self.pointer_name}_int) mod {self.num_entries}
+          (i - {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
   end process;
