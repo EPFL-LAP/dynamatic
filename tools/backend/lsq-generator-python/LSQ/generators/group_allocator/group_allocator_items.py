@@ -236,13 +236,13 @@ class NumNewQueueEntriesBody():
                     # get the case number one-hot encoded
                     # (not the group number, since not all groups are in the mux)
                     group_one_hot = one_hot(case_number, num_cases)
+                    group_one_hot = group_one_hot.replace("0", "-")
                     case_number = case_number + 1
                     
                     new_entries = self.new_entries(i)
 
                     assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
                     new_entries_bin = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
-                    new_entries_bin = new_entries_bin.replace("0", "-")
 
                     # map assignments to a select input
                     cases += f"""
