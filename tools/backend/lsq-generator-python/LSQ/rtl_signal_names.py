@@ -144,12 +144,21 @@ It is naive as it only considers loads and stores currently being allocated, not
 """
 
 
-GROUP_INIT_TRANSFER_NAME = f"{GROUP_INIT_CHANNEL_NAME}_transfer"
+# GROUP_INIT_TRANSFER_NAME = f"{GROUP_INIT_CHANNEL_NAME}_transfer"
+# """
+# RTL name for signals which identify whether a 
+# particular group init channel is 'transfer' in this cycle.
+# There is one of these 1-bit signals per group of memory operations.
+# """
+
+GROUP_INIT_TRANSFER_NAME = f"group_init_hs"
 """
 RTL name for signals which identify whether a 
 particular group init channel is 'transfer' in this cycle.
 There is one of these 1-bit signals per group of memory operations.
 """
+
+
 
 
 def NUM_EMPTY_ENTRIES_NAIVE_NAME(
