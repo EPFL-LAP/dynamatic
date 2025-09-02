@@ -111,8 +111,14 @@ class Config:
             self.gaNumStores = self._group_num_stores
 
             self._group_store_order = obj["ldOrder"]
+            self.gaLdOrder = _group_store_order
+
             self._group_load_port_idxs = obj["ldPortIdx"]
+
+            self.gaLdPortIdx = self._group_load_port_idxs
+
             self._group_store_port_idxs = obj["stPortIdx"]
+            self.gaStPortIdx = self._group_store_port_idxs
 
             #self.ldqAddrW
             self._ldq_idx_w = math.ceil(math.log2(self._ldq_num_entries))
