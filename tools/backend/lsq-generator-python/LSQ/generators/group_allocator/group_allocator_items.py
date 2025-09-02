@@ -1347,7 +1347,7 @@ class GroupAllocatorBodyItems():
             )
     
     class NumNewEntriesAssignment():
-        def get():
+        def get(self):
             return f"""
 
     -- the "number of new entries" signals are local, 
