@@ -338,6 +338,10 @@ class GroupAllocator:
 
         """
 
+        # Write to the file
+        with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
+            file.write(self.print_dec(GroupHandshakingDecl(config, self.prefix + "_ga")))
+
         # subunit_prefix = self.prefix + "_ga"
 
         # unit = self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
