@@ -35,13 +35,14 @@ class WriteEnableDecl():
 -- based on the group init channels from the dataflow circuit
 -- and the tail pointers of the {queue_type.value} queue.
 --
--- First, the number of write enable signals to  is decided
+-- First, the number of write enable signals to set high is decided
 -- based on the "number of new entries to the {queue_type.value} queue".
 -- 
 -- This "number of new entries to the {queue_type.value} queue" is also used
 -- by the {queue_type.value} queue itself, to update its tail pointer.
 --
--- Then they are shifted into the correct place for the internal circular buffer,
+-- Then the write enables are shifted into the correct place 
+-- for the internal circular buffer,
 -- based on the {queue_type.value} tail pointer.
 """.strip()
 
