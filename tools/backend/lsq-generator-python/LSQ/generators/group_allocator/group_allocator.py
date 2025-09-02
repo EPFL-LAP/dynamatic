@@ -536,6 +536,12 @@ class GroupAllocator:
             file.write(f'architecture arch of {self.module_name} is\n')
             file.write(ctx.signalInitString)
             file.write('begin\n' + arch + '\n')
+
+            b = GroupAllocatorBodyItems
+
+            hs = b.GroupHandshakingInst(config, self.prefix+"_ga")
+            file.write(hs.get())
+
             file.write(ctx.regInitString + 'end architecture;\n')
 
     def instantiate(
