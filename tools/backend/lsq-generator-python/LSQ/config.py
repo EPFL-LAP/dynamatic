@@ -93,6 +93,7 @@ class Config:
             self.numStPorts = self._num_st_ports
 
             self._num_groups = obj["numBBs"]
+            self.numGroups = self._num_groups
 
             self.numLdMem = obj["numLdChannels"]
             self.numStMem = obj["numStChannels"]
