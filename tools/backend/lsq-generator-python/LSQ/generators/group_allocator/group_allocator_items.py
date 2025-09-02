@@ -680,8 +680,8 @@ class NaiveStoreOrderPerEntryBodyItems():
     variable case_input : std_logic_vector({num_cases} - 1 downto 0);
   begin
     -- convert q tail pointers to integer
-    {load_pointer_name}_int = to_integer(unsigned({load_pointer_name}_i));
-    {store_pointer_name}_int = to_integer(unsigned({store_pointer_name}_i));
+    {load_pointer_name}_int := to_integer(unsigned({load_pointer_name}_i));
+    {store_pointer_name}_int := to_integer(unsigned({store_pointer_name}_i));
 
     {unshifted_assignments}
 
