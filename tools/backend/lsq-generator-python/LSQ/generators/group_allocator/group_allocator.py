@@ -30,7 +30,9 @@ from LSQ.generators.group_allocator.group_allocator_items import \
 class WriteEnableDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
         self.top_level_comment = f"""
+-- {queue_type.value} Queue Write Enables Unit
 -- Sub-unit of the Group Allocator.
+--
 -- Generates the write enable signals for the {queue_type.value} queue
 -- based on the number of {queue_type.value} queue entries being allocated
 -- and the tail pointers of the {queue_type.value} queue.
@@ -78,7 +80,9 @@ class WriteEnableDecl():
 class NumNewQueueEntriesDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
         self.top_level_comment = f"""
+-- Number of New Entries in the {queue_type.value} Queue Unit
 -- Sub-unit of the Group Allocator.
+--
 -- Generates the number of newly allocated {queue_type.value} queue entries.
 --
 -- This is used by the {queue_type.value} queue to update its tail pointer,
@@ -106,7 +110,9 @@ class NumNewQueueEntriesDecl():
 class NaiveStoreOrderPerEntryDecl():
     def __init__(self, config: Config, prefix):
         self.top_level_comment = f"""
+-- Naive Store Order Per Load Queue Entry Unit
 -- Sub-unit of the Group Allocator.
+--
 -- Generates the naive store orders.
 --
 -- There is one naive store order per entry in the load queue.
@@ -156,7 +162,9 @@ class NaiveStoreOrderPerEntryDecl():
 class PortIdxPerEntryDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
         self.top_level_comment = f"""
+-- {queue_type.value} Port Index per {queue_type.value} Queue Entry
 -- Sub-unit of the Group Allocator.
+--
 -- Generates the {queue_type.value} port index per {queue_type.value} entry.
 --
 -- Each {queue_type.value} queue entry must know which {queue_type.value} port
@@ -198,7 +206,9 @@ class PortIdxPerEntryDecl():
 class GroupHandshakingDecl():
     def __init__(self, config : Config, prefix):
         self.top_level_comment = f"""
+-- Group Initiation Handshaking Unit
 -- Sub-unit of the Group Allocator.
+--
 -- Generates the local "group init channel transfer" signals
 -- as well as the output "group init channel ready" signals
 --
