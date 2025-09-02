@@ -187,6 +187,12 @@ RTL name for the unshifted naive store position per queue entry.
 It is naive as it only considers loads and stores currently being allocated, not previous stores.
 """
     
+SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME = f"shifted_stores_{NAIVE_STORE_ORDER_PER_ENTRY_NAME}"
+"""
+RTL name for the naive store position per queue entry, shifted only based on the store queue pointer.
+It is naive as it only considers loads and stores currently being allocated, not previous stores.
+"""
+    
 
 def UNSHIFTED_WRITE_ENABLE_NAME(
         queue_type : QueueType, 

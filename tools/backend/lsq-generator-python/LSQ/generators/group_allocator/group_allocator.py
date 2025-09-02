@@ -97,8 +97,9 @@ class NaiveStoreOrderPerEntryDecl():
         l = NaiveStoreOrderPerEntryLocalItems()
 
         self.local_items = [
-            l.NaiveStoreOrderPerEntry(config, shifted=False),
-            l.NaiveStoreOrderPerEntry(config, shifted=True)
+            l.NaiveStoreOrderPerEntry(config, shifted_both=True),
+            l.NaiveStoreOrderPerEntry(config, shifted_stores=True),
+            l.NaiveStoreOrderPerEntry(config, unshifted=True)
         ]
 
         b = NaiveStoreOrderPerEntryBodyItems()

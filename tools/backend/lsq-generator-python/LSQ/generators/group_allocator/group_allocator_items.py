@@ -471,7 +471,7 @@ class PortIdxPerEntryBodyItems():
     for i in 0 to {self.num_entries} - 1 loop
       {port_idx}(i) <=
         {unsh_port_idx}(
-          (i + {self.pointer_name}_int) mod {self.num_entries}
+          (i - {self.pointer_name}_int) mod {self.num_entries}
         );
     end loop;
 """.strip()
@@ -541,16 +541,22 @@ class NaiveStoreOrderPerEntryLocalItems():
         """
         def __init__(self, 
                      config : Config,
-                     shifted = False
+                     shifted_stores = False,
+                     shifted_both = False,
+                     unshifted = False
                      ):
             
             bitwidth = config.store_queue_num_entries()
             number = config.load_queue_num_entries()
 
-            if shifted:
+            if shifted_both:
                 base_name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
-            else:
+            elif shifted_stores:
+                base_name = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+            elif unshifted:
                 base_name = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+            else:
+                raise RuntimeError("unclear store order signal")
 
             Signal2D.__init__(
                 self,
@@ -638,15 +644,23 @@ class NaiveStoreOrderPerEntryBodyItems():
 """.strip()
 
                 shifted = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+                shifted_stores = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 shifted_assignments = f"""
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
         for j in 0 to {config.store_queue_num_entries()} - 1 loop
-          row_idx := (i - {load_pointer_name}_int) mod {config.load_queue_num_entries()};
-          col_idx := (j - {store_pointer_name}_int) mod {config.store_queue_num_entries()};
+          col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
 
-          -- assign shifted value
-          {shifted}(row_idx)(col_idx) <= {unshifted}(i)(j);
+          -- assign shifted value based on store queue
+          {shifted_stores}(i)(j) <= {unshifted}(i)(col_idx);
+        end loop;
+      end loop;
+
+      for i in 0 to {config.load_queue_num_entries()} - 1 loop
+          row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
+
+          -- assign shifted value based on load queue
+          {shifted}(i) <= {shifted_stores}(row_idx);
         end loop;
       end loop;
 """.strip()
