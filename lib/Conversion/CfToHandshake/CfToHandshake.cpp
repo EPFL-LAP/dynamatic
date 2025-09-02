@@ -1501,14 +1501,14 @@ struct GetGlobalOpConversion
       // No corresponding Global (maybe emit pass failure is better)
       return failure();
     }
-    auto newOp =
-        rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType());
+
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
     if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
-      setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
-          newOp, op.getContext(), denseAttr);
+      rewriter.replaceOpWithNewOp<handshake::RAMOp>(
+          op, op.getType(),
+          handshake::MemoryInitialValueAttr::get(op.getContext(), denseAttr));
     } else {
       llvm::report_fatal_error(
           "The initial value must be denoted in DenseElementsAttr.");
