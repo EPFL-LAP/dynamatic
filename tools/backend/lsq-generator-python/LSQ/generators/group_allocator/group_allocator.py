@@ -32,7 +32,7 @@ from LSQ.generators.group_allocator.group_allocator_items import \
 class WriteEnableDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
         self.top_level_comment = f"""
--- {queue_type.value} Queue Write Enables Unit
+-- (Load/Store) Queue Write Enables Unit
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the write enable signals for the {queue_type.value} queue
@@ -82,7 +82,7 @@ class WriteEnableDecl():
 class NumNewQueueEntriesDecl():
     def __init__(self, config : Config, queue_type : QueueType, prefix):
         self.top_level_comment = f"""
--- Number of New Entries in the {queue_type.value} Queue Unit
+-- Number of New Entries in the (Load/Store) Queue Unit
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the number of newly allocated {queue_type.value} queue entries.
