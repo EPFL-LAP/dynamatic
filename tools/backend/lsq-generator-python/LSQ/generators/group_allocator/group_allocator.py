@@ -343,6 +343,8 @@ class GroupAllocator:
             file.write(self.print_dec(GroupHandshakingDecl(config, self.prefix + "_ga")))
 
             file.write(self.print_dec(WriteEnableDecl(config, QueueType.LOAD, self.prefix + "_ga")))
+            file.write(self.print_dec(WriteEnableDecl(config, QueueType.STORE, self.prefix + "_ga")))
+
 
         # subunit_prefix = self.prefix + "_ga"
 
@@ -443,8 +445,8 @@ class GroupAllocator:
 
         # ldq_wen_unshifted = LogicArray(
             # ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
-        stq_wen_unshifted = LogicArray(
-            ctx, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
+        # stq_wen_unshifted = LogicArray(
+            # ctx, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
         
         # for i in range(0, self.configs.numLdqEntries):
             # arch += Op(ctx, ldq_wen_unshifted[i],
@@ -453,12 +455,12 @@ class GroupAllocator:
                     #    'else', '\'0\''
                     #    )
 
-        for i in range(0, self.configs.numStqEntries):
-            arch += Op(ctx, stq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_stores, '>', (i, self.configs.stqAddrW),
-                       'else', '\'0\''
-                       )
+        # for i in range(0, self.configs.numStqEntries):
+        #     arch += Op(ctx, stq_wen_unshifted[i],
+        #                '\'1\'', 'when',
+        #                num_stores, '>', (i, self.configs.stqAddrW),
+        #                'else', '\'0\''
+        #                )
 
         # Shift the arrays
         if (self.configs.ldpAddrW > 0):
@@ -469,7 +471,7 @@ class GroupAllocator:
                                     stq_port_idx_rom, stq_tail_i)
             
         # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
-        arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
+        # arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
 
         for i in range(0, self.configs.numLdqEntries):
             arch += CyclicLeftShift(ctx,
@@ -501,6 +503,9 @@ class GroupAllocator:
             file.write(hs.get())
 
             write_enable = b.WriteEnableInst(config, QueueType.LOAD, self.prefix + "_ga")
+            file.write(write_enable.get())
+
+            write_enable = b.WriteEnableInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(write_enable.get())
 
             file.write(arch + '\n')
