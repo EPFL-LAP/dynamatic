@@ -187,12 +187,27 @@ class Config:
         
     def queue_idx_bitwidth(self, queue_type : QueueType) -> int:
         """
-        Bitwidth for a pointer into the store queue.
+        Bitwidth for a pointer into the (load/store) queue.
 
         Calculated by ceil(log2(num_entries))
         """
-        return self._stq_idx_w
-    
+
+        match queue_type:
+            case QueueType.LOAD:
+                return self._ldq_idx_w
+            case QueueType.STORE:
+                return self._stq_idx_w    
+
+    def queue_num_entries(self, queue_type : QueueType) -> int:
+        """
+        Number of queue entries in the (load/store) queue.
+        """
+        match queue_type:
+            case QueueType.LOAD:
+                return self._ldq_num_entries
+            case QueueType.STORE:
+                return self._stq_num_entries    
+
     
     def load_queue_num_entries(self) -> int:
         """

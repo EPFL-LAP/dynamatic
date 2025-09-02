@@ -4,20 +4,22 @@ from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPrio
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture, Signal
+from LSQ.entity import Entity, Architecture, Signal, EntityComment
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
 
 from LSQ.rtl_signal_names import *
 
+import LSQ.declarative_signals as ds
+
+from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
+
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorPortItems, 
         GroupAllocatorBodyItems,
         GroupAllocatorLocalItems,
-        GroupHandshakingLocalItems,
-        GroupHandshakingBodyItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
@@ -132,8 +134,6 @@ class NaiveStoreOrderPerEntryDecl():
         self.prefix = prefix
 
 
-
-
         ga_p = GroupAllocatorPortItems()
         ga_l = GroupAllocatorLocalItems()
 
@@ -203,67 +203,12 @@ class PortIdxPerEntryDecl():
             b.Body(config, queue_type)
         ]
 
-class GroupHandshakingDecl():
-    def __init__(self, config : Config, prefix):
-        self.top_level_comment = f"""
--- Group Initiation Handshaking Unit
--- Sub-unit of the Group Allocator.
---
--- Generates the local "group init channel transfer" signals
--- as well as the output "group init channel ready" signals
---
--- Without multi-group assignment enabled,
--- the ready signal to a group is based on how empty/full the current
--- load and store queue are.
---
--- If there is enough space to allocate the group,
--- the ready signal is set high.
---
--- The transfer signal is the "and" of the ready and valid signals.
-""".strip()
-        
-        self.name = GROUP_HANDSHAKING_NAME
-        self.prefix = prefix
-
-        ga_p = GroupAllocatorPortItems()
-
-        ga_l = GroupAllocatorLocalItems()
-
-        d = Signal.Direction
-        self.entity_port_items = [
-            ga_p.GroupInitValid(config),
-            ga_p.GroupInitReady(config),
-
-            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
-            ga_p.QueueIsEmpty(QueueType.LOAD),
-
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-            ga_p.QueueIsEmpty(QueueType.STORE),
-
-            ga_l.GroupInitTransfer(config, d.OUTPUT)
-        ]
-
-        l = GroupHandshakingLocalItems()
-        self.local_items = [
-            l.NaiveNumEmptyEntries(config, QueueType.LOAD),
-            l.NaiveNumEmptyEntries(config, QueueType.STORE),
-
-            ga_p.GroupInitReady(config)
-        ]
-
-        b = GroupHandshakingBodyItems()
-
-        self.body = [
-            b.Body(config)
-        ]
-
 class GroupAllocatorDecl():
     def __init__(self, config : Config, prefix, subunit_prefix):
         self.top_level_comment = f"""
 -- Group Allocator.
 """.strip()
+        
 
         p = GroupAllocatorPortItems()
         l = GroupAllocatorLocalItems()
@@ -274,12 +219,12 @@ class GroupAllocatorDecl():
         d = Signal.Direction
 
         self.entity_port_items = [
-            p.Reset(),
-            p.Clock(),
+            ds.Reset(),
+            ds.Clock(),
 
-            p.GroupInitChannelComment(config),
+            EntityComment(ds.GroupInitValid.comment(config)),
+            ds.GroupInitValid(config),
 
-            p.GroupInitValid(config),
             p.GroupInitReady(config),
 
             p.QueueInputsComment(queue_type=QueueType.LOAD),
@@ -431,7 +376,7 @@ class GroupAllocator:
 
         subunit_prefix = self.prefix + "_ga"
 
-        unit = self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
+        unit = self.print_dec(GroupHandshaking(config, subunit_prefix))
 
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))

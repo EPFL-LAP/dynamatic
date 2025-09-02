@@ -95,7 +95,7 @@ class WrapSubReturn():
         self.line3 = line3
         self.line4 = line4
 
-def WrapSub(out, a, b, max) -> WrapSubReturn:
+def WrapSub(output_signal, lhs_signal, rhs_signal, wrap_max) -> WrapSubReturn:
     """
     if "max" is power of 2:
         in_a - in_b
@@ -106,14 +106,14 @@ def WrapSub(out, a, b, max) -> WrapSubReturn:
             out = (in_a + max) - in_b
     """
 
-    if isPow2(max):
-        line1 = f"{out} <= std_logic_vector(unsigned({a}) - unsigned({b}));"
+    if isPow2(wrap_max):
+        line1 = f"{output_signal} <= std_logic_vector(unsigned({lhs_signal}) - unsigned({rhs_signal}));"
         return WrapSubReturn(single_line=True, line1=line1)
     else:
-        line1 = f"{out} <="
-        line2 = f"std_logic_vector(unsigned({a}) - unsigned({b}))"
-        line3 = f"when {a} >= b else"
-        line4 = f"std_logic_vector({max} + unsigned({a}) - unsigned({b}))" 
+        line1 = f"{output_signal} <="
+        line2 = f"std_logic_vector(unsigned({lhs_signal}) - unsigned({rhs_signal}))"
+        line3 = f"when {lhs_signal} >= b else"
+        line4 = f"std_logic_vector({wrap_max} + unsigned({lhs_signal}) - unsigned({rhs_signal}))" 
 
         return WrapSubReturn(
             single_line=False, 
