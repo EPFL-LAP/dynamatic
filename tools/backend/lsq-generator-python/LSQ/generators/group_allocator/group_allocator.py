@@ -421,13 +421,13 @@ class GroupAllocator:
 
         subunit_prefix = self.prefix + "_ga"
 
-        unit = self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
-        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
+        unit = self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
 
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
 
-        unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
+        unit += self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
+        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
 
         if config.load_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
@@ -435,7 +435,7 @@ class GroupAllocator:
         if config.store_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
-        unit += self.print_dec(GroupHandshakingDecl(config, subunit_prefix))
+        unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
         unit += self.print_dec(GroupAllocatorDecl(config, self.prefix, subunit_prefix))
 
