@@ -149,155 +149,155 @@ class NumNewQueueEntriesBody():
                     def has_items(group_idx): return config.group_num_stores(group_idx) > 0
                     self.has_items = has_items
 
+#         def __init__(self, config : Config, queue_type : QueueType):
+#             self._set_params(config, queue_type)
+
+#             self.item = ""
+
+#             selects = []
+            
+#             zeros_binary = get_as_binary_string_padded(0, self.new_entries_bitwidth)
+
+#             for i in range(config.num_groups()):
+#                 if self.has_items(i):  
+#                     new_entries = self.new_entries(i)
+#                     new_entries_binary = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
+
+#                     select = f"({new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary})"
+
+#                     selects.append(select)
+
+#                     self.item += f"""
+#   -- Group {i} has {new_entries} {queue_type.value}(s)
+# """.removeprefix("\n")
+
+#             assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
+#             self.item += f"""
+#   {assign_to} <=
+# """
+#             for select in selects[:-1]:
+#                 self.item += f"""
+#     {select}
+#       or 
+# """.removeprefix("\n")
+                
+#             self.item += f"""
+#     {selects[-1]};
+# """.removeprefix("\n")
+
         def __init__(self, config : Config, queue_type : QueueType):
             self._set_params(config, queue_type)
 
-            self.item = ""
+            ############################
+            # Build mux inner pieces
+            ############################
 
-            selects = []
+            # case input is the std_logic_vector of concatenated bits
+            # we pass to the mux's case statement
+            case_input = ""
+
+            # not all groups have loads/store
+            # if the group does not have any of 
+            # the relevant memory op,
+            # we do not pass its transfer signal to the mux
+            #
+            # num_cases tracks how many groups 
+            # are passed to the mux
             
-            zeros_binary = get_as_binary_string_padded(0, self.new_entries_bitwidth)
+            num_cases = 0
 
+            # add each group to the mux's case statement input
+            # if it has he relevant memory op
             for i in range(config.num_groups()):
-                if self.has_items(i):  
+                if self.has_items(i):      
+                    
+                    case_input += f"""
+    case_input({num_cases}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+""" .removeprefix("\n")
+                    
+                    num_cases = num_cases + 1  
+                    
+            case_input = case_input.strip()
+                    
+
+            # cases are the mux's data inputs
+            # each is associated with one of the inputs
+            # by a 'when' statement
+            # and then a set of assignments
+            cases = ""
+
+            # not all groups are in the mux, 
+            # so we need to track how many 'when' statements
+            # we have added
+            case_number = 0
+            for i in range(config.num_groups()):
+                # if it has at least one of the relevant ops
+                if self.has_items(i):      
+                    # get the case number one-hot encoded
+                    # (not the group number, since not all groups are in the mux)
+                    group_one_hot = one_hot(case_number, num_cases)
+                    case_number = case_number + 1
+                    
                     new_entries = self.new_entries(i)
-                    new_entries_binary = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
 
-                    select = f"({new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary})"
+                    assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
+                    new_entries_bin = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
+                    new_entries_bin = new_entries_bin.replace("0", "-")
 
-                    selects.append(select)
+                    # map assignments to a select input
+                    cases += f"""
+      when {group_one_hot} =>
+        -- Group {i} has {new_entries} {queue_type.value}(s)
+        {assign_to} <= {new_entries_bin};
 
-                    self.item += f"""
-  -- Group {i} has {new_entries} {queue_type.value}(s)
 """.removeprefix("\n")
 
-            assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
-            self.item += f"""
-  {assign_to} <=
-"""
-            for select in selects[:-1]:
-                self.item += f"""
-    {select}
-      or 
+                # if there are no loads/stores
+                else:
+                    cases += f"""
+      -- Group {i} has no {queue_type.value}s
+
 """.removeprefix("\n")
                 
-            self.item += f"""
-    {selects[-1]};
+                    
+            cases += f"""
+      -- defaults handled at top of process
+      when others =>
+        null;
 """.removeprefix("\n")
 
-        # def __init__(self, config : Config, queue_type : QueueType):
-        #     self._set_params(config, queue_type)
-
-#             ############################
-#             # Build mux inner pieces
-#             ############################
-
-#             # case input is the std_logic_vector of concatenated bits
-#             # we pass to the mux's case statement
-#             case_input = ""
-
-#             # not all groups have loads/store
-#             # if the group does not have any of 
-#             # the relevant memory op,
-#             # we do not pass its transfer signal to the mux
-#             #
-#             # num_cases tracks how many groups 
-#             # are passed to the mux
-            
-#             num_cases = 0
-
-#             # add each group to the mux's case statement input
-#             # if it has he relevant memory op
-#             for i in range(config.num_groups()):
-#                 if self.has_items(i):      
-                    
-#                     case_input += f"""
-#     case_input({num_cases}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
-# """ .removeprefix("\n")
-                    
-#                     num_cases = num_cases + 1  
-                    
-#             case_input = case_input.strip()
-                    
-
-#             # cases are the mux's data inputs
-#             # each is associated with one of the inputs
-#             # by a 'when' statement
-#             # and then a set of assignments
-#             cases = ""
-
-#             # not all groups are in the mux, 
-#             # so we need to track how many 'when' statements
-#             # we have added
-#             case_number = 0
-#             for i in range(config.num_groups()):
-#                 # if it has at least one of the relevant ops
-#                 if self.has_items(i):      
-#                     # get the case number one-hot encoded
-#                     # (not the group number, since not all groups are in the mux)
-#                     group_one_hot = one_hot(case_number, num_cases)
-#                     case_number = case_number + 1
-                    
-#                     new_entries = self.new_entries(i)
-
-#                     assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
-#                     new_entries_bin = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
-                    
-
-#                     # map assignments to a select input
-#                     cases += f"""
-#       when {group_one_hot} =>
-#         -- Group {i} has {new_entries} {queue_type.value}(s)
-#         {assign_to} <= {new_entries_bin};
-
-# """.removeprefix("\n")
-
-#                 # if there are no loads/stores
-#                 else:
-#                     cases += f"""
-#       -- Group {i} has no {queue_type.value}s
-
-# """.removeprefix("\n")
-                
-                    
-#             cases += f"""
-#       -- defaults handled at top of process
-#       when others =>
-#         null;
-# """.removeprefix("\n")
-
-#             # format correctly
-#             cases = cases.strip()
+            # format correctly
+            cases = cases.strip()
 
 
-#             ############################
-#             # Actual mux statement
-#             ############################
+            ############################
+            # Actual mux statement
+            ############################
 
-#             self.item = f"""
-#   process(all)
-#     variable case_input : std_logic_vector({num_cases} - 1 downto 0);
-#   begin
-#     -- If no group is transferring,
-#     -- or the group has no {queue_type.value}s,
-#     -- then set to zero
-#     {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o <= (others => '0');
+            self.item = f"""
+  process(all)
+    variable case_input : std_logic_vector({num_cases} - 1 downto 0);
+  begin
+    -- If no group is transferring,
+    -- or the group has no {queue_type.value}s,
+    -- then set to zero
+    {NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o <= (others => '0');
 
-#     {case_input}
+    {case_input}
 
-#     -- This LSQ was generated without multi-group allocation
-#     -- and so assumes the dataflow circuit will only ever 
-#     -- have 1 group valid signal in a given cycle
+    -- This LSQ was generated without multi-group allocation
+    -- and so assumes the dataflow circuit will only ever 
+    -- have 1 group valid signal in a given cycle
 
-#     -- Using case statement to help infer one-hot mux
-#     case
-#       case_input
-#     is
-#       {cases}
+    -- Using case statement to help infer one-hot mux
+    case?
+      case_input
+    is
+      {cases}
 
-#     end case;
-#   end process;
-# """.strip()
+    end case;
+  end process;
+""".strip()
             
         def get(self):
             return self.item
