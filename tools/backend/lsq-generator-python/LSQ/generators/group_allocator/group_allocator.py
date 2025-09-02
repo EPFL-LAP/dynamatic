@@ -510,7 +510,7 @@ class GroupAllocator:
             write_enable = b.WriteEnableInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(write_enable.get())
 
-            store_order = b.NaiveStoreOrderPerEntry(config, QueueType.STORE, self.prefix + "_ga")
+            store_order = b.NaiveStoreOrderPerEntry(config, self.prefix + "_ga")
             file.write(store_order.get())
 
             file.write(arch + '\n')
