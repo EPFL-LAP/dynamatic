@@ -342,6 +342,8 @@ class GroupAllocator:
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
             file.write(self.print_dec(GroupHandshakingDecl(config, self.prefix + "_ga")))
 
+            file.write(self.print_dec(WriteEnableDecl(config, QueueType.LOAD, self.prefix + "_ga")))
+
         # subunit_prefix = self.prefix + "_ga"
 
         # unit = self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
@@ -406,60 +408,12 @@ class GroupAllocator:
         ga_ls_order_o = LogicVecArray(
             ctx, 'ga_ls_order', 'o', self.configs.numLdqEntries, self.configs.numStqEntries)
 
-        # The number of empty load and store is calculated with cyclic subtraction.
-        # If the empty signal is high, then set the number to max value.
-        # loads_sub = LogicVec(ctx, 'loads_sub', 'w', self.configs.ldqAddrW)
-        # stores_sub = LogicVec(ctx, 'stores_sub', 'w', self.configs.stqAddrW)
-        # empty_loads = LogicVec(ctx, 'empty_loads', 'w',
-                            #    self.configs.emptyLdAddrW)
-        # empty_stores = LogicVec(ctx, 'empty_stores', 'w',
-                                # self.configs.emptyStAddrW)
-
-        # arch += WrapSub_old(ctx, loads_sub, ldq_head_i,
-                        # ldq_tail_i, self.configs.numLdqEntries)
-        # arch += WrapSub_old(ctx, stores_sub, stq_head_i,
-                        # stq_tail_i, self.configs.numStqEntries)
-
-        # arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
-                #    '(', '\'0\'', '&', loads_sub, ')')
-        # arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
-                #    '(', '\'0\'', '&', stores_sub, ')')
 
         # Generate handshake signals
         # group_init_ready = LogicArray(
             # ctx, 'group_init_ready', 'w', self.configs.numGroups)
         group_init_hs = LogicArray(
             ctx, 'group_init_hs', 'w', self.configs.numGroups)
-
-        # for i in range(0, self.configs.numGroups):
-        #     arch += Op(ctx, group_init_ready[i],
-        #                '\'1\'', 'when',
-        #                '(', empty_loads,  '>=', (
-        #         self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
-        #         '(', empty_stores, '>=', (
-        #         self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
-        #         'else', '\'0\'')
-
-        # if (self.configs.gaMulti):
-        #     group_init_and = LogicArray(
-        #         ctx, 'group_init_and', 'w', self.configs.numGroups)
-        #     ga_rr_mask = LogicVec(ctx, 'ga_rr_mask', 'r',
-        #                           self.configs.numGroups)
-        #     ga_rr_mask.regInit()
-        #     for i in range(0, self.configs.numGroups):
-        #         arch += Op(ctx, group_init_and[i],
-        #                    group_init_ready[i], 'and', group_init_valid_i[i])
-        #         arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
-        #     arch += CyclicPriorityMasking(ctx, group_init_hs,
-        #                                   group_init_and, ga_rr_mask)
-        #     for i in range(0, self.configs.numGroups):
-        #         arch += Op(ctx, (ga_rr_mask, (i+1) %
-        #                          self.configs.numGroups), (group_init_hs, i))
-        # else:
-        #     for i in range(0, self.configs.numGroups):
-        #         arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
-        #         arch += Op(ctx, group_init_hs[i],
-        #                    group_init_ready[i], 'and', group_init_valid_i[i])
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
@@ -487,16 +441,18 @@ class GroupAllocator:
         arch += Op(ctx, num_loads_o, num_loads)
         arch += Op(ctx, num_stores_o, num_stores)
 
-        ldq_wen_unshifted = LogicArray(
-            ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
+        # ldq_wen_unshifted = LogicArray(
+            # ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
         stq_wen_unshifted = LogicArray(
             ctx, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_loads, '>', (i, self.configs.ldqAddrW),
-                       'else', '\'0\''
-                       )
+        
+        # for i in range(0, self.configs.numLdqEntries):
+            # arch += Op(ctx, ldq_wen_unshifted[i],
+                    #    '\'1\'', 'when',
+                    #    num_loads, '>', (i, self.configs.ldqAddrW),
+                    #    'else', '\'0\''
+                    #    )
+
         for i in range(0, self.configs.numStqEntries):
             arch += Op(ctx, stq_wen_unshifted[i],
                        '\'1\'', 'when',
@@ -511,8 +467,10 @@ class GroupAllocator:
         if (self.configs.stpAddrW > 0):
             arch += CyclicLeftShift(ctx, stq_port_idx_o,
                                     stq_port_idx_rom, stq_tail_i)
-        arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
+            
+        # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
+
         for i in range(0, self.configs.numLdqEntries):
             arch += CyclicLeftShift(ctx,
                                     ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
@@ -541,6 +499,9 @@ class GroupAllocator:
 
             hs = b.GroupHandshakingInst(config, self.prefix + "_ga")
             file.write(hs.get())
+
+            write_enable = b.WriteEnableInst(config, QueueType.LOAD, self.prefix + "_ga")
+            file.write(write_enable.get())
 
             file.write(arch + '\n')
 
