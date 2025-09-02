@@ -185,7 +185,7 @@ class GroupHandshakingBody():
             return if_statements.strip()
                 
 
-        def _get_output_assignments(config: Config):
+        def _get_output_assignments(self, config : Config):
             """
             The init ready signal is local, 
             since it is used to calculate the init transfer output.
