@@ -214,7 +214,7 @@ class GroupHandshakingBody():
   -- drive the transfer output
   {init_transfer} <= {init_valid} and {init_ready};
 
-""".removeprefix("\n")
+""".lstrip()
                 
             return assignments.strip()
         
