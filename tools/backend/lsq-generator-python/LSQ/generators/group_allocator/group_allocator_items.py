@@ -657,11 +657,10 @@ class NaiveStoreOrderPerEntryBodyItems():
       end loop;
 
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
-          row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
+        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
 
-          -- assign shifted value based on load queue
-          {shifted}(i) <= {shifted_stores}(row_idx);
-        end loop;
+        -- assign shifted value based on load queue
+        {shifted}(i) <= {shifted_stores}(row_idx);
       end loop;
 """.strip()
 
