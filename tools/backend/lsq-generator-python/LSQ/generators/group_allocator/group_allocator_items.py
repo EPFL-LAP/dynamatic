@@ -182,7 +182,7 @@ class NumNewQueueEntriesBody():
 """.removeprefix("\n")
                 
             self.item += f"""
-    {select[-1]};
+    {selects[-1]};
 """.removeprefix("\n")
 
         # def __init__(self, config : Config, queue_type : QueueType):
