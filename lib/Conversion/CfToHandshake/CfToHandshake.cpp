@@ -1509,6 +1509,9 @@ struct GetGlobalOpConversion
     if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
       setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
           newOp, op.getContext(), denseAttr);
+    } else {
+      llvm::report_fatal_error(
+          "The initial value must be denoted in DenseElementsAttr.");
     }
     return success();
   }
