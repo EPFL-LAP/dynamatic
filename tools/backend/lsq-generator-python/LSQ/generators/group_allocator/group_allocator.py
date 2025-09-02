@@ -251,7 +251,7 @@ class GroupAllocatorDecl():
             b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix),
             b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix),
 
-            b.NaiveStoreOrderPerEntry(config, subunit_prefix),
+            b.NaiveStoreOrderPerEntryInst(config, subunit_prefix),
 
             b.WriteEnableInst(config, QueueType.LOAD, subunit_prefix),
             b.WriteEnableInst(config, QueueType.STORE, subunit_prefix)
@@ -348,6 +348,9 @@ class GroupAllocator:
 
             file.write(self.print_dec(NaiveStoreOrderPerEntryDecl(config, self.prefix + "_ga")))
 
+            file.write(self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, self.prefix + "_ga")))
+            file.write(self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, self.prefix + "_ga")))
+
 
         # subunit_prefix = self.prefix + "_ga"
 
@@ -439,10 +442,10 @@ class GroupAllocator:
                              self.configs.gaStPortIdx, group_init_hs)
         # arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
                         #  group_init_hs, MaskLess)
-        arch += Mux1HROM(ctx, num_loads,
-                         self.configs.gaNumLoads, group_init_hs)
-        arch += Mux1HROM(ctx, num_stores,
-                         self.configs.gaNumStores, group_init_hs)
+        # arch += Mux1HROM(ctx, num_loads,
+                        #  self.configs.gaNumLoads, group_init_hs)
+        # arch += Mux1HROM(ctx, num_stores,
+                        #  self.configs.gaNumStores, group_init_hs)
         arch += Op(ctx, num_loads_o, num_loads)
         arch += Op(ctx, num_stores_o, num_stores)
 
@@ -511,8 +514,15 @@ class GroupAllocator:
             write_enable = b.WriteEnableInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(write_enable.get())
 
-            store_order = b.NaiveStoreOrderPerEntry(config, self.prefix + "_ga")
+            store_order = b.NaiveStoreOrderPerEntryInst(config, self.prefix + "_ga")
             file.write(store_order.get())
+
+            num_loads_mux = b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.prefix + "_ga")
+            file.write(num_loads_mux.get())
+
+            num_stores_mux = b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.prefix + "_ga")
+            file.write(num_stores_mux.get())
+
 
             file.write(arch + '\n')
 

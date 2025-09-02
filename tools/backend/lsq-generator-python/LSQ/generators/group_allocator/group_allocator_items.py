@@ -647,6 +647,10 @@ class NaiveStoreOrderPerEntryBodyItems():
                 shifted_stores = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 shifted_assignments = f"""
+
+      -- shift all the store orders based on the store queue pointer
+      -- From Hailin's design, the circuit is better shifting based on
+      -- one pointer at a time 
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
         for j in 0 to {config.store_queue_num_entries()} - 1 loop
           col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
@@ -656,6 +660,7 @@ class NaiveStoreOrderPerEntryBodyItems():
         end loop;
       end loop;
 
+      -- shift all the store orders based on the load queue pointer
       for i in 0 to {config.load_queue_num_entries()} - 1 loop
         row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
 
@@ -687,7 +692,7 @@ class NaiveStoreOrderPerEntryBodyItems():
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
 
-    -- where to shift a value to
+    -- where a location in the shifted order should read from
     variable row_idx, col_idx : natural;
 
     variable case_input : std_logic_vector({num_cases} - 1 downto 0);
@@ -1248,7 +1253,7 @@ class GroupAllocatorBodyItems():
                 port_items=port_items
             )
 
-    class NaiveStoreOrderPerEntry(Instantiation):
+    class NaiveStoreOrderPerEntryInst(Instantiation):
         def __init__(self, config : Config, prefix):
 
             ga_l = GroupAllocatorLocalItems()
