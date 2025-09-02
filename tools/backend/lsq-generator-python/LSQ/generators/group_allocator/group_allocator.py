@@ -345,6 +345,8 @@ class GroupAllocator:
             file.write(self.print_dec(WriteEnableDecl(config, QueueType.LOAD, self.prefix + "_ga")))
             file.write(self.print_dec(WriteEnableDecl(config, QueueType.STORE, self.prefix + "_ga")))
 
+            file.write(self.print_dec(NaiveStoreOrderPerEntryDecl(config, self.prefix + "_ga")))
+
 
         # subunit_prefix = self.prefix + "_ga"
 
@@ -424,18 +426,18 @@ class GroupAllocator:
         if (self.configs.stpAddrW > 0):
             stq_port_idx_rom = LogicVecArray(
                 ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
-        ga_ls_order_rom = LogicVecArray(
-            ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        ga_ls_order_temp = LogicVecArray(
-            ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
+        # ga_ls_order_rom = LogicVecArray(
+            # ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
+        # ga_ls_order_temp = LogicVecArray(
+            # ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         if (self.configs.ldpAddrW > 0):
             arch += Mux1HROM(ctx, ldq_port_idx_rom,
                              self.configs.gaLdPortIdx, group_init_hs)
         if (self.configs.stpAddrW > 0):
             arch += Mux1HROM(ctx, stq_port_idx_rom,
                              self.configs.gaStPortIdx, group_init_hs)
-        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
-                         group_init_hs, MaskLess)
+        # arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
+                        #  group_init_hs, MaskLess)
         arch += Mux1HROM(ctx, num_loads,
                          self.configs.gaNumLoads, group_init_hs)
         arch += Mux1HROM(ctx, num_stores,
@@ -473,11 +475,11 @@ class GroupAllocator:
         # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         # arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
 
-        for i in range(0, self.configs.numLdqEntries):
-            arch += CyclicLeftShift(ctx,
-                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
-        arch += CyclicLeftShift(ctx, ga_ls_order_o,
-                                ga_ls_order_temp, ldq_tail_i)
+        # for i in range(0, self.configs.numLdqEntries):
+        #     arch += CyclicLeftShift(ctx,
+        #                             ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
+        # arch += CyclicLeftShift(ctx, ga_ls_order_o,
+        #                         ga_ls_order_temp, ldq_tail_i)
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
@@ -507,6 +509,9 @@ class GroupAllocator:
 
             write_enable = b.WriteEnableInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(write_enable.get())
+
+            store_order = b.NaiveStoreOrderPerEntry(config, QueueType.STORE, self.prefix + "_ga")
+            file.write(store_order.get())
 
             file.write(arch + '\n')
 
