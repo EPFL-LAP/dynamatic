@@ -43,7 +43,7 @@ class GroupHandshaking():
         self.entity_port_items = [
             EntityComment(f"""  
     -- Group init channels from the dataflow circuit
-    -- {config.num_groups()} control channels,
+    -- {config.num_groups()} control channel(s),
     -- One for each group of memory operations.
 
 """),
@@ -53,8 +53,7 @@ class GroupHandshaking():
 
             EntityComment(f"""
     -- Inputs from the load queue.
-    -- Used to see if there is enough space to allocate
-    -- each group
+    -- Used to see if there is enough space to allocate each group.
 
 """),
 
@@ -64,8 +63,7 @@ class GroupHandshaking():
 
             EntityComment(f"""    
     -- Inputs from the store queue.
-    -- Used to see if there is enough space to allocate
-    -- each group
+    -- Used to see if there is enough space to allocate each group.
 
 """),
 
@@ -137,7 +135,7 @@ class GroupHandshakingBody():
 
   end process;
 
-    {self._get_output_assignments(config)}
+  {self._get_output_assignments(config)}
 
 """.removeprefix("\n")
                 

@@ -228,7 +228,7 @@ class GroupAllocatorDecl():
             EntityComment(f"""
                           
     -- Group init channels from the dataflow circuit
-    -- {config.num_groups()} control channels,
+    -- {config.num_groups()} control channel(s),
     -- One for each group of memory operations.
 
 
