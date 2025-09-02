@@ -520,7 +520,7 @@ class GroupAllocator:
             num_loads_mux = b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.prefix + "_ga")
             file.write(num_loads_mux.get())
 
-            num_stores_mux = b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.prefix + "_ga")
+            num_stores_mux = b.NumNewQueueEntriesInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(num_stores_mux.get())
 
 
