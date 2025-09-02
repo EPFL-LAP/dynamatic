@@ -351,6 +351,12 @@ class GroupAllocator:
             file.write(self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, self.prefix + "_ga")))
             file.write(self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, self.prefix + "_ga")))
 
+            if config.load_ports_idx_bitwidth() > 0:
+                file.write(self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, self.prefix + "_ga")))
+
+            if config.store_ports_idx_bitwidth() > 0:
+                file.write(self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, self.prefix + "_ga")))
+
 
         # subunit_prefix = self.prefix + "_ga"
 
@@ -424,22 +430,22 @@ class GroupAllocator:
             ctx, 'group_init_hs', 'w', self.configs.numGroups)
 
         # ROM value
-        if (self.configs.ldpAddrW > 0):
-            ldq_port_idx_rom = LogicVecArray(
-                ctx, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
-        if (self.configs.stpAddrW > 0):
-            stq_port_idx_rom = LogicVecArray(
-                ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
+        # if (self.configs.ldpAddrW > 0):
+        #     ldq_port_idx_rom = LogicVecArray(
+        #         ctx, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
+        # if (self.configs.stpAddrW > 0):
+        #     stq_port_idx_rom = LogicVecArray(
+        #         ctx, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
         # ga_ls_order_rom = LogicVecArray(
             # ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         # ga_ls_order_temp = LogicVecArray(
             # ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        if (self.configs.ldpAddrW > 0):
-            arch += Mux1HROM(ctx, ldq_port_idx_rom,
-                             self.configs.gaLdPortIdx, group_init_hs)
-        if (self.configs.stpAddrW > 0):
-            arch += Mux1HROM(ctx, stq_port_idx_rom,
-                             self.configs.gaStPortIdx, group_init_hs)
+        # if (self.configs.ldpAddrW > 0):
+        #     arch += Mux1HROM(ctx, ldq_port_idx_rom,
+        #                      self.configs.gaLdPortIdx, group_init_hs)
+        # if (self.configs.stpAddrW > 0):
+        #     arch += Mux1HROM(ctx, stq_port_idx_rom,
+        #                      self.configs.gaStPortIdx, group_init_hs)
         # arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
                         #  group_init_hs, MaskLess)
         # arch += Mux1HROM(ctx, num_loads,
@@ -469,12 +475,12 @@ class GroupAllocator:
         #                )
 
         # Shift the arrays
-        if (self.configs.ldpAddrW > 0):
-            arch += CyclicLeftShift(ctx, ldq_port_idx_o,
-                                    ldq_port_idx_rom, ldq_tail_i)
-        if (self.configs.stpAddrW > 0):
-            arch += CyclicLeftShift(ctx, stq_port_idx_o,
-                                    stq_port_idx_rom, stq_tail_i)
+        # if (self.configs.ldpAddrW > 0):
+        #     arch += CyclicLeftShift(ctx, ldq_port_idx_o,
+        #                             ldq_port_idx_rom, ldq_tail_i)
+        # if (self.configs.stpAddrW > 0):
+        #     arch += CyclicLeftShift(ctx, stq_port_idx_o,
+        #                             stq_port_idx_rom, stq_tail_i)
             
         # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         # arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
@@ -525,6 +531,15 @@ class GroupAllocator:
 
             num_new_entries = b.NumNewEntriesAssignment()
             file.write(num_new_entries.get())
+
+            if config.load_ports_idx_bitwidth() > 0:
+                port_idx = b.PortIdxPerEntryInst(config, QueueType.LOAD, self.prefix + "_ga")
+                file.write(port_idx.get())
+
+            if config.store_ports_idx_bitwidth() > 0:
+                port_idx = b.PortIdxPerEntryInst(config, QueueType.STORE, self.prefix + "_ga")
+                file.write(port_idx.get())
+
 
             file.write(arch + '\n')
 
