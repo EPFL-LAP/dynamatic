@@ -1397,64 +1397,7 @@ class GroupAllocatorLocalItems():
                 ),
                 always_number=True
             )
-
-class GroupHandshakingLocalItemsOld():
-    class PointerSub(Signal):
-        """
-        Local signal
-        
-        Bitwidth = N
-
-        Number = 1
-
-        Number of empty entries in a queue
-        """
-
-        def init(self,
-                 config : Config,
-                 queue_type : QueueType
-                 ):
-
-            Signal.__init__(
-                self,
-                base_name=POINTER_SUB_NAME(queue_type),
-                size=Signal.Size(
-                    bitwidth=config.store_queue_idx_bitwidth(),
-                    number=
-                ),
-                always_number=True
-            )
-
-    class Empty(Signal):
-        """
-        Local signal
-        
-        Bitwidth = N
-
-        Number = 1
-
-        Bitwidth required for number of empty elements in queue
-        """
-
-        def init(self,
-                 config : Config,
-                 queue_type : QueueType
-                 ):
-
-            Signal.__init__(
-                self,
-                base_name=POINTER_SUB_NAME(queue_type),
-                size=Signal.Size(
-                    bitwidth=1,
-                    number=config.num_groups()
-                ),
-                always_number=True
-            )
             
-
-class GroupHandshakingBodyItems():
-    class Body():
-
 
 class GroupHandshakingLocalItems():
     class NaiveNumEmptyEntries(Signal):
