@@ -1356,7 +1356,7 @@ class GroupAllocatorBodyItems():
     -- Here we drive the outputs with them
     {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)};
     {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)};
-""".strip()
+"""
                     
 class GroupAllocatorLocalItems():
     class NumNewQueueEntries(Signal):

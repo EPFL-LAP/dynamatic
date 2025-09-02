@@ -526,7 +526,7 @@ class GroupAllocator:
             num_new_entries = b.NumNewEntriesAssignment()
             file.write(num_new_entries.get())
 
-            file.write('\n' + arch + '\n')
+            file.write(arch + '\n')
 
             file.write(ctx.regInitString + 'end architecture;\n')
 
