@@ -169,7 +169,7 @@ class NumNewQueueEntriesBody():
 
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
-"""
+""".removeprefix("\n")
 
             assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
             self.item += f"""
