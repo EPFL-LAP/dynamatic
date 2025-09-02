@@ -467,7 +467,7 @@ class PortIdxPerEntryBodyItems():
             self.shifted_assignments = f"""
     -- {queue_type.value} port indices must be mod left-shifted based on queue tail
     for i in 0 to {self.num_entries} - 1 loop
-      {port_idx}(i + {self.pointer_name}_int) mod {self.num_entries}) <=
+      {port_idx}((i + {self.pointer_name}_int) mod {self.num_entries}) <=
         {unsh_port_idx}(i);
         
     end loop;
