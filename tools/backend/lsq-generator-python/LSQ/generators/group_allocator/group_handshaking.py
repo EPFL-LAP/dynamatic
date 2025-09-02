@@ -48,7 +48,7 @@ class GroupHandshaking():
     -- One for each group of memory operations.
 
 
-""".removeprefix("\n").removesuffix("\n")),
+"""),
 
             ds.GroupInitValid(config),
             ds.GroupInitReady(config),
