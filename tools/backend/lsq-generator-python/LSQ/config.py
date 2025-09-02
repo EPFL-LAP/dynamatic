@@ -111,7 +111,7 @@ class Config:
             self.gaNumStores = self._group_num_stores
 
             self._group_store_order = obj["ldOrder"]
-            self.gaLdOrder = _group_store_order
+            self.gaLdOrder = self._group_store_order
 
             self._group_load_port_idxs = obj["ldPortIdx"]
 
