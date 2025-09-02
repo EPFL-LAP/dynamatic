@@ -5,8 +5,7 @@ from LSQ.rtl_signal_names import *
 
 from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_hot, mask_until
 
-
-from LSQ.operators.arithmetic import WrapSub
+import LSQ.declarative_signals as ds
 
 class WriteEnableLocalItems():
     class WriteEnable(Signal):
@@ -1105,7 +1104,7 @@ class GroupAllocatorBodyItems():
 
             si = SimpleInstantiation
             port_items = [
-                si(p.GroupInitValid(config), c.INPUT),
+                si(ds.GroupInitValid(config), c.INPUT),
                 si(p.GroupInitReady(config), c.OUTPUT),
 
                 si(p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL), c.INPUT),

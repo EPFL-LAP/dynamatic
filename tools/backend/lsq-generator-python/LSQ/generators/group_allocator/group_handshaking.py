@@ -150,7 +150,7 @@ class GroupHandshakingBody():
 
         def _get_ready_if_statements(self, config : Config):
             """
-            Get the if statement for each group which decides its ready signal
+            Get the if statement for each group to calculate its ready signal.
             If there is not enough space in either queues, the signal is 0.
             Otherwise, the ready signal is 1.
             """
