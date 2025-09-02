@@ -446,8 +446,8 @@ class GroupAllocator:
                         #  self.configs.gaNumLoads, group_init_hs)
         # arch += Mux1HROM(ctx, num_stores,
                         #  self.configs.gaNumStores, group_init_hs)
-        arch += Op(ctx, num_loads_o, num_loads)
-        arch += Op(ctx, num_stores_o, num_stores)
+        # arch += Op(ctx, num_loads_o, num_loads)
+        # arch += Op(ctx, num_stores_o, num_stores)
 
         # ldq_wen_unshifted = LogicArray(
             # ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
@@ -523,8 +523,10 @@ class GroupAllocator:
             num_stores_mux = b.NumNewQueueEntriesInst(config, QueueType.STORE, self.prefix + "_ga")
             file.write(num_stores_mux.get())
 
+            num_new_entries = b.NumNewEntriesAssignment()
+            file.write(num_new_entries.get())
 
-            file.write(arch + '\n')
+            file.write('\n' + arch + '\n')
 
             file.write(ctx.regInitString + 'end architecture;\n')
 
