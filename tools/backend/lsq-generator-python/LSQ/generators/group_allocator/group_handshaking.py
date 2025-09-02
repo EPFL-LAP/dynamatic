@@ -172,9 +172,9 @@ class GroupHandshakingBody():
     --      {num_loads} load(s)
     --      {num_stores} store(s)
     if 
-      {load_is_empty} = '0' and {load_empty_entries}_int < {num_loads} 
+      ({load_is_empty} = '0' and {load_empty_entries}_int < {num_loads})
         or
-      {store_is_empty} = '0' and {store_empty_entries}_int < {num_stores}
+      ({store_is_empty} = '0' and {store_empty_entries}_int < {num_stores})
     then
         {group_init_ready} <= '0';
     else 
