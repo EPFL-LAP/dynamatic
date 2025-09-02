@@ -84,12 +84,10 @@ class WriteEnableBodyItems():
   begin
     {self.pointer_name}_int := to_integer(unsigned({self.pointer_name}_i));
 
-    -- {queue_type.value} write enables must be mod left shifted based on queue tail
+    -- {queue_type.value} write enables must be mod left-shifted based on queue tail
     for i in 0 to {self.num_entries} - 1 loop
-      {wen}(i) <=
-        {unsh_wen}(
-          (i - {self.pointer_name}_int) mod {self.num_entries}
-        );
+      {wen}((i + {self.pointer_name}_int) mod {self.num_entries}) <=
+        {unsh_wen}(0);
     end loop;
   end process;
 """.strip()
@@ -467,12 +465,11 @@ class PortIdxPerEntryBodyItems():
             unsh_port_idx = UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)
 
             self.shifted_assignments = f"""
-    -- {queue_type.value} port indices must be mod left shifted based on queue tail
+    -- {queue_type.value} port indices must be mod left-shifted based on queue tail
     for i in 0 to {self.num_entries} - 1 loop
-      {port_idx}(i) <=
-        {unsh_port_idx}(
-          (i - {self.pointer_name}_int) mod {self.num_entries}
-        );
+      {port_idx}(i + {self.pointer_name}_int) mod {self.num_entries}) <=
+        {unsh_port_idx}(i);
+        
     end loop;
 """.strip()
 
