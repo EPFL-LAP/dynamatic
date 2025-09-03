@@ -236,7 +236,6 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
     cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
         -DLLVM_TARGETS_TO_BUILD="host" \
-        -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
         $CMAKE_COMPILERS $CMAKE_LLVM_BUILD_OPTIMIZATIONS

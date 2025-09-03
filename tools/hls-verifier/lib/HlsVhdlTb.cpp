@@ -45,7 +45,7 @@ struct MemRefToDualPortRAM {
 
     int dataWidth = type.getElementType().getIntOrFloatBitWidth();
     int dataDepth = type.getNumElements();
-    int addrWidth = ((int)ceil(log2(dataDepth)));
+    int addrWidth = max((int)ceil(log2(dataDepth)), 1);
 
     // The two_port_RAM has two read/write interfaces, each has
     // - we: write enable (must be set to 1 when writing)
@@ -70,7 +70,7 @@ struct MemRefToDualPortRAM {
                         const std::string &outputFilePath) {
     int dataWidth = type.getElementTypeBitWidth();
     int dataDepth = type.getNumElements();
-    int addrWidth = ((int)ceil(log2(dataDepth)));
+    int addrWidth = max((int)ceil(log2(dataDepth)), 1);
     declareConstant(os, "INPUT_" + argName, "STRING",
                     "\"" + inputVectorPath + "/input_" + argName + ".dat" +
                         "\"");
