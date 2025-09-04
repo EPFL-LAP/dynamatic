@@ -103,10 +103,12 @@ class NumNewEntriesBody():
 
             # generate the or of each masked signal
             # apart from the last one
-            one_hot_ors = [f"""
+            one_hot_ors = ""
+            for i in range(mask_id - 1):
+                one_hot_ors += f"""
     {f"{num_new_entries_masked}_{i}"}
       or            
-""" for i in range(mask_id - 1)]
+""".removeprefix("\n")
 
             # assignment and last input to the or
             # as well as the ending semi colon
