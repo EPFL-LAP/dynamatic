@@ -14,7 +14,7 @@ Each job is executed in a separate environment, i.e. jobs do not share anything 
 
 Steps are executed in order on a single runner, as if you were to run the commands normally via the shell on your computer. If a step fails (returns a non-zero exit code), the job will stop and fail, unless otherwise specified.
 
-The main Actions workflow for building and integration is described in [.github/workflows/ci.yml](/.github/workflows/ci.yml). It runs every time a pull request into main is opened, reopened, updated (i.e. new commits are pushed to it) or marked ready for review (i.e. converted from draft PR to "regular" PR). It consists of two jobs:
+The main Actions workflow for building and integration is described in `.github/workflows/ci.yml`. It runs every time a pull request into main is opened, reopened, updated (i.e. new commits are pushed to it) or marked ready for review (i.e. converted from draft PR to "regular" PR). It consists of two jobs:
 - `check-format`, which runs the [formatting checks](Formatting.md),
 - `integration`, which runs the build process, [integration tests](IntegrationTests.md) and [MLIR unit tests](../IntroductoryMaterial/FileCheckTesting.md).
 
