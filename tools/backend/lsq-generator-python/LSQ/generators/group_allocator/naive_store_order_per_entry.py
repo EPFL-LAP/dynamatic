@@ -119,16 +119,21 @@ class NaiveStoreOrderPerEntryBodyItems():
 
 
                 for i in range(config.queue_num_entries(QueueType.LOAD)):
+                    assign_to = f"{unshifted}({i})"
+
+                    if i < 10:
+                        assign_to = assign_to + " "
+                
                     mux_inputs = to_mux.get(i, [])
 
                     if len(mux_inputs) == 0:
                         self.item += f"""
-  {unshifted}({i}) <= others <= 0;
+   {assign_to} <= (others => '0');
 """.removeprefix("\n")
                     elif len(mux_inputs) == 1:
                         group, index = mux_inputs[0]
                         self.item += f"""
-  {unshifted}({i}) <= group_{group}_masked_naive_store_order({index})
+  {assign_to} <= group_{group}_masked_naive_store_order({index})
 """.removeprefix("\n")
                     else:
                         one_hots = ""
@@ -145,7 +150,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 """.strip()
 
                         self.item += f"""
-  {unshifted}({i}) <= 
+  {assign_to} <= 
     {one_hots}
     {final_assignment}
 """.removeprefix("\n")
