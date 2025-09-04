@@ -292,7 +292,6 @@ class Config:
         """
         Number of groups with loads in them
         """
-        print(self._group_num_loads)
         return len([i for i, num_loads in enumerate(self._group_num_loads) if num_loads > 0])
     
     def num_groups_with_stores(self) -> int:
@@ -300,7 +299,7 @@ class Config:
         Number of groups with loads in them
         """
         
-        return len([i for i, num_stores in self._group_num_stores if num_stores > 0])
+        return len([i for i, num_stores in enumerate(self._group_num_stores) if num_stores > 0])
 
     def group_num_stores(self, group_idx) -> int:
         """
