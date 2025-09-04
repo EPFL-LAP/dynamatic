@@ -82,7 +82,6 @@ class NaiveStoreOrderPerEntryDecl():
 
 class NaiveStoreOrderPerEntryBodyItems():
     class Body():
-
         def __init__(self, config : Config):
             needs_order_shift = False
             for group_orders in range(config.num_groups()):
@@ -91,69 +90,23 @@ class NaiveStoreOrderPerEntryBodyItems():
                         needs_order_shift = True
             
             if needs_order_shift:
+                store_order_width = config.queue_num_entries(QueueType.STORE)
+                zero_store_order = mask_until(0, store_order_width)
+
+                self.item = ""
+                for i in config.num_groups(config):
+                    non_zero_store_orders = 0
+                    transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
+                    for store_order_int in config.group_store_order(i):
+                        if store_order_int != 0:
+                            store_order = mask_until(store_order_int, store_order_width)
+                            assign_to = f"group_{i}_masked_naive_store_order({non_zero_store_orders})"
+                            self.item += f"""
+   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order}"
+""".removeprefix("\n")
 
                 load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
                 store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
-
-                case_inputs = ""
-                num_cases = 0
-                for i in range(config.num_groups()):
-                    if config.group_num_loads(i) > 0:
-                        case_inputs += f"""
-    case_input({num_cases}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
-""".removeprefix("\n")
-                        num_cases = num_cases + 1
-
-                case_inputs = case_inputs.strip()
-
-                cases = ""
-
-                case_number = 0
-                for i in range(config.num_groups()):
-                    if config.group_num_loads(i) > 0:      
-                        group_one_hot = one_hot(case_number, num_cases)
-                        case_number = case_number + 1
-                        cases += f"""
-      when {group_one_hot} =>
-""".removeprefix("\n")
-                        for j, store_order in enumerate(config.group_store_order(i)):
-                            if store_order > 0:
-                                cases += f"""
-        -- Ld {j} of group {i}'s store order
-        {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
-
-""".removeprefix("\n")
-                            else:
-                                cases += f"""
-        -- Ld {j} of group {i} has no preceding stores, use default value
-
-""".removeprefix("\n")
-                    else:
-                        cases += f"""
-      -- Group {i} has no loads
-
-""".removeprefix("\n")
-
-                cases += f"""
-      -- defaults handled at top of process
-      when others =>
-        null;
-""".removeprefix("\n")
-
-
-                cases = cases.strip()
-
-                unshifted_assignments = f"""
-  {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
-
-    {case_inputs}
-
-    case
-      case_input
-    is
-      {cases}
-    end case;
-""".strip()
 
                 shifted = NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 shifted_stores = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
@@ -197,8 +150,7 @@ class NaiveStoreOrderPerEntryBodyItems():
             
                 output_assignments = output_assignments.strip()
 
-                self.item = f"""
-
+                self.item += f"""
 
   process(all)
     -- tail pointers as integers for indexing
@@ -207,13 +159,10 @@ class NaiveStoreOrderPerEntryBodyItems():
     -- where a location in the shifted order should read from
     variable row_idx, col_idx : natural;
 
-    variable case_input : std_logic_vector({num_cases} - 1 downto 0);
   begin
     -- convert q tail pointers to integer
     {load_pointer_name}_int := to_integer(unsigned({load_pointer_name}_i));
     {store_pointer_name}_int := to_integer(unsigned({store_pointer_name}_i));
-
-    {unshifted_assignments}
 
     {shifted_assignments}
 
@@ -304,12 +253,17 @@ class MaskedStoreOrder():
     def get_local_item(self):
         item = ""
 
-        number = self.config.queue_num_entries(QueueType.LOAD)
         bitwidth = self.config.queue_num_entries(QueueType.STORE)
         for i in range(self.config.num_groups()):
-            name = f"group_{i}_masked_naive_store_order"
-            item += f"""
-    signal {name} = data_array({number} - 1 downto 0)({bitwidth} - 1 downto 0);
+            non_zero_store_orders = 0
+            for store_order in self.config.group_store_order(i):
+                if store_order != 0:
+                    non_zero_store_orders = non_zero_store_orders + 1
+            
+            if non_zero_store_orders > 0:
+                name = f"group_{i}_masked_naive_store_order"
+                item += f"""
+      signal {name} : data_array({non_zero_store_orders} - 1 downto 0)({bitwidth} - 1 downto 0);
 """.removeprefix("\n")
         
         return item.strip()
