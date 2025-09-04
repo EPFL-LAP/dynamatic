@@ -172,8 +172,6 @@ class GroupHandshakingBody():
 
   {self._get_ready_when_statements(config)}
 
-  end process;
-
   {self._get_output_assignments(config)}
 
 """.removeprefix("\n")
@@ -254,18 +252,18 @@ class GroupHandshakingBody():
                     num_empty_check_st = f" and {store_empty_entries} < {num_stores_binary}"
 
                 when_statements += f"""
-    -- Group {i} has:
-    --      {num_loads} load(s)
-    --      {num_stores} store(s)
-    -- 
-    -- To be ready to allocate a group,
-    -- both queues must have enough space for the group's memory operations
-    {group_init_ready} <= '0' when
-      ({load_is_empty} = '0'{num_empty_check_ld})
-        or
-      ({store_is_empty} = '0'{num_empty_check_st})
-    else
-        '1';
+  -- Group {i} has:
+  --      {num_loads} load(s)
+  --      {num_stores} store(s)
+  -- 
+  -- To be ready to allocate a group,
+  -- both queues must have enough space for the group's memory operations
+  {group_init_ready} <= '0' when
+    ({load_is_empty} = '0'{num_empty_check_ld})
+      or
+    ({store_is_empty} = '0'{num_empty_check_st})
+  else '1';
+
 """.removeprefix("\n")
             
             return when_statements.strip()
