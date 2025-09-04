@@ -171,10 +171,16 @@ class NumNewEntriesBody():
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
   {assign_to} <= {select};
+
+""".removeprefix("\n")
+                else:
+                    self.item += f"""
+-- Group {i} has no {queue_type.value}(s)
+
 """.removeprefix("\n")
 
 
-            assign_to = f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"
+            assign_to = f"{NUM_NEW_ENTRIES_NAME(queue_type)}_o"
             self.item += f"""
   {assign_to} <= 
 """
@@ -187,6 +193,7 @@ class NumNewEntriesBody():
             i = groups[-1]
             self.item += f"""
     {f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"};
+    
 """.removeprefix("\n")
 
 #         def __init__(self, config : Config, queue_type : QueueType):
