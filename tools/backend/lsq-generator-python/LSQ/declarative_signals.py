@@ -216,7 +216,7 @@ class NumNewQueueEntries(Signal):
                     ):
         Signal.__init__(
             self,
-            base_name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+            base_name=NUM_NEW_ENTRIES_NAME(queue_type),
             direction=direction,
             size=Signal.Size(
                 bitwidth=config.queue_idx_bitwidth(queue_type),

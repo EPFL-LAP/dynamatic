@@ -22,7 +22,7 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
         NaiveStoreOrderPerEntryBodyItems,
-        NumNewQueueEntriesBody,
+        NumNewEntriesBody,
         WriteEnableLocalItems,
         WriteEnableBodyItems
     )
@@ -128,7 +128,7 @@ class NumNewQueueEntriesDecl():
 -- for the {queue_type.value} queue.
 """.strip()
 
-        self.name = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
+        self.name = NUM_NEW_ENTRIES_NAME(queue_type)
         self.prefix = prefix
 
 
@@ -147,7 +147,7 @@ class NumNewQueueEntriesDecl():
 
         self.local_items = []
 
-        b = NumNewQueueEntriesBody()
+        b = NumNewEntriesBody()
         self.body = [
             b.Body(config, queue_type)
         ]

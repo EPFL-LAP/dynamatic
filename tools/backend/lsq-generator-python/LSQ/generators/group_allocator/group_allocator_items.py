@@ -59,7 +59,7 @@ class WriteEnableBodyItems():
 
         def _unshifted_assignments(self, queue_type : QueueType):
             unshf_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
-            new_entries = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
+            new_entries = NUM_NEW_ENTRIES_NAME(queue_type)
 
             self.unshifted_assignments = f"""
   process(all)
@@ -128,7 +128,7 @@ class WriteEnableBodyItems():
         def get(self):
             return self.item
 
-class NumNewQueueEntriesBody():
+class NumNewEntriesBody():
     class Body():
         def _set_params(self, config : Config, queue_type : QueueType):
             match queue_type:
@@ -154,35 +154,39 @@ class NumNewQueueEntriesBody():
 
             self.item = ""
 
-            selects = []
+            groups = []
             
             zeros_binary = bin_string(0, self.new_entries_bitwidth)
 
             for i in range(config.num_groups()):
                 if self.has_items(i):  
+                    groups.append(i)
+
                     new_entries = self.new_entries(i)
                     new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
 
                     select = f"({new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary})"
-
-                    selects.append(select)
+                    assign_to = f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"
 
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
+  {assign_to} <= {select};
 """.removeprefix("\n")
 
-            assign_to = f"{NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)}_o"
+
+            assign_to = f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"
             self.item += f"""
-  {assign_to} <=
+  {assign_to} <= 
 """
-            for select in selects[:-1]:
+            for i in groups[:-1]:
                 self.item += f"""
-    {select}
+    {f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"}
       or 
 """.removeprefix("\n")
-                
+            
+            i = groups[-1]
             self.item += f"""
-    {selects[-1]};
+    {f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked_{i}"};
 """.removeprefix("\n")
 
 #         def __init__(self, config : Config, queue_type : QueueType):
@@ -981,7 +985,7 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=NUM_NEW_QUEUE_ENTRIES_NAME(queue_type),
+                name=NUM_NEW_ENTRIES_NAME(queue_type),
                 prefix=prefix,
                 port_items=port_items
             )
@@ -1037,8 +1041,8 @@ class GroupAllocatorBodyItems():
     -- since they are used to generate the write enable signals
     --
     -- Here we drive the outputs with them
-    {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.LOAD)};
-    {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)}_o <= {NUM_NEW_QUEUE_ENTRIES_NAME(QueueType.STORE)};
+    {NUM_NEW_ENTRIES_NAME(QueueType.LOAD)}_o <= {NUM_NEW_ENTRIES_NAME(QueueType.LOAD)};
+    {NUM_NEW_ENTRIES_NAME(QueueType.STORE)}_o <= {NUM_NEW_ENTRIES_NAME(QueueType.STORE)};
 
 """.removeprefix("\n")
                     

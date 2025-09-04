@@ -92,7 +92,7 @@ def WRITE_ENABLE_NAME(
 
 #     return f"num_new_{queue_type.value}_q_entries"
 
-def NUM_NEW_QUEUE_ENTRIES_NAME(
+def NUM_NEW_ENTRIES_NAME(
         queue_type : QueueType, 
         ):
     """
