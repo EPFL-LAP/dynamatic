@@ -106,7 +106,7 @@ class NumNewEntriesBody():
             # one hot with one input
             if mask_id == 1:
                 self.item += f"""
-    {num_new_entries}_o <= {f"{num_new_entries_masked}_{mask_id}"};
+    {num_new_entries}_o <= {f"{num_new_entries_masked}_0"};
 """
             else:
                 # generate the or of each masked signal
@@ -126,8 +126,8 @@ class NumNewEntriesBody():
     -- Since the inputs are masked by one-hot valid signals
     -- The output is simply an OR of the inputs
     {num_new_entries}_o <= 
-        {one_hot_ors}
-        {f"{num_new_entries_masked}_{mask_id - 1}"};
+      {one_hot_ors}
+      {f"{num_new_entries_masked}_{mask_id - 1}"};
     """
           
         def get(self):
