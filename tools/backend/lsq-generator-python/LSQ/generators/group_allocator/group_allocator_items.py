@@ -768,7 +768,7 @@ class GroupAllocatorBodyItems():
 
                 si(ds.NaiveStoreOrderPerEntry(
                     config,
-                    d.INPUT
+                    d.OUTPUT
                     ),
                     c.OUTPUT
                 )
