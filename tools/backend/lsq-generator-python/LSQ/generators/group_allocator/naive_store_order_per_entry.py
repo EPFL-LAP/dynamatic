@@ -8,6 +8,8 @@ import LSQ.declarative_signals as ds
 
 from LSQ.utils import one_hot, mask_until
 
+from collections import defaultdict
+
 class NaiveStoreOrderPerEntryDecl():
     def __init__(self, config: Config, prefix):
         self.top_level_comment = f"""
@@ -59,6 +61,7 @@ class NaiveStoreOrderPerEntryDecl():
         ]
 
         self.local_items = [
+            MaskedStoreOrder(config),
             NaiveStoreOrderPerEntry(
                 config, 
                 shifted_both=True
@@ -70,8 +73,7 @@ class NaiveStoreOrderPerEntryDecl():
             NaiveStoreOrderPerEntry(
                 config, 
                 unshifted=True
-            ),
-            MaskedStoreOrder(config)
+            )
         ]
 
         b = NaiveStoreOrderPerEntryBodyItems()
@@ -90,28 +92,70 @@ class NaiveStoreOrderPerEntryBodyItems():
                         needs_order_shift = True
             
             if needs_order_shift:
+                unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+
                 store_order_width = config.queue_num_entries(QueueType.STORE)
                 zero_store_order = mask_until(0, store_order_width)
 
                 self.item = ""
+                to_mux = defaultdict(list)
                 for i in range(config.num_groups()):
+
                     non_zero_store_orders = 0
                     transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
-                    for store_order_int in config.group_store_order(i):
+
+                    for j, store_order_int in enumerate(config.group_store_order(i)):
                         if store_order_int != 0:
+                            to_mux[j].append((i, non_zero_store_orders))
+
                             store_order = mask_until(store_order_int, store_order_width)
+
                             assign_to = f"group_{i}_masked_naive_store_order({non_zero_store_orders})"
+
                             self.item += f"""
    {assign_to} <= {store_order} when {transfer_name} else {zero_store_order}
 
 """.removeprefix("\n")
 
+
+                for i in range(config.queue_num_entries(QueueType.LOAD)):
+                    mux_inputs = to_mux.get(i, [])
+
+                    if len(mux_inputs) == 0:
+                        self.item += f"""
+  {unshifted}({i}) <= others <= 0;
+""".removeprefix("\n")
+                    elif len(mux_inputs) == 1:
+                        group, index = mux_inputs[0]
+                        self.item += f"""
+  {unshifted}({i}) <= group_{group}_masked_naive_store_order({index})
+""".removeprefix("\n")
+                    else:
+                        one_hots = ""
+                        for group, index in mux_inputs[:-1]:
+                            one_hots += f"""
+    group_{group}_masked_naive_store_order({index})
+      or
+""".removeprefix("\n")
+                        one_hots = one_hots.strip()
+
+                        final_group, final_index = mux_inputs[-1]
+                        final_assignment = f"""
+    group_{final_group}_masked_naive_store_order({final_index})
+""".strip()
+
+                        self.item += f"""
+  {unshifted}({i}) <= 
+    {one_hots}
+    {final_assignment}
+""".removeprefix("\n")
+                    
                 load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
                 store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
 
                 shifted = NAIVE_STORE_ORDER_PER_ENTRY_NAME
                 shifted_stores = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
-                unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+ 
                 shifted_assignments = f"""
 
       -- shift all the store orders based on the store queue pointer
@@ -262,7 +306,7 @@ class MaskedStoreOrder():
                     non_zero_store_orders = non_zero_store_orders + 1
             
             if non_zero_store_orders > 0:
-                name = f"group_{i}_masked_naive_store_order"
+                name = f"group_{i}_masked_naive_store_order".ljust(35)
                 item += f"""
   signal {name} : data_array({non_zero_store_orders} - 1 downto 0)({bitwidth} - 1 downto 0);
 """.removeprefix("\n")
