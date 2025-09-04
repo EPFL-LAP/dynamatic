@@ -712,7 +712,7 @@ class GroupAllocatorBodyItems():
                     config, 
                     queue_type, 
                     QueuePointerType.TAIL,
-                    d.OUTPUT
+                    d.INPUT
                     ),
                     c.INPUT
                 ),
