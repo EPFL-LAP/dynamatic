@@ -102,27 +102,33 @@ class NumNewEntriesBody():
   -- Group {i} has no {queue_type.value}(s)
 
 """.removeprefix("\n")
-
-            # generate the or of each masked signal
-            # apart from the last one
-            one_hot_ors = ""
-            for i in range(mask_id):
-                one_hot_ors += f"""
-  {f"{num_new_entries_masked}_{i}"}
-    or            
-""".removeprefix("\n")
-                
-            one_hot_ors = one_hot_ors.strip()
-
-            # assignment and last input to the or
-            # as well as the ending semi colon
-            self.item += f"""
-  -- Since the inputs are masked by one-hot valid signals
-  -- The output is simply an OR of the inputs
-  {num_new_entries}_o <= 
-    {one_hot_ors}
-    {f"{num_new_entries_masked}_{mask_id}"};
+                    
+            # one hot with one input
+            if mask_id == 1:
+                self.item += f"""
+    {num_new_entries}_o <= {f"{num_new_entries_masked}_{mask_id}"};
 """
+            else:
+                # generate the or of each masked signal
+                # apart from the last one
+                one_hot_ors = ""
+                for i in range(mask_id):
+                    one_hot_ors += f"""
+        {f"{num_new_entries_masked}_{i}"}
+        or            
+    """.removeprefix("\n")
+                    
+                one_hot_ors = one_hot_ors.strip()
+
+                # assignment and last input to the or
+                # as well as the ending semi colon
+                self.item += f"""
+    -- Since the inputs are masked by one-hot valid signals
+    -- The output is simply an OR of the inputs
+    {num_new_entries}_o <= 
+        {one_hot_ors}
+        {f"{num_new_entries_masked}_{mask_id}"};
+    """
           
         def get(self):
             return self.item
