@@ -113,7 +113,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                             assign_to = f"group_{i}_masked_naive_store_order({non_zero_store_orders})"
 
                             self.item += f"""
-   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order}
+   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
 
 """.removeprefix("\n")
 
@@ -128,12 +128,12 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                     if len(mux_inputs) == 0:
                         self.item += f"""
-   {assign_to} <= (others => '0');
+  {assign_to} <= (others => '0');
 """.removeprefix("\n")
                     elif len(mux_inputs) == 1:
                         group, index = mux_inputs[0]
                         self.item += f"""
-  {assign_to} <= group_{group}_masked_naive_store_order({index})
+  {assign_to} <= group_{group}_masked_naive_store_order({index});
 """.removeprefix("\n")
                     else:
                         one_hots = ""
@@ -202,6 +202,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                 self.item += f"""
 
+                
   process(all)
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
