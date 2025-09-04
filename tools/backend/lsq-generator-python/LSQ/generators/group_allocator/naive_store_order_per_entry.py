@@ -94,7 +94,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                 zero_store_order = mask_until(0, store_order_width)
 
                 self.item = ""
-                for i in config.num_groups(config):
+                for i in config.num_groups():
                     non_zero_store_orders = 0
                     transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
                     for store_order_int in config.group_store_order(i):
