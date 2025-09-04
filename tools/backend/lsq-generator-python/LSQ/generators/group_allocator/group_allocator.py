@@ -633,7 +633,7 @@ class GroupAllocator:
 
         unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        unit += self.print_dec(GroupAllocatorDeclarative(config, self.prefix, subunit_prefix))
+        unit += self.print_dec(GroupAllocatorDeclarative(config, self.prefix))
 
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
