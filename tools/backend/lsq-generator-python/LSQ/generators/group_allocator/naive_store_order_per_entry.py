@@ -183,7 +183,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                         final_group, final_index = mux_inputs[-1]
                         final_assignment = f"""
-    group_{final_group}_masked_naive_store_order({final_index})
+    group_{final_group}_masked_naive_store_order({final_index});
 """.strip()
 
                         self.item += f"""
