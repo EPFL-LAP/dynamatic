@@ -7,8 +7,6 @@ from LSQ.rtl_signal_names import *
 
 from LSQ.operators.arithmetic import WrapSub  
 
-from LSQ.generators.group_allocator.group_allocator_items import GroupAllocatorPortItems, GroupAllocatorLocalItems
-
 import LSQ.declarative_signals as ds
 
  
@@ -35,10 +33,6 @@ class GroupHandshaking():
         self.prefix = prefix
 
 
-        ga_p = GroupAllocatorPortItems()
-
-        ga_l = GroupAllocatorLocalItems()
-
         d = Signal.Direction
         self.entity_port_items = [
             Comment(f"""  
@@ -57,19 +51,44 @@ class GroupHandshaking():
 
 """),
 
-            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
-            ga_p.QueueIsEmpty(QueueType.LOAD),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.HEAD,
+                d.INPUT
+            ),
+            ds.QueueIsEmpty(
+                QueueType.LOAD,
+                d.INPUT
+            ),
 
             Comment(f"""    
     -- Inputs from the store queue.
     -- Used to see if there is enough space to allocate each group.
 
 """),
-
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-            ga_p.QueueIsEmpty(QueueType.STORE),
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.HEAD,
+                d.INPUT
+            ),
+            ds.QueueIsEmpty(
+                QueueType.STORE,
+                d.INPUT
+            ),
 
             Comment(f"""             
     -- A boolean per group init channel
@@ -79,13 +98,21 @@ class GroupHandshaking():
 
 """),
 
-            ga_l.GroupInitTransfer(config, d.OUTPUT)
+            ds.GroupInitTransfer(
+                config, 
+                d.OUTPUT)
         ]
 
 
         self.local_items = [
-            NaiveNumEmptyEntries(config, QueueType.LOAD),
-            NaiveNumEmptyEntries(config, QueueType.STORE),
+            NaiveNumEmptyEntries(
+                config, 
+                QueueType.LOAD
+            ),
+            NaiveNumEmptyEntries(
+                config, 
+                QueueType.STORE
+            ),
 
             ds.GroupInitReady(config)
         ]
