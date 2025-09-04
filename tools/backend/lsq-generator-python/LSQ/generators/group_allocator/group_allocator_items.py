@@ -995,20 +995,29 @@ class GroupAllocatorBodyItems():
             si = SimpleInstantiation
 
             port_items = [
-                si(ds.NumNewQueueEntries(config, queue_type, d.INPUT), c.LOCAL),
+                si(
+                    ds.NumNewQueueEntries(
+                        config, 
+                        queue_type, 
+                        d.INPUT
+                    ), 
+                    c.LOCAL
+                ),
 
                 si(
                     ds.QueuePointer(
                         config, 
                         queue_type, 
-                        QueuePointerType.TAIL
-                        ), 
-                        c.INPUT
+                        QueuePointerType.TAIL,
+                        d.INPUT
+                    ), 
+                    c.INPUT
                     ),
                 si(
                     ds.QueueWriteEnable(
                         config, 
-                        queue_type
+                        queue_type,
+                        d.OUTPUT
                     ),
                     c.OUTPUT
                 )
