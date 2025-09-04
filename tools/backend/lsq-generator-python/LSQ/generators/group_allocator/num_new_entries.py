@@ -114,7 +114,7 @@ class NumNewEntriesBody():
                 one_hot_ors = ""
                 for i in range(mask_id - 1):
                     one_hot_ors += f"""
-        {f"{num_new_entries_masked}_{i}"}
+      {f"{num_new_entries_masked}_{i}"}
         or            
 """.removeprefix("\n")
                     
