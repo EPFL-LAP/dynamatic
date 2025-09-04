@@ -41,12 +41,10 @@ class NumNewEntries():
         ]
 
         self.local_items = [
-            ds.NumNewQueueEntries(
+            NumNewEntriesMasked(
                 config, 
                 queue_type, 
-                direction=d.OUTPUT,
-                masked=True
-            )
+                )
         ]
 
         b = NumNewEntriesBody()
@@ -79,47 +77,81 @@ class NumNewEntriesBody():
             self._set_params(config, queue_type)
 
             self.item = ""
-
-            groups = []
-            
+           
             zeros_binary = bin_string(0, self.new_entries_bitwidth)
 
-            num_new_entries_masked = NUM_NEW_ENTRIES_NAME(queue_type, masked=True)
-            num_new_entries= NUM_NEW_ENTRIES_NAME(queue_type, masked=False)
+            num_new_entries_masked = MASKED_NUM_NEW_ENTRIES_NAME(queue_type)
+            num_new_entries= NUM_NEW_ENTRIES_NAME(queue_type)
 
+            mask_id = 0
             for i in range(config.num_groups()):
                 if self.has_items(i):  
-                    groups.append(i)
-
                     new_entries = self.new_entries(i)
                     new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
 
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
-  {num_new_entries_masked}_{i} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
+  {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
 
 """.removeprefix("\n")
+                    mask_id = mask_id + 1
                 else:
                     self.item += f"""
 -- Group {i} has no {queue_type.value}(s)
 
 """.removeprefix("\n")
 
+            # generate the or of each masked signal
+            # apart from the last one
+            one_hot_ors = [f"""
+    {f"{num_new_entries_masked}_{i}"}
+      or            
+""" for i in range(mask_id - 1)]
+
+            # assignment and last input to the or
+            # as well as the ending semi colon
             self.item += f"""
   -- Since the inputs are masked by one-hot valid signals
   -- The output is simply an OR of the inputs
   {num_new_entries}_o <= 
+    {one_hot_ors}
+    {f"{num_new_entries_masked}_{mask_id}"};
 """
-            for group_id in groups[:-1]:
-                self.item += f"""
-    {f"{num_new_entries_masked}_{group_id}"}
-      or 
-""".removeprefix("\n")
-            
-            group_id = groups[-1]
-            self.item += f"""
-    {f"{num_new_entries_masked}_{i}"};
-""".removeprefix("\n")
-
+          
         def get(self):
             return self.item
+
+
+
+# Declarative local signal only used by the num loads unit
+class NumNewEntriesMasked(Signal):
+    """
+    Bitwidth = N, Number = M
+
+    Number of new entries allocated to the queue,
+    each specific to a group
+
+    Same bitwidth as queue pointer.
+    1 per group (only if they have a non-zero value)
+    """
+
+    def __init__(self, 
+                    config : Config,
+                    queue_type : QueueType,
+                    ):
+        
+        
+        match queue_type:
+            case QueueType.LOAD:
+                number = config.num_groups_with_loads()
+            case QueueType.STORE:
+                number = config.num_groups_with_stores()
+
+        Signal.__init__(
+            self,
+            base_name=MASKED_NUM_NEW_ENTRIES_NAME(queue_type),
+            size=Signal.Size(
+                bitwidth=config.queue_idx_bitwidth(queue_type),
+                number=number
+            )
+        )

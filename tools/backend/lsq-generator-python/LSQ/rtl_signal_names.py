@@ -94,20 +94,27 @@ def WRITE_ENABLE_NAME(
 
 def NUM_NEW_ENTRIES_NAME(
         queue_type : QueueType, 
-        masked : bool = False
         ):
     """
     RTL name for the "number of new (load/store) queue entries" signal. 
     Output by the group allocator, and used by the load queue to update its tail pointer.
     """
 
-    mask_suffix = "_masked" if masked else ""
-
     match queue_type:
         case QueueType.LOAD:
-            return f"num_loads{mask_suffix}"
+            return f"num_loads"
         case QueueType.STORE:
-            return f"num_stores{mask_suffix}"
+            return f"num_stores"
+        
+def MASKED_NUM_NEW_ENTRIES_NAME(
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for the "number of new (load/store) queue entries" signal,
+    specific to each group and masked by its valid signal
+    """
+    return f"{NUM_NEW_ENTRIES_NAME(queue_type)}_masked"
+
 
 # def PORT_INDEX_PER_ENTRY_NAME(
 #         queue_type : QueueType, 
