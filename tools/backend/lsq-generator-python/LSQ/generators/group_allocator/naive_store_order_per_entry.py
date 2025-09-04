@@ -163,25 +163,25 @@ class NaiveStoreOrderPerEntryBodyItems():
  
                 shifted_assignments = f"""
 
-      -- shift all the store orders based on the store queue pointer
-      -- From Hailin's design, the circuit is better shifting based on
-      -- one pointer at a time 
-      for i in 0 to {config.load_queue_num_entries()} - 1 loop
-        for j in 0 to {config.store_queue_num_entries()} - 1 loop
-          col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
+    -- shift all the store orders based on the store queue pointer
+    -- From Hailin's design, the circuit is better shifting based on
+    -- one pointer at a time 
+    for i in 0 to {config.load_queue_num_entries()} - 1 loop
+      for j in 0 to {config.store_queue_num_entries()} - 1 loop
+        col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
 
-          -- assign shifted value based on store queue
-          {shifted_stores}(i)(j) <= {unshifted}(i)(col_idx);
-        end loop;
+        -- assign shifted value based on store queue
+        {shifted_stores}(i)(j) <= {unshifted}(i)(col_idx);
       end loop;
+    end loop;
 
-      -- shift all the store orders based on the load queue pointer
-      for i in 0 to {config.load_queue_num_entries()} - 1 loop
-        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
+    -- shift all the store orders based on the load queue pointer
+    for i in 0 to {config.load_queue_num_entries()} - 1 loop
+      row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
 
-        -- assign shifted value based on load queue
-        {shifted}(i) <= {shifted_stores}(row_idx);
-      end loop;
+      -- assign shifted value based on load queue
+      {shifted}(i) <= {shifted_stores}(row_idx);
+    end loop;
 """.strip()
 
                 output_assignments = ""
