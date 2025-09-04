@@ -279,8 +279,6 @@ class GroupHandshakingBody():
             
             return when_statements.strip()
                 
-        def _num_empty_check(self, config : Config, queue_type : QueueType, num_to_allocate):
-
 
         def _get_output_assignments(self, config : Config):
             """
