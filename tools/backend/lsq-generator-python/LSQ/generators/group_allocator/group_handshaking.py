@@ -231,30 +231,41 @@ class GroupHandshakingBody():
                 num_loads = config.group_num_loads(i)
                 num_stores = config.group_num_stores(i)
 
-                # don't need naive num empty check if the group allocates 
-                # into the entire queue
+                # if the group allocates into the entire queue
+                # checking just the empty signal is enough
+                ld_q_num_entries = config.queue_num_entries(QueueType.LOAD)
                 if num_loads == config.queue_num_entries(QueueType.LOAD):
                     num_empty_check_ld = ""
+                    ld_q_percent = 100
+                # otherwise not ready if num empty is less than num allocated
                 else:
                     idx_bitwidth = config.queue_idx_bitwidth(QueueType.LOAD)
                     num_loads_binary = bin_string(num_loads, idx_bitwidth)
 
                     num_empty_check_ld = f" and {load_empty_entries} < {num_loads_binary}"
 
-                # don't need naive num empty check if the group allocates 
-                # into the entire queue
-                if num_stores == config.queue_num_entries(QueueType.STORE):
+                    ld_q_percent = int(num_loads / ld_q_num_entries)
+
+                # if the group allocates into the entire queue
+                # checking just the empty signal is enough
+                st_q_num_entries = config.queue_num_entries(QueueType.STORE)
+                if num_stores == st_q_num_entries:
                     num_empty_check_st = ""
+                    st_q_percent = 100
+                # otherwise not ready if num empty is less than num allocated
                 else:
                     idx_bitwidth = config.queue_idx_bitwidth(QueueType.STORE)
                     num_stores_binary = bin_string(num_stores, idx_bitwidth)
 
                     num_empty_check_st = f" and {store_empty_entries} < {num_stores_binary}"
 
+                    st_q_percent = int(num_stores / st_q_num_entries)
+
+                
                 when_statements += f"""
   -- Group {i} has:
-  --      {num_loads} load(s)
-  --      {num_stores} store(s)
+  --      {num_loads} load(s), {ld_q_percent}% of the queue
+  --      {num_stores} store(s), {st_q_percent}% of the queue
   -- 
   -- To be ready to allocate a group,
   -- both queues must have enough space for the group's memory operations
@@ -268,6 +279,8 @@ class GroupHandshakingBody():
             
             return when_statements.strip()
                 
+        def _num_empty_check(self, config : Config, queue_type : QueueType, num_to_allocate):
+
 
         def _get_output_assignments(self, config : Config):
             """
