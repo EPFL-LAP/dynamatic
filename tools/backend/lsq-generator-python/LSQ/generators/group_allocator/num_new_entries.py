@@ -1,0 +1,125 @@
+from LSQ.config import Config
+from LSQ.utils import QueueType, bin_string
+
+from LSQ.rtl_signal_names import *
+
+from LSQ.entity import Signal
+
+import LSQ.declarative_signals as ds
+
+
+class NumNewEntries():
+    def __init__(self, config : Config, queue_type : QueueType, prefix):
+        self.top_level_comment = f"""
+-- Number of New Entries in the (Load/Store) Queue Unit
+-- Sub-unit of the Group Allocator.
+--
+-- Generates the number of newly allocated {queue_type.value} queue entries.
+--
+-- This is used by the {queue_type.value} queue to update its tail pointer,
+-- based on circular buffer pointer update logic.
+--
+-- It is also used to generate the write enable signals
+-- for the {queue_type.value} queue.
+""".strip()
+
+        self.name = NUM_NEW_ENTRIES_NAME(queue_type)
+        self.prefix = prefix
+
+
+        d = Signal.Direction
+        self.entity_port_items = [
+            ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+            ),
+            ds.NumNewQueueEntries(
+                config, 
+                queue_type, 
+                direction=d.OUTPUT
+            )
+        ]
+
+        self.local_items = [
+            ds.NumNewQueueEntries(
+                config, 
+                queue_type, 
+                direction=d.OUTPUT,
+                masked=True
+            )
+        ]
+
+        b = NumNewEntriesBody()
+        self.body = [
+            b.Body(config, queue_type)
+        ]
+
+class NumNewEntriesBody():
+    class Body():
+        def _set_params(self, config : Config, queue_type : QueueType):
+            match queue_type:
+                case QueueType.LOAD:
+                    def new_entries(idx) : return config.group_num_loads(idx)
+                    self.new_entries = new_entries
+
+                    self.new_entries_bitwidth = config.load_queue_idx_bitwidth()
+
+                    def has_items(group_idx): return config.group_num_loads(group_idx) > 0
+                    self.has_items = has_items
+                case QueueType.STORE:
+                    def new_entries(idx): return config.group_num_stores(idx)
+                    self.new_entries = new_entries
+
+                    self.new_entries_bitwidth = config.store_queue_idx_bitwidth()
+
+                    def has_items(group_idx): return config.group_num_stores(group_idx) > 0
+                    self.has_items = has_items
+
+        def __init__(self, config : Config, queue_type : QueueType):
+            self._set_params(config, queue_type)
+
+            self.item = ""
+
+            groups = []
+            
+            zeros_binary = bin_string(0, self.new_entries_bitwidth)
+
+            num_new_entries_masked = NUM_NEW_ENTRIES_NAME(queue_type, masked=True)
+            num_new_entries= NUM_NEW_ENTRIES_NAME(queue_type, masked=False)
+
+            for i in range(config.num_groups()):
+                if self.has_items(i):  
+                    groups.append(i)
+
+                    new_entries = self.new_entries(i)
+                    new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
+
+                    self.item += f"""
+  -- Group {i} has {new_entries} {queue_type.value}(s)
+  {num_new_entries_masked}_{i} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
+
+""".removeprefix("\n")
+                else:
+                    self.item += f"""
+-- Group {i} has no {queue_type.value}(s)
+
+""".removeprefix("\n")
+
+            self.item += f"""
+  -- Since the inputs are masked by one-hot valid signals
+  -- The output is simply an OR of the inputs
+  {num_new_entries}_o <= 
+"""
+            for group_id in groups[:-1]:
+                self.item += f"""
+    {f"{num_new_entries_masked}_{group_id}"}
+      or 
+""".removeprefix("\n")
+            
+            group_id = groups[-1]
+            self.item += f"""
+    {f"{num_new_entries_masked}_{i}"};
+""".removeprefix("\n")
+
+        def get(self):
+            return self.item

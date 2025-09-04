@@ -212,11 +212,12 @@ class NumNewQueueEntries(Signal):
                     queue_type : QueueType,
                     # used as local signal in group allocator
                     # where it does not have direction
-                    direction : Signal.Direction = None
+                    direction : Signal.Direction = None,
+                    masked : bool = False
                     ):
         Signal.__init__(
             self,
-            base_name=NUM_NEW_ENTRIES_NAME(queue_type),
+            base_name=NUM_NEW_ENTRIES_NAME(queue_type, masked),
             direction=direction,
             size=Signal.Size(
                 bitwidth=config.queue_idx_bitwidth(queue_type),

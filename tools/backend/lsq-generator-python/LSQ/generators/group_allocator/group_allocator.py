@@ -1,6 +1,5 @@
 from LSQ.context import VHDLContext
 from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
@@ -14,6 +13,7 @@ from LSQ.rtl_signal_names import *
 import LSQ.declarative_signals as ds
 
 from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
+from LSQ.generators.group_allocator.num_new_entries import NumNewEntries
 
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
@@ -22,7 +22,6 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
         NaiveStoreOrderPerEntryBodyItems,
-        NumNewEntriesBody,
         WriteEnableLocalItems,
         WriteEnableBodyItems
     )
@@ -113,44 +112,6 @@ class WriteEnableDecl():
             b.Body(config, queue_type)
         ]
 
-class NumNewQueueEntriesDecl():
-    def __init__(self, config : Config, queue_type : QueueType, prefix):
-        self.top_level_comment = f"""
--- Number of New Entries in the (Load/Store) Queue Unit
--- Sub-unit of the Group Allocator.
---
--- Generates the number of newly allocated {queue_type.value} queue entries.
---
--- This is used by the {queue_type.value} queue to update its tail pointer,
--- based on circular buffer pointer update logic.
---
--- It is also used to generate the write enable signals
--- for the {queue_type.value} queue.
-""".strip()
-
-        self.name = NUM_NEW_ENTRIES_NAME(queue_type)
-        self.prefix = prefix
-
-
-        d = Signal.Direction
-        self.entity_port_items = [
-            ds.GroupInitTransfer(
-                config, 
-                d.INPUT
-            ),
-            ds.NumNewQueueEntries(
-                config, 
-                queue_type, 
-                direction=d.OUTPUT
-            )
-        ]
-
-        self.local_items = []
-
-        b = NumNewEntriesBody()
-        self.body = [
-            b.Body(config, queue_type)
-        ]
 
 class NaiveStoreOrderPerEntryDecl():
     def __init__(self, config: Config, prefix):
@@ -619,8 +580,8 @@ class GroupAllocator:
 
         unit = self.print_dec(GroupHandshaking(config, self.lsq_name))
 
-        unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
-        unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
+        unit += self.print_dec(NumNewEntries(config, QueueType.LOAD, subunit_prefix))
+        unit += self.print_dec(NumNewEntries(config, QueueType.STORE, subunit_prefix))
 
         unit += self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
         unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
