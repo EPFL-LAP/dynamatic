@@ -102,7 +102,8 @@ class NaiveStoreOrderPerEntryBodyItems():
                             store_order = mask_until(store_order_int, store_order_width)
                             assign_to = f"group_{i}_masked_naive_store_order({non_zero_store_orders})"
                             self.item += f"""
-   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order}"
+   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order}
+
 """.removeprefix("\n")
 
                 load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
@@ -263,7 +264,7 @@ class MaskedStoreOrder():
             if non_zero_store_orders > 0:
                 name = f"group_{i}_masked_naive_store_order"
                 item += f"""
-      signal {name} : data_array({non_zero_store_orders} - 1 downto 0)({bitwidth} - 1 downto 0);
+  signal {name} : data_array({non_zero_store_orders} - 1 downto 0)({bitwidth} - 1 downto 0);
 """.removeprefix("\n")
         
-        return item.strip()
+        return item
