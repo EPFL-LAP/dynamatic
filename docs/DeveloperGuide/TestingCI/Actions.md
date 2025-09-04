@@ -4,13 +4,21 @@ This document describes the GitHub Actions workflow used for the purposes of CI 
 
 ## Basics
 
-CI checks run when a pull request is opened, when changes are made to the PR (i.e. pushes are made to that branch), when it is reopened and when it is marked ready for review (i.e. when it goes from a draft PR to a "regular" PR).
+Workflows are defined using YAML files, placed in the `.github/workflows` directory. A workflow consists of one or more jobs, and each job consists of one or more steps. 
 
-The CI workflow is described in `.github/workflows/ci.yml`. It consists of two main jobs:
+Workflows are triggered (i.e. run), when certain changes on the repository occur. For example, a workflow can run whenever a pull request into main is opened/marked ready for reviewm, or when a push is made into a specified branch, and so on. A comprehensive list of such trigger events is available [in the official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
+
+Each job is executed in a separate environment, i.e. jobs do not share anything by default. They can run either on GitHub's cloud-based runners, or on user-defined self-hosted runners.
+- [GitHub's runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) are ephemeral virtual machines, i.e. they are created only for running that specific job and deleted after the job is finished. This means that they are unsuitable for jobs that require large dependencies, since they would need to be reinstalled every time.
+- [Self-hosted runners](https://docs.github.com/en/actions/concepts/runners/self-hosted-runners) can be set up by the repository administrators on any personal/school PC. Since they are regular machines by themselves, one can manage them however he or she wants. This means that dependencies do not need to be installed on every run. The downside is obviously that one needs to own a machine for this and that the contention for it is likely going to be large.
+
+Steps are executed in order on a single runner, as if you were to run the commands normally via the shell on your computer. If a step fails (returns a non-zero exit code), the job will stop and fail, unless otherwise specified.
+
+The main Actions workflow for building and integration is described in [.github/workflows/ci.yml](../../../.github/workflows/ci.yml). It runs every time a pull request into main is opened, reopened, updated (i.e. new commits are pushed to it) or marked ready for review (i.e. converted from draft PR to "regular" PR). It consists of two jobs:
 - `check-format`, which runs the [formatting checks](Formatting.md),
 - `integration`, which runs the build process, [integration tests](IntegrationTests.md) and [MLIR unit tests](../IntroductoryMaterial/FileCheckTesting.md).
 
-These jobs can be picked up by runners, machines that run the specified steps. They can be [hosted by GitHub](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) in the cloud, and they can be [self-hosted](https://docs.github.com/en/actions/concepts/runners/self-hosted-runners). `check-format` runs on cloud runners, while `integration` runs on a self-hosted runner that is set up on a VM inside EPFL's network. This is because of the fact that `integration` requires a large number of dependencies which cannot be feasibly installed on every run on GitHub's runners, and also because it requires build artifact caching, which would be more difficult to set up with GitHub's ephemeral runners.
+`check-format` runs on cloud runners, while `integration` runs on a self-hosted runner that is set up on a VM inside EPFL's network. This is because of the fact that `integration` requires a large number of dependencies which cannot be feasibly installed on every run on GitHub's runners, and also because it requires build artifact caching, which would be more difficult to set up with GitHub's ephemeral runners.
 
 ## Usage
 
