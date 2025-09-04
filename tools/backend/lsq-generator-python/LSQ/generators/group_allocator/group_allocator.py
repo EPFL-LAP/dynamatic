@@ -14,14 +14,13 @@ import LSQ.declarative_signals as ds
 
 from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
 from LSQ.generators.group_allocator.num_new_entries import NumNewEntries
+from LSQ.generators.group_allocator.naive_store_order_per_entry import NaiveStoreOrderPerEntryDecl
 
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorBodyItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
-        NaiveStoreOrderPerEntryLocalItems,
-        NaiveStoreOrderPerEntryBodyItems,
         WriteEnableLocalItems,
         WriteEnableBodyItems
     )
