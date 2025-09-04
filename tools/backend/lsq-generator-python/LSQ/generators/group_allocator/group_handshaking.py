@@ -244,7 +244,7 @@ class GroupHandshakingBody():
 
                     num_empty_check_ld = f" and {load_empty_entries} < {num_loads_binary}"
 
-                    ld_q_percent = int(num_loads / ld_q_num_entries)
+                    ld_q_percent = int(100 * num_loads / ld_q_num_entries)
 
                 # if the group allocates into the entire queue
                 # checking just the empty signal is enough
@@ -259,7 +259,7 @@ class GroupHandshakingBody():
 
                     num_empty_check_st = f" and {store_empty_entries} < {num_stores_binary}"
 
-                    st_q_percent = int(num_stores / st_q_num_entries)
+                    st_q_percent = int(100 * num_stores / st_q_num_entries)
 
                 
                 when_statements += f"""

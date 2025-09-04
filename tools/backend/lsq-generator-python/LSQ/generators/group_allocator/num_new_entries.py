@@ -106,6 +106,7 @@ class NumNewEntriesBody():
             # one hot with one input
             if mask_id == 1:
                 self.item += f"""
+  -- mux with a single input is just an assignment
   {num_new_entries}_o <= {f"{num_new_entries_masked}_0"};
 """
             else:
