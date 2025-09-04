@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPrio
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture, Signal, EntityComment
+from LSQ.entity import Entity, Architecture, Signal, Comment
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -17,9 +17,7 @@ from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
 
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
-        GroupAllocatorPortItems, 
         GroupAllocatorBodyItems,
-        GroupAllocatorLocalItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
         NaiveStoreOrderPerEntryLocalItems,
@@ -53,14 +51,50 @@ class WriteEnableDecl():
         self.name = WRITE_ENABLE_NAME(queue_type)
         self.prefix = prefix
 
-        ga_p = GroupAllocatorPortItems()
-        ga_l = GroupAllocatorLocalItems()
+
 
         d = Signal.Direction
         self.entity_port_items = [
-            ga_l.NumNewQueueEntries(config, queue_type, d.INPUT),
-            ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
-            ga_p.QueueWriteEnable(config, queue_type)
+            Comment(
+                f"""
+
+    -- Input: Number of New Queue Entries to Allocate (N)
+    -- The first N write enables signals are set to high.
+"""
+            ),
+            ds.NumNewQueueEntries(
+                config, 
+                queue_type, 
+                d.INPUT
+            ),
+
+            Comment(
+                f"""
+    -- Input: {queue_type.value} queue pointer
+    -- Used to shift the write enables into the correct alignment
+
+"""
+            ),
+            ds.QueuePointer(
+                config, 
+                queue_type, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+
+
+            Comment(
+                f"""
+
+    -- Output: Shifted write enable signals
+
+"""
+            ),
+            ds.QueueWriteEnable(
+                config, 
+                queue_type,
+                d.OUTPUT
+            )
         ]
 
 
@@ -97,12 +131,18 @@ class NumNewQueueEntriesDecl():
         self.name = NUM_NEW_QUEUE_ENTRIES_NAME(queue_type)
         self.prefix = prefix
 
-        ga_l = GroupAllocatorLocalItems()
 
         d = Signal.Direction
         self.entity_port_items = [
-            ga_l.GroupInitTransfer(config, d.INPUT),
-            ga_l.NumNewQueueEntries(config, queue_type, direction=d.OUTPUT)
+            ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+            ),
+            ds.NumNewQueueEntries(
+                config, 
+                queue_type, 
+                direction=d.OUTPUT
+            )
         ]
 
         self.local_items = []
@@ -137,24 +177,46 @@ class NaiveStoreOrderPerEntryDecl():
         self.prefix = prefix
 
 
-        ga_p = GroupAllocatorPortItems()
-        ga_l = GroupAllocatorLocalItems()
-
         d = Signal.Direction
     
         self.entity_port_items = [
-            ga_l.GroupInitTransfer(config, d.INPUT),
-            ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-            ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-            ga_p.NaiveStoreOrderPerEntry(config)
+            ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.NaiveStoreOrderPerEntry(
+                config,
+                d.OUTPUT
+            )
         ]
 
         l = NaiveStoreOrderPerEntryLocalItems()
 
         self.local_items = [
-            l.NaiveStoreOrderPerEntry(config, shifted_both=True),
-            l.NaiveStoreOrderPerEntry(config, shifted_stores=True),
-            l.NaiveStoreOrderPerEntry(config, unshifted=True)
+            l.NaiveStoreOrderPerEntry(
+                config, 
+                shifted_both=True
+            ),
+            l.NaiveStoreOrderPerEntry(
+                config, 
+                shifted_stores=True
+            ),
+            l.NaiveStoreOrderPerEntry(
+                config, 
+                unshifted=True
+            )
         ]
 
         b = NaiveStoreOrderPerEntryBodyItems()
@@ -183,15 +245,25 @@ class PortIdxPerEntryDecl():
         self.name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
         self.prefix = prefix
 
-        ga_p = GroupAllocatorPortItems()
-        ga_l = GroupAllocatorLocalItems()
 
         d = Signal.Direction
     
         self.entity_port_items = [
-            ga_l.GroupInitTransfer(config, d.INPUT),
-            ga_p.QueuePointer(config, queue_type, QueuePointerType.TAIL),
-            ga_p.PortIdxPerQueueEntry(config, queue_type)
+            ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                queue_type, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.PortIdxPerEntry(
+                config, 
+                queue_type,
+                d.OUTPUT
+            )
         ]
 
         l = PortIdxPerEntryLocalItems()
@@ -206,26 +278,54 @@ class PortIdxPerEntryDecl():
             b.Body(config, queue_type)
         ]
 
-class GroupAllocatorDecl():
-    def __init__(self, config : Config, prefix, subunit_prefix):
+class GroupAllocatorDeclarative():
+    def __init__(self, config : Config, unique_name):
+        """
+        Declarative definition of the Group Allocator.
+
+        First all the signals in its entity port mapping are listed.
+
+        Then all its local signals.
+
+        Then finally a list of instantiations of sub-units,
+        which contain actual RTL logic.
+
+        The group allocator contains only 2 assignments of actual RTL:
+        Driving the output "number of new queue entries" signals
+        with the local "number of new queue entries" signals.
+
+        Args:
+            config(Config) : Config containing the parameterization of this LSQ: queue sizes, bitwidths, etc.
+            unqiue_name(str) : Unique name from the netlist printer
+        """
+
+
         self.top_level_comment = f"""
--- Group Allocator.
+-- Group Allocator
 """.strip()
         
+        subunit_prefix = unique_name + "_ga"
 
-        p = GroupAllocatorPortItems()
-        l = GroupAllocatorLocalItems()
+        LOAD_QUEUE = QueueType.LOAD
+        STORE_QUEUE = QueueType.STORE
 
         self.name = GROUP_ALLOCATOR_NAME
-        self.prefix = prefix
+        self.prefix = unique_name
 
         d = Signal.Direction
+
+        #################################
+        ## Declarative Description
+        ## of Group Allocators 
+        ## Entity Port Map Signals
+        #################################
 
         self.entity_port_items = [
             ds.Reset(),
             ds.Clock(),
 
-            EntityComment(f"""
+
+            Comment(f"""
                           
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} control channel(s),
@@ -233,51 +333,182 @@ class GroupAllocatorDecl():
 
 
 """.removeprefix("\n").removesuffix("\n")),
-
             ds.GroupInitValid(config),
             ds.GroupInitReady(config),
 
-            p.QueueInputsComment(queue_type=QueueType.LOAD),
-            p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
-            p.QueuePointer(config, QueueType.LOAD, QueuePointerType.TAIL),
-            p.QueueIsEmpty(QueueType.LOAD),
 
-            p.QueueInputsComment(queue_type=QueueType.STORE),
-            p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
-            p.QueuePointer(config, QueueType.STORE, QueuePointerType.TAIL),
-            p.QueueIsEmpty(QueueType.STORE),
 
-            p.QueueWriteEnableComment(config, QueueType.LOAD),
-            p.QueueWriteEnable(config, QueueType.LOAD),
+            Comment(f"""
+                          
+    -- Input signals from the load queue
 
-            p.NumNewQueueEntriesComment(QueueType.LOAD),
-            # since this is both a local signal and an output
-            # the class is placed in local signals
-            l.NumNewQueueEntries(config, QueueType.LOAD, d.OUTPUT),
+"""),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.HEAD,
+                d.INPUT
+                ),
 
-            p.PortIdxPerQueueEntryComment(config, QueueType.LOAD),
-            p.PortIdxPerQueueEntry(config, QueueType.LOAD),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.TAIL,
+                d.INPUT
+                ),
+            ds.QueueIsEmpty(
+                QueueType.LOAD,
+                d.INPUT
+                ),
 
-            p.QueueWriteEnableComment(config, QueueType.STORE),
-            p.QueueWriteEnable(config, QueueType.STORE),
 
-            p.NumNewQueueEntriesComment(QueueType.STORE),
-            # since this is both a local signal and an output
-            # the class is placed in local signals
-            l.NumNewQueueEntries(config, QueueType.STORE, d.OUTPUT),
 
-            p.PortIdxPerQueueEntryComment(config, QueueType.STORE),
-            p.PortIdxPerQueueEntry(config, QueueType.STORE),
+
+            Comment(f"""
+                          
+    -- Input signals from the store queue
+
+"""),            
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.HEAD,
+                d.INPUT
+                ),
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.TAIL,
+                d.INPUT
+                ),
+            ds.QueueIsEmpty(
+                QueueType.STORE,
+                d.INPUT
+            ),
+
+
+
+
+            Comment(f"""
+                          
+    -- Load queue write enable signals
+    -- {config.queue_num_entries(LOAD_QUEUE)} signals, one for each queue entry.
+
+"""),
+            ds.QueueWriteEnable(
+                config, 
+                QueueType.LOAD,
+                d.OUTPUT
+                ),
+
+
+
+
+            Comment(f"""
+                          
+    -- Number of new load queue entries to allocate.
+    -- Used by the load queue to update its tail pointer.
+    -- Bitwidth equal to the load queue pointer bitwidth.
+
+"""),
+            ds.NumNewQueueEntries(
+                config, 
+                QueueType.LOAD, 
+                d.OUTPUT
+                ),
+
+
+
+            Comment(f"""
+                          
+    -- Load port index to write into each load queue entry.
+    -- {config.queue_num_entries(LOAD_QUEUE)} signals, each {config.ports_idx_bitwidth(LOAD_QUEUE)} bit(s).
+    -- Not one-hot.
+    -- Absent if there is only one load port
+
+"""),
+            ds.PortIdxPerEntry(
+                config, 
+                QueueType.LOAD,
+                d.OUTPUT
+                ),
+
+
+
+
+            Comment(f"""
+                          
+    -- Store queue write enable signals
+    -- {config.queue_num_entries(STORE_QUEUE)} signals, one for each queue entry.
+
+"""),
+            ds.QueueWriteEnable(
+                config, 
+                QueueType.STORE,
+                d.OUTPUT
+                ),
+
+
+
+
+            Comment(f"""
+                          
+    -- Number of new store queue entries to allocate.
+    -- Used by the store queue to update its tail pointer.
+    -- Bitwidth equal to the store queue pointer bitwidth.
+
+"""),
+            ds.NumNewQueueEntries(
+                config, 
+                QueueType.STORE, 
+                d.OUTPUT
+                ),
+
+
+
+
+            Comment(f"""
+                          
+    -- Store port index to write into each store queue entry.
+    -- {config.queue_num_entries(STORE_QUEUE)} signals, each {config.ports_idx_bitwidth(STORE_QUEUE)} bit(s).
+    -- Not one-hot.
+    -- Absent if there is only one store port
+
+"""),
+            ds.PortIdxPerEntry(
+                config, 
+                QueueType.STORE, 
+                d.OUTPUT
+                ),
     
-            p.NaiveStoreOrderPerEntryComment(config),
-            p.NaiveStoreOrderPerEntry(config)
+
+            Comment(f"""
+
+    -- Store order per load queue entry
+    -- {config.queue_num_entries(LOAD_QUEUE)} signals, each {config.queue_num_entries(STORE_QUEUE)} bit(s).
+    -- One per entry in the load queue, with 1 bit per entry in the store queue.
+    -- The order of the memory operations, read from the ROM, 
+    -- has been shifted to generate this.
+    -- It is naive, however, as 1s for already allocated stores are not present.
+
+"""),
+            ds.NaiveStoreOrderPerEntry(
+                config, 
+                d.OUTPUT
+                )
         ]
 
 
         self.local_items = [
-            l.GroupInitTransfer(config),
-            l.NumNewQueueEntries(config, QueueType.LOAD),
-            l.NumNewQueueEntries(config, QueueType.STORE)
+            ds.GroupInitTransfer(config),
+            ds.NumNewQueueEntries(
+                config, 
+                QueueType.LOAD
+                ),
+            ds.NumNewQueueEntries(
+                config, 
+                QueueType.STORE
+                )
         ]
 
         b = GroupAllocatorBodyItems
@@ -402,7 +633,7 @@ class GroupAllocator:
 
         unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        unit += self.print_dec(GroupAllocatorDecl(config, self.prefix, subunit_prefix))
+        unit += self.print_dec(GroupAllocatorDeclarative(config, self.prefix, subunit_prefix))
 
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:

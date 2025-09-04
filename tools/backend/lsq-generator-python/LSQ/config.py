@@ -231,6 +231,17 @@ class Config:
         """
         return self._stq_num_entries
     
+    def ports_idx_bitwidth(self, queue_type : QueueType) -> int:
+        """
+        Bitwidth required to identify a load/store port.
+        """
+        match queue_type:
+            case QueueType.LOAD:
+                return self._ldp_idx_w
+            case QueueType.STORE:
+                return self._stp_idx_w
+    
+
     def load_queue_size_w(self) -> int:
         """
         Bitwidth required to represent 

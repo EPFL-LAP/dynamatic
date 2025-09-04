@@ -1,4 +1,4 @@
-from LSQ.entity import Signal, EntityComment
+from LSQ.entity import Signal, Comment
 from LSQ.config import Config
 
 from LSQ.utils import QueueType, QueuePointerType
@@ -41,7 +41,7 @@ class GroupHandshaking():
 
         d = Signal.Direction
         self.entity_port_items = [
-            EntityComment(f"""  
+            Comment(f"""  
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} control channel(s),
     -- One for each group of memory operations.
@@ -51,7 +51,7 @@ class GroupHandshaking():
             ds.GroupInitValid(config),
             ds.GroupInitReady(config),
 
-            EntityComment(f"""
+            Comment(f"""
     -- Inputs from the load queue.
     -- Used to see if there is enough space to allocate each group.
 
@@ -61,7 +61,7 @@ class GroupHandshaking():
             ga_p.QueuePointer(config, QueueType.LOAD, QueuePointerType.HEAD),
             ga_p.QueueIsEmpty(QueueType.LOAD),
 
-            EntityComment(f"""    
+            Comment(f"""    
     -- Inputs from the store queue.
     -- Used to see if there is enough space to allocate each group.
 
@@ -71,7 +71,7 @@ class GroupHandshaking():
             ga_p.QueuePointer(config, QueueType.STORE, QueuePointerType.HEAD),
             ga_p.QueueIsEmpty(QueueType.STORE),
 
-            EntityComment(f"""             
+            Comment(f"""             
     -- A boolean per group init channel
     -- to see if the group is being allocated this cycle.
     -- Used to decide what the group allocator writes
@@ -272,3 +272,4 @@ class NaiveNumEmptyEntries(Signal):
                 number=1
             )
         )
+

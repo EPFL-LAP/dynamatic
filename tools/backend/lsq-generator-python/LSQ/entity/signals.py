@@ -12,8 +12,18 @@ class Signal():
             self.number = number
 
     class Direction(Enum):
+        """
+        Enum class to specify if signal in an entity port mapping
+        is an input or output.
+        """
         INPUT = 1
+        """
+        Input Entity Signal
+        """
         OUTPUT = 2
+        """
+        Output Entity Signal
+        """
 
     def signal_size_to_type_declaration(self):
         if self.size.bitwidth == 1 and not self.always_vector:
@@ -164,7 +174,7 @@ class SimpleInstantiation():
     def get_inst_item(self):
         return self.signal.get_inst_item(self.cxn_type)
 
-class EntityComment():
+class Comment():
     def __init__(self, comment):
         self.comment = comment
     
