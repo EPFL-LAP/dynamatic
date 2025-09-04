@@ -83,10 +83,10 @@ class NumNewEntriesBody():
             num_new_entries_masked = MASKED_NUM_NEW_ENTRIES_NAME(queue_type)
             num_new_entries= NUM_NEW_ENTRIES_NAME(queue_type)
 
-            mask_id = -1
+            mask_id = 0
             for i in range(config.num_groups()):
                 if self.has_items(i):  
-                    mask_id = mask_id + 1
+                    
 
                     new_entries = self.new_entries(i)
                     new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
@@ -96,7 +96,7 @@ class NumNewEntriesBody():
   {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
 
 """.removeprefix("\n")
-                    
+                    mask_id = mask_id + 1
                 else:
                     self.item += f"""
   -- Group {i} has no {queue_type.value}(s)
@@ -112,7 +112,7 @@ class NumNewEntriesBody():
                 # generate the or of each masked signal
                 # apart from the last one
                 one_hot_ors = ""
-                for i in range(mask_id):
+                for i in range(mask_id - 1):
                     one_hot_ors += f"""
         {f"{num_new_entries_masked}_{i}"}
         or            
@@ -127,7 +127,7 @@ class NumNewEntriesBody():
     -- The output is simply an OR of the inputs
     {num_new_entries}_o <= 
         {one_hot_ors}
-        {f"{num_new_entries_masked}_{mask_id}"};
+        {f"{num_new_entries_masked}_{mask_id - 1}"};
     """
           
         def get(self):
