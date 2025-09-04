@@ -116,7 +116,7 @@ class NumNewEntriesBody():
                     one_hot_ors += f"""
         {f"{num_new_entries_masked}_{i}"}
         or            
-    """.removeprefix("\n")
+""".removeprefix("\n")
                     
                 one_hot_ors = one_hot_ors.strip()
 
