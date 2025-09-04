@@ -1,0 +1,315 @@
+
+from LSQ.config import Config
+
+from LSQ.rtl_signal_names import *
+
+from LSQ.entity import Signal, Signal2D
+import LSQ.declarative_signals as ds
+
+from LSQ.utils import one_hot, mask_until
+
+class NaiveStoreOrderPerEntryDecl():
+    def __init__(self, config: Config, prefix):
+        self.top_level_comment = f"""
+-- Naive Store Order Per Load Queue Entry Unit
+-- Sub-unit of the Group Allocator.
+--
+-- Generates the naive store orders.
+--
+-- There is one naive store order per entry in the load queue.
+-- Each store order has 1 bit per entry in the store queue.
+--
+-- For the a load entry's store order, if the value is 1
+-- the store must happen before that load.
+--
+-- These are the naive store orders, and so only contain the order
+-- between stores and loads in the group currently being allocated
+--
+-- Information on already allocated stores is added to this later.
+""".strip()
+
+        self.name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+
+        self.prefix = prefix
+
+
+        d = Signal.Direction
+    
+        self.entity_port_items = [
+            ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.TAIL,
+                d.INPUT
+            ),
+            ds.NaiveStoreOrderPerEntry(
+                config,
+                d.OUTPUT
+            )
+        ]
+
+        self.local_items = [
+            NaiveStoreOrderPerEntry(
+                config, 
+                shifted_both=True
+            ),
+            NaiveStoreOrderPerEntry(
+                config, 
+                shifted_stores=True
+            ),
+            NaiveStoreOrderPerEntry(
+                config, 
+                unshifted=True
+            ),
+            MaskedStoreOrder(config)
+        ]
+
+        b = NaiveStoreOrderPerEntryBodyItems()
+        self.body = [
+            b.Body(config)
+        ]
+    
+
+class NaiveStoreOrderPerEntryBodyItems():
+    class Body():
+
+        def __init__(self, config : Config):
+            needs_order_shift = False
+            for group_orders in range(config.num_groups()):
+                for order in config.group_store_order(group_orders):
+                    if order > 0:
+                        needs_order_shift = True
+            
+            if needs_order_shift:
+
+                load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
+                store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
+
+                case_inputs = ""
+                num_cases = 0
+                for i in range(config.num_groups()):
+                    if config.group_num_loads(i) > 0:
+                        case_inputs += f"""
+    case_input({num_cases}) := {GROUP_INIT_TRANSFER_NAME}_{i}_i;
+""".removeprefix("\n")
+                        num_cases = num_cases + 1
+
+                case_inputs = case_inputs.strip()
+
+                cases = ""
+
+                case_number = 0
+                for i in range(config.num_groups()):
+                    if config.group_num_loads(i) > 0:      
+                        group_one_hot = one_hot(case_number, num_cases)
+                        case_number = case_number + 1
+                        cases += f"""
+      when {group_one_hot} =>
+""".removeprefix("\n")
+                        for j, store_order in enumerate(config.group_store_order(i)):
+                            if store_order > 0:
+                                cases += f"""
+        -- Ld {j} of group {i}'s store order
+        {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME}({j}) <= {mask_until(store_order, config.store_queue_num_entries())};
+
+""".removeprefix("\n")
+                            else:
+                                cases += f"""
+        -- Ld {j} of group {i} has no preceding stores, use default value
+
+""".removeprefix("\n")
+                    else:
+                        cases += f"""
+      -- Group {i} has no loads
+
+""".removeprefix("\n")
+
+                cases += f"""
+      -- defaults handled at top of process
+      when others =>
+        null;
+""".removeprefix("\n")
+
+
+                cases = cases.strip()
+
+                unshifted_assignments = f"""
+  {UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME} <= (others => (others => '0'));
+
+    {case_inputs}
+
+    case
+      case_input
+    is
+      {cases}
+    end case;
+""".strip()
+
+                shifted = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+                shifted_stores = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+                unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+                shifted_assignments = f"""
+
+      -- shift all the store orders based on the store queue pointer
+      -- From Hailin's design, the circuit is better shifting based on
+      -- one pointer at a time 
+      for i in 0 to {config.load_queue_num_entries()} - 1 loop
+        for j in 0 to {config.store_queue_num_entries()} - 1 loop
+          col_idx := (j + {store_pointer_name}_int) mod {config.store_queue_num_entries()};
+
+          -- assign shifted value based on store queue
+          {shifted_stores}(i)(j) <= {unshifted}(i)(col_idx);
+        end loop;
+      end loop;
+
+      -- shift all the store orders based on the load queue pointer
+      for i in 0 to {config.load_queue_num_entries()} - 1 loop
+        row_idx := (i + {load_pointer_name}_int) mod {config.load_queue_num_entries()};
+
+        -- assign shifted value based on load queue
+        {shifted}(i) <= {shifted_stores}(row_idx);
+      end loop;
+""".strip()
+
+                output_assignments = ""
+
+                for i in range(config.load_queue_num_entries()):
+                    output_name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+
+                    # pad single digit output names
+                    if i < 10:
+                        output_name += " "
+
+
+                    output_assignments += f"""
+  {output_name} <= {NAIVE_STORE_ORDER_PER_ENTRY_NAME}({i});
+""".removeprefix("\n")
+            
+                output_assignments = output_assignments.strip()
+
+                self.item = f"""
+
+
+  process(all)
+    -- tail pointers as integers for indexing
+    variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
+
+    -- where a location in the shifted order should read from
+    variable row_idx, col_idx : natural;
+
+    variable case_input : std_logic_vector({num_cases} - 1 downto 0);
+  begin
+    -- convert q tail pointers to integer
+    {load_pointer_name}_int := to_integer(unsigned({load_pointer_name}_i));
+    {store_pointer_name}_int := to_integer(unsigned({store_pointer_name}_i));
+
+    {unshifted_assignments}
+
+    {shifted_assignments}
+
+  end process;
+
+
+  {output_assignments}
+""".removeprefix("\n").strip()
+            else:
+                self.item = f"""  
+  -- Naive store orders are all zeros
+  -- Since within each BB, no store ever precedes a load
+
+""".removeprefix("\n")
+
+                zeros = mask_until(0, config.store_queue_num_entries())
+                for i in range(config.load_queue_num_entries()):
+                    name = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+
+                    # pad for <= alignment
+                    if i < 10:
+                        name += " "
+
+                    self.item += f"""
+  {name} <= {zeros};
+""".removeprefix("\n")
+                    
+                self.item = self.item.strip()
+
+        def get(self):
+            return self.item
+        
+class NaiveStoreOrderPerEntry(Signal2D):
+    """
+    Bitwidth = N
+    Number = M
+
+    Local 2D input vector storing the 
+    (unshifted/shifted) store order per queue entry
+        
+    Bitwidth is equal to the number of store queue entriews
+    Number is equal to the number of load queue entries
+    """
+    def __init__(self, 
+                    config : Config,
+                    shifted_stores = False,
+                    shifted_both = False,
+                    unshifted = False,
+                    ):
+        
+        bitwidth = config.store_queue_num_entries()
+        number = config.load_queue_num_entries()
+
+        if shifted_both:
+            base_name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+        elif shifted_stores:
+            base_name = SHIFTED_STORES_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+        elif unshifted:
+            base_name = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
+        else:
+            raise RuntimeError("unclear store order signal")
+
+        Signal2D.__init__(
+            self,
+            base_name=base_name,
+            direction=Signal.Direction.INPUT,
+            size=Signal.Size(
+                bitwidth=bitwidth,
+                number=number
+            )
+        )
+
+# Declarative local signal only used by the num loads unit
+class MaskedStoreOrder():
+    """
+    3D signal
+    
+    Local 2D vector, per group, storing the
+    naive store order per queue entry.
+        
+    Bitwidth is equal to the number of store queue entriews
+    Number is equal to the number of load queue entries
+    """
+
+    def __init__(self, config : Config):
+        self.config = config
+
+    def get_local_item(self):
+        item = ""
+
+        number = self.config.queue_num_entries(QueueType.LOAD)
+        bitwidth = self.config.queue_num_entries(QueueType.STORE)
+        for i in range(self.config.num_groups()):
+            name = f"group_{i}_masked_naive_store_order"
+            item += f"""
+    signal {name} = data_array({number} - 1 downto 0)({bitwidth} - 1 downto 0);
+""".removeprefix("\n")
+        
+        return item.strip()

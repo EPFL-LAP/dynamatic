@@ -336,3 +336,4 @@ class Config:
         Number of stores in a group
         """
         return self._group_num_stores[group_idx]
+    

@@ -199,6 +199,7 @@ It is naive as it only considers loads and stores currently being allocated, not
 """
     
 
+
 def UNSHIFTED_WRITE_ENABLE_NAME(
         queue_type : QueueType, 
         ):
