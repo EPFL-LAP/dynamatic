@@ -27,11 +27,15 @@ class QueuePointerType(Enum):
     HEAD = "head"
     TAIL = "tail"
 
-def get_as_binary_string(val: int) -> str:
+def bin_string(val: int, width: int = None) -> str:
+    """
+    Get an integer as a binary string.
+    If width is not None, the string is padded to 
+    'width' bits.
+    """
+    if width is not None:
+        return f"\"{bin(val)[2:].zfill(width)}\""
     return f"\"{bin(val)[2:]}\""
-
-def get_as_binary_string_padded(val: int, width: int) -> str:
-    return f"\"{bin(val)[2:].zfill(width)}\""
 
 def get_required_bitwidth(val: int) -> int:
     if val == 0:

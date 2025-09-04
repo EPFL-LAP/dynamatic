@@ -174,7 +174,7 @@ class SimpleInstantiation():
     def get_inst_item(self):
         return self.signal.get_inst_item(self.cxn_type)
 
-class Comment():
+class RTLComment():
     def __init__(self, comment):
         self.comment = comment
     

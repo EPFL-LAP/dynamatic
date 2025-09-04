@@ -288,6 +288,7 @@ class Config:
         """
         return self._group_num_loads[group_idx]
     
+    
     def group_num_stores(self, group_idx) -> int:
         """
         Number of stores in a group

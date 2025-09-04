@@ -4,7 +4,7 @@ from LSQ.operators import Op, WrapSub_old, Mux1HROM, CyclicLeftShift, CyclicPrio
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture, Signal, Comment
+from LSQ.entity import Entity, Architecture, Signal, RTLComment
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -55,7 +55,7 @@ class WriteEnableDecl():
 
         d = Signal.Direction
         self.entity_port_items = [
-            Comment(
+            RTLComment(
                 f"""
 
     -- Input: Number of New Queue Entries to Allocate (N)
@@ -68,7 +68,7 @@ class WriteEnableDecl():
                 d.INPUT
             ),
 
-            Comment(
+            RTLComment(
                 f"""
     -- Input: {queue_type.value} queue pointer
     -- Used to shift the write enables into the correct alignment
@@ -83,7 +83,7 @@ class WriteEnableDecl():
             ),
 
 
-            Comment(
+            RTLComment(
                 f"""
 
     -- Output: Shifted write enable signals
@@ -325,7 +325,7 @@ class GroupAllocatorDeclarative():
             ds.Clock(),
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Group init channels from the dataflow circuit
     -- {config.num_groups()} control channel(s),
@@ -338,7 +338,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Input signals from the load queue
 
@@ -364,7 +364,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Input signals from the store queue
 
@@ -389,7 +389,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Load queue write enable signals
     -- {config.queue_num_entries(LOAD_QUEUE)} signals, one for each queue entry.
@@ -404,7 +404,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Number of new load queue entries to allocate.
     -- Used by the load queue to update its tail pointer.
@@ -419,7 +419,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Load port index to write into each load queue entry.
     -- {config.queue_num_entries(LOAD_QUEUE)} signals, each {config.ports_idx_bitwidth(LOAD_QUEUE)} bit(s).
@@ -436,7 +436,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Store queue write enable signals
     -- {config.queue_num_entries(STORE_QUEUE)} signals, one for each queue entry.
@@ -451,7 +451,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Number of new store queue entries to allocate.
     -- Used by the store queue to update its tail pointer.
@@ -467,7 +467,7 @@ class GroupAllocatorDeclarative():
 
 
 
-            Comment(f"""
+            RTLComment(f"""
                           
     -- Store port index to write into each store queue entry.
     -- {config.queue_num_entries(STORE_QUEUE)} signals, each {config.ports_idx_bitwidth(STORE_QUEUE)} bit(s).
@@ -482,7 +482,7 @@ class GroupAllocatorDeclarative():
                 ),
     
 
-            Comment(f"""
+            RTLComment(f"""
 
     -- Store order per load queue entry
     -- {config.queue_num_entries(LOAD_QUEUE)} signals, each {config.queue_num_entries(STORE_QUEUE)} bit(s).

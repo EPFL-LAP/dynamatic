@@ -1,9 +1,9 @@
-from LSQ.entity import Signal, Comment, Instantiation, SimpleInstantiation, InstCxnType, Signal2D
+from LSQ.entity import Signal, RTLComment, Instantiation, SimpleInstantiation, InstCxnType, Signal2D
 from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.utils import get_as_binary_string_padded, get_required_bitwidth, one_hot, mask_until
+from LSQ.utils import bin_string, get_required_bitwidth, one_hot, mask_until
 
 import LSQ.declarative_signals as ds
 
@@ -156,12 +156,12 @@ class NumNewQueueEntriesBody():
 
             selects = []
             
-            zeros_binary = get_as_binary_string_padded(0, self.new_entries_bitwidth)
+            zeros_binary = bin_string(0, self.new_entries_bitwidth)
 
             for i in range(config.num_groups()):
                 if self.has_items(i):  
                     new_entries = self.new_entries(i)
-                    new_entries_binary = get_as_binary_string_padded(new_entries, self.new_entries_bitwidth)
+                    new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
 
                     select = f"({new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary})"
 
@@ -442,7 +442,7 @@ class PortIdxPerEntryBodyItems():
                     # correctly associated with a port
                     for j, idx in enumerate(self.ports(i)):
                         assign_to = f"{UNSHIFTED_PORT_INDEX_PER_ENTRY_NAME(queue_type)}({j})"
-                        idx_bin = get_as_binary_string_padded(idx, self.idx_bitwidth)
+                        idx_bin = bin_string(idx, self.idx_bitwidth)
 
                         cases += f"""
         -- {queue_type.value} {j} of group {i} is from {queue_type.value} port {idx}
