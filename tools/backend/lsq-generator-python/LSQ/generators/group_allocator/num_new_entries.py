@@ -87,7 +87,7 @@ class NumNewEntriesBody():
             for i in range(config.num_groups()):
                 if self.has_items(i):  
                     mask_id = mask_id + 1
-                    
+
                     new_entries = self.new_entries(i)
                     new_entries_binary = bin_string(new_entries, self.new_entries_bitwidth)
 
@@ -99,17 +99,17 @@ class NumNewEntriesBody():
                     
                 else:
                     self.item += f"""
--- Group {i} has no {queue_type.value}(s)
+  -- Group {i} has no {queue_type.value}(s)
 
 """.removeprefix("\n")
 
             # generate the or of each masked signal
             # apart from the last one
             one_hot_ors = ""
-            for i in range(mask_id - 1):
+            for i in range(mask_id):
                 one_hot_ors += f"""
-    {f"{num_new_entries_masked}_{i}"}
-      or            
+  {f"{num_new_entries_masked}_{i}"}
+    or            
 """.removeprefix("\n")
                 
             one_hot_ors = one_hot_ors.strip()
