@@ -82,6 +82,13 @@ class NaiveStoreOrderPerEntryDecl():
         ]
     
 
+def ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
 class NaiveStoreOrderPerEntryBodyItems():
     class Body():
         def __init__(self, config : Config):
@@ -94,25 +101,53 @@ class NaiveStoreOrderPerEntryBodyItems():
             if needs_order_shift:
                 unshifted = UNSHIFTED_NAIVE_STORE_ORDER_PER_ENTRY_NAME
 
+                # First, we need to generate masked store orders
+                # by combining the non-zero orders with the transfer signals
+                # if the store orders is zero, we don't need to do anything
+
                 store_order_width = config.queue_num_entries(QueueType.STORE)
                 zero_store_order = mask_until(0, store_order_width)
 
                 self.item = ""
+
+                # to_mux is a dictionary of lists
+                # each key represents a load queue entry
+                # the list is the inputs to the mux for that entry
                 to_mux = defaultdict(list)
+
+                # iterate over all the groups
                 for i in range(config.num_groups()):
 
-                    non_zero_store_orders = 0
+                    # transfer name is constant per group
                     transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
 
-                    for j, store_order_int in enumerate(config.group_store_order(i)):
-                        if store_order_int != 0:
-                            to_mux[j].append((i, non_zero_store_orders))
+                    # we also mask the non-zero store orders
+                    # so we need to remember where to write the masked signal to
+                    masked_store_order_index = 0
 
+                    # for each store order in the group
+                    for j, store_order_int in enumerate(config.group_store_order(i)):
+                        # if non-zero
+                        if store_order_int != 0:
+                            # the store order corresponds to load queue j, so the key is j
+                            # we store the group and the index to read from
+                            to_mux[j].append((i, masked_store_order_index))
+
+                            # convert the integer store order to a signal
+                            # e.g. if the store order is 3 
+                            # (meaning the first 3 stores are ahead of this load)
+                            # and there are 5 entries in the store queue
+                            # the signal is 00111
                             store_order = mask_until(store_order_int, store_order_width)
 
-                            assign_to = f"group_{i}_masked_naive_store_order({non_zero_store_orders})"
+                            assign_to = f"group_{i}_masked_naive_store_order({masked_store_order_index})"
+
+                            masked_store_order_index = masked_store_order_index + 1
 
                             self.item += f"""
+   -- Load {j} of group {i} has preceding stores inside of its BB
+   -- and therefore a non-zero store order
+   -- Mask it so we can use it an OR mux
    {assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
 
 """.removeprefix("\n")
@@ -128,11 +163,13 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                     if len(mux_inputs) == 0:
                         self.item += f"""
+  -- No group has a non-zero store order for load {i}
   {assign_to} <= (others => '0');
 """.removeprefix("\n")
                     elif len(mux_inputs) == 1:
                         group, index = mux_inputs[0]
                         self.item += f"""
+  -- Only group {group} has a non-zero store order for load {i}
   {assign_to} <= group_{group}_masked_naive_store_order({index});
 """.removeprefix("\n")
                     else:
@@ -150,6 +187,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 """.strip()
 
                         self.item += f"""
+  -- Mux the non-zero store orders using OR, as they have been one-hot-masked
   {assign_to} <= 
     {one_hots}
     {final_assignment}
