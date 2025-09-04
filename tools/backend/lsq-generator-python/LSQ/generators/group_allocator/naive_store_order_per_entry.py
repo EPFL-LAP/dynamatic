@@ -201,8 +201,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                 output_assignments = output_assignments.strip()
 
                 self.item += f"""
-
-                
+     
   process(all)
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
@@ -219,9 +218,8 @@ class NaiveStoreOrderPerEntryBodyItems():
 
   end process;
 
-
   {output_assignments}
-""".removeprefix("\n").strip()
+""".removeprefix("\n")
             else:
                 self.item = f"""  
   -- Naive store orders are all zeros
