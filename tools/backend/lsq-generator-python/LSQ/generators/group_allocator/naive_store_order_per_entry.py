@@ -92,9 +92,14 @@ def ordinal(n: int) -> str:
 class NaiveStoreOrderPerEntryBodyItems():
     class Body():
         def __init__(self, config : Config):
+            # if a store never precedes a load inside of a BB
+            # the naive store orders are all zeros
+            # so first check if we need anything at all
             needs_order_shift = False
             for group_orders in range(config.num_groups()):
                 for order in config.group_store_order(group_orders):
+                    # if any store order is non-zero,
+                    # we need the roms + muxs + shifter
                     if order > 0:
                         needs_order_shift = True
             
@@ -103,7 +108,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                 # First, we need to generate masked store orders
                 # by combining the non-zero orders with the transfer signals
-                # if the store orders is zero, we don't need to do anything
+                # if the store orders are zero, we don't need to do anything
 
                 store_order_width = config.queue_num_entries(QueueType.STORE)
                 zero_store_order = mask_until(0, store_order_width)
@@ -121,7 +126,7 @@ class NaiveStoreOrderPerEntryBodyItems():
                     # transfer name is constant per group
                     transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
 
-                    # we also mask the non-zero store orders
+                    # we only mask the non-zero store orders
                     # so we need to remember where to write the masked signal to
                     masked_store_order_index = 0
 
@@ -135,7 +140,7 @@ class NaiveStoreOrderPerEntryBodyItems():
 
                             # convert the integer store order to a signal
                             # e.g. if the store order is 3 
-                            # (meaning the first 3 stores are ahead of this load)
+                            # (meaning the first 3 stores in this BB are ahead of this load)
                             # and there are 5 entries in the store queue
                             # the signal is 00111
                             store_order = mask_until(store_order_int, store_order_width)
@@ -154,26 +159,38 @@ class NaiveStoreOrderPerEntryBodyItems():
 
 
                 for i in range(config.queue_num_entries(QueueType.LOAD)):
+                    # unshifted store order variable
                     assign_to = f"{unshifted}({i})"
 
+                    # pad name if less than 10
+                    # to maintain alignment
                     if i < 10:
                         assign_to = assign_to + " "
                 
+                    # get mux inputs
+                    # or an empty list
                     mux_inputs = to_mux.get(i, [])
 
+                    # No mux at all, since no non-zero store orders
                     if len(mux_inputs) == 0:
                         self.item += f"""
   -- No group has a non-zero store order for load {i}
   {assign_to} <= (others => '0');
 """.removeprefix("\n")
+                    # No mux at all, since there is only 1 non-zero store order
                     elif len(mux_inputs) == 1:
                         group, index = mux_inputs[0]
                         self.item += f"""
   -- Only group {group} has a non-zero store order for load {i}
   {assign_to} <= group_{group}_masked_naive_store_order({index});
 """.removeprefix("\n")
+                        
+                    # Here we build an actual mux
+
                     else:
                         one_hots = ""
+                        # for every input except the last input
+                        # add a store order plus an OR
                         for group, index in mux_inputs[:-1]:
                             one_hots += f"""
     group_{group}_masked_naive_store_order({index})
@@ -181,18 +198,27 @@ class NaiveStoreOrderPerEntryBodyItems():
 """.removeprefix("\n")
                         one_hots = one_hots.strip()
 
+                        # add the last assignment plus a semi colon
                         final_group, final_index = mux_inputs[-1]
                         final_assignment = f"""
     group_{final_group}_masked_naive_store_order({final_index});
 """.strip()
 
+                        # combine store orders, the ORs,
+                        # and the final store order with the ;
                         self.item += f"""
-  -- Mux the non-zero store orders using OR, as they have been one-hot-masked
+  -- More than one group has a non-zero store order for load {i}
+  -- We mux them using OR, as they have been one-hot-masked
   {assign_to} <= 
     {one_hots}
     {final_assignment}
 """.removeprefix("\n")
                     
+
+                #################################
+                # Barrel shifter
+                #################################
+
                 load_pointer_name = QUEUE_POINTER_NAME(QueueType.LOAD, QueuePointerType.TAIL)
                 store_pointer_name = QUEUE_POINTER_NAME(QueueType.STORE, QueuePointerType.TAIL)
 
@@ -239,7 +265,9 @@ class NaiveStoreOrderPerEntryBodyItems():
                 output_assignments = output_assignments.strip()
 
                 self.item += f"""
-     
+
+  -- Hopefully we infer a barrel shifter here without writing out
+  -- all the lines of code for it
   process(all)
     -- tail pointers as integers for indexing
     variable {load_pointer_name}_int, {store_pointer_name}_int : natural;
