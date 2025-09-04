@@ -145,10 +145,10 @@ class NaiveStoreOrderPerEntryBodyItems():
                             masked_store_order_index = masked_store_order_index + 1
 
                             self.item += f"""
-   -- Load {j} of group {i} has preceding stores inside of its BB
-   -- and therefore a non-zero store order
-   -- Mask it so we can use it an OR mux
-   {assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
+  -- Load {j} of group {i} has preceding stores inside of its BB
+  -- and therefore a non-zero store order
+  -- Mask it so we can use it an OR mux
+  {assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
 
 """.removeprefix("\n")
 
