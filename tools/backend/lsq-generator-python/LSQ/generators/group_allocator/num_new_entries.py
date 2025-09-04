@@ -99,14 +99,14 @@ class NumNewEntriesBody():
                     mask_id = mask_id + 1
                 else:
                     self.item += f"""
-  -- Group {i} has no {queue_type.value}(s)
+  -- Group {i} has no {queue_type.value}s
 
 """.removeprefix("\n")
                     
             # one hot with one input
             if mask_id == 1:
                 self.item += f"""
-    {num_new_entries}_o <= {f"{num_new_entries_masked}_0"};
+  {num_new_entries}_o <= {f"{num_new_entries_masked}_0"};
 """
             else:
                 # generate the or of each masked signal
@@ -114,8 +114,8 @@ class NumNewEntriesBody():
                 one_hot_ors = ""
                 for i in range(mask_id - 1):
                     one_hot_ors += f"""
-      {f"{num_new_entries_masked}_{i}"}
-        or            
+    {f"{num_new_entries_masked}_{i}"}
+      or            
 """.removeprefix("\n")
                     
                 one_hot_ors = one_hot_ors.strip()
@@ -125,9 +125,9 @@ class NumNewEntriesBody():
                 self.item += f"""
     -- Since the inputs are masked by one-hot valid signals
     -- The output is simply an OR of the inputs
-    {num_new_entries}_o <= 
-      {one_hot_ors}
-      {f"{num_new_entries_masked}_{mask_id - 1}"};
+  {num_new_entries}_o <= 
+    {one_hot_ors}
+    {f"{num_new_entries_masked}_{mask_id - 1}"};
     """
           
         def get(self):
