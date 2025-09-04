@@ -269,11 +269,14 @@ class GroupHandshakingBody():
   -- 
   -- To be ready to allocate a group,
   -- both queues must have enough space for the group's memory operations
-  {group_init_ready} <= '0' when
+  {group_init_ready} <= 
+    '0' 
+  when
     ({load_is_empty} = '0'{num_empty_check_ld})
       or
     ({store_is_empty} = '0'{num_empty_check_st})
-  else '1';
+  else 
+    '1';
 
 """.removeprefix("\n")
             
