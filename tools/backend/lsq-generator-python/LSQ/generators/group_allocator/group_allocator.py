@@ -578,9 +578,9 @@ class GroupAllocator:
 
         self.name = name
         self.configs = configs
-        self.prefix = name
+        self.lsq_name = name
 
-        self.module_name = f"{self.prefix}_{GROUP_ALLOCATOR_NAME}_unit"
+        self.module_name = f"{self.lsq_name}_{GROUP_ALLOCATOR_NAME}_unit"
 
     def generate(self, path_rtl, config : Config) -> None:
         """
@@ -615,9 +615,9 @@ class GroupAllocator:
 
         """
 
-        subunit_prefix = self.prefix + "_ga"
+        subunit_prefix = self.lsq_name + "_ga"
 
-        unit = self.print_dec(GroupHandshaking(config, subunit_prefix))
+        unit = self.print_dec(GroupHandshaking(config, self.lsq_name))
 
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.LOAD, subunit_prefix))
         unit += self.print_dec(NumNewQueueEntriesDecl(config, QueueType.STORE, subunit_prefix))
@@ -633,7 +633,7 @@ class GroupAllocator:
 
         unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
 
-        unit += self.print_dec(GroupAllocatorDeclarative(config, self.prefix))
+        unit += self.print_dec(GroupAllocatorDeclarative(config, self.lsq_name))
 
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:

@@ -31,8 +31,8 @@ class GroupHandshaking():
 -- The transfer signal is the "and" of the ready and valid signals.
 """.strip()
             
-        self.name = "ga_" + GROUP_HANDSHAKING_NAME
-        self.lsq_name = lsq_name
+        self.name = GROUP_HANDSHAKING_NAME
+        self.prefix = lsq_name + "_ga"
 
 
         d = Signal.Direction
