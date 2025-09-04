@@ -165,5 +165,6 @@ class NumNewEntriesMasked(Signal):
             size=Signal.Size(
                 bitwidth=config.queue_idx_bitwidth(queue_type),
                 number=number
-            )
+            ),
+            always_number=True
         )
