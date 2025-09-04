@@ -109,6 +109,8 @@ class NumNewEntriesBody():
     {f"{num_new_entries_masked}_{i}"}
       or            
 """.removeprefix("\n")
+                
+            one_hot_ors = one_hot_ors.strip()
 
             # assignment and last input to the or
             # as well as the ending semi colon
