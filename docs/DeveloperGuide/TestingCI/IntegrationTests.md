@@ -1,7 +1,7 @@
 # Integration Tests
 
 This document describes the setup used for running integration tests in Dynamatic, based on [GoogleTest](https://google.github.io/googletest/), [Ninja](https://ninja-build.org/)
-and [CMake's ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html).
+and [CMake's ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html). For a more general overview of the purpose of integration testing, see [Introduction](Introduction.md).
 
 ## Introduction
 
@@ -11,65 +11,117 @@ A **benchmark** is a piece of .c code, commonly called a *kernel*, which is writ
 
 An **integration test** is a piece of code which runs a Dynamatic in order to compile, convert into HDL and simulate a certain benchmark, with some specific parameters. To clarify the difference, `integration-test/fir/fir.c` is a benchmark, while a C++ function which runs Dynamatic `set-src <benchmark>`, `compile`, `write-hdl` and `simulate` commands is an integration test. Note that integration tests differ by parameters used; a test that runs `compile --buffer-algorithm on-merges` is not the same as a test that runs `compile --buffer-algorithm fpga20`, even if they use the same benchmark.
 
-As mentioned above, integration tests usually run the following steps using Dynamatic's frontend shell:
+As mentioned above, the basic integration tests run the following steps using Dynamatic's frontend shell (this is referred to as the "basic" flow):
 ```
+> set-dynamatic-path path/to/dynamatic/root
 > set-src path/to/benchmark
-> compile
-> write-hdl
+> set-clock-period 5
+> compile --buffer-algorithm fpga20
+> write-hdl --hdl vhdl
 > simulate
 ```
-If any of the steps report a failure, the test fails.
+If any of the steps report a failure, the test fails. For more information about the commands and the Dynamatic frontend shell, see [Command Reference](../../UserGuide/CommandReference.md).
+
+Dynamatic uses GoogleTest as the testing framework for writing integration tests. When Dynamatic is built, CMake registers all of the GoogleTest tests, which allows them to be run using CMake's ctest utility:
+```
+$ cd build/tools/integration
+$ ctest --parallel 8 --output-on-failure 
+```
+To simplify this, a custom target is defined in `tools/integration/CMakeLists.txt`, so that the tests can easily be run using ninja:
+```
+$ ninja -C build run-all-integration-tests
+```
+
+## Code structure
 
 All code related to integration testing is located in `tools/integration`.
 - `util.cpp` and `util.h` contain helper functions for running integration tests. 
 - `TEST_SUITE.cpp` contains the actual tests. For more details, [see below](#googletest-basics).
 - `generate_perf_report.py` is a script which reads the results of testing and generates a performance (in terms of cycle count) report in .md format.
-- `run_integration.py`, `run_spec_integration.py` and `ignored_tests.txt` are leftovers from the old testing setup which didn't rely on GoogleTest. Even though they are unused, they are left here as reference if any problems arise with the current setup.
+- `run_integration.py`, `run_spec_integration.py` and `ignored_tests.txt` are leftovers from the old testing setup which didn't rely on GoogleTest. Even though they are unused, they are left here as reference if any problems arise with the current setup. `run_integration.py` was used to run all benchmarks with the basic flow, except the ones listed in `ignored_tests.txt`. `run_spec_integration.py` was used to run benchmarks with a custom flow which used the speculation feature. It was replaced with the new setup because GoogleTest is a standard framework that people might be familiar with already, is very well documented and writing different tests with it is simpler than extending a custom script.
 
 ## GoogleTest basics
 
-This is a crash course on GoogleTest features that are important for Dynamatic. For more information, see the [GoogleTest documentation](https://google.github.io/googletest/). 
+This is a crash course on GoogleTest features that are important for Dynamatic. Also, refer to the [GoogleTest documentation](https://google.github.io/googletest/), since these concepts can be confusing. 
 
-In theory, the simplest way we could write integration tests for Dynamatic would be to make a test case for each combination of parameters (such as `--buffer-algorithm` and other flags) and benchmarks. Note that the code in the examples is simplified with some details removed for the sake of clarity.
+GoogleTest allows us to write tests in a function-like form. For this, we use the `TEST` macro. Here is a very elementary example of a test:
 ```c++
-TEST(BasicTests, binary_search_vhdl) {
-  EXPECT_EQ(runIntegrationTest("binary_search", "vhdl"));
+int sum(int a, int b) {
+  return a + b;
 }
 
-TEST(BasicTests, binary_search_verilog) {
-  EXPECT_EQ(runIntegrationTest("binary_search", "verilog"));
-}
+TEST(SumTests, positive_numbers) {
+  int x = 5, y = 4;
+  int expected = x + y;
+  int received = sum(x, y);
 
-TEST(BasicTests, fir_vhdl) {
-  EXPECT_EQ(runIntegrationTest("fir", "vhdl"));
+  EXPECT_EQ(received, expected);
 }
-
-TEST(BasicTests, fir_verilog) {
-  EXPECT_EQ(runIntegrationTest("fir", "verilog"));
-}
-
-...
 ```
-It is immediately clear that such an approach is highly impractical. For this reason, we take advantage of GoogleTest's parameterized testing feature. This allows us to run the same integration test code for many different parameters, in our case benchmarks. For example:
+The code inside the test is run by GoogleTest like a function. `EXPECT_EQ` is a macro assertion which ensures that the two arguments are equal. If not, the test will fail.
+
+Now, let's demonstrate how this would look like in the case of Dynamatic. Assume there is a helper function
 ```c++
-TEST_P(BasicTests, vhdl) {
-  std::string name = GetParam();
-  EXPECT_EQ(runIntegrationTest(name, "vhdl"));
+int runIntegrationTest(std::string benchmark);
+```
+which runs the basic flow described in the introduction and returns 0 if it was successful and 1 otherwise. Then, a test would look like:
+```c++
+TEST(BasicTests, binary_search) {
+  int exitCode = runIntegrationTest("binary_search");
+  
+  EXPECT_EQ(exitCode, 0);
+}
+```
+Because of the macro, the test will fail if the exit code is non-zero.
+
+However, by doing this we only run one benchmark with the basic flow. If we want to run multiple benchmarks, we would have something like this:
+```c++
+TEST(BasicTests, binary_search) {
+  int exitCode = runIntegrationTest("binary_search");
+  
+  EXPECT_EQ(exitCode, 0);
 }
 
-TEST_P(BasicTests, verilog) {
-  std::string name = GetParam();
-  EXPECT_EQ(runIntegrationTest(name, "verilog"));
+TEST(BasicTests, fir) {
+  int exitCode = runIntegrationTest("fir");
+  
+  EXPECT_EQ(exitCode, 0);
 }
 
+TEST(BasicTests, kernel_3mm_float) {
+  int exitCode = runIntegrationTest("kernel_3mm_float");
+  
+  EXPECT_EQ(exitCode, 0);
+}
+
+// etc.
+```
+and so on for all Dynamatic benchmarks. It is immediately clear that such an approach is very impractical, since there are a lot of benchmarks, which means a lot of duplicate code. This is where GoogleTest's parameterized testing helps us. A parameterized test is a test which accepts a parameter, much like a function or a template in programming. First, we define a testing fixture for the parameterized test. This is necessary to define the type of the parameter.
+```c++
+class BasicTests : public testing::TestWithParam<std::string> {};
+```
+
+Then, we create a parameterized test with the given fixture. As specified in the fixture, the test takes a parameter of type `std::string`. The parameter's value can be retrieved using `GetParam()`.
+```c++
+TEST_P(BasicTests, basic) {
+  std::string name = GetParam();
+  int exitCode = runIntegrationTest(name);
+
+  EXPECT_EQ(exitCode, 0);
+}
+```
+
+Finally, we must specify the concrete parameters that will be used to run the parameterized test. We use the macro `INSTANTIATE_TEST_SUITE_P(instantiationName, fixtureName, params)` for this purpose. Since the parameter list contains all benchmarks, we appropriately name the instantiation `AllBenchmarks`.
+```c++
 INSTANTIATE_TEST_SUITE_P(
     AllBenchmarks, BasicTests,
-    testing::Values("single_loop", "atax", "atax_float", /* ... */)
+    testing::Values("binary_search", "fir", "kernel_3mm_float", /* ... */)
 );
 ```
-In this example, `BasicTests` is the name of something called a *test fixture*, which is a group of tests which should be run in the same way. This fixture is parameterized, with the parameter being the benchmark name, and has two test cases, `vhdl` and `verilog`. Finally, we instantiate the test suite. The instantiation's parameters are `single_loop`, `atax`, `atax_float` etc. (i.e. all Dynamatic benchmarks), and the instantiation is appropriately named `AllBenchmarks`. By instantiating, we achieved the same as in the first example, but without having to write it all manually.
 
-GoogleTest uses the following naming scheme for parameterized tests:
+This way, we have used only a few lines of code to achieve the same outcome as if we were to duplicate the code as in the prior example.
+
+Note that GoogleTest uses the following naming scheme for parameterized tests:
 ```
 InstantiationName/FixtureName.TestCaseName/ParamValue
 ```
@@ -78,6 +130,7 @@ For example:
 AllBenchmarks/BasicTests.vhdl/binary_search
 AllBenchmarks/BasicTests.verilog/fir
 ```
+This will be important in the following section.
 
 ## Running tests
 
@@ -168,14 +221,23 @@ Currently, there are 3 groups of benchmarks:
 - Memory benchmarks, located in `integration-test/memory/`,
 - Sharing benchmarks, located in `integration-test/sharing/`,
 - Miscellaneous benchmarks, located in `integration-test/`.
+
 Test suite instantiations follow these benchmark groups, since each instantiation defines which benchmarks the test suite will use.
 
-**If you want to add a benchmark**, add the corresponding folder and .c kernel inside of it, and then add its name to the test suite instantiation. For example, if we want to add `new_kernel` to miscellaneous benchmarks, we would:
+### Adding a benchmark
+
+*Example use case: You created some benchmarks that don't have array accesses to evaluate timing/area optimization, and you want them to be run with the basic Dynamatic flow.*
+
+Add the corresponding folder and .c kernel inside of it, and then add its name to the test suite instantiation. For example, if we want to add `new_kernel` to miscellaneous benchmarks, we would:
 1. Create the folder `integration-test/new_kernel`.
 2. Write the code of the kernel to `integration-test/new_kernel/new_kernel.c`.
 3. In `tools/integration/TEST_SUITE.cpp`, find the instantiation `MiscBenchmarks` and inside `testing::Values` add the name `"new_kernel"`.
 
-**If you want to add a new test case for an existing fixture**, add a new macro invocation:
+### Adding a new test case for an existing fixture
+
+*Example use case: You want the same set of benchmarks to be run with some different parameters, e.g. with Verilog instead of VHDL or with FPL'22 instead of FPGA'20 buffering.*
+
+Add a new macro invocation:
 ```c++
 TEST_P(ExistingFixtureName, newTestCaseName) {
   // code
@@ -193,7 +255,11 @@ TEST_P(BasicFixture, verilog) {
 }
 ```
 
-**If we want to add a new fixture** (for a new group of benchmarks), first we define the fixture at the top of `TEST_SUITE.cpp`:
+### Adding a new fixture
+
+*Example use case: You want to have a new group of benchmarks, different than the three mentioned at the beginning. Maybe you have a set of benchmarks only for speculation.*
+
+First we define the fixture at the top of `TEST_SUITE.cpp`:
 ```c++
 class NewFixture : public testing::TestWithParam<std::string> {};
 ```
@@ -202,7 +268,16 @@ Then we create some test cases for it as stated earlier. Finally, we instantiate
 INSTANTIATE_TEST_SUITE_P(SomeBenchmarks, NewFixture, testing::Values(...));
 ```
 
-**If you want a test to be ignored by the CI** for whatever reason, you should name it `testCaseName_NoCI`.
+### Ignoring tests in the Actions workflow
+
+*Example use case: Your feature is merged into main along with some tests, but is incomplete and the tests take a long time, so you want the workflow to skip them.*
+
+If you want the actions workflow to ignore a test case for whatever reason, you should name it `testCaseName_NoCI`. For example:
+```c++
+TEST_P(SpecFixture, spec_NoCI) {
+  // ...
+}
+```
 
 ## Custom integration tests
 
