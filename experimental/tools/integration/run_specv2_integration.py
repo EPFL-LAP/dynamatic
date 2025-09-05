@@ -469,6 +469,8 @@ def main():
     with open(handshake_canonicalized, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_buffered,
+            "--handshake-spec-v2-post-buffering",
+            "--handshake-materialize",
             "--handshake-canonicalize",
             "--handshake-hoist-ext-instances"
         ],

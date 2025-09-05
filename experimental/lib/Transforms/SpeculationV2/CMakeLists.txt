@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticSpeculationV2
   PostSpecV2.cpp
   PreSpecV2.cpp
   JSONImporter.cpp
+  SpecV2PostBuffering.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

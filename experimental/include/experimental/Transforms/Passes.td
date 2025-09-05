@@ -114,6 +114,14 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   ];
 }
 
+def SpecV2PostBuffering : DynamaticPass<"handshake-spec-v2-post-buffering"> {
+  let summary = "Spec v2 post buffering";
+  let description = [{
+  }];
+  let options = [
+  ];
+}
+
 def CfGateBinarization : DynamaticPass<"cf-gate-binarization"> {
   let summary = "Limit entries to at most 2";
   let description = [{
