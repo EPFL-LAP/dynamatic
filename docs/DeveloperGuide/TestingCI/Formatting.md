@@ -76,20 +76,20 @@ The simplest way to keep your Python scripts well-formatted is to use VS Code fo
 
 
 [^1]: Note that the above command will fail if no files have been modified, or if some of the modified files are deleted files. Hence, the entire code of the check in `.github/workflows/ci.yml` is:
-```bash
-FILES=$(comm -23 <(git ls-files '*.py' --modified | sort) <(git ls-files '*.py' --deleted | sort))
-STATUS=$?
-if [[ $FILES ]]; then
-  exec 3>&1
-  OUTPUT=$(autopep8 --max-line-length 200 --diff $FILES 3>&- | tee /dev/fd/3)
-  exec 3>&-
-  if [[ $OUTPUT ]]; then
-    STATUS=1
-  else
-    STATUS=0
-  fi
-else
-  STATUS=0
-fi
-echo "autopep8 exited with $STATUS"
-```
+    ```bash
+    FILES=$(comm -23 <(git ls-files '*.py' --modified | sort) <(git ls-files '*.py' --deleted | sort))
+    STATUS=$?
+    if [[ $FILES ]]; then
+      exec 3>&1
+      OUTPUT=$(autopep8 --max-line-length 200 --diff $FILES 3>&- | tee /dev/fd/3)
+      exec 3>&-
+      if [[ $OUTPUT ]]; then
+        STATUS=1
+      else
+        STATUS=0
+      fi
+    else
+      STATUS=0
+    fi
+    echo "autopep8 exited with $STATUS"
+    ```
