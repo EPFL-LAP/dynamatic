@@ -27,7 +27,7 @@ class BarrelShifterDecl(DeclarativeUnit):
         self.parent = parent
         self.unit_name = unit_name
 
-        self.port_items = [
+        self.entity_port_items = [
             pointer,
             to_shift,
             output
