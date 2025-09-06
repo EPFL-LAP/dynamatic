@@ -45,7 +45,7 @@ class BarrelShifterDecl(DeclarativeUnit):
                 )
 
         self.body = [
-            BarrelShifterBody()
+            BarrelShifterBody(pointer, to_shift, output)
         ]
 
 class BarrelShifterBody():
