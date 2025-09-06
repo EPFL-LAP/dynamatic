@@ -3,15 +3,68 @@ from LSQ.config import Config
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.entity import Signal, Signal2D, Instantiation, SimpleInstantiation, InstCxnType
+from LSQ.entity import Signal, Signal2D, Instantiation, SimpleInstantiation, InstCxnType, DeclarativeUnit, Entity, Architecture
 import LSQ.declarative_signals as ds
 
 from LSQ.utils import one_hot, mask_until
 
 from collections import defaultdict
 
-class NaiveStoreOrderPerEntryDecl():
-    def __init__(self, config: Config, prefix):
+from LSQ.generators.barrel_shifter import get_barrel_shifter
+
+def get_naive_store_order_per_entry(config, parent):
+    
+
+    declaration = NaiveStoreOrderPerEntryDecl(config, parent)
+    unit = Entity(declaration).get() + Architecture(declaration).get()
+
+    d = Signal.Direction
+
+    v_barrel_shift = get_barrel_shifter(
+        declaration.name(),
+        "barrel_shift_vrt",
+        ds.QueuePointer(
+                config, 
+                QueueType.STORE,
+                QueuePointerType.TAIL,
+                d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            unshifted=True,
+            direction = d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_stores=True,
+            direction = d.OUTPUT
+        )
+    )
+
+    h_barrel_shift = get_barrel_shifter(
+        declaration.name(),
+        "barrel_shift_hoz",
+        ds.QueuePointer(
+                config, 
+                QueueType.LOAD,
+                QueuePointerType.TAIL,
+                d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_stores=True,
+            direction = d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_both=True,
+            direction = d.OUTPUT
+        )
+    )
+    return v_barrel_shift + h_barrel_shift + unit
+
+class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
+    def __init__(self, config: Config, parent):
         self.top_level_comment = f"""
 -- Naive Store Order Per Load Queue Entry Unit
 -- Sub-unit of the Group Allocator.
@@ -30,9 +83,9 @@ class NaiveStoreOrderPerEntryDecl():
 -- Information on already allocated stores is added to this later.
 """.strip()
 
-        self.name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
+        self.unit_name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
 
-        self.prefix = prefix
+        self.parent = parent
 
 
         d = Signal.Direction
@@ -76,12 +129,10 @@ class NaiveStoreOrderPerEntryDecl():
             )
         ]
 
-        subprefix = f"{self.prefix}_{self.name}"
-
         self.body = [
             Muxes(config),
-            VerticalBarrelShiftInstantiation(config, subprefix),
-            HorizontalBarrelShiftInstantiation(config, subprefix)
+            VerticalBarrelShiftInstantiation(config, self.name()),
+            HorizontalBarrelShiftInstantiation(config, self.name())
         ]
     
 
@@ -152,10 +203,10 @@ class Muxes():
                         masked_store_order_index = masked_store_order_index + 1
 
                         self.item += f"""
--- Load {j} of group {i} has preceding stores inside of its BB
--- and therefore a non-zero store order
--- Mask it so we can use it an OR mux
-{assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
+  -- Load {j} of group {i} has preceding stores inside of its BB
+  -- and therefore a non-zero store order
+  -- Mask it so we can use it an OR mux
+  {assign_to} <= {store_order} when {transfer_name} else {zero_store_order};
 
 """.removeprefix("\n")
 
@@ -176,15 +227,15 @@ class Muxes():
                 # No mux at all, since no non-zero store orders
                 if len(mux_inputs) == 0:
                     self.item += f"""
--- No group has a non-zero store order for load {i}
-{assign_to} <= (others => '0');
+  -- No group has a non-zero store order for load {i}
+  {assign_to} <= (others => '0');
 """.removeprefix("\n")
                 # No mux at all, since there is only 1 non-zero store order
                 elif len(mux_inputs) == 1:
                     group, index = mux_inputs[0]
                     self.item += f"""
--- Only group {group} has a non-zero store order for load {i}
-{assign_to} <= group_{group}_masked_naive_store_order({index});
+  -- Only group {group} has a non-zero store order for load {i}
+  {assign_to} <= group_{group}_masked_naive_store_order({index});
 """.removeprefix("\n")
                     
                 # Here we build an actual mux
@@ -195,25 +246,29 @@ class Muxes():
                     # add a store order plus an OR
                     for group, index in mux_inputs[:-1]:
                         one_hots += f"""
-group_{group}_masked_naive_store_order({index})
-    or
+  group_{group}_masked_naive_store_order({index})
+      or
 """.removeprefix("\n")
                     one_hots = one_hots.strip()
 
                     # add the last assignment plus a semi colon
                     final_group, final_index = mux_inputs[-1]
                     final_assignment = f"""
-group_{final_group}_masked_naive_store_order({final_index});
+  group_{final_group}_masked_naive_store_order({final_index});
 """.strip()
 
                     # combine store orders, the ORs,
                     # and the final store order with the ;
                     self.item += f"""
--- More than one group has a non-zero store order for load {i}
--- We mux them using OR, as they have been one-hot-masked
-{assign_to} <= 
-{one_hots}
-{final_assignment}
+  -- More than one group has a non-zero store order for load {i}
+  -- We mux them using OR, as they have been one-hot-masked
+  {assign_to} <= 
+  {one_hots}
+  {final_assignment}
+
+""".removeprefix("\n")
+                    
+            self.item += f"""
 
 """.removeprefix("\n")
                 
@@ -348,7 +403,7 @@ class NaiveStoreOrderPerEntry(Signal2D):
         Signal2D.__init__(
             self,
             base_name=base_name,
-            direction=Signal.Direction.INPUT,
+            direction=direction,
             size=Signal.Size(
                 bitwidth=bitwidth,
                 number=number
@@ -357,7 +412,7 @@ class NaiveStoreOrderPerEntry(Signal2D):
 
 
 class VerticalBarrelShiftInstantiation(Instantiation):
-    def __init__(self, config : Config, prefix):
+    def __init__(self, config : Config, parent):
         si = SimpleInstantiation
         d = Signal.Direction
         c = InstCxnType
@@ -393,14 +448,14 @@ class VerticalBarrelShiftInstantiation(Instantiation):
         Instantiation.__init__(
             self,
             "barrel_shift_vrt",
-            prefix,
+            parent,
             port_items
         )
 
 
 
 class HorizontalBarrelShiftInstantiation(Instantiation):
-    def __init__(self, config : Config, prefix):
+    def __init__(self, config : Config, parent):
         si = SimpleInstantiation
         d = Signal.Direction
         c = InstCxnType
@@ -409,7 +464,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
             si(
                 ds.QueuePointer(
                     config, 
-                    QueueType.STORE,
+                    QueueType.LOAD,
                     QueuePointerType.TAIL,
                     d.INPUT
                     ),
@@ -436,7 +491,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
         Instantiation.__init__(
             self,
             "barrel_shift_hoz",
-            prefix,
+            parent,
             port_items
         )
 

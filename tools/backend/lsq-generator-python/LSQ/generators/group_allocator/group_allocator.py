@@ -14,7 +14,7 @@ import LSQ.declarative_signals as ds
 
 from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
 from LSQ.generators.group_allocator.num_new_entries import NumNewEntries
-from LSQ.generators.group_allocator.naive_store_order_per_entry import NaiveStoreOrderPerEntryDecl
+from LSQ.generators.group_allocator.naive_store_order_per_entry import get_naive_store_order_per_entry
 
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
@@ -518,7 +518,7 @@ class GroupAllocator:
         if config.store_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
 
-        unit += self.print_dec(NaiveStoreOrderPerEntryDecl(config, subunit_prefix))
+        unit += get_naive_store_order_per_entry(config, subunit_prefix)
 
         unit += self.print_dec(GroupAllocatorDeclarative(config, self.lsq_name))
 

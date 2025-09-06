@@ -16,6 +16,9 @@
 #       {full_declaration}
 # """.removeprefix("\n")
     
+class DeclarativeUnit():
+   def name(self):
+      return f"{self.parent}_{self.unit_name}"
 
 class Entity():
   def __init__(self):
@@ -27,8 +30,7 @@ class Entity():
     for item in declaration.entity_port_items:
         self.entity_port_items += item.get_entity_item()
       
-    self.name = declaration.name
-    self.prefix = declaration.prefix
+    self.name = declaration.name()
 
     self.top_level_comment = declaration.top_level_comment
     
@@ -49,7 +51,7 @@ use ieee.numeric_std.all;
 use work.types.all;
 
 {self.top_level_comment}
-entity {self.prefix}_{self.name}_unit is
+entity {self.name}_unit is
   port(
     {self.entity_port_items}
   );
@@ -106,10 +108,10 @@ end architecture;
       return architecture
 
 class Instantiation():
-    def __init__(self, name, prefix, port_items):
+    def __init__(self, unit_name, parent, port_items):
       self.port_items = ""
-      self.name = name
-      self.prefix = prefix
+      self.unit_name = unit_name
+      self.parent = parent
 
       for port_item in port_items:
          self.port_items += port_item.get_inst_item()
@@ -118,7 +120,7 @@ class Instantiation():
     
     def get(self):
        return f"""
-  {self.name}_unit : entity work.{self.prefix}_{self.name}_unit
+  {self.unit_name}_unit : entity work.{self.parent}_{self.unit_name}_unit
     port map(
       {self.port_items}
     );
