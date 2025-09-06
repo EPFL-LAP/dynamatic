@@ -62,14 +62,14 @@ class BarrelShifterBody():
 
         num_shifts = to_shift.size.number
 
-        shift_ins = [to_shift.base_name]
+        shift_ins = [f"{to_shift.base_name}"_i]
         shift_outs = []
 
         for i in range(num_stages - 1):
             shift_ins.append(local_items[i].base_name)
             shift_outs.append(local_items[i].base_name)
 
-        shift_outs.append(output.base_name)
+        shift_outs.append(f"{output.base_name}_o")
 
         for i in range(pointer.size.bitwidth):
             self.item += f"""
@@ -79,7 +79,7 @@ class BarrelShifterBody():
 
     {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <=
       {shift_ins[i]}(i)
-        when std_tail{i} = '1' else
+        when std_tail({i}) = '1' else
       {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
   end generate;
