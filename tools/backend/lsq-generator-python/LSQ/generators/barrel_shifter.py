@@ -65,6 +65,8 @@ class BarrelShifterBody():
         shift_ins = [f"{to_shift.base_name}_i"]
         shift_outs = []
 
+        pointer_name = f"{pointer.base_name}_i"
+
         for i in range(num_stages - 1):
             shift_ins.append(local_items[i].base_name)
             shift_outs.append(local_items[i].base_name)
@@ -79,7 +81,7 @@ class BarrelShifterBody():
 
     -- value at 0 in input goes to value at {2**i} in output
     {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
-      {shift_ins[i]}(i) when std_tail({i}) = '1' 
+      {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
         else
       {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
