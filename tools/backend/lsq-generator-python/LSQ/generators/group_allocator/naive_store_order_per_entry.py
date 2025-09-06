@@ -355,15 +355,12 @@ class NaiveStoreOrderPerEntry(Signal2D):
 
 
 class VerticalBarrelShiftInstantiation(Instantiation):
-    def __init__(self, config : Config, name):
+    def __init__(self, config : Config, prefix, name):
         si = SimpleInstantiation
         d = Signal.Direction
         c = InstCxnType
 
-
-        self.name = name + "barrel_shift_vrt"
-
-        self.port_items = [
+        port_items = [
             si(
                 ds.QueuePointer(
                     config, 
@@ -391,6 +388,14 @@ class VerticalBarrelShiftInstantiation(Instantiation):
             )
         ]
 
+        Instantiation.__init__(
+            self,
+            "barrel_shifrt_vrt",
+            name,
+            port_items
+        )
+
+
 
 class HorizontalBarrelShiftInstantiation(Instantiation):
     def __init__(self, config : Config, name):
@@ -398,9 +403,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
         d = Signal.Direction
         c = InstCxnType
 
-        self.name = name + "barrel_shift_hoz"
-
-        self.port_items = [
+        port_items = [
             si(
                 ds.QueuePointer(
                     config, 
@@ -427,6 +430,14 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
                 c.LOCAL
             )
         ]
+
+        Instantiation.__init__(
+            self,
+            "barrel_shift_hoz",
+            name,
+            port_items
+        )
+
 
 # Declarative local signal only used by the num loads unit
 class MaskedStoreOrder():
