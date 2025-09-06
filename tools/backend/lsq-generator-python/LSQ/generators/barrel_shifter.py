@@ -77,6 +77,7 @@ class BarrelShifterBody():
   -- if '1', shift left by {(2**i)} 
   shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
 
+    -- value at 0 in input goes to value at {2**i} in output
     {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
       {shift_ins[i]}(i) when std_tail({i}) = '1' 
         else
