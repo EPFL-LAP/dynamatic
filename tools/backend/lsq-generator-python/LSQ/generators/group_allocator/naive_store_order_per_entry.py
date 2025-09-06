@@ -22,7 +22,7 @@ def get_naive_store_order_per_entry(config, parent):
 
     v_barrel_shift = get_barrel_shifter(
         declaration.name(),
-        "barrel_shift_vrt",
+        "barrel_shift_hoz",
         ds.QueuePointer(
                 config, 
                 QueueType.STORE,
