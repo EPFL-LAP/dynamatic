@@ -62,14 +62,14 @@ class BarrelShifterBody():
 
         num_shifts = to_shift.size.number
 
-        shifts_ins = [to_shift]
+        shifts_ins = [to_shift.base_name]
         shift_outs = []
 
         for i in range(num_stages):
-            shifts_ins.append(local_items[i])
-            shift_outs.append(local_items[i])
+            shifts_ins.append(local_items[i].base_name)
+            shift_outs.append(local_items[i].base_name)
 
-        shift_outs.append(output)
+        shift_outs.append(output.base_name)
 
         for i in range(pointer.size.bitwidth):
             self.item += f"""
