@@ -71,6 +71,8 @@ class BarrelShifterBody():
 
         shift_outs.append(output.base_name)
 
+        print(shift_ins, shift_outs)
+
         for i in range(pointer.size.bitwidth):
             self.item += f"""
   -- Check bit {i} of {pointer.base_name}
