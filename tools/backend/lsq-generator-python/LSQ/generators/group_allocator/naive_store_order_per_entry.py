@@ -365,6 +365,7 @@ class VerticalBarrelShiftInstantiation(Instantiation):
                 ds.QueuePointer(
                     config, 
                     QueueType.STORE,
+                    QueuePointerType.TAIL,
                     d.INPUT
                     ),
                 c.INPUT
@@ -399,6 +400,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
                 ds.QueuePointer(
                     config, 
                     QueueType.STORE,
+                    QueuePointerType.TAIL,
                     d.INPUT
                     ),
                 c.INPUT
