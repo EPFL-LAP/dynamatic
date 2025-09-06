@@ -75,19 +75,15 @@ class BarrelShifterBody():
             self.item += f"""
   -- Check bit {i} of {pointer.base_name}
   -- if '1', shift left by {(2**i)} 
-""".removeprefix("\n")
-            for j in range(num_shifts):
-                new_index = (j + 2**i) % num_shifts
-                assign_to = shift_outs[i]
-                read_from = shift_ins[i]
-                self.item += f"""
-  {assign_to}({new_index:02}) <= 
-    {read_from}({j:02}) 
-      when {pointer.base_name}({i}) 
-    else 
-      {read_from}({new_index:02}); 
+  for i in 0 to {num_shifts} - 1 generate
+    {shift_outs}((i + {2**i}) mod {num_shifts}) <=
+      {shift_ins}(i)
+        when std_tail{i} = '1' else
+      {shift_ins}((i + {2**i}) mod {num_shifts})
 
+  end generate;
 """.removeprefix("\n")
+
             self.item += f"""
 
 """.removeprefix("\n")
