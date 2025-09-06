@@ -77,8 +77,13 @@ class BarrelShifterBody():
   -- if '1', shift left by {(2**i)} 
 """.removeprefix("\n")
             for j in range(num_shifts):
+                new_index = (j + 2**i) % num_shifts
+                assign_to = f"{shift_outs[i]}({new_index})"
+
+                if new_index < 10:
+                    assign_to = assign_to + " "
                 self.item += f"""
-  {shift_outs[i]}({(j + 2**i) % num_shifts}) <= {shift_ins[i]}({j}); 
+  {assign_to} <= {shift_ins[i]}({j}); 
 """.removeprefix("\n")
             self.item += f"""
 
