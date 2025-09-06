@@ -3,7 +3,7 @@ from LSQ.utils import QueueType, bin_string
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.entity import Signal
+from LSQ.entity import Signal, DeclarativeUnit
 
 import LSQ.declarative_signals as ds
 
