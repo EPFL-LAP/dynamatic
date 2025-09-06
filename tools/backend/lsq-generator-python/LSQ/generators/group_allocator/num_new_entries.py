@@ -8,7 +8,7 @@ from LSQ.entity import Signal
 import LSQ.declarative_signals as ds
 
 
-class NumNewEntries():
+class NumNewEntries(DeclarativeUnit):
     def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
 -- Number of New Entries in the (Load/Store) Queue Unit

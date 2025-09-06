@@ -404,19 +404,19 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
             b.GroupHandshakingInst(config, self.name()),
 
 
-            *([b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix)] \
+            *([b.PortIdxPerEntryInst(config, QueueType.LOAD, self.name())] \
                   if config.load_ports_num() > 1 else []),
 
-            *([b.PortIdxPerEntryInst(config, QueueType.STORE, subunit_prefix)] \
+            *([b.PortIdxPerEntryInst(config, QueueType.STORE, self.name())] \
                   if config.store_ports_num() > 1 else []),
 
-            b.NumNewQueueEntriesInst(config, QueueType.LOAD, subunit_prefix),
-            b.NumNewQueueEntriesInst(config, QueueType.STORE, subunit_prefix),
+            b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.name()),
+            b.NumNewQueueEntriesInst(config, QueueType.STORE, self.name()),
 
-            b.NaiveStoreOrderPerEntryInst(config, subunit_prefix),
+            b.NaiveStoreOrderPerEntryInst(config, self.name()),
 
-            b.WriteEnableInst(config, QueueType.LOAD, subunit_prefix),
-            b.WriteEnableInst(config, QueueType.STORE, subunit_prefix),
+            b.WriteEnableInst(config, QueueType.LOAD, self.name()),
+            b.WriteEnableInst(config, QueueType.STORE, self.name()),
 
             b.NumNewEntriesAssignment()
         ]
@@ -502,25 +502,25 @@ class GroupAllocator:
 
         """
 
-        subunit_prefix = self.lsq_name + "_ga"
+        ga_decl = GroupAllocatorDeclarative(config, self.lsq_name)
 
-        unit = self.print_dec(GroupHandshaking(config, self.lsq_name))
+        unit = self.print_dec(GroupHandshaking(config, ga_decl.name()))
 
-        unit += self.print_dec(NumNewEntries(config, QueueType.LOAD, subunit_prefix))
-        unit += self.print_dec(NumNewEntries(config, QueueType.STORE, subunit_prefix))
+        unit += self.print_dec(NumNewEntries(config, QueueType.LOAD, ga_decl.name()))
+        unit += self.print_dec(NumNewEntries(config, QueueType.STORE, ga_decl.name()))
 
-        unit += self.print_dec(WriteEnableDecl(config, QueueType.LOAD, subunit_prefix))
-        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, subunit_prefix))
+        unit += self.print_dec(WriteEnableDecl(config, QueueType.LOAD, ga_decl.name()))
+        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, ga_decl.name()))
 
         if config.load_ports_num() > 1:
-            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, subunit_prefix))
+            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, ga_decl.name()))
 
         if config.store_ports_num() > 1:
-            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, subunit_prefix))
+            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, ga_decl.name()))
 
-        unit += get_naive_store_order_per_entry(config, subunit_prefix)
+        unit += get_naive_store_order_per_entry(config, ga_decl.name())
 
-        unit += self.print_dec(GroupAllocatorDeclarative(config, self.lsq_name))
+        unit += self.print_dec(ga_decl)
 
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
