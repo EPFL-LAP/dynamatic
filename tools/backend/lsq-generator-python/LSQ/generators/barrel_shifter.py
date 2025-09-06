@@ -62,9 +62,9 @@ class BarrelShifterBody():
 
         num_stages = pointer.size.bitwidth
 
-        if direction == ShiftDirection.HORIZONTAL:
+        if direction == ShiftDirection.VERTICAL:
             num_shifts = to_shift.size.number
-        elif direction == ShiftDirection.VERTICAL:
+        elif direction == ShiftDirection.HORIZONTAL:
             num_shifts = to_shift.size.bitwidth
             wrapper_size = to_shift.size.number
 
