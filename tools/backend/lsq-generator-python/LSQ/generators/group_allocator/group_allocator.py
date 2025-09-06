@@ -130,7 +130,7 @@ class PortIdxPerEntryDecl(DeclarativeUnit):
 """.strip()
 
         self.unit_name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-        self.prefix = parent
+        self.parent = parent
 
 
         d = Signal.Direction
