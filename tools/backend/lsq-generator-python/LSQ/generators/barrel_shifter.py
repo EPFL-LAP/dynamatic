@@ -36,11 +36,10 @@ class BarrelShifterDecl(DeclarativeUnit):
         ]
 
         assert(pointer.size.number == 1)
-        self.num_stages = pointer.size.bitwidth
 
         self.local_items = []
 
-        for i in range(self.num_stages):
+        for i in range(pointer.size.bitwidth):
             self.local_items.append(
                 ShiftStageSignal(to_shift, i)
                 )
@@ -56,10 +55,23 @@ class BarrelShifterBody():
             to_shift : Signal2D,
             output : Signal2D
             ):
-        pass
+        self.item = ""
+
+        for i in range(pointer.size.bitwidth):
+            self.item += f"""
+  -- Check bit {i} if {pointer.base_name}
+  -- if 1, shift left by {2^i} 
+""".removeprefix
+            for j in range(to_shift.size.number):
+                self.item += f"""
+     {output.base_name}({j}) <= {to_shift.base_name}({(j + 2^i) & to_shift.size.number}); 
+""".removeprefix("\n")
+            self.item += f"""
+
+""".removeprefix("\n")
 
     def get(self):
-        return ""
+        return self.item
 
 class ShiftStageSignal(Signal2D):
     def __init__(self, to_shift : Signal2D, stage):
