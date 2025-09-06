@@ -62,7 +62,7 @@ class BarrelShifterBody():
 
         num_shifts = to_shift.size.number
 
-        shift_ins = [f"{to_shift.base_name}"_i]
+        shift_ins = [f"{to_shift.base_name}_i"]
         shift_outs = []
 
         for i in range(num_stages - 1):
