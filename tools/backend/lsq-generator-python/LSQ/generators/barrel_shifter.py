@@ -78,7 +78,7 @@ class BarrelShifterBody():
 """.removeprefix("\n")
             for j in range(num_shifts):
                 self.item += f"""
-  {shift_outs[i]}({j}) <= {shift_ins[i]}({(j + 2**i) % to_shift.size.number}); 
+  {shift_outs[i]}({(j + 2**i) % num_shifts}) <= {shift_ins[i]}({0}); 
 """.removeprefix("\n")
             self.item += f"""
 
