@@ -41,7 +41,7 @@ class BarrelShifterDecl(DeclarativeUnit):
 
         for i in range(pointer.size.bitwidth):
             self.local_items.append(
-                ShiftStageSignal(to_shift, i)
+                ShiftStageSignal(output, i)
                 )
 
         self.body = [
