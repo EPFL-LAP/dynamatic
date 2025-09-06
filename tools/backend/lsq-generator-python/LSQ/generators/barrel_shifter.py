@@ -61,7 +61,7 @@ class BarrelShifterBody():
             self.item += f"""
   -- Check bit {i} if {pointer.base_name}
   -- if 1, shift left by {2^i} 
-""".removeprefix
+""".removeprefix("\n")
             for j in range(to_shift.size.number):
                 self.item += f"""
      {output.base_name}({j}) <= {to_shift.base_name}({(j + 2^i) & to_shift.size.number}); 
