@@ -76,9 +76,8 @@ end entity;
 
 class Architecture():
     def __init__(self, declaration):
-      self.name = declaration.name
 
-      self.prefix = declaration.prefix
+      self.name = declaration.name()
 
       self.local_items = ""
 
@@ -97,7 +96,7 @@ class Architecture():
 
     def get(self):
       architecture = f"""
-architecture arch of {self.prefix}_{self.name}_unit is
+architecture arch of {self.name}_unit is
   {self.local_items}
 begin
 
