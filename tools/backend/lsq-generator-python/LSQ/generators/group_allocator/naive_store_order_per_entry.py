@@ -78,8 +78,8 @@ class NaiveStoreOrderPerEntryDecl():
 
         self.body = [
             Muxes(config),
-            VerticalBarrelShiftInstantiation(config),
-            HorizontalBarrelShiftInstantiation(config)
+            VerticalBarrelShiftInstantiation(config, f"{self.prefix}_{self.name}"),
+            HorizontalBarrelShiftInstantiation(config, f"{self.prefix}_{self.name}")
         ]
     
 
@@ -355,10 +355,13 @@ class NaiveStoreOrderPerEntry(Signal2D):
 
 
 class VerticalBarrelShiftInstantiation(Instantiation):
-    def __init__(self, config : Config,):
+    def __init__(self, config : Config, name):
         si = SimpleInstantiation
         d = Signal.Direction
         c = InstCxnType
+
+
+        self.name = name + "barrel_shift_vrt"
 
         self.port_items = [
             si(
@@ -390,10 +393,12 @@ class VerticalBarrelShiftInstantiation(Instantiation):
 
 
 class HorizontalBarrelShiftInstantiation(Instantiation):
-    def __init__(self, config : Config,):
+    def __init__(self, config : Config, name):
         si = SimpleInstantiation
         d = Signal.Direction
         c = InstCxnType
+
+        self.name = name + "barrel_shift_hoz"
 
         self.port_items = [
             si(
