@@ -13,7 +13,7 @@ from LSQ.utils import bin_string
 
  
 class GroupHandshaking():
-    def __init__(self, config : Config, lsq_name):
+    def __init__(self, config : Config, parent):
         self.top_level_comment = f"""
 -- Group Initiation Handshaking Unit
 -- Sub-unit of the Group Allocator.
@@ -31,8 +31,8 @@ class GroupHandshaking():
 -- The transfer signal is the "and" of the ready and valid signals.
 """.strip()
             
-        self.name = GROUP_HANDSHAKING_NAME
-        self.prefix = lsq_name + "_ga"
+        self.unit_name = GROUP_HANDSHAKING_NAME
+        self.parent = parent
 
 
         d = Signal.Direction

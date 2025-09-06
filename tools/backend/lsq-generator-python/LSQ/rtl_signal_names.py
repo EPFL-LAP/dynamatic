@@ -1,6 +1,6 @@
 from LSQ.utils import QueueType, QueuePointerType
 
-GROUP_ALLOCATOR_NAME = "group_allocator"
+GROUP_ALLOCATOR_NAME = "ga"
 """
 RTL name for the group allocator
 """

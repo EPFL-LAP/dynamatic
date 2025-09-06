@@ -388,7 +388,7 @@ class PortIdxPerEntryBodyItems():
 
 class GroupAllocatorBodyItems():
     class GroupHandshakingInst(Instantiation):
-        def __init__(self, config : Config, prefix):
+        def __init__(self, config : Config, parent):
 
             c = InstCxnType
 
@@ -477,13 +477,13 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=GROUP_HANDSHAKING_NAME,
-                prefix=prefix,
+                unit_name=GROUP_HANDSHAKING_NAME,
+                parent=parent,
                 port_items=port_items
             )
 
     class PortIdxPerEntryInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType, prefix):
+        def __init__(self, config : Config, queue_type : QueueType, parent):
 
             c = InstCxnType
             d = Signal.Direction
@@ -519,13 +519,13 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
-                prefix=prefix,
+                unit_name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+                parent=parent,
                 port_items=port_items
             )
 
     class NaiveStoreOrderPerEntryInst(Instantiation):
-        def __init__(self, config : Config, prefix):
+        def __init__(self, config : Config, parent):
 
             c = InstCxnType
             d = Signal.Direction
@@ -567,13 +567,13 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
-                prefix=prefix,
+                unit_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
+                parent=parent,
                 port_items=port_items
             )
 
     class NumNewQueueEntriesInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType, prefix):
+        def __init__(self, config : Config, queue_type : QueueType, parent):
 
             c = InstCxnType
             d = Signal.Direction
@@ -600,13 +600,13 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=NUM_NEW_ENTRIES_NAME(queue_type),
-                prefix=prefix,
+                unit_name=NUM_NEW_ENTRIES_NAME(queue_type),
+                parent=parent,
                 port_items=port_items
             )
 
     class WriteEnableInst(Instantiation):
-        def __init__(self, config : Config, queue_type : QueueType, prefix):
+        def __init__(self, config : Config, queue_type : QueueType, parent):
 
             c = InstCxnType
             d = Signal.Direction
@@ -644,8 +644,8 @@ class GroupAllocatorBodyItems():
 
             Instantiation.__init__(
                 self,
-                name=WRITE_ENABLE_NAME(queue_type),
-                prefix=prefix,
+                unit_name=WRITE_ENABLE_NAME(queue_type),
+                parent=parent,
                 port_items=port_items
             )
     

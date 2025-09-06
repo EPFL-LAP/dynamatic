@@ -3,7 +3,7 @@ from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture, Signal, RTLComment
+from LSQ.entity import Entity, Architecture, Signal, RTLComment, DeclarativeUnit
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -25,8 +25,8 @@ from LSQ.generators.group_allocator.group_allocator_items import \
         WriteEnableBodyItems
     )
 
-class WriteEnableDecl():
-    def __init__(self, config : Config, queue_type : QueueType, prefix):
+class WriteEnableDecl(DeclarativeUnit):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
 -- (Load/Store) Queue Write Enables Unit
 -- Sub-unit of the Group Allocator.
@@ -46,8 +46,8 @@ class WriteEnableDecl():
 -- based on the {queue_type.value} tail pointer.
 """.strip()
 
-        self.name = WRITE_ENABLE_NAME(queue_type)
-        self.prefix = prefix
+        self.unit_name = WRITE_ENABLE_NAME(queue_type)
+        self.parent = parent
 
 
 
@@ -111,8 +111,8 @@ class WriteEnableDecl():
             b.Body(config, queue_type)
         ]
 
-class PortIdxPerEntryDecl():
-    def __init__(self, config : Config, queue_type : QueueType, prefix):
+class PortIdxPerEntryDecl(DeclarativeUnit):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
 -- {queue_type.value} Port Index per {queue_type.value} Queue Entry
 -- Sub-unit of the Group Allocator.
@@ -129,8 +129,8 @@ class PortIdxPerEntryDecl():
 -- based on the {queue_type.value} tail pointer.
 """.strip()
 
-        self.name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-        self.prefix = prefix
+        self.unit_name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
+        self.prefix = parent
 
 
         d = Signal.Direction
@@ -165,8 +165,8 @@ class PortIdxPerEntryDecl():
             b.Body(config, queue_type)
         ]
 
-class GroupAllocatorDeclarative():
-    def __init__(self, config : Config, unique_name):
+class GroupAllocatorDeclarative(DeclarativeUnit):
+    def __init__(self, config : Config, parent):
         """
         Declarative definition of the Group Allocator.
 
@@ -191,13 +191,13 @@ class GroupAllocatorDeclarative():
 -- Group Allocator
 """.strip()
         
-        subunit_prefix = unique_name + "_ga"
+        self.parent = parent
+        self.unit_name = GROUP_ALLOCATOR_NAME
+
 
         LOAD_QUEUE = QueueType.LOAD
         STORE_QUEUE = QueueType.STORE
 
-        self.name = GROUP_ALLOCATOR_NAME
-        self.prefix = unique_name
 
         d = Signal.Direction
 
@@ -401,7 +401,7 @@ class GroupAllocatorDeclarative():
         b = GroupAllocatorBodyItems
 
         self.body = [
-            b.GroupHandshakingInst(config, subunit_prefix),
+            b.GroupHandshakingInst(config, self.name()),
 
 
             *([b.PortIdxPerEntryInst(config, QueueType.LOAD, subunit_prefix)] \

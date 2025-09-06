@@ -9,7 +9,7 @@ import LSQ.declarative_signals as ds
 
 
 class NumNewEntries():
-    def __init__(self, config : Config, queue_type : QueueType, prefix):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
 -- Number of New Entries in the (Load/Store) Queue Unit
 -- Sub-unit of the Group Allocator.
@@ -23,8 +23,8 @@ class NumNewEntries():
 -- for the {queue_type.value} queue.
 """.strip()
 
-        self.name = NUM_NEW_ENTRIES_NAME(queue_type)
-        self.prefix = prefix
+        self.unit_name = NUM_NEW_ENTRIES_NAME(queue_type)
+        self.parent = parent
 
 
         d = Signal.Direction
