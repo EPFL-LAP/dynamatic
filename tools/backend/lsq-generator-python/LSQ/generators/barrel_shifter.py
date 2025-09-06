@@ -82,7 +82,11 @@ class BarrelShifterBody():
                 read_from = shift_ins[i]
                 self.item += f"""
   {assign_to}({new_index:02}) <= 
-    {read_from}({j:02}) when {pointer.base_name}({i}) else {read_from}({new_index:02}); 
+    {read_from}({j:02}) 
+      when {pointer.base_name}({i}) 
+    else 
+      {read_from}({new_index:02}); 
+
 """.removeprefix("\n")
             self.item += f"""
 
