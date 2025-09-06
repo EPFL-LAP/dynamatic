@@ -10,7 +10,7 @@ from LSQ.utils import one_hot, mask_until
 
 from collections import defaultdict
 
-from LSQ.generators.barrel_shifter import get_barrel_shifter
+from LSQ.generators.barrel_shifter import get_barrel_shifter, ShiftDirection
 
 def get_naive_store_order_per_entry(config, parent):
     
@@ -38,12 +38,13 @@ def get_naive_store_order_per_entry(config, parent):
             config,
             shifted_stores=True,
             direction = d.OUTPUT
-        )
+        ),
+        ShiftDirection.HORIZONTAL
     )
 
     h_barrel_shift = get_barrel_shifter(
         declaration.name(),
-        "barrel_shift_hoz",
+        "barrel_shift_vrt",
         ds.QueuePointer(
                 config, 
                 QueueType.LOAD,
@@ -59,7 +60,8 @@ def get_naive_store_order_per_entry(config, parent):
             config,
             shifted_both=True,
             direction = d.OUTPUT
-        )
+        ),
+        ShiftDirection.VERTICAL
     )
     return v_barrel_shift + h_barrel_shift + unit
 
@@ -131,8 +133,8 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
 
         self.body = [
             Muxes(config),
-            VerticalBarrelShiftInstantiation(config, self.name()),
-            HorizontalBarrelShiftInstantiation(config, self.name())
+            HorizontalBarrelShiftInstantiation(config, self.name()),
+            VerticalBarrelShiftInstantiation(config, self.name())
         ]
     
 
@@ -411,7 +413,7 @@ class NaiveStoreOrderPerEntry(Signal2D):
         )
 
 
-class VerticalBarrelShiftInstantiation(Instantiation):
+class HorizontalBarrelShiftInstantiation(Instantiation):
     def __init__(self, config : Config, parent):
         si = SimpleInstantiation
         d = Signal.Direction
@@ -447,14 +449,14 @@ class VerticalBarrelShiftInstantiation(Instantiation):
 
         Instantiation.__init__(
             self,
-            "barrel_shift_vrt",
+            "barrel_shift_hoz",
             parent,
             port_items
         )
 
 
 
-class HorizontalBarrelShiftInstantiation(Instantiation):
+class VerticalBarrelShiftInstantiation(Instantiation):
     def __init__(self, config : Config, parent):
         si = SimpleInstantiation
         d = Signal.Direction
@@ -490,7 +492,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
 
         Instantiation.__init__(
             self,
-            "barrel_shift_hoz",
+            "barrel_shift_vrt",
             parent,
             port_items
         )

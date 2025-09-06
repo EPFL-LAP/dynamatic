@@ -3,7 +3,7 @@ from enum import Enum
 
 class ShiftDirection(Enum):
     VERTICAL = 0
-    HORIZONATAL = 1
+    HORIZONTAL = 1
 
 def get_barrel_shifter(
                  parent : str, 
@@ -11,8 +11,9 @@ def get_barrel_shifter(
                  pointer : Signal,
                  to_shift : Signal2D,
                  output : Signal2D,
+                 direction : ShiftDirection
                  ):
-    declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output)
+    declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output, direction)
     return Entity(declaration).get() + Architecture(declaration).get()
 
 
@@ -23,6 +24,7 @@ class BarrelShifterDecl(DeclarativeUnit):
                  pointer : Signal,
                  to_shift : Signal2D,
                  output : Signal2D,
+                 direction : ShiftDirection
                  ):
         self.parent = parent
         self.unit_name = unit_name
@@ -45,7 +47,7 @@ class BarrelShifterDecl(DeclarativeUnit):
                 )
 
         self.body = [
-            BarrelShifterBody(pointer, to_shift, output, self.local_items)
+            BarrelShifterBody(pointer, to_shift, output, direction)
         ]
 
 class BarrelShifterBody():
@@ -54,13 +56,17 @@ class BarrelShifterBody():
             pointer : Signal,
             to_shift : Signal2D,
             output : Signal2D,
-            local_items
+            direction : ShiftDirection
             ):
         self.item = ""
 
         num_stages = pointer.size.bitwidth
 
-        num_shifts = to_shift.size.number
+        if direction == ShiftDirection.HORIZONTAL:
+            num_shifts = to_shift.size.number
+        elif direction == ShiftDirection.VERTICAL:
+            num_shifts = to_shift.size.bitwidth
+            wrapper_size = to_shift.size.number
 
         shift_ins = [f"{to_shift.base_name}_i"]
         shift_outs = []
@@ -68,25 +74,42 @@ class BarrelShifterBody():
         pointer_name = f"{pointer.base_name}_i"
 
         for i in range(num_stages - 1):
-            shift_ins.append(local_items[i].base_name)
-            shift_outs.append(local_items[i].base_name)
+            shift_ins.append(f"stage_{i+1}")
+            shift_outs.append(f"stage_{i+1}")
 
         shift_outs.append(f"{output.base_name}_o")
 
         for i in range(pointer.size.bitwidth):
-            self.item += f"""
-  -- Check bit {i} of {pointer.base_name}
-  -- if '1', shift left by {(2**i)} 
-  shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
+            if direction == ShiftDirection.VERTICAL:
+                self.item += f"""
+    -- Check bit {i} of {pointer.base_name}
+    -- if '1', shift left by {(2**i)} 
+    shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
 
-    -- value at 0 in input goes to value at {2**i} in output
-    {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
-      {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
-        else
-      {shift_ins[i]}((i + {2**i}) mod {num_shifts});
+        -- value at 0 in input goes to value at {2**i} in output
+        {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
+        {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
+            else
+        {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
-  end generate;
-""".removeprefix("\n")
+    end generate;
+    """.removeprefix("\n")
+            elif direction == ShiftDirection.HORIZONTAL:
+                self.item += f"""
+    -- Check bit {i} of {pointer.base_name}
+    -- if '1', shift left by {(2**i)} 
+    shift_stage_{i + 1}_wrapper : for i in 0 to {wrapper_size} - 1 generate
+      shift_stage_{i + 1} : for j in 0 to {num_shifts} - 1 generate
+
+        -- value at 0 in input goes to value at {2**i} in output
+        {shift_outs[i]}(i)((j + {2**i}) mod {num_shifts}) <= 
+        {shift_ins[i]}(i)(j) when {pointer_name}({i}) = '1' 
+            else
+        {shift_ins[i]}(i)((j + {2**i}) mod {num_shifts});
+
+      end generate;
+    end generate;
+    """.removeprefix("\n")
 
             self.item += f"""
 
