@@ -1,4 +1,4 @@
-from LSQ.entity import Entity, Architecture, Signal, DeclarativeUnit
+from LSQ.entity import Entity, Architecture, Signal, Signal2D, DeclarativeUnit
 from enum import Enum
 
 class ShiftDirection(Enum):
@@ -9,8 +9,8 @@ def get_barrel_shifter(
                  parent : str, 
                  unit_name : str,
                  pointer : Signal,
-                 to_shift : Signal,
-                 output : Signal,
+                 to_shift : Signal2D,
+                 output : Signal2D,
                  ):
     declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output)
     return Entity(declaration).get() + Architecture(declaration).get()
@@ -21,8 +21,8 @@ class BarrelShifterDecl(DeclarativeUnit):
                  parent : str, 
                  unit_name : str,
                  pointer : Signal,
-                 to_shift : Signal,
-                 output : Signal,
+                 to_shift : Signal2D,
+                 output : Signal2D,
                  ):
         self.parent = parent
         self.unit_name = unit_name
@@ -53,17 +53,17 @@ class BarrelShifterBody():
     def __init__(
             self, 
             pointer : Signal,
-            to_shift : Signal,
-            output : Signal
+            to_shift : Signal2D,
+            output : Signal2D
             ):
         pass
 
     def get(self):
         return ""
 
-class ShiftStageSignal(Signal):
-    def __init__(self, to_shift : Signal, stage):
-        Signal.__init__(
+class ShiftStageSignal(Signal2D):
+    def __init__(self, to_shift : Signal2D, stage):
+        Signal2D.__init__(
             self,
             base_name=f"{to_shift.base_name}_stage_{stage}",
             size=to_shift.size,
