@@ -76,10 +76,11 @@ class BarrelShifterBody():
   -- Check bit {i} of {pointer.base_name}
   -- if '1', shift left by {(2**i)} 
   for i in 0 to {num_shifts} - 1 generate
+
     {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <=
       {shift_ins[i]}(i)
         when std_tail{i} = '1' else
-      {shift_ins[i]}((i + {2**i}) mod {num_shifts})
+      {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
   end generate;
 """.removeprefix("\n")
