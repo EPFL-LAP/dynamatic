@@ -45,7 +45,7 @@ class BarrelShifterDecl(DeclarativeUnit):
                 )
 
         self.body = [
-
+            BarrelShifterBody()
         ]
 
 class BarrelShifterBody():
