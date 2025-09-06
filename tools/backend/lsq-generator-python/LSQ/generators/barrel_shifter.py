@@ -96,7 +96,7 @@ class ShiftStageSignal(Signal2D):
     def __init__(self, to_shift : Signal2D, stage):
         Signal2D.__init__(
             self,
-            base_name=f"{to_shift.base_name}_stage_{stage}",
+            base_name=f"stage_{stage}",
             size=to_shift.size,
             always_number=to_shift.always_number,
             always_vector=to_shift.always_vector
