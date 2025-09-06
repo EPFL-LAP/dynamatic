@@ -39,7 +39,7 @@ class BarrelShifterDecl(DeclarativeUnit):
 
         self.local_items = []
 
-        for i in range(pointer.size.bitwidth):
+        for i in range(1, pointer.size.bitwidth + 1):
             self.local_items.append(
                 ShiftStageSignal(output, i)
                 )
