@@ -45,7 +45,7 @@ class BarrelShifterDecl(DeclarativeUnit):
                 )
 
         self.body = [
-            BarrelShifterBody(pointer, to_shift, output)
+            BarrelShifterBody(pointer, to_shift, output, self.local_items)
         ]
 
 class BarrelShifterBody():
@@ -78,7 +78,7 @@ class BarrelShifterBody():
 """.removeprefix("\n")
             for j in range(num_shifts):
                 self.item += f"""
-    {shifts_ins[i]}({j}) <= {shift_outs[i].base_name}({(j + 2**i) % to_shift.size.number}); 
+  {shifts_ins[i]}({j}) <= {shift_outs[i].base_name}({(j + 2**i) % to_shift.size.number}); 
 """.removeprefix("\n")
             self.item += f"""
 
