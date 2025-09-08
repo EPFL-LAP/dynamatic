@@ -360,8 +360,8 @@ class Muxes():
   remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1 generate
     -- No group has a non-zero store order for load i
     {unshifted}(i) <= (others => '0');
-  end generate
-  
+  end generate;
+
 """.removeprefix("\n")
 
     def get(self):
