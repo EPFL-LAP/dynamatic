@@ -62,8 +62,8 @@ def _get_barrel_shifters(config, declaration):
         ),
         ShiftDirection.HORIZONTAL,
                 comment=f"""
-  -- Horizontal barrel shifter for the naive store order
-  -- Aligns store order with store queue
+-- Horizontal barrel shifter for the naive store order
+-- Aligns store order with store queue
 """.strip()
     )
 
@@ -88,8 +88,8 @@ def _get_barrel_shifters(config, declaration):
         ),
         ShiftDirection.VERTICAL,
         comment=f"""
-  -- Vertical barrel shifter for the naive store order
-  -- Aligns store order with load queue
+-- Vertical barrel shifter for the naive store order
+-- Aligns store order with load queue
 """.strip()
     )
 

@@ -34,13 +34,13 @@ class BarrelShifterDecl(DeclarativeUnit):
         match direction:
             case ShiftDirection.HORIZONTAL:
                 shift_comment = f"""
-  -- Horizontal Barrel Shifter
-  -- Leaves array items unshifted, shifts bits
+-- Horizontal Barrel Shifter
+-- Leaves array items unshifted, shifts bits
 """.strip()
             case ShiftDirection.VERTICAL:
                 shift_comment = f"""
-  -- Vertical Barrel Shifter
-  -- Leaves bits unshifted, shifts array items
+-- Vertical Barrel Shifter
+-- Leaves bits unshifted, shifts array items
 """.strip()
 
         self.top_level_comment = f"""
