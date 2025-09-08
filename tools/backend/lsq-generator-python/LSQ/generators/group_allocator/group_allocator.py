@@ -78,10 +78,10 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
         )
 
         # Specify port entity items
-        self.entity_port_items = self.get_port_items()
+        self.entity_port_items = self.get_port_items(config)
 
         # Specify local items
-        self.local_items = self.get_local_items()
+        self.local_items = self.get_local_items(config)
 
 
         self.body = [
