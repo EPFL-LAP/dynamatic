@@ -11,9 +11,10 @@ def get_barrel_shifter(
                  pointer : Signal,
                  to_shift : Signal2D,
                  output : Signal2D,
-                 direction : ShiftDirection
+                 direction : ShiftDirection,
+                 comment = ""
                  ):
-    declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output, direction)
+    declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output, direction, comment)
     return Entity(declaration).get() + Architecture(declaration).get()
 
 
@@ -24,12 +25,28 @@ class BarrelShifterDecl(DeclarativeUnit):
                  pointer : Signal,
                  to_shift : Signal2D,
                  output : Signal2D,
-                 direction : ShiftDirection
+                 direction : ShiftDirection,
+                 comment
                  ):
         self.parent = parent
         self.unit_name = unit_name
 
-        self.top_level_comment = ""
+        match direction:
+            case ShiftDirection.HORIZONTAL:
+                shift_comment = f"""
+  -- Horizontal Barrel Shifter
+  -- Leaves array items unshifted, shifts bits
+""".strip()
+            case ShiftDirection.VERTICAL:
+                shift_comment = f"""
+  -- Vertical Barrel Shifter
+  -- Leaves bits unshifted, shifts array items
+""".strip()
+
+        self.top_level_comment = f"""
+  {comment}
+  {shift_comment}
+""".strip()
 
         self.entity_port_items = [
             pointer,

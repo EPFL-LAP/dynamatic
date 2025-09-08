@@ -60,7 +60,11 @@ def _get_barrel_shifters(config, declaration):
             shifted_stores=True,
             direction = d.OUTPUT
         ),
-        ShiftDirection.HORIZONTAL
+        ShiftDirection.HORIZONTAL,
+                comment=f"""
+  -- Horizontal barrel shifter for the naive store order
+  -- Aligns store order with store queue
+""".strip()
     )
 
     v_barrel_shift = get_barrel_shifter(
@@ -82,7 +86,11 @@ def _get_barrel_shifters(config, declaration):
             shifted_both=True,
             direction = d.OUTPUT
         ),
-        ShiftDirection.VERTICAL
+        ShiftDirection.VERTICAL,
+        comment=f"""
+  -- Vertical barrel shifter for the naive store order
+  -- Aligns store order with load queue
+""".strip()
     )
 
     return h_barrel_shift + v_barrel_shift
