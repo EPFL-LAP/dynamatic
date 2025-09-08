@@ -253,6 +253,8 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
+      .Case<handshake::GateOp>([&](auto) { return "cyan"; })
+      .Case<handshake::InitOp>([&](auto) { return "lightgrey"; })
       .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
@@ -290,7 +292,8 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     std::string prettyLabel;
     switch (labelType) {
     case LabelType::TYPE:
-      prettyLabel = getPrettyNodeLabel(op);
+      prettyLabel =
+          getUniqueName(op).str() + " (" + getPrettyNodeLabel(op) + ")";
       break;
     case LabelType::UNAME:
       prettyLabel = getUniqueName(op);

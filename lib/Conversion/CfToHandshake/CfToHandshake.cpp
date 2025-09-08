@@ -27,6 +27,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
+#include "experimental/Support/CFGAnnotation.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -230,9 +231,9 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  MLIRContext *ctx = getContext();
+
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo, ctx)))
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -243,6 +244,8 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
+  // Annotate the IR with the CFG information
+  experimental::cfg::annotateCFG(funcOp, rewriter, namer);
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 
@@ -778,7 +781,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
-              Value done = edgeBuilder.get(handshake::ControlType::get(ctx));
+              Value done =
+                  edgeBuilder.get(handshake::ControlType::get(getContext()));
               assert((addr && data) && "failed to remap address or data");
               auto newOp =
                   rewriter.create<handshake::StoreOp>(loc, addr, data, done);

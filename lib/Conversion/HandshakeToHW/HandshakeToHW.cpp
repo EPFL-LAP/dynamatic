@@ -541,6 +541,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
+      .Case<handshake::GateOp>([&](auto) {
+        // Number of input channels and data bitwidth
+        addUnsigned("SIZE", op->getNumOperands());
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
           [&](auto) {
             // Bitwidth
@@ -690,6 +695,22 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           })
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
+      })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        // auto paramsAttr =
+        //     initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+        // if (paramsAttr) {
+        //   auto initTokenAttr =
+        //       paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+        //   int initialValue =
+        //       (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+        //   addUnsigned("INITIAL_VALUE", initialValue);
+        // }
+
+        addUnsigned("INITIAL_VALUE", 0);
+
+        addType("DATA_TYPE", op->getResult(0));
+        addString("BUFFER_TYPE", "ONE_SLOT_BREAK_R");
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -1823,6 +1844,8 @@ public:
                     ConvertToHWInstance<handshake::MuxOp>,
                     ConvertToHWInstance<handshake::JoinOp>,
                     ConvertToHWInstance<handshake::BlockerOp>,
+                    ConvertToHWInstance<handshake::GateOp>,
+                    ConvertToHWInstance<handshake::InitOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,

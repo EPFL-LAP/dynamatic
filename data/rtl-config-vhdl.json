@@ -478,6 +478,60 @@
     "dependencies": ["shift_reg_break_dv_dataless"]
   },
   {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb_init.vhd",
+    "module-name": "tehb_dataless_init"
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INITIAL_VALUE", "type": "unsigned"}
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/tehb_init.vhd",
+    "module-name": "tehb_init",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_DV", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner_init.vhd",
+    "module-name": "elastic_fifo_inner_dataless_init"
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_DV", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INITIAL_VALUE", "type": "unsigned"}
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner_init.vhd",
+    "module-name": "elastic_fifo_inner_init",
+    "dependencies": ["elastic_fifo_inner_dataless"]
+  },
+  {
     "name": "handshake.ndwire",
     "parameters": [
       {
@@ -802,6 +856,12 @@
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/join.vhd",
     "module-name": "join_handshake",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.gate",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }, { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/gate.vhd",
     "dependencies": ["join"]
   },
   {

@@ -302,7 +302,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.sink" || modName == "handshake.subi" ||
       modName == "handshake.shli" || modName == "handshake.blocker" ||
       modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
-      modName == "handshake.ready_remover" ||
+      modName == "handshake.ready_remover" || modName == "handshake.init" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -394,6 +394,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
       modName == "handshake.fptosi" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.init" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
@@ -934,9 +935,17 @@ bool RTLConfiguration::hasMatchingComponent(const RTLRequest &request) {
 }
 
 RTLMatch *RTLConfiguration::getMatchingComponent(const RTLRequest &request) {
+  llvm::errs() << "Searching for matching component for request at "
+               << request.loc << "\n";
   notifyRequest(request);
   std::vector<RTLMatch> matches;
   for (const RTLComponent &component : components) {
+    llvm::errs() << "bi rabt : " << component.getName() << "\n";
+  }
+
+  llvm::errs() << "____\n";
+  for (const RTLComponent &component : components) {
+    llvm::errs() << "Checking component " << component.getName() << "\n";
     if (RTLMatch *match = request.tryToMatch(component))
       return match;
   }

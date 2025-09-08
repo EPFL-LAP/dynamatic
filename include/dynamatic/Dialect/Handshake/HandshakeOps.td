@@ -634,6 +634,34 @@ def BlockerOp : Handshake_Op<"blocker", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
+def GateOp : Handshake_Op<"gate", [
+  IsSimpleHandshake<"data">,
+  IsSimpleHandshake<"result"> 
+  ]> {
+  let summary = "gate operation";
+  let description = [{
+    A data synchronizer controlled by an external signal. Blocks handshakes
+    until all inputs are valid and the control signal is true, then forwards
+    the first input.
+
+    Example:
+
+    ```mlir
+    %0 = gate %data, %control_1, %control_2 : !handshake.channel<i32>, !handshake.channel<i1>, !handshake.channel<i1>
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$data, Variadic<ControlType>:$control);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$data `,` $control attr-dict `:` type($data) `,` type($control) `to` type($result)";
+  let builders = [OpBuilder<
+    (ins "Value":$data, "ValueRange":$control), [{
+      $_state.addOperands(data);
+      $_state.addOperands(control);
+      $_state.addTypes(data.getType());
+  }]>];
+}
+
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
   let summary = "Logical negation";
   let description = [{
