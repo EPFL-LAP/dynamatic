@@ -297,7 +297,7 @@ class Muxes():
 
 """.removeprefix("\n")
 
-        max_num_loads_in_one_group = max(to_mux.keys())
+        max_num_loads_in_one_group = max(to_mux.keys()) + 1
         for i in range(max_num_loads_in_one_group):
             # unshifted store order variable
             assign_to = f"{unshifted}({i})"
@@ -357,7 +357,7 @@ class Muxes():
                     
         queue_entries =config.queue_num_entries(QueueType.LOAD)
         self.item += f"""
-  remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1generate
+  remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1 generate
     -- No group has a non-zero store order for load i
     {unshifted}(i) <= (others => '0');
   end generate
