@@ -314,6 +314,11 @@ class Muxes():
                     
         queue_entries = config.queue_num_entries(QueueType.LOAD)
         self.item += f"""
+  -- No group has more than {max_num_loads_in_one_group} loads
+  -- So we use a generate to set 
+  -- load entry {max_num_loads_in_one_group} 
+  -- to load entry {queue_entries - 1} 
+  -- to zero
   remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1 generate
     -- No group has a non-zero store order for load i
     {unshifted}(i) <= (others => '0');

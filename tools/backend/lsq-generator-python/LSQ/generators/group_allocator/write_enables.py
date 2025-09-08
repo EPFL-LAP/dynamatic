@@ -113,7 +113,7 @@ class WriteEnablesUnshifted():
   unshifted_write_enables : for i_int in 0 to {config.queue_num_entries(queue_type)} - 1 generate
 
     -- convert integer for loop iterator
-    -- to constant unsighned value in each generated assignment
+    -- to constant unsigned value in each generated assignment
     constant i : 
       unsigned({bitwidth} - 1 downto 0) := to_unsigned(i_int, {bitwidth});
 

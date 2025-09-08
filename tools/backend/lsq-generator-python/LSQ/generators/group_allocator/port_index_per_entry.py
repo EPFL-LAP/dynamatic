@@ -24,7 +24,7 @@ def get_port_index_per_entry(config, queue_type : QueueType, parent):
 class PortIndexPerEntryDecl(DeclarativeUnit):
     def __init__(self, config: Config, parent, queue_type : QueueType):
         self.top_level_comment = f"""
--- {queue_type.value.capitalize()}) Port Index per {queue_type.value.capitalize()} Queue Entry
+-- {queue_type.value.capitalize()} Port Index per {queue_type.value.capitalize()} Queue Entry
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the {queue_type.value} port index per {queue_type.value} entry.
@@ -207,6 +207,11 @@ class Muxes():
                     
         queue_entries = config.queue_num_entries(queue_type)
         self.item += f"""
+  -- No group has more than {max_num_in_one_group} {queue_type.name}(s)
+  -- So we use a generate to set 
+  -- {queue_type.value} entry {max_num_in_one_group} 
+  -- to {queue_type.value} entry {queue_entries - 1} 
+  -- to zero
   remaining_entries : for i in {max_num_in_one_group} to {queue_entries} - 1 generate
     -- No group has a {queue_type.value} i
     {unshifted}(i) <= (others => '0');
