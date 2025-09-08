@@ -24,7 +24,7 @@ def get_port_index_per_entry(config, queue_type : QueueType, parent):
 class PortIndexPerEntryDecl(DeclarativeUnit):
     def __init__(self, config: Config, parent, queue_type : QueueType):
         self.top_level_comment = f"""
--- {queue_type.value} Port Index per {queue_type.value} Queue Entry
+-- (Load/Store) Port Index per (Load/Store) Queue Entry
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the {queue_type.value} port index per {queue_type.value} entry.
@@ -75,7 +75,8 @@ class PortIndexPerEntryDecl(DeclarativeUnit):
 
         self.body = [
             Muxes(config, queue_type),
-            BarrelShiftInstantiation
+            BarrelShiftInstantiation(config, self.name(), queue_type),
+            OutputAssignments(config, queue_type)
         ]
 
 class Muxes():
