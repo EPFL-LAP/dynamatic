@@ -20,7 +20,7 @@ USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
 FAST_TOKEN_DELIVERY=${12}
 
-for i in {1..11}; do shift; done
+for i in {1..12}; do shift; done
 
 SKIPPABLE_ACTTIVE=0
 SKIPPABLE_SEQ_N=()

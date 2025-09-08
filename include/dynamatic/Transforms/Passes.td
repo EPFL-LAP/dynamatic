@@ -143,6 +143,7 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
             "Number of comparators">,
     Option<"kernelName", "kernelName", "std::string", "\"histogram\"",
             "Name">];
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
