@@ -1,27 +1,8 @@
 
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
-#include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Conversion/LLVMCommon/VectorPattern.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
-#include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributeInterfaces.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/ValueRange.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "clang-c/CXString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -29,33 +10,43 @@
 #include "clang-c/Index.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
-#include <cstddef>
 #include <optional>
+#include <regex>
 
 #include "InferArgTypes.h"
+
+#define DEBUG_TYPE "infer-arg-types"
 
 using namespace mlir;
 using namespace dynamatic;
 
 Type ArgType::getMlirType(OpBuilder &builder) const {
   Type baseMLIRElemType;
-  switch (baseElemType) {
-    // clang-format off
-  case Void:       baseMLIRElemType = builder.getNoneType(); break;
-  case Bool:       baseMLIRElemType = builder.getI1Type();   break;
-  case Int8:       baseMLIRElemType = builder.getI8Type();   break;
-  case Int16:      baseMLIRElemType = builder.getI16Type();  break;
-  case Int32:      baseMLIRElemType = builder.getI32Type();  break;
-  case Int64:      baseMLIRElemType = builder.getI64Type();  break;
-  case Float:      baseMLIRElemType = builder.getF32Type();  break;
-  case Double:     baseMLIRElemType = builder.getF64Type();  break;
-  case LongDouble: baseMLIRElemType = builder.getF128Type(); break;
-    // clang-format on
-  case Elaborated:
-    assert(false && "Dynamatic currently cannot handle elaborated types (e.g., "
-                    "struct, typedef, etc).");
-    break;
+
+  if (std::holds_alternative<CXBuiltInScalarTypes>(baseElemType)) {
+    switch (std::get<CXBuiltInScalarTypes>(baseElemType)) {
+      // clang-format off
+      case Void:       baseMLIRElemType = builder.getNoneType(); break;
+      case Bool:       baseMLIRElemType = builder.getI1Type();   break;
+      case Int8:       baseMLIRElemType = builder.getI8Type();   break;
+      case Int16:      baseMLIRElemType = builder.getI16Type();  break;
+      case Int32:      baseMLIRElemType = builder.getI32Type();  break;
+      case Int64:      baseMLIRElemType = builder.getI64Type();  break;
+      case Float:      baseMLIRElemType = builder.getF32Type();  break;
+      case Double:     baseMLIRElemType = builder.getF64Type();  break;
+      case LongDouble: baseMLIRElemType = builder.getF128Type(); break;
+      // clang-format on
+    case Elaborated:
+      assert(false &&
+             "Dynamatic currently cannot handle elaborated types (e.g., "
+             "struct, typedef, etc).");
+      break;
+    }
+  } else {
+    baseMLIRElemType =
+        builder.getIntegerType(std::get<BitIntType>(baseElemType).bitWidth);
   }
+
   if (arrayDimensions.empty()) {
     return baseMLIRElemType;
   }
@@ -66,7 +57,7 @@ Type ArgType::getMlirType(OpBuilder &builder) const {
 /// \brief: This function checks if clangType is a scalar type (e.g., int,
 /// float, ..., anything that is not an array) and returns the corresponding
 /// enum "ArgType". It return nothing if it is not a scalar type.
-std::optional<BaseScalarType> processScalarType(CXType clangType) {
+static std::optional<CXScalarType> processScalarType(CXType clangType) {
   switch (clangType.kind) {
   case CXType_Bool:
     return Bool;
@@ -110,8 +101,28 @@ std::optional<BaseScalarType> processScalarType(CXType clangType) {
     }
     return Elaborated;
   }
-  default:
+
+  case CXType_Unexposed: {
+    // Newer C features are denoted as "CXType_Unexposed" in libclang
+    // HACK: We use string regex to extract the integer type.
+    std::string typeName = clang_getCString(clang_getTypeSpelling(clangType));
+    std::regex re(R"(_BitInt\((\d+)\))");
+    std::smatch match;
+    if (std::regex_search(typeName, match, re)) {
+      bool isUnsigned = false;
+      unsigned width;
+      if (typeName.find("unsigned") != std::string::npos) {
+        isUnsigned = true;
+      }
+      width = std::stoi(match[1].str());
+      return BitIntType{width, isUnsigned};
+    }
+    llvm_unreachable("Unhandled CXType_Unexposed type!");
     return std::nullopt;
+  }
+  default: {
+    return std::nullopt;
+  }
   }
 }
 
@@ -129,7 +140,7 @@ std::optional<BaseScalarType> processScalarType(CXType clangType) {
 /// Furthermore, we don't want to throw an error on Elaborated types here,
 /// because the included headers might contain those types (but they will not be
 /// used anywhere later).
-std::optional<ArgType> fromCXType(CXType type) {
+static std::optional<ArgType> fromCXType(CXType type) {
   // Handle scalar type
   if (auto scalarType = processScalarType(type); scalarType.has_value()) {
     return ArgType{*scalarType, {}, false};
@@ -181,6 +192,10 @@ static CXChildVisitResult visitParamDecl(CXCursor cursor, CXCursor parent,
     auto argType = fromCXType(type);
     if (argType.has_value()) {
       args->push_back(argType.value());
+    } else {
+      llvm::errs() << "Warning - unable to parse " << getCursorSpelling(cursor)
+                   << " with type "
+                   << clang_getCString(clang_getTypeSpelling(type)) << "!\n";
     }
     // else: Maybe instead of push nothing here, we should have a ArgType that
     // is specifically for "I don't know what it is?"

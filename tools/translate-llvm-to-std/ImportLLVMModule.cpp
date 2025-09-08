@@ -310,6 +310,12 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
   BasicBlock &entryBB = llvmFunc->getEntryBlock();
   blockMap[&entryBB] = entryBlock;
 
+  if (llvmFunc->arg_size() != entryBlock->getNumArguments()) {
+    llvm_unreachable(
+        "Inferred fewer arguments for MLIR function! The original "
+        "C function potentially contains unhandled argument types.");
+  }
+
   for (auto [llvmArg, mlirArg] :
        llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
     valueMap[&llvmArg] = mlirArg;

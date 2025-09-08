@@ -30,7 +30,7 @@ using namespace mlir;
 
 /// \brief: The scalar types in the original C code. We could add our custom
 /// types in the future.
-enum BaseScalarType {
+enum CXBuiltInScalarTypes {
   Void,
   Bool,
   Int8,
@@ -45,6 +45,14 @@ enum BaseScalarType {
   Elaborated,
 };
 
+/// Used to denote _BitInt(..)---a type introduced in C23.
+struct BitIntType {
+  unsigned bitWidth;
+  bool isUnsigned;
+};
+
+using CXScalarType = std::variant<CXBuiltInScalarTypes, BitIntType>;
+
 /// \brief: This struct stores the type of the original C code. It is used
 /// instead of CXType because CXType manages raw pointers and we cannot keep
 /// them safely.
@@ -58,7 +66,7 @@ enum BaseScalarType {
 /// the value is passed by reference in the future (we can (and probably should)
 /// use this to determine whether we return the value at the output).
 struct ArgType {
-  BaseScalarType baseElemType;
+  CXScalarType baseElemType;
   std::vector<int64_t> arrayDimensions;
   bool isPassedByReference;
 
