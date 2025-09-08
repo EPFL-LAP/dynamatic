@@ -6,18 +6,18 @@ class ShiftDirection(Enum):
     HORIZONTAL = 1
 
 def get_barrel_shifter_1D(
-                 parent : str, 
+                 parent_name : str, 
                  unit_name : str,
                  pointer : Signal,
                  to_shift : Signal,
                  output : Signal,
                  comment = ""
                  ):
-    declaration = BarrelShifter1DDecl(parent, unit_name, pointer, to_shift, output, comment)
+    declaration = BarrelShifter1DDecl(parent_name, unit_name, pointer, to_shift, output, comment)
     return Entity(declaration).get() + Architecture(declaration).get()
 
 def get_barrel_shifter(
-                 parent : str, 
+                 parent_name : str, 
                  unit_name : str,
                  pointer : Signal,
                  to_shift : Signal2D,
@@ -25,13 +25,13 @@ def get_barrel_shifter(
                  direction : ShiftDirection,
                  comment = ""
                  ):
-    declaration = BarrelShifterDecl(parent, unit_name, pointer, to_shift, output, direction, comment)
+    declaration = BarrelShifterDecl(parent_name, unit_name, pointer, to_shift, output, direction, comment)
     return Entity(declaration).get() + Architecture(declaration).get()
 
 
 class BarrelShifterDecl(DeclarativeUnit):
     def __init__(self, 
-                 parent : str, 
+                 parent_name : str, 
                  unit_name : str,
                  pointer : Signal,
                  to_shift : Signal2D,
@@ -39,8 +39,11 @@ class BarrelShifterDecl(DeclarativeUnit):
                  direction : ShiftDirection,
                  comment
                  ):
-        self.parent = parent
-        self.unit_name = unit_name
+        
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=unit_name
+        )
 
         match direction:
             case ShiftDirection.HORIZONTAL:
@@ -156,15 +159,18 @@ class BarrelShifterBody():
 
 class BarrelShifter1DDecl(DeclarativeUnit):
     def __init__(self, 
-                 parent : str, 
+                 parent_name : str, 
                  unit_name : str,
                  pointer : Signal,
                  to_shift : Signal,
                  output : Signal,
                  comment
                  ):
-        self.parent = parent
-        self.unit_name = unit_name
+        
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=unit_name
+        )
 
         self.top_level_comment = comment
 
