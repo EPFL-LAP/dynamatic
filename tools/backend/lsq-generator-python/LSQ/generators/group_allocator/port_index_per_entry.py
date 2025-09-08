@@ -24,7 +24,7 @@ def get_port_index_per_entry(config, queue_type : QueueType, parent):
 class PortIndexPerEntryDecl(DeclarativeUnit):
     def __init__(self, config: Config, parent, queue_type : QueueType):
         self.top_level_comment = f"""
--- (Load/Store) Port Index per (Load/Store) Queue Entry
+-- {queue_type.value.capitalize()}) Port Index per {queue_type.value.capitalize()} Queue Entry
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the {queue_type.value} port index per {queue_type.value} entry.
@@ -125,7 +125,7 @@ class Muxes():
                 port_index = bin_string(port_index_int, idx_bitwidth)
 
                 self.item += f"""
-  -- Load {j} of group {i} has port index {port_index_int}
+  -- {queue_type.value.capitalize} {j} of group {i} has port index {port_index_int}
   {assign_to}({j}) <= {port_index} when {transfer_name} else {zero_bin};
 
 """.removeprefix("\n")
@@ -163,7 +163,7 @@ class Muxes():
 
                 masked = MASKED_PORT_INDEX_PER_ENTRY_NAME(group, queue_type)
                 self.item += f"""
--- Only group {group} has a load {i}
+-- Only group {group} has a {queue_type.value} {i}
 {assign_to} <= {masked}({i});
 """.removeprefix("\n")
                 
@@ -197,7 +197,7 @@ class Muxes():
                 # combine the port indices, the ORs,
                 # and the final port index with the ;
                 self.item += f"""
-  -- More than one group has a load {i}
+  -- More than one group has a {queue_type.value} {i}
   -- We mux their port indices using OR, as they have been one-hot-masked
   {assign_to} <= 
     {one_hots}
@@ -205,10 +205,10 @@ class Muxes():
 
 """.removeprefix("\n")
                     
-        queue_entries = config.queue_num_entries(QueueType.LOAD)
+        queue_entries = config.queue_num_entries(queue_type)
         self.item += f"""
   remaining_entries : for i in {max_num_in_one_group} to {queue_entries} - 1 generate
-    -- No group has a load i
+    -- No group has a {queue_type.value} i
     {unshifted}(i) <= (others => '0');
   end generate;
 
@@ -326,7 +326,7 @@ class BarrelShiftInstantiation(Instantiation):
             si(
                 ds.QueuePointer(
                     config, 
-                    QueueType.LOAD,
+                    queue_type,
                     QueuePointerType.TAIL,
                     d.INPUT
                     ),
@@ -379,7 +379,7 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
         "barrel_shift",
         ds.QueuePointer(
                 config, 
-                QueueType.LOAD,
+                queue_type,
                 QueuePointerType.TAIL,
                 d.INPUT
         ),
