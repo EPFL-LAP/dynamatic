@@ -235,7 +235,7 @@ class BarrelShiftInstantiation(Instantiation):
             comment=f"""
   -- Shift the bits representing the write enables
   -- Based on the {queue_type.value} queue tail pointer
-  -- So that bit 0 move to bit (tail pointer)
+  -- So that bit 0 moves to bit (tail pointer)
   -- Making the order aligned with the {queue_type.value} queue
 """.strip()
         )

@@ -454,7 +454,7 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
             comment=f"""
   -- Shift the bits inside of each store order
   -- Based on the store queue tail pointer
-  -- So that bit 0 move to bit (tail pointer)
+  -- So that bit 0 moves to bit (tail pointer)
   -- Making the order aligned with the store queue
 """.strip()
         )
