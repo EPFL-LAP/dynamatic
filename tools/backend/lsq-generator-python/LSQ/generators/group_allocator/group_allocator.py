@@ -238,9 +238,9 @@ class GroupAllocator:
             ctx, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         ga_ls_order_temp = LogicVecArray(
             ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        if (self.configs.ldpAddrW > 0):
-            arch += Mux1HROM(ctx, ldq_port_idx_rom,
-                             self.configs.gaLdPortIdx, group_init_hs)
+        # if (self.configs.ldpAddrW > 0):
+        #     arch += Mux1HROM(ctx, ldq_port_idx_rom,
+        #                      self.configs.gaLdPortIdx, group_init_hs)
         if (self.configs.stpAddrW > 0):
             arch += Mux1HROM(ctx, stq_port_idx_rom,
                              self.configs.gaStPortIdx, group_init_hs)
@@ -296,6 +296,8 @@ class GroupAllocator:
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
             file.write(get_group_handshaking(self.configs, self.module_name))
+            file.write(get_port_index_per_entry(self.configs, QueueType.LOAD, self.module_name))
+
 
             file.write('\n\n')
             file.write(ctx.library)
@@ -306,6 +308,7 @@ class GroupAllocator:
             file.write(ctx.signalInitString)
             file.write('begin\n')
             file.write(GroupHandshakingInst(self.configs, self.module_name).get())
+            file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name))
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
 
