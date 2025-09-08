@@ -244,8 +244,8 @@ class GroupAllocator:
         # if (self.configs.stpAddrW > 0):
         #     arch += Mux1HROM(ctx, stq_port_idx_rom,
         #                      self.configs.gaStPortIdx, group_init_hs)
-        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
-                         group_init_hs, MaskLess)
+        # arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
+        #                  group_init_hs, MaskLess)
         # arch += Mux1HROM(ctx, num_loads,
                         #  self.configs.gaNumLoads, group_init_hs)
         # arch += Mux1HROM(ctx, num_stores,
@@ -279,11 +279,11 @@ class GroupAllocator:
         #                             stq_port_idx_rom, stq_tail_i)
         # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         # arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
-        for i in range(0, self.configs.numLdqEntries):
-            arch += CyclicLeftShift(ctx,
-                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
-        arch += CyclicLeftShift(ctx, ga_ls_order_o,
-                                ga_ls_order_temp, ldq_tail_i)
+        # for i in range(0, self.configs.numLdqEntries):
+        #     arch += CyclicLeftShift(ctx,
+        #                             ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
+        # arch += CyclicLeftShift(ctx, ga_ls_order_o,
+        #                         ga_ls_order_temp, ldq_tail_i)
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
@@ -306,6 +306,8 @@ class GroupAllocator:
             file.write(get_write_enables(self.configs, QueueType.LOAD, self.module_name))
             file.write(get_write_enables(self.configs, QueueType.STORE, self.module_name))
 
+            file.write(get_naive_store_order_per_entry(self.configs, self.module_name))
+
 
             file.write('\n\n')
             file.write(ctx.library)
@@ -325,6 +327,8 @@ class GroupAllocator:
 
             file.write(WriteEnableInst(self.configs, QueueType.LOAD, self.module_name).get())
             file.write(WriteEnableInst(self.configs, QueueType.STORE, self.module_name).get())
+
+            file.write(NaiveStoreOrderPerEntryInst(self.configs, self.module_name).get())
 
 
             file.write(arch + '\n')
