@@ -188,7 +188,7 @@ class Trivial():
   {name} <= {zeros};
 """.removeprefix("\n")
                 
-                self.item = self.item.strip()
+        self.item = self.item.strip()
     
     def get(self):
         return self.item
