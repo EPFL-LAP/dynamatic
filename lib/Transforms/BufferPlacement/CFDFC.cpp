@@ -229,17 +229,27 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
             break;
           }
         }
-      } else if (cycle.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
+      } else {
         channels.insert(res);
-        if (isCFDFCBackedge(res))
+        if (getUniqueName(&op) == "mux2" && getUniqueName(user) == "join0")
           backedges.insert(res);
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
-        channels.insert(res);
+        else if (isCFDFCBackedge(res) && getUniqueName(&op) != "cond_br0" &&
+                 getUniqueName(user) != "mux2")
+          backedges.insert(res);
       }
+      // else if (cycle.size() == 1) {
+      //   // The channel is in the CFDFC if its producer/consumer belong to the
+      //   // same basic block and the CFDFC is just a block looping to itself
+      //   channels.insert(res);
+      //   if (isCFDFCBackedge(res))
+      //     backedges.insert(res);
+      // }
+      // else if (!isBackedge(res)) {
+      //   // } else {
+      //   // The channel is in the CFDFC if its producer/consumer belong to the
+      //   // same basic block and the channel is not a backedge
+      //   channels.insert(res);
+      // }
     }
   }
 }

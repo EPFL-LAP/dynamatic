@@ -394,7 +394,9 @@ void CFDFCUnionBuffers::setup() {
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
+  GRBLinExpr objective = addBackedgeObjective(allChannels);
+
+  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs, objective);
   markReadyToOptimize();
 }
 

@@ -79,6 +79,8 @@ struct ChannelVars {
   GRBVar dataLatency;
   /// Usage of a shift register on the channel (binary).
   GRBVar shiftReg;
+  /// Whether the channel is a backedge or not (binary).
+  GRBVar isBackedge;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -267,6 +269,10 @@ protected:
   /// steady state.
   void addSteadyStateReachabilityConstraints(CFDFC &cfdfc);
 
+  void addBackedgeConstraints();
+
+  void addMuxConstraint(CFDFC &cfdfc);
+
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel
   /// variables were created for the data signal.
@@ -355,6 +361,8 @@ protected:
   /// extracted CFDFCs.
   unsigned getChannelNumExecs(Value channel);
 
+  GRBLinExpr addBackedgeObjective(ValueRange allChannels);
+
   /// Adds the MILP model's objective. The objective maximizes throughput while
   /// minimizing buffer usage, with throughput prioritized. It has a positive
   /// "throughput term" for every provided CFDFC. These terms are weighted by
@@ -365,7 +373,8 @@ protected:
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
-  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
+  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs,
+                                 GRBLinExpr objective);
 
   /// Adds the MILP model's objective. The objective maximizes throughput while
   /// minimizing buffer area, with throughput prioritized. It has a positive

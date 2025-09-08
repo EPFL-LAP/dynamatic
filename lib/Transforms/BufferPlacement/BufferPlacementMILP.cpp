@@ -11,10 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/CycleDetection.h"
+#include "dynamatic/Transforms/BufferPlacement/Johnson.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -31,6 +34,13 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::handshake;
+
+/// Type alias for a cycle (sequence of operations forming a loop)
+using Cycle = std::vector<Operation *>;
+using CycleList = std::vector<Cycle>;
+
+using ChannelCycle = std::vector<Value>;
+using ChannelCycleList = std::vector<ChannelCycle>;
 
 /// Returns a textual name for a signal type.
 static StringRef getSignalName(SignalType signalType) {
@@ -137,6 +147,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
   chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
   chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
+  chVars.isBackedge = createVar("backedge", GRB_BINARY);
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
@@ -168,6 +179,13 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     if (failed(
             timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
       latency = 0.0;
+    StringRef uniqueName = getUniqueName(unit);
+
+    if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
+        uniqueName != "mux0") {
+      latency = -10.0;
+      llvm::errs() << "Here\n";
+    }
     if (latency == 0.0)
       unitVars.retOut = unitVars.retIn;
     else
@@ -249,6 +267,14 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   double latency;
   if (failed(timingDB.getLatency(unit, signalType, latency, targetPeriod)))
     latency = 0.0;
+
+  StringRef uniqueName = getUniqueName(unit);
+
+  if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
+      uniqueName != "mux0") {
+    latency = -10.0;
+    llvm::errs() << "Here\n";
+  }
 
   if (latency == 0.0) {
     double delay;
@@ -415,13 +441,63 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
     GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
     GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
-    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+    // unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+    ChannelVars &chVars = vars.channelVars[channel];
+    GRBVar backedge = chVars.isBackedge;
 
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
     model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
                     "throughput_channelRetiming");
+  }
+}
+
+void BufferPlacementMILP::addBackedgeConstraints() {
+  GraphForJohnson graph(funcInfo.funcOp);
+  ChannelCycleList channelCycles = graph.findAllChannelCycles();
+
+  for (ChannelCycle cycle : channelCycles) {
+
+    // llvm::errs() << "Found cycle: ";
+    // for (Value channel : cycle) {
+    //   llvm::errs() << channel << "\n";
+    // }
+    // llvm::errs() << "-------------------\n";
+
+    GRBLinExpr sumOfBackedges;
+    for (Value channel : cycle) {
+      ChannelVars &chVars = vars.channelVars[channel];
+      sumOfBackedges += chVars.isBackedge;
+    }
+
+    // Exactly one channel in the cycle must be marked as a backedge
+    model.addConstr(sumOfBackedges == 1, "cycle_has_backedge");
+  }
+}
+
+void BufferPlacementMILP::addMuxConstraint(CFDFC &cfdfc) {
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
+    Operation *dstOp = *channel.getUsers().begin();
+
+    if (auto muxOp = dyn_cast<handshake::MuxOp>(dstOp)) {
+      llvm::errs() << "found a mux op: " << muxOp << "\n";
+      ValueRange dataOperands = muxOp.getDataOperands();
+
+      for (Value dataOp : dataOperands) {
+        llvm::errs() << "data operand: " << dataOp << "\n";
+        // check if this value is created by a source operation
+        if (isa<handshake::SourceOp>(dataOp.getDefiningOp())) {
+          GRBVar &chTokenOccupancy =
+              cfVars.channelThroughputs[muxOp.getResult()];
+
+          // model.addConstr(chTokenOccupancy == 1, "rouzbeh");
+          llvm::errs() << muxOp.getResult() << "adding mux constraint\n";
+        }
+      }
+    }
   }
 }
 
@@ -437,8 +513,8 @@ void BufferPlacementMILP::
     /// TODO: this is from legacy implementation, we should understand why we
     /// really do this and figure out if it makes sense (@lucas-rami: I don't
     /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
+    // if (isa<handshake::StoreOp>(dstOp))
+    //   continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -493,12 +569,12 @@ void BufferPlacementMILP::
     // Assuming that we minimize the number of buffer slots, bubble occupancy
     // always takes the minimum feasible value. Therefore, the combined
     // constraints are equivalent to:
-    // If dataBuf holds, then token occupancy + CFDFC's throughput <= numSlots;
-    // otherwise, token occupancy <= numSlots. (Already enforced by the earlier
-    // constraint named "throughput_channel")
-    // The following constraint encodes the case where readyBuf holds, and is
-    // trivially satisfied when readyBuf does not hold (since the earlier
-    // constraint already enforces it):
+    // If dataBuf holds, then token occupancy + CFDFC's throughput <=
+    // numSlots; otherwise, token occupancy <= numSlots. (Already enforced by
+    // the earlier constraint named "throughput_channel") The following
+    // constraint encodes the case where readyBuf holds, and is trivially
+    // satisfied when readyBuf does not hold (since the earlier constraint
+    // already enforces it):
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
       model.addConstr(
@@ -523,8 +599,8 @@ void BufferPlacementMILP::
     /// TODO: this is from legacy implementation, we should understand why we
     /// really do this and figure out if it makes sense (@lucas-rami: I don't
     /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
+    // if (isa<handshake::StoreOp>(dstOp))
+    //   continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -570,9 +646,9 @@ void BufferPlacementMILP::
         0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegExtraBubblesName);
 
     // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
-    // number (dataLatency) minus the ceiling of the product of data latency and
-    // CFDFC throughput.
-    // We approximate the ceiling function numerically to keep the model linear.
+    // number (dataLatency) minus the ceiling of the product of data latency
+    // and CFDFC throughput. We approximate the ceiling function numerically
+    // to keep the model linear.
     model.addQConstr(shiftRegExtraBubbles >=
                          dataLatency - dataLatency * throughput - 0.99,
                      shiftRegExtraBubblesName);
@@ -602,9 +678,19 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency,
-                                   targetPeriod)) ||
-        latency == 0.0)
+    if (failed(
+            timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
+      continue;
+
+    StringRef uniqueName = getUniqueName(unit);
+
+    if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
+        uniqueName != "mux0") {
+      latency = -10.0;
+      llvm::errs() << "Here\n";
+    }
+
+    if (latency == 0.0)
       continue;
 
     // Retrieve the MILP variables corresponding to the unit's fluid retiming
@@ -657,18 +743,18 @@ void BufferPlacementMILP::addBlackboxConstraints(
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 
-    // Path In variable of the channel that comes after blackbox module (output
-    // of blackbox)
+    // Path In variable of the channel that comes after blackbox module
+    // (output of blackbox)
     GRBVar &outputPathIn =
         vars.channelVars[channel].signalVars[SignalType::DATA].path.tIn;
 
-    // Path Out variable of the channel that comes before blackbox module (input
-    // of blackbox)
+    // Path Out variable of the channel that comes before blackbox module
+    // (input of blackbox)
     GRBVar &inputPathOut =
         vars.channelVars[inputChannel].signalVars[SignalType::DATA].path.tOut;
 
-    // Delay propagation constraint for blackbox nodes. Delay propagates through
-    // input edges to output edges, increasing by delay variable.
+    // Delay propagation constraint for blackbox nodes. Delay propagates
+    // through input edges to output edges, increasing by delay variable.
     model.addConstr(inputPathOut + delay == outputPathIn,
                     "blackbox_constraint_" + std::to_string(bitwidth));
   }
@@ -690,8 +776,8 @@ void BufferPlacementMILP::addCutSelectionConstraints(
   }
   model.update();
   // Cut Selection Constraint. Only a single cut of a node can be selected.
-  // This affects delay propagation, as delay will propagate through the chosen
-  // cut.
+  // This affects delay propagation, as delay will propagate through the
+  // chosen cut.
   model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
@@ -702,10 +788,10 @@ void BufferPlacementMILP::addCutSelectionConflicts(
   // Loop over edges in the path from the leaf to the root.
   for (auto &nodePath : path) {
     if (nodePath->nodeMLIRValue) {
-      // Add the Cut Selection Conflict Constraints. An LUT cannot cover an edge
-      // if it is cut by a buffer, as LUTs cannot cover multiple sequential
-      // stages. This constraint ensures an edge is either covered by a LUT, or
-      // a buffer is inserted on the edge.
+      // Add the Cut Selection Conflict Constraints. An LUT cannot cover an
+      // edge if it is cut by a buffer, as LUTs cannot cover multiple
+      // sequential stages. This constraint ensures an edge is either covered
+      // by a LUT, or a buffer is inserted on the edge.
       model.addConstr(1 >= nodePath->gurobiVars->bufferVar + cutSelectionVar,
                       "cut_selection_conflict");
     }
@@ -830,8 +916,8 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   DenseMap<Operation *, GRBVar> opToGRB;
 
   funcInfo.funcOp.walk([&](Operation *op) {
-    // Create a Gurobi variable for each operation, which will hold the order of
-    // the Operation in the topological ordering
+    // Create a Gurobi variable for each operation, which will hold the order
+    // of the Operation in the topological ordering
     StringRef uniqueName = getUniqueName(op);
     GRBVar operationVariable = modelFeedback.addVar(
         0, GRB_INFINITY, 0.0, GRB_INTEGER, uniqueName.str());
@@ -854,10 +940,10 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
       edgeToOps[std::make_pair(op, user)] = edge;
       modelFeedback.update();
       // This constraint enforces topological order, by forcing successor
-      // operations to have a bigger larger index in the topological order than
-      // their predecessors. If such an order cannot be satisfied with the given
-      // set of nodes, "edge" variable is set to 1, which means the edge needs
-      // to be cut to have an acyclic graph.
+      // operations to have a bigger larger index in the topological order
+      // than their predecessors. If such an order cannot be satisfied with
+      // the given set of nodes, "edge" variable is set to 1, which means the
+      // edge needs to be cut to have an acyclic graph.
       modelFeedback.addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
                               "operation_order");
     }
@@ -925,8 +1011,8 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
 
   // Iterate over all CFDFCs which contain the channel to determine its total
   // number of executions. Backedges are executed one less time than "forward
-  // edges" since they are only taken between executions of the cycle the CFDFC
-  // represents
+  // edges" since they are only taken between executions of the cycle the
+  // CFDFC represents
   unsigned numExec = isBackedge(channel) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
@@ -934,8 +1020,20 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
+GRBLinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
+  GRBLinExpr objective;
+
+  for (Value channel : allChannels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    objective -= chVars.isBackedge;
+  }
+
+  return objective;
+}
+
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
-                                                    ArrayRef<CFDFC *> cfdfcs) {
+                                                    ArrayRef<CFDFC *> cfdfcs,
+                                                    GRBLinExpr objective) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
@@ -943,8 +1041,8 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
     totalExecs += getChannelNumExecs(channel);
   }
 
-  // Create the expression for the MILP objective
-  GRBLinExpr objective;
+  // // Create the expression for the MILP objective
+  // GRBLinExpr objective;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -958,13 +1056,13 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
     }
   }
 
-  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
-  // coefficient to any positive value
+  // In case we ran the MILP without providing any CFDFC, set the maximum
+  // CFDFC coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
-  // For each channel, add a "penalty" in case a buffer is added to the channel,
-  // and another penalty that depends on the number of slots
+  // For each channel, add a "penalty" in case a buffer is added to the
+  // channel, and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
   double slotPenaltyMul = 1e-5;
   for (Value channel : channels) {
@@ -1001,8 +1099,8 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
     }
   }
 
-  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
-  // coefficient to any positive value
+  // In case we ran the MILP without providing any CFDFC, set the maximum
+  // CFDFC coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
@@ -1010,14 +1108,14 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   // penalty for buffer presence is an empirical value, consistent with
   // 'addMaxThroughputObjective'. The slot penalties for each buffer type are
   // rough estimates, based on the number of LUTs as logic observed when each
-  // buffer type was synthesized individually. To adjust these parameters during
-  // tuning, simply modify the values here.
+  // buffer type was synthesized individually. To adjust these parameters
+  // during tuning, simply modify the values here.
 
-  // For each channel, add a "penalty" in case a buffer is added to the channel,
-  // and another penalty that depends on the number of slots
+  // For each channel, add a "penalty" in case a buffer is added to the
+  // channel, and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
-  // In general, buffers that break data paths have a lower area cost per slot,
-  // while other types incur a higher cost
+  // In general, buffers that break data paths have a lower area cost per
+  // slot, while other types incur a higher cost
   double largeSlotPenaltyMul = 1e-4;
   double smallSlotPenaltyMul = 1e-5;
   // For SHIFT_REG_BREAK_DV, a small area cost is incurred when the buffer
@@ -1126,6 +1224,20 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     }
     os.unindent();
     os << "\n";
+  }
+
+  for (auto &[value, chVars] : vars.channelVars) {
+    os << "Channel " << getUniqueName(*value.getUses().begin())
+       << " buffer present: " << chVars.bufPresent.get(GRB_DoubleAttr_X)
+       << "\n";
+  }
+
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    for (auto backedge : cf->backedges) {
+      os << "CFDFC #" << idx << " backedge "
+         << getUniqueName(*backedge.getUses().begin()) << "\n";
+    }
   }
 }
 
