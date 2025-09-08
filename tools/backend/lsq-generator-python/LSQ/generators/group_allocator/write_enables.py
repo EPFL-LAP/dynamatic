@@ -14,7 +14,7 @@ def get_write_enables(config, queue_type : QueueType, parent):
     declaration = WriteEnablesDecl(config, parent, queue_type)
     unit = Entity(declaration).get() + Architecture(declaration).get()
 
-    barrel_shifters = _get_barrel_shifter(config, declaration)
+    barrel_shifters = _get_barrel_shifter(config, declaration, queue_type)
 
     return barrel_shifters + unit
 
