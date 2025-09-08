@@ -5,6 +5,7 @@ from LSQ.config import Config
 
 import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
+import LSQ.generators.group_allocator as group_allocator
 
 class LSQ:
     def __init__(
@@ -508,7 +509,9 @@ class LSQ:
         ######   Entity Instantiation   ######
 
         # Group Allocator
-        arch += lsq_submodules.group_allocator.instantiate(
+        arch += group_allocator.instantiate(
+            self.configs,
+            self.module_name,
             ctx,
             group_init_valid_i, group_init_ready_o,
             ldq_tail, ldq_head, ldq_empty,

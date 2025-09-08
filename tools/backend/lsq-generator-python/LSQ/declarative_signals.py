@@ -184,7 +184,7 @@ class PortIdxPerEntry(Signal):
             always_vector=True
         )
 
-class NumNewQueueEntries(Signal):
+class NumNewEntries(Signal):
     """       
     Output of Group Allocator,
     input to either Load Queue or Store Queue.

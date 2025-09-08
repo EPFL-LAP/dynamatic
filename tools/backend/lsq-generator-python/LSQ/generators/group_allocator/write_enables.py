@@ -53,7 +53,7 @@ class WriteEnablesDecl(DeclarativeUnit):
     -- The first N write enables signals are set to high.
 """
             ),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 queue_type, 
                 d.INPUT

@@ -1,4 +1,4 @@
-from LSQ.entity import Signal, RTLComment, DeclarativeUnit
+from LSQ.entity import Signal, RTLComment, DeclarativeUnit, Entity, Architecture
 from LSQ.config import Config
 
 from LSQ.utils import QueueType, QueuePointerType
@@ -12,7 +12,12 @@ import LSQ.declarative_signals as ds
 from LSQ.utils import bin_string
 
  
-class GroupHandshaking(DeclarativeUnit):
+def get_group_handshaking(config, parent):
+    declaration = GroupHandshakingDecl(config, parent)
+
+    return Entity(declaration).get() + Architecture(declaration).get()
+
+class GroupHandshakingDecl(DeclarativeUnit):
     def __init__(self, config : Config, parent):
         self.top_level_comment = f"""
 -- Group Initiation Handshaking Unit

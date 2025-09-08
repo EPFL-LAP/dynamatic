@@ -3,12 +3,16 @@ from LSQ.utils import QueueType, bin_string
 
 from LSQ.rtl_signal_names import *
 
-from LSQ.entity import Signal, DeclarativeUnit
+from LSQ.entity import Signal, DeclarativeUnit, Entity, Architecture
 
 import LSQ.declarative_signals as ds
 
+def get_num_new_entries(config, queue_type : QueueType, parent):
+    declaration = NumNewEntriesDecl(config, queue_type, parent)
 
-class NumNewEntries(DeclarativeUnit):
+    return Entity(declaration).get() + Architecture(declaration).get()
+
+class NumNewEntriesDecl(DeclarativeUnit):
     def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
 -- Number of New Entries in the {queue_type.value.capitalize()} Queue Unit
@@ -33,7 +37,7 @@ class NumNewEntries(DeclarativeUnit):
                 config, 
                 d.INPUT
             ),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 queue_type, 
                 direction=d.OUTPUT

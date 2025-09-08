@@ -3,7 +3,7 @@ from LSQ.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from LSQ.utils import MaskLess
 from LSQ.config import Config
 
-from LSQ.entity import Entity, Architecture, Signal, RTLComment, DeclarativeUnit
+from LSQ.entity import Entity, Architecture, Signal, RTLComment, DeclarativeUnit, Instantiation, SimpleInstantiation, InstCxnType
 
 from LSQ.utils import QueueType, QueuePointerType
 # from LSQ.architecture import Architecture
@@ -12,18 +12,40 @@ from LSQ.rtl_signal_names import *
 
 import LSQ.declarative_signals as ds
 
-from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
-from LSQ.generators.group_allocator.num_new_entries import NumNewEntries
+
+from LSQ.generators.group_allocator.group_handshaking import get_group_handshaking
+from LSQ.generators.group_allocator.num_new_entries import get_num_new_entries
 from LSQ.generators.group_allocator.naive_store_order_per_entry import get_naive_store_order_per_entry
 
 from LSQ.generators.group_allocator.write_enables import get_write_enables
 
 from LSQ.generators.group_allocator.port_index_per_entry import get_port_index_per_entry
 
-from LSQ.generators.group_allocator.group_allocator_items import \
-    (
-        GroupAllocatorBodyItems,
-    )
+
+def get_group_allocator(config, parent):
+    declaration = GroupAllocatorDeclarative(config, parent)
+
+    unit = Entity(declaration).get() + Architecture(declaration).get()
+
+    ga_name = declaration.name()
+
+    dependencies = get_group_handshaking(config, ga_name)
+
+    dependencies += get_num_new_entries(config, QueueType.LOAD, ga_name)
+    dependencies += get_num_new_entries(config, QueueType.STORE, ga_name)
+
+    dependencies += get_write_enables(config, QueueType.LOAD, ga_name)
+    dependencies += get_write_enables(config, QueueType.STORE, ga_name)
+
+    if config.load_ports_num() > 1:
+        dependencies += get_port_index_per_entry(config, QueueType.LOAD, ga_name)
+
+    if config.store_ports_num() > 1:
+        dependencies += get_port_index_per_entry(config, QueueType.STORE, ga_name)
+
+    dependencies += get_naive_store_order_per_entry(config, ga_name)
+
+    return dependencies + unit
 
 class GroupAllocatorDeclarative(DeclarativeUnit):
     def __init__(self, config : Config, parent):
@@ -158,7 +180,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
     -- Bitwidth equal to the load queue pointer bitwidth.
 
 """),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 QueueType.LOAD, 
                 d.OUTPUT
@@ -205,7 +227,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
     -- Bitwidth equal to the store queue pointer bitwidth.
 
 """),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 QueueType.STORE, 
                 d.OUTPUT
@@ -248,301 +270,418 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
 
         self.local_items = [
             ds.GroupInitTransfer(config),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 QueueType.LOAD
                 ),
-            ds.NumNewQueueEntries(
+            ds.NumNewEntries(
                 config, 
                 QueueType.STORE
                 )
         ]
 
-        b = GroupAllocatorBodyItems
 
         self.body = [
-            b.GroupHandshakingInst(config, self.name()),
+            GroupHandshakingInst(config, self.name()),
 
 
-            *([b.PortIdxPerEntryInst(config, QueueType.LOAD, self.name())] \
+            *([PortIdxPerEntryInst(config, QueueType.LOAD, self.name())] \
                   if config.load_ports_num() > 1 else []),
 
-            *([b.PortIdxPerEntryInst(config, QueueType.STORE, self.name())] \
+            *([PortIdxPerEntryInst(config, QueueType.STORE, self.name())] \
                   if config.store_ports_num() > 1 else []),
 
-            b.NumNewQueueEntriesInst(config, QueueType.LOAD, self.name()),
-            b.NumNewQueueEntriesInst(config, QueueType.STORE, self.name()),
+            NumNewQueueEntriesInst(config, QueueType.LOAD, self.name()),
+            NumNewQueueEntriesInst(config, QueueType.STORE, self.name()),
 
-            b.NaiveStoreOrderPerEntryInst(config, self.name()),
+            NaiveStoreOrderPerEntryInst(config, self.name()),
 
-            b.WriteEnableInst(config, QueueType.LOAD, self.name()),
-            b.WriteEnableInst(config, QueueType.STORE, self.name()),
+            WriteEnableInst(config, QueueType.LOAD, self.name()),
+            WriteEnableInst(config, QueueType.STORE, self.name()),
 
-            b.NumNewEntriesAssignment()
+            NumNewEntriesAssignment()
         ]
 
-class GroupAllocator:
-    def print_dec(self, dec):
-        entity = Entity(dec)
-        arch = Architecture(dec)
-
-        return entity.get() + arch.get()
-
-    def __init__(
-        self,
-        name: str,
-        configs: Config
-    ):
-        """
-        Group Allocator
-
-        Models a group allocator for a Load-Store Queue (LSQ) system.
-
-        This class encapsulates the logic for generating a VHDL module that allocates
-        space for groups of memory operations (loads and stores) in the load queue and 
-        the store queue.
-
-        Parameters:
-            name    : Base name of the group allocator.
-            suffix  : Suffix appended to the entity name.
-            configs : configuration generated from JSON
-
-        Instance Variable:
-            self.module_name = name + suffix : Entity and architecture identifier
-
-        Example:
-            ga = GroupAllocator(
-                    name="config_0_core", 
-                    suffix="_ga", 
-                    configs=configs
-                )
-
-            # You can later generate VHDL entity and architecture by
-            #     ga.generate(...)
-            # You can later instantiate VHDL entity by
-            #     ga.instantiate(...)
-        """
-
-        self.name = name
-        self.configs = configs
-        self.lsq_name = name
-
-        self.module_name = f"{self.lsq_name}_{GROUP_ALLOCATOR_NAME}_unit"
-
-    def generate(self, path_rtl, config : Config) -> None:
-        """
-        Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
-
-        Parameters:
-            path_rtl    : Output directory for VHDL files.
-
-        Output:
-            Appends the 'entity' and 'architecture' definitions
-            to the .vhd file at <path_rtl>/<self.name>.vhd.
-            Entity and architecture use the identifier: <self.module_name>
-
-        Example (Group Allocator):
-            ga.generate(path_rtl)
-
-            produces in rtl/config_0_core.vhd:
-
-            entity config_0_core_ga is
-                port(
-                    rst           : in  std_logic;
-                    clk           : in  std_logic;
-                    ...
-                );
-            end entity;
-
-            architecture arch of config_0_core_ga is
-                -- signals generated here
-            begin
-                -- group allocator logic here
-            end architecture;
-
-        """
-
-        ga_decl = GroupAllocatorDeclarative(config, self.lsq_name)
-
-        unit = self.print_dec(GroupHandshaking(config, ga_decl.name()))
-
-        unit += self.print_dec(NumNewEntries(config, QueueType.LOAD, ga_decl.name()))
-        unit += self.print_dec(NumNewEntries(config, QueueType.STORE, ga_decl.name()))
-
-        unit += get_write_enables(config, QueueType.LOAD, ga_decl.name())
-        unit += get_write_enables(config, QueueType.STORE, ga_decl.name())
-
-        if config.load_ports_num() > 1:
-            unit += get_port_index_per_entry(config, QueueType.LOAD, ga_decl.name())
-
-        if config.store_ports_num() > 1:
-            unit += get_port_index_per_entry(config, QueueType.STORE, ga_decl.name())
-
-        unit += get_naive_store_order_per_entry(config, ga_decl.name())
-
-        unit += self.print_dec(ga_decl)
-
-        # Write to the file
-        with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
-            file.write(unit)
 
 
-    def instantiate(
-        self,
-        ctx:                VHDLContext,
-        group_init_valid_i: LogicArray,
-        group_init_ready_o: LogicArray,
-        ldq_tail_i:         LogicVec,
-        ldq_head_i:         LogicVec,
-        ldq_empty_i:        Logic,
-        stq_tail_i:         LogicVec,
-        stq_head_i:         LogicVec,
-        stq_empty_i:        Logic,
-        ldq_wen_o:          LogicArray,
-        num_loads_o:        LogicVec,
-        ldq_port_idx_o:     LogicVecArray,
-        stq_wen_o:          LogicArray,
-        num_stores_o:       LogicVec,
-        stq_port_idx_o:     LogicVecArray,
-        ga_ls_order_o:      LogicVecArray
-    ) -> str:
-        """
-        Group Allocator Instantiation
+def instantiate(
+    config:             Config,
+    lsq_name:           str,
+    ctx:                VHDLContext,
+    group_init_valid_i: LogicArray,
+    group_init_ready_o: LogicArray,
+    ldq_tail_i:         LogicVec,
+    ldq_head_i:         LogicVec,
+    ldq_empty_i:        Logic,
+    stq_tail_i:         LogicVec,
+    stq_head_i:         LogicVec,
+    stq_empty_i:        Logic,
+    ldq_wen_o:          LogicArray,
+    num_loads_o:        LogicVec,
+    ldq_port_idx_o:     LogicVecArray,
+    stq_wen_o:          LogicArray,
+    num_stores_o:       LogicVec,
+    stq_port_idx_o:     LogicVecArray,
+    ga_ls_order_o:      LogicVecArray
+) -> str:
 
-        Creates the VHDL port mapping for the group allocator entity.
 
-        Parameters:
-            ctx                  : VHDLContext for code generation state.
-            group_init_valid_i   : Group Allocator handshake valid signal
-            group_init_ready_o   : Group Allocator handshake ready signal
-            ldq_tail_i           : Load queue tail
-            ldq_head_i           : Load queue head
-            ldq_empty_i          : (boolean) load queue empty
-            stq_tail_i           : Store queue tail
-            stq_head_i           : Store queue head
-            stq_empty_i          : (boolean) store queue empty
-            ldq_wen_o            : Load queue write enable
-            num_loads_o          : The number of loads
-            ldq_port_idx_o       : Load queue port index
-            stq_wen_o            : Store queue write enable
-            num_stores_o         : The number of stores
-            stq_port_idx_o       : Store queue port index
-            ga_ls_order_o        : Group Allocator load-store order matrix
+    module_name = f"{lsq_name}_{GROUP_ALLOCATOR_NAME}_unit"
 
-        Returns:
-            VHDL instantiation string for inclusion in the architecture body.
+    arch = ctx.get_current_indent(
+    ) + f'{module_name} : entity work.{module_name}\n'
+    ctx.tabLevel += 1
+    arch += ctx.get_current_indent() + f'port map(\n'
+    ctx.tabLevel += 1
 
-        Example:
-            arch += ga.instantiate(
-                ctx,
-                group_init_valid_i = group_init_valid_i,
-                group_init_ready_o = group_init_ready_o,
-                ldq_tail_i         = ldq_tail,
-                ldq_head_i         = ldq_head,
-                ldq_empty_i        = ldq_empty,
-                stq_tail_i         = stq_tail,
-                stq_head_i         = stq_head,
-                stq_empty_i        = stq_empty,
-                ldq_wen_o          = ldq_wen,
-                num_loads_o        = num_loads,
-                ldq_port_idx_o     = ldq_port_idx,
-                stq_wen_o          = stq_wen,
-                num_stores_o       = num_stores,
-                stq_port_idx_o     = stq_port_idx,
-                ga_ls_order_o      = ga_ls_order
+    arch += ctx.get_current_indent() + f'rst => rst,\n'
+    arch += ctx.get_current_indent() + f'clk => clk,\n'
+
+    for i in range(0, config.num_groups()):
+        arch += ctx.get_current_indent() + \
+            f'group_init_valid_{i}_i => {group_init_valid_i.getNameRead(i)},\n'
+    for i in range(0, config.num_groups()):
+        arch += ctx.get_current_indent() + \
+            f'group_init_ready_{i}_o => {group_init_ready_o.getNameWrite(i)},\n'
+
+    arch += ctx.get_current_indent() + \
+        f'ldq_tail_i => {ldq_tail_i.getNameRead()},\n'
+    arch += ctx.get_current_indent() + \
+        f'ldq_head_i => {ldq_head_i.getNameRead()},\n'
+    arch += ctx.get_current_indent() + \
+        f'ldq_empty_i => {ldq_empty_i.getNameRead()},\n'
+
+    arch += ctx.get_current_indent() + \
+        f'stq_tail_i => {stq_tail_i.getNameRead()},\n'
+    arch += ctx.get_current_indent() + \
+        f'stq_head_i => {stq_head_i.getNameRead()},\n'
+    arch += ctx.get_current_indent() + \
+        f'stq_empty_i => {stq_empty_i.getNameRead()},\n'
+
+    for i in range(0, config.numLdqEntries):
+        arch += ctx.get_current_indent() + \
+            f'ldq_wen_{i}_o => {ldq_wen_o.getNameWrite(i)},\n'
+    arch += ctx.get_current_indent() + \
+        f'num_loads_o => {num_loads_o.getNameWrite()},\n'
+    if (config.ldpAddrW > 0):
+        for i in range(0, config.numLdqEntries):
+            arch += ctx.get_current_indent() + \
+                f'ldq_port_idx_{i}_o => {ldq_port_idx_o.getNameWrite(i)},\n'
+
+    for i in range(0, config.numStqEntries):
+        arch += ctx.get_current_indent() + \
+            f'stq_wen_{i}_o => {stq_wen_o.getNameWrite(i)},\n'
+    if (config.stpAddrW > 0):
+        for i in range(0, config.numStqEntries):
+            arch += ctx.get_current_indent() + \
+                f'stq_port_idx_{i}_o => {stq_port_idx_o.getNameWrite(i)},\n'
+
+    for i in range(0, config.numLdqEntries):
+        arch += ctx.get_current_indent() + \
+            f'ga_ls_order_{i}_o => {ga_ls_order_o.getNameWrite(i)},\n'
+
+    arch += ctx.get_current_indent() + \
+        f'num_stores_o => {num_stores_o.getNameWrite()}\n'
+
+    ctx.tabLevel -= 1
+    arch += ctx.get_current_indent() + f');\n'
+    ctx.tabLevel -= 1
+    return arch
+
+
+class GroupHandshakingInst(Instantiation):
+    def __init__(self, config : Config, parent):
+
+        c = InstCxnType
+
+        d = Signal.Direction
+
+        si = SimpleInstantiation
+        port_items = [
+            si(
+                ds.GroupInitValid(
+                    config
+                ), 
+                c.INPUT
+            ),
+            si(
+                ds.GroupInitReady(
+                    config,
+                ), 
+                c.OUTPUT
+            ),
+
+            si(
+                ds.QueuePointer(
+                    config, 
+                    QueueType.LOAD, 
+                    QueuePointerType.TAIL,
+                    d.INPUT
+                ), 
+                c.INPUT
+            ),
+            si(
+                ds.QueuePointer(
+                    config, 
+                    QueueType.LOAD, 
+                    QueuePointerType.HEAD,
+                    d.INPUT
+                    ), 
+                c.INPUT
+            ),
+            si(
+                ds.QueueIsEmpty(
+                    QueueType.LOAD,
+                    d.INPUT
+                ), 
+            c.INPUT
+            ),
+
+            si(
+                ds.QueuePointer(
+                    config, 
+                    QueueType.STORE, 
+                    QueuePointerType.TAIL,
+                    d.INPUT
+                ), 
+                c.INPUT
+            ),
+
+            si(
+                ds.QueuePointer(
+                    config, 
+                    QueueType.STORE, 
+                    QueuePointerType.HEAD,
+                    d.INPUT
+                ), 
+                c.INPUT
+            ),
+            
+            si(
+                ds.QueueIsEmpty(
+                    QueueType.STORE,
+                    d.INPUT
+                ), 
+                c.INPUT
+            ),
+
+
+
+            si(
+                ds.GroupInitTransfer(
+                    config, 
+                    d.OUTPUT
+                ), 
+                c.LOCAL
             )
+        ]
 
-            This generates, inside 'config_0_core.vhd' and under the 'architecture config_0_core', the following instantiation
 
-            architecture arch of config_0_core is
-                signal ...
-            begin
-                ...
-                config_0_core_ga : entity work.config_0_core_ga
-                    port map(
-                        rst => rst,
-                        clk => clk,
-                        group_init_valid_0_i => group_init_valid_0_i,
-                        group_init_ready_0_o => group_init_ready_0_o,
-                        ldq_tail_i => ldq_tail_q,
-                        ldq_head_i => ldq_head_q,
-                        ldq_empty_i => ldq_empty,
-                        stq_tail_i => stq_tail_q,
-                        stq_head_i => stq_head_q,
-                        stq_empty_i => stq_empty,
-                        ldq_wen_0_o => ldq_wen_0,
-                        ldq_wen_1_o => ldq_wen_1,
-                        num_loads_o => num_loads,
-                        ldq_port_idx_0_o => ldq_port_idx_0_d,
-                        ldq_port_idx_1_o => ldq_port_idx_1_d,
-                        stq_wen_0_o => stq_wen_0,
-                        stq_wen_1_o => stq_wen_1,
-                        stq_port_idx_0_o => stq_port_idx_0_d,
-                        stq_port_idx_1_o => stq_port_idx_1_d,
-                        ga_ls_order_0_o => ga_ls_order_0,
-                        ga_ls_order_1_o => ga_ls_order_1,
-                        num_stores_o => num_stores
-                    );
-                ...
-            end architecture;
-        """
+        Instantiation.__init__(
+            self,
+            unit_name=GROUP_HANDSHAKING_NAME,
+            parent=parent,
+            port_items=port_items,
+            comment=f"""
+  -- Generate the group init ready and group init transfer signals,
+  -- used to allocated into the load queue and store queue.
+""".strip()
+        )
 
-        arch = ctx.get_current_indent(
-        ) + f'{self.module_name} : entity work.{self.module_name}\n'
-        ctx.tabLevel += 1
-        arch += ctx.get_current_indent() + f'port map(\n'
-        ctx.tabLevel += 1
 
-        arch += ctx.get_current_indent() + f'rst => rst,\n'
-        arch += ctx.get_current_indent() + f'clk => clk,\n'
+class PortIdxPerEntryInst(Instantiation):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
 
-        for i in range(0, self.configs.num_groups()):
-            arch += ctx.get_current_indent() + \
-                f'group_init_valid_{i}_i => {group_init_valid_i.getNameRead(i)},\n'
-        for i in range(0, self.configs.num_groups()):
-            arch += ctx.get_current_indent() + \
-                f'group_init_ready_{i}_o => {group_init_ready_o.getNameWrite(i)},\n'
+        c = InstCxnType
+        d = Signal.Direction
 
-        arch += ctx.get_current_indent() + \
-            f'ldq_tail_i => {ldq_tail_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'ldq_head_i => {ldq_head_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'ldq_empty_i => {ldq_empty_i.getNameRead()},\n'
+        si = SimpleInstantiation
+        port_items = [
+            si(
+                ds.GroupInitTransfer(
+                    config, 
+                    d.INPUT
+                ), 
+                c.LOCAL
+            ),
 
-        arch += ctx.get_current_indent() + \
-            f'stq_tail_i => {stq_tail_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'stq_head_i => {stq_head_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'stq_empty_i => {stq_empty_i.getNameRead()},\n'
+            si(
+                ds.QueuePointer(
+                config, 
+                queue_type, 
+                QueuePointerType.TAIL,
+                d.INPUT
+                ),
+                c.INPUT
+            ),
 
-        for i in range(0, self.configs.numLdqEntries):
-            arch += ctx.get_current_indent() + \
-                f'ldq_wen_{i}_o => {ldq_wen_o.getNameWrite(i)},\n'
-        arch += ctx.get_current_indent() + \
-            f'num_loads_o => {num_loads_o.getNameWrite()},\n'
-        if (self.configs.ldpAddrW > 0):
-            for i in range(0, self.configs.numLdqEntries):
-                arch += ctx.get_current_indent() + \
-                    f'ldq_port_idx_{i}_o => {ldq_port_idx_o.getNameWrite(i)},\n'
+            si(ds.PortIdxPerEntry(
+                config, 
+                queue_type,
+                d.OUTPUT
+                ),
+                c.OUTPUT
+            )
+        ]
 
-        for i in range(0, self.configs.numStqEntries):
-            arch += ctx.get_current_indent() + \
-                f'stq_wen_{i}_o => {stq_wen_o.getNameWrite(i)},\n'
-        if (self.configs.stpAddrW > 0):
-            for i in range(0, self.configs.numStqEntries):
-                arch += ctx.get_current_indent() + \
-                    f'stq_port_idx_{i}_o => {stq_port_idx_o.getNameWrite(i)},\n'
+        Instantiation.__init__(
+            self,
+            unit_name=PORT_INDEX_PER_ENTRY_NAME(queue_type),
+            parent=parent,
+            port_items=port_items,
+            comment=f"""
+  -- Generate the {queue_type.value} port index per {queue_type.value} queue entry
+  -- aligned with the {queue_type.value} queue.
+""".strip()
+        )
 
-        for i in range(0, self.configs.numLdqEntries):
-            arch += ctx.get_current_indent() + \
-                f'ga_ls_order_{i}_o => {ga_ls_order_o.getNameWrite(i)},\n'
+class NaiveStoreOrderPerEntryInst(Instantiation):
+    def __init__(self, config : Config, parent):
 
-        arch += ctx.get_current_indent() + \
-            f'num_stores_o => {num_stores_o.getNameWrite()}\n'
+        c = InstCxnType
+        d = Signal.Direction
 
-        ctx.tabLevel -= 1
-        arch += ctx.get_current_indent() + f');\n'
-        ctx.tabLevel -= 1
-        return arch
+        si = SimpleInstantiation
+        port_items = [
+            si(ds.GroupInitTransfer(
+                config, 
+                d.INPUT
+                ), 
+                c.LOCAL
+            ),
+
+            si(ds.QueuePointer(
+                config, 
+                QueueType.LOAD, 
+                QueuePointerType.TAIL,
+                d.INPUT
+                ),
+                c.INPUT
+            ),
+
+            si(ds.QueuePointer(
+                config, 
+                QueueType.STORE, 
+                QueuePointerType.TAIL,
+                d.INPUT
+                ),
+                c.INPUT
+            ),
+
+            si(ds.NaiveStoreOrderPerEntry(
+                config,
+                d.OUTPUT
+                ),
+                c.OUTPUT
+            )
+        ]
+
+        Instantiation.__init__(
+            self,
+            unit_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME,
+            parent=parent,
+            port_items=port_items,
+            comment=f"""
+  -- Generate the naive store order per load queue entry, aligned with the load queue.
+  -- Naive as it only contains information
+  -- about the order of stores in the group being allocated
+""".strip()
+        )
+
+class NumNewQueueEntriesInst(Instantiation):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
+
+        c = InstCxnType
+        d = Signal.Direction
+
+        si = SimpleInstantiation
+        port_items = [
+            si(
+                ds.GroupInitTransfer(
+                    config, 
+                    d.INPUT
+                ), 
+                c.LOCAL
+            ),
+
+            si(
+                ds.NumNewEntries(
+                    config, 
+                    queue_type,
+                    d.OUTPUT
+                ),
+                c.LOCAL
+            )
+        ]
+
+        Instantiation.__init__(
+            self,
+            unit_name=NUM_NEW_ENTRIES_NAME(queue_type),
+            parent=parent,
+            port_items=port_items,
+            comment=f"""
+  -- Generate the number of new {queue_type.value} entries to allocate into the {queue_type.value} queue
+  -- Mux of ROMs based on group init transfer signals
+""".strip()
+        )
+
+class WriteEnableInst(Instantiation):
+    def __init__(self, config : Config, queue_type : QueueType, parent):
+
+        c = InstCxnType
+        d = Signal.Direction
+
+        si = SimpleInstantiation
+
+        port_items = [
+            si(
+                ds.NumNewEntries(
+                    config, 
+                    queue_type, 
+                    d.INPUT
+                ), 
+                c.LOCAL
+            ),
+
+            si(
+                ds.QueuePointer(
+                    config, 
+                    queue_type, 
+                    QueuePointerType.TAIL,
+                    d.INPUT
+                ), 
+                c.INPUT
+                ),
+            si(
+                ds.QueueWriteEnable(
+                    config, 
+                    queue_type,
+                    d.OUTPUT
+                ),
+                c.OUTPUT
+            )
+        ]
+
+        Instantiation.__init__(
+            self,
+            unit_name=WRITE_ENABLE_NAME(queue_type),
+            parent=parent,
+            port_items=port_items,
+            comment=f"""
+  -- Generate write enable signals for the {queue_type.value} queue
+  -- Shifted so they are aligned with its entries.
+""".strip()
+        )
+
+class NumNewEntriesAssignment():
+    def get(self):
+        return f"""
+    -- the "number of new entries" signals are local, 
+    -- since they are used to generate the write enable signals
+
+    -- Here we drive the outputs with them
+    {NUM_NEW_ENTRIES_NAME(QueueType.LOAD)}_o <= {NUM_NEW_ENTRIES_NAME(QueueType.LOAD)};
+    {NUM_NEW_ENTRIES_NAME(QueueType.STORE)}_o <= {NUM_NEW_ENTRIES_NAME(QueueType.STORE)};
+
+""".removeprefix("\n")
+                    
