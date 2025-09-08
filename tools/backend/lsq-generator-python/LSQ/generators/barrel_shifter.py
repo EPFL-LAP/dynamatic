@@ -398,10 +398,10 @@ class BarrelShifterBody():
       -- Check bit {i} of {pointer.base_name}
       -- if '1', shift left by {(2**i)} 
       -- e.g. value at 0 in input goes to value at {2**i} in output
-      {shift_outs[i]}(i)({shift_index}) <= 
-        {shift_ins[i]}(i)({j}) when {pointer_name}({i}) = '1' 
+      {shift_outs[i]}({k})({shift_index}) <= 
+        {shift_ins[i]}({k})({j}) when {pointer_name}({i}) = '1' 
           else
-        {shift_ins[i]}(i)({shift_index});
+        {shift_ins[i]}({k})({shift_index});
 
 """.removeprefix("\n")
 
