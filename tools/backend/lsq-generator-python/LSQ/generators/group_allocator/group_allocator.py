@@ -16,100 +16,14 @@ from LSQ.generators.group_allocator.group_handshaking import GroupHandshaking
 from LSQ.generators.group_allocator.num_new_entries import NumNewEntries
 from LSQ.generators.group_allocator.naive_store_order_per_entry import get_naive_store_order_per_entry
 
+from LSQ.generators.group_allocator.write_enables import get_write_enables
+
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorBodyItems,
         PortIdxPerEntryBodyItems,
         PortIdxPerEntryLocalItems,
-        WriteEnableLocalItems,
-        WriteEnableBodyItems
     )
-
-class WriteEnableDecl(DeclarativeUnit):
-    def __init__(self, config : Config, queue_type : QueueType, parent):
-        self.top_level_comment = f"""
--- (Load/Store) Queue Write Enables Unit
--- Sub-unit of the Group Allocator.
---
--- Generates the write enable signals for the {queue_type.value} queue
--- based on the number of {queue_type.value} queue entries being allocated
--- and the tail pointers of the {queue_type.value} queue.
---
--- First, the number of write enable signals to set high is decided
--- based on the "number of new entries to the {queue_type.value} queue".
--- 
--- This "number of new entries to the {queue_type.value} queue" is also used
--- by the {queue_type.value} queue itself, to update its tail pointer.
---
--- Then the write enables are shifted into the correct place 
--- for the internal circular buffer,
--- based on the {queue_type.value} tail pointer.
-""".strip()
-
-        self.unit_name = WRITE_ENABLE_NAME(queue_type)
-        self.parent = parent
-
-
-
-        d = Signal.Direction
-        self.entity_port_items = [
-            RTLComment(
-                f"""
-
-    -- Input: Number of New Queue Entries to Allocate (N)
-    -- The first N write enables signals are set to high.
-"""
-            ),
-            ds.NumNewQueueEntries(
-                config, 
-                queue_type, 
-                d.INPUT
-            ),
-
-            RTLComment(
-                f"""
-    -- Input: {queue_type.value} queue pointer
-    -- Used to shift the write enables into the correct alignment
-
-"""
-            ),
-            ds.QueuePointer(
-                config, 
-                queue_type, 
-                QueuePointerType.TAIL,
-                d.INPUT
-            ),
-
-
-            RTLComment(
-                f"""
-
-    -- Output: Shifted write enable signals
-
-"""
-            ),
-            ds.QueueWriteEnable(
-                config, 
-                queue_type,
-                d.OUTPUT
-            )
-        ]
-
-
-
-
-        l = WriteEnableLocalItems()
-
-        self.local_items = [
-            l.WriteEnable(config, queue_type, shifted=False),
-            l.WriteEnable(config, queue_type, shifted=True)
-        ]
-
-        b = WriteEnableBodyItems()
-
-        self.body = [
-            b.Body(config, queue_type)
-        ]
 
 class PortIdxPerEntryDecl(DeclarativeUnit):
     def __init__(self, config : Config, queue_type : QueueType, parent):
@@ -509,8 +423,8 @@ class GroupAllocator:
         unit += self.print_dec(NumNewEntries(config, QueueType.LOAD, ga_decl.name()))
         unit += self.print_dec(NumNewEntries(config, QueueType.STORE, ga_decl.name()))
 
-        unit += self.print_dec(WriteEnableDecl(config, QueueType.LOAD, ga_decl.name()))
-        unit += self.print_dec(WriteEnableDecl(config, QueueType.STORE, ga_decl.name()))
+        unit += get_write_enables(config, QueueType.LOAD, ga_decl.name())
+        unit += get_write_enables(config, QueueType.STORE, ga_decl.name())
 
         if config.load_ports_num() > 1:
             unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, ga_decl.name()))

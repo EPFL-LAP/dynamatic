@@ -37,64 +37,6 @@ def get_naive_store_order_per_entry(config, parent):
 
     return barrel_shifters + unit
 
-def _get_barrel_shifters(config, declaration):
-
-    d = Signal.Direction
-
-    h_barrel_shift = get_barrel_shifter(
-        declaration.name(),
-        "barrel_shift_hoz",
-        ds.QueuePointer(
-                config, 
-                QueueType.STORE,
-                QueuePointerType.TAIL,
-                d.INPUT
-        ),
-        NaiveStoreOrderPerEntry(
-            config,
-            unshifted=True,
-            direction = d.INPUT
-        ),
-        NaiveStoreOrderPerEntry(
-            config,
-            shifted_stores=True,
-            direction = d.OUTPUT
-        ),
-        ShiftDirection.HORIZONTAL,
-                comment=f"""
--- Horizontal barrel shifter for the naive store order
--- Aligns store order with store queue
-""".strip()
-    )
-
-    v_barrel_shift = get_barrel_shifter(
-        declaration.name(),
-        "barrel_shift_vrt",
-        ds.QueuePointer(
-                config, 
-                QueueType.LOAD,
-                QueuePointerType.TAIL,
-                d.INPUT
-        ),
-        NaiveStoreOrderPerEntry(
-            config,
-            shifted_stores=True,
-            direction = d.INPUT
-        ),
-        NaiveStoreOrderPerEntry(
-            config,
-            shifted_both=True,
-            direction = d.OUTPUT
-        ),
-        ShiftDirection.VERTICAL,
-        comment=f"""
--- Vertical barrel shifter for the naive store order
--- Aligns store order with load queue
-""".strip()
-    )
-
-    return h_barrel_shift + v_barrel_shift
-
 class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
     def __init__(self, config: Config, parent, trivial):
         self.top_level_comment = f"""
@@ -305,7 +247,13 @@ class Muxes():
 
 """.removeprefix("\n")
 
+        # if the max number of loads in any basic block is N
+        # and the number of load queue entries is N
+        # only loads up to N are printed in this for loop
+        # so first we find N
+        # (N + 1) to M are handled in the generate statement below
         max_num_loads_in_one_group = max(to_mux.keys()) + 1
+
         for i in range(max_num_loads_in_one_group):
             # unshifted store order variable
             assign_to = f"{unshifted}({i})"
@@ -319,13 +267,14 @@ class Muxes():
             # or an empty list
             mux_inputs = to_mux.get(i, [])
 
-            # No mux at all, since no non-zero store orders
+            # No mux, since no non-zero store orders
             if len(mux_inputs) == 0:
                 self.item += f"""
   -- No group has a non-zero store order for load {i}
   {assign_to} <= (others => '0');
 """.removeprefix("\n")
-            # No mux at all, since there is only 1 non-zero store order
+                
+            # No mux, since there is only 1 non-zero store order
             elif len(mux_inputs) == 1:
                 group, index = mux_inputs[0]
                 self.item += f"""
@@ -334,7 +283,6 @@ class Muxes():
 """.removeprefix("\n")
                 
             # Here we build an actual mux
-
             else:
                 one_hots = ""
                 # for every input except the last input
@@ -363,7 +311,7 @@ class Muxes():
 
 """.removeprefix("\n")
                     
-        queue_entries =config.queue_num_entries(QueueType.LOAD)
+        queue_entries = config.queue_num_entries(QueueType.LOAD)
         self.item += f"""
   remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1 generate
     -- No group has a non-zero store order for load i
@@ -574,3 +522,60 @@ class VerticalBarrelShiftInstantiation(Instantiation):
         )
 
 
+def _get_barrel_shifters(config, declaration):
+
+    d = Signal.Direction
+
+    h_barrel_shift = get_barrel_shifter(
+        declaration.name(),
+        "barrel_shift_hoz",
+        ds.QueuePointer(
+                config, 
+                QueueType.STORE,
+                QueuePointerType.TAIL,
+                d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            unshifted=True,
+            direction = d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_stores=True,
+            direction = d.OUTPUT
+        ),
+        ShiftDirection.HORIZONTAL,
+                comment=f"""
+-- Horizontal barrel shifter for the naive store order
+-- Aligns store order with store queue
+""".strip()
+    )
+
+    v_barrel_shift = get_barrel_shifter(
+        declaration.name(),
+        "barrel_shift_vrt",
+        ds.QueuePointer(
+                config, 
+                QueueType.LOAD,
+                QueuePointerType.TAIL,
+                d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_stores=True,
+            direction = d.INPUT
+        ),
+        NaiveStoreOrderPerEntry(
+            config,
+            shifted_both=True,
+            direction = d.OUTPUT
+        ),
+        ShiftDirection.VERTICAL,
+        comment=f"""
+-- Vertical barrel shifter for the naive store order
+-- Aligns store order with load queue
+""".strip()
+    )
+
+    return h_barrel_shift + v_barrel_shift

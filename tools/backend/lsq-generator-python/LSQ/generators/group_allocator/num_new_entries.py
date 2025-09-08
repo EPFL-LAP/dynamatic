@@ -124,8 +124,8 @@ class NumNewEntriesBody():
                 # assignment and last input to the or
                 # as well as the ending semi colon
                 self.item += f"""
-    -- Since the inputs are masked by one-hot valid signals
-    -- The output is simply an OR of the inputs
+  -- Since the inputs are masked by one-hot valid signals
+  -- The output is simply an OR of the inputs
   {num_new_entries}_o <= 
     {one_hot_ors}
     {f"{num_new_entries_masked}_{mask_id - 1}"};
