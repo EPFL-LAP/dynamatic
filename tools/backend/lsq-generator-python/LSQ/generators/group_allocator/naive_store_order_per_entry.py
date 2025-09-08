@@ -184,7 +184,8 @@ class Trivial():
             # pad for <= alignment
             if i < 10:
                 name += " "
-                self.item += f"""
+                
+            self.item += f"""
   {name} <= {zeros};
 """.removeprefix("\n")
                 
