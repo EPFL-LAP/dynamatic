@@ -493,7 +493,13 @@ class HorizontalBarrelShiftInstantiation(Instantiation):
             self,
             "barrel_shift_hoz",
             parent,
-            port_items
+            port_items,
+            comment=f"""
+    -- Shift the bits inside of each store order
+    -- Based on the store queue tail pointer
+    -- So that bit 0 move to bit (tail pointer)
+    -- Making the order aligned with the store queue
+""".lstrip()
         )
 
 
@@ -549,7 +555,13 @@ class VerticalBarrelShiftInstantiation(Instantiation):
             self,
             "barrel_shift_vrt",
             parent,
-            port_items
+            port_items,
+           comment=f"""
+    -- Shift the array items of the store order
+    -- Based on the load queue tail pointer
+    -- So that array item 0 moves to array item (tail pointer)
+    -- Making the order aligned with the load queue
+""".lstrip()
         )
 
 
