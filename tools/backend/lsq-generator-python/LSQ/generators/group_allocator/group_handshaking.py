@@ -307,7 +307,7 @@ class GroupHandshakingBody():
             for i in range(config.num_groups()):
                 init_ready = f"{GROUP_INIT_CHANNEL_NAME}_ready_{i}"
                 init_valid = f"{GROUP_INIT_CHANNEL_NAME}_valid_{i}_i"
-                init_transfer = f"{GROUP_INIT_TRANSFER_NAME}_o({i})"
+                init_transfer = f"{GROUP_INIT_TRANSFER_NAME}_{i}_o"
 
                 # ready output driven by local
                 # transfer output driven by (valid and ready)
