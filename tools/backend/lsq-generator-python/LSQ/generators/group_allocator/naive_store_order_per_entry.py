@@ -361,6 +361,7 @@ class Muxes():
     -- No group has a non-zero store order for load i
     {unshifted}(i) <= (others => '0');
   end generate
+  
 """.removeprefix("\n")
 
     def get(self):
