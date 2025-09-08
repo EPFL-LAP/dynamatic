@@ -321,13 +321,13 @@ class GroupInitTransfer(Signal):
     the Port Index per Queue Entry Unit
     and the Naive Store Order per Load Queue Entry Unit,
     
-    Bitwidth = 1
+    Bitwidth = N
 
-    Number = N
+    Number = 1
 
     Whether a particular group init channel transfers this cycle.
         
-    1-bit signal, 1 signal per group of memory accesses
+    N-bit signal, 1 bit per group of memory accesses
     """
 
     def __init__(self, 
@@ -340,9 +340,9 @@ class GroupInitTransfer(Signal):
             base_name=GROUP_INIT_TRANSFER_NAME,
             direction=direction,
             size=Signal.Size(
-                bitwidth=1,
-                number=config.num_groups()
+                bitwidth=config.num_groups(),
+                number=1
             ),
-            always_number=True
+            always_vector=True
         )
         

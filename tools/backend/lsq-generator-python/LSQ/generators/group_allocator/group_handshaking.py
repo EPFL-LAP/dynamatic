@@ -12,13 +12,13 @@ import LSQ.declarative_signals as ds
 from LSQ.utils import bin_string
 
  
-def get_group_handshaking(config, parent):
-    declaration = GroupHandshakingDecl(config, parent)
+def get_group_handshaking(config, parent_name):
+    declaration = GroupHandshakingDecl(config, parent_name)
 
     return Entity(declaration).get() + Architecture(declaration).get()
 
 class GroupHandshakingDecl(DeclarativeUnit):
-    def __init__(self, config : Config, parent):
+    def __init__(self, config : Config, parent_name):
         self.top_level_comment = f"""
 -- Group Initiation Handshaking Unit
 -- Sub-unit of the Group Allocator.
@@ -36,9 +36,10 @@ class GroupHandshakingDecl(DeclarativeUnit):
 -- The transfer signal is the "and" of the ready and valid signals.
 """.strip()
             
-        self.unit_name = GROUP_HANDSHAKING_NAME
-        self.parent = parent
-
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=GROUP_HANDSHAKING_NAME
+        )
 
         d = Signal.Direction
 

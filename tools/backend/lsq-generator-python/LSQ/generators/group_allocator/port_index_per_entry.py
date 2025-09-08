@@ -12,9 +12,9 @@ from collections import defaultdict
 
 from LSQ.generators.barrel_shifter import get_barrel_shifter, ShiftDirection
 
-def get_port_index_per_entry(config, queue_type : QueueType, parent):
+def get_port_index_per_entry(config, queue_type : QueueType, parent_name):
     
-    declaration = PortIndexPerEntryDecl(config, parent, queue_type)
+    declaration = PortIndexPerEntryDecl(config, parent_name, queue_type)
     unit = Entity(declaration).get() + Architecture(declaration).get()
 
     barrel_shifter = _get_barrel_shifter(config, declaration, queue_type)
@@ -22,7 +22,7 @@ def get_port_index_per_entry(config, queue_type : QueueType, parent):
     return barrel_shifter + unit
 
 class PortIndexPerEntryDecl(DeclarativeUnit):
-    def __init__(self, config: Config, parent, queue_type : QueueType):
+    def __init__(self, config: Config, parent_name, queue_type : QueueType):
         self.top_level_comment = f"""
 -- {queue_type.value.capitalize()} Port Index per {queue_type.value.capitalize()} Queue Entry
 -- Sub-unit of the Group Allocator.
@@ -39,10 +39,10 @@ class PortIndexPerEntryDecl(DeclarativeUnit):
 -- based on the {queue_type.value} tail pointer.
 """.strip()
 
-       
-        self.unit_name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-        self.parent = parent
-
+        self.initialize_name(
+            parent_name=parent_name, 
+            unit_name=PORT_INDEX_PER_ENTRY_NAME(queue_type)
+            )
 
         d = Signal.Direction
     
@@ -109,7 +109,7 @@ class Muxes():
 
 
             # transfer name is constant per group
-            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
+            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_i({i})"
 
             # assignment name is constant per group
             assign_to = MASKED_PORT_INDEX_PER_ENTRY_NAME(i, queue_type)

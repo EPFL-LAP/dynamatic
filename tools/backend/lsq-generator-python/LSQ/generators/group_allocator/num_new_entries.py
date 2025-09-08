@@ -7,13 +7,13 @@ from LSQ.entity import Signal, DeclarativeUnit, Entity, Architecture
 
 import LSQ.declarative_signals as ds
 
-def get_num_new_entries(config, queue_type : QueueType, parent):
-    declaration = NumNewEntriesDecl(config, queue_type, parent)
+def get_num_new_entries(config, queue_type : QueueType, parent_name):
+    declaration = NumNewEntriesDecl(config, queue_type, parent_name)
 
     return Entity(declaration).get() + Architecture(declaration).get()
 
 class NumNewEntriesDecl(DeclarativeUnit):
-    def __init__(self, config : Config, queue_type : QueueType, parent):
+    def __init__(self, config : Config, queue_type : QueueType, parent_name):
         self.top_level_comment = f"""
 -- Number of New Entries in the {queue_type.value.capitalize()} Queue Unit
 -- Sub-unit of the Group Allocator.
@@ -27,8 +27,10 @@ class NumNewEntriesDecl(DeclarativeUnit):
 -- for the {queue_type.value} queue.
 """.strip()
 
-        self.unit_name = NUM_NEW_ENTRIES_NAME(queue_type)
-        self.parent = parent
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=NUM_NEW_ENTRIES_NAME(queue_type)
+        )
 
 
         d = Signal.Direction
@@ -97,7 +99,7 @@ class NumNewEntriesBody():
 
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
-  {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
+  {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_i({i}) else {zeros_binary};
 
 """.removeprefix("\n")
                     mask_id = mask_id + 1

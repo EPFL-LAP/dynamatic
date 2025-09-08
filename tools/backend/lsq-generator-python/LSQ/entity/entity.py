@@ -14,8 +14,21 @@ class DeclarativeUnit():
    self.top_level_comment is placed above the entity declaration
    """
    
+   def initialize_name(self, parent_name, unit_name):
+      """
+      RTL entities must have unique names. 
+      The top-level generation call will pass a unique name
+      e.g. LSQ_0. 
+
+      All other units build their names by appending their unit name
+      to their parent's name
+      """
+      self.parent_name = parent_name
+      self.unit_name = unit_name
+
+
    def name(self):
-      return f"{self.parent}_{self.unit_name}"
+      return f"{self.parent_name}_{self.unit_name}"
 
 class Entity():
   def __init__(self):

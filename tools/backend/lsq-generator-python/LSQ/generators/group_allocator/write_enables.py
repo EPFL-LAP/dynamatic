@@ -10,8 +10,8 @@ from collections import defaultdict
 
 from LSQ.generators.barrel_shifter import get_barrel_shifter_1D, ShiftDirection
 
-def get_write_enables(config, queue_type : QueueType, parent):
-    declaration = WriteEnablesDecl(config, parent, queue_type)
+def get_write_enables(config, queue_type : QueueType, parent_name):
+    declaration = WriteEnablesDecl(config, parent_name, queue_type)
     unit = Entity(declaration).get() + Architecture(declaration).get()
 
     barrel_shifters = _get_barrel_shifter(config, declaration, queue_type)
@@ -21,7 +21,7 @@ def get_write_enables(config, queue_type : QueueType, parent):
 
 
 class WriteEnablesDecl(DeclarativeUnit):
-    def __init__(self, config: Config, parent, queue_type : QueueType):
+    def __init__(self, config: Config, parent_name, queue_type : QueueType):
         self.top_level_comment = f"""
 -- {queue_type.value.capitalize()} Queue Write Enables Unit
 -- Sub-unit of the Group Allocator.
@@ -41,8 +41,11 @@ class WriteEnablesDecl(DeclarativeUnit):
 -- based on the {queue_type.value} tail pointer.
 """.strip()
         
-        self.unit_name = WRITE_ENABLE_NAME(queue_type)
-        self.parent = parent
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=WRITE_ENABLE_NAME(queue_type)
+        )
+
 
         d = Signal.Direction
         self.entity_port_items = [

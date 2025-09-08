@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from LSQ.generators.barrel_shifter import get_barrel_shifter, ShiftDirection
 
-def get_naive_store_order_per_entry(config, parent):
+def get_naive_store_order_per_entry(config, parent_name):
     
     # if a store never precedes a load inside of a BB
     # the naive store orders are all zeros
@@ -25,7 +25,7 @@ def get_naive_store_order_per_entry(config, parent):
             if order > 0:
                 trivial = False
 
-    declaration = NaiveStoreOrderPerEntryDecl(config, parent, trivial)
+    declaration = NaiveStoreOrderPerEntryDecl(config, parent_name, trivial)
     unit = Entity(declaration).get() + Architecture(declaration).get()
 
     # if orders are all zeros, there are no dependencies
@@ -38,7 +38,7 @@ def get_naive_store_order_per_entry(config, parent):
     return barrel_shifters + unit
 
 class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
-    def __init__(self, config: Config, parent, trivial):
+    def __init__(self, config: Config, parent_name, trivial):
         self.top_level_comment = f"""
 -- Naive Store Order Per Load Queue Entry Unit
 -- Sub-unit of the Group Allocator.
@@ -57,9 +57,10 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
 -- Information on already allocated stores is added to this later.
 """.strip()
 
-        self.unit_name = NAIVE_STORE_ORDER_PER_ENTRY_NAME
-
-        self.parent = parent
+        self.initialize_name(
+            parent_name=parent_name,
+            unit_name=NAIVE_STORE_ORDER_PER_ENTRY_NAME
+        )
 
 
         d = Signal.Direction
@@ -184,7 +185,7 @@ class Trivial():
             # pad for <= alignment
             if i < 10:
                 name += " "
-                
+
             self.item += f"""
   {name} <= {zeros};
 """.removeprefix("\n")
@@ -216,7 +217,7 @@ class Muxes():
         for i in range(config.num_groups()):
 
             # transfer name is constant per group
-            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
+            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_i({i})"
 
             # we only mask the non-zero store orders
             # so we need to remember where to write the masked signal to
