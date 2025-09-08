@@ -44,9 +44,9 @@ class Entity():
 
 ---------------------------------------------------------------
 
+library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-
 use work.types.all;
 
 {self.top_level_comment}
