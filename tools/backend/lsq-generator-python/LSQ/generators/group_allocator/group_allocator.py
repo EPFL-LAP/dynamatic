@@ -81,7 +81,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
         self.entity_port_items = self.get_port_items()
 
         # Specify local items
-        self.local_items = 
+        self.local_items = self.get_local_items()
 
 
         self.body = [
