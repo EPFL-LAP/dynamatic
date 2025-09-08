@@ -16,7 +16,7 @@ def codeGen(path_rtl, config : Config):
     # with open(f'{path_rtl}/{name}.vhd', 'a') as file:
     #     file.write(get_group_allocator(config, name))
 
-    ga = GroupAllocator(name, "ga", config)
+    ga = GroupAllocator(name, "_ga", config)
     ga.generate(path_rtl)
 
     # Load Address Port Dispatcher
