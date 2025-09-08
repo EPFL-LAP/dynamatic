@@ -115,7 +115,7 @@ class WriteEnablesUnshifted():
     -- convert integer for loop iterator
     -- to constant unsighned value in each generated assignment
     constant i : 
-      unsigned({bitwidth} - 1 downto 0) := to_unsigned(i, {bitwidth});
+      unsigned({bitwidth} - 1 downto 0) := to_unsigned(i_int, {bitwidth});
 
   begin
 
