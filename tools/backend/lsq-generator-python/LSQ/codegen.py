@@ -1,5 +1,5 @@
 from LSQ.context import VHDLContext
-from LSQ.generators.group_allocator.group_allocator import get_group_allocator
+from LSQ.generators.group_allocator.group_allocator import get_group_allocator, GroupAllocator
 import LSQ.generators.dispatchers as dispatchers
 import LSQ.generators.core as core
 
@@ -13,8 +13,11 @@ def codeGen(path_rtl, config : Config):
 
     name = config.name + '_core'
 
-    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
-        file.write(get_group_allocator(config, name))
+    # with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+    #     file.write(get_group_allocator(config, name))
+
+    ga = GroupAllocator(name, "ga", config)
+    ga.generate(path_rtl)
 
     # Load Address Port Dispatcher
     ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(

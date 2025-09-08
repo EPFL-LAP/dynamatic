@@ -208,7 +208,7 @@ class Muxes():
         queue_entries = config.queue_num_entries(queue_type)
         self.item += f"""
   -- No group has more than {max_num_in_one_group} {queue_type.value}(s)
-  -- So we use a generate to set the port index
+  -- So we use a generate to set the port index for
   -- {queue_type.value} queue entry {max_num_in_one_group} to {queue_type.value} queue entry {queue_entries - 1} 
   -- to zero
   remaining_entries : for i in {max_num_in_one_group} to {queue_entries} - 1 generate
