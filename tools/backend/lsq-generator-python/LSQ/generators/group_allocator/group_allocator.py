@@ -271,9 +271,9 @@ class GroupAllocator:
                        )
 
         # Shift the arrays
-        if (self.configs.ldpAddrW > 0):
-            arch += CyclicLeftShift(ctx, ldq_port_idx_o,
-                                    ldq_port_idx_rom, ldq_tail_i)
+        # if (self.configs.ldpAddrW > 0):
+        #     arch += CyclicLeftShift(ctx, ldq_port_idx_o,
+        #                             ldq_port_idx_rom, ldq_tail_i)
         if (self.configs.stpAddrW > 0):
             arch += CyclicLeftShift(ctx, stq_port_idx_o,
                                     stq_port_idx_rom, stq_tail_i)
