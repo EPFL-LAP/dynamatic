@@ -126,7 +126,7 @@ class Muxes():
 
                 self.item += f"""
   -- Load {j} of group {i} has port index {port_index_int}
-  {assign_to} <= {port_index} when {transfer_name} else {zero_bin};
+  {assign_to}({j}) <= {port_index} when {transfer_name} else {zero_bin};
 
 """.removeprefix("\n")
 
