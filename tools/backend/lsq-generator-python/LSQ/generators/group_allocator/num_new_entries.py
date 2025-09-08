@@ -11,7 +11,7 @@ import LSQ.declarative_signals as ds
 class NumNewEntries(DeclarativeUnit):
     def __init__(self, config : Config, queue_type : QueueType, parent):
         self.top_level_comment = f"""
--- Number of New Entries in the (Load/Store) Queue Unit
+-- Number of New Entries in the {queue_type.value.capitalize()} Queue Unit
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the number of newly allocated {queue_type.value} queue entries.

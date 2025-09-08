@@ -23,7 +23,7 @@ def get_write_enables(config, queue_type : QueueType, parent):
 class WriteEnablesDecl(DeclarativeUnit):
     def __init__(self, config: Config, parent, queue_type : QueueType):
         self.top_level_comment = f"""
--- (Load/Store) Queue Write Enables Unit
+-- {queue_type.value.capitalize()s} Queue Write Enables Unit
 -- Sub-unit of the Group Allocator.
 --
 -- Generates the write enable signals for the {queue_type.value} queue
