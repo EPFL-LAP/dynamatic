@@ -149,7 +149,7 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
                        
   -- Output:
   -- Naive store orders, indicating which stores preced which loads
-  -- but only for the loads and store being allocated
+  -- but only for the loads and store in the group being allocated
                        
 """.removeprefix("\n")),
             ds.NaiveStoreOrderPerEntry(
@@ -333,7 +333,7 @@ class Muxes():
                 # add a store order plus an OR
                 for group, index in mux_inputs[:-1]:
                     one_hots += f"""
-  group_{group}_masked_naive_store_order({index})
+    group_{group}_masked_naive_store_order({index})
       or
 """.removeprefix("\n")
                 one_hots = one_hots.strip()
@@ -341,7 +341,7 @@ class Muxes():
                 # add the last assignment plus a semi colon
                 final_group, final_index = mux_inputs[-1]
                 final_assignment = f"""
-  group_{final_group}_masked_naive_store_order({final_index});
+    group_{final_group}_masked_naive_store_order({final_index});
 """.strip()
 
                 # combine store orders, the ORs,
@@ -350,8 +350,8 @@ class Muxes():
   -- More than one group has a non-zero store order for load {i}
   -- We mux them using OR, as they have been one-hot-masked
   {assign_to} <= 
-  {one_hots}
-  {final_assignment}
+    {one_hots}
+    {final_assignment}
 
 """.removeprefix("\n")
                     
