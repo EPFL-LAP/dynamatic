@@ -165,6 +165,7 @@ class Muxes():
                 self.item += f"""
 -- Only group {group} has a {queue_type.value} {i}
 {assign_to} <= {masked}({i});
+
 """.removeprefix("\n")
                 
             # Here we build an actual mux
