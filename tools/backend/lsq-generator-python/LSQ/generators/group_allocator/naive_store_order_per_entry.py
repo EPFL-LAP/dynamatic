@@ -151,7 +151,7 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
   -- Naive store orders, indicating which stores preced which loads
   -- but only for the loads and store being allocated
                        
-""".remove_prefix("\n")),
+""".removeprefix("\n")),
             ds.NaiveStoreOrderPerEntry(
                 config,
                 d.OUTPUT
@@ -163,12 +163,12 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
 
   -- Masked store orders, unmuxed and unshifted
   -- used as input to muxes controlled by group init transfers                       
-""".remove_prefix("\n")),
+""".removeprefix("\n")),
             MaskedStoreOrder(config),
                         RTLComment(f"""
 
   -- Outputs of the muxes: unshifted store orders                  
-""".remove_prefix("\n")),
+""".removeprefix("\n")),
             NaiveStoreOrderPerEntry(
                 config, 
                 shifted_both=True
@@ -177,7 +177,7 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
 
   -- Outputs of the first barrel shifter
   -- The bits themselves now align with the store queue           
-""".remove_prefix("\n")),
+""".removeprefix("\n")),
             NaiveStoreOrderPerEntry(
                 config, 
                 shifted_stores=True
@@ -186,7 +186,7 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
 
   -- Outputs of the second barrel shifter
   -- The array items now align with the load queue        
-""".remove_prefix("\n")),
+""".removeprefix("\n")),
             NaiveStoreOrderPerEntry(
                 config, 
                 unshifted=True
