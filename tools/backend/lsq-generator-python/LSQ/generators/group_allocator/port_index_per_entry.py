@@ -163,8 +163,8 @@ class Muxes():
 
                 masked = MASKED_PORT_INDEX_PER_ENTRY_NAME(group, queue_type)
                 self.item += f"""
--- Only group {group} has a {queue_type.value} {i}
-{assign_to} <= {masked}({i});
+  -- Only group {group} has a {queue_type.value} {i}
+  {assign_to} <= {masked}({i});
 
 """.removeprefix("\n")
                 

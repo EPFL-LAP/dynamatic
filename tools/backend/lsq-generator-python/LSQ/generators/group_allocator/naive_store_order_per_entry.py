@@ -281,8 +281,9 @@ class Muxes():
             elif len(mux_inputs) == 1:
                 group, index = mux_inputs[0]
                 self.item += f"""
--- Only group {group} has a non-zero store order for load {i}
-{assign_to} <= group_{group}_masked_naive_store_order({index});
+  -- Only group {group} has a non-zero store order for load {i}
+  {assign_to} <= group_{group}_masked_naive_store_order({index});
+
 """.removeprefix("\n")
                 
             # Here we build an actual mux

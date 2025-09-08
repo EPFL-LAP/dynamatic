@@ -295,7 +295,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
   -- One-hot group allocation signals
   -- Used as inputs to muxes, 
   -- to set the rest of the values to allocate
-  -- 1 bit per group, as there are {config.num}
+  -- 1 bit per group, and there are {config.num_groups()} groups
 """.removeprefix("\n")),
             ds.GroupInitTransfer(config.num_groups()),
 
