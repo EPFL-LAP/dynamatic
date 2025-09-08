@@ -105,7 +105,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
             NumNewEntriesAssignment()
         ]
 
-    def get_port_items(self, config):
+    def get_port_items(self, config : Config):
         LOAD_QUEUE = QueueType.LOAD
         STORE_QUEUE = QueueType.STORE
 
@@ -289,14 +289,15 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
                 )
         ]
 
-    def get_local_items(self, config):
+    def get_local_items(self, config : Config):
         return [
             RTLComment(f"""
   -- One-hot group allocation signals
   -- Used as inputs to muxes, 
   -- to set the rest of the values to allocate
+  -- 1 bit per group, as there are {config.num}
 """.removeprefix("\n")),
-            ds.GroupInitTransfer(config),
+            ds.GroupInitTransfer(config.num_groups()),
 
             RTLComment(f"""
                        
