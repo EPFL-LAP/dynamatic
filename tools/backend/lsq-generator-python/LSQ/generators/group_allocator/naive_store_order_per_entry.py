@@ -316,8 +316,7 @@ class Muxes():
         self.item += f"""
   -- No group has a non-zero store order for a load past load {max_num_loads_in_one_group - 1} 
   -- So we use a generate to set 
-  -- load entry {max_num_loads_in_one_group} 
-  -- to load entry {queue_entries - 1} 
+  -- load entry {max_num_loads_in_one_group} to load entry {queue_entries - 1} 
   -- to zero
   remaining_entries : for i in {max_num_loads_in_one_group} to {queue_entries} - 1 generate
     -- No group has a non-zero store order for load i
