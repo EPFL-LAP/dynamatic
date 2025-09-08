@@ -340,9 +340,9 @@ class GroupInitTransfer(Signal):
             base_name=GROUP_INIT_TRANSFER_NAME,
             direction=direction,
             size=Signal.Size(
-                bitwidth=config.num_groups(),
-                number=1
+                bitwidth=1,
+                number=config.num_groups()
             ),
-            always_vector=True
+            always_number=True
         )
         

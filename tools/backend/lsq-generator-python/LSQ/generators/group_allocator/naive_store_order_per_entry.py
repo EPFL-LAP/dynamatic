@@ -217,7 +217,7 @@ class Muxes():
         for i in range(config.num_groups()):
 
             # transfer name is constant per group
-            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_i({i})"
+            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
 
             # we only mask the non-zero store orders
             # so we need to remember where to write the masked signal to

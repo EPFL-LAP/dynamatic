@@ -109,7 +109,7 @@ class Muxes():
 
 
             # transfer name is constant per group
-            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_i({i})"
+            transfer_name = f"{GROUP_INIT_TRANSFER_NAME}_{i}_i"
 
             # assignment name is constant per group
             assign_to = MASKED_PORT_INDEX_PER_ENTRY_NAME(i, queue_type)

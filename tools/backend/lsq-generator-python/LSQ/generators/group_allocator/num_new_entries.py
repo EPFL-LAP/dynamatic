@@ -99,7 +99,7 @@ class NumNewEntriesBody():
 
                     self.item += f"""
   -- Group {i} has {new_entries} {queue_type.value}(s)
-  {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_i({i}) else {zeros_binary};
+  {num_new_entries_masked}_{mask_id} <= {new_entries_binary} when {GROUP_INIT_TRANSFER_NAME}_{i}_i else {zeros_binary};
 
 """.removeprefix("\n")
                     mask_id = mask_id + 1
