@@ -157,7 +157,8 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
             self.body = [
                 Muxes(config),
                 HorizontalBarrelShiftInstantiation(config, self.name()),
-                VerticalBarrelShiftInstantiation(config, self.name())
+                VerticalBarrelShiftInstantiation(config, self.name()),
+                OutputAssignments(config)
             ]
     
 
@@ -248,7 +249,7 @@ class Muxes():
 """.removeprefix("\n")
 
         # if the max number of loads in any basic block is N
-        # and the number of load queue entries is N
+        # and the number of load queue entries is M
         # only loads up to N are printed in this for loop
         # so first we find N
         # (N + 1) to M are handled in the generate statement below
@@ -320,6 +321,26 @@ class Muxes():
 
 """.removeprefix("\n")
 
+    def get(self):
+        return self.item
+    
+
+
+class OutputAssignments():
+    def __init__(self, config : Config):
+        self.item = ""
+        queue_type = QueueType.LOAD
+
+        for i in range(config.queue_num_entries(queue_type)):
+            assign_to = f"{NAIVE_STORE_ORDER_PER_ENTRY_NAME}_{i}_o"
+
+            if i < 10:
+                assign_to += " "
+
+            self.item += f"""
+  {assign_to} <= {NAIVE_STORE_ORDER_PER_ENTRY_NAME}({i});
+""".removeprefix("\n")
+            
     def get(self):
         return self.item
         

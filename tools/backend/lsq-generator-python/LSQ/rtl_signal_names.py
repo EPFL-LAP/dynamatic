@@ -137,6 +137,16 @@ def PORT_INDEX_PER_ENTRY_NAME(
         case QueueType.STORE:
             return f"stq_port_idx"
 
+def MASKED_PORT_INDEX_PER_ENTRY_NAME(
+        group_id,
+        queue_type : QueueType, 
+        ):
+    """
+    RTL name for index to a (load/store) port, per (load/store) queue entry,
+    masked by the group init transfer signal.
+    """
+
+    return f"group_{group_id}_masked_{PORT_INDEX_PER_ENTRY_NAME(queue_type)}"
 
 
 # NAIVE_STORE_ORDER_PER_ENTRY_NAME = "naive_store_order"

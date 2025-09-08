@@ -18,66 +18,12 @@ from LSQ.generators.group_allocator.naive_store_order_per_entry import get_naive
 
 from LSQ.generators.group_allocator.write_enables import get_write_enables
 
+from LSQ.generators.group_allocator.port_index_per_entry import get_port_index_per_entry
+
 from LSQ.generators.group_allocator.group_allocator_items import \
     (
         GroupAllocatorBodyItems,
-        PortIdxPerEntryBodyItems,
-        PortIdxPerEntryLocalItems,
     )
-
-class PortIdxPerEntryDecl(DeclarativeUnit):
-    def __init__(self, config : Config, queue_type : QueueType, parent):
-        self.top_level_comment = f"""
--- {queue_type.value} Port Index per {queue_type.value} Queue Entry
--- Sub-unit of the Group Allocator.
---
--- Generates the {queue_type.value} port index per {queue_type.value} entry.
---
--- Each {queue_type.value} queue entry must know which {queue_type.value} port
--- it exchanges data with.
---
--- First, the port indices are selected based on 
--- which group is currently being allocated.
---
--- Then they are shifted into the correct place for the internal circular buffer,
--- based on the {queue_type.value} tail pointer.
-""".strip()
-
-        self.unit_name = PORT_INDEX_PER_ENTRY_NAME(queue_type)
-        self.parent = parent
-
-
-        d = Signal.Direction
-    
-        self.entity_port_items = [
-            ds.GroupInitTransfer(
-                config, 
-                d.INPUT
-            ),
-            ds.QueuePointer(
-                config, 
-                queue_type, 
-                QueuePointerType.TAIL,
-                d.INPUT
-            ),
-            ds.PortIdxPerEntry(
-                config, 
-                queue_type,
-                d.OUTPUT
-            )
-        ]
-
-        l = PortIdxPerEntryLocalItems()
-
-        self.local_items = [
-            l.PortIdxPerQueueEntry(config, queue_type, shifted=False),
-            l.PortIdxPerQueueEntry(config, queue_type, shifted=True)
-        ]
-
-        b = PortIdxPerEntryBodyItems()
-        self.body = [
-            b.Body(config, queue_type)
-        ]
 
 class GroupAllocatorDeclarative(DeclarativeUnit):
     def __init__(self, config : Config, parent):
@@ -427,10 +373,10 @@ class GroupAllocator:
         unit += get_write_enables(config, QueueType.STORE, ga_decl.name())
 
         if config.load_ports_num() > 1:
-            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.LOAD, ga_decl.name()))
+            unit += get_port_index_per_entry(config, QueueType.LOAD, ga_decl.name())
 
         if config.store_ports_num() > 1:
-            unit += self.print_dec(PortIdxPerEntryDecl(config, QueueType.STORE, ga_decl.name()))
+            unit += get_port_index_per_entry(config, QueueType.STORE, ga_decl.name())
 
         unit += get_naive_store_order_per_entry(config, ga_decl.name())
 
