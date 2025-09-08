@@ -8,7 +8,7 @@ import LSQ.declarative_signals as ds
 
 from collections import defaultdict
 
-from LSQ.generators.barrel_shifter import get_barrel_shifter, ShiftDirection
+from LSQ.generators.barrel_shifter import get_barrel_shifter_1D, ShiftDirection
 
 def get_write_enables(config, queue_type : QueueType, parent):
     declaration = WriteEnablesDecl(config, parent, queue_type)
@@ -228,7 +228,7 @@ class BarrelShiftInstantiation(Instantiation):
             parent,
             port_items,
             comment=f"""
-  -- Shift the bits represent the write enables
+  -- Shift the bits representing the write enables
   -- Based on the {queue_type.value} queue tail pointer
   -- So that bit 0 move to bit (tail pointer)
   -- Making the order aligned with the {queue_type.value} queue
@@ -240,14 +240,14 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
     d = Signal.Direction
 
     
-    return get_barrel_shifter(
+    return get_barrel_shifter_1D(
         declaration.name(),
         "barrel_shift",
         ds.QueuePointer(
-                config, 
-                queue_type,
-                QueuePointerType.TAIL,
-                d.INPUT
+            config, 
+            queue_type,
+            QueuePointerType.TAIL,
+            d.INPUT
         ),
         WriteEnable(
             config,
@@ -261,9 +261,8 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
             shifted=True,
             direction = d.OUTPUT
         ),
-        ShiftDirection.HORIZONTAL,
         comment=f"""
--- Horizontal barrel shifter for the write enables
+-- Barrel shifter for the write enables
 -- Aligns write enable bits with {queue_type.value} queue
 """.strip()
     )
