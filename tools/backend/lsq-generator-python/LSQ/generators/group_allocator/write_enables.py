@@ -110,12 +110,11 @@ class WriteEnablesUnshifted():
         self.item = f"""
   unshifted_write_enables : for i_int in 0 to {config.queue_num_entries(queue_type)} - 1 generate
     -- convert integer for loop iterator
-    -- to constant value in each generated assignment
+    -- to constant unsighned value in each generated assignment
     constant i : 
-      std_logic_vector({bitwidth}) := 
-        std_logic_vector(to_unsigned(i, {bitwidth}));
+      unsigned({bitwidth} - 1 downto 0) := to_unsigned(i, {bitwidth}));
   begin
-    {unshf_wen}(i) <= '1' when i < {new_entries} else '0';
+    {unshf_wen}(i) <= '1' when i < unsigned({new_entries}_i) else '0';
   end generate:
 
 """.removeprefix("\n")
