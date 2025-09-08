@@ -312,7 +312,7 @@ class GroupHandshakingBody():
   -- drive the transfer output
   {init_transfer} <= {init_valid} and {init_ready};
 
-""".lstrip()
+""".removeprefix("\n")
                 
             return assignments.strip()
         
