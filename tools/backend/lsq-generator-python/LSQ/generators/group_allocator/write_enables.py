@@ -119,7 +119,7 @@ class WriteEnablesUnshifted():
 
   begin
 
-    {unshf_wen}(i) <= '1' when i < unsigned({new_entries}_i) else '0';
+    {unshf_wen}(i_int) <= '1' when i < unsigned({new_entries}_i) else '0';
 
   end generate;
 
