@@ -180,7 +180,7 @@ class BarrelShifter1DDecl(DeclarativeUnit):
 
         for i in range(1, pointer.size.bitwidth):
             self.local_items.append(
-                ShiftStageSignal(output, i)
+                ShiftStageSignal1D(output, i)
                 )
 
         self.body = [
@@ -215,15 +215,15 @@ class BarrelShifter1DBody():
         self.item += f"""
 
     -- Shift bits
-    shift_stage_{i + 1} : for j in 0 to {num_shifts} - 1 generate
+    shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
 
       -- Check bit {i} of {pointer.base_name}
       -- if '1', shift left by {(2**i)} 
       -- e.g. value at 0 in input goes to value at {2**i} in output
-      {shift_outs[i]}(i)((j + {2**i}) mod {num_shifts}) <= 
-        {shift_ins[i]}(i)(j) when {pointer_name}({i}) = '1' 
+      {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
+        {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
           else
-        {shift_ins[i]}(i)((j + {2**i}) mod {num_shifts});
+        {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
     end generate;
 
@@ -241,5 +241,18 @@ class ShiftStageSignal(Signal2D):
             always_number=to_shift.always_number,
             always_vector=to_shift.always_vector
         )
+
+
+class ShiftStageSignal1D(Signal):
+    def __init__(self, to_shift : Signal, stage):
+        Signal.__init__(
+            self,
+            base_name=f"stage_{stage}",
+            size=to_shift.size,
+            always_number=to_shift.always_number,
+            always_vector=to_shift.always_vector
+        )
+
+
 
 
