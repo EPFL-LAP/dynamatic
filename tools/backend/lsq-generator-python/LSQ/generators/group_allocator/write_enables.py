@@ -121,7 +121,7 @@ class WriteEnablesUnshifted():
 
     {unshf_wen}(i) <= '1' when i < unsigned({new_entries}_i) else '0';
 
-  end generate:
+  end generate;
 
 """.removeprefix("\n")
         
