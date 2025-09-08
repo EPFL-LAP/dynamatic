@@ -125,7 +125,7 @@ class Muxes():
                 port_index = bin_string(port_index_int, idx_bitwidth)
 
                 self.item += f"""
-  -- {queue_type.value.capitalize} {j} of group {i} has port index {port_index_int}
+  -- {queue_type.value.capitalize()} {j} of group {i} has port index {port_index_int}
   {assign_to}({j}) <= {port_index} when {transfer_name} else {zero_bin};
 
 """.removeprefix("\n")
