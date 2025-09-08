@@ -390,7 +390,7 @@ class WriteEnablesUnshifted():
         unshf_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
 
         for i in range(config.queue_num_entries(queue_type)):
-            self.item = f"""
+            self.item += f"""
   {unshf_wen}({i}) <= '1' when {bin_string(i, bitwidth)} < {new_entries}_i else '0';
 
 """.removeprefix("\n")
