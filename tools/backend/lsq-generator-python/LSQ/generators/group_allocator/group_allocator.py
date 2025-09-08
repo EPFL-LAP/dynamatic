@@ -241,9 +241,9 @@ class GroupAllocator:
         # if (self.configs.ldpAddrW > 0):
         #     arch += Mux1HROM(ctx, ldq_port_idx_rom,
         #                      self.configs.gaLdPortIdx, group_init_hs)
-        if (self.configs.stpAddrW > 0):
-            arch += Mux1HROM(ctx, stq_port_idx_rom,
-                             self.configs.gaStPortIdx, group_init_hs)
+        # if (self.configs.stpAddrW > 0):
+        #     arch += Mux1HROM(ctx, stq_port_idx_rom,
+        #                      self.configs.gaStPortIdx, group_init_hs)
         arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
                          group_init_hs, MaskLess)
         arch += Mux1HROM(ctx, num_loads,
@@ -274,9 +274,9 @@ class GroupAllocator:
         # if (self.configs.ldpAddrW > 0):
         #     arch += CyclicLeftShift(ctx, ldq_port_idx_o,
         #                             ldq_port_idx_rom, ldq_tail_i)
-        if (self.configs.stpAddrW > 0):
-            arch += CyclicLeftShift(ctx, stq_port_idx_o,
-                                    stq_port_idx_rom, stq_tail_i)
+        # if (self.configs.stpAddrW > 0):
+        #     arch += CyclicLeftShift(ctx, stq_port_idx_o,
+        #                             stq_port_idx_rom, stq_tail_i)
         arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
         for i in range(0, self.configs.numLdqEntries):
@@ -296,7 +296,10 @@ class GroupAllocator:
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
             file.write(get_group_handshaking(self.configs, self.module_name))
-            file.write(get_port_index_per_entry(self.configs, QueueType.LOAD, self.module_name))
+            if (self.configs.ldpAddrW > 0):
+                file.write(get_port_index_per_entry(self.configs, QueueType.LOAD, self.module_name))
+            if (self.configs.stpAddrW > 0):
+                file.write(get_port_index_per_entry(self.configs, QueueType.STORE, self.module_name))
 
 
             file.write('\n\n')
@@ -308,7 +311,11 @@ class GroupAllocator:
             file.write(ctx.signalInitString)
             file.write('begin\n')
             file.write(GroupHandshakingInst(self.configs, self.module_name).get())
-            file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name).get())
+            if (self.configs.ldpAddrW > 0):
+                file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name).get())
+            if (self.configs.stpAddrW > 0):
+                file.write(PortIdxPerEntryInst(self.configs, QueueType.STORE, self.module_name).get())
+
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
 
