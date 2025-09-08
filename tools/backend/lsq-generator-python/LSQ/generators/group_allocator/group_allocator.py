@@ -321,7 +321,7 @@ class GroupAllocator:
             file.write(NumNewQueueEntriesInst(self.configs, QueueType.LOAD, self.module_name).get())
             file.write(NumNewQueueEntriesInst(self.configs, QueueType.STORE, self.module_name).get())
 
-            file.write(WriteEnableInst(self.configs, QueueType.STORE, self.module_name).get())
+            file.write(WriteEnableInst(self.configs, QueueType.LOAD, self.module_name).get())
 
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
