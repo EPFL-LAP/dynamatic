@@ -32,6 +32,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRControlFlowDialect
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
