@@ -55,8 +55,8 @@ class BarrelShifterDecl(DeclarativeUnit):
 """.strip()
 
         self.top_level_comment = f"""
-  {comment}
-  {shift_comment}
+{comment}
+{shift_comment}
 """.strip()
 
         self.entity_port_items = [

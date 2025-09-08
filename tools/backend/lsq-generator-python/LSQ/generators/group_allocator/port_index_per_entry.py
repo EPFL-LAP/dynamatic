@@ -392,7 +392,7 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
         ),
         ShiftDirection.VERTICAL,
         comment=f"""
--- Vertical barrel shifter for the port index per entry
+-- Barrel shifter for the port index per entry
 -- Aligns port index with {queue_type.value} queue
 """.strip()
     )
