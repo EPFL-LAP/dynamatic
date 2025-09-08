@@ -108,13 +108,19 @@ class WriteEnablesUnshifted():
         unshf_wen = UNSHIFTED_WRITE_ENABLE_NAME(queue_type)
 
         self.item = f"""
+  -- For each write enable, if its index is less than the number of new entries
+  -- Set it to 1
   unshifted_write_enables : for i_int in 0 to {config.queue_num_entries(queue_type)} - 1 generate
+
     -- convert integer for loop iterator
     -- to constant unsighned value in each generated assignment
     constant i : 
-      unsigned({bitwidth} - 1 downto 0) := to_unsigned(i, {bitwidth}));
+      unsigned({bitwidth} - 1 downto 0) := to_unsigned(i, {bitwidth});
+
   begin
+
     {unshf_wen}(i) <= '1' when i < unsigned({new_entries}_i) else '0';
+
   end generate:
 
 """.removeprefix("\n")
