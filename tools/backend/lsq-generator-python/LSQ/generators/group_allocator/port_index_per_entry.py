@@ -6,7 +6,7 @@ from LSQ.rtl_signal_names import *
 from LSQ.entity import Signal, Signal2D, Instantiation, SimpleInstantiation, InstCxnType, DeclarativeUnit, Entity, Architecture, RTLComment
 import LSQ.declarative_signals as ds
 
-from LSQ.utils import one_hot, mask_until
+from LSQ.utils import bin_string
 
 from collections import defaultdict
 
@@ -88,6 +88,10 @@ class Muxes():
         self.item = ""
 
 
+        idx_bitwidth = config.ports_idx_bitwidth(queue_type)
+
+        zero_bin = bin_string(0, idx_bitwidth)
+
         # to_mux is a dictionary of lists
         # each key represents a queue entry
         # the list is the inputs to the mux for that entry
@@ -114,14 +118,15 @@ class Muxes():
             # we don't enumerate the ports themselves
             # since currently there is dummy zeros in them
             for j in range(number):
-                port_index = ports[j]
-
                 # store that group i has a load j
                 to_mux[j].append((i, j))
 
+                port_index_int = ports[j]
+                port_index = bin_string(port_index_int, idx_bitwidth)
+
                 self.item += f"""
-  -- Load {j} of group {i} has port index {port_index}
-  {assign_to} <= {port_index} when {transfer_name} else {0};
+  -- Load {j} of group {i} has port index {port_index_int}
+  {assign_to} <= {port_index} when {transfer_name} else {zero_bin};
 
 """.removeprefix("\n")
 
@@ -392,7 +397,7 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
         ),
         ShiftDirection.VERTICAL,
         comment=f"""
--- Barrel shifter for the port index per entry
+-- Barrel shifter for the port index per entry unit
 -- Aligns port index with {queue_type.value} queue
 """.strip()
     )
