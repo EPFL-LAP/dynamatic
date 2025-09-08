@@ -378,14 +378,16 @@ def _get_barrel_shifter(config, declaration, queue_type : QueueType):
                 QueuePointerType.TAIL,
                 d.INPUT
         ),
-        NaiveStoreOrderPerEntry(
+        PortIdxPerEntry(
             config,
-            shifted_stores=True,
+            queue_type,
+            shifted=False,
             direction = d.INPUT
         ),
-        NaiveStoreOrderPerEntry(
+        PortIdxPerEntry(
             config,
-            shifted_both=True,
+            queue_type,
+            shifted=True,
             direction = d.OUTPUT
         ),
         ShiftDirection.VERTICAL,
