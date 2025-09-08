@@ -263,12 +263,12 @@ class GroupAllocator:
         #                num_loads, '>', (i, self.configs.ldqAddrW),
         #                'else', '\'0\''
         #                )
-        for i in range(0, self.configs.numStqEntries):
-            arch += Op(ctx, stq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_stores, '>', (i, self.configs.stqAddrW),
-                       'else', '\'0\''
-                       )
+        # for i in range(0, self.configs.numStqEntries):
+        #     arch += Op(ctx, stq_wen_unshifted[i],
+        #                '\'1\'', 'when',
+        #                num_stores, '>', (i, self.configs.stqAddrW),
+        #                'else', '\'0\''
+        #                )
 
         # Shift the arrays
         # if (self.configs.ldpAddrW > 0):
@@ -278,7 +278,7 @@ class GroupAllocator:
         #     arch += CyclicLeftShift(ctx, stq_port_idx_o,
         #                             stq_port_idx_rom, stq_tail_i)
         # arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
-        arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
+        # arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
         for i in range(0, self.configs.numLdqEntries):
             arch += CyclicLeftShift(ctx,
                                     ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
@@ -304,6 +304,8 @@ class GroupAllocator:
             file.write(get_num_new_entries(self.configs, QueueType.STORE, self.module_name))
 
             file.write(get_write_enables(self.configs, QueueType.LOAD, self.module_name))
+            file.write(get_write_enables(self.configs, QueueType.STORE, self.module_name))
+
 
             file.write('\n\n')
             file.write(ctx.library)
@@ -322,6 +324,8 @@ class GroupAllocator:
             file.write(NumNewQueueEntriesInst(self.configs, QueueType.STORE, self.module_name).get())
 
             file.write(WriteEnableInst(self.configs, QueueType.LOAD, self.module_name).get())
+            file.write(WriteEnableInst(self.configs, QueueType.STORE, self.module_name).get())
+
 
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
