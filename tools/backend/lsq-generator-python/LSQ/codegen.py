@@ -1,5 +1,5 @@
 from LSQ.context import VHDLContext
-import LSQ.generators.group_allocator.group_allocator as group_allocator
+from LSQ.generators.group_allocator.group_allocator import get_group_allocator
 import LSQ.generators.dispatchers as dispatchers
 import LSQ.generators.core as core
 
@@ -7,49 +7,46 @@ import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 from LSQ.config import Config
 
-def codeGen(path_rtl, configs : Config):
+def codeGen(path_rtl, config : Config):
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()
 
-    name = configs.name + '_core'
+    name = config.name + '_core'
 
-    # Group Allocator
-    ga = group_allocator.GroupAllocator(
-        name=name, configs=configs)
-    ga.generate(path_rtl, configs)
-    lsq_submodules.group_allocator = ga
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+        file.write(get_group_allocator(config, name))
 
     # Load Address Port Dispatcher
     ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
-        name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW)
+        name, '_lda', config.numLdPorts, config.numLdqEntries, config.addrW, config.ldpAddrW)
     ptq_dispatcher_lda.generate(path_rtl)
     lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
 
     # Load Data Port Dispatcher
     qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
-        name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.payload_bitwidth, configs.ldpAddrW)
+        name, '_ldd', config.numLdPorts, config.numLdqEntries, config.payload_bitwidth, config.ldpAddrW)
     qtp_dispatcher_ldd.generate(path_rtl)
     lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
 
     # Store Address Port Dispatcher
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
-        name, '_sta', configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW)
+        name, '_sta', config.numStPorts, config.numStqEntries, config.addrW, config.stpAddrW)
     ptq_dispatcher_sta.generate(path_rtl)
     lsq_submodules.ptq_dispatcher_sta = ptq_dispatcher_sta
 
     # Store Data Port Dispatcher
     ptq_dispatcher_std = dispatchers.PortToQueueDispatcher(
-        name, '_std', configs.numStPorts, configs.numStqEntries, configs.payload_bitwidth, configs.stpAddrW)
+        name, '_std', config.numStPorts, config.numStqEntries, config.payload_bitwidth, config.stpAddrW)
     ptq_dispatcher_std.generate(path_rtl)
     lsq_submodules.ptq_dispatcher_std = ptq_dispatcher_std
 
     # Store Backward Port Dispatcher
-    if configs.stResp:
+    if config.stResp:
         qtp_dispatcher_stb = dispatchers.QueueToPortDispatcher(
-            name, '_stb', configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW)
+            name, '_stb', config.numStPorts, config.numStqEntries, 0, config.stpAddrW)
         qtp_dispatcher_stb.generate(path_rtl)
         lsq_submodules.qtp_dispatcher_stb = qtp_dispatcher_stb
 
     # Change the name of the following module to lsq_core
-    lsq_core = core.LSQ(name, '', configs)
+    lsq_core = core.LSQ(name, '', config)
     lsq_core.generate(lsq_submodules, path_rtl)
