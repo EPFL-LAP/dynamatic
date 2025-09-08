@@ -5,7 +5,7 @@ from LSQ.config import Config
 
 import LSQ.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
-import LSQ.generators.group_allocator as group_allocator
+import LSQ.generators.group_allocator.group_allocator as group_allocator
 
 class LSQ:
     def __init__(
