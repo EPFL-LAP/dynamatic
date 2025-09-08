@@ -1,5 +1,5 @@
 from LSQ.context import VHDLContext
-from LSQ.generators.group_allocator.group_allocator import get_group_allocator, GroupAllocator
+from LSQ.generators.group_allocator.group_allocator import get_group_allocator
 import LSQ.generators.dispatchers as dispatchers
 import LSQ.generators.core as core
 
