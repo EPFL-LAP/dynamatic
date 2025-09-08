@@ -556,7 +556,7 @@ class VerticalBarrelShiftInstantiation(Instantiation):
             "barrel_shift_vrt",
             parent,
             port_items,
-            comment=f"""s
+            comment=f"""
   -- Shift the array items of the store order
   -- Based on the load queue tail pointer
   -- So that array item 0 moves to array item (tail pointer)
