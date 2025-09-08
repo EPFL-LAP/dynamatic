@@ -1,22 +1,19 @@
-
-
-
-# def makeEntitySignal(base_name, signal):
    
-    
-
-
-# def makeInstantiationSignal(base_name, signal):
-#     name = f"{base_name}"
-
-#     full_declaration = f"{name},"
-#     if signal.signal_size.bitwidth == 0:
-#         full_declaration = f"-- {full_declaration}"
-#     return f"""
-#       {full_declaration}
-# """.removeprefix("\n")
-    
 class DeclarativeUnit():
+   """
+   Class used to generate RTL by declaratively
+   stating its input and output ports, and local signals
+
+   Has one function "name",
+   based on self.parent and self.unit_name
+
+   Uses self.entity_port_items to print the entity port mapping,
+   self.local_items to print the local signals,
+   and self.body to print the body.
+
+   self.top_level_comment is placed above the entity declaration
+   """
+   
    def name(self):
       return f"{self.parent}_{self.unit_name}"
 
@@ -107,7 +104,13 @@ end architecture;
       return architecture
 
 class Instantiation():
-    def __init__(self, unit_name, parent, port_items):
+    """
+    Class to define RTL instantiations of other entities
+    The python code matches the verbosity of RTL,
+    so instantiations are described fully separately to the
+    entity descriptions.
+    """
+    def __init__(self, unit_name, parent, port_items, comment=""):
       self.port_items = ""
       self.unit_name = unit_name
       self.parent = parent
@@ -116,9 +119,12 @@ class Instantiation():
          self.port_items += port_item.get_inst_item()
 
       self.port_items = self.port_items.strip()[:-1]
+
+      self.comment = comment
     
     def get(self):
        return f"""
+  {self.comment}
   {self.unit_name}_unit : entity work.{self.parent}_{self.unit_name}_unit
     port map(
       {self.port_items}

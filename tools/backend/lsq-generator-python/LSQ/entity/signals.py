@@ -180,3 +180,6 @@ class RTLComment():
     
     def get_entity_item(self):
         return self.comment
+    
+    def get_local_item(self):
+        return self.comment
