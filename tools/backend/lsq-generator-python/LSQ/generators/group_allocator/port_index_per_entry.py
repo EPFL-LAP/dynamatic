@@ -69,7 +69,6 @@ class PortIndexPerEntryDecl(DeclarativeUnit):
             MaskedPortIndex(config, queue_type),
             PortIdxPerEntry(config, queue_type, shifted=False),
             PortIdxPerEntry(config, queue_type, shifted=True),
-            OutputAssignments(config, queue_type)
         ]
 
 
