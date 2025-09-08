@@ -107,7 +107,7 @@ class BarrelShifterBody():
 
         shift_outs.append(f"{output.base_name}_o")
 
-        for i in range(pointer.size.bitwidth):
+        for i in range(num_stages):
             if direction == ShiftDirection.VERTICAL:
                 self.item += f"""
 
@@ -211,8 +211,8 @@ class BarrelShifter1DBody():
 
         shift_outs.append(f"{output.base_name}_o")
 
-       
-        self.item += f"""
+        for i in range(num_stages):
+            self.item += f"""
 
     -- Shift bits
     shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
