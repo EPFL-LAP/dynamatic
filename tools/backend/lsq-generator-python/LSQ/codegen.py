@@ -13,11 +13,11 @@ def codeGen(path_rtl, config : Config):
 
     name = config.name + '_core'
 
-    # with open(f'{path_rtl}/{name}.vhd', 'a') as file:
-    #     file.write(get_group_allocator(config, name))
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+        file.write(get_group_allocator(config, name))
 
-    ga = GroupAllocator(name, "_ga_unit", config)
-    ga.generate(path_rtl)
+    # ga = GroupAllocator(name, "_ga_unit", config)
+    # ga.generate(path_rtl)
 
     # Load Address Port Dispatcher
     ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
