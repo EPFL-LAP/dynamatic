@@ -377,29 +377,31 @@ class BarrelShifterBody():
         for i in range(num_stages):
             if direction == ShiftDirection.VERTICAL:
                 for j in range(num_shifts):
+                    shift_index = (j+ 2**i) % num_shifts
                     self.item += f"""
 
     -- Check bit {i} of {pointer.base_name}
     -- if '1', shift left by {(2**i)} 
     -- e.g. value at 0 in input goes to value at {2**i} in output
-    {shift_outs[i]}({j + {2**i} % num_shifts}) <= 
+    {shift_outs[i]}({shift_index}) <= 
       {shift_ins[i]}({j}) when {pointer_name}({i}) = '1' 
         else
-      {shift_ins[i]}(({(j+ {2**i}) % num_shifts});
+      {shift_ins[i]}(({shift_index});
 
 """.removeprefix("\n")
             elif direction == ShiftDirection.HORIZONTAL:
                 for k in range(wrapper_size):
                     for j in range(num_shifts):
+                        shift_index = (j + 2**i) % num_shifts
                         self.item += f"""
 
       -- Check bit {i} of {pointer.base_name}
       -- if '1', shift left by {(2**i)} 
       -- e.g. value at 0 in input goes to value at {2**i} in output
-      {shift_outs[i]}(i)({j + 2**i % num_shifts}) <= 
+      {shift_outs[i]}(i)({shift_index}) <= 
         {shift_ins[i]}(i)({j}) when {pointer_name}({i}) = '1' 
           else
-        {shift_ins[i]}(i)({(j + 2**i) % num_shifts});
+        {shift_ins[i]}(i)({shift_index});
 
 """.removeprefix("\n")
 
