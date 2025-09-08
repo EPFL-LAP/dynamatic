@@ -193,7 +193,6 @@ class BarrelShifter1DBody():
             pointer : Signal,
             to_shift : Signal,
             output : Signal,
-            direction : ShiftDirection
             ):
         self.item = ""
 
