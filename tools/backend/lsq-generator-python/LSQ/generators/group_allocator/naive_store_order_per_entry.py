@@ -172,32 +172,32 @@ class NaiveStoreOrderPerEntryDecl(DeclarativeUnit):
             self.local_items = [
                 RTLComment(f"""
 
-    -- Masked store orders, unmuxed and unshifted
-    -- used as input to muxes controlled by group init transfers                       
-    """.removeprefix("\n")),
+  -- Masked store orders, unmuxed and unshifted
+  -- used as input to muxes controlled by group init transfers                       
+""".removeprefix("\n")),
                 MaskedStoreOrder(config),
                             RTLComment(f"""
 
-    -- Outputs of the muxes: unshifted store orders                  
-    """.removeprefix("\n")),
+  -- Outputs of the muxes: unshifted store orders                  
+""".removeprefix("\n")),
                 NaiveStoreOrderPerEntry(
                     config, 
                     shifted_both=True
                 ),
                 RTLComment(f"""
 
-    -- Outputs of the first barrel shifter
-    -- The bits themselves now align with the store queue           
-    """.removeprefix("\n")),
+  -- Outputs of the first barrel shifter
+  -- The bits themselves now align with the store queue           
+""".removeprefix("\n")),
                 NaiveStoreOrderPerEntry(
                     config, 
                     shifted_stores=True
                 ),
                 RTLComment(f"""
 
-    -- Outputs of the second barrel shifter
-    -- The array items now align with the load queue        
-    """.removeprefix("\n")),
+  -- Outputs of the second barrel shifter
+  -- The array items now align with the load queue        
+""".removeprefix("\n")),
                 NaiveStoreOrderPerEntry(
                     config, 
                     unshifted=True
