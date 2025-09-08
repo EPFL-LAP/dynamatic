@@ -308,7 +308,7 @@ class GroupAllocator:
             file.write(ctx.signalInitString)
             file.write('begin\n')
             file.write(GroupHandshakingInst(self.configs, self.module_name).get())
-            file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name))
+            file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name).get())
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
 
