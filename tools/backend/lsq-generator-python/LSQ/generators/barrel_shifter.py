@@ -82,11 +82,13 @@ class BarrelShifterBody():
         for i in range(pointer.size.bitwidth):
             if direction == ShiftDirection.VERTICAL:
                 self.item += f"""
-  -- Check bit {i} of {pointer.base_name}
-  -- if '1', shift left by {(2**i)} 
+
+  -- Shift array items
   shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
 
-    -- value at 0 in input goes to value at {2**i} in output
+    -- Check bit {i} of {pointer.base_name}
+    -- if '1', shift left by {(2**i)} 
+    -- e.g. value at 0 in input goes to value at {2**i} in output
     {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
       {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
         else
@@ -96,12 +98,16 @@ class BarrelShifterBody():
 """.removeprefix("\n")
             elif direction == ShiftDirection.HORIZONTAL:
                 self.item += f"""
-  -- Check bit {i} of {pointer.base_name}
-  -- if '1', shift left by {(2**i)} 
+
+  -- Leave array items unshifted
   shift_stage_{i + 1}_wrapper : for i in 0 to {wrapper_size} - 1 generate
+
+    -- Shift bits
     shift_stage_{i + 1} : for j in 0 to {num_shifts} - 1 generate
 
-      -- value at 0 in input goes to value at {2**i} in output
+      -- Check bit {i} of {pointer.base_name}
+      -- if '1', shift left by {(2**i)} 
+      -- e.g. value at 0 in input goes to value at {2**i} in output
       {shift_outs[i]}(i)((j + {2**i}) mod {num_shifts}) <= 
         {shift_ins[i]}(i)(j) when {pointer_name}({i}) = '1' 
           else
