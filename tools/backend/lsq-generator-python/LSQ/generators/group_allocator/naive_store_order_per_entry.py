@@ -297,7 +297,7 @@ class Muxes():
 
 """.removeprefix("\n")
 
-        max_num_loads_in_one_group = max(mux_inputs.keys)
+        max_num_loads_in_one_group = max(to_mux.keys)
         for i in range(max_num_loads_in_one_group):
             # unshifted store order variable
             assign_to = f"{unshifted}({i})"
