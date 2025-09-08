@@ -41,7 +41,9 @@ class Entity():
     self.entity_port_items = self.entity_port_items[:-1]
 
     entity = f"""
-library ieee;
+
+---------------------------------------------------------------
+
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
