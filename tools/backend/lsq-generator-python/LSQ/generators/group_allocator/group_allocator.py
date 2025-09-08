@@ -246,10 +246,10 @@ class GroupAllocator:
         #                      self.configs.gaStPortIdx, group_init_hs)
         arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
                          group_init_hs, MaskLess)
-        arch += Mux1HROM(ctx, num_loads,
-                         self.configs.gaNumLoads, group_init_hs)
-        arch += Mux1HROM(ctx, num_stores,
-                         self.configs.gaNumStores, group_init_hs)
+        # arch += Mux1HROM(ctx, num_loads,
+                        #  self.configs.gaNumLoads, group_init_hs)
+        # arch += Mux1HROM(ctx, num_stores,
+                        #  self.configs.gaNumStores, group_init_hs)
         arch += Op(ctx, num_loads_o, num_loads)
         arch += Op(ctx, num_stores_o, num_stores)
 
@@ -300,7 +300,8 @@ class GroupAllocator:
                 file.write(get_port_index_per_entry(self.configs, QueueType.LOAD, self.module_name))
             if (self.configs.stpAddrW > 0):
                 file.write(get_port_index_per_entry(self.configs, QueueType.STORE, self.module_name))
-
+            file.write(get_num_new_entries(self.configs, QueueType.LOAD, self.module_name))
+            file.write(get_num_new_entries(self.configs, QueueType.STORE, self.module_name))
 
             file.write('\n\n')
             file.write(ctx.library)
@@ -315,6 +316,8 @@ class GroupAllocator:
                 file.write(PortIdxPerEntryInst(self.configs, QueueType.LOAD, self.module_name).get())
             if (self.configs.stpAddrW > 0):
                 file.write(PortIdxPerEntryInst(self.configs, QueueType.STORE, self.module_name).get())
+            file.write(NumNewQueueEntriesInst(self.configs, QueueType.LOAD, self.module_name).get())
+            file.write(NumNewQueueEntriesInst(self.configs, QueueType.STORE, self.module_name).get())
 
             file.write(arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
