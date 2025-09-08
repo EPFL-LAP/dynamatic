@@ -297,7 +297,7 @@ class GroupAllocatorDeclarative(DeclarativeUnit):
   -- to set the rest of the values to allocate
   -- 1 bit per group, and there are {config.num_groups()} groups
 """.removeprefix("\n")),
-            ds.GroupInitTransfer(config.num_groups()),
+            ds.GroupInitTransfer(config),
 
             RTLComment(f"""
                        
