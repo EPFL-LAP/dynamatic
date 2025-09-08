@@ -214,18 +214,18 @@ class BarrelShifter1DBody():
         for i in range(num_stages):
             self.item += f"""
 
-    -- Shift bits
-    shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
+  -- Shift bits
+  shift_stage_{i + 1} : for i in 0 to {num_shifts} - 1 generate
 
-      -- Check bit {i} of {pointer.base_name}
-      -- if '1', shift left by {(2**i)} 
-      -- e.g. value at 0 in input goes to value at {2**i} in output
-      {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
-        {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
-          else
-        {shift_ins[i]}((i + {2**i}) mod {num_shifts});
+    -- Check bit {i} of {pointer.base_name}
+    -- if '1', shift left by {(2**i)} 
+    -- e.g. value at 0 in input goes to value at {2**i} in output
+    {shift_outs[i]}((i + {2**i}) mod {num_shifts}) <= 
+      {shift_ins[i]}(i) when {pointer_name}({i}) = '1' 
+        else
+      {shift_ins[i]}((i + {2**i}) mod {num_shifts});
 
-    end generate;
+  end generate;
 
 """.removeprefix("\n")
 
