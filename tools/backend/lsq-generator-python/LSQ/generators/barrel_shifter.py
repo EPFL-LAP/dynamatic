@@ -386,7 +386,7 @@ class BarrelShifterBody():
     {shift_outs[i]}({shift_index}) <= 
       {shift_ins[i]}({j}) when {pointer_name}({i}) = '1' 
         else
-      {shift_ins[i]}(({shift_index});
+      {shift_ins[i]}({shift_index});
 
 """.removeprefix("\n")
             elif direction == ShiftDirection.HORIZONTAL:
