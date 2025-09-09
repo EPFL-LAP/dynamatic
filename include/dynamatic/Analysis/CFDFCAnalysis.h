@@ -12,13 +12,11 @@ using namespace dynamatic::buffer;
 
 namespace dynamatic {
 
-struct BufferPlacementResult {
-  SmallVector<std::pair<CFDFC, double>> cfdfcAndThroughputs;
-};
+using ListOfCFDFCs = std::vector<CFDFC>;
 
 /// This Analysis is preserved after buffer placement
 struct CFDFCAnalysis {
-  std::map<handshake::FuncOp, BufferPlacementResult> results;
+  std::map<handshake::FuncOp, ListOfCFDFCs> results;
   CFDFCAnalysis(mlir::Operation *modOp) {}
 };
 

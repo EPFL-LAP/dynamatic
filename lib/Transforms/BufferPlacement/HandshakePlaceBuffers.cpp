@@ -291,12 +291,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-
-    perfAnalysis.results.insert(
-        std::make_pair(funcOp, BufferPlacementResult()));
-
-    funcToInfo.insert(std::make_pair(
-        funcOp, FuncInfo(funcOp, &perfAnalysis.results[funcOp])));
+    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
     FuncInfo &info = funcToInfo[funcOp];
 
     // Read the CSV containing arch information (number of transitions between

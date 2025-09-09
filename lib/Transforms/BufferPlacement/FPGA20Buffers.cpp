@@ -102,7 +102,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 
-  populateCFDFCAnalysisResult();
+  populateCFDFCThroughputAndOccupancy();
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
