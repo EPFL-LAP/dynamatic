@@ -22,6 +22,7 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
 include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
@@ -962,6 +963,23 @@ def StoreOp : Handshake_MemPortOp<"store", [
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Memory hierarchy
+//===----------------------------------------------------------------------===//
+
+def RAMOp : Handshake_Op<"ram", []>  {
+  let arguments = (ins OptionalAttr<MemoryInitialValueAttr>:$initialValue);
+  let builders = [
+    OpBuilder<(ins 
+    "MemRefType":$memrefType
+    ), [{
+      $_state.types.push_back(memrefType);
+    }]>
+  ];
+
+  let results = (outs AnyStaticShapeMemRef:$result);
 }
 
 //===----------------------------------------------------------------------===//
