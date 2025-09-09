@@ -85,6 +85,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::SIToFPOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::UIToFPOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::FPToSIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::CmpIOp, std::vector<Any> &,
@@ -572,6 +574,13 @@ LogicalResult StdExecuter::execute(mlir::arith::SIToFPOp op,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::UIToFPOp op,
+                                   std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(APIntOps::RoundAPIntToFloat(any_cast<APInt>(in[0])));
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::FPToSIOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -879,6 +888,7 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                 arith::RemSIOp,
                 arith::RemUIOp,
                 arith::SIToFPOp,
+                arith::UIToFPOp,
                 arith::SelectOp,
                 arith::ShLIOp,
                 arith::ShRSIOp,
