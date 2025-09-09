@@ -287,6 +287,14 @@ void scalarPrinter<double>(const double &arg, OS &os) {
      << *((const unsigned int *)(&arg)) << std::endl;
 }
 
+/// Specialization of the scalar printer for int.
+template <>
+void scalarPrinter<int>(const int &arg, OS &os) {
+  // Print the char as a 8-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
+     << std::endl;
+}
+
 /// Writes the argument's as an 8-digits hexadecimal number padded with zeros
 /// directly to stdout.
 template <typename T>
