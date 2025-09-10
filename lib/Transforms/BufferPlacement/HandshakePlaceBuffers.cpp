@@ -141,7 +141,7 @@ protected:
   /// iteratively solving MILPs until the MILP solution indicates that no
   /// "executable cycle" remains in the circuit.
   virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
-                                  SmallVector<CFDFC> &cfdfcs);
+                                  std::vector<CFDFC> &cfdfcs);
 
   /// Computes an optimal buffer placement for a Handhsake function by solving
   /// a large MILP over the entire dataflow circuit represented by the
@@ -158,7 +158,8 @@ protected:
 
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
-  virtual void instantiateBuffers(BufferPlacement &placement);
+  virtual void instantiateBuffers(BufferPlacement &placement,
+                                  ArrayRef<CFDFC> cfdfcs);
 };
 
 } // namespace buffer
@@ -286,7 +287,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
-  auto &perfAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
@@ -312,10 +312,18 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
+  auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
+
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    // Create an empty list of CFDFCs for funcOp
+    cfdfcAnalysis.results.emplace(funcOp);
     if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
       return failure();
+
+    for (auto [cf, _] : funcToInfo[funcOp].cfdfcs) {
+      cfdfcAnalysis.results[funcOp].push_back(*cf);
+    }
   }
 
   markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
@@ -426,7 +434,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
 
   // Get CFDFCs from the function unless the functions has no archs (i.e.,
   // it has a single block) in which case there are no CFDFCs
-  SmallVector<CFDFC> cfdfcs;
+  std::vector<CFDFC> cfdfcs;
   if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
     return failure();
 
@@ -460,13 +468,13 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   if (failed(getBufferPlacement(info, timingDB, logger, placement)))
     return failure();
 
-  instantiateBuffers(placement);
+  instantiateBuffers(placement, cfdfcs);
   return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    Logger *logger,
-                                                   SmallVector<CFDFC> &cfdfcs) {
+                                                   std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
   // Store all archs in a set. We use a pointer to each arch as the key type to
@@ -678,13 +686,14 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       result.numOneSlotR = props.minTrans;
       placement[channel] = result;
     }
-    instantiateBuffers(placement);
+    instantiateBuffers(placement, {});
   }
 
   return success();
 }
 
-void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
+void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
+                                                   ArrayRef<CFDFC> cfdfcs) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
