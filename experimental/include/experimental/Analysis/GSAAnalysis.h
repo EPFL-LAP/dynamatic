@@ -51,7 +51,12 @@ struct GateInput {
   /// the IR, another gate or empty.
   std::variant<Value, Gate *> input;
 
-  /// Set of all blocks that forward this gateInput to the gate.
+  /// Set of all blocks that forward this GateInput to the gate.
+  /// A value or block argument is defined in a producer block, but may reach
+  /// the PHI through one or more sender blocks. Each sender block comes
+  /// immediately before the consumer block in the CFG. For predicate
+  /// computation, control dependence must be analyzed on the sender
+  /// blocks as well as on the producer.
   std::unordered_set<Block *> senders;
 
   /// Constructor a gate input being the result of an operation.
@@ -175,6 +180,11 @@ public:
   bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa) {
     return !pa.isPreserved<GSAAnalysis>();
   }
+
+  // Check if value is already among the operands of the phi.
+  // If found, record preds as a sender of that operand.
+  bool isValueAlreadyPresent(Value c, SmallVectorImpl<GateInput *> &operands,
+                             Block *pred);
 
   /// Get a vector containing all the gates related to a basic block.
   ArrayRef<Gate *> getGatesPerBlock(Block *bb) const;

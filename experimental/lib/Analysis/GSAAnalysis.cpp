@@ -36,6 +36,17 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(handshake::MergeOp &merge,
   convertSSAToGSAMerges(merge, region);
 }
 
+bool experimental::gsa::GSAAnalysis::isValueAlreadyPresent(
+    Value v, SmallVectorImpl<GateInput *> &operands, Block *pred) {
+  for (GateInput *in : operands) {
+    if (in->isTypeValue() && in->getValue() == v) {
+      in->senders.insert(pred);
+      return true;
+    }
+  }
+  return false;
+}
+
 void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
     handshake::MergeOp &mergeOp, Region &region) {
 
@@ -54,17 +65,14 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   // Create a set for the operands of the corresponding phi function
   SmallVector<GateInput *> operands;
 
-  auto isAlreadyPresent = [&](Value c) -> bool {
-    return std::any_of(operands.begin(), operands.end(), [c](GateInput *in) {
-      return in->isTypeValue() && in->getValue() == c;
-    });
-  };
-
   // Add to the list of operands of the new gate all the values which were not
   // already used
+  // Each new operand records its defining block as a sender.
+  // TODO: Edit senders. v.getParentBlock() is producer
   for (Value v : mergeOp.getOperands()) {
-    if (!isAlreadyPresent(v)) {
+    if (!isValueAlreadyPresent(v, operands, v.getParentBlock())) {
       GateInput *gateInput = new GateInput(v);
+      gateInput->senders.insert(v.getParentBlock());
       gateInputList.push_back(gateInput);
       operands.push_back(gateInput);
     }
@@ -281,7 +289,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<GateInput *> operands;
-      // Create a set to track repetition of missing-phi operands
+      // Track block-argument operands to avoid recording duplicates
       SmallVector<MissingPhi> operandsMissPhi;
       DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
@@ -298,30 +306,16 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
         assert(branchOp && "Expected terminator operation in a predecessor "
                            "block feeding a block argument!");
 
-        // Check if input value `c` is already among the phi's operands
-        // (either as a concrete value or a missing-phi) and update its senders
-        // if found.
-        auto isAlreadyPresent = [&](Value c) -> bool {
-          // Check for concrete values already present
-          for (GateInput *in : operands) {
-            if (in->isTypeValue() && in->getValue() == c) {
-              in->senders.insert(pred);
+        // Check if a block-argument operand is already present among missing
+        // phis. Two missing-phi operands are considered equal if they
+        // originated from and target the same argument of the same block.
+        // The value is not compared, which might be problematic.
+        auto isBlockArgAlreadyPresent = [&](BlockArgument blockArg) -> bool {
+          for (MissingPhi &mPhi : operandsMissPhi) {
+            if (mPhi.blockArg.getParentBlock() == blockArg.getParentBlock() &&
+                mPhi.blockArg.getArgNumber() == blockArg.getArgNumber()) {
+              mPhi.pi->senders.insert(pred);
               return true;
-            }
-          }
-
-          // Check for duplicate missing-phi operands
-          if (BlockArgument blockArgC = dyn_cast<BlockArgument>(c)) {
-            for (MissingPhi mPhi : operandsMissPhi) {
-              // Two missing-phi operands are considered equal if they
-              // originated from and target the same argument of the same block.
-              // The value is not compared, which might be problematic.
-              if ((mPhi.blockArg.getParentBlock() ==
-                   blockArgC.getParentBlock()) &&
-                  (mPhi.blockArg.getArgNumber() == blockArgC.getArgNumber())) {
-                mPhi.pi->senders.insert(pred);
-                return true;
-              }
             }
           }
           return false;
@@ -346,16 +340,18 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
           /// of missing phis. Otherwise, the input is a value, and it can be
           /// safely added directly.
           if (BlockArgument blockArg = dyn_cast<BlockArgument>(producer);
-              blockArg && !producer.getParentBlock()->hasNoPredecessors() &&
-              !isAlreadyPresent(dyn_cast<Value>(producer))) {
-            gateInput = new GateInput((Gate *)nullptr);
-            MissingPhi missingPhi = MissingPhi(gateInput, blockArg);
-            missingPhi.pi->senders.insert(pred);
-            phisToConnect.push_back(missingPhi);
-            gateInputList.push_back(gateInput);
-            operandsMissPhi.push_back(missingPhi);
+              blockArg && !producer.getParentBlock()->hasNoPredecessors()) {
+            if (!isBlockArgAlreadyPresent(blockArg)) {
+              gateInput = new GateInput((Gate *)nullptr);
+              MissingPhi missingPhi = MissingPhi(gateInput, blockArg);
+              missingPhi.pi->senders.insert(pred);
+              phisToConnect.push_back(missingPhi);
+              gateInputList.push_back(gateInput);
+              operandsMissPhi.push_back(missingPhi);
+            }
           } else {
-            if (!isAlreadyPresent(dyn_cast<Value>(producer))) {
+            if (!isValueAlreadyPresent(dyn_cast<Value>(producer), operands,
+                                       pred)) {
               gateInput = new GateInput(producer);
               gateInput->senders.insert(pred);
               gateInputList.push_back(gateInput);
@@ -565,19 +561,23 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
 
       // MU gate has exactly one operand from inside and one from outside the
       // loop. If more than one exists, a phi gate is added to select the output
+      // Note: gates created for loop inputs are flagged as MU-generated,
+      // so they will later be placed in the condition block. This flagging is
+      // not done for gates created from initial inputs.
       GateInput *operandInit = nullptr, *operandLoop = nullptr;
 
+      // Handle initail input
       if (initialInputs.size() == 1)
         operandInit = initialInputs[0];
       else {
-        Gate *initialPhi =
-            new Gate(phi->result, initialInputs, GateType::PhiGate,
-                     ++uniqueGateIndex, nullptr, true);
+        Gate *initialPhi = new Gate(phi->result, initialInputs,
+                                    GateType::PhiGate, ++uniqueGateIndex);
         gatesPerBlock[phiBlock].push_back(initialPhi);
         operandInit = new GateInput(initialPhi);
         gateInputList.push_back(operandInit);
       }
 
+      // Handle loop input
       if (loopInputs.size() == 1)
         operandLoop = loopInputs[0];
       else {
