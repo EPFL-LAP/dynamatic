@@ -63,7 +63,6 @@ TEST_P(MemoryFixture, basic) {
   RecordProperty("cycles", std::to_string(config.simTime));
 }
 
-#if 0
 TEST_P(SharingUnitTestFixture, basic) {
   IntegrationTestData configWithSharing{
       // clang-format off
@@ -93,8 +92,8 @@ TEST_P(SharingUnitTestFixture, basic) {
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
-#endif
 
+#if 0
 TEST_P(SharingFixture, basic) {
   IntegrationTestData configWithSharing{
       // clang-format off
@@ -124,6 +123,7 @@ TEST_P(SharingFixture, basic) {
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
+#endif
 
 TEST_P(SpecFixture, spec_NoCI) {
   const std::string &name = GetParam();
