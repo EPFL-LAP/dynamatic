@@ -133,7 +133,8 @@ protected:
 
   /// Places buffers in the function, according to the logic dictated by the
   /// algorithm the pass was instantiated with.
-  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB);
+  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB,
+                                     CFDFCAnalysis &cfdfcAnalysis);
 
   /// Identifies and extracts all existing CFDFCs in the function using
   /// estimated transition frequencies between its basic blocks. Fills the
@@ -159,7 +160,7 @@ protected:
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
   virtual void instantiateBuffers(BufferPlacement &placement,
-                                  ArrayRef<CFDFC> cfdfcs);
+                                  std::vector<CFDFC> &cfdfcs);
 };
 
 } // namespace buffer
@@ -317,13 +318,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     // Create an empty list of CFDFCs for funcOp
-    cfdfcAnalysis.results.emplace(funcOp);
-    if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
+    if (failed(placeBuffers(funcToInfo[funcOp], timingDB, cfdfcAnalysis)))
       return failure();
-
-    for (auto [cf, _] : funcToInfo[funcOp].cfdfcs) {
-      cfdfcAnalysis.results[funcOp].push_back(*cf);
-    }
   }
 
   markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
@@ -418,9 +414,8 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
   os.flush();
 }
 
-LogicalResult
-HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
-                                        TimingDatabase &timingDB) {
+LogicalResult HandshakePlaceBuffersPass::placeBuffers(
+    FuncInfo &info, TimingDatabase &timingDB, CFDFCAnalysis &cfdfcAnalysis) {
   // Use a wrapper around a logger to benefit from RAII
   std::error_code ec;
   BufferLogger bufLogger(info.funcOp, dumpLogs, ec);
@@ -469,6 +464,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
     return failure();
 
   instantiateBuffers(placement, cfdfcs);
+  cfdfcAnalysis.results[info.funcOp] = cfdfcs;
   return success();
 }
 
@@ -686,14 +682,72 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       result.numOneSlotR = props.minTrans;
       placement[channel] = result;
     }
-    instantiateBuffers(placement, {});
+
+    // We cannot pass the reference of a temporary object to std::vector<..>&,
+    // so we have to create this empty vector.
+    std::vector<CFDFC> dummy;
+    instantiateBuffers(placement, dummy);
   }
 
   return success();
 }
 
+// Adding a new buffer op changes the CFDFC graph. This function updates all the
+// CFDFCs that contain the channel.
+static void insertBufferOpAndOccupancyInCFDFC(
+    handshake::BufferOp bufOp, std::vector<CFDFC> &cfdfcs,
+    unsigned totalChannelLatency,
+    std::map<CFDFC *, double> &remainingTokensToDistribute) {
+
+  Value bufferIn = bufOp.getOperand();
+  for (CFDFC cf : cfdfcs) {
+    if (cf.channels.contains(bufferIn)) {
+      // When we add a new buffer op, the value remains the same object (now
+      // used by a different user). Therefore, we just need to add the newly
+      // added operation and channel.
+      cf.units.insert(bufOp.getOperation());
+      cf.channels.insert(bufOp.getResult());
+
+      // After the buffer is inserted, we distribute the token in the CFDFC to
+      // the buffers on the channel.
+      if (!cf.channelOccupancy.count(bufferIn)) {
+        llvm::report_fatal_error(
+            "Placing a buffer on a channel that doesn't have a registered "
+            "occupancy value!");
+      }
+      double totalChanOccupancy = cf.channelOccupancy[bufferIn];
+      double toDistribute;
+      if (totalChanOccupancy < (double)totalChannelLatency) {
+        // Case N < L:
+        // Distribute tokens among slots with latency (the tokens
+        // are not blocking each other, so they will only be stopped by the
+        // sequential buffer slot).
+        toDistribute =
+            (bufOp.getLatencyDV() / totalChannelLatency) * totalChanOccupancy;
+        cf.unitOccupancy[bufOp] = toDistribute;
+      } else {
+        // Case N => L:
+        // Assign 1 token to each bufer slot with latency, the rest is assigned
+        // bottom (from the receiver of the channel) -> up (to the producer
+        // of the channel).
+        toDistribute =
+            // Assign to the slot that has DV latency
+            bufOp.getLatencyDV() +
+            // Assign to the slots without DV latency
+            fmin(bufOp.getNumSlots() - bufOp.getLatencyDV(),
+                 remainingTokensToDistribute[&cf]);
+
+        cf.unitOccupancy[bufOp] = toDistribute;
+      }
+      assert(toDistribute <= bufOp.getNumSlots() &&
+             "Should not assign tokens to a buffer more than its slots!");
+      remainingTokensToDistribute[&cf] -= toDistribute;
+    }
+  }
+}
+
 void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
-                                                   ArrayRef<CFDFC> cfdfcs) {
+                                                   std::vector<CFDFC> &cfdfcs) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
@@ -703,12 +757,17 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
+
+    // We need to record the list of placed buffers. We will calculate their
+    // token occupancy in each CFDFC below.
+    SmallVector<handshake::BufferOp, 2> placedBuffers;
     auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, numSlots, bufferType);
+      placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -731,6 +790,32 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     placeBuffer(BufferType::FIFO_BREAK_NONE, placeRes.numFifoNone);
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
+    }
+
+    unsigned totalChannelLatency = 0;
+    for (auto bufOp : placedBuffers) {
+      totalChannelLatency += bufOp.getLatencyDV();
+    }
+
+    // For each CFDFC, how many tokens are distributed into the buffers placed
+    // on the channel?
+    std::map<CFDFC *, double> tokenToDistribute;
+    for (auto cf : cfdfcs) {
+      tokenToDistribute[&cf] = cf.channelOccupancy.count(channel)
+                                   ? cf.channelOccupancy.at(channel)
+                                   : 0.0;
+    }
+
+    for (auto bufOp : llvm::reverse(placedBuffers)) {
+      // Insert the buffer ops into each CFDFC that contains the original
+      // channel, and assign the token occupancy to each buffer. We start from
+      // the end of the channel (e.g., the one closest to the receiver) to the
+      // beginning of the channel.
+      //
+      // reverse(placedBuffers): the first inserted buffer is the one closest to
+      // the sender.
+      insertBufferOpAndOccupancyInCFDFC(bufOp, cfdfcs, totalChannelLatency,
+                                        tokenToDistribute);
     }
   }
 }

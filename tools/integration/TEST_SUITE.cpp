@@ -17,15 +17,21 @@
 class BasicFixture : public testing::TestWithParam<std::string> {};
 class MemoryFixture : public testing::TestWithParam<std::string> {};
 class SharingFixture : public testing::TestWithParam<std::string> {};
+class SharingUnitTestFixture : public testing::TestWithParam<std::string> {};
 class SpecFixture : public testing::TestWithParam<std::string> {};
 
 TEST_P(BasicFixture, basic) {
-  std::string name = GetParam();
-  int simTime = -1;
-
-  EXPECT_EQ(runIntegrationTest(name, simTime), 0);
-
-  RecordProperty("cycles", std::to_string(simTime));
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
 }
 
 //
@@ -44,27 +50,81 @@ TEST_P(BasicFixture, basic) {
 // }
 
 TEST_P(MemoryFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
-  std::string name = GetParam();
-  int simTime = -1;
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+}
 
-  EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
+TEST_P(SharingUnitTestFixture, basic) {
+  IntegrationTestData configWithSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
+      .useVerilog = false,
+      .useSharing = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
 
-  RecordProperty("cycles", std::to_string(simTime));
+  IntegrationTestData configWithoutSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
+
+  // Check if sharing brings under 5% latency increase
+  EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
+            true);
+
+  RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
 TEST_P(SharingFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
-  std::string name = GetParam();
-  int simTime = -1;
+  IntegrationTestData configWithSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
+      .useVerilog = false,
+      .useSharing = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
 
-  EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
+  IntegrationTestData configWithoutSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
 
-  RecordProperty("cycles", std::to_string(simTime));
+  // Check if sharing brings under 5% latency increase
+  EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
+            true);
+
+  RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
 TEST_P(SpecFixture, spec_NoCI) {
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runSpecIntegrationTest(name, simTime), true);
@@ -102,8 +162,15 @@ INSTANTIATE_TEST_SUITE_P(
                     "test_memory_18", "test_smallbound"),
     [](const auto &info) { return "memory_" + info.param; });
 
-INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
                          testing::Values("share_test_1", "share_test_2"),
+                         [](const auto &info) {
+                           return "sharing_" + info.param;
+                         });
+
+INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+                         testing::Values("gsum", "gsumif", "kernel_3mm_float",
+                                         "kernel_2mm_float", "gesummv_float"),
                          [](const auto &info) {
                            return "sharing_" + info.param;
                          });
