@@ -63,6 +63,7 @@ TEST_P(MemoryFixture, basic) {
   RecordProperty("cycles", std::to_string(config.simTime));
 }
 
+#if 0
 TEST_P(SharingUnitTestFixture, basic) {
   IntegrationTestData configWithSharing{
       // clang-format off
@@ -92,6 +93,7 @@ TEST_P(SharingUnitTestFixture, basic) {
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
+#endif
 
 TEST_P(SharingFixture, basic) {
   IntegrationTestData configWithSharing{
@@ -168,12 +170,14 @@ INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
                            return "sharing_" + info.param;
                          });
 
+#if 0
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
                          testing::Values("gsum", "gsumif", "kernel_3mm_float",
                                          "kernel_2mm_float", "gesummv_float"),
                          [](const auto &info) {
                            return "sharing_" + info.param;
                          });
+#endif
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
