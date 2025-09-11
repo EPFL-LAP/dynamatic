@@ -16,7 +16,7 @@ using ListOfCFDFCs = std::vector<CFDFC>;
 
 /// This Analysis is preserved after buffer placement
 struct CFDFCAnalysis {
-  std::map<handshake::FuncOp, ListOfCFDFCs> results;
+  std::map<handshake::FuncOp, ListOfCFDFCs> mapFuncOpToCFDFCs;
   CFDFCAnalysis(mlir::Operation *modOp) {}
 };
 

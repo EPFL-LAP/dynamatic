@@ -464,7 +464,7 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
     return failure();
 
   instantiateBuffers(placement, cfdfcs);
-  cfdfcAnalysis.results[info.funcOp] = cfdfcs;
+  cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
   return success();
 }
 

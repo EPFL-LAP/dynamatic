@@ -97,7 +97,7 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
 
   SmallVector<CFDFC *> cfdfcPtrs;
 
-  for (auto &cfdfc : analysis.results[funcOp]) {
+  for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
     // Note: here cfdfc must be a reference to the objects in the vector,
     // otherwise the copy that "&cfdfc" points to will immediately goes out of
     // scope after the loop.
@@ -110,11 +110,11 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
 
-  for (auto [id, cf] : llvm::enumerate(analysis.results[funcOp])) {
+  for (auto [id, cf] : llvm::enumerate(analysis.mapFuncOpToCFDFCs[funcOp])) {
     cfIndices[&cf] = id;
   }
 
-  for (auto &cfdfc : analysis.results[funcOp]) {
+  for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
     sharingInfo[funcOp].cfThroughput[cfIndices[&cfdfc]] = cfdfc.throughput;
     sharingInfo[funcOp].cfUnits[cfIndices[&cfdfc]] =
         std::set(cfdfc.units.begin(), cfdfc.units.end());
