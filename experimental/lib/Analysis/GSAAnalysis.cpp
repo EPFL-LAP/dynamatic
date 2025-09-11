@@ -643,6 +643,7 @@ BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
 
   return blockCond;
 }
+
 static BoolExpression* getLoopExitCondition (CFGLoop* loop,std::vector<std::string>* cofactorList , mlir::CFGLoopInfo &li, const BlockIndexing &bi){
   
   SmallVector<Block *> exitBlocks;
@@ -750,33 +751,10 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,const BlockIn
         operandLoop = loopInputs[0];
         llvm::errs() << "one loop operand"<< "\n";
       }
-
-      //Block *op0Block = phi->operands[0]->getBlock(),
-      //      *op1Block = phi->operands[1]->getBlock();
-      /*
-      // Checks whether the block of the merge is a loop header
-      bool isBlockHeader =
-          loopInfo.getLoopFor(phiBlock)->getHeader() == phiBlock;
-
-      // Checks whether the two operands come from different loops (in
-      // this case, one of the values is the initial definition)
-      bool operandFromOutsideLoop =
-          loopInfo.getLoopFor(op0Block) != loopInfo.getLoopFor(op1Block);
-
-      // If both the conditions hold, then we have a MU gate
-      if (!(isBlockHeader && operandFromOutsideLoop)){
-        llvm::errs() << "I dieed here" << "\n";
-        continue;
-      }*/
       
       phi->gsaGateFunction = GateType::MuGate;
       phi->operands = {operandInit, operandLoop};
 
-      /*
-      // Use the initial value of MU as first input of the gate
-      if (domInfo.dominates(op1Block, phiBlock))
-        std::swap(phi->operands[0], phi->operands[1]);
-      */
 
       // The block determining the MU condition is the exiting block of the
       // innermost loop the MU is in

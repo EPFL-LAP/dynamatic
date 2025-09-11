@@ -77,9 +77,12 @@ static Block *returnMuxConditionBlock(Value muxCondition) {
       muxConditionBlock = userBlock;
       break;
     }
+
+// TODO: extend for multi-loop exit
+
   }
-  assert(muxConditionBlock &&
-         "Mux condition must be feeding any block terminator.");
+  if (!muxConditionBlock)
+    muxConditionBlock = muxCondition.getParentBlock();
   return muxConditionBlock;
 }
 
@@ -563,12 +566,125 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
+
+/// Starting from a boolean expression which is a single variable (either
+/// direct or complement) return its corresponding circuit equivalent. This
+/// means, either we obtain the output of the operation determining the
+/// condition, or we add a `not` to complement.
+static Value boolVariableToCircuit(PatternRewriter &rewriter,
+                                   experimental::boolean::BoolExpression *expr,
+                                   Block *block, const ftd::BlockIndexing &bi, bool needsChannelify = true) {
+
+  // Convert the expression into a single condition (for instance, `c0` or
+  // `~c0`).
+  SingleCond *singleCond = static_cast<SingleCond *>(expr);
+
+  // Use the BlockIndexing to access the block corresponding to such condition
+  // and access its terminator to determine the condition.
+  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
+  if (!conditionOpt.has_value()) {
+    llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
+    return nullptr;
+  }
+  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
+
+  // Add a not if the condition is negated.
+  if (singleCond->isNegated) {
+    rewriter.setInsertionPointToStart(block);
+    auto notOp = rewriter.create<handshake::NotOp>(
+        block->getOperations().front().getLoc(),
+        ftd::channelifyType(condition.getType()), condition);
+    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    return notOp->getResult(0);
+  }
+  if (needsChannelify){
+    condition.setType(ftd::channelifyType(condition.getType()));
+  }
+  return condition;
+}
+
+/// Get a circuit out a boolean expression, depending on the different kinds
+/// of expressions you might have.
+static Value boolExpressionToCircuit(PatternRewriter &rewriter,
+                                     BoolExpression *expr, Block *block,
+                                     const ftd::BlockIndexing &bi, bool needsChannelify = true) {
+
+  // Variable case
+  if (expr->type == ExpressionType::Variable)
+    return boolVariableToCircuit(rewriter, expr, block, bi, needsChannelify);
+
+  // Constant case (either 0 or 1)
+  rewriter.setInsertionPointToStart(block);
+  auto sourceOp = rewriter.create<handshake::SourceOp>(
+      block->getOperations().front().getLoc());
+  Value cnstTrigger = sourceOp.getResult();
+
+  auto intType = rewriter.getIntegerType(1);
+  auto cstAttr = rewriter.getIntegerAttr(
+      intType, (expr->type == ExpressionType::One ? 1 : 0));
+
+  auto constOp = rewriter.create<handshake::ConstantOp>(
+      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
+
+  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+
+  return constOp.getResult();
+}
+
+/// Convert a `BDD` object as obtained from the bdd expansion to a
+/// circuit
+static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+                          const ftd::BlockIndexing &bi, bool needsChannelify = true) {
+  if (!bdd->successors.has_value())
+    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi, needsChannelify);
+
+  rewriter.setInsertionPointToStart(block);
+
+  // Get the two operands by recursively calling `bddToCircuit` (it possibly
+  // creates other muxes in a hierarchical way)
+  SmallVector<Value> muxOperands;
+  muxOperands.push_back(
+      bddToCircuit(rewriter, bdd->successors.value().first, block, bi, needsChannelify));
+  muxOperands.push_back(
+      bddToCircuit(rewriter, bdd->successors.value().second, block, bi, needsChannelify));
+  Value muxCond =
+      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi, needsChannelify);
+
+  // Create the multiplxer and add it to the rest of the circuit
+  auto muxOp = rewriter.create<handshake::MuxOp>(
+      block->getOperations().front().getLoc(), muxOperands[0].getType(),
+      muxCond, muxOperands);
+  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+
+  return muxOp.getResult();
+}
+
+static BoolExpression* getLoopExitCondition (CFGLoop* loop,std::vector<std::string>* cofactorList , mlir::CFGLoopInfo &li, const ftd::BlockIndexing &bi){
+  
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+  //loopExit = exitBlocks.front();
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+  return fLoopExit;
+}
+
 void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumerOp, Value operand) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  BlockIndexing bi(funcOp.getBody());
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
@@ -617,8 +733,15 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
     // Get the condition for the block exiting
-    Value conditionValue =
-        loop->getExitingBlock()->getTerminator()->getOperand(0);
+    std::vector<std::string>  cofactorList; 
+    BoolExpression *exitCondition = getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
+    Value conditionValue;
+    if (size(cofactorList)>1){
+      BDD *bdd = buildBDD(exitCondition, cofactorList);
+      conditionValue = bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
+    }
+    else 
+      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
     // Create the false constant to feed `init`
     auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
@@ -662,96 +785,6 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   // Final replace the usage of the operand in the consumer with the output of
   // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
-}
-
-/// Starting from a boolean expression which is a single variable (either
-/// direct or complement) return its corresponding circuit equivalent. This
-/// means, either we obtain the output of the operation determining the
-/// condition, or we add a `not` to complement.
-static Value boolVariableToCircuit(PatternRewriter &rewriter,
-                                   experimental::boolean::BoolExpression *expr,
-                                   Block *block, const ftd::BlockIndexing &bi) {
-
-  // Convert the expression into a single condition (for instance, `c0` or
-  // `~c0`).
-  SingleCond *singleCond = static_cast<SingleCond *>(expr);
-
-  // Use the BlockIndexing to access the block corresponding to such condition
-  // and access its terminator to determine the condition.
-  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
-  if (!conditionOpt.has_value()) {
-    llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
-    return nullptr;
-  }
-  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
-
-  // Add a not if the condition is negated.
-  if (singleCond->isNegated) {
-    rewriter.setInsertionPointToStart(block);
-    auto notOp = rewriter.create<handshake::NotOp>(
-        block->getOperations().front().getLoc(),
-        ftd::channelifyType(condition.getType()), condition);
-    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-    return notOp->getResult(0);
-  }
-  condition.setType(ftd::channelifyType(condition.getType()));
-  return condition;
-}
-
-/// Get a circuit out a boolean expression, depending on the different kinds
-/// of expressions you might have.
-static Value boolExpressionToCircuit(PatternRewriter &rewriter,
-                                     BoolExpression *expr, Block *block,
-                                     const ftd::BlockIndexing &bi) {
-
-  // Variable case
-  if (expr->type == ExpressionType::Variable)
-    return boolVariableToCircuit(rewriter, expr, block, bi);
-
-  // Constant case (either 0 or 1)
-  rewriter.setInsertionPointToStart(block);
-  auto sourceOp = rewriter.create<handshake::SourceOp>(
-      block->getOperations().front().getLoc());
-  Value cnstTrigger = sourceOp.getResult();
-
-  auto intType = rewriter.getIntegerType(1);
-  auto cstAttr = rewriter.getIntegerAttr(
-      intType, (expr->type == ExpressionType::One ? 1 : 0));
-
-  auto constOp = rewriter.create<handshake::ConstantOp>(
-      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
-
-  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return constOp.getResult();
-}
-
-/// Convert a `BDD` object as obtained from the bdd expansion to a
-/// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi) {
-  if (!bdd->successors.has_value())
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  rewriter.setInsertionPointToStart(block);
-
-  // Get the two operands by recursively calling `bddToCircuit` (it possibly
-  // creates other muxes in a hierarchical way)
-  SmallVector<Value> muxOperands;
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().first, block, bi));
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().second, block, bi));
-  Value muxCond =
-      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxOperands[0].getType(),
-      muxCond, muxOperands);
-  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return muxOp.getResult();
 }
 
 // Returns true if loop is a while loop, detected by the loop header being
@@ -814,7 +847,7 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
   } else {
 
-    llvm::errs()<<"\n Entereded else in addSuppressionInLoop\n ";
+    llvm::errs()<<"\n Entereded else in addSuppressionInLoop : multiple loop exit\n ";
 
     std::vector<std::string> cofactorList;
     SmallVector<Block *> exitBlocks;
@@ -1209,15 +1242,18 @@ llvm::errs()<<"\nstart addGsaGates\n";
         operandIndex++;
       }
 
-      Value conditionValue =
-          phi->conditionBlock->getTerminator()->getOperand(0);
-      conditionValue.print(llvm::errs());
-      // Apply a BDD expansion to the loop exit expression and the list of
-      // cofactors
-      BDD *bdd = buildBDD(phi->condition, phi->cofactorList);
+      Value conditionValue;
 
-      // Convert the boolean expression obtained through BDD to a circuit
-      conditionValue = bddToCircuit(rewriter, bdd, phi->getBlock(), bi);
+      if (size(phi->cofactorList)> 1){
+        // Apply a BDD expansion to the loop exit expression and the list of
+        // cofactors
+        BDD *bdd = buildBDD(phi->condition, phi->cofactorList);
+        // Convert the boolean expression obtained through BDD to a circuit
+        conditionValue = bddToCircuit(rewriter, bdd, phi->getBlock(), bi, false);
+      }
+      else
+        conditionValue =  phi->conditionBlock->getTerminator()->getOperand(0);
+
 phi->print();
       llvm::errs()<<"\ncondition Value\n";
       conditionValue.print(llvm::errs());
