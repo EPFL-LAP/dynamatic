@@ -65,13 +65,19 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   // Create a set for the operands of the corresponding phi function
   SmallVector<GateInput *> operands;
 
+  auto isAlreadyPresent = [&](Value c) -> bool {
+    return std::any_of(operands.begin(), operands.end(), [c](GateInput *in) {
+      return in->isTypeValue() && in->getValue() == c;
+    });
+  };
+
   // Add to the list of operands of the new gate all the values which were not
   // already used
   // TODO: senders
   for (Value v : mergeOp.getOperands()) {
-    if (!isValueAlreadyPresent(v, operands, v.getParentBlock())) {
+    if (!isAlreadyPresent(v)) {
       GateInput *gateInput = new GateInput(v);
-      gateInput->senders.insert(v.getParentBlock());
+      //gateInput->senders.insert(v.getParentBlock());
       gateInputList.push_back(gateInput);
       operands.push_back(gateInput);
     }
