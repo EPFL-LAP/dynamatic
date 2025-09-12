@@ -62,7 +62,6 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
 
   // Add to the list of operands of the new gate all the values which were not
   // already used
-  // Each new operand records its defining block as a sender.
   // TODO: Edit senders if needed
   for (Value v : mergeOp.getOperands()) {
     if (!isAlreadyPresent(v)) {
@@ -319,10 +318,10 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
         // If found, record preds as a sender of that operand.
         auto isValueAlreadyPresent = [&](Value v) -> bool {
           for (GateInput *in : operands) {
-              if (in->isTypeValue() && in->getValue() == v) {
-                  in->senders.insert(pred);
-                  return true;
-              }
+            if (in->isTypeValue() && in->getValue() == v) {
+              in->senders.insert(pred);
+              return true;
+            }
           }
           return false;
         };
@@ -671,7 +670,8 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op : operands) {
+      for (GateInput *&op
+           : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());
