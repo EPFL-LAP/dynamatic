@@ -94,8 +94,14 @@ void materializeValue(Value val) {
 
   unsigned numUses = std::distance(uses.begin(), uses.end());
 
-  if (numUses == 1)
+  if (numUses == 1) {
+    for (Operation *user : val.getUsers()) {
+      if (user != uses[0]->getOwner())
+        eraseOpRecursively(user);
+    }
+    uses[0]->set(val);
     return;
+  }
 
   ForkOp forkOp = builder.create<ForkOp>(val.getLoc(), val, numUses);
   inheritBB(val.getDefiningOp(), forkOp);
