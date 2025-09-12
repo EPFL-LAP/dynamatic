@@ -35,7 +35,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(handshake::MergeOp &merge,
   inputOp = &region;
   convertSSAToGSAMerges(merge, region);
 }
-
+/*
 bool experimental::gsa::GSAAnalysis::isValueAlreadyPresent(
     Value v, SmallVectorImpl<GateInput *> &operands, Block *pred) {
   for (GateInput *in : operands) {
@@ -45,7 +45,7 @@ bool experimental::gsa::GSAAnalysis::isValueAlreadyPresent(
     }
   }
   return false;
-}
+}*/
 
 void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
     handshake::MergeOp &mergeOp, Region &region) {
@@ -341,7 +341,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
         assert(branchOp && "Expected terminator operation in a predecessor "
                            "block feeding a block argument!");
 
-         // Check if a block-argument operand is already present among missing
+        // Check if a block-argument operand is already present among missing
         // phis. Two missing-phi operands are considered equal if they
         // originated from and target the same argument of the same block.
         // The value is not compared, which might be problematic.
@@ -354,6 +354,18 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
             }
           }
           return false;
+        };
+
+        // Check if value is already among the operands of the phi.
+        // If found, record preds as a sender of that operand.
+        auto isValueAlreadyPresent = [&](Value v) -> bool {
+            for (GateInput *in : operands) {
+                if (in->isTypeValue() && in->getValue() == v) {
+                    in->senders.insert(pred);
+                    return true;
+                }
+            }
+            return false;
         };
 
         // For each alternative in the branch terminator
@@ -385,8 +397,7 @@ llvm::errs() << "convertSSAToGSA is called" <<"\n";
               operandsMissPhi.push_back(missingPhi);
             }
           } else {
-            if (!isValueAlreadyPresent(dyn_cast<Value>(producer), operands,
-                                       pred)) {
+            if (!isValueAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
               gateInput->senders.insert(pred);
               gateInputList.push_back(gateInput);

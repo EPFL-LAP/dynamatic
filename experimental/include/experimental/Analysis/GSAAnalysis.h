@@ -180,8 +180,8 @@ public:
 
   // Check if value is already among the operands of the phi.
   // If found, record preds as a sender of that operand.
-  bool isValueAlreadyPresent(Value c, SmallVectorImpl<GateInput *> &operands,
-                             Block *pred);
+  //bool isValueAlreadyPresent(Value c, SmallVectorImpl<GateInput *> &operands,
+   //                          Block *pred);
 
   /// Get a vector containing all the gates related to a basic block.
   ArrayRef<Gate *> getGatesPerBlock(Block *bb) const;
