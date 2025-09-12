@@ -85,11 +85,9 @@ static void declareHandshakeSignals(mlir::raw_indented_ostream &os,
   }
 }
 
-static void printVhdlImpl(mlir::raw_indented_ostream &os,
-                          const unsigned &dataWidth,
-                          const unsigned &numInputOperands,
-                          const unsigned &groupSize, const unsigned &latency,
-                          ArrayRef<unsigned> listOfCredits) {
+static void printVhdlImpl(mlir::raw_indented_ostream &os, unsigned dataWidth,
+                          unsigned numInputOperands, unsigned groupSize,
+                          unsigned latency, ArrayRef<unsigned> listOfCredits) {
   os << "---------------------------------------------------------\n";
   os << "-- Sharing Wrapper Circuit for Managing the Shared Unit\n";
   os << "-- Number of credits of each operation: ";
