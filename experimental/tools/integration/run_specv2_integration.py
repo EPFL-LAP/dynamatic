@@ -368,6 +368,35 @@ def main():
             else:
                 return fail(id, "Failed to add speculative units")
 
+        # Export dot file
+        dot = os.path.join(comp_out_dir, f"{kernel_name}_spec.dot")
+        with open(dot, "w") as f:
+            result = subprocess.run([
+                EXPORT_DOT_BIN, handshake_speculation,
+                "--edge-style=spline", "--label-type=uname"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Created dot file")
+            else:
+                return fail(id, "Failed to export dot file")
+
+        # Convert DOT graph to PNG
+        png = os.path.join(comp_out_dir, f"{kernel_name}_spec.png")
+        with open(png, "w") as f:
+            result = subprocess.run([
+                "dot", "-Tpng", dot
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Created PNG file")
+            else:
+                return fail(id, "Failed to create PNG file")
+
         # Post-speculation
         handshake_post_speculation = os.path.join(
             comp_out_dir, "handshake_post_speculation.mlir")
