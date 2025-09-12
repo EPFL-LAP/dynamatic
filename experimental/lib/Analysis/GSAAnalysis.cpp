@@ -36,17 +36,6 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(handshake::MergeOp &merge,
   convertSSAToGSAMerges(merge, region);
 }
 
-bool experimental::gsa::GSAAnalysis::isValueAlreadyPresent(
-    Value v, SmallVectorImpl<GateInput *> &operands, Block *pred) {
-  for (GateInput *in : operands) {
-    if (in->isTypeValue() && in->getValue() == v) {
-      in->senders.insert(pred);
-      return true;
-    }
-  }
-  return false;
-}
-
 void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
     handshake::MergeOp &mergeOp, Region &region) {
 
@@ -65,14 +54,19 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   // Create a set for the operands of the corresponding phi function
   SmallVector<GateInput *> operands;
 
+  auto isAlreadyPresent = [&](Value c) -> bool {
+    return std::any_of(operands.begin(), operands.end(), [c](GateInput *in) {
+      return in->isTypeValue() && in->getValue() == c;
+    });
+  };
+
   // Add to the list of operands of the new gate all the values which were not
   // already used
   // Each new operand records its defining block as a sender.
-  // TODO: Edit senders. v.getParentBlock() is producer
+  // TODO: Edit senders if needed
   for (Value v : mergeOp.getOperands()) {
-    if (!isValueAlreadyPresent(v, operands, v.getParentBlock())) {
+    if (!isAlreadyPresent(v)) {
       GateInput *gateInput = new GateInput(v);
-      gateInput->senders.insert(v.getParentBlock());
       gateInputList.push_back(gateInput);
       operands.push_back(gateInput);
     }
@@ -321,6 +315,18 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
           return false;
         };
 
+        // Check if value is already among the operands of the phi.
+        // If found, record preds as a sender of that operand.
+        auto isValueAlreadyPresent = [&](Value v) -> bool {
+          for (GateInput *in : operands) {
+              if (in->isTypeValue() && in->getValue() == v) {
+                  in->senders.insert(pred);
+                  return true;
+              }
+          }
+          return false;
+        };
+
         // For each alternative in the branch terminator
         for (auto [successorId, successorBlock] :
              llvm::enumerate(branchOp->getSuccessors())) {
@@ -350,8 +356,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
               operandsMissPhi.push_back(missingPhi);
             }
           } else {
-            if (!isValueAlreadyPresent(dyn_cast<Value>(producer), operands,
-                                       pred)) {
+            if (!isValueAlreadyPresent(dyn_cast<Value>(producer))) {
               gateInput = new GateInput(producer);
               gateInput->senders.insert(pred);
               gateInputList.push_back(gateInput);
