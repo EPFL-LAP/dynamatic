@@ -583,16 +583,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       frontiers.clear();
 
       unsigned bb = loopBBs[i];
-      unsigned nextBB = loopBBs[(i + 1) % loopBBs.size()];
 
       for (auto passer : funcOp.getOps<PasserOp>()) {
         if (getLogicBB(passer) != bb)
-          continue;
-        Operation *user = getUniqueUser(passer.getResult());
-        while (getLogicBB(user) == bb) {
-          user = getUniqueUser(user->getResult(0));
-        }
-        if (getLogicBB(user) != nextBB)
           continue;
         frontiers.insert(passer);
       }
@@ -601,6 +594,13 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       do {
         frontiersUpdated = false;
         for (auto passerOp : frontiers) {
+          if (llvm::find(loopBBs,
+                         getLogicBB(getUniqueUser(passerOp.getResult()))) ==
+              loopBBs.end()) {
+            // The passer is exiting the loop. Do not move it.
+            continue;
+          }
+
           if (isEligibleForPasserMotionOverPM(passerOp)) {
             performPasserMotionPastPM(passerOp, frontiers);
             frontiersUpdated = true;
@@ -738,13 +738,15 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   }
 
   DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
-  // Convert bbMap to a json file
-  std::ofstream csvFile(bbMapping);
-  csvFile << "before,after\n";
-  for (const auto &entry : bbMap) {
-    csvFile << entry.first << "," << entry.second << "\n";
+  if (bbMapping != "") {
+    // Convert bbMap to a json file
+    std::ofstream csvFile(bbMapping);
+    csvFile << "before,after\n";
+    for (const auto &entry : bbMap) {
+      csvFile << entry.first << "," << entry.second << "\n";
+    }
+    csvFile.close();
   }
-  csvFile.close();
 
   recalculateMCBlocks(funcOp);
 }
