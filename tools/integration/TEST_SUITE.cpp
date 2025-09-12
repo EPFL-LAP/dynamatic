@@ -93,8 +93,7 @@ TEST_P(SharingUnitTestFixture, basic) {
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
-#if 0
-TEST_P(SharingFixture, basic) {
+TEST_P(SharingFixture, sharing_NoCI) {
   IntegrationTestData configWithSharing{
       // clang-format off
       .name = GetParam(),
@@ -123,7 +122,6 @@ TEST_P(SharingFixture, basic) {
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
-#endif
 
 TEST_P(SpecFixture, spec_NoCI) {
   const std::string &name = GetParam();
@@ -170,14 +168,12 @@ INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
                            return "sharing_" + info.param;
                          });
 
-#if 0
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
                          testing::Values("gsum", "gsumif", "kernel_3mm_float",
                                          "kernel_2mm_float", "gesummv_float"),
                          [](const auto &info) {
                            return "sharing_" + info.param;
                          });
-#endif
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
