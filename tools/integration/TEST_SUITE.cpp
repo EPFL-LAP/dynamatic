@@ -63,6 +63,9 @@ TEST_P(MemoryFixture, basic) {
   RecordProperty("cycles", std::to_string(config.simTime));
 }
 
+/// This testing fixture runs the test with and without sharing. It checks
+/// whenever the sharing option is enabled, the pass can run without any
+/// interruption and does not penalize the latency.
 TEST_P(SharingUnitTestFixture, basic) {
   IntegrationTestData configWithSharing{
       // clang-format off
@@ -93,6 +96,9 @@ TEST_P(SharingUnitTestFixture, basic) {
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
+/// This testing fixture runs the test with and without sharing. It checks
+/// whenever the sharing option is enabled, the pass can run without any
+/// interruption and does not penalize the latency.
 TEST_P(SharingFixture, sharing_NoCI) {
   IntegrationTestData configWithSharing{
       // clang-format off
@@ -168,12 +174,24 @@ INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
                            return "sharing_" + info.param;
                          });
 
+// clang-format off
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
-                         testing::Values("gsum", "gsumif", "kernel_3mm_float",
-                                         "kernel_2mm_float", "gesummv_float"),
-                         [](const auto &info) {
-                           return "sharing_" + info.param;
-                         });
+    testing::Values(
+      "atax_float",
+      "bicg_float",
+      "gsum",
+      "gsumif",
+      "gemm_float",
+      "mvt_float",
+      "syr2k_float",
+      "kernel_3mm_float",
+      "kernel_2mm_float",
+      "gesummv_float"
+      ),
+    [](const auto &info) {
+    return "sharing_" + info.param;
+    });
+// clang-format on
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
