@@ -17,6 +17,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cstddef>
 #include <fstream>
 
 using namespace llvm::sys;
@@ -86,21 +87,87 @@ static std::pair<Value, Value> getLoopContinueAndExit(FuncOp funcOp,
 static bool isEligibleForMuxPasserSwap(MuxOp muxOp) {
   // Ensure the rewritten subcircuit structure.
   Operation *backedgeDefiningOp = muxOp.getDataOperands()[1].getDefiningOp();
-  if (!isa<PasserOp>(backedgeDefiningOp))
+  if (!isa<PasserOp>(backedgeDefiningOp)) {
+    llvm::errs() << "data1 is not passer\n";
     return false;
+  }
   auto passerOp = cast<PasserOp>(backedgeDefiningOp);
 
   Operation *selectorDefiningOp = muxOp.getSelectOperand().getDefiningOp();
-  if (!isa<InitOp>(selectorDefiningOp))
+  if (!isa<InitOp>(selectorDefiningOp)) {
+    llvm::errs() << "mux select is not init\n";
     return false;
+  }
   auto initOp = cast<InitOp>(selectorDefiningOp);
 
-  if (!equalsIndirectly(passerOp.getCtrl(), initOp.getOperand()))
+  if (!equalsIndirectly(passerOp.getCtrl(), initOp.getOperand())) {
+    llvm::errs() << "mux select and passer ctrl not equal\n";
     return false;
+  }
 
   // TODO: Verify token counts
 
   return true;
+}
+
+static bool isMuxPasserToAndEligible(MuxOp muxOp) {
+  auto *data0 = muxOp.getDataOperands()[0].getDefiningOp();
+  auto *data1 = muxOp.getDataOperands()[1].getDefiningOp();
+
+  if (!isa<ConstantOp>(data0)) {
+    llvm::errs() << "data0 is not constant\n";
+    return false;
+  }
+  auto constOp = cast<ConstantOp>(data0);
+  if (constOp.getValue().cast<IntegerAttr>().getValue() != 0) {
+    llvm::errs() << "data0 is not constant 0\n";
+    return false;
+  }
+  auto *constDefiningOp = constOp.getOperand().getDefiningOp();
+  if (!isa<SourceOp>(constDefiningOp)) {
+    llvm::errs() << "data0 is not from source\n";
+    return false;
+  }
+
+  if (!isa<PasserOp>(data1)) {
+    llvm::errs() << "data1 is not passer\n";
+    return false;
+  }
+  auto passerOp = cast<PasserOp>(data1);
+
+  if (!equalsIndirectly(passerOp.getCtrl(), muxOp.getSelectOperand())) {
+    llvm::errs() << "mux select and passer ctrl not equal\n";
+    return false;
+  }
+
+  return true;
+}
+static AndIOp muxPasserToAnd(MuxOp muxOp) {
+  OpBuilder builder(muxOp.getContext());
+  builder.setInsertionPoint(muxOp);
+
+  auto passerOp = cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp());
+  auto constOp = cast<ConstantOp>(muxOp.getDataOperands()[0].getDefiningOp());
+  auto sourceOp = cast<SourceOp>(constOp.getOperand().getDefiningOp());
+
+  AndIOp andIOp = builder.create<AndIOp>(
+      muxOp->getLoc(), muxOp.getResult().getType(),
+      ArrayRef<Value>{passerOp.getCtrl(), passerOp.getData()});
+  inheritBB(muxOp, andIOp);
+
+  muxOp.getResult().replaceAllUsesWith(andIOp.getResult());
+
+  // Erase the old ops
+  eraseMaterializedOperation(muxOp);
+  eraseMaterializedOperation(passerOp);
+  eraseMaterializedOperation(constOp);
+  eraseMaterializedOperation(sourceOp);
+
+  materializeValue(andIOp.getLhs());
+  materializeValue(andIOp.getRhs());
+  materializeValue(andIOp.getResult());
+
+  return andIOp;
 }
 
 /// Performs the MuxPasserSwap, swapping the MuxOp and PasserOp, and updating
@@ -335,6 +402,10 @@ static bool isPasserSimplifiable(PasserOp ctrlDefiningPasser) {
     return false;
   }
   auto bottomPasser = cast<PasserOp>(bottomOp);
+  if (ctrlDefiningPasser.getResult() != bottomPasser.getCtrl()) {
+    llvm::errs() << "Ctrl mismatch\n";
+    return false;
+  }
 
   Operation *topOp = bottomPasser.getData().getDefiningOp();
   if (!isa<PasserOp>(topOp)) {
@@ -372,6 +443,10 @@ static AndIOp simplifyPasser(PasserOp ctrlDefiningPasser) {
   topPasser->erase();
   ctrlDefiningPasser->erase();
 
+  materializeValue(andOp.getLhs());
+  materializeValue(andOp.getRhs());
+  materializeValue(andOp.getResult());
+
   return andOp;
 }
 
@@ -400,7 +475,8 @@ static AndIOp moveAndIUp(AndIOp candidateAndI) {
   for (auto res : lhsFork->getResults()) {
     bool rewritten = false;
     if (auto andI = dyn_cast<AndIOp>(getUniqueUser(res))) {
-      if (andI.getLhs() == res && equalsIndirectly(andI.getRhs(), rhs)) {
+      if ((andI.getLhs() == res && equalsIndirectly(andI.getRhs(), rhs)) ||
+          (andI.getRhs() == res && equalsIndirectly(andI.getLhs(), rhs))) {
         andI.getResult().replaceAllUsesWith(newAndI.getResult());
         andI->erase();
         rewritten = true;
@@ -497,35 +573,69 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
   OpBuilder builder(funcOp->getContext());
 
-  auto [loopContinue, loopExit] = getLoopContinueAndExit(funcOp, loopBBs[0]);
-
   DenseSet<PasserOp> frontiers;
   // n is a member variable handled by tablegen.
   // Storing repeating inits for post-processing.
   SmallVector<SpecV2RepeatingInitOp> repeatingInits(n);
-  Value specLoopContinue = loopContinue;
 
   if (!disableInitialMotion) {
-    for (Operation *op : iterateOverPossiblyIndirectUsers(loopContinue)) {
-      if (auto passer = dyn_cast<PasserOp>(op)) {
+    for (size_t i = 0; i < loopBBs.size(); i++) {
+      frontiers.clear();
+
+      unsigned bb = loopBBs[i];
+      unsigned nextBB = loopBBs[(i + 1) % loopBBs.size()];
+
+      for (auto passer : funcOp.getOps<PasserOp>()) {
+        if (getLogicBB(passer) != bb)
+          continue;
+        Operation *user = getUniqueUser(passer.getResult());
+        while (getLogicBB(user) == bb) {
+          user = getUniqueUser(user->getResult(0));
+        }
+        if (getLogicBB(user) != nextBB)
+          continue;
         frontiers.insert(passer);
       }
-    }
 
-    bool frontiersUpdated;
-    do {
-      frontiersUpdated = false;
-      for (auto passerOp : frontiers) {
-        if (isEligibleForPasserMotionOverPM(passerOp)) {
-          performPasserMotionPastPM(passerOp, frontiers);
-          frontiersUpdated = true;
-          // If frontiers are updated, the iterator is outdated.
-          // Break and restart the loop.
-          break;
+      bool frontiersUpdated;
+      do {
+        frontiersUpdated = false;
+        for (auto passerOp : frontiers) {
+          if (isEligibleForPasserMotionOverPM(passerOp)) {
+            performPasserMotionPastPM(passerOp, frontiers);
+            frontiersUpdated = true;
+            // If frontiers are updated, the iterator is outdated.
+            // Break and restart the loop.
+            break;
+          }
+        }
+        // If no frontiers were updated, we can stop.
+      } while (frontiersUpdated);
+
+      SmallVector<PasserOp> ctrlDefiningPassers;
+      for (auto passer : frontiers) {
+        if (isPasserSimplifiable(passer)) {
+          ctrlDefiningPassers.push_back(passer);
         }
       }
-      // If no frontiers were updated, we can stop.
-    } while (frontiersUpdated);
+
+      for (auto passer : ctrlDefiningPassers) {
+        AndIOp andIOp = simplifyPasser(passer);
+        moveAndIUp(andIOp);
+      }
+
+      for (auto muxOp : funcOp.getOps<MuxOp>()) {
+        if (getLogicBB(muxOp) != bb)
+          continue;
+        if (!muxOp->hasAttr("specv2_loop_cond_mux"))
+          continue;
+
+        if (isMuxPasserToAndEligible(muxOp)) {
+          AndIOp andIOp = muxPasserToAnd(muxOp);
+          moveAndIUp(andIOp);
+        }
+      }
+    }
   }
 
   // Repeatedly move passers past Muxes and PMSC.
@@ -550,12 +660,10 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       frontiers.insert(passerOp);
     }
 
-    auto newRI = moveRepeatingInitsUp(specLoopContinue);
+    Value riResult = frontiers.begin()->getCtrl();
+    auto newRI = moveRepeatingInitsUp(riResult.getDefiningOp()->getOperand(0));
 
     repeatingInits[i] = newRI;
-
-    // Update SLC for the next iteration
-    specLoopContinue = newRI.getResult();
 
     // Repeatedly move passers inside PMSC.
     bool frontiersUpdated;
@@ -617,20 +725,15 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     }
 
     // Simplify the exit passers.
-    AndIOp lastAndI = nullptr;
-    for (Operation *user : iterateOverPossiblyIndirectUsers(loopExit)) {
-      if (auto ctrlDefiningPasser = dyn_cast<PasserOp>(user)) {
-        if (isPasserSimplifiable(ctrlDefiningPasser)) {
-          lastAndI = simplifyPasser(ctrlDefiningPasser);
-        } else {
-          ctrlDefiningPasser->emitError(
-              "Expected the exit passer to be simplifiable");
-        }
+    SmallVector<PasserOp> ctrlDefiningPassers;
+    for (auto passer : funcOp.getOps<PasserOp>()) {
+      if (isPasserSimplifiable(passer)) {
+        ctrlDefiningPassers.push_back(passer);
       }
     }
-
-    if (lastAndI != nullptr) {
-      moveAndIUp(lastAndI);
+    for (auto passer : ctrlDefiningPassers) {
+      AndIOp andIOp = simplifyPasser(passer);
+      moveAndIUp(andIOp);
     }
   }
 

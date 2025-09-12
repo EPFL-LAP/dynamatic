@@ -48,7 +48,7 @@ struct PostSpecV2Pass
   void runDynamaticPass() override;
 };
 
-static InitOp moveInitsUp(Value fedValue) {
+static InitOp moveInitsUp(Value fedValue, unsigned headBB) {
   fedValue = getForkTop(fedValue);
   materializeValue(fedValue);
 
@@ -64,7 +64,7 @@ static InitOp moveInitsUp(Value fedValue) {
   ForkOp fork = cast<ForkOp>(uniqueUser);
 
   auto newInit = builder.create<InitOp>(fedValue.getLoc(), fedValue, 0);
-  inheritBB(fedValue.getDefiningOp(), newInit);
+  setBB(newInit, headBB);
   fedValue.replaceAllUsesExcept(newInit.getResult(), newInit);
 
   for (auto res : fork->getResults()) {
@@ -130,7 +130,7 @@ void PostSpecV2Pass::runDynamaticPass() {
   for (auto init : funcOp.getOps<InitOp>()) {
     if (getLogicBB(init) != headBB)
       continue;
-    moveInitsUp(init.getOperand());
+    moveInitsUp(init.getOperand(), headBB);
     break;
   }
 

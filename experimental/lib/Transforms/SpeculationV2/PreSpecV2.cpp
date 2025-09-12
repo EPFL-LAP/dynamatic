@@ -100,21 +100,34 @@ static LogicalResult replaceBranchesWithPassers(FuncOp &funcOp, unsigned bb) {
 
     builder.setInsertionPoint(branch);
 
-    // Build a passer for the trueResult
-    PasserOp trueResultPasser =
-        builder.create<PasserOp>(branch.getLoc(), data, condition);
-    setBB(trueResultPasser, bb);
-    branch.getTrueResult().replaceAllUsesWith(trueResultPasser.getResult());
+    if (auto sink = dyn_cast<SinkOp>(getUniqueUser(branch.getTrueResult()))) {
+      sink->erase();
+    } else {
+      // Build a passer for the trueResult
+      PasserOp trueResultPasser =
+          builder.create<PasserOp>(branch.getLoc(), data, condition);
+      setBB(trueResultPasser, bb);
+      branch.getTrueResult().replaceAllUsesWith(trueResultPasser.getResult());
+    }
 
-    // Build a passer for the falseResult
-    // The passer ctrl is inverted condition.
-    PasserOp falseResultPasser = builder.create<PasserOp>(
-        branch.getLoc(), data, invertCondition.getResult());
-    setBB(falseResultPasser, bb);
-    branch.getFalseResult().replaceAllUsesWith(falseResultPasser.getResult());
+    if (auto sink = dyn_cast<SinkOp>(getUniqueUser(branch.getFalseResult()))) {
+      sink->erase();
+    } else {
+      // Build a passer for the falseResult
+      // The passer ctrl is inverted condition.
+      PasserOp falseResultPasser = builder.create<PasserOp>(
+          branch.getLoc(), data, invertCondition.getResult());
+      setBB(falseResultPasser, bb);
+      branch.getFalseResult().replaceAllUsesWith(falseResultPasser.getResult());
+    }
 
     // Erase the branch
     branch->erase();
+  }
+
+  if (invertCondition.getResult().use_empty()) {
+    // If the inverted condition is not used, erase it.
+    invertCondition->erase();
   }
 
   return success();
