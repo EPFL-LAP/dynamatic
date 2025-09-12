@@ -670,8 +670,7 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op
-           : operands) {
+      for (GateInput *&op : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());
