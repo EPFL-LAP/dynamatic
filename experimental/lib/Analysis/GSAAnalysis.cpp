@@ -16,6 +16,7 @@
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -78,7 +79,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
     gatesPerBlock[block].push_back(newPhi);
   }
 
-  convertPhiToMu(region);
+  convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
@@ -216,9 +217,11 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
 
   // Get the index of the condition (it is associated to a basic block in
   // "indexPerBlock" mapping)
-  Gate *newGate =
-      new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
+  Gate *newGate = new Gate(
+      originalPhi->result, operandsGamma, GateType::GammaGate,
+      ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(),
+      BoolExpression::boolVar(conditionToUse),
+      {conditionToUse}); // since condition is one block boolvar is enough
   gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
 
   return newGate;
@@ -358,7 +361,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
     missing.pi->input = *foundGate;
   }
 
-  convertPhiToMu(region);
+  convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
@@ -469,7 +472,50 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
   }
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
+// TODO: reuse functions from FtdImplementation
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                          CFGLoopInfo &li,
+                                          const BlockIndexing &bi) {
+
+  // Get the boolean expression associated to the block exit
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
+  auto *terminatorOperation = loopExit->getTerminator();
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+
+  // If the destination of the false outcome is not the block, then the
+  // condition must be negated
+  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
+    blockCond->boolNegate();
+
+  return blockCond;
+}
+
+static BoolExpression *
+getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
+                     mlir::CFGLoopInfo &li, const BlockIndexing &bi) {
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+  return fLoopExit;
+}
+
+void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
+                                                    const BlockIndexing &bi) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
@@ -511,6 +557,11 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
       // innermost loop the MU is in
       phi->conditionBlock =
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
+      // Mu condition is the negation of loop exit-> if loop exit == false ? use
+      // loop input : use initial input
+      phi->condition = getLoopExitCondition(loopInfo.getLoopFor(phiBlock),
+                                            &phi->cofactorList, loopInfo, bi)
+                           ->boolNegate();
       phi->isRoot = true;
     }
   }
