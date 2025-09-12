@@ -730,11 +730,12 @@ insertBufferOpAndOccupancyInCFDFC(handshake::BufferOp bufOp, CFDFC &cfdfc,
     // sequential buffer slot).
     //
     // Example:
-    // - Channel: producer -> T, T, DV, DV -> receiver
+    // - Channel: producer -> T, DV, DV, DV -> receiver
     // - Num of tokens: 2
     // (remark: DV introduces 1 cycle delay on data and valid, T does not
     // introduce delay on any path).
-    // In this case, the token must occupy in the 2 DV slots and but the T slots
+    // In this case, the token must occupy in the 3 DV slots and but the T
+    // slots; each DV slot holds 2/3 tokens.
     tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChanOccupancy;
     cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
