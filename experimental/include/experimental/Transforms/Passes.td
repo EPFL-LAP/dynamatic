@@ -122,6 +122,16 @@ def SpecV2PostBuffering : DynamaticPass<"handshake-spec-v2-post-buffering"> {
   ];
 }
 
+def SpecV2CutCondDep : DynamaticPass<"handshake-spec-v2-cut-cond-dep"> {
+  let summary = "Spec v2 cut condition dependency";
+  let description = [{
+  }];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the kernel information related to speculation.">,
+  ];
+}
+
 def CfGateBinarization : DynamaticPass<"cf-gate-binarization"> {
   let summary = "Limit entries to at most 2";
   let description = [{

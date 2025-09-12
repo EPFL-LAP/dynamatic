@@ -86,6 +86,10 @@ def main():
         help="Disable speculation")
     parser.add_argument(
         "--cp", type=str, help="clock period", default="10.000")
+    parser.add_argument(
+        "--use-prof-cache", action='store_true', help="Use profiling cache")
+    parser.add_argument(
+        "--decide-n", action='store_true', help="Decide n. No generation")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -325,11 +329,61 @@ def main():
         else:
             return fail(id, "Failed to apply transformations to handshake")
 
-    spec_json_path = os.path.join(c_file_dir, "specv2.json")
+    # Profiling
+    run_prof = False
+    frequencies = os.path.join(c_file_dir, "frequencies-cache.csv")
+    if args.use_prof_cache:
+        if os.path.isfile(frequencies):
+            run_prof = False
+            print("Using existing profiling cache")
+        else:
+            run_prof = True
+            print("Prof file does not exist; running profiler")
+
+    if run_prof:
+        profiler_bin = os.path.join(comp_out_dir, "profile")
+        result = subprocess.run([
+            CLANGXX_BIN, transformed_code,
+            "-D", "PRINT_PROFILING_INFO",
+            "-I", str(DYNAMATIC_ROOT / "include"),
+            "-Wno-deprecated",
+            "-o", profiler_bin
+        ])
+        if result.returncode == 0:
+            print("Built kernel for profiling")
+        else:
+            return fail(id, "Failed to place simple buffers")
+
+        profiler_inputs = os.path.join(comp_out_dir, "profiler-inputs.txt")
+        with open(profiler_inputs, "w") as f:
+            result = subprocess.run([profiler_bin],
+                                    stdout=f,
+                                    stderr=sys.stdout
+                                    )
+            if result.returncode == 0:
+                print("Ran kernel for profiling")
+            else:
+                return fail(id, "Failed to kernel for profiling")
+
+        with open(frequencies, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_PROFILER_BIN, gate_binarized,
+                "--top-level-function=" + kernel_name,
+                "--input-args-file=" + profiler_inputs,
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Profiled cf-level")
+            else:
+                return fail(id, "Failed to profile cf-level")
 
     if args.disable_spec:
         handshake_post_speculation = handshake_transformed
     else:
+        spec_json_path = os.path.join(c_file_dir, "specv2.json")
+
         # Pre-speculation
         handshake_pre_speculation = os.path.join(
             comp_out_dir, "handshake_pre_speculation.mlir")
@@ -348,11 +402,113 @@ def main():
             else:
                 return fail(id, "Failed on pre-speculation")
 
+        if args.decide_n:
+            print("Deciding n")
+            handshake_initial_speculation = os.path.join(
+                comp_out_dir, "handshake_initial_speculation.mlir")
+            bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+            with open(handshake_initial_speculation, "w") as f:
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+                    f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n=0",
+                    "--handshake-materialize",
+                    "--handshake-canonicalize"
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Added speculative units")
+                else:
+                    return fail(id, "Failed to add speculative units")
+
+            handshake_cut_dep = os.path.join(
+                comp_out_dir, "handshake_cut_dep.mlir")
+            with open(handshake_cut_dep, "w") as f:
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_initial_speculation,
+                    f"--handshake-spec-v2-cut-cond-dep=json-path={spec_json_path}",
+                    "--handshake-materialize",
+                    "--handshake-canonicalize"
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Cut conditional dependencies")
+                else:
+                    return fail(id, "Failed to cut conditional dependencies")
+
+            updated_frequencies = os.path.join(
+                comp_out_dir, "updated_frequencies.csv")
+            with open(updated_frequencies, "w") as f:
+                result = subprocess.run([
+                    "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
+                    "--frequencies=" + frequencies,
+                    "--mapping=" + bb_mapping
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Updated frequencies.csv")
+                else:
+                    return fail(id, "Failed to update frequencies.csv")
+
+            # Buffer placement 1
+            timing_model = DYNAMATIC_ROOT / "data" / "components.json"
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_initial_speculation,
+                "--handshake-set-buffering-properties=version=fpga20",
+                f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+            ],
+                stdout=subprocess.DEVNULL,
+                stderr=sys.stdout,
+                cwd=comp_out_dir
+            )
+            if result.returncode == 0:
+                print("Buffer placement (pre spec)")
+            else:
+                return fail(id, "Failed buf placement (pre spec)")
+
+            with open(os.path.join(comp_out_dir, f"buffer-placement/{kernel_name}/placement.log")) as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("CFDFC") or line.startswith("Throughput of CFDFC"):
+                        print(line)
+
+            # Buffer placement 2
+            timing_model = DYNAMATIC_ROOT / "data" / "components.json"
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_cut_dep,
+                "--handshake-set-buffering-properties=version=fpga20",
+                f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+            ],
+                stdout=subprocess.DEVNULL,
+                stderr=sys.stdout,
+                cwd=comp_out_dir
+            )
+            if result.returncode == 0:
+                print("Buffer placement (post spec)")
+            else:
+                return fail(id, "Failed buf placement (post spec)")
+
+            with open(os.path.join(comp_out_dir, f"buffer-placement/{kernel_name}/placement.log")) as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("CFDFC") or line.startswith("Throughput of CFDFC"):
+                        print(line)
+
+            return {
+                "id": id,
+                "msg": "Decided n",
+                "status": "pass"
+            }
         # Speculation
-        handshake_speculation = os.path.join(
+        handshake_initial_speculation = os.path.join(
             comp_out_dir, "handshake_speculation.mlir")
         bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
-        with open(handshake_speculation, "w") as f:
+        with open(handshake_initial_speculation, "w") as f:
             print(f"n={n}, variable={variable}")
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_pre_speculation,
@@ -372,7 +528,7 @@ def main():
         dot = os.path.join(comp_out_dir, f"{kernel_name}_spec.dot")
         with open(dot, "w") as f:
             result = subprocess.run([
-                EXPORT_DOT_BIN, handshake_speculation,
+                EXPORT_DOT_BIN, handshake_initial_speculation,
                 "--edge-style=spline", "--label-type=uname"
             ],
                 stdout=f,
@@ -402,7 +558,7 @@ def main():
             comp_out_dir, "handshake_post_speculation.mlir")
         with open(handshake_post_speculation, "w") as f:
             result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_speculation,
+                DYNAMATIC_OPT_BIN, handshake_initial_speculation,
                 f"--handshake-post-spec-v2=json-path={spec_json_path}",
                 "--handshake-materialize",
                 "--handshake-canonicalize"
@@ -414,46 +570,6 @@ def main():
                 print("Post-speculation")
             else:
                 return fail(id, "Failed on post-speculation")
-
-    # Buffer placement (fpga20)
-    profiler_bin = os.path.join(comp_out_dir, "profile")
-    result = subprocess.run([
-        CLANGXX_BIN, transformed_code,
-        "-D", "PRINT_PROFILING_INFO",
-        "-I", str(DYNAMATIC_ROOT / "include"),
-        "-Wno-deprecated",
-        "-o", profiler_bin
-    ])
-    if result.returncode == 0:
-        print("Built kernel for profiling")
-    else:
-        return fail(id, "Failed to place simple buffers")
-
-    profiler_inputs = os.path.join(comp_out_dir, "profiler-inputs.txt")
-    with open(profiler_inputs, "w") as f:
-        result = subprocess.run([profiler_bin],
-                                stdout=f,
-                                stderr=sys.stdout
-                                )
-        if result.returncode == 0:
-            print("Ran kernel for profiling")
-        else:
-            return fail(id, "Failed to kernel for profiling")
-
-    frequencies = os.path.join(comp_out_dir, "frequencies.csv")
-    with open(frequencies, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_PROFILER_BIN, gate_binarized,
-            "--top-level-function=" + kernel_name,
-            "--input-args-file=" + profiler_inputs,
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Profiled cf-level")
-        else:
-            return fail(id, "Failed to profile cf-level")
 
     # Update frequencies.csv
     if args.disable_spec:
