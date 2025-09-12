@@ -683,6 +683,9 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       placement[channel] = result;
     }
 
+    // Since we are not using MILP, we do not need to access to CFDFC to get the
+    // throughput information.
+    //
     // We cannot pass the reference of a temporary object to std::vector<..>&,
     // so we have to create this empty vector.
     std::vector<CFDFC> dummy;
@@ -706,40 +709,65 @@ insertBufferOpAndOccupancyInCFDFC(handshake::BufferOp bufOp, CFDFC &cfdfc,
   cfdfc.units.insert(bufOp.getOperation());
   cfdfc.channels.insert(bufOp.getResult());
 
-  // After the buffer is inserted, we distribute the token in the CFDFC to
-  // the buffers on the channel.
   if (!cfdfc.channelOccupancy.count(bufferIn)) {
     llvm::report_fatal_error(
         "Placing a buffer on a channel that doesn't have a registered "
         "occupancy value!");
   }
+
   double totalChanOccupancy = cfdfc.channelOccupancy[bufferIn];
-  double toDistribute;
+  double tokensInBufOp;
+  // The MILP solution returns the token occupancy per each channel in the
+  // CFDFC.
+  //
+  // The tokens in the CFDFC might be smaller than the total number slots of the
+  // channel. Therefore, we need to calculate the number of tokens per different
+  // buffer slots.
   if (totalChanOccupancy < (double)totalChannelLatency) {
     // Case "#tokens in the channel" < "Total latency of the channel":
     // Distribute tokens among slots with latency (the tokens
     // are not blocking each other, so they will only be stopped by the
     // sequential buffer slot).
-    toDistribute =
+    //
+    // Example:
+    // - Channel: producer -> T, T, DV, DV -> receiver
+    // - Num of tokens: 2
+    // (remark: DV introduces 1 cycle delay on data and valid, T does not
+    // introduce delay on any path).
+    // In this case, the token must occupy in the 2 DV slots and but the T slots
+    tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChanOccupancy;
-    cfdfc.unitOccupancy[bufOp] = toDistribute;
+    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
   } else {
     // Case "#tokens in the channel" => "Total latency of the channel":
-    // Assign 1 token to each bufer slot with latency, the rest is assigned
+    // Assign one token to each bufer slot with latency, the rest is assigned
     // bottom (from the receiver of the channel) -> up (to the producer
     // of the channel).
-    toDistribute =
-        // Assign to the slot that has DV latency
+    //
+    // Example:
+    // - Channel: producer -> T, T, DV, DV, T -> receiver
+    // - Num of tokens: 3
+    //
+    // In this case, the token must occupy in the 2 DV slots and the last T
+    // slot.
+    tokensInBufOp =
+        // Assign to the slot with DV latency >= 1
         bufOp.getLatencyDV() +
-        // Assign to the slots without DV latency
+        // Assign to the slots DV latency = 1. We insert buffers into the
+        // CFDFC starting from the channel that is the closest to the receiver,
+        // so this function does not need to take care of the order between the
+        // slots without DV latency.
         fmin(bufOp.getNumSlots() - bufOp.getLatencyDV(),
              remainingTknsToDistribute);
 
-    cfdfc.unitOccupancy[bufOp] = toDistribute;
+    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
   }
-  assert(toDistribute <= bufOp.getNumSlots() &&
+
+  // Sanity check: we should never assign more tokens to the buffer than its
+  // buffer slot.
+  assert(tokensInBufOp <= bufOp.getNumSlots() &&
          "Should not assign tokens to a buffer more than its slots!");
-  remainingTknsToDistribute -= toDistribute;
+  remainingTknsToDistribute -= tokensInBufOp;
 }
 
 void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,

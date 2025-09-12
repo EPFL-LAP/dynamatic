@@ -110,8 +110,9 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
 
-  for (auto [id, cf] : llvm::enumerate(analysis.mapFuncOpToCFDFCs[funcOp])) {
-    cfIndices[&cf] = id;
+  for (auto [cfdfcIdx, cfdfc] :
+       llvm::enumerate(analysis.mapFuncOpToCFDFCs[funcOp])) {
+    cfIndices[&cfdfc] = cfdfcIdx;
   }
 
   for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
@@ -127,7 +128,6 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
   // For each CFDFC Union, mark the most-frequently-executed CFC as performance
   // critical.
   for (CFDFCUnion &cfUnion : disjointUnions) {
-
     CFDFC **critCf =
         std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
                          [](CFDFC const *l, CFDFC const *r) {
