@@ -21,6 +21,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <unordered_set>
@@ -176,6 +177,11 @@ public:
   bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa) {
     return !pa.isPreserved<GSAAnalysis>();
   }
+
+  // Check if value is already among the operands of the phi.
+  // If found, record preds as a sender of that operand.
+  bool isValueAlreadyPresent(Value c, SmallVectorImpl<GateInput *> &operands,
+                             Block *pred);
 
   /// Get a vector containing all the gates related to a basic block.
   ArrayRef<Gate *> getGatesPerBlock(Block *bb) const;
