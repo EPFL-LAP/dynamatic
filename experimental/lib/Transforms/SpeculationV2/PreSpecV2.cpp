@@ -129,21 +129,23 @@ static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> bbs) {
   builder.setInsertionPoint(funcOp.getBodyBlock(),
                             funcOp.getBodyBlock()->begin());
 
-  unsigned headBB = bbs[0];
   Value condition = nullptr;
-  for (unsigned bb : bbs) {
+  for (size_t i = 0; i < bbs.size(); i++) {
+    unsigned bb = bbs[i];
+    unsigned nextBB = bbs[(i + 1) % bbs.size()];
     auto passers = funcOp.getOps<PasserOp>();
     auto passer = llvm::find_if(passers, [&](PasserOp passer) {
       if (getLogicBB(passer) != bb)
         return false;
 
       // Use the polarity of the passer connected inside the loop
-      auto outputBBOrNull = getLogicBB(getUniqueUser(passer.getResult()));
+      // Might not be materialized, due to the introduction of PasserOp
+      auto outputBBOrNull = getLogicBB(*passer.getResult().getUsers().begin());
       if (!outputBBOrNull.has_value()) {
         // Connected to outside the loop.
         return false;
       }
-      return llvm::find(bbs, outputBBOrNull.value()) != bbs.end();
+      return outputBBOrNull.value() == nextBB;
     });
     if (passer != passers.end()) {
       // Add the condition to loop conditions
@@ -153,15 +155,16 @@ static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> bbs) {
       } else {
         // TODO: consider the basic block
         SourceOp src = builder.create<SourceOp>(builder.getUnknownLoc());
-        setBB(src, headBB);
+        setBB(src, bb);
         ConstantOp cst = builder.create<ConstantOp>(
             builder.getUnknownLoc(),
             IntegerAttr::get(builder.getIntegerType(1), 0), src);
-        setBB(cst, headBB);
+        setBB(cst, bb);
         MuxOp mux = builder.create<MuxOp>(
             builder.getUnknownLoc(), condition.getType(), condition,
             ArrayRef<Value>{cst.getResult(), (*passer).getCtrl()});
-        setBB(mux, headBB);
+        setBB(mux, bb);
+        mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
         condition = mux.getResult();
       }
     } else {
@@ -223,6 +226,8 @@ static LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
   for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
     if (getLogicBB(muxOp) != headBB)
       continue;
+    if (muxOp->hasAttr("specv2_loop_cond_mux"))
+      continue;
 
     assert(muxOp.getDataOperands().size() == 2);
 
@@ -243,7 +248,7 @@ static LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
     }
   }
 
-  // Build an InitOp[False] for each MuxOp
+  // Build an InitOp[False] for CMerge-replacing Mux
   InitOp initOp =
       builder.create<InitOp>(loopCondition.getLoc(), loopCondition, 0);
   setBB(initOp, headBB);
