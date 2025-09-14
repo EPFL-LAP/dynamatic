@@ -480,7 +480,8 @@ void setupBackedge(FuncOp funcOp, ElasticMiterConfig &config) {
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
                           const std::filesystem::path &filename,
-                          const std::filesystem::path &contextPath) {
+                          const std::filesystem::path &contextPath,
+                          bool disableNDWire) {
 
   OwningOpRef<ModuleOp> mod =
       parseSourceFile<ModuleOp>(filename.string(), &context);
@@ -528,16 +529,18 @@ createReachabilityCircuit(MLIRContext &context,
       return funcOp.emitError("ElasticMiter currently supports only 1-bit or "
                               "control inputs.");
 
-    std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
+    if (!disableNDWire) {
+      std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
-    NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
-    setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
+      NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
+      setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
 
-    // Use the newly created NDwire's output instead of the original argument in
-    // the funcOp's operations
-    for (Operation *op : llvm::make_early_inc_range(arg.getUsers())) {
-      if (op != ndWireOp)
-        op->replaceUsesOfWith(arg, ndWireOp.getResult());
+      // Use the newly created NDwire's output instead of the original argument
+      // in the funcOp's operations
+      for (Operation *op : llvm::make_early_inc_range(arg.getUsers())) {
+        if (op != ndWireOp)
+          op->replaceUsesOfWith(arg, ndWireOp.getResult());
+      }
     }
 
     Attribute attr = funcOp.getArgNames()[i];
@@ -556,17 +559,20 @@ createReachabilityCircuit(MLIRContext &context,
   for (unsigned i = 0; i < endOp.getOperands().size(); ++i) {
     Value result = endOp.getOperand(i);
 
-    std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
+    if (!disableNDWire) {
+      std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
-    NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
-    setHandshakeAttributes(builder, endNDWireOp, maxBB + 1, ndwName);
+      NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
+      setHandshakeAttributes(builder, endNDWireOp, maxBB + 1, ndwName);
 
-    // Use the newly created NDwire's output instead of the original argument in
-    // the FuncOp's operations
-    for (Operation *op : llvm::make_early_inc_range(result.getUsers())) {
-      if (op != endNDWireOp)
-        op->replaceUsesOfWith(result, endNDWireOp.getResult());
+      // Use the newly created NDwire's output instead of the original argument
+      // in the FuncOp's operations
+      for (Operation *op : llvm::make_early_inc_range(result.getUsers())) {
+        if (op != endNDWireOp)
+          op->replaceUsesOfWith(result, endNDWireOp.getResult());
+      }
     }
+
     Attribute attr = funcOp.getResNames()[i];
     auto strAttr = attr.dyn_cast<StringAttr>();
     config.results.push_back(
@@ -775,40 +781,43 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string rhsBlockerName = "rhs_out_bl_" + outName;
     std::string eqName = "out_eq_" + outName;
 
+    Value blockerSource;
     if (allowNonacceptance) {
       NDSourceOp ndSourceOp = builder.create<NDSourceOp>(loc);
       setHandshakeAttributes(builder, ndSourceOp, bbOut, "out_nds_" + outName);
-      LazyForkOp lazyForkOp =
-          builder.create<LazyForkOp>(loc, ndSourceOp.getResult(), 2);
-      setHandshakeAttributes(builder, lazyForkOp, bbOut, "out_lf_" + outName);
-
-      size_t outputBufferSlots = disableDecoupling ? 1 : bufferSlots;
-      BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
-          loc, lazyForkOp.getResults()[0], outputBufferSlots,
-          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-      setHandshakeAttributes(builder, lhsNDSBufferOp, bbOut,
-                             "out_buf_lhs_nds_" + outName);
-      BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
-          loc, lazyForkOp.getResults()[1], outputBufferSlots,
-          dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-      setHandshakeAttributes(builder, rhsNDSBufferOp, bbOut,
-                             "out_buf_rhs_nds_" + outName);
-      Value lhsBlockerCtrl = lhsNDSBufferOp.getResult();
-      Value rhsBlockerCtrl = rhsNDSBufferOp.getResult();
-
-      BlockerOp lhsBlockerOp =
-          builder.create<BlockerOp>(loc, lhsResult, lhsBlockerCtrl);
-      setHandshakeAttributes(builder, lhsBlockerOp, bbOut, lhsBlockerName);
-      BlockerOp rhsBlockerOp =
-          builder.create<BlockerOp>(loc, rhsResult, rhsBlockerCtrl);
-      setHandshakeAttributes(builder, rhsBlockerOp, bbOut, rhsBlockerName);
-
-      lhsResult = lhsBlockerOp.getResult();
-      rhsResult = rhsBlockerOp.getResult();
+      blockerSource = ndSourceOp.getResult();
+    } else {
+      SourceOp sourceOp = builder.create<SourceOp>(loc);
+      setHandshakeAttributes(builder, sourceOp, bbOut, "out_src_" + outName);
+      blockerSource = sourceOp.getResult();
     }
 
-    Value lhsBufferInput = lhsResult;
-    Value rhsBufferInput = rhsResult;
+    LazyForkOp lazyForkOp = builder.create<LazyForkOp>(loc, blockerSource, 2);
+    setHandshakeAttributes(builder, lazyForkOp, bbOut, "out_lf_" + outName);
+
+    size_t outputBufferSlots = disableDecoupling ? 1 : bufferSlots;
+    BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
+        loc, lazyForkOp.getResults()[0], outputBufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    setHandshakeAttributes(builder, lhsNDSBufferOp, bbOut,
+                           "out_buf_lhs_nds_" + outName);
+    BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
+        loc, lazyForkOp.getResults()[1], outputBufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    setHandshakeAttributes(builder, rhsNDSBufferOp, bbOut,
+                           "out_buf_rhs_nds_" + outName);
+    Value lhsBlockerCtrl = lhsNDSBufferOp.getResult();
+    Value rhsBlockerCtrl = rhsNDSBufferOp.getResult();
+
+    BlockerOp lhsBlockerOp =
+        builder.create<BlockerOp>(loc, lhsResult, lhsBlockerCtrl);
+    setHandshakeAttributes(builder, lhsBlockerOp, bbOut, lhsBlockerName);
+    BlockerOp rhsBlockerOp =
+        builder.create<BlockerOp>(loc, rhsResult, rhsBlockerCtrl);
+    setHandshakeAttributes(builder, rhsBlockerOp, bbOut, rhsBlockerName);
+
+    Value lhsBufferInput = lhsBlockerOp.getResult();
+    Value rhsBufferInput = rhsBlockerOp.getResult();
 
     if (disableNDWire) {
       lhsNDwName = "";

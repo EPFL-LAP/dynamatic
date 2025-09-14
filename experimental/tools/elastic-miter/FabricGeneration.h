@@ -93,7 +93,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
                           const std::filesystem::path &filename,
-                          const std::filesystem::path &contextPath);
+                          const std::filesystem::path &contextPath,
+                          bool disableNDWire);
 
 // This creates an elastic-miter MLIR module and a JSON config file given the
 // path to two MLIR files. The input files need to contain exactly one module

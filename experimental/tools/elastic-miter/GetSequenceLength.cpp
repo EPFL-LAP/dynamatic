@@ -189,6 +189,11 @@ static FailureOr<size_t> compareReachableStates(
     }
   }
 
+  llvm::errs() << "nrOfTokens: " << nrOfTokens << "\n";
+  llvm::errs() << "infinite states: " << infiniteStateSet.size()
+               << ", finite states: " << finiteStateSet.size()
+               << ", difference: " << differenceCount << "\n";
+
   return differenceCount;
 }
 
@@ -202,7 +207,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
   // Add ND wires to the circuit
   auto ret = dynamatic::experimental::createReachabilityCircuit(
-      context, mlirPath, contextPath);
+      context, mlirPath, contextPath, true);
   if (failed(ret)) {
     llvm::errs() << "Failed to create reachability module.\n";
     return failure();
@@ -257,6 +262,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
   // inifinite tokens can be reached.
   int numberOfTokens = 1;
   while (true) {
+    llvm::errs() << "Analyzing reachable states with "
+                 << std::to_string(numberOfTokens) << " tokens.\n";
     std::filesystem::path wrapperPath =
         outputDir / ("main_" + std::to_string(numberOfTokens) + ".smv");
 
