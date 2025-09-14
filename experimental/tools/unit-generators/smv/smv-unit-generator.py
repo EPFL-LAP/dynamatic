@@ -161,10 +161,6 @@ def generate_code(name, mod_type, parameters):
             return ndconstant.generate_ndconstant(name, parameters)
         case "blocker":
             return blocker.generate_blocker(name, parameters)
-        case "init":
-            return init.generate_init(name, parameters)
-        case "ndwire":
-            return ndwire.generate_ndwire(name, parameters)
         case "spec_v2_repeating_init":
             return spec_v2_repeating_init.generate_spec_v2_repeating_init(name, parameters)
         case "spec_v2_interpolator":
@@ -175,6 +171,10 @@ def generate_code(name, mod_type, parameters):
             return spec_v2_nd_speculator.generate_spec_v2_nd_speculator(name, parameters)
         case "passer":
             return passer.generate_passer(name, parameters)
+        case "ndwire":
+            return ndwire.generate_ndwire(name, parameters)
+        case "init":
+            return init.generate_init(name, parameters)
         case "lsq":
             return lsq.generate_lsq(name, parameters)
         case _:
