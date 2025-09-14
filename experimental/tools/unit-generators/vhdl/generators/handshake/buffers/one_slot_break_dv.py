@@ -1,20 +1,26 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.support.buffer_counter import generate_buffer_counter, generate_buffer_counter_embedding
 
 
 def generate_one_slot_break_dv(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
+    debug_counter = params.get("debug_counter", False)
 
     if extra_signals:
-        return _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals)
+        return _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals, debug_counter)
     if bitwidth == 0:
-        return _generate_one_slot_break_dv_dataless(name)
+        return _generate_one_slot_break_dv_dataless(name, debug_counter)
     else:
-        return _generate_one_slot_break_dv(name, bitwidth)
+        return _generate_one_slot_break_dv(name, bitwidth, debug_counter)
 
 
-def _generate_one_slot_break_dv_dataless(name):
+def _generate_one_slot_break_dv_dataless(name, debug_counter):
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies = generate_buffer_counter(
+        debug_counter_name, 1) if debug_counter else ""
+
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -53,16 +59,21 @@ begin
 
   ins_ready  <= not outputValid or outs_ready;
   outs_valid <= outputValid;
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
-    return entity + architecture
+    return dependencies + entity + architecture
 
 
-def _generate_one_slot_break_dv(name, bitwidth):
+def _generate_one_slot_break_dv(name, bitwidth, debug_counter):
     inner_name = f"{name}_inner"
+    dependencies = _generate_one_slot_break_dv_dataless(inner_name, False)
 
-    dependencies = _generate_one_slot_break_dv_dataless(inner_name)
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies += generate_buffer_counter(
+        debug_counter_name, 1) if debug_counter else ""
 
     entity = f"""
 library ieee;
@@ -115,13 +126,15 @@ begin
 
   ins_ready <= inputReady;
   regEn     <= inputReady and ins_valid;
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
     return dependencies + entity + architecture
 
 
-def _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals):
+def _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals, debug_counter):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -136,4 +149,4 @@ def _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_one_slot_break_dv(name, bitwidth + extra_signals_bitwidth))
+        lambda name: _generate_one_slot_break_dv(name, bitwidth + extra_signals_bitwidth, debug_counter))
