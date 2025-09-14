@@ -1,0 +1,24 @@
+#include "handshake_passer_0.smv"
+
+
+MODULE simpleInduction_lhs_wrapper (A_in, A_in_valid, C_in, C_in_valid, D_in, D_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := simpleInduction_lhs_wrapped.B_out;
+DEFINE B_out_valid := simpleInduction_lhs_wrapped.B_out_valid;
+DEFINE simpleInduction_lhs_wrapped_B_out_ready := B_out_ready;
+DEFINE simpleInduction_lhs_wrapped_A_in := A_in;
+DEFINE simpleInduction_lhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := simpleInduction_lhs_wrapped.A_in_ready;
+DEFINE simpleInduction_lhs_wrapped_C_in := C_in;
+DEFINE simpleInduction_lhs_wrapped_C_in_valid := C_in_valid;
+DEFINE C_in_ready := simpleInduction_lhs_wrapped.C_in_ready;
+DEFINE simpleInduction_lhs_wrapped_D_in := D_in;
+DEFINE simpleInduction_lhs_wrapped_D_in_valid := D_in_valid;
+DEFINE D_in_ready := simpleInduction_lhs_wrapped.D_in_ready;
+
+
+VAR simpleInduction_lhs_wrapped : simpleInduction_lhs(simpleInduction_lhs_wrapped_A_in, simpleInduction_lhs_wrapped_A_in_valid, simpleInduction_lhs_wrapped_C_in, simpleInduction_lhs_wrapped_C_in_valid, simpleInduction_lhs_wrapped_D_in, simpleInduction_lhs_wrapped_D_in_valid, simpleInduction_lhs_wrapped_B_out_ready);
+
+-- properties

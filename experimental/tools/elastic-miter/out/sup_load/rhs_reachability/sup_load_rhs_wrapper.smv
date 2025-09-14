@@ -1,7 +1,6 @@
-#include "handshake_ndwire_0.smv"
 #include "handshake_load_0.smv"
-#include "handshake_buffer_0.smv"
 #include "handshake_passer_0.smv"
+#include "handshake_buffer_0.smv"
 
 
 MODULE sup_load_rhs_wrapper (Addr_in, Addr_in_valid, Cond, Cond_valid, Data_out_ready)

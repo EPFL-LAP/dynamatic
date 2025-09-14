@@ -49,28 +49,20 @@ static cl::opt<std::string> rhsFilenameArg(
     cl::desc("The right-hand side (RHS) input handshake MLIR file"),
     cl::cat(generalCategory));
 
-static cl::opt<std::string> customContextArg(
-    "custom-context", cl::Prefix, cl::Optional,
-    cl::desc("MLIR file specifying the custom context (optional)"),
-    cl::cat(generalCategory));
-
 static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(generalCategory));
 
 static cl::opt<bool>
-    disableNDWire("disable_ndwire",
-                  cl::desc("Disables NDWire in the miter fabric"),
-                  cl::init(false), cl::cat(generalCategory));
-static cl::opt<bool>
-    disableDecoupling("disable_decoupling",
-                      cl::desc("Disables decoupling in the miter fabric"),
+    timingInsensitive("timing_insensitive",
+                      cl::desc("Disable NDWire and Decoupling buffers"),
                       cl::init(false), cl::cat(generalCategory));
 
-static cl::opt<bool>
-    infiniteTokens("infinite_tokens",
-                   cl::desc("Enables infinite tokens in the miter fabric"),
-                   cl::init(false), cl::cat(generalCategory));
+static cl::opt<size_t>
+    specifiedTokens("specify_tokens",
+                    cl::desc("Specify the number of tokens instead of running "
+                             "reachability analysis"),
+                    cl::init(0), cl::Optional, cl::cat(generalCategory));
 
 // Specify a Sequence Length Relation constraint.
 // Can be used multiple times. E.g.: --seq_length="0+1=2" --seq_length="1<2"
@@ -191,34 +183,25 @@ parseSequenceConstraints() {
 
 static FailureOr<bool> checkEquivalence(
     MLIRContext &context, const std::filesystem::path &lhsPath,
-    const std::filesystem::path &rhsPath, const std::string &customContextPath,
+    const std::filesystem::path &rhsPath,
     const std::filesystem::path &outputDir,
     const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
         &constraints) {
 
-  std::filesystem::path contextFilePath = outputDir / "context.mlir";
-  if (customContextPath.empty()) {
-    // Create a default context if no custom context is provided
-    if (failed(generateDefaultMiterContext(context, lhsPath, contextFilePath)))
-      return failure();
-  } else {
-    // Copy the custom context file to the output directory
-    std::filesystem::copy(customContextPath, contextFilePath);
-  }
-
-  size_t nrOfTokens = 0;
-  if (!infiniteTokens) {
+  size_t nrOfTokens = specifiedTokens;
+  if (nrOfTokens == 0) {
     // Find out needed number of tokens for the LHS
     auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
-        context, outputDir / "lhs_reachability", lhsPath, contextFilePath);
+        context, outputDir / "lhs_reachability", lhsPath);
     if (failed(failOrLHSseqLen))
       return failure();
 
     // Find out needed number of tokens for the RHS
     auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
-        context, outputDir / "rhs_reachability", rhsPath, contextFilePath);
+        context, outputDir / "rhs_reachability", rhsPath);
     if (failed(failOrRHSseqLen))
       return failure();
+
     nrOfTokens = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
   }
 
@@ -229,8 +212,8 @@ static FailureOr<bool> checkEquivalence(
   // Create an elastic-miter circuit with a needed nrOfTokens to emulate an
   // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, contextFilePath, miterDir.string(), nrOfTokens,
-      allowNonacceptance, disableNDWire, disableDecoupling);
+      context, lhsPath, rhsPath, miterDir.string(), nrOfTokens,
+      allowNonacceptance, timingInsensitive);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();
@@ -326,9 +309,8 @@ int main(int argc, char **argv) {
   }
   std::filesystem::create_directories(outputDir);
 
-  auto failOrEquivalent =
-      checkEquivalence(context, lhsPath, rhsPath, customContextArg, outputDir,
-                       failOrSequenceConstraints.value());
+  auto failOrEquivalent = checkEquivalence(context, lhsPath, rhsPath, outputDir,
+                                           failOrSequenceConstraints.value());
   if (failed(failOrEquivalent)) {
     llvm::errs() << "Equivalence checking failed.\n";
     return 1;

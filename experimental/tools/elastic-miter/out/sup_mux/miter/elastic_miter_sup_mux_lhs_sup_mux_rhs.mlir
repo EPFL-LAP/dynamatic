@@ -16,11 +16,11 @@ module {
     %13 = blocker %19[%11] {handshake.bb = 3 : ui32, handshake.name = "lhs_out_bl_iterLiveIn"} : <i1>, <>
     %14 = blocker %27[%12] {handshake.bb = 3 : ui32, handshake.name = "rhs_out_bl_iterLiveIn"} : <i1>, <>
     %15 = cmpi eq, %13, %14 {handshake.bb = 3 : ui32, handshake.name = "out_eq_iterLiveIn"} : <i1>
-    %16:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "lhs_vm_fork_2"} : <i1>
+    %16:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "lhs_fork_continue"} : <i1>
     %17 = passer %4[%16#0] {handshake.bb = 1 : ui32, handshake.name = "lhs_passer"} : <i1>, <i1>
     %18 = init %16#1 {handshake.bb = 1 : ui32, handshake.name = "lhs_oldInit", initToken = 0 : ui1} : <i1>
     %19 = mux %18 [%1, %17] {handshake.bb = 1 : ui32, handshake.name = "lhs_data_mux"} : <i1>, [<i1>, <i1>] to <i1>
-    %20:2 = fork [2] %8 {handshake.bb = 2 : ui32, handshake.name = "rhs_vm_fork_2"} : <i1>
+    %20:2 = fork [2] %8 {handshake.bb = 2 : ui32, handshake.name = "rhs_fork_continue"} : <i1>
     %21 = spec_v2_repeating_init %20#0 {handshake.bb = 2 : ui32, handshake.name = "rhs_ri1", initToken = 1 : ui1} : <i1>
     %22 = buffer %21, bufferType = FIFO_BREAK_NONE, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "rhs_buffer1"} : <i1>
     %23 = init %22 {handshake.bb = 2 : ui32, handshake.name = "rhs_newInit", initToken = 0 : ui1} : <i1>

@@ -199,15 +199,14 @@ static FailureOr<size_t> compareReachableStates(
 
 FailureOr<size_t> getSequenceLength(MLIRContext &context,
                                     const std::filesystem::path &outputDir,
-                                    const std::filesystem::path &mlirPath,
-                                    const std::filesystem::path &contextPath) {
+                                    const std::filesystem::path &mlirPath) {
 
   // Create the outputDir if it doesn't exist
   std::filesystem::create_directories(outputDir);
 
   // Add ND wires to the circuit
-  auto ret = dynamatic::experimental::createReachabilityCircuit(
-      context, mlirPath, contextPath, true);
+  auto ret = dynamatic::experimental::createReachabilityCircuit(context,
+                                                                mlirPath, true);
   if (failed(ret)) {
     llvm::errs() << "Failed to create reachability module.\n";
     return failure();

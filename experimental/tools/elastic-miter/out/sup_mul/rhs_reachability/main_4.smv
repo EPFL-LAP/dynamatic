@@ -1,0 +1,35 @@
+#include "sup_mul_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_A_in : bool_input_exact(sup_mul_rhs.A_in_ready, 4);
+  VAR seq_generator_B_in : bool_input_exact(sup_mul_rhs.B_in_ready, 4);
+  VAR seq_generator_Cond : bool_input_exact(sup_mul_rhs.Cond_ready, 4);
+
+  VAR sup_mul_rhs : sup_mul_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_B_in.outs, seq_generator_B_in.outs_valid, seq_generator_Cond.outs, seq_generator_Cond.outs_valid, sink_C_out.ins_ready);
+
+  VAR sink_C_out : sink_main(sup_mul_rhs.C_out_valid);
+

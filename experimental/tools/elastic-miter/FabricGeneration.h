@@ -24,10 +24,10 @@ namespace dynamatic::experimental {
 // Instead of keeping the original BB for the LHS/RHS circuit, the BB is used to
 // organize the different part of the miter circuit. The BBs can therefore not
 // be used for any control-flow analysis.
-// constexpr unsigned int BB_IN = 0;  // Input auxillary logic
-// constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
-// constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
-// constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+constexpr unsigned int BB_IN = 0;  // Input auxillary logic
+constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
+constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
+constexpr unsigned int BB_OUT = 3; // Output auxillary logic
 
 struct ElasticMiterConfig {
   SmallVector<std::string> inputForks;
@@ -39,7 +39,6 @@ struct ElasticMiterConfig {
   SmallVector<std::pair<std::string, Type>> arguments;
   SmallVector<std::pair<std::string, Type>> results;
   SmallVector<std::string> eq;
-  SmallVector<std::string> backedges;
   std::string funcName;
   std::string lhsFuncName;
   std::string rhsFuncName;
@@ -72,8 +71,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module,
-                                          bool allowArgsNonmaterialization);
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module);
 
 LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
                              ModuleOp mod);
@@ -83,9 +81,8 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
 // contain exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   ModuleOp contextModule, size_t bufferSlots,
-                   bool allowNonacceptance, bool disableNDWire,
-                   bool disableDecoupling);
+                   size_t bufferSlots, bool allowNonacceptance,
+                   bool timingInsensitive);
 
 // Creates a reachability circuit. Essentially ND wires are put at all in- and
 // outputs of the circuit. Additionally creates a json config file with the name
@@ -93,24 +90,15 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
                           const std::filesystem::path &filename,
-                          const std::filesystem::path &contextPath,
-                          bool disableNDWire);
-
+                          bool timingInsensitive);
 // This creates an elastic-miter MLIR module and a JSON config file given the
 // path to two MLIR files. The input files need to contain exactly one module
 // each. Each module needs to contain exactely one handshake.func.
 FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
-                  const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool allowNonacceptance, bool disableNDWire,
-                  bool disableDecoupling);
-
-LogicalResult
-generateDefaultMiterContext(MLIRContext &context,
-                            const std::filesystem::path &lhsFile,
-                            const std::filesystem::path &outputFile);
+                  bool allowNonacceptance, bool timingInsensitive);
 
 } // namespace dynamatic::experimental
 

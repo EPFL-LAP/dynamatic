@@ -127,25 +127,6 @@ std::string createElasticMiterTestBench(
       }
     }
   }
-
-  for (const auto &backedge : config.backedges) {
-    wrapper << llvm::formatv("INVAR {0}.backedge_eq_{1}.result_valid -> "
-                             "{0}.backedge_eq_{1}.result;\n",
-                             modelSmvName, backedge)
-                   .str();
-
-    // tmp
-    wrapper << llvm::formatv(R"DELIM(VAR last_token_{0} : boolean;
-ASSIGN init(last_token_{0}) := TRUE;
-ASSIGN next(last_token_{0}) := case
-  {1}.backedge_constant_{0}.result_valid : {1}.backedge_constant_{0}.result;
-  TRUE : last_token_{0};
-esac;
-FAIRNESS !last_token_{0};
-)DELIM",
-                             backedge, modelSmvName)
-                   .str();
-  }
   return wrapper.str();
 }
 

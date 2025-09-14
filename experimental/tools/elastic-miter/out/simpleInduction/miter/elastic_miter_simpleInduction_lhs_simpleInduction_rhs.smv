@@ -1,0 +1,55 @@
+#include "handshake_ndsource_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_source_0.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE elastic_miter_simpleInduction_lhs_simpleInduction_rhs (A_in, A_in_valid, C_in, C_in_valid, D_in, D_in_valid, EQ_B_out_ready)
+
+
+-- input and output
+DEFINE EQ_B_out := out_eq_B_out.result;
+DEFINE EQ_B_out_valid := out_eq_B_out.result_valid;
+DEFINE out_eq_B_out_result_ready := EQ_B_out_ready;
+DEFINE in_fork_A_in_ins := A_in;
+DEFINE in_fork_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := in_fork_A_in.ins_ready;
+DEFINE in_fork_C_in_ins := C_in;
+DEFINE in_fork_C_in_ins_valid := C_in_valid;
+DEFINE C_in_ready := in_fork_C_in.ins_ready;
+DEFINE in_fork_D_in_ins := D_in;
+DEFINE in_fork_D_in_ins_valid := D_in_valid;
+DEFINE D_in_ready := in_fork_D_in.ins_ready;
+
+
+VAR in_fork_A_in : handshake_lazy_fork_0(in_fork_A_in_ins, in_fork_A_in_ins_valid, lhs_in_buf_A_in.ins_ready, rhs_in_buf_A_in.ins_ready);
+VAR lhs_in_buf_A_in : handshake_buffer_0(in_fork_A_in.outs_0, in_fork_A_in.outs_0_valid, lhs_p1.data_ready);
+VAR rhs_in_buf_A_in : handshake_buffer_0(in_fork_A_in.outs_1, in_fork_A_in.outs_1_valid, rhs_p1.data_ready);
+VAR in_fork_C_in : handshake_lazy_fork_0(in_fork_C_in_ins, in_fork_C_in_ins_valid, lhs_in_buf_C_in.ins_ready, rhs_in_buf_C_in.ins_ready);
+VAR lhs_in_buf_C_in : handshake_buffer_0(in_fork_C_in.outs_0, in_fork_C_in.outs_0_valid, lhs_p1.ctrl_ready);
+VAR rhs_in_buf_C_in : handshake_buffer_0(in_fork_C_in.outs_1, in_fork_C_in.outs_1_valid, rhs_mux.index_ready);
+VAR in_fork_D_in : handshake_lazy_fork_0(in_fork_D_in_ins, in_fork_D_in_ins_valid, lhs_in_buf_D_in.ins_ready, rhs_in_buf_D_in.ins_ready);
+VAR lhs_in_buf_D_in : handshake_buffer_0(in_fork_D_in.outs_0, in_fork_D_in.outs_0_valid, lhs_p2.ctrl_ready);
+VAR rhs_in_buf_D_in : handshake_buffer_0(in_fork_D_in.outs_1, in_fork_D_in.outs_1_valid, rhs_mux.ins_1_ready);
+VAR out_nds_B_out : handshake_ndsource_0(out_lf_B_out.ins_ready);
+VAR out_lf_B_out : handshake_lazy_fork_1(out_nds_B_out.result_valid, out_buf_lhs_nds_B_out.ins_ready, out_buf_rhs_nds_B_out.ins_ready);
+VAR out_buf_lhs_nds_B_out : handshake_buffer_1(out_lf_B_out.outs_0_valid, lhs_out_bl_B_out.ctrl_ready);
+VAR out_buf_rhs_nds_B_out : handshake_buffer_1(out_lf_B_out.outs_1_valid, rhs_out_bl_B_out.ctrl_ready);
+VAR lhs_out_bl_B_out : handshake_blocker_0(lhs_p2.result, lhs_p2.result_valid, out_buf_lhs_nds_B_out.outs_valid, out_eq_B_out.lhs_ready);
+VAR rhs_out_bl_B_out : handshake_blocker_0(rhs_p1.result, rhs_p1.result_valid, out_buf_rhs_nds_B_out.outs_valid, out_eq_B_out.rhs_ready);
+VAR out_eq_B_out : handshake_cmpi_0(lhs_out_bl_B_out.outs, lhs_out_bl_B_out.outs_valid, rhs_out_bl_B_out.outs, rhs_out_bl_B_out.outs_valid, out_eq_B_out_result_ready);
+VAR lhs_p1 : handshake_passer_0(lhs_in_buf_A_in.outs, lhs_in_buf_A_in.outs_valid, lhs_in_buf_C_in.outs, lhs_in_buf_C_in.outs_valid, lhs_p2.data_ready);
+VAR lhs_p2 : handshake_passer_0(lhs_p1.result, lhs_p1.result_valid, lhs_in_buf_D_in.outs, lhs_in_buf_D_in.outs_valid, lhs_out_bl_B_out.ins_ready);
+VAR rhs_source : handshake_source_0(rhs_constant.ctrl_ready);
+VAR rhs_constant : handshake_constant_0(rhs_source.outs_valid, rhs_mux.ins_0_ready);
+VAR rhs_mux : handshake_mux_0(rhs_in_buf_C_in.outs, rhs_in_buf_C_in.outs_valid, rhs_constant.outs, rhs_in_buf_D_in.outs, rhs_constant.outs_valid, rhs_in_buf_D_in.outs_valid, rhs_p1.ctrl_ready);
+VAR rhs_p1 : handshake_passer_0(rhs_in_buf_A_in.outs, rhs_in_buf_A_in.outs_valid, rhs_mux.outs, rhs_mux.outs_valid, rhs_out_bl_B_out.ins_ready);
+
+-- properties

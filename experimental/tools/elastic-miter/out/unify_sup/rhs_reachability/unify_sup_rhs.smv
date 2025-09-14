@@ -1,31 +1,26 @@
 #include "handshake_andi_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_ndwire_0.smv"
 
 
 MODULE unify_sup_rhs (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, B_out_ready)
 
 
 -- input and output
-DEFINE B_out := ndw_out_B_out.outs;
-DEFINE B_out_valid := ndw_out_B_out.outs_valid;
-DEFINE ndw_out_B_out_outs_ready := B_out_ready;
-DEFINE ndw_in_A_in_ins := A_in;
-DEFINE ndw_in_A_in_ins_valid := A_in_valid;
-DEFINE A_in_ready := ndw_in_A_in.ins_ready;
-DEFINE ndw_in_Cond1_ins := Cond1;
-DEFINE ndw_in_Cond1_ins_valid := Cond1_valid;
-DEFINE Cond1_ready := ndw_in_Cond1.ins_ready;
-DEFINE ndw_in_Cond2_ins := Cond2;
-DEFINE ndw_in_Cond2_ins_valid := Cond2_valid;
-DEFINE Cond2_ready := ndw_in_Cond2.ins_ready;
+DEFINE B_out := passer.result;
+DEFINE B_out_valid := passer.result_valid;
+DEFINE passer_result_ready := B_out_ready;
+DEFINE passer_data := A_in;
+DEFINE passer_data_valid := A_in_valid;
+DEFINE A_in_ready := passer.data_ready;
+DEFINE andi_lhs := Cond1;
+DEFINE andi_lhs_valid := Cond1_valid;
+DEFINE Cond1_ready := andi.lhs_ready;
+DEFINE andi_rhs := Cond2;
+DEFINE andi_rhs_valid := Cond2_valid;
+DEFINE Cond2_ready := andi.rhs_ready;
 
 
-VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, passer.data_ready);
-VAR ndw_in_Cond1 : handshake_ndwire_0(ndw_in_Cond1_ins, ndw_in_Cond1_ins_valid, andi.lhs_ready);
-VAR ndw_in_Cond2 : handshake_ndwire_0(ndw_in_Cond2_ins, ndw_in_Cond2_ins_valid, andi.rhs_ready);
-VAR ndw_out_B_out : handshake_ndwire_0(passer.result, passer.result_valid, ndw_out_B_out_outs_ready);
-VAR andi : handshake_andi_0(ndw_in_Cond1.outs, ndw_in_Cond1.outs_valid, ndw_in_Cond2.outs, ndw_in_Cond2.outs_valid, passer.ctrl_ready);
-VAR passer : handshake_passer_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, andi.result, andi.result_valid, ndw_out_B_out.ins_ready);
+VAR andi : handshake_andi_0(andi_lhs, andi_lhs_valid, andi_rhs, andi_rhs_valid, passer.ctrl_ready);
+VAR passer : handshake_passer_0(passer_data, passer_data_valid, andi.result, andi.result_valid, passer_result_ready);
 
 -- properties

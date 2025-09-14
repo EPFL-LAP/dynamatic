@@ -1,0 +1,27 @@
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE muxForkSwap_rhs_wrapper (sel_in, sel_in_valid, data_in, data_in_valid, out1_ready, out2_ready)
+
+
+-- input and output
+DEFINE out1 := muxForkSwap_rhs_wrapped.out1;
+DEFINE out1_valid := muxForkSwap_rhs_wrapped.out1_valid;
+DEFINE muxForkSwap_rhs_wrapped_out1_ready := out1_ready;
+DEFINE out2 := muxForkSwap_rhs_wrapped.out2;
+DEFINE out2_valid := muxForkSwap_rhs_wrapped.out2_valid;
+DEFINE muxForkSwap_rhs_wrapped_out2_ready := out2_ready;
+DEFINE muxForkSwap_rhs_wrapped_sel_in := sel_in;
+DEFINE muxForkSwap_rhs_wrapped_sel_in_valid := sel_in_valid;
+DEFINE sel_in_ready := muxForkSwap_rhs_wrapped.sel_in_ready;
+DEFINE muxForkSwap_rhs_wrapped_data_in := data_in;
+DEFINE muxForkSwap_rhs_wrapped_data_in_valid := data_in_valid;
+DEFINE data_in_ready := muxForkSwap_rhs_wrapped.data_in_ready;
+
+
+VAR muxForkSwap_rhs_wrapped : muxForkSwap_rhs(muxForkSwap_rhs_wrapped_sel_in, muxForkSwap_rhs_wrapped_sel_in_valid, muxForkSwap_rhs_wrapped_data_in, muxForkSwap_rhs_wrapped_data_in_valid, muxForkSwap_rhs_wrapped_out1_ready, muxForkSwap_rhs_wrapped_out2_ready);
+
+-- properties

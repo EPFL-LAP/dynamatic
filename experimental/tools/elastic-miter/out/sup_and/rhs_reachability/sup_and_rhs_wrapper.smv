@@ -1,5 +1,4 @@
 #include "handshake_passer_0.smv"
-#include "handshake_ndwire_0.smv"
 #include "handshake_andi_0.smv"
 
 

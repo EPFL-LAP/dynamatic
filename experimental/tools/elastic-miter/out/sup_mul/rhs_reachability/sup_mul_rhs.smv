@@ -1,0 +1,26 @@
+#include "handshake_passer_0.smv"
+#include "handshake_muli_0.smv"
+
+
+MODULE sup_mul_rhs (A_in, A_in_valid, B_in, B_in_valid, Cond, Cond_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := passer1.result;
+DEFINE C_out_valid := passer1.result_valid;
+DEFINE passer1_result_ready := C_out_ready;
+DEFINE muli_lhs := A_in;
+DEFINE muli_lhs_valid := A_in_valid;
+DEFINE A_in_ready := muli.lhs_ready;
+DEFINE muli_rhs := B_in;
+DEFINE muli_rhs_valid := B_in_valid;
+DEFINE B_in_ready := muli.rhs_ready;
+DEFINE passer1_ctrl := Cond;
+DEFINE passer1_ctrl_valid := Cond_valid;
+DEFINE Cond_ready := passer1.ctrl_ready;
+
+
+VAR muli : handshake_muli_0(muli_lhs, muli_lhs_valid, muli_rhs, muli_rhs_valid, passer1.data_ready);
+VAR passer1 : handshake_passer_0(muli.result, muli.result_valid, passer1_ctrl, passer1_ctrl_valid, passer1_result_ready);
+
+-- properties

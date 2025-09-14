@@ -1,0 +1,35 @@
+#include "muxForkSwap_lhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_sel_in : bool_input_exact(muxForkSwap_lhs.sel_in_ready, 1);
+  VAR seq_generator_data_in : bool_input_exact(muxForkSwap_lhs.data_in_ready, 1);
+
+  VAR muxForkSwap_lhs : muxForkSwap_lhs (seq_generator_sel_in.outs, seq_generator_sel_in.outs_valid, seq_generator_data_in.outs, seq_generator_data_in.outs_valid, sink_out1.ins_ready, sink_out2.ins_ready);
+
+  VAR sink_out1 : sink_main(muxForkSwap_lhs.out1_valid);
+  VAR sink_out2 : sink_main(muxForkSwap_lhs.out2_valid);
+

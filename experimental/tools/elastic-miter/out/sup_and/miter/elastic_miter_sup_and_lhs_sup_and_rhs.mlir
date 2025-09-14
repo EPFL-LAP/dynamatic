@@ -9,19 +9,19 @@ module {
     %6:2 = lazy_fork [2] %arg2 {handshake.bb = 0 : ui32, handshake.name = "in_fork_Cond"} : <i1>
     %7 = buffer %6#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 0 : ui32, handshake.name = "lhs_in_buf_Cond"} : <i1>
     %8 = buffer %6#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 0 : ui32, handshake.name = "rhs_in_buf_Cond"} : <i1>
-    %9 = ndsource {handshake.bb = 5 : ui32, handshake.name = "out_nds_C_out"} : <>
-    %10:2 = lazy_fork [2] %9 {handshake.bb = 5 : ui32, handshake.name = "out_lf_C_out"} : <>
-    %11 = buffer %10#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "out_buf_lhs_nds_C_out"} : <>
-    %12 = buffer %10#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 5 : ui32, handshake.name = "out_buf_rhs_nds_C_out"} : <>
-    %13 = blocker %19[%11] {handshake.bb = 5 : ui32, handshake.name = "lhs_out_bl_C_out"} : <i1>, <>
-    %14 = blocker %21[%12] {handshake.bb = 5 : ui32, handshake.name = "rhs_out_bl_C_out"} : <i1>, <>
-    %15 = cmpi eq, %13, %14 {handshake.bb = 5 : ui32, handshake.name = "out_eq_C_out"} : <i1>
-    %16:2 = fork [2] %7 {handshake.bb = 2 : ui32, handshake.name = "lhs_fork_cond"} : <i1>
-    %17 = passer %1[%16#0] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer1"} : <i1>, <i1>
-    %18 = passer %4[%16#1] {handshake.bb = 2 : ui32, handshake.name = "lhs_passer2"} : <i1>, <i1>
-    %19 = andi %17, %18 {handshake.bb = 2 : ui32, handshake.name = "lhs_andi"} : <i1>
-    %20 = andi %2, %5 {handshake.bb = 4 : ui32, handshake.name = "rhs_andi"} : <i1>
-    %21 = passer %20[%8] {handshake.bb = 4 : ui32, handshake.name = "rhs_passer1"} : <i1>, <i1>
-    end {handshake.bb = 5 : ui32, handshake.name = "end"} %15 : <i1>
+    %9 = ndsource {handshake.bb = 3 : ui32, handshake.name = "out_nds_C_out"} : <>
+    %10:2 = lazy_fork [2] %9 {handshake.bb = 3 : ui32, handshake.name = "out_lf_C_out"} : <>
+    %11 = buffer %10#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_C_out"} : <>
+    %12 = buffer %10#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_C_out"} : <>
+    %13 = blocker %19[%11] {handshake.bb = 3 : ui32, handshake.name = "lhs_out_bl_C_out"} : <i1>, <>
+    %14 = blocker %21[%12] {handshake.bb = 3 : ui32, handshake.name = "rhs_out_bl_C_out"} : <i1>, <>
+    %15 = cmpi eq, %13, %14 {handshake.bb = 3 : ui32, handshake.name = "out_eq_C_out"} : <i1>
+    %16:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "lhs_fork_cond"} : <i1>
+    %17 = passer %1[%16#0] {handshake.bb = 1 : ui32, handshake.name = "lhs_passer1"} : <i1>, <i1>
+    %18 = passer %4[%16#1] {handshake.bb = 1 : ui32, handshake.name = "lhs_passer2"} : <i1>, <i1>
+    %19 = andi %17, %18 {handshake.bb = 1 : ui32, handshake.name = "lhs_andi"} : <i1>
+    %20 = andi %2, %5 {handshake.bb = 2 : ui32, handshake.name = "rhs_andi"} : <i1>
+    %21 = passer %20[%8] {handshake.bb = 2 : ui32, handshake.name = "rhs_passer1"} : <i1>, <i1>
+    end {handshake.bb = 3 : ui32, handshake.name = "end"} %15 : <i1>
   }
 }

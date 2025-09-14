@@ -1,13 +1,13 @@
+#include "handshake_blocker_0.smv"
 #include "handshake_load_0.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_buffer_2.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_lazy_fork_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_blocker_0.smv"
-#include "handshake_lazy_fork_1.smv"
 #include "handshake_buffer_1.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_buffer_2.smv"
+#include "handshake_ndsource_0.smv"
 
 
 MODULE elastic_miter_sup_load_lhs_sup_load_rhs (Addr_in, Addr_in_valid, Cond, Cond_valid, EQ_Data_out_ready)

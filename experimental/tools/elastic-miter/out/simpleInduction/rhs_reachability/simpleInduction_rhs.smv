@@ -1,0 +1,30 @@
+#include "handshake_passer_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE simpleInduction_rhs (A_in, A_in_valid, C_in, C_in_valid, D_in, D_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := p1.result;
+DEFINE B_out_valid := p1.result_valid;
+DEFINE p1_result_ready := B_out_ready;
+DEFINE p1_data := A_in;
+DEFINE p1_data_valid := A_in_valid;
+DEFINE A_in_ready := p1.data_ready;
+DEFINE mux_index := C_in;
+DEFINE mux_index_valid := C_in_valid;
+DEFINE C_in_ready := mux.index_ready;
+DEFINE mux_ins_1 := D_in;
+DEFINE mux_ins_1_valid := D_in_valid;
+DEFINE D_in_ready := mux.ins_1_ready;
+
+
+VAR source : handshake_source_0(constant.ctrl_ready);
+VAR constant : handshake_constant_0(source.outs_valid, mux.ins_0_ready);
+VAR mux : handshake_mux_0(mux_index, mux_index_valid, constant.outs, mux_ins_1, constant.outs_valid, mux_ins_1_valid, p1.ctrl_ready);
+VAR p1 : handshake_passer_0(p1_data, p1_data_valid, mux.outs, mux.outs_valid, p1_result_ready);
+
+-- properties

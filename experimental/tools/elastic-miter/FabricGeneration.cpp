@@ -14,17 +14,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <iterator>
-#include <optional>
 #include <string>
 #include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -151,41 +147,12 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
                                outputTypes, argAttr, resAttr);
 }
 
-static inline bool eligibleForMaterialization(Value val) {
-  return isa<handshake::ControlType, handshake::ChannelType>(val.getType());
-}
-
-LogicalResult verifyIRMaterializedExceptForArgs(handshake::FuncOp funcOp) {
-  auto checkUses = [&](Operation *op, Value val, StringRef desc,
-                       unsigned idx) -> LogicalResult {
-    if (!eligibleForMaterialization(val))
-      return success();
-
-    auto numUses = std::distance(val.getUses().begin(), val.getUses().end());
-    if (numUses == 0)
-      return op->emitError() << desc << " " << idx << " has no uses.";
-    if (numUses > 1)
-      return op->emitError() << desc << " " << idx << " has multiple uses.";
-    return success();
-  };
-
-  // Check results of operations
-  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-    for (OpResult res : op.getResults()) {
-      if (failed(checkUses(&op, res, "result", res.getResultNumber())))
-        return failure();
-    }
-  }
-  return success();
-}
-
 // Get the first and only non-external FuncOp from the module.
 // Additionally check some properites:
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module,
-                                          bool allowArgsNonmaterialization) {
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   // We only support one function per module
   FuncOp funcOp = nullptr;
   for (auto op : module.getOps<FuncOp>()) {
@@ -201,16 +168,9 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module,
 
   if (funcOp) {
     // Check that the FuncOp is materialized
-    if (allowArgsNonmaterialization) {
-      if (failed(verifyIRMaterializedExceptForArgs(funcOp))) {
-        llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
-        return failure();
-      }
-    } else {
-      if (failed(dynamatic::verifyIRMaterialized(funcOp))) {
-        llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
-        return failure();
-      }
+    if (failed(dynamatic::verifyIRMaterialized(funcOp))) {
+      llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
+      return failure();
     }
   }
 
@@ -269,245 +229,23 @@ EndOp getUniqueEndOp(FuncOp funcOp) {
   return *endOps.begin();
 }
 
-llvm::StringMap<Type> getAllInputValuesFromMiterContext(FuncOp contextFunc) {
-  EndOp endOp = getUniqueEndOp(contextFunc);
-
-  llvm::StringMap<Type> inputValues;
-  for (auto [i, result] : llvm::enumerate(endOp.getOperands())) {
-    // Get the name of the result
-    auto resName = contextFunc.getResName(i);
-    // Get the type of the result
-    auto resType = result.getType();
-    // Add to the map
-    inputValues.insert({resName.str(), resType});
-  }
-  return inputValues;
-}
-
-std::optional<BlockArgument> findArg(FuncOp funcOp, StringRef argName) {
-  for (auto [i, attr] : llvm::enumerate(funcOp.getArgNames())) {
-    auto strAttr = attr.dyn_cast<StringAttr>();
-    if (strAttr && strAttr.getValue() == argName) {
-      return funcOp.getArgument(i);
-    }
-  }
-
-  return std::nullopt;
-}
-
-std::optional<Value> findRes(FuncOp funcOp, StringRef resName) {
-  EndOp endOp = getUniqueEndOp(funcOp);
-  for (auto [i, attr] : llvm::enumerate(funcOp.getResNames())) {
-    auto strAttr = attr.dyn_cast<StringAttr>();
-    if (strAttr && strAttr.getValue() == resName) {
-      return endOp.getOperand(i);
-    }
-  }
-
-  return std::nullopt;
-}
-
-FuncOp fuseValueManager(FuncOp contextFuncOp, FuncOp funcOp) {
-  OpBuilder builder(funcOp.getContext());
-
-  auto [newFuncOp, newBlock] = buildNewFuncWithBlock(
-      funcOp.getName(), contextFuncOp.getResultTypes(), funcOp.getResultTypes(),
-      contextFuncOp.getResNames(), funcOp.getResNames());
-
-  funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
-
-  builder.setInsertionPointToStart(newBlock);
-
-  for (auto [i, newArg] : llvm::enumerate(newFuncOp.getArguments())) {
-    // Get the name and type of the input value
-    auto name = contextFuncOp.getResName(i);
-
-    if (auto arg = findArg(funcOp, name)) {
-      assert(arg->getType() == newArg.getType() &&
-             "The type of the argument does not match the expected type");
-
-      arg->replaceAllUsesWith(newArg);
-    }
-
-    if (newArg.hasOneUse())
-      continue;
-    if (newArg.use_empty()) {
-      auto sinkOp = builder.create<SinkOp>(newArg.getLoc(), newArg);
-      setHandshakeAttributes(builder, sinkOp, 1,
-                             "vm_sink_" + std::to_string(i));
-      continue;
-    }
-
-    auto forkOp = builder.create<ForkOp>(
-        newArg.getLoc(), newArg,
-        std::distance(newArg.getUses().begin(), newArg.getUses().end()));
-    setHandshakeAttributes(builder, forkOp, 1, "vm_fork_" + std::to_string(i));
-    int j = 0;
-    for (OpOperand &opOperand : llvm::make_early_inc_range(newArg.getUses())) {
-      if (opOperand.getOwner() == forkOp)
-        continue;
-      opOperand.set(forkOp.getResult()[j]);
-      j++;
-    }
-  }
-
-  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-    op.remove();
-    newBlock->getOperations().push_back(&op);
-    unsigned bb = getLogicBB(&op).value_or(0);
-    setBB(&op, bb + 1);
-  }
-
-  funcOp->erase();
-  return newFuncOp;
-}
-
-std::pair<FuncOp, unsigned> fuseContext(FuncOp contextFuncOp, FuncOp funcOp) {
-  OpBuilder builder(funcOp.getContext());
-
-  auto [newFuncOp, newBlock] =
-      buildNewFuncWithBlock(funcOp.getName(), contextFuncOp.getArgumentTypes(),
-                            funcOp.getResultTypes(),
-                            contextFuncOp.getArgNames(), funcOp.getResNames());
-
-  funcOp->getParentOfType<ModuleOp>().push_back(newFuncOp);
-
-  builder.setInsertionPointToStart(newBlock);
-
-  for (auto [i, newArg] : llvm::enumerate(newFuncOp.getArguments())) {
-    auto oldArg = contextFuncOp.getArgument(i);
-    oldArg.replaceAllUsesWith(newArg);
-  }
-
-  EndOp endOp = getUniqueEndOp(contextFuncOp);
-
-  for (auto [i, oldArg] : llvm::enumerate(funcOp.getArguments())) {
-    auto newResult = endOp->getOperand(i);
-    oldArg.replaceAllUsesWith(newResult);
-  }
-  endOp->erase();
-
-  // move all operations from the context function to the new function
-  unsigned contextMaxBB = 0;
-  for (Operation &op : llvm::make_early_inc_range(contextFuncOp.getOps())) {
-    op.remove();
-    newBlock->getOperations().push_back(&op);
-    unsigned bb = getLogicBB(&op).value_or(0);
-    setBB(&op, bb + 1);
-    contextMaxBB = std::max(contextMaxBB, bb + 1);
-  }
-
-  unsigned maxBB = contextMaxBB;
-  for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-    op.remove();
-    newBlock->getOperations().push_back(&op);
-    unsigned bb = getLogicBB(&op).value_or(0);
-    setBB(&op, bb + contextMaxBB);
-    maxBB = std::max(maxBB, bb + contextMaxBB);
-  }
-
-  contextFuncOp->erase();
-  funcOp->erase();
-
-  return std::make_pair(newFuncOp, maxBB);
-}
-
-void handleBackedge(FuncOp funcOp, OpBuilder &builder, Value arg,
-                    Value resValue, StringRef argName, unsigned endBB,
-                    ElasticMiterConfig &config) {
-  auto source = builder.create<SourceOp>(funcOp.getLoc());
-  setHandshakeAttributes(builder, source, 0,
-                         "backedge_source_" + argName.str());
-  auto constant = builder.create<NDConstantOp>(funcOp.getLoc(), arg.getType(),
-                                               source.getResult());
-  setHandshakeAttributes(builder, constant, 0,
-                         "backedge_constant_" + argName.str());
-
-  auto lazyForkStart =
-      builder.create<ForkOp>(funcOp.getLoc(), constant.getResult(), 2);
-  setHandshakeAttributes(builder, lazyForkStart, 0,
-                         "backedge_lf_start_" + argName.str());
-
-  auto sink = builder.create<SinkOp>(funcOp.getLoc(), arg);
-  setHandshakeAttributes(builder, sink, 0,
-                         "backedge_sink_start_" + argName.str());
-  arg.replaceAllUsesExcept(lazyForkStart.getResults()[0], sink);
-
-  auto lazyForkEnd = builder.create<LazyForkOp>(funcOp.getLoc(), resValue, 2);
-  setHandshakeAttributes(builder, lazyForkEnd, endBB,
-                         "backedge_lf_end_" + argName.str());
-  resValue.replaceAllUsesExcept(lazyForkEnd.getResults()[0], lazyForkEnd);
-
-  auto compOp = builder.create<CmpIOp>(funcOp.getLoc(), CmpIPredicate::eq,
-                                       lazyForkStart.getResults()[1],
-                                       lazyForkEnd.getResults()[1]);
-  setHandshakeAttributes(builder, compOp, endBB,
-                         "backedge_eq_" + argName.str());
-
-  auto sinkOp = builder.create<SinkOp>(funcOp.getLoc(), compOp.getResult());
-  setHandshakeAttributes(builder, sinkOp, endBB,
-                         "backedge_sink_end_" + argName.str());
-
-  config.backedges.push_back(argName.str());
-}
-
-void setupBackedge(FuncOp funcOp, ElasticMiterConfig &config) {
-  OpBuilder builder(funcOp.getContext());
-  builder.setInsertionPointToStart(&funcOp.getBody().front());
-
-  EndOp endOp = getUniqueEndOp(funcOp);
-  unsigned endBB = getLogicBB(endOp).value();
-
-  for (auto [i, argName] : llvm::enumerate(funcOp.getArgNames())) {
-    auto argNameStr = argName.cast<StringAttr>().getValue();
-    if (!argNameStr.ends_with("_backedge"))
-      continue;
-
-    argNameStr = argNameStr.drop_back(strlen("_backedge"));
-    Value arg = funcOp.getArgument(i);
-    if (auto res = findRes(funcOp, argNameStr)) {
-      handleBackedge(funcOp, builder, arg, res.value(), argNameStr, endBB,
-                     config);
-    } else if (auto res = findRes(funcOp, "EQ_" + argNameStr.str())) {
-      Value resValue = res.value().getDefiningOp<CmpIOp>().getLhs();
-      handleBackedge(funcOp, builder, arg, resValue, argNameStr, endBB, config);
-    }
-  }
-}
-
 // Create the reachability circuit by putting ND wires at all the in- and
 // outputs
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context,
                           const std::filesystem::path &filename,
-                          const std::filesystem::path &contextPath,
-                          bool disableNDWire) {
+                          bool timingInsensitive) {
 
   OwningOpRef<ModuleOp> mod =
       parseSourceFile<ModuleOp>(filename.string(), &context);
   if (!mod)
     return failure();
 
-  OwningOpRef<ModuleOp> contextMod =
-      parseSourceFile<ModuleOp>(contextPath.string(), &context);
-  if (!contextMod)
-    return failure();
-  auto contextFuncOrFailure = getModuleFuncOpAndCheck(contextMod.get(), false);
-  if (failed(contextFuncOrFailure)) {
-    llvm::errs() << "Failed to get context FuncOp.\n";
-    return failure();
-  }
-
   // Get the FuncOp from the module, also check some needed properties
-  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get(), true);
+  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get());
   if (failed(funcOrFailure))
     return failure();
   FuncOp funcOp = funcOrFailure.value();
-
-  funcOp = fuseValueManager(contextFuncOrFailure.value(), funcOp);
-
-  auto [newFuncOp, maxBB] = fuseContext(contextFuncOrFailure.value(), funcOp);
-  funcOp = newFuncOp;
 
   OpBuilder builder(&context);
 
@@ -529,7 +267,7 @@ createReachabilityCircuit(MLIRContext &context,
       return funcOp.emitError("ElasticMiter currently supports only 1-bit or "
                               "control inputs.");
 
-    if (!disableNDWire) {
+    if (!timingInsensitive) {
       std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
       NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
@@ -550,7 +288,6 @@ createReachabilityCircuit(MLIRContext &context,
   }
 
   EndOp endOp = getUniqueEndOp(funcOp);
-  setBB(endOp, maxBB + 1);
 
   // Create the output side auxillary logic:
   // Every output of the LHS/RHS circuits is connected to a non-derministic
@@ -559,11 +296,11 @@ createReachabilityCircuit(MLIRContext &context,
   for (unsigned i = 0; i < endOp.getOperands().size(); ++i) {
     Value result = endOp.getOperand(i);
 
-    if (!disableNDWire) {
+    if (!timingInsensitive) {
       std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
       NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
-      setHandshakeAttributes(builder, endNDWireOp, maxBB + 1, ndwName);
+      setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
 
       // Use the newly created NDwire's output instead of the original argument
       // in the FuncOp's operations
@@ -579,8 +316,6 @@ createReachabilityCircuit(MLIRContext &context,
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
 
-  setupBackedge(funcOp, config);
-
   return std::make_pair(mod.release(), config);
 }
 
@@ -589,12 +324,11 @@ createReachabilityCircuit(MLIRContext &context,
 // exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   ModuleOp contextModule, size_t bufferSlots,
-                   bool allowNonacceptance, bool disableNDWire,
-                   bool disableDecoupling) {
+                   size_t bufferSlots, bool allowNonacceptance,
+                   bool timingInsensitive) {
 
   // Get the LHS FuncOp from the LHS module, also check some required properties
-  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule, true);
+  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
   if (failed(funcOrFailure)) {
     llvm::errs() << "Failed to get LHS FuncOp.\n";
     return failure();
@@ -602,22 +336,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   FuncOp lhsFuncOp = funcOrFailure.value();
 
   // Get the RHS FuncOp from the RHS module
-  funcOrFailure = getModuleFuncOpAndCheck(rhsModule, true);
+  funcOrFailure = getModuleFuncOpAndCheck(rhsModule);
   if (failed(funcOrFailure)) {
     llvm::errs() << "Failed to get RHS FuncOp.\n";
     return failure();
   }
   FuncOp rhsFuncOp = funcOrFailure.value();
-
-  funcOrFailure = getModuleFuncOpAndCheck(contextModule, false);
-  if (failed(funcOrFailure)) {
-    llvm::errs() << "Failed to get context FuncOp.\n";
-    return failure();
-  }
-  FuncOp contextFuncOp = funcOrFailure.value();
-
-  lhsFuncOp = fuseValueManager(contextFuncOp, lhsFuncOp);
-  rhsFuncOp = fuseValueManager(contextFuncOp, rhsFuncOp);
 
   OpBuilder builder(&context);
 
@@ -650,26 +374,19 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   miterModule.push_back(newFuncOp);
 
   // Add "lhs_" to all operations in the LHS funcOp
-  unsigned lhsBBMax = 0;
   for (Operation &op : lhsFuncOp.getOps()) {
     if (failed(prefixOperation(op, "lhs_"))) {
-      op.dump();
       llvm::errs() << "Failed to prefix the LHS.\n";
       return failure();
     }
-    unsigned bb = getLogicBB(&op).value_or(0);
-    lhsBBMax = std::max(lhsBBMax, bb);
   }
 
   // Add "rhs_" to all operations in the RHS funcOp
-  unsigned rhsBBMax = 0;
   for (Operation &op : rhsFuncOp.getOps()) {
     if (failed(prefixOperation(op, "rhs_"))) {
       llvm::errs() << "Failed to prefix the RHS.\n";
       return failure();
     }
-    unsigned bb = getLogicBB(&op).value_or(0);
-    rhsBBMax = std::max(rhsBBMax, bb);
   }
 
   builder.setInsertionPointToStart(newBlock);
@@ -682,8 +399,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // from surrounding circuits. The output of the ND wire is then connected to
   // the original input of the circuits. This completely decouples the
   // operation of the two circuits.
-  unsigned bbIn = 0;
-  size_t inputBufferSlots = disableDecoupling ? 1 : bufferSlots;
+  size_t inputBufferSlots = timingInsensitive ? 1 : bufferSlots;
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
     Value lhsArg = lhsFuncOp.getArgument(i);
     Value rhsArg = rhsFuncOp.getArgument(i);
@@ -701,26 +417,26 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
     auto forkOp = builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
-    setHandshakeAttributes(builder, forkOp, bbIn, forkName);
+    setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
     config.inputForks.push_back(forkName);
 
     BufferOp lhsBufferOp = builder.create<BufferOp>(
         forkOp.getLoc(), forkOp.getResult()[0], inputBufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     lhsBufferOp.setDebugCounter(true);
-    setHandshakeAttributes(builder, lhsBufferOp, bbIn, lhsBufName);
+    setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
     Value lhsNDWireInput = lhsBufferOp.getResult();
 
     BufferOp rhsBufferOp = builder.create<BufferOp>(
         forkOp.getLoc(), forkOp.getResult()[1], inputBufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     rhsBufferOp.setDebugCounter(true);
-    setHandshakeAttributes(builder, rhsBufferOp, bbIn, rhsBufName);
+    setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
     Value rhsNDWireInput = rhsBufferOp.getResult();
 
     Value lhsInput = lhsNDWireInput;
     Value rhsInput = rhsNDWireInput;
-    if (disableNDWire) {
+    if (timingInsensitive) {
       lhsNdwName = "";
       rhsNdwName = "";
     } else {
@@ -728,8 +444,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
           builder.create<NDWireOp>(forkOp.getLoc(), lhsNDWireInput);
       NDWireOp rhsNDWireOp =
           builder.create<NDWireOp>(forkOp.getLoc(), rhsNDWireInput);
-      setHandshakeAttributes(builder, lhsNDWireOp, bbIn, lhsNdwName);
-      setHandshakeAttributes(builder, rhsNDWireOp, bbIn, rhsNdwName);
+      setHandshakeAttributes(builder, lhsNDWireOp, BB_IN, lhsNdwName);
+      setHandshakeAttributes(builder, rhsNDWireOp, BB_IN, rhsNdwName);
       lhsInput = lhsNDWireOp.getResult();
       rhsInput = rhsNDWireOp.getResult();
     }
@@ -746,12 +462,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     // the rhsFuncOp's operations
     for (Operation *op : llvm::make_early_inc_range(rhsArg.getUsers()))
       op->replaceUsesOfWith(rhsArg, rhsInput);
-  }
 
-  for (auto [i, arg] : llvm::enumerate(contextFuncOp.getArguments())) {
-    StringAttr attr = cast<StringAttr>(contextFuncOp.getArgNames()[i]);
+    Attribute attr = lhsFuncOp.getArgNames()[i];
+    auto strAttr = attr.dyn_cast<StringAttr>();
     config.arguments.push_back(
-        std::make_pair(attr.getValue().str(), arg.getType()));
+        std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
   }
 
   // Get lhs and rhs EndOp, after checking there is only one EndOp each
@@ -765,9 +480,9 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // completely decouples the operation of the two circuits. The buffers then
   // are connected pairwise to a comparator to check that the outputs are
   // equivalent.
-  unsigned bbOut = lhsBBMax + rhsBBMax + 1;
   llvm::SmallVector<Value> miterResultValues;
   Location loc = newFuncOp.getLoc();
+  size_t outputBufferSlots = timingInsensitive ? 1 : bufferSlots;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
@@ -784,42 +499,41 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     Value blockerSource;
     if (allowNonacceptance) {
       NDSourceOp ndSourceOp = builder.create<NDSourceOp>(loc);
-      setHandshakeAttributes(builder, ndSourceOp, bbOut, "out_nds_" + outName);
+      setHandshakeAttributes(builder, ndSourceOp, BB_OUT, "out_nds_" + outName);
       blockerSource = ndSourceOp.getResult();
     } else {
       SourceOp sourceOp = builder.create<SourceOp>(loc);
-      setHandshakeAttributes(builder, sourceOp, bbOut, "out_src_" + outName);
+      setHandshakeAttributes(builder, sourceOp, BB_OUT, "out_src_" + outName);
       blockerSource = sourceOp.getResult();
     }
 
     LazyForkOp lazyForkOp = builder.create<LazyForkOp>(loc, blockerSource, 2);
-    setHandshakeAttributes(builder, lazyForkOp, bbOut, "out_lf_" + outName);
+    setHandshakeAttributes(builder, lazyForkOp, BB_OUT, "out_lf_" + outName);
 
-    size_t outputBufferSlots = disableDecoupling ? 1 : bufferSlots;
     BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
         loc, lazyForkOp.getResults()[0], outputBufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    setHandshakeAttributes(builder, lhsNDSBufferOp, bbOut,
+    setHandshakeAttributes(builder, lhsNDSBufferOp, BB_OUT,
                            "out_buf_lhs_nds_" + outName);
     BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
         loc, lazyForkOp.getResults()[1], outputBufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    setHandshakeAttributes(builder, rhsNDSBufferOp, bbOut,
+    setHandshakeAttributes(builder, rhsNDSBufferOp, BB_OUT,
                            "out_buf_rhs_nds_" + outName);
     Value lhsBlockerCtrl = lhsNDSBufferOp.getResult();
     Value rhsBlockerCtrl = rhsNDSBufferOp.getResult();
 
     BlockerOp lhsBlockerOp =
         builder.create<BlockerOp>(loc, lhsResult, lhsBlockerCtrl);
-    setHandshakeAttributes(builder, lhsBlockerOp, bbOut, lhsBlockerName);
+    setHandshakeAttributes(builder, lhsBlockerOp, BB_OUT, lhsBlockerName);
     BlockerOp rhsBlockerOp =
         builder.create<BlockerOp>(loc, rhsResult, rhsBlockerCtrl);
-    setHandshakeAttributes(builder, rhsBlockerOp, bbOut, rhsBlockerName);
+    setHandshakeAttributes(builder, rhsBlockerOp, BB_OUT, rhsBlockerName);
 
     Value lhsBufferInput = lhsBlockerOp.getResult();
     Value rhsBufferInput = rhsBlockerOp.getResult();
 
-    if (disableNDWire) {
+    if (timingInsensitive) {
       lhsNDwName = "";
       rhsNDwName = "";
     } else {
@@ -829,8 +543,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       lhsEndNDWireOp = builder.create<NDWireOp>(loc, lhsResult);
       rhsEndNDWireOp = builder.create<NDWireOp>(loc, rhsResult);
 
-      setHandshakeAttributes(builder, lhsEndNDWireOp, bbOut, lhsNDwName);
-      setHandshakeAttributes(builder, rhsEndNDWireOp, bbOut, rhsNDwName);
+      setHandshakeAttributes(builder, lhsEndNDWireOp, BB_OUT, lhsNDwName);
+      setHandshakeAttributes(builder, rhsEndNDWireOp, BB_OUT, rhsNDwName);
 
       lhsBufferInput = lhsEndNDWireOp.getResult();
       rhsBufferInput = rhsEndNDWireOp.getResult();
@@ -838,7 +552,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     Value lhsInput = lhsBufferInput;
     Value rhsInput = rhsBufferInput;
-    if (disableDecoupling) {
+    if (timingInsensitive) {
       lhsBufName = "";
       rhsBufName = "";
     } else {
@@ -849,8 +563,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
           loc, rhsBufferInput, bufferSlots,
           dynamatic::handshake::BufferType::FIFO_BREAK_DV);
 
-      setHandshakeAttributes(builder, lhsEndBufferOp, bbOut, lhsBufName);
-      setHandshakeAttributes(builder, rhsEndBufferOp, bbOut, rhsBufName);
+      setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
+      setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
       lhsInput = lhsEndBufferOp.getResult();
       rhsInput = rhsEndBufferOp.getResult();
@@ -860,12 +574,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       SmallVector<Value> joinInputs = {lhsInput, rhsInput};
       JoinOp joinOp =
           builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
-      setHandshakeAttributes(builder, joinOp, bbOut, eqName);
+      setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);
       miterResultValues.push_back(joinOp.getResult());
     } else {
       CmpIOp compOp = builder.create<CmpIOp>(
           builder.getUnknownLoc(), CmpIPredicate::eq, lhsInput, rhsInput);
-      setHandshakeAttributes(builder, compOp, bbOut, eqName);
+      setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
       miterResultValues.push_back(compOp.getResult());
     }
 
@@ -892,24 +606,20 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   for (Operation &op : llvm::make_early_inc_range(lhsFuncOp.getOps())) {
     op.remove();
     newBlock->getOperations().push_back(&op);
+    setBB(&op, BB_LHS);
   }
 
   // Move operations from rhs to the new miter FuncOp and set the handshake.bb
   for (Operation &op : llvm::make_early_inc_range(rhsFuncOp.getOps())) {
     op.remove();
     newBlock->getOperations().push_back(&op);
-    unsigned bb = getLogicBB(&op).value_or(0);
-    dynamatic::setBB(&op, bb + lhsBBMax);
+    setBB(&op, BB_RHS);
   }
 
   builder.setInsertionPointToEnd(newBlock);
   EndOp newEndOp =
       builder.create<EndOp>(builder.getUnknownLoc(), miterResultValues);
-  setHandshakeAttributes(builder, newEndOp, bbOut, "end");
-
-  newFuncOp = fuseContext(contextFuncOp, newFuncOp).first;
-
-  setupBackedge(newFuncOp, config);
+  setHandshakeAttributes(builder, newEndOp, BB_OUT, "end");
 
   return std::make_pair(miterModule, config);
 }
@@ -917,10 +627,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
-                  const std::filesystem::path &contextPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool allowNonacceptance, bool disableNDWire,
-                  bool disableDecoupling) {
+                  bool allowNonacceptance, bool timingInsensitive) {
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
   if (!lhsModuleRef) {
@@ -937,17 +645,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   }
   ModuleOp rhsModule = rhsModuleRef.get();
 
-  OwningOpRef<ModuleOp> contextModuleRef =
-      parseSourceFile<ModuleOp>(contextPath.string(), &context);
-  if (!contextModuleRef) {
-    llvm::errs() << "Failed to load context module.\n";
-    return failure();
-  }
-  ModuleOp contextModule = contextModuleRef.get();
-
-  auto ret = createElasticMiter(context, lhsModule, rhsModule, contextModule,
-                                nrOfTokens, allowNonacceptance, disableNDWire,
-                                disableDecoupling);
+  auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens,
+                                allowNonacceptance, timingInsensitive);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();
@@ -961,48 +660,6 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
     return failure();
   }
   return std::make_pair(outputDir / mlirFilename, config);
-}
-
-LogicalResult
-generateDefaultMiterContext(MLIRContext &context,
-                            const std::filesystem::path &lhsFile,
-                            const std::filesystem::path &outputFile) {
-  OwningOpRef<ModuleOp> lhsMod =
-      parseSourceFile<ModuleOp>(lhsFile.string(), &context);
-  if (!lhsMod) {
-    llvm::errs() << "Failed to parse the provided MLIR file: " << lhsFile
-                 << "\n";
-    return failure();
-  }
-
-  auto lhsFuncOps = lhsMod.get().getOps<FuncOp>();
-  assert(std::distance(lhsFuncOps.begin(), lhsFuncOps.end()) == 1 &&
-         "Expected a single function");
-
-  FuncOp lhsFuncOp = *lhsFuncOps.begin();
-
-  OpBuilder builder(&context);
-  ModuleOp module = ModuleOp::create(builder.getUnknownLoc());
-
-  // Create a new function with the input values as arguments
-  auto [funcOp, entryBlock] = buildNewFuncWithBlock(
-      "context", lhsFuncOp.getArgumentTypes(), lhsFuncOp.getArgumentTypes(),
-      lhsFuncOp.getArgNames(), lhsFuncOp.getArgNames());
-  module.push_back(funcOp);
-
-  builder.setInsertionPointToStart(entryBlock);
-
-  EndOp endOp =
-      builder.create<EndOp>(builder.getUnknownLoc(), funcOp.getArguments());
-  setHandshakeAttributes(builder, endOp, 1, "end");
-
-  // Write the module to the output file
-  if (failed(createMlirFile(outputFile, module))) {
-    llvm::errs() << "Failed to write default context MLIR file.\n";
-    return failure();
-  }
-
-  return success();
 }
 
 } // namespace dynamatic::experimental

@@ -1,0 +1,76 @@
+-- handshake_muli_0 : muli(['latency=4', 'bitwidth=1'])
+
+
+
+MODULE handshake_muli_0(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
+  VAR inner_handshake_manager : handshake_muli_0__handshake_manager(lhs_valid, rhs_valid, outs_ready);
+
+  -- output
+  DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
+  DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
+  DEFINE result_valid := inner_handshake_manager.outs_valid;
+
+  DEFINE result := lhs & rhs;
+  
+  
+MODULE handshake_muli_0__handshake_manager(lhs_valid, rhs_valid, outs_ready)
+  VAR inner_join : handshake_muli_0__handshake_manager__join(lhs_valid, rhs_valid, inner_delay_buffer.ins_ready);
+  VAR inner_delay_buffer : handshake_muli_0__handshake_manager__delay_buffer(inner_join.outs_valid, outs_ready);
+
+  -- output
+  DEFINE lhs_ready := inner_join.ins_0_ready;
+  DEFINE rhs_ready := inner_join.ins_1_ready;
+  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+  
+  
+MODULE handshake_muli_0__handshake_manager__join(ins_0_valid, ins_1_valid, outs_ready)
+
+  DEFINE
+  all_valid := ins_0_valid & ins_1_valid;
+
+  -- output
+  DEFINE
+  ins_0_ready := outs_ready & ins_1_valid;
+  ins_1_ready := outs_ready & ins_0_valid;
+  outs_valid := all_valid;
+
+  
+MODULE handshake_muli_0__handshake_manager__delay_buffer(ins_valid, outs_ready)
+  VAR inner_one_slot_break_dv : handshake_muli_0__handshake_manager__delay_buffer__one_slot_break_dv_dataless(v2, outs_ready);
+  VAR v0 : boolean;
+  VAR v1 : boolean;
+  VAR v2 : boolean;
+
+  ASSIGN init(v0) := FALSE;
+  ASSIGN next(v0) := ins_valid;
+
+  ASSIGN init(v1) := FALSE;
+  ASSIGN next(v1) := inner_one_slot_break_dv.ins_ready ? v0 : v1;
+
+  ASSIGN init(v2) := FALSE;
+  ASSIGN next(v2) := inner_one_slot_break_dv.ins_ready ? v1 : v2;
+
+
+  -- output
+  DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
+  DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
+
+
+MODULE handshake_muli_0__handshake_manager__delay_buffer__one_slot_break_dv_dataless (ins_valid, outs_ready)
+  VAR
+  outs_valid_i : boolean;
+  
+
+  ASSIGN
+  init(outs_valid_i) := FALSE;
+  next(outs_valid_i) := ins_valid | (outs_valid_i & !outs_ready);
+
+  -- output
+  DEFINE
+  ins_ready := !outs_valid_i | outs_ready;
+  outs_valid := outs_valid_i;
+
+
+
+
+

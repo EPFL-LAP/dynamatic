@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_Addr_in : bool_input(elastic_miter_sup_load_lhs_sup_load_rhs.Addr_in_ready, 6);
-  VAR seq_generator_Cond : bool_input(elastic_miter_sup_load_lhs_sup_load_rhs.Cond_ready, 6);
+  VAR seq_generator_Addr_in : bool_input(elastic_miter_sup_load_lhs_sup_load_rhs.Addr_in_ready, 3);
+  VAR seq_generator_Cond : bool_input(elastic_miter_sup_load_lhs_sup_load_rhs.Cond_ready, 3);
 
   VAR elastic_miter_sup_load_lhs_sup_load_rhs : elastic_miter_sup_load_lhs_sup_load_rhs (seq_generator_Addr_in.outs, seq_generator_Addr_in.outs_valid, seq_generator_Cond.outs, seq_generator_Cond.outs_valid, sink_EQ_Data_out.ins_ready);
 

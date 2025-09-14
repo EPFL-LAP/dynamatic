@@ -1,0 +1,34 @@
+#include "handshake_ndsource_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_buffer_1.smv"
+
+
+MODULE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapper (sel_in, sel_in_valid, data_in, data_in_valid, EQ_out1_ready, EQ_out2_ready)
+
+
+-- input and output
+DEFINE EQ_out1 := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.EQ_out1;
+DEFINE EQ_out1_valid := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.EQ_out1_valid;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_EQ_out1_ready := EQ_out1_ready;
+DEFINE EQ_out2 := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.EQ_out2;
+DEFINE EQ_out2_valid := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.EQ_out2_valid;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_EQ_out2_ready := EQ_out2_ready;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_sel_in := sel_in;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_sel_in_valid := sel_in_valid;
+DEFINE sel_in_ready := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.sel_in_ready;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_data_in := data_in;
+DEFINE elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_data_in_valid := data_in_valid;
+DEFINE data_in_ready := elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped.data_in_ready;
+
+
+VAR elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped : elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs(elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_sel_in, elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_sel_in_valid, elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_data_in, elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_data_in_valid, elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_EQ_out1_ready, elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs_wrapped_EQ_out2_ready);
+
+-- properties

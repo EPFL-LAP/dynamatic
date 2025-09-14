@@ -26,9 +26,9 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_A_in : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.A_in_ready, 2);
-  VAR seq_generator_Cond1 : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.Cond1_ready, 2);
-  VAR seq_generator_Cond2 : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.Cond2_ready, 2);
+  VAR seq_generator_A_in : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.A_in_ready, 1);
+  VAR seq_generator_Cond1 : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.Cond1_ready, 1);
+  VAR seq_generator_Cond2 : bool_input(elastic_miter_unify_sup_lhs_unify_sup_rhs.Cond2_ready, 1);
 
   VAR elastic_miter_unify_sup_lhs_unify_sup_rhs : elastic_miter_unify_sup_lhs_unify_sup_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_Cond1.outs, seq_generator_Cond1.outs_valid, seq_generator_Cond2.outs, seq_generator_Cond2.outs_valid, sink_EQ_B_out.ins_ready);
 

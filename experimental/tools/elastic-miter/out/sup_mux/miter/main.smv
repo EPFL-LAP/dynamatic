@@ -26,9 +26,9 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_loopLiveIn : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.loopLiveIn_ready, 3);
-  VAR seq_generator_iterLiveOut : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.iterLiveOut_ready, 3);
-  VAR seq_generator_oldContinue : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.oldContinue_ready, 3);
+  VAR seq_generator_loopLiveIn : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.loopLiveIn_ready, 2);
+  VAR seq_generator_iterLiveOut : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.iterLiveOut_ready, 2);
+  VAR seq_generator_oldContinue : bool_input(elastic_miter_sup_mux_lhs_sup_mux_rhs.oldContinue_ready, 2);
 
   VAR elastic_miter_sup_mux_lhs_sup_mux_rhs : elastic_miter_sup_mux_lhs_sup_mux_rhs (seq_generator_loopLiveIn.outs, seq_generator_loopLiveIn.outs_valid, seq_generator_iterLiveOut.outs, seq_generator_iterLiveOut.outs_valid, seq_generator_oldContinue.outs, seq_generator_oldContinue.outs_valid, sink_EQ_iterLiveIn.ins_ready);
 
@@ -38,7 +38,7 @@ INVARSPEC (elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_iterLiveIn_valid -> elastic_
 CTLSPEC AF (AG ((elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_loopLiveIn.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_loopLiveIn.debug_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_iterLiveOut.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_iterLiveOut.debug_counter.counter) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_oldContinue.debug_counter.counter = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_oldContinue.debug_counter.counter) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_out_bl_iterLiveIn.outs_valid) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_out_bl_iterLiveIn.outs_valid)));
 
 INVAR  seq_generator_iterLiveOut.exact_tokens = seq_generator_oldContinue.exact_tokens ;
-INVAR  seq_generator_iterLiveOut.exact_tokens = elastic_miter_sup_mux_lhs_sup_mux_rhs.out_nds_iterLiveIn.exact_tokens ;
+INVAR  seq_generator_iterLiveOut.exact_tokens <= elastic_miter_sup_mux_lhs_sup_mux_rhs.out_nds_iterLiveIn.exact_tokens ;
 VAR oldContinue_false_token_cnt : 0..31;
 ASSIGN init(oldContinue_false_token_cnt) := 0;
 ASSIGN next(oldContinue_false_token_cnt) := case
