@@ -28,6 +28,17 @@
     ]
   },
   {
+    "name": "handshake.lsq",
+    "generator": "/usr/bin/env python3 $DYNAMATIC/tools/backend/lsq-generator-python/lsq-generator.py -o $OUTPUT_DIR -c $OUTPUT_DIR/$MODULE_NAME.json",
+    "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
+    "hdl": "vhdl",
+    "io-kind": "flat",
+    "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
+    "io-signals": {
+      "data": "_bits"
+    }
+  },
+  {
     "name": "handshake.cmpi",
     "parameters": [
       {
@@ -79,11 +90,11 @@
         "type": "unsigned"
       },
       {
-        "name": "TIMING",
-        "type": "timing"
+        "name": "BUFFER_TYPE",
+        "type": "string"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS timing=\"$TIMING\" bitwidth=$BITWIDTH transparent=$TRANSPARENT extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.fork",
@@ -268,9 +279,38 @@
     ]
   },
   {
+    "name": "handshake.sharing_wrapper",
+    "parameters":[
+      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"},
+      { "name": "LATENCY", "type": "unsigned"},
+      { "name": "CREDITS", "type": "string"}
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH num_shared_operands=$NUM_SHARED_OPERANDS latency=$LATENCY credits='\"$CREDITS\"'",
+    "dependencies":[
+      "types",
+      "sharing_support"
+    ]
+  },
+    {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      {
+        "name": "SIZE",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t lazy_fork -p size=$SIZE bitwidth=$BITWIDTH",
+    "dependencies": [
+      "types"
+    ]
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
   }
 ]

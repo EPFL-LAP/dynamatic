@@ -183,19 +183,6 @@ def MemInterfaceAttr : Handshake_Attr<"MemInterface", "mem_interface"> {
   }];
 }
 
-def DependenceComponentAttr : Handshake_Attr<"DependenceComponent", "dep_comp"> {
-  let summary = "Information about the direction of a dependence for an AffineForOp";
-  let description = [{
-    Holds the same information as a `mlir::affine::DependenceComponent` (except 
-    the `op` it refers to, since this would typically be attached to the
-    operation in question or to one that would reference it through a
-    `::dynamatic::handshake::MemDependenceAttr`).
-  }];
-
-  let parameters = (ins "::std::optional<int64_t>":$lb, "::std::optional<int64_t>":$ub);
-  let assemblyFormat = "`[` $lb `,` $ub `]`";
-}
-
 def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let summary = "A memory dependence with respect to another memory access";
   let description = [{
@@ -206,36 +193,15 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     represents a RAW memory dependency. 
     
     The dependency is furthermore characterized by the loop depth at which the
-    dependency is (`loopDepth`) and a list of dependence components
-    (`components`) whose size indicates the number of commom loops surrounding
-    both operations.
+    dependency is (`loopDepth`).
   }];
   
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
-    "unsigned":$loopDepth,
-    ArrayRefParameter<"::dynamatic::handshake::DependenceComponentAttr">:$components
+    "unsigned":$loopDepth
   );
 
-  let builders = [
-    AttrBuilder<(ins  "::mlir::StringRef":$dstAccess, 
-                      "unsigned":$loopDepth,
-                      "::mlir::ArrayRef<::mlir::affine::DependenceComponent>":$components), [{
-      SmallVector<::dynamatic::handshake::DependenceComponentAttr> compAttrs;
-      for (auto &comp : components)
-        compAttrs.push_back(::dynamatic::handshake::DependenceComponentAttr::get(
-          context, comp.lb, comp.ub));
-      return $_get(context, ::mlir::StringAttr::get(context, dstAccess), 
-        loopDepth, compAttrs);  
-    }]>
-  ];
-
-  let hasCustomAssemblyFormat = 1;
-  let extraClassDeclaration = [{
-    size_t getNumCommonLoops() {
-      return getComponents().size();
-    }
-  }];
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `]`";
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
@@ -254,21 +220,44 @@ def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
 // Buffer annotations
 //===----------------------------------------------------------------------===//
 
-def TimingInfo : TypeParameter<
-  "::dynamatic::handshake::TimingInfo", "timing information"> {
-}
 
-def TimingAttr : Handshake_Attr<"Timing", "timing"> {
- let summary = "the timing characteristics of an operation";
-  let description = [{
-    Holds an operation's timing characteristics such as latencies between input
-    and output ports. Usually stored as an RTL parameter to guide the backend in
-    selecting an appropriate RTL module to implement the operation. 
-  }];
-  
-  let parameters = (ins TimingInfo:$info);
-  
-  let hasCustomAssemblyFormat = 1; 
+def Handshake_BufferTypeAttr : I64EnumAttr<
+    "BufferType", "",
+    [
+      /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
+      /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer),
+      /// it introduces one cycle of latency on the D and V paths.
+      /// It does not break the R signal path and adds no latency on R.
+      I64EnumAttrCase<"ONE_SLOT_BREAK_DV", 0>,
+          
+      /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path.
+      /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer),
+      /// it introduces one cycle of latency on the R path.
+      /// It does not break the D and V signal path and adds no latency on D and V.
+      I64EnumAttrCase<"ONE_SLOT_BREAK_R", 1>,
+
+      /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO),
+      /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths.
+      /// Its only purpose is to hold tokens.
+      I64EnumAttrCase<"FIFO_BREAK_NONE", 2>,
+
+      /// FIFO_BREAK_DV: This buffer breaks the D and V paths.
+      /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers,
+      /// its structure cannot be split. It introduces one cycle of latency on the
+      /// D and V paths regardless of the number of slots and has no latency on R.
+      /// It was previously called an 'elastic_fifo_inner'.
+      I64EnumAttrCase<"FIFO_BREAK_DV", 3>,
+
+      /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal
+      /// paths and introduces one cycle of latency on all of them.
+      I64EnumAttrCase<"ONE_SLOT_BREAK_DVR", 4>,
+
+      /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
+      /// handshake control signals, causing them to accept or stall inputs
+      /// simultaneously.
+      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
 }
 
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
@@ -424,5 +413,34 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
   let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
 }
 
+
+//===----------------------------------------------------------------------===//
+// FPU Implementation
+//===----------------------------------------------------------------------===//
+
+// Enum Tablegen declaration structure taken from the test enum in TestOps.td
+// in https://reviews.llvm.org/D115181, which is the PR which introduced
+// the version of enums we use in Dynamatic
+//
+// this weird structure has been removed in up-to-date MLIR
+//
+// I64EnumAttrs can be used directly,
+// but they serialize as integers when in the attribute dictionary
+// which makes the IR difficult for humans to interpret.
+
+// Declare the underlying C++ enum and accompanying utility functions
+// by declaring an I64EnumAttr with "let genSpecializedAttr = 0;"
+// which tells tablegen not to actually generate the attribute
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
+  // C++ value is FPUImpl::FLOPOCO, string version is "flopoco"
+  I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+  // C++ value is FPUImpl::VIVADO, string version is "vivado"
+  I64EnumAttrCase<"VIVADO", 1, "vivado">
+]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
+}
+// and then we pass that "fake" attribute to this, which is the real attribute
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

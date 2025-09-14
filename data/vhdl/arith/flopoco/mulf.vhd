@@ -3,8 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 entity mulf is
   generic (
-    DATA_TYPE : integer;
-    INTERNAL_DELAY : integer
+    DATA_TYPE : integer
   );
   port (
     -- inputs

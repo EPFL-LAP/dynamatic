@@ -93,6 +93,12 @@ create_generator_symlink() {
     ln -f --symbolic ../../$src $dst
 }
 
+create_include_symlink() {
+    local src=$1
+    local dst="build/include/clang_headers"
+    echo "$dst -> $src"
+    ln -fT --symbolic "$src" "$dst"
+}
 
 # Determine whether cmake should be re-configured by looking for a
 # CMakeCache.txt file in the current working directory.
@@ -228,8 +234,9 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja ../llvm \
-        -DLLVM_ENABLE_PROJECTS="mlir;clang" \
+        -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
         -DLLVM_TARGETS_TO_BUILD="host" \
+        -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
         $CMAKE_COMPILERS $CMAKE_LLVM_BUILD_OPTIMIZATIONS
@@ -331,6 +338,7 @@ if should_run_cmake ; then
       -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
       -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
       -DCLANG_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/clang \
+      -DPolly_DIR="$POLYGEIST_DIR"/llvm-project/build/tools/polly/lib/cmake/polly \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -422,6 +430,11 @@ create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
 create_generator_symlink build/bin/exp-sharing-wrapper-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+
+# Create symbolic links to polygeist headers (standard c library for clang)
+create_include_symlink "$POLYGEIST_DIR"/llvm-project/clang/lib/Headers
+
+
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow
 fi

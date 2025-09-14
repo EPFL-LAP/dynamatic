@@ -408,11 +408,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
     BufferOp lhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[0], TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        forkOp.getLoc(), forkOp.getResults()[BB_IN], bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     BufferOp rhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResult()[1], TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+        forkOp.getLoc(), forkOp.getResults()[1], bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
     setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
 
@@ -489,6 +489,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, rhsEndNDWireOp, BB_OUT, rhsNDwName);
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
+<<<<<<< HEAD
         nextLocation->getLoc(), lhsEndNDWireOp.getResult(),
         TimingInfo::break_dv(), bufferSlots,
         dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
@@ -496,6 +497,14 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
         nextLocation->getLoc(), rhsEndNDWireOp.getResult(),
         TimingInfo::break_dv(), bufferSlots,
         dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+=======
+        nextLocation->getLoc(), lhsEndNDWireOp.getResult(), bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    BufferOp rhsEndBufferOp = builder.create<BufferOp>(
+        nextLocation->getLoc(), rhsEndNDWireOp.getResult(), bufferSlots,
+        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+
+>>>>>>> main
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 

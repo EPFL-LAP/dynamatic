@@ -41,7 +41,6 @@ void registerTestRTLSuppport();
 namespace dynamatic {
 namespace experimental {
 namespace test {
-void registerTestCDGAnalysisPass();
 void registerTestHandshakeSimulator();
 } // namespace test
 } // namespace experimental
@@ -49,7 +48,6 @@ void registerTestHandshakeSimulator();
 
 void registerTestPasses() {
   dynamatic::test::registerTestRTLSuppport();
-  dynamatic::experimental::test::registerTestCDGAnalysisPass();
   dynamatic::experimental::test::registerTestHandshakeSimulator();
 }
 

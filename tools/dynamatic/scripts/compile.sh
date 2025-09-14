@@ -13,10 +13,11 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 BUFFER_ALGORITHM=$5
 TARGET_CP=$6
-POLYGEIST_PATH=$7
-USE_SHARING=$8
-FPUNITS_GEN=$9
-USE_RIGIDIFICATION=${10}
+USE_SHARING=$7
+FPUNITS_GEN=$8
+USE_RIGIDIFICATION=${9}
+DISABLE_LSQ=${10}
+FAST_TOKEN_DELIVERY=${11}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -33,8 +34,9 @@ F_AFFINE="$COMP_DIR/affine.mlir"
 F_AFFINE_MEM="$COMP_DIR/affine_mem.mlir"
 F_SCF="$COMP_DIR/scf.mlir"
 F_CF="$COMP_DIR/cf.mlir"
-F_CF_TRANFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
+F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_dyn_transformed_mem_dep_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -95,7 +97,7 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
   -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE"
@@ -123,22 +125,44 @@ exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 # cf transformations (standard)
 "$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
     --control-flow-sink --loop-invariant-code-motion --canonicalize \
-    > "$F_CF_TRANFORMED"
+    > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic)
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  --mark-memory-interfaces \
-  > "$F_CF_DYN_TRANSFORMED"
-exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-  "Applied Dynamatic transformations to cf"
+"$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+    --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+    > "$F_CF_DYN_TRANSFORMED"
+  exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+    "Applied Dynamatic transformations to cf"
+
+if [[ $DISABLE_LSQ -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+    --force-memory-interface="force-mc=true" \
+    > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
+  exit_on_fail "Failed to force usage of MC interface" \
+    "Forced usage of MC interface in cf"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+    --mark-memory-interfaces \
+    > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
+  exit_on_fail "Failed to mark memory interfaces in cf" \
+    "Marked memory accesses with the corresponding interfaces in cf"
+fi
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-  > "$F_HANDSHAKE"
-exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+  echo_info "Running FTD algorithm for handshake conversion"
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+fi
 
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
@@ -149,13 +173,12 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
-
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
-  BUFFER_PLACEMENT_PASS="credit-based-sharing"
+  # NOTE: to use this in dynamatic-opt, do ${SHARING_PASS:+"$SHARING_PASS"} to
+  # conditionally pass the string as an argument if not empty.
+  SHARING_PASS="--credit-based-sharing=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
   echo_info "Set to apply credit-based sharing after buffer placement."
-else
-  BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
 
 # Buffer placement
@@ -163,8 +186,10 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json" \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
+    ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -186,8 +211,11 @@ else
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
+    ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

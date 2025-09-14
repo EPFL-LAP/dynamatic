@@ -21,7 +21,8 @@ use ieee.numeric_std.all;
 -- Entity of constant
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     ctrl_valid : in  std_logic;
     ctrl_ready : out std_logic;

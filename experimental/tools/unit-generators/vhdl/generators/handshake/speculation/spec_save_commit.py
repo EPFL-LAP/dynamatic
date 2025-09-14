@@ -23,7 +23,8 @@ use ieee.numeric_std.all;
 -- Entity of spec_save_commit
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- inputs
     {data(f"ins : in std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in std_logic;

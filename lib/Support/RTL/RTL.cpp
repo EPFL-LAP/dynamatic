@@ -287,33 +287,7 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   auto modType = modOp.getModuleType();
 
   registerBitwidthParameter(modOp, modName, modType);
-  registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-  registerSelectedDelayParameter(modOp, modName, modType);
-}
-
-void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
-                                              llvm::StringRef modName,
-                                              hw::ModuleType &modType) {
-  // Look for INTERNAL_DELAY in hw.parameters
-  if (auto paramsAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters")) {
-    if (auto selectedDelay = paramsAttr.get("INTERNAL_DELAY")) {
-      if (auto stringAttr = selectedDelay.dyn_cast<StringAttr>()) {
-        std::string delayStr = stringAttr.getValue().str();
-        serializedParams["INTERNAL_DELAY"] = delayStr;
-        return;
-      }
-    }
-  }
-
-  // Fallback: also check for direct attribute (in case some modules have it
-  // there)
-  if (auto selectedDelay = modOp->getAttrOfType<StringAttr>("internal_delay")) {
-    std::string delayStr = selectedDelay.getValue().str();
-    serializedParams["INTERNAL_DELAY"] = delayStr;
-  } else {
-    serializedParams["INTERNAL_DELAY"] = "0.0";
-  }
 }
 
 void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
@@ -333,6 +307,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
+      modName == "handshake.sharing_wrapper" ||
       modName == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
@@ -371,7 +346,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.mem_controller") {
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "handshake.lsq") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     // Warning: Ports differ from instance to instance.
@@ -400,30 +376,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
   }
 }
 
-void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
-                                            llvm::StringRef modName,
-                                            hw::ModuleType &modType) {
-  if (modName == "handshake.buffer") {
-    auto params =
-        modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-      auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::break_r() ||
-          info == handshake::TimingInfo::break_none()) {
-        serializedParams["TRANSPARENT"] = "True";
-      } else if (info == handshake::TimingInfo::break_dv() ||
-                 info == handshake::TimingInfo::break_dvr()) {
-        serializedParams["TRANSPARENT"] = "False";
-      } else {
-        llvm_unreachable("Unknown timing info");
-      }
-    } else {
-      llvm_unreachable("Unknown timing attr");
-    }
-  }
-}
-
 void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                              llvm::StringRef modName,
                                              hw::ModuleType &modType) {
@@ -442,7 +394,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
-      modName == "handshake.fptosi" ||
+      modName == "handshake.fptosi" || modName == "handshake.lazy_fork" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

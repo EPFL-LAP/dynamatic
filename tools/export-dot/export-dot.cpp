@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DOT.h"
@@ -146,40 +146,11 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::BufferOp>(
           [&](handshake::BufferOp bufferOp) -> std::string {
             // Try to infer the buffer type from HW parameters, if present
-            auto params = bufferOp->getAttrOfType<DictionaryAttr>(
-                RTL_PARAMETERS_ATTR_NAME);
-            if (!params)
-              return "buffer";
-            auto optSlots = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-            std::string numSlotsStr = "";
-            if (optSlots) {
-              if (auto numSlots = dyn_cast<IntegerAttr>(optSlots->getValue())) {
-                if (numSlots.getType().isUnsignedInteger())
-                  numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
-              }
-            }
-            auto optBufferType =
-                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType)
-              return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr =
-                    dyn_cast<StringAttr>(optBufferType->getValue())) {
-              llvm::StringRef bufferTypeStr = bufferTypeAttr.getValue();
-              if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DV) {
-                return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_R) {
-                return "R" + numSlotsStr;
-              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_DV) {
-                return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_NONE) {
-                return "NONE" + numSlotsStr;
-              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DVR) {
-                return "DVR" + numSlotsStr;
-              } else if (bufferTypeStr == BufferOp::SHIFT_REG_BREAK_DV) {
-                return "SRDV" + numSlotsStr;
-              }
-            }
-            return "buffer" + numSlotsStr;
+
+            std::string numSlots = std::to_string(bufferOp.getNumSlots());
+            std::string bufferType =
+                stringifyEnum(bufferOp.getBufferType()).str();
+            return bufferType + " [" + numSlots + "]";
           })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
         return getMemLabel("MC", getMemName(mcOp.getMemRef()));

@@ -229,7 +229,7 @@ class LSQ:
 
         ######  Queue Registers ######
         # Load Queue Entries
-        ldq_valid = LogicArray(ctx, 'ldq_valid', 'r',
+        ldq_alloc = LogicArray(ctx, 'ldq_alloc', 'r',
                                self.configs.numLdqEntries)
         ldq_issue = LogicArray(ctx, 'ldq_issue', 'r',
                                self.configs.numLdqEntries)
@@ -248,7 +248,7 @@ class LSQ:
                                  self.configs.numLdqEntries, self.configs.dataW)
 
         # Store Queue Entries
-        stq_valid = LogicArray(ctx, 'stq_valid', 'r',
+        stq_alloc = LogicArray(ctx, 'stq_alloc', 'r',
                                self.configs.numStqEntries)
         if self.configs.stResp:
             stq_exec = LogicArray(ctx, 'stq_exec', 'r',
@@ -333,14 +333,14 @@ class LSQ:
                 ldq_wen_p1 = LogicArray(
                     ctx, 'ldq_wen_p1', 'r', self.configs.numLdqEntries)
                 ldq_wen_p1.regInit()
-        ldq_valid_next = LogicArray(
-            ctx, 'ldq_valid_next', 'w', self.configs.numLdqEntries)
+        ldq_alloc_next = LogicArray(
+            ctx, 'ldq_alloc_next', 'w', self.configs.numLdqEntries)
         for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_valid_next[i],
-                       'not', ldq_reset[i], 'and', ldq_valid[i]
+            arch += Op(ctx, ldq_alloc_next[i],
+                       'not', ldq_reset[i], 'and', ldq_alloc[i]
                        )
-            arch += Op(ctx, ldq_valid[i],
-                       ldq_wen[i], 'or', ldq_valid_next[i]
+            arch += Op(ctx, ldq_alloc[i],
+                       ldq_wen[i], 'or', ldq_alloc_next[i]
                        )
             if self.configs.pipe0 or self.configs.pipeComp:
                 arch += Op(ctx, ldq_wen_p0[i], ldq_wen[i])
@@ -369,14 +369,14 @@ class LSQ:
                        '(', ldq_data_wen[i], 'or', ldq_data_valid[i], ')'
                        )
         # store queue
-        stq_valid_next = LogicArray(
-            ctx, 'stq_valid_next', 'w', self.configs.numStqEntries)
+        stq_alloc_next = LogicArray(
+            ctx, 'stq_alloc_next', 'w', self.configs.numStqEntries)
         for i in range(0, self.configs.numStqEntries):
-            arch += Op(ctx, stq_valid_next[i],
-                       'not', stq_reset[i], 'and', stq_valid[i]
+            arch += Op(ctx, stq_alloc_next[i],
+                       'not', stq_reset[i], 'and', stq_alloc[i]
                        )
-            arch += Op(ctx, stq_valid[i],
-                       stq_wen[i], 'or', stq_valid_next[i]
+            arch += Op(ctx, stq_alloc[i],
+                       stq_wen[i], 'or', stq_alloc_next[i]
                        )
             if self.configs.stResp:
                 arch += Op(ctx, stq_exec[i],
@@ -393,13 +393,13 @@ class LSQ:
                        )
 
         # order matrix
-        # store_is_older(i,j) = (not stq_reset(j) and (stq_valid(j) or ga_ls_order(i, j)))
+        # store_is_older(i,j) = (not stq_reset(j) and (stq_alloc(j) or ga_ls_order(i, j)))
         #                  when ldq_wen(i)
         #                  else not stq_reset(j) and store_is_older(i, j)
         for i in range(0, self.configs.numLdqEntries):
             for j in range(0, self.configs.numStqEntries):
                 arch += Op(ctx, (store_is_older, i, j),
-                           '(', 'not', (stq_reset, j), 'and', '(', (stq_valid,
+                           '(', 'not', (stq_reset, j), 'and', '(', (stq_alloc,
                                                                     j), 'or', (ga_ls_order, i, j), ')', ')',
                            'when', (ldq_wen, i), 'else',
                            'not', (stq_reset, j), 'and', (store_is_older, i, j)
@@ -408,9 +408,9 @@ class LSQ:
         # pointers update
         ldq_not_empty = Logic(ctx, 'ldq_not_empty', 'w')
         stq_not_empty = Logic(ctx, 'stq_not_empty', 'w')
-        arch += Reduce(ctx, ldq_not_empty, ldq_valid, 'or')
+        arch += Reduce(ctx, ldq_not_empty, ldq_alloc, 'or')
         arch += Op(ctx, ldq_empty, 'not', ldq_not_empty)
-        arch += MuxLookUp(ctx, stq_not_empty, stq_valid, stq_head)
+        arch += MuxLookUp(ctx, stq_not_empty, stq_alloc, stq_head)
         arch += Op(ctx, stq_empty, 'not', stq_not_empty)
         arch += Op(ctx, empty_o, ldq_empty, 'and', stq_empty)
 
@@ -434,12 +434,12 @@ class LSQ:
         if self.configs.headLag:
             # Update the head pointer according to the valid signal of last cycle
             arch += CyclicPriorityMasking(ctx,
-                                          ldq_head_next_oh, ldq_valid, ldq_tail_oh)
-            arch += Reduce(ctx, ldq_head_sel, ldq_valid, 'or')
+                                          ldq_head_next_oh, ldq_alloc, ldq_tail_oh)
+            arch += Reduce(ctx, ldq_head_sel, ldq_alloc, 'or')
         else:
             arch += CyclicPriorityMasking(ctx, ldq_head_next_oh,
-                                          ldq_valid_next, ldq_tail_oh)
-            arch += Reduce(ctx, ldq_head_sel, ldq_valid_next, 'or')
+                                          ldq_alloc_next, ldq_tail_oh)
+            arch += Reduce(ctx, ldq_head_sel, ldq_alloc_next, 'or')
         arch += OHToBits(ctx, ldq_head_next, ldq_head_next_oh)
         arch += Op(ctx, ldq_head, ldq_head_next, 'when',
                    ldq_head_sel, 'else', ldq_tail)
@@ -456,12 +456,12 @@ class LSQ:
             if self.configs.headLag:
                 # Update the head pointer according to the valid signal of last cycle
                 arch += CyclicPriorityMasking(ctx,
-                                              stq_head_next_oh, stq_valid, stq_tail_oh)
-                arch += Reduce(ctx, stq_head_sel, stq_valid, 'or')
+                                              stq_head_next_oh, stq_alloc, stq_tail_oh)
+                arch += Reduce(ctx, stq_head_sel, stq_alloc, 'or')
             else:
                 arch += CyclicPriorityMasking(ctx, stq_head_next_oh,
-                                              stq_valid_next, stq_tail_oh)
-                arch += Reduce(ctx, stq_head_sel, stq_valid_next, 'or')
+                                              stq_alloc_next, stq_tail_oh)
+                arch += Reduce(ctx, stq_head_sel, stq_alloc_next, 'or')
             arch += OHToBits(ctx, stq_head_next, stq_head_next_oh)
             arch += Op(ctx, stq_head, stq_head_next, 'when',
                        stq_head_sel, 'else', stq_tail)
@@ -473,7 +473,7 @@ class LSQ:
                        stq_head_sel, 'else', stq_head)
 
         # Load Queue Entries
-        ldq_valid.regInit(init=[0]*self.configs.numLdqEntries)
+        ldq_alloc.regInit(init=[0]*self.configs.numLdqEntries)
         ldq_issue.regInit()
         if (self.configs.ldpAddrW > 0):
             ldq_port_idx.regInit(ldq_wen)
@@ -483,7 +483,7 @@ class LSQ:
         ldq_data.regInit(ldq_data_wen)
 
         # Store Queue Entries
-        stq_valid.regInit(init=[0]*self.configs.numStqEntries)
+        stq_alloc.regInit(init=[0]*self.configs.numStqEntries)
         if self.configs.stResp:
             stq_exec.regInit()
         if (self.configs.stpAddrW > 0):
@@ -522,27 +522,27 @@ class LSQ:
         arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
             ctx,
             ldp_addr_i, ldp_addr_valid_i, ldp_addr_ready_o,
-            ldq_valid, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
+            ldq_alloc, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
         )
 
         # Load Data Port Dispatcher
         arch += lsq_submodules.qtp_dispatcher_ldd.instantiate(
             ctx,
             ldp_data_o, ldp_data_valid_o, ldp_data_ready_i,
-            ldq_valid, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
+            ldq_alloc, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
         )
         # Store Address Port Dispatcher
         arch += lsq_submodules.ptq_dispatcher_sta.instantiate(
             ctx,
             stp_addr_i, stp_addr_valid_i, stp_addr_ready_o,
-            stq_valid, stq_addr_valid, stq_port_idx, stq_addr, stq_addr_wen, stq_head_oh
+            stq_alloc, stq_addr_valid, stq_port_idx, stq_addr, stq_addr_wen, stq_head_oh
         )
 
         # Store Data Port Dispatcher
         arch += lsq_submodules.ptq_dispatcher_std.instantiate(
             ctx,
             stp_data_i, stp_data_valid_i, stp_data_ready_o,
-            stq_valid, stq_data_valid, stq_port_idx, stq_data, stq_data_wen, stq_head_oh
+            stq_alloc, stq_data_valid, stq_port_idx, stq_data, stq_data_wen, stq_head_oh
         )
 
         # Store Backward Port Dispatcher
@@ -550,7 +550,7 @@ class LSQ:
             arch += lsq_submodules.qtp_dispatcher_stb.instantiate(
                 ctx,
                 None, stp_exec_valid_o, stp_exec_ready_i,
-                stq_valid, stq_exec, stq_port_idx, None, stq_reset, stq_head_oh
+                stq_alloc, stq_exec, stq_port_idx, None, stq_reset, stq_head_oh
             )
 
         if self.configs.pipe0:
@@ -580,12 +580,12 @@ class LSQ:
             can_bypass_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
             if self.configs.pipeComp:
-                ldq_valid_pcomp = LogicArray(
-                    ctx, 'ldq_valid_pcomp', 'r', self.configs.numLdqEntries)
+                ldq_alloc_pcomp = LogicArray(
+                    ctx, 'ldq_alloc_pcomp', 'r', self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp = LogicArray(
                     ctx, 'ldq_addr_valid_pcomp', 'r', self.configs.numLdqEntries)
-                stq_valid_pcomp = LogicArray(
-                    ctx, 'stq_valid_pcomp', 'r', self.configs.numStqEntries)
+                stq_alloc_pcomp = LogicArray(
+                    ctx, 'stq_alloc_pcomp', 'r', self.configs.numStqEntries)
                 stq_addr_valid_pcomp = LogicArray(
                     ctx, 'stq_addr_valid_pcomp', 'r', self.configs.numStqEntries)
                 stq_data_valid_pcomp = LogicArray(
@@ -597,20 +597,20 @@ class LSQ:
                 store_is_older_pcomp = LogicVecArray(
                     ctx, 'store_is_older_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
 
-                ldq_valid_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
+                ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp.regInit()
-                stq_valid_pcomp.regInit(init=[0]*self.configs.numStqEntries)
+                stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
                 stq_addr_valid_pcomp.regInit()
                 stq_data_valid_pcomp.regInit()
                 addr_same_pcomp.regInit()
                 store_is_older_pcomp.regInit()
 
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, (ldq_valid_pcomp, i), (ldq_valid, i))
+                    arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
                     arch += Op(ctx, (ldq_addr_valid_pcomp, i),
                                (ldq_addr_valid, i))
                 for j in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, (stq_valid_pcomp, j), (stq_valid, j))
+                    arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
                     arch += Op(ctx, (stq_addr_valid_pcomp, j),
                                (stq_addr_valid, j))
                     arch += Op(ctx, (stq_data_valid_pcomp, j),
@@ -636,7 +636,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (ld_st_conflict, i, j),
-                                   (stq_valid_pcomp, j),   'and',
+                                   (stq_alloc_pcomp, j),   'and',
                                    (store_is_older_pcomp, i, j), 'and',
                                    '(', (addr_same_pcomp, i,
                                          j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
@@ -650,7 +650,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (can_bypass_p0, i, j),
-                                   (ldq_valid_pcomp, i),        'and',
+                                   (ldq_alloc_pcomp, i),        'and',
                                    (stq_data_valid_pcomp, j),   'and',
                                    (addr_same_pcomp, i, j),     'and',
                                    (addr_valid_pcomp, i, j)
@@ -682,7 +682,7 @@ class LSQ:
                 # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
                 # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_valid_pcomp[i],
+                    arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i],
                                'and', ldq_addr_valid_pcomp[i])
                 # Generate list for loads that does not face dependency issue
                 for i in range(0, self.configs.numLdqEntries):
@@ -759,7 +759,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict_curr, i),
-                               (ldq_valid_pcomp, i), 'and',
+                               (ldq_alloc_pcomp, i), 'and',
                                'not', MuxIndex(
                                    store_is_older_pcomp[i], stq_issue), 'and',
                                '(', MuxIndex(
@@ -768,7 +768,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict_next, i),
-                               (ldq_valid_pcomp, i), 'and',
+                               (ldq_alloc_pcomp, i), 'and',
                                'not', MuxIndex(
                                    store_is_older_pcomp[i], stq_issue_next), 'and',
                                '(', MuxIndex(
@@ -777,7 +777,7 @@ class LSQ:
                 # The store is valid whe the entry is valid and the data is also valid,
                 # the store address should also be valid
                 arch += MuxLookUp(ctx, store_valid_curr,
-                                  stq_valid_pcomp, stq_issue)
+                                  stq_alloc_pcomp, stq_issue)
                 arch += MuxLookUp(ctx, store_data_valid_curr,
                                   stq_data_valid_pcomp, stq_issue)
                 arch += MuxLookUp(ctx, store_addr_valid_curr,
@@ -788,7 +788,7 @@ class LSQ:
                            store_addr_valid_curr
                            )
                 arch += MuxLookUp(ctx, store_valid_next,
-                                  stq_valid_pcomp, stq_issue_next)
+                                  stq_alloc_pcomp, stq_issue_next)
                 arch += MuxLookUp(ctx, store_data_valid_next,
                                   stq_data_valid_pcomp, stq_issue_next)
                 arch += MuxLookUp(ctx, store_addr_valid_next,
@@ -847,7 +847,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (ld_st_conflict, i, j),
-                                   (stq_valid, j),         'and',
+                                   (stq_alloc, j),         'and',
                                    (store_is_older, i, j), 'and',
                                    '(', (addr_same, i,
                                          j), 'or', 'not', (stq_addr_valid, j), ')'
@@ -861,7 +861,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (can_bypass_p0, i, j),
-                                   (ldq_valid, i),        'and',
+                                   (ldq_alloc, i),        'and',
                                    (stq_data_valid, j),   'and',
                                    (addr_same, i, j),     'and',
                                    (addr_valid, i, j)
@@ -894,7 +894,7 @@ class LSQ:
                 # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx, load_req_valid[i],
-                               ldq_valid[i], 'and', ldq_addr_valid[i])
+                               ldq_alloc[i], 'and', ldq_addr_valid[i])
                 # Generate list for loads that does not face dependency issue
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx, can_load_p0[i], 'not',
@@ -970,7 +970,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict_curr, i),
-                               (ldq_valid, i), 'and',
+                               (ldq_alloc, i), 'and',
                                'not', MuxIndex(
                                    store_is_older[i], stq_issue), 'and',
                                '(', MuxIndex(
@@ -979,7 +979,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict_next, i),
-                               (ldq_valid, i), 'and',
+                               (ldq_alloc, i), 'and',
                                'not', MuxIndex(
                                    store_is_older[i], stq_issue_next), 'and',
                                '(', MuxIndex(
@@ -987,7 +987,7 @@ class LSQ:
                                )
                 # The store is valid whe the entry is valid and the data is also valid,
                 # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid_curr, stq_valid, stq_issue)
+                arch += MuxLookUp(ctx, store_valid_curr, stq_alloc, stq_issue)
                 arch += MuxLookUp(ctx, store_data_valid_curr,
                                   stq_data_valid, stq_issue)
                 arch += MuxLookUp(ctx, store_addr_valid_curr,
@@ -998,7 +998,7 @@ class LSQ:
                            store_addr_valid_curr
                            )
                 arch += MuxLookUp(ctx, store_valid_next,
-                                  stq_valid, stq_issue_next)
+                                  stq_alloc, stq_issue_next)
                 arch += MuxLookUp(ctx, store_data_valid_next,
                                   stq_data_valid, stq_issue_next)
                 arch += MuxLookUp(ctx, store_addr_valid_next,
@@ -1058,12 +1058,12 @@ class LSQ:
                 ctx, 'can_bypass', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
 
             if self.configs.pipeComp:
-                ldq_valid_pcomp = LogicArray(
-                    ctx, 'ldq_valid_pcomp', 'r', self.configs.numLdqEntries)
+                ldq_alloc_pcomp = LogicArray(
+                    ctx, 'ldq_alloc_pcomp', 'r', self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp = LogicArray(
                     ctx, 'ldq_addr_valid_pcomp', 'r', self.configs.numLdqEntries)
-                stq_valid_pcomp = LogicArray(
-                    ctx, 'stq_valid_pcomp', 'r', self.configs.numStqEntries)
+                stq_alloc_pcomp = LogicArray(
+                    ctx, 'stq_alloc_pcomp', 'r', self.configs.numStqEntries)
                 stq_addr_valid_pcomp = LogicArray(
                     ctx, 'stq_addr_valid_pcomp', 'r', self.configs.numStqEntries)
                 stq_data_valid_pcomp = LogicArray(
@@ -1075,20 +1075,20 @@ class LSQ:
                 store_is_older_pcomp = LogicVecArray(
                     ctx, 'store_is_older_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
 
-                ldq_valid_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
+                ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp.regInit()
-                stq_valid_pcomp.regInit(init=[0]*self.configs.numStqEntries)
+                stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
                 stq_addr_valid_pcomp.regInit()
                 stq_data_valid_pcomp.regInit()
                 addr_same_pcomp.regInit()
                 store_is_older_pcomp.regInit()
 
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, (ldq_valid_pcomp, i), (ldq_valid, i))
+                    arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
                     arch += Op(ctx, (ldq_addr_valid_pcomp, i),
                                (ldq_addr_valid, i))
                 for j in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, (stq_valid_pcomp, j), (stq_valid, j))
+                    arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
                     arch += Op(ctx, (stq_addr_valid_pcomp, j),
                                (stq_addr_valid, j))
                     arch += Op(ctx, (stq_data_valid_pcomp, j),
@@ -1114,7 +1114,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (ld_st_conflict, i, j),
-                                   (stq_valid_pcomp, j),         'and',
+                                   (stq_alloc_pcomp, j),         'and',
                                    (store_is_older_pcomp, i, j), 'and',
                                    '(', (addr_same_pcomp, i,
                                          j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
@@ -1128,7 +1128,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (can_bypass, i, j),
-                                   (ldq_valid_pcomp, i),        'and',
+                                   (ldq_alloc_pcomp, i),        'and',
                                    'not', (ldq_issue, i),       'and',
                                    (stq_data_valid_pcomp, j),   'and',
                                    (addr_same_pcomp, i, j),     'and',
@@ -1151,7 +1151,7 @@ class LSQ:
                 # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
                 # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_valid_pcomp[i], 'and',
+                    arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i], 'and',
                                'not', ldq_issue[i], 'and', ldq_addr_valid_pcomp[i])
                 # Generate list for loads that does not face dependency issue
                 for i in range(0, self.configs.numLdqEntries):
@@ -1192,7 +1192,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict, i),
-                               (ldq_valid_pcomp, i), 'and',
+                               (ldq_alloc_pcomp, i), 'and',
                                'not', MuxIndex(
                                    store_is_older_pcomp[i], stq_issue), 'and',
                                '(', MuxIndex(
@@ -1202,7 +1202,7 @@ class LSQ:
                 arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
                 # The store is valid whe the entry is valid and the data is also valid,
                 # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid, stq_valid_pcomp, stq_issue)
+                arch += MuxLookUp(ctx, store_valid, stq_alloc_pcomp, stq_issue)
                 arch += MuxLookUp(ctx, store_data_valid,
                                   stq_data_valid_pcomp, stq_issue)
                 arch += MuxLookUp(ctx, store_addr_valid,
@@ -1251,7 +1251,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (ld_st_conflict, i, j),
-                                   (stq_valid, j),         'and',
+                                   (stq_alloc, j),         'and',
                                    (store_is_older, i, j), 'and',
                                    '(', (addr_same, i,
                                          j), 'or', 'not', (stq_addr_valid, j), ')'
@@ -1265,7 +1265,7 @@ class LSQ:
                     for j in range(0, self.configs.numStqEntries):
                         arch += Op(ctx,
                                    (can_bypass, i, j),
-                                   (ldq_valid, i),        'and',
+                                   (ldq_alloc, i),        'and',
                                    'not', (ldq_issue, i), 'and',
                                    (stq_data_valid, j),   'and',
                                    (addr_same, i, j),     'and',
@@ -1288,7 +1288,7 @@ class LSQ:
                 # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
                 # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_valid[i], 'and',
+                    arch += Op(ctx, load_req_valid[i], ldq_alloc[i], 'and',
                                'not', ldq_issue[i], 'and', ldq_addr_valid[i])
                 # Generate list for loads that does not face dependency issue
                 for i in range(0, self.configs.numLdqEntries):
@@ -1328,7 +1328,7 @@ class LSQ:
                 for i in range(0, self.configs.numLdqEntries):
                     arch += Op(ctx,
                                (st_ld_conflict, i),
-                               (ldq_valid, i), 'and',
+                               (ldq_alloc, i), 'and',
                                'not', MuxIndex(
                                    store_is_older[i], stq_issue), 'and',
                                '(', MuxIndex(
@@ -1338,7 +1338,7 @@ class LSQ:
                 arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
                 # The store is valid whe the entry is valid and the data is also valid,
                 # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid, stq_valid, stq_issue)
+                arch += MuxLookUp(ctx, store_valid, stq_alloc, stq_issue)
                 arch += MuxLookUp(ctx, store_data_valid,
                                   stq_data_valid, stq_issue)
                 arch += MuxLookUp(ctx, store_addr_valid,

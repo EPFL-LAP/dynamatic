@@ -27,6 +27,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <filesystem>
 
 #include "experimental/Support/SubjectGraph.h"
 #include <algorithm>
@@ -56,17 +57,22 @@ void BaseSubjectGraph::connectInputNodesHelper(
     ChannelSignals &currentSignals,
     BaseSubjectGraph *moduleBeforeSubjectGraph) {
 
+  auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
+  Value channel = nullptr;
+
+  if (moduleBeforeSubjectGraph->op != nullptr)
+    channel = moduleBeforeSubjectGraph->op->getResult(resultNumber);
+
   // Get the output nodes of the module before the current module, by retrieving
   // the result number.
   ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph]);
+      moduleBeforeSubjectGraph->returnOutputNodes(resultNumber);
 
   // Connect ready and valid singals. Only 1 bit each.
   Node::connectNodes(moduleBeforeOutputNodes.readySignal,
-                     currentSignals.readySignal);
+                     currentSignals.readySignal, channel);
   Node::connectNodes(currentSignals.validSignal,
-                     moduleBeforeOutputNodes.validSignal);
+                     moduleBeforeOutputNodes.validSignal, channel);
 
   if (isBlackbox) {
     // If the module is a blackbox, we don't connect the data signals.
@@ -77,7 +83,7 @@ void BaseSubjectGraph::connectInputNodesHelper(
     // Connect data signals. Multiple bits.
     for (unsigned int j = 0; j < currentSignals.dataSignals.size(); j++) {
       Node::connectNodes(currentSignals.dataSignals[j],
-                         moduleBeforeOutputNodes.dataSignals[j]);
+                         moduleBeforeOutputNodes.dataSignals[j], channel);
     }
   }
 }
@@ -160,9 +166,6 @@ void BaseSubjectGraph::processNodesWithRules(
         assignSignals(rule.signals, node, nodeName);
         if (rule.renameNode) // change the name of the node if set true
           node->name = uniqueName + "_" + nodeName;
-        if (rule.extraProcessing) // apply extra processing to node if a
-                                  // function is given
-          rule.extraProcessing(node);
       } else if (nodeName.find(".") != std::string::npos ||
                  nodeName.find("dataReg") !=
                      std::string::npos) { // Nodes with "." and "dataReg"
@@ -206,6 +209,34 @@ void BaseSubjectGraph::insertNewSubjectGraph(BaseSubjectGraph *predecessorGraph,
   changeIO(successorGraph, predecessorGraph->outputSubjectGraphs);
 }
 
+void ArithSubjectGraph::processOutOfRuleNodes() {
+  // Data signal nodes of blackbox modules need to be set as Blackbox Outputs.
+  // Valid and Ready signals are not blackboxed, so they are not set.
+  auto setBlackboxBool = [&](Node *node) {
+    std::string nodeName = node->name;
+    if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                       nodeName.find("ready") == std::string::npos)) {
+      node->isBlackboxOutput = (true);
+    }
+  };
+
+  for (auto &node : blifData->getAllNodes()) {
+    std::string nodeName = node->name;
+    if (nodeName.find("result") != std::string::npos &&
+        (node->isInput || node->isOutput)) {
+      assignSignals(resultNodes, node, nodeName);
+      node->name = uniqueName + "_" + nodeName;
+      setBlackboxBool(node);
+    } else if (nodeName.find(".") != std::string::npos ||
+               nodeName.find("dataReg") !=
+                   std::string::npos) { // Nodes with "." and "dataReg"
+                                        // require unique naming to avoid
+                                        // naming conflicts
+      node->name = (uniqueName + "." + nodeName);
+    }
+  }
+}
+
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Get datawidth of the operation
@@ -222,20 +253,11 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
     isBlackbox = true;
   }
 
-  // Data signal nodes of blackbox modules need to be set as Blackbox Outputs.
-  // Valid and Ready signals are not blackboxed, so they are not set.
-  auto setBlackboxBool = [&](Node *node) {
-    std::string nodeName = node->name;
-    if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
-                       nodeName.find("ready") == std::string::npos)) {
-      node->isBlackboxOutput = (true);
-    }
-  };
+  // "result" case does not obey the rules
+  processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"lhs", lhsNodes, false, nullptr},
-      {"rhs", rhsNodes, false, nullptr},
-      {"result", resultNodes, true, setBlackboxBool}};
+  std::vector<NodeProcessingRule> rules = {{"lhs", lhsNodes, false},
+                                           {"rhs", rhsNodes, false}};
 
   processNodesWithRules(rules);
 }
@@ -346,7 +368,7 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // "outs" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false}};
 
   processNodesWithRules(rules);
 }
@@ -399,14 +421,13 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   inputNodes.resize(size);
 
-  loadBlifFile({size, dataWidth});
+  loadBlifFile({size, dataWidth, selectType});
 
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"index", indexNodes, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"index", indexNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -474,9 +495,8 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"index", indexNodes, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"index", indexNodes, true},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -509,11 +529,10 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  std::vector<NodeProcessingRule> rules = {
-      {"condition", conditionNodes, false, nullptr},
-      {"data", inputNodes, false, nullptr},
-      {"true", trueOut, true, nullptr},
-      {"false", falseOut, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"condition", conditionNodes, false},
+                                           {"data", inputNodes, false},
+                                           {"trueOut", trueOut, true},
+                                           {"falseOut", falseOut, true}};
 
   processNodesWithRules(rules);
 }
@@ -536,8 +555,7 @@ SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Source module has no attributes
   loadBlifFile({});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -559,12 +577,11 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(loadOp.getAddressInput().getType());
 
-  loadBlifFile({addrType, dataWidth});
+  loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"addrIn", addrInSignals, false, nullptr},
-      {"addrOut", addrOutSignals, true, nullptr},
-      {"dataOut", dataOutSignals, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"addrIn", addrInSignals, false},
+                                           {"addrOut", addrOutSignals, true},
+                                           {"dataOut", dataOutSignals, true}};
 
   processNodesWithRules(rules);
 }
@@ -589,12 +606,11 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(storeOp.getAddressInput().getType());
 
-  loadBlifFile({addrType, dataWidth});
+  loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"dataIn", dataInSignals, false, nullptr},
-      {"addrIn", addrInSignals, false, nullptr},
-      {"addrOut", addrOutSignals, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"dataIn", dataInSignals, false},
+                                           {"addrIn", addrInSignals, false},
+                                           {"addrOut", addrOutSignals, true}};
 
   processNodesWithRules(rules);
 }
@@ -621,9 +637,8 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 
   loadBlifFile({dataWidth});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ctrl", controlSignals, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"ctrl", controlSignals, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -653,9 +668,8 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 
   loadBlifFile({inputWidth, outputWidth});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -677,13 +691,14 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   dataWidth =
       handshake::getHandshakeTypeBitWidth(selectOp->getOperand(1).getType());
 
-  loadBlifFile({dataWidth});
+  // Append "or" so "select" becomes "selector", as defined in HDL file
+  loadBlifFile({dataWidth}, "or");
 
   std::vector<NodeProcessingRule> rules = {
-      {"condition", condition, false, nullptr},
-      {"trueValue", trueValue, false, nullptr},
-      {"falseValue", falseValue, false, nullptr},
-      {"result", outputNodes, true, nullptr},
+      {"condition", condition, false},
+      {"trueValue", trueValue, false},
+      {"falseValue", falseValue, false},
+      {"result", outputNodes, true},
   };
 
   processNodesWithRules(rules);
@@ -739,8 +754,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -770,9 +784,8 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -811,9 +824,8 @@ void BufferSubjectGraph::initBuffer() {
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false, nullptr},
-      {"outs", outputNodes, true, nullptr}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -823,12 +835,7 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op);
 
   // Get the Buffer type and data width from the operation attributes
-  auto params =
-      bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-  auto bufferTypeNamed =
-      params.getNamed(handshake::BufferOp::BUFFER_TYPE_ATTR_NAME);
-  auto bufferTypeAttr = dyn_cast<StringAttr>(bufferTypeNamed->getValue());
-  bufferType = bufferTypeAttr.getValue().str();
+  bufferType = handshake::stringifyEnum(bufferOp.getBufferType());
 
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
@@ -842,10 +849,11 @@ BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
                                        std::string bufferTypeName)
     : BaseSubjectGraph(), dataWidth(inputDataWidth),
       bufferType(std::move(bufferTypeName)) {
+  op = nullptr; // No MLIR operation associated with this buffer
   // Static buffer count is used to create unique names for buffers. It keeps
   // track of how many new buffers have been created so far.
   static unsigned int bufferCount;
-  uniqueName = bufferTypeName + "_" + std::to_string(bufferCount++);
+  uniqueName = bufferType + "_" + std::to_string(bufferCount++);
 
   initBuffer();
 }
@@ -868,6 +876,21 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
                                                     StringRef blifFiles) {
   baseBlifPath = blifFiles;
   std::vector<BaseSubjectGraph *> subjectGraphs;
+
+  if (!std::filesystem::exists(baseBlifPath) ||
+      !std::filesystem::is_directory(baseBlifPath) ||
+      std::none_of(std::filesystem::directory_iterator(baseBlifPath),
+                   std::filesystem::directory_iterator{},
+                   [](const std::filesystem::directory_entry &e) {
+                     return std::filesystem::is_directory(e);
+                   })) {
+    llvm::errs() << "The buffer placement algorithm MapBuf expects an aig "
+                    "library at location: '"
+                 << baseBlifPath
+                 << "' which has not been found. Please refer to the doc for "
+                    "more information on how to generate it.\n";
+    assert(false && "AIG library not found.");
+  }
 
   funcOp.walk([&](Operation *op) {
     llvm::TypeSwitch<Operation *, void>(op)

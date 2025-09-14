@@ -15,6 +15,7 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf
+  DynamaticLLVMToControlFlow
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
@@ -27,6 +28,7 @@ target_link_libraries(dynamatic-opt
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
+  DynamaticExperimentalConversion 
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms

@@ -18,6 +18,7 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.ndwire as ndwire
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -52,6 +53,7 @@ import generators.handshake.ndwire as ndwire
 import generators.handshake.init as init
 
 import generators.memory.memory_controller as memory_controller
+import generators.memory.lsq as lsq
 
 
 def generate_code(name, mod_type, parameters):
@@ -150,6 +152,8 @@ def generate_code(name, mod_type, parameters):
             return ndwire.generate_ndwire(name, parameters)
         case "init":
             return init.generate_init(name, parameters)
+        case "lsq":
+            return lsq.generate_lsq(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 

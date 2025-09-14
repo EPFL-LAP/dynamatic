@@ -8,7 +8,8 @@ entity store is
     ADDR_TYPE : integer
   );
   port (
-    clk, rst : in std_logic;
+    clk : in  std_logic;
+    rst : in std_logic;
     -- data from circuit channel
     dataIn       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     dataIn_valid : in  std_logic;
