@@ -729,10 +729,10 @@ static void insertBufferOpAndOccupancyInCFDFC(
     //
     // Example:
     // - Channel: producer -> T, DV, DV, DV -> receiver
-    // - Num of tokens: 2
-    // (remark: DV introduces 1 cycle delay on data and valid, T does not
-    // introduce delay on any path).
-    // In this case, the token must occupy in the 3 DV slots and but the T
+    // - Number of tokens: 2
+    // (remark: DV introduces a 1-cycle delay on data and valid, T does not
+    // introduce a delay on any path).
+    // In this case, the token must occupy the 3 DV slots but the T
     // slots; each DV slot holds 2/3 tokens.
     tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
@@ -745,7 +745,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
     //
     // Example:
     // - Channel: producer -> T, T, DV, DV, T -> receiver
-    // - Num of tokens: 3
+    // - Number of tokens: 3
     //
     // In this case, the token must occupy in the 2 DV slots and the last T
     // slot.
