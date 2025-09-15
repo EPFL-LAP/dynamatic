@@ -695,27 +695,25 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   return success();
 }
 
-// Adding a new buffer op changes the CFDFC graph. This function updates all the
-// CFDFCs that contain the channel.
-static void
-insertBufferOpAndOccupancyInCFDFC(handshake::BufferOp bufOp, CFDFC &cfdfc,
-                                  unsigned totalChannelLatency,
-                                  double &remainingTknsToDistribute) {
+/// Adding a new buffer op changes the CFDFC graph. This function updates the
+/// cfdfc that contain the channel.
+/// - bufOp: The buffer to be inserted into the CFDFC.
+/// - CFDFC: The CFDFC.
+/// - totalChannelLatency: The total number of sequential latency on DV path.
+/// - totalChanOccupancy: The total number of tokens to be distributed on the
+///   CFDFC.
+/// - remainingTknsToDistribute: The remaining tokens to be distributed on the
+///   channel.
+static void insertBufferOpAndOccupancyInCFDFC(
+    handshake::BufferOp bufOp, CFDFC &cfdfc, unsigned totalChannelLatency,
+    unsigned totalChannelOccupancy, double &remainingTknsToDistribute) {
 
-  Value bufferIn = bufOp.getOperand();
   // When we add a new buffer op, the value remains the same object (now
   // used by a different user). Therefore, we just need to add the newly
   // added operation and channel.
   cfdfc.units.insert(bufOp.getOperation());
   cfdfc.channels.insert(bufOp.getResult());
 
-  if (!cfdfc.channelOccupancy.count(bufferIn)) {
-    llvm::report_fatal_error(
-        "Placing a buffer on a channel that doesn't have a registered "
-        "occupancy value!");
-  }
-
-  double totalChanOccupancy = cfdfc.channelOccupancy[bufferIn];
   double tokensInBufOp;
   // The MILP solution returns the token occupancy per each channel in the
   // CFDFC.
@@ -723,7 +721,7 @@ insertBufferOpAndOccupancyInCFDFC(handshake::BufferOp bufOp, CFDFC &cfdfc,
   // The tokens in the CFDFC might be smaller than the total number slots of the
   // channel. Therefore, we need to calculate the number of tokens per different
   // buffer slots.
-  if (totalChanOccupancy < (double)totalChannelLatency) {
+  if (totalChannelOccupancy < (double)totalChannelLatency) {
     // Case "#tokens in the channel" < "Total latency of the channel":
     // Distribute tokens among slots with latency (the tokens
     // are not blocking each other, so they will only be stopped by the
@@ -737,7 +735,7 @@ insertBufferOpAndOccupancyInCFDFC(handshake::BufferOp bufOp, CFDFC &cfdfc,
     // In this case, the token must occupy in the 3 DV slots and but the T
     // slots; each DV slot holds 2/3 tokens.
     tokensInBufOp =
-        (bufOp.getLatencyDV() / totalChannelLatency) * totalChanOccupancy;
+        (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
     cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
   } else {
     // Case "#tokens in the channel" => "Total latency of the channel":
@@ -822,26 +820,34 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       totalChannelLatency += bufOp.getLatencyDV();
     }
 
-    // List of CFDFCs that contain the channel. We need to calculate their
-    // buffer occupancy after placing the buffers.
-    // For each CFDFC, how many tokens are distributed into the buffers placed
-    // on the channel?
+    // Insert the buffers and their token occupancy into the CFDFCs that contain
+    // them.
     for (auto &cfdfc : cfdfcs) {
-      if (!cfdfc.channels.contains(bufferIn))
+      // Skipping the CFDFCs that do not contain the channel.
+      if (!cfdfc.channels.contains(channel))
         continue;
 
-      double numTokensOfChannelInCFDFC = cfdfc.channelOccupancy.at(channel);
+      // How many tokens are distributed into the buffers placed on the channel?
+      // This variable is updated after every buffer placed.
+      double currNumTokensOfChannelInCFDFC = cfdfc.channelOccupancy.at(channel);
+      double totalChannelOccupancy = currNumTokensOfChannelInCFDFC;
       for (auto &bufOp : llvm::reverse(placedBuffers)) {
-        // Insert the buffer ops into each CFDFC that contains the original
-        // channel, and assign the token occupancy to each buffer. We start from
-        // the end of the channel (e.g., the one closest to the receiver) to the
-        // beginning of the channel.
+        // Insert the buffer ops into the CFDFC that contains the original
+        // channel, and assign the token occupancy (i.e.,
+        // numTokensOfChannelInCFDFC) to each buffer. We start from the end of
+        // the channel (e.g., the one closest to the receiver) to the beginning
+        // of the channel.
         //
         // reverse(placedBuffers): the first inserted buffer is the one closest
         // to the sender.
         insertBufferOpAndOccupancyInCFDFC(bufOp, cfdfc, totalChannelLatency,
-                                          numTokensOfChannelInCFDFC);
+                                          totalChannelOccupancy,
+                                          currNumTokensOfChannelInCFDFC);
       }
+
+      // Set the channel occupancy to zero (they are transferred to the buffer
+      // placed).
+      cfdfc.channelOccupancy[channel] = 0.0;
     }
   }
 }
