@@ -21,6 +21,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -49,6 +50,14 @@ struct GateInput {
   /// Depending on the type of the input, it might be a reference to a value on
   /// the IR, another gate or empty.
   std::variant<Value, Gate *> input;
+
+  /// Set of all blocks that forward this GateInput to the gate.
+  /// A value or block argument is defined in a producer block, but may reach
+  /// the PHI through one or more sender blocks. Each sender block comes
+  /// immediately before the consumer block in the CFG. For predicate
+  /// computation, control dependence must be analyzed on the sender
+  /// blocks as well as on the producer.
+  std::unordered_set<Block *> senders;
 
   /// Constructor a gate input being the result of an operation.
   GateInput(Value v) : input(v) {};
@@ -108,6 +117,13 @@ struct Gate {
 
   /// list of condition cofactors
   std::vector<std::string> cofactorList;
+  
+  /// Block in which the gate is placed
+  Block *gateBlock;
+
+  /// True if this gate was generated as part of expanding a Mu gate.
+  /// Allows special handling when splitting multi-input Mu structures.
+  bool muGenerated;
 
   /// Index of the current gate, which uniquely identifies it.
   unsigned index;
@@ -120,15 +136,15 @@ struct Gate {
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
        Block *c = nullptr,
        boolean::BoolExpression *cond = boolean::BoolExpression::boolZero(),
-       std::vector<std::string> cof = {})
+       std::vector<std::string> cof = {},  bool muGen = false)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
-        condition(cond), cofactorList(cof), index(i) {}
+        condition(cond), cofactorList(cof), gateBlock(v.getParentBlock()), muGenerated(muGen), index(i) {}
 
   /// Print the information about the gate.
   void print();
 
   /// Get the block the gate refers to.
-  inline Block *getBlock() { return result.getParentBlock(); }
+  inline Block *getBlock() { return gateBlock; }
 
   /// Get the argument numebr the gate refers to. If the value is not a block
   /// argument, return 0
