@@ -113,7 +113,7 @@ public:
   virtual LogicalResult
   convertMemoryOps(handshake::FuncOp funcOp,
                    ConversionPatternRewriter &rewriter,
-                   const DenseMap<Value, unsigned> &memrefIndices,
+                   const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
                    BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
                    bool isFtd = false) const;
 

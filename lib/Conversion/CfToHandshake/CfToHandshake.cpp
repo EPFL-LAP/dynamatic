@@ -700,7 +700,7 @@ LowerFuncToHandshake::MemAccesses::MemAccesses(Value memStart)
 
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    const DenseMap<Value, unsigned> &memrefIndices,
+    const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
     BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
   // Count the number of memory regions in the function, and derive the starting
@@ -847,22 +847,23 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     // - We need to do this convoluted mapping ("arg in the
     // original CF func" -> "position in the argument" -> "arg in the
     // handshake func.".
-    if (memrefIndices.count(memref)) {
-      // MemRef is a function argument
-      auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
-      assert(accessesIt != memInfo.end() && "unknown memref");
+    if (/* Case: MemRef is a function argument */ memrefToFuncArgIndex.count(
+        memref)) {
+      auto handshakeMemRef = funcArgs[memrefToFuncArgIndex.at(memref)];
+      // Get the start signal
+      auto *accessIt = memInfo.find(handshakeMemRef);
+      assert(accessIt != memInfo.end() && "unknown memref");
       if (memAttr.connectsToMC())
-        accessesIt->second.mcPorts[block].push_back(portOp);
+        accessIt->second.mcPorts[block].push_back(portOp);
       else
-        accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
-    } else {
-      // MemRef is produced by Alloca or GetGlobal
-      auto *accessesIt = memInfo.find(memref);
-      assert(accessesIt != memInfo.end() && "unknown memref");
+        accessIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    } else /* Case: MemRef is produced by Alloca or GetGlobal */ {
+      auto *accessIt = memInfo.find(memref);
+      assert(accessIt != memInfo.end() && "unknown memref");
       if (memAttr.connectsToMC())
-        accessesIt->second.mcPorts[block].push_back(portOp);
+        accessIt->second.mcPorts[block].push_back(portOp);
       else
-        accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+        accessIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
     }
   }
 
