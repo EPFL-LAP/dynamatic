@@ -970,7 +970,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
 //===----------------------------------------------------------------------===//
 
 def RAMOp : Handshake_Op<"ram", []>  {
-  let arguments = (ins OptionalAttr<MemoryInitialValueAttr>:$initialValue);
+  let arguments = (ins OptionalAttr<ElementsAttr>:$initialValue);
   let builders = [
     OpBuilder<(ins 
     "MemRefType":$memrefType

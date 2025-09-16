@@ -1506,9 +1506,8 @@ struct GetGlobalOpConversion
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
     if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
-      rewriter.replaceOpWithNewOp<handshake::RAMOp>(
-          op, op.getType(),
-          handshake::MemoryInitialValueAttr::get(op.getContext(), denseAttr));
+      rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                    denseAttr);
     } else {
       llvm::report_fatal_error(
           "The initial value must be denoted in DenseElementsAttr.");

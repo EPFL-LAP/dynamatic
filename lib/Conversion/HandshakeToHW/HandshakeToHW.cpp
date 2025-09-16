@@ -867,15 +867,15 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
   addUnsigned("SIZE", resType.getNumElements());
 
   if (auto initialValueAttr = op->getInitialValueAttr()) {
-    Type elemType = initialValueAttr.getConstant().getElementType();
+    Type elemType = initialValueAttr.getElementType();
     std::vector<std::string> strValues;
-    strValues.reserve(initialValueAttr.getConstant().getNumElements());
+    strValues.reserve(initialValueAttr.getNumElements());
     if (isa<IntegerType>(elemType)) {
-      for (auto val : initialValueAttr.getConstant().getValues<int32_t>()) {
+      for (auto val : initialValueAttr.getValues<int32_t>()) {
         strValues.push_back(std::to_string(val));
       }
     } else if (isa<Float32Type>(elemType)) {
-      for (auto val : initialValueAttr.getConstant().getValues<float>()) {
+      for (auto val : initialValueAttr.getValues<float>()) {
         strValues.push_back(std::to_string(val));
       }
     } else {
