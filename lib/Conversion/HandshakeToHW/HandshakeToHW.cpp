@@ -1243,8 +1243,8 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   for (auto ramOp : funcOp.getOps<handshake::RAMOp>()) {
     for (auto *userOp : ramOp.getResult().getUsers()) {
       if (auto memInterface = dyn_cast<MemoryOpInterface>(userOp)) {
-        InternalMemLoweringState memLowingState(ramOp, memInterface);
-        state.internalMemInterfaces.insert({memInterface, memLowingState});
+        InternalMemLoweringState memLoweringState(ramOp, memInterface);
+        state.internalMemInterfaces.insert({memInterface, memLoweringState});
       }
     }
   }

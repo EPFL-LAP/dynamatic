@@ -178,6 +178,8 @@ private:
   NameAnalysis &namer;
 };
 
+// This rewrite pattern rewrites the global ops to make the memref they
+// return and the initial values they hold one-dimensional.
 struct GlobalOpConversion : public OpConversionPattern<memref::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
