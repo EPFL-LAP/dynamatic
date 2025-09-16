@@ -978,6 +978,23 @@ def RAMOp : Handshake_Op<"ram", []>  {
     has an "ElementsAttr" attribute that stores the initial (reset) content of
     the memory.
 
+    This operation is converted from get_global ops or alloca ops in the
+    built-in memref dialect (see "CfToHandshake" pass).
+
+    Assumptions:
+    - Currently, if the global op does not have an initial value, we initialize
+      the RAM content with all zeros (and 0.0 if the elements are FPs).
+
+    Limitations:
+    - Currently this RAMOp always gets mapped into a RAM with 1 read port and 1
+      write port. 
+
+    TODO: 
+    - Enum attribute to indicate the architecture of the memory op.
+    - ROM support.
+    - Multiple (at most 2) reads and writes within the same clock cycle.
+    - Map ROM to BRAM or wide MUX.
+
     Example: MLIR format
 
     ```mlir
@@ -992,15 +1009,6 @@ def RAMOp : Handshake_Op<"ram", []>  {
     // Access its initialValue
     std::optional<ElementsAttr> initialValue = ramOp.getInitialValue();
     ```
-
-    Limitations: Currently this RAMOp always gets mapped into a RAM with 1 read
-    port and 1 write port. 
-
-    TODO: 
-    - Enum attribute to indicate the architecture of the memory op.
-    - ROM support.
-    - Multiple (at most 2) reads and writes within the same clock cycle.
-    - Map ROM to BRAM or wide MUX.
   }];
 
   let results = (outs AnyStaticShapeMemRef:$result);
