@@ -39,6 +39,8 @@ begin
   converted <= to_std_logic_vector(float_value);
   outs <= q4;
 
+  -- NOTE: This 5 stage latency is used to imitate the latency of the Vitis
+  -- HLS for Kintex-7 FPGA devices. This should be revised.
   process (clk)
   begin
     if (clk'event and clk = '1') then
