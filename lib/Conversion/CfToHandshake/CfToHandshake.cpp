@@ -718,6 +718,19 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       if (!isValidMemrefType(arg.getLoc(), memrefTy))
         return failure();
       unsigned memStartIdx = memStartOffset + (memIdx++);
+      // Every memory controller needs a start signal to indicate that the BRAM
+      // can safely accept new memory requests. For internally allocated
+      // memories (which will be converted to BRAMs or MUXes) we use the
+      // function's control signal as the memory start signal.
+      //
+      // NOTE: Each external memory bank (passed in the function argument)
+      // has a separate block argument as the memory controller's start signal
+      // - arg: function argument of memref type that will be managed by a
+      // memory controller
+      // - {funcArgs[...]}: the external start signals.
+      //
+      // @Jiahui17: Should we use the first block control instead for the memory
+      // start signals? Or at least make it optional..
       memInfo.insert({arg, {funcArgs[memStartIdx]}});
     }
   }
@@ -726,8 +739,16 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
   Block *firstBlock = &funcOp.getBlocks().front();
   auto firstBBControl = getBlockControl(firstBlock);
   funcOp.walk([&](memref::AllocaOp op) {
+    // Every memory controller needs a start signal to indicate that the BRAM
+    // can safely accept new memory requests. For internally allocated
+    // memories (which will be converted to BRAMs or MUXes) we use the
+    // function's control signal as the memory start signal.
+    //
+    // NOTE: Each external memory bank (passed in the function argument)
+    // has a separate block argument as the memory controller's start signal
     Value memref = op->getResult(0);
-    memInfo.insert({memref, {firstBBControl}});
+    memInfo.insert({/* will be managed by a mem_controller */ memref,
+                    /* mem_controller's start signal */ {firstBBControl}});
   });
 
   funcOp.walk([&](memref::GetGlobalOp op) {
