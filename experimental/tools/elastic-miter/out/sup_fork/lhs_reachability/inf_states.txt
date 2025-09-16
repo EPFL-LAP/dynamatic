@@ -34,4 +34,4 @@ reachable states: 4 (2^2) out of 16 (2^4)
   sup_fork_lhs.fork.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.01 seconds, total: 0.01 seconds
+elapse: 0.00 seconds, total: 0.00 seconds

@@ -122,4 +122,4 @@ reachable states: 12 (2^3.58496) out of 65536 (2^16)
   muxForkSwap_lhs.data_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.02 seconds, total: 0.02 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

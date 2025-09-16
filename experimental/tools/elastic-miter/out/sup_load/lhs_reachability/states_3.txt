@@ -542,4 +542,4 @@ reachable states: 48 (2^5.58496) out of 262144 (2^18)
   sup_load_lhs.mc_buffer.data = FALSE
   -------------------------
 ######################################################################
-elapse: 0.01 seconds, total: 0.01 seconds
+elapse: 0.02 seconds, total: 0.02 seconds

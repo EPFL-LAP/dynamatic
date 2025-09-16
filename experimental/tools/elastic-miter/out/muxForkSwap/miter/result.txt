@@ -12,4 +12,4 @@
 -- invariant (elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.EQ_out1_valid -> elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.EQ_out1)  is true
 -- invariant (elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.EQ_out2_valid -> elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.EQ_out2)  is true
 -- specification AF (AG (((((elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.lhs_in_buf_sel_in.debug_counter.counter = elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.rhs_in_buf_sel_in.debug_counter.counter & elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.lhs_in_buf_data_in.debug_counter.counter = elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.rhs_in_buf_data_in.debug_counter.counter) & !elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.lhs_out_bl_out1.outs_valid) & !elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.rhs_out_bl_out1.outs_valid) & !elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.lhs_out_bl_out2.outs_valid) & !elastic_miter_muxForkSwap_lhs_muxForkSwap_rhs.rhs_out_bl_out2.outs_valid))  is true
-elapse: 0.34 seconds, total: 0.34 seconds
+elapse: 0.35 seconds, total: 0.35 seconds

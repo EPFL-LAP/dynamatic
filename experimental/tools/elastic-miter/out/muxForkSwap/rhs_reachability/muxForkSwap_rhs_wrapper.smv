@@ -1,7 +1,7 @@
+#include "handshake_mux_0.smv"
+#include "handshake_fork_0.smv"
 #include "handshake_source_0.smv"
 #include "handshake_constant_0.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_mux_0.smv"
 
 
 MODULE muxForkSwap_rhs_wrapper (sel_in, sel_in_valid, data_in, data_in_valid, out1_ready, out2_ready)

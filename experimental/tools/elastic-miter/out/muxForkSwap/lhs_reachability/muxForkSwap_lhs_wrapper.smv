@@ -1,5 +1,5 @@
-#include "handshake_fork_0.smv"
 #include "handshake_mux_0.smv"
+#include "handshake_fork_0.smv"
 #include "handshake_source_0.smv"
 #include "handshake_constant_0.smv"
 

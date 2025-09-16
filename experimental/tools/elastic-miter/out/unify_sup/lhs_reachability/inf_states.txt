@@ -62,4 +62,4 @@ reachable states: 8 (2^3) out of 32 (2^5)
   unify_sup_lhs.fork_cond2.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.00 seconds, total: 0.00 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

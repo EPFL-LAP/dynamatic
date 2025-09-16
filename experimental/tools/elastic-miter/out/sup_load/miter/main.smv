@@ -36,4 +36,4 @@ MODULE main
 INVARSPEC (elastic_miter_sup_load_lhs_sup_load_rhs.EQ_Data_out_valid -> elastic_miter_sup_load_lhs_sup_load_rhs.EQ_Data_out);
 CTLSPEC AF (AG ((elastic_miter_sup_load_lhs_sup_load_rhs.lhs_in_buf_Addr_in.debug_counter.counter = elastic_miter_sup_load_lhs_sup_load_rhs.rhs_in_buf_Addr_in.debug_counter.counter) & (elastic_miter_sup_load_lhs_sup_load_rhs.lhs_in_buf_Cond.debug_counter.counter = elastic_miter_sup_load_lhs_sup_load_rhs.rhs_in_buf_Cond.debug_counter.counter) & (!elastic_miter_sup_load_lhs_sup_load_rhs.lhs_out_bl_Data_out.outs_valid) & (!elastic_miter_sup_load_lhs_sup_load_rhs.rhs_out_bl_Data_out.outs_valid)));
 
-INVAR  seq_generator_Addr_in.exact_tokens = seq_generator_Cond.exact_tokens & seq_generator_Addr_in.exact_tokens = elastic_miter_sup_load_lhs_sup_load_rhs.out_nds_Data_out.exact_tokens ;
+INVAR  seq_generator_Addr_in.exact_tokens = seq_generator_Cond.exact_tokens & seq_generator_Addr_in.exact_tokens <= elastic_miter_sup_load_lhs_sup_load_rhs.out_nds_Data_out.exact_tokens ;

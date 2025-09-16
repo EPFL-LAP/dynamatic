@@ -1,7 +1,7 @@
 #include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
 #include "handshake_source_0.smv"
 #include "handshake_constant_0.smv"
-#include "handshake_mux_0.smv"
 
 
 MODULE simpleInduction_rhs (A_in, A_in_valid, C_in, C_in_valid, D_in, D_in_valid, B_out_ready)

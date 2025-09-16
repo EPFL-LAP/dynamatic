@@ -12,7 +12,11 @@ run() {
     NAME=$1
     shift
     CTX="$@"
+    start=$(date +%s%3N)
     ./bin/elastic-miter --lhs=$REWRITES/${NAME}_lhs.mlir --rhs=$REWRITES/${NAME}_rhs.mlir -o $OUT_DIR/${NAME} --cex $CTX
+    end=$(date +%s%3N)
+    execution_time=$((end - start))
+    echo "Execution time: ${execution_time} ms"
     exit_on_fail "($NAME): Equivalence checking failed"
 }
 
@@ -23,7 +27,7 @@ run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_
 run sup_mul --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={in:2}&{in:0}<={out:0}"
 run sup_fork --allow_nonacceptance --timing_insensitive
 run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
-run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={out:0}"
+run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}<={out:0}"
 
 # Rewrite C
 run simpleInduction --allow_nonacceptance --timing_insensitive
