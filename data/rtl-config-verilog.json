@@ -131,6 +131,14 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.maxsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/maxsi.v",
+    "dependencies": ["join"]
+  },
+  {
     "name": "handshake.mulf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }

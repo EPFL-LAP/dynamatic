@@ -91,11 +91,15 @@ end architecture;
 
 # Returns the 2's complement binary representation of integer `n` with the given
 # `bitwidth`.
-def to_twos_complement(n, bitwidth):
+def to_twos_complement(n, bitwidth, addr):
     if n < 0:
         n = (1 << bitwidth) + n
     if n >= (1 << bitwidth) or n < 0:
-        raise ValueError(f"Value {n} doesn't fit in {bitwidth} bits")
+        raise ValueError(
+            f"""
+            The memory cannot be correctly instantiated, since the value
+            {n} at address {addr} doesn't fit in {bitwidth} bits.
+            """)
     return format(n, f'0{bitwidth}b')
 
 
@@ -114,21 +118,33 @@ def gen_ram(
     assert len(init_vals) <= int(size)
 
     if hdl == "verilog":
-        for id, val in enumerate(init_vals):
+        for id_, val in enumerate(init_vals):
+            if (not val.lstrip("+-").isdigit()):
+                raise ValueError(
+                    f"Initial value {val} at address {id_} is not a number!")
+            val_2s_complement = to_twos_complement(
+                int(val), int(data_width), id_)
             init_strings.append(
-                "ram[" + str(id) + "] = " + str(data_width) + "'b" + to_twos_complement(int(val), int(data_width)) + ";")
+                "ram[" + str(id_) + "] = " + str(data_width)
+                + "'b" + val_2s_complement + ";")
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - len(init_vals)):
                 init_items.append(
-                    "ram[" + str(id) + "] = " + data_width + "'b0;")
+                    "ram[" + str(id_) + "] = " + data_width + "'b0;")
         init_str = "\n".join(init_strings)
     elif hdl == "vhdl":
         init_strings = ["signal ram : ram_type := ("]
         init_items = []
-        for id, val in enumerate(init_vals):
-            init_items.append(
-                "\"" + f"{to_twos_complement(int(val), int(data_width))}" + "\"")
+
+        for id_, val in enumerate(init_vals):
+            if (not val.lstrip("+-").isdigit()):
+                raise ValueError(
+                    f"Initial value {val} at address {id_} is not a number!")
+            val_2s_complement = to_twos_complement(
+                int(val), int(data_width), id_)
+            init_items.append("\"" + val_2s_complement + "\"")
+
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - len(init_vals)):
@@ -157,15 +173,21 @@ if __name__ == "__main__":
         description="Generate a RAM HDL module."
     )
 
-    parser.add_argument("--module-name", required=True, help="Name of the generated module")
-    parser.add_argument("--hdl", required=True, help="Target HDL (e.g., verilog, vhdl)")
-    parser.add_argument("--output", required=True, help="Path to output HDL file")
-    parser.add_argument("--data-width", type=int, required=True, help="Data bus width")
-    parser.add_argument("--addr-width", type=int, required=True, help="Address bus width")
-    parser.add_argument("--size", type=int, required=True, help="Number of memory elements")
-    parser.add_argument( "--values", nargs="*", default=[],
-        help="List of initial values (space separated, e.g. --values 1 2 3 4)",
-    )
+    parser.add_argument("--module-name", required=True,
+                        help="Name of the generated module")
+    parser.add_argument("--hdl", required=True,
+                        help="Target HDL (e.g., verilog, vhdl)")
+    parser.add_argument("--output", required=True,
+                        help="Path to output HDL file")
+    parser.add_argument("--data-width", type=int,
+                        required=True, help="Data bus width")
+    parser.add_argument("--addr-width", type=int,
+                        required=True, help="Address bus width")
+    parser.add_argument("--size", type=int, required=True,
+                        help="Number of memory elements")
+    parser.add_argument("--values", nargs="*", default=[],
+                        help="List of initial values (space separated, e.g. --values 1 2 3 4)",
+                        )
 
     args = parser.parse_args()
 

@@ -31,7 +31,7 @@ architecture arch of uitofp is
   signal q3 : std_logic_vector(32 - 1 downto 0);
   signal q4 : std_logic_vector(32 - 1 downto 0);
   signal buff_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic_vector(32 - 1 downto 0);
+  signal oehb_dataOut, oehb_datain          : std_logic;
   signal float_value : float32;
 begin
 
@@ -67,7 +67,10 @@ begin
       buff_valid
     );
 
-  oehb : entity work.oehb(arch) generic map (32)
+  -- This OEHB is necessary to make the unit elastic. If not placed (i.e.,
+  -- adding one more cycle of latency), this unit would deadlock in a fork-join
+  -- pattern.
+  oehb : entity work.oehb(arch) generic map (1)
     port map(
       clk        => clk,
       rst        => rst,
@@ -75,8 +78,8 @@ begin
       outs_ready => outs_ready,
       outs_valid => outs_valid,
       ins_ready  => oehb_ready,
-      ins        => oehb_datain,
-      outs       => oehb_dataOut
+      ins(0)     => oehb_datain,
+      outs(0)    => oehb_dataOut
     );
   ins_ready <= oehb_ready;
 
