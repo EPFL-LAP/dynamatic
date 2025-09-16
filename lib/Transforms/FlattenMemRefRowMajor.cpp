@@ -184,26 +184,39 @@ struct GlobalOpConversion : public OpConversionPattern<memref::GlobalOp> {
   matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
     MemRefType type = op.getType();
+
+    // - isUniDimensional: The global op is already one dimensional, so the
+    // rewrite pattern can report that nothing is done.
+    // - !type.hasStaticShape(): The global op does not have a static shape, no
+    // transformation is applied. In this case, if the op is not 1-dimensional,
+    // the rewrite pass will signal a failure.
     if (isUniDimensional(type) || !type.hasStaticShape())
       return failure();
 
     auto newType =
         MemRefType::get({type.getNumElements()}, type.getElementType());
-    auto attr = op.getInitialValueAttr();
 
-    if (auto denseAttr = dyn_cast<DenseElementsAttr>(attr)) {
-      auto newDenseType =
-          RankedTensorType::get({type.getNumElements()}, type.getElementType());
-      rewriter.replaceOpWithNewOp<memref::GlobalOp>(
-          op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
-          TypeAttr::get(newType), denseAttr.reshape(newDenseType),
-          op.getConstantAttr(), op.getAlignmentAttr());
-    } else {
-      rewriter.replaceOpWithNewOp<memref::GlobalOp>(
-          op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
-          TypeAttr::get(newType), op.getInitialValueAttr(),
-          op.getConstantAttr(), op.getAlignmentAttr());
+    // If the global op has an initial value and it is a dense element
+    // attribute, then we reshape both the type and the initial value then
+    // return.
+    if (auto attr = op.getInitialValue()) {
+      if (auto denseAttr = dyn_cast<DenseElementsAttr>(*attr)) {
+        auto newDenseType = RankedTensorType::get({type.getNumElements()},
+                                                  type.getElementType());
+        rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+            op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+            TypeAttr::get(newType), denseAttr.reshape(newDenseType),
+            op.getConstantAttr(), op.getAlignmentAttr());
+        return success();
+      }
     }
+
+    // If the global op does not have an initial value, then we reshape the
+    // memref type then return.
+    rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+        TypeAttr::get(newType), op.getInitialValueAttr(), op.getConstantAttr(),
+        op.getAlignmentAttr());
     return success();
   }
 };
