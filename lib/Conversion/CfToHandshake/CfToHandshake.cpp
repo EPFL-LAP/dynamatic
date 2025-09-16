@@ -853,17 +853,23 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       // Get the start signal
       auto *accessIt = memInfo.find(handshakeMemRef);
       assert(accessIt != memInfo.end() && "unknown memref");
+
+      // This reference holds the set of memory ports and the start signals
+      auto &memoryAccessInfo = accessIt->second;
       if (memAttr.connectsToMC())
-        accessIt->second.mcPorts[block].push_back(portOp);
+        memoryAccessInfo.mcPorts[block].push_back(portOp);
       else
-        accessIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+        memoryAccessInfo.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
     } else /* Case: MemRef is produced by Alloca or GetGlobal */ {
       auto *accessIt = memInfo.find(memref);
       assert(accessIt != memInfo.end() && "unknown memref");
+
+      // This reference holds the set of memory ports and the start signals
+      auto &memoryAccessInfo = accessIt->second;
       if (memAttr.connectsToMC())
-        accessIt->second.mcPorts[block].push_back(portOp);
+        memoryAccessInfo.mcPorts[block].push_back(portOp);
       else
-        accessIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+        memoryAccessInfo.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
     }
   }
 
