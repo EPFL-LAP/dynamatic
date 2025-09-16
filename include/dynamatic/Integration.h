@@ -53,6 +53,16 @@ static void scalarPrinter(const T &arg, OS &os);
 template <typename T>
 static void arrayPrinter(const T *arrayPtr, size_t size, OS &os);
 
+/// Compile-time function to compute the total number of elements
+/// in a multidimensional array type.
+///
+/// Example:
+///   getArraySize<int[2][3][4]>() == 24 (2 * 3 * 4)
+///
+/// It works recursively:
+///   - If T is one-dimensional (rank == 1), return its extent (size).
+///   - Otherwise, multiply the first dimension by the size of the remaining
+///   dimensions.
 template <typename T>
 constexpr size_t getArraySize() {
   if constexpr (std::rank_v<T> == 1)
@@ -61,16 +71,29 @@ constexpr size_t getArraySize() {
     return std::extent_v<T> * getArraySize<std::remove_extent_t<T>>();
 }
 
+/// Helper metafunction to deduce the "value type" of an array type.
+///
+/// Behavior:
+///   - If T is not an array, the value type is T itself.
+///   - If T is an array type, one dimension is peeled off at a time
+///     (via specialization) until the base element type is reached.
+///
+/// Examples:
+///   getValueType<int[2][3][4]> == int
+///   getValueType<double[5]>    == double
+///   getValueType<char>         == char
 template <typename T>
 struct getValueTypeImpl {
   using type = T;
 };
-
 template <typename T, size_t TSize>
 struct getValueTypeImpl<T[TSize]> {
   using type = typename getValueTypeImpl<T>::type;
 };
 
+/// Alias to simplify usage of getValueTypeImpl.
+/// Instead of writing getValueTypeImpl<T>::type,
+/// you can just use getValueType<T>.
 template <typename T>
 using getValueType = typename getValueTypeImpl<T>::type;
 
@@ -273,24 +296,52 @@ void dumpHLSArg(const T &arg, const char *argName) {
   outFile.close();
 }
 
+/// Helper function to dump a parameter pack of arguments with their
+/// corresponding names.
+///
+/// Usage:
+///   dumpArgsImpl("fir, a, b, c", someFunc, argA, argB, argC);
+///
+/// Behavior:
+///   - The first token in the string (e.g. "fir") is ignored.
+///   - The first function parameter (`Func`) is also ignored.
+///     It is passed redundantly as both a name and an argument
+///     to simplify the caller macro.
+///   - The remaining tokens (e.g. "a", "b", "c") are extracted by splitting on
+///   commas.
+///   - Each argument in the parameter pack is passed to `dumpHLSArg` together
+///   with
+///     the matching name from the parsed list.
+///   - Whitespace around names is trimmed before use.
+///
+/// Example:
+///   Input:  names = "fir, a, b, c"
+///           args  = { argA, argB, argC }
+///   Effect: calls
+///              dumpHLSArg(argA, "a");
+///              dumpHLSArg(argB, "b");
+///              dumpHLSArg(argC, "c");
 template <typename Func, typename... Args>
 void dumpArgsImpl(const char *names, Func, Args &&...args) {
-  std::string s(names); // "fir, a, b, c"
+  std::string s(names); // e.g. "fir, a, b, c"
   std::stringstream ss(s);
   std::string name;
 
-  // split on ',' and dump alongside each arg
+  // Split the input string on ',' to extract argument names
   std::vector<std::string> nameList;
-  // drop the first item
+
+  // Discard the first token (the function name)
   std::getline(ss, name, ',');
   while (std::getline(ss, name, ',')) {
-    // trim spaces
+    // Trim leading and trailing whitespace
     name.erase(0, name.find_first_not_of(" \t"));
     name.erase(name.find_last_not_of(" \t") + 1);
     nameList.push_back(name);
   }
 
   size_t i = 0;
+  // At this point, nameList should be {"a", "b", "c"}
+  // Iterate over args and pair each with the corresponding name
   ((dumpHLSArg(args, nameList[i++].c_str())), ...);
 }
 
