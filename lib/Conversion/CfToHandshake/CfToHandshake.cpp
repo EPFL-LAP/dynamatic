@@ -548,7 +548,8 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
               operand.getType())) {
         llvm_unreachable(
             "Attempting to construct merge on a non-handshake operand. You "
-            "might have accidentally maximized the SSA of a certain op.");
+            "might have accidentally maximized the SSA of a placeholder op "
+            "like LSQ, MemoryController, or RAMOp.");
       }
       assert(operand.getType()
                      .cast<handshake::ExtraSignalsTypeInterface>()
