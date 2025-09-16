@@ -1461,10 +1461,38 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
 
 struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
+
+  // Construct a dense element attribute with everything zeroes.
+  DenseElementsAttr getZeroAttr(ShapedType type) const {
+    auto elemType = type.getElementType();
+    if (auto intTy = dyn_cast<IntegerType>(elemType)) {
+      return DenseElementsAttr::get(type, APInt(intTy.getWidth(), 0));
+    }
+    if (auto floatTy = dyn_cast<FloatType>(type)) {
+      if (floatTy.isF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEhalf(), /*negative=*/false));
+      if (floatTy.isBF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::BFloat(), /*negative=*/false));
+      if (floatTy.isF32())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEsingle(), /*negative=*/false));
+      if (floatTy.isF64())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEdouble(), /*negative=*/false));
+      llvm::report_fatal_error("Unhandled float element type!");
+    }
+    llvm::report_fatal_error("Unknown base element type!");
+  }
+
   LogicalResult
   matchAndRewrite(memref::AllocaOp op, OpAdaptor adapter,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType());
+    // HACK: By default, we initialize the memory with all zeros. According to
+    // the C standard, this only happens for arrays.
+    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                  getZeroAttr(op.getType()));
     return success();
   }
 };

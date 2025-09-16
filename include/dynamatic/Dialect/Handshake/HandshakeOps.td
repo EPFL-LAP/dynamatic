@@ -970,14 +970,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
 //===----------------------------------------------------------------------===//
 
 def RAMOp : Handshake_Op<"ram", []>  {
-  let arguments = (ins OptionalAttr<ElementsAttr>:$initialValue);
-  let builders = [
-    OpBuilder<(ins 
-    "MemRefType":$memrefType
-    ), [{
-      $_state.types.push_back(memrefType);
-    }]>
-  ];
+  let arguments = (ins ElementsAttr:$initialValue);
 
   let results = (outs AnyStaticShapeMemRef:$result);
 }
