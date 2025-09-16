@@ -93,7 +93,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 
-  populateCFDFCAnalysisResult();
+  populateCFDFCThroughputAndOccupancy();
 }
 
 void CostAwareBuffers::addCustomChannelConstraints(Value channel) {

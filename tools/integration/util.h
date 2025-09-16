@@ -23,9 +23,18 @@
 
 namespace fs = std::filesystem;
 
-int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath = std::nullopt,
-                       bool useVerilog = false);
+struct IntegrationTestData {
+  // Configurations
+  std::string name;
+  fs::path benchmarkPath;
+  bool useVerilog;
+  bool useSharing;
+
+  // Results
+  int simTime;
+};
+
+int runIntegrationTest(IntegrationTestData &config);
 bool runSpecIntegrationTest(const std::string &name, int &outSimTime);
 int getSimulationTime(const fs::path &logFile);
 

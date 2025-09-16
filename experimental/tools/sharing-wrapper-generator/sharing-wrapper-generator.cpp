@@ -49,39 +49,34 @@ static cl::opt<std::string> clOptLatency(cl::Positional, cl::Required,
                                          cl::desc("<latency>"),
                                          cl::cat(mainCategory));
 
-llvm::SmallVector<unsigned, 8> parseCreditOpt(std::string creditString) {
-  llvm::SmallVector<unsigned, 8> listOfCredits;
-
+static llvm::SmallVector<unsigned, 8> parseCreditOpt(StringRef creditString) {
   std::string delimiter = " ";
+  SmallVector<StringRef, 8> parts;
+  creditString.split(parts, delimiter, -1, false);
 
-  size_t pos = 0;
-  std::string token;
-  while ((pos = creditString.find(delimiter)) != std::string::npos) {
-    token = clOptListOfCredits.substr(0, pos);
-    listOfCredits.emplace_back(std::stoi(token));
-    creditString.erase(0, pos + delimiter.length());
+  SmallVector<unsigned, 8> listOfCredits;
+  for (auto p : parts) {
+    listOfCredits.push_back(std::stoi(p.str()));
   }
-  listOfCredits.emplace_back(std::stoi(creditString));
-
   return listOfCredits;
 }
 
-std::string getRangeFromSize(unsigned size) {
+static std::string getRangeFromSize(unsigned size) {
   return "(" + std::to_string(size) + " - 1 downto 0)";
 }
 
-void declareDataSignal(mlir::raw_indented_ostream &os,
-                       const std::string &unitName, unsigned bitwidth,
-                       unsigned numOutputs) {
+static void declareDataSignal(mlir::raw_indented_ostream &os,
+                              StringRef unitName, unsigned bitwidth,
+                              unsigned numOutputs) {
   for (unsigned i = 0; i < numOutputs; i++) {
     os << "signal " << unitName << "_out" << i << "_data"
        << " : std_logic_vector" << getRangeFromSize(bitwidth) << ";\n";
   }
 }
 
-void declareHandshakeSignals(mlir::raw_indented_ostream &os,
-                             const std::string &unitName, unsigned bitwidth,
-                             unsigned numOutputs) {
+static void declareHandshakeSignals(mlir::raw_indented_ostream &os,
+                                    StringRef unitName, unsigned bitwidth,
+                                    unsigned numOutputs) {
   for (unsigned i = 0; i < numOutputs; i++) {
     os << "signal " << unitName << "_out" << i << "_valid"
        << " : std_logic;\n";
@@ -90,10 +85,9 @@ void declareHandshakeSignals(mlir::raw_indented_ostream &os,
   }
 }
 
-void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
-                   const unsigned &numInputOperands, const unsigned &groupSize,
-                   const unsigned &latency,
-                   const llvm::SmallVector<unsigned, 8> &listOfCredits) {
+static void printVhdlImpl(mlir::raw_indented_ostream &os, unsigned dataWidth,
+                          unsigned numInputOperands, unsigned groupSize,
+                          unsigned latency, ArrayRef<unsigned> listOfCredits) {
   os << "---------------------------------------------------------\n";
   os << "-- Sharing Wrapper Circuit for Managing the Shared Unit\n";
   os << "-- Number of credits of each operation: ";
