@@ -38,5 +38,8 @@
 
     assign index = index_internal;
 
+    initial begin
+      $fatal("control_merge implementation with data signal has a bug. Use beta backend instead");
+    end
     assign outs = ins[index_internal * DATA_TYPE +: DATA_TYPE];
   endmodule
