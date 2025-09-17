@@ -6,7 +6,7 @@ This document describes the GitHub Actions workflow used for the purposes of CI 
 
 Workflows are defined using YAML files, placed in the `.github/workflows/` directory. A workflow consists of one or more jobs, and each job consists of one or more steps. 
 
-Workflows are triggered (i.e. run), when certain changes on the repository occur. For example, a workflow can run whenever a pull request into main is opened/marked ready for reviewm, or when a push is made into a specified branch, and so on. A comprehensive list of such trigger events is available [in the official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
+Workflows are triggered (i.e. run), when certain changes on the repository occur. For example, a workflow can run whenever a pull request into main is opened/marked ready for review, or when a push is made into a specified branch, and so on. A comprehensive list of such trigger events is available [in the official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
 
 Each job is executed in a separate environment, i.e. jobs do not share anything by default. They can run either on GitHub's cloud-based runners, or on user-defined self-hosted runners.
 - [GitHub's runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) are ephemeral virtual machines, i.e. they are created only for running that specific job and deleted after the job is finished. This means that they are unsuitable for jobs that require large dependencies, since they would need to be reinstalled every time.
