@@ -4,7 +4,7 @@ This document describes the GitHub Actions workflow used for the purposes of CI 
 
 ## Basics
 
-Workflows are defined using YAML files, placed in the `.github/workflows/` directory. A workflow consists of one or more jobs, and each job consists of one or more steps. 
+Workflows are defined using YAML files, placed in the `.github/workflows/` directory. A workflow consists of one or more jobs, and each job consists of one or more steps. Each step corresponds to running one or more shell commands. A step may install a dependency, run a build script, or do any other required task.
 
 Workflows are triggered (i.e. run), when certain changes on the repository occur. For example, a workflow can run whenever a pull request into main is opened/marked ready for review, or when a push is made into a specified branch, and so on. A comprehensive list of such trigger events is available [in the official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
 
@@ -22,7 +22,7 @@ The main Actions workflow for building and integration is described in `.github/
 - `check-format`, which runs the [formatting checks](Formatting.md),
 - `integration`, which runs the build process, [integration tests](IntegrationTests.md) and [MLIR unit tests](../IntroductoryMaterial/FileCheckTesting.md).
 
-`check-format` runs on cloud runners, while `integration` runs on a self-hosted runner that is set up on a VM inside EPFL's network. This is because of the fact that `integration` requires a large number of dependencies which cannot be feasibly installed on every run on GitHub's runners. Another reason why a self-hosted runner is used is because building Dynamatic needs build artifacts to be cached, otherwise the build process would take an unacceptable amount of time because of the Polygeist build. *ccache* is used for this purpose; it caches build results outside of the workspace folder, which allows the workspace folder to be cleaned completely before every run, and avoids issues caused by any leftover state from previous runs. Of course, *ccache*'s cache is a form of state kept in between runs, but we trust that *ccache* does its job properly and gives the same results as if we were to run the entire compilation from scratch.
+`check-format` runs on cloud runners, while `integration` runs on a self-hosted runner that is set up on a VM inside EPFL's network. This is because of the fact that `integration` requires a large number of dependencies which cannot be feasibly installed on every run on GitHub's runners. Another reason why a self-hosted runner is used is because building Dynamatic needs build artifacts to be cached, otherwise the build process would take an unacceptable amount of time because of the Polygeist build. *ccache* is used for this purpose; it caches build results outside of the workspace folder, which allows the workspace folder to be cleaned completely before every run, and avoids issues caused by any leftover state from previous runs. It is very important that the runs are independent of each other. This is true under the assumption that ccache properly caches and restores the build artifacts (which we trust is true).
 
 Simply put, the your interaction with the workflow will look as follows:
 
@@ -81,14 +81,15 @@ The format of the report is the following. The `cycles` column is the performanc
 - What are the "defaults" that the workflow runs?
   
   - The basic integration tests run the following commands in `bin/dynamatic`:
-
-      1. `set-dynamatic-path <DYNAMATIC_ROOT_FOLDER>`
-      2. `set-src <PATH_TO_BENCHMARK>` (e.g. `integration-test/fir/fir.c`)
-      3. `set-clock-period 5`
-      4. `compile --buffer-algorithm fpga20`
-      5. `write-hdl --hdl vhdl`
-      6. `simulate`
-      7. `exit`
+      ```
+      set-dynamatic-path <DYNAMATIC_ROOT_FOLDER>
+      set-src <PATH_TO_BENCHMARK> # e.g. integration-test/fir/fir.c`
+      set-clock-period 5
+      compile --buffer-algorithm fpga20
+      write-hdl --hdl vhdl
+      simulate
+      exit
+      ```
 
 - How do I add a certain feature in the "default" verification flow? / How do I make it run with different flags (e.g. different buffering algorithms)?
 
