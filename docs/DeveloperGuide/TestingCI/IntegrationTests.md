@@ -7,9 +7,9 @@ and [CMake's ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html). Fo
 
 In order to avoid confusion, we introduce the following terminology.
 
-A **benchmark** is a piece of .c code, commonly called a *kernel*, which is written in order to be compiled by Dynamatic into a HDL representation of a dataflow circuit. Confusingly, benchmarks are located in the `integration-test` folder. We also say that benchmarks are *testing resources*, since they are files that are loaded and used when running a test.
+A **benchmark** is a piece of .c code, commonly called a *kernel*, which is written in order to be compiled by Dynamatic into a HDL representation of a dataflow circuit. Benchmarks are located in the `integration-test` folder. We also say that benchmarks are *testing resources*, since they are files used for testing Dynamatic and verifying its correct behaviour".
 
-An **integration test** is a piece of code which runs a Dynamatic in order to compile, convert into HDL and simulate a certain benchmark, with some specific parameters. To clarify the difference, `integration-test/fir/fir.c` is a benchmark, while a C++ function which runs Dynamatic `set-src <benchmark>`, `compile`, `write-hdl` and `simulate` commands is an integration test. Note that integration tests differ by parameters used; a test that runs `compile --buffer-algorithm on-merges` is not the same as a test that runs `compile --buffer-algorithm fpga20`, even if they use the same benchmark.
+An **integration test** is a sequence of all HLS flow steps (except synthesis) run in Dynamatic, with a certain set of parameters. For instance, the C code describing the functional behaviour of an FIR filter is a benchmark that Dynamatic receives as input to generate the corresponding HDL. An integration test instructs Dynamatic to read the C code for the FIR filter and to execute a certain set of commands (specifically, compilation, HDL generation and simulation).
 
 As mentioned above, the basic integration tests run the following steps using Dynamatic's frontend shell (this is referred to as the "basic" flow):
 ```
@@ -44,7 +44,7 @@ All code related to integration testing is located in `tools/integration`.
 
 This is a crash course on GoogleTest features that are important for Dynamatic. Also, refer to the [GoogleTest documentation](https://google.github.io/googletest/), since these concepts can be confusing. 
 
-GoogleTest allows us to write tests in a function-like form. For this, we use the `TEST` macro. Here is a very elementary example of a test:
+GoogleTest allows us to write tests in a function-like form. For this, we use the `TEST` macro. Let's imagine we want to test a C function called `sum` that computes the sum of two integers. We want to evaluate if this function behaves correctly when given inputs 5 and 4. The GoogleTest test would look like this:
 ```c++
 int sum(int a, int b) {
   return a + b;
@@ -60,19 +60,23 @@ TEST(SumTests, positive_numbers) {
 ```
 The code inside the test is run by GoogleTest like a function. `EXPECT_EQ` is a macro assertion which ensures that the two arguments are equal. If not, the test will fail.
 
-Now, let's demonstrate how this would look like in the case of Dynamatic. Assume there is a helper function
+Now, let's demonstrate how this would look like in the case of Dynamatic. We have a helper function defined in `util.cpp` that abstracts away the details of calling Dynamatic. It runs the basic flow described in the introduction and returns an exit code (0 if success).
 ```c++
 int runIntegrationTest(std::string benchmark);
 ```
-which runs the basic flow described in the introduction and returns 0 if it was successful and 1 otherwise. Then, a test would look like:
+(*Note: This function actually takes more parameters that are left out here for simplicity. Refer to tools/integration/util.cpp.*)
+
+Then, a test would look like:
 ```c++
+// BasicTests is the name of the test suite,
+// binary_search is the name of a test case in the BasicTests suite
 TEST(BasicTests, binary_search) {
   int exitCode = runIntegrationTest("binary_search");
   
   EXPECT_EQ(exitCode, 0);
 }
 ```
-Because of the macro, the test will fail if the exit code is non-zero.
+`EXPECT_EQ` is a macro assertion that fails the test if the first argument isn't equal to the second one. Because of the macro, the test will fail if the exit code is non-zero.
 
 However, by doing this we only run one benchmark with the basic flow. If we want to run multiple benchmarks, we would have something like this:
 ```c++
@@ -101,7 +105,9 @@ and so on for all Dynamatic benchmarks. It is immediately clear that such an app
 class BasicTests : public testing::TestWithParam<std::string> {};
 ```
 
-Then, we create a parameterized test with the given fixture. As specified in the fixture, the test takes a parameter of type `std::string`. The parameter's value can be retrieved using `GetParam()`.
+In general, a fixture is a set of tests that are run with the same data configuration. In our case, the data configuration consists of the list of benchmarks. So, all test cases in the same fixture will be run with the same benchmarks.
+
+Then, we create a parameterized test with the given fixture using the `TEST_P` macro. As specified in the fixture, the test takes a parameter of type `std::string`. The parameter's value can be retrieved using `GetParam()`.
 ```c++
 TEST_P(BasicTests, basic) {
   std::string name = GetParam();
@@ -111,7 +117,7 @@ TEST_P(BasicTests, basic) {
 }
 ```
 
-Finally, we must specify the concrete parameters that will be used to run the parameterized test. We use the macro `INSTANTIATE_TEST_SUITE_P(instantiationName, fixtureName, params)` for this purpose. Since the parameter list contains all benchmarks, we appropriately name the instantiation `AllBenchmarks`.
+Finally, we must specify the concrete parameters that will be used to run the parameterized test. We use the macro `INSTANTIATE_TEST_SUITE_P(instantiationName, fixtureName, params)` for this purpose. As its name suggests, it serves to make an instance of the test suite with the given parameters; think of making an instance of a class in C++ with some parameters in the constructor. Since the parameter list contains all benchmarks, we appropriately name the instantiation `AllBenchmarks`.
 ```c++
 INSTANTIATE_TEST_SUITE_P(
     AllBenchmarks, BasicTests,
@@ -130,7 +136,7 @@ For example:
 AllBenchmarks/BasicTests.vhdl/binary_search
 AllBenchmarks/BasicTests.verilog/fir
 ```
-This will be important in the following section.
+**This will be important in the following section.**
 
 ## Running tests
 
@@ -263,7 +269,7 @@ First we define the fixture at the top of `TEST_SUITE.cpp`:
 ```c++
 class NewFixture : public testing::TestWithParam<std::string> {};
 ```
-Then we create some test cases for it as stated earlier. Finally, we instantiate it:
+Then we create some test cases for it as stated earlier. Finally, we instantiate it at the bottom of the same file:
 ```c++
 INSTANTIATE_TEST_SUITE_P(SomeBenchmarks, NewFixture, testing::Values(...));
 ```
