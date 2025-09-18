@@ -130,7 +130,7 @@ def gen_ram(
         # If some elements are not initialized, fill in the rest with zeroes.
         if len(init_vals) < int(size):
             for _ in range(int(size) - len(init_vals)):
-                init_items.append(
+                init_strings.append(
                     "ram[" + str(id_) + "] = " + data_width + "'b0;")
         init_str = "\n".join(init_strings)
     elif hdl == "vhdl":
