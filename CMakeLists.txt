@@ -193,6 +193,20 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   FetchContent_MakeAvailable(dot2smv)
 endif()
 
+# We use GoogleTest for regression tests
+FetchContent_Declare(
+  googletest
+  DOWNLOAD_EXTRACT_TIMESTAMP true
+  URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+)
+
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# TODO: Use the JSON package from Boost instead.
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 
 #-------------------------------------------------------------------------------
 # Directory setup
