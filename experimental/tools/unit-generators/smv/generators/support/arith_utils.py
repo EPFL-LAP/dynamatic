@@ -29,7 +29,7 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
 def _generate_handshake_manager(name, latency):
     return f"""
 MODULE {name}(lhs_valid, rhs_valid, outs_ready)
-  VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
+  VAR inner_join : {name}__join(lhs_valid, rhs_valid, inner_delay_buffer.ins_ready);
   VAR inner_delay_buffer : {name}__delay_buffer(inner_join.outs_valid, outs_ready);
 
   -- output
