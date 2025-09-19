@@ -1321,18 +1321,23 @@ dynamatic::getMemoryPorts(handshake::MemoryOpInterface memOp) {
 }
 
 handshake::MemoryOpInterface dynamatic::findMemInterface(Value val) {
-  llvm::SmallDenseSet<Operation *, 2> explore(val.getUsers().begin(),
-                                              val.getUsers().end());
   llvm::SmallDenseSet<Operation *, 2> visited;
-  for (Operation *op : explore) {
-    if (auto [_, newOp] = visited.insert(op); !newOp)
+  llvm::SmallVector<Operation *, 4> worklist(val.getUsers().begin(),
+                                             val.getUsers().end());
+
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (!visited.insert(op).second)
       continue;
     if (auto memOp = dyn_cast<handshake::MemoryOpInterface>(op))
       return memOp;
     if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp,
-            handshake::ForkOp, handshake::LazyForkOp>(op))
-      explore.insert(op->getUsers().begin(), op->getUsers().end());
+            handshake::ForkOp, handshake::LazyForkOp>(op)) {
+      for (auto *user : op->getUsers())
+        worklist.push_back(user);
+    }
   }
+
   return nullptr;
 }
 
@@ -1355,7 +1360,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
                      unsigned doneOutputIdx)
     : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {doneOutputIdx},
-                 Kind::STORE) {};
+                 Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1388,8 +1393,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort) {};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
 size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)
@@ -1485,9 +1489,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group) {};
+    : blockID(blockID), group(group){};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1523,7 +1527,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
