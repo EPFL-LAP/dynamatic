@@ -625,6 +625,10 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
     SmallVector<Value> newResults;
     SmallVector<Type> newResTypes;
     Type newDataType = rewriter.getIntegerType(optWidth);
+    if (optWidth == 0)
+      llvm::errs() << "Optimizing bitwidth of " << op->getName() << " from "
+                   << dataWidth << " to " << optWidth << " - " << channelVal
+                   << "\n";
     Type newChannelType = channelVal.getType().withDataType(newDataType);
     cfg.getNewOperands(optWidth, ext, minDataOperands, rewriter, newOperands);
     cfg.getResultTypes(newChannelType, newResTypes);
@@ -1547,6 +1551,10 @@ struct HandshakeOptimizeBitwidthsPass
   void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
+
+    for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+      funcOp.print(llvm::errs());
+    }
 
     // Create greedy config for all optimization passes
     mlir::GreedyRewriteConfig config;

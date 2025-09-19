@@ -271,6 +271,8 @@ protected:
 
   void addBackedgeConstraints();
 
+  void addDataBufConstraint();
+
   void addMuxConstraint(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a

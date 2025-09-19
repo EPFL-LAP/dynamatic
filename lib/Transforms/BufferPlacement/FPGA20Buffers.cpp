@@ -204,6 +204,7 @@ void FPGA20Buffers::setup() {
     addUnitThroughputConstraints(*cfdfc);
   }
   addBackedgeConstraints();
+  addDataBufConstraint();
 
   GRBLinExpr objective = addBackedgeObjective(allChannels);
   // Add the MILP objective and mark the MILP ready to be optimized
