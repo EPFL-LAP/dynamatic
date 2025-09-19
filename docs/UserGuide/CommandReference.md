@@ -1,4 +1,4 @@
-# Command Reference
+#Command Reference
 The Dynamatic shell is an interactive command line-based interface (you can launch it from Dynamatic's top level directory with `./bin/dynamatic` after building Dynamatic) that allows users to interact with Dynamatic and use the different commands available to generate dataflow circuits from C code.  
 
 This document provides an overview of the different commands available in the Dynamatic frontend and their respective flags and options.
@@ -16,6 +16,9 @@ This document provides an overview of the different commands available in the Dy
 > The `compile` command does not require Gurobi by default, but it is needed for [smart buffer placement options](OptimizationsAndDirectives.md#optimization-algorithms-in-dynamatic).  
 
 The `--buffer-algorithm` flag allows users to use smart buffer placement algorithms notably `fpga20` and `fpl22` for throughput and timing optimizations.
+The `--fast-token-delivery` flag enables the *Fast Token Delivery (FTD)* algorithm during the 
+CF → Handshake lowering stage. Note that this option is currently incompatible with smart buffer 
+placement algorithms.
 - `write-hdl [--hdl <vhdl|verilog|smv>]`: Convert results from `compile` to a VHDL, Verilog or SMV file.
 - `simulate`: Simulates the HDL produced by `write-hdl`. 
 > [!NOTE]  
