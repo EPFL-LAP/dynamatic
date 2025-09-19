@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
@@ -276,6 +277,8 @@ static StringRef getNodeColor(Operation *op) {
 static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   DOTGraph::Builder builder(graph);
   mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
+  mlir::DenseMap<std::pair<unsigned, StringRef>, DOTGraph::Subgraph *>
+      nestedSubgraphs;
   DOTGraph::Subgraph *root = &builder.getRoot();
 
   // Collect port names for all operations and the top-level function
@@ -414,14 +417,35 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     // Determine the subgraph in which to insert the operation
     DOTGraph::Subgraph *bbSub = root;
     std::optional<unsigned> bb = getLogicBB(&op);
+
     if (bb) {
-      if (auto subIt = bbSubgraphs.find(*bb); subIt != bbSubgraphs.end()) {
-        bbSub = subIt->second;
+      // Ensure the BB-level subgraph exists
+      if (auto it = bbSubgraphs.find(*bb); it != bbSubgraphs.end()) {
+        bbSub = it->second;
       } else {
-        std::string name = "cluster" + std::to_string(*bb);
-        bbSub = &builder.addSubgraph(name, *root);
+        std::string bbName = "clusterBB" + std::to_string(*bb);
+        bbSub = &builder.addSubgraph(bbName, *root);
         bbSub->addAttr("label", "BB " + std::to_string(*bb));
-        bbSubgraphs.insert({*bb, bbSub});
+        bbSubgraphs[*bb] = bbSub;
+      }
+
+      // Now check if the op has a drawing attribute
+      if (auto a =
+              op.getAttrOfType<dynamatic::handshake::DrawingAttr>("drawing")) {
+        llvm::StringRef drawing = a.getName().getValue(); // the string value
+
+        // Either reuse or create the nested drawing subgraph inside this BB
+        auto key = std::make_pair(*bb, drawing);
+        if (auto it = nestedSubgraphs.find(key); it != nestedSubgraphs.end()) {
+          bbSub = it->second;
+        } else {
+          std::string clusterName =
+              "clusterBB" + std::to_string(*bb) + "_" + drawing.str();
+          auto *nested = &builder.addSubgraph(clusterName, *bbSub);
+          nested->addAttr("label", drawing.str());
+          nestedSubgraphs[key] = nested;
+          bbSub = nested;
+        }
       }
     }
 
@@ -455,7 +479,8 @@ int main(int argc, char **argv) {
       argc, argv,
       "Exports a DOT graph corresponding to the module for visualization\n"
       "and legacy-compatibility purposes.The pass only supports exporting\n"
-      "the graph of a single Handshake function at the moment, and will fail\n"
+      "the graph of a single Handshake function at the moment, and will "
+      "fail\n"
       "if there is more than one Handhsake function in the module.");
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
@@ -465,9 +490,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Functions feeding into HLS tools might have attributes from high(er) level
-  // dialects or parsers. Allow unregistered dialects to not fail in these
-  // cases
+  // Functions feeding into HLS tools might have attributes from high(er)
+  // level dialects or parsers. Allow unregistered dialects to not fail in
+  // these cases
   MLIRContext context;
   context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
                       handshake::HandshakeDialect, math::MathDialect>();

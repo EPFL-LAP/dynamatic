@@ -147,6 +147,20 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
   }];
 }
 
+def DrawingAttr : Handshake_Attr<"Drawing", "drawing"> {
+    let summary = "a";
+  let description = [{
+    a
+  }];
+  let parameters = (ins "::mlir::StringAttr":$name);
+  let assemblyFormat = "`[` $name `]`";
+    let builders = [
+  AttrBuilder<(ins "llvm::StringRef":$nameStr), [{
+    return $_get(context, mlir::StringAttr::get(context, nameStr));
+  }]>
+];
+}
+
 //===----------------------------------------------------------------------===//
 // Memory annotations
 //===----------------------------------------------------------------------===//
@@ -205,7 +219,6 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   );
 
   let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $isActive `]`";
-
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
