@@ -149,6 +149,11 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
+      // unbundle second output should be ignored since it is not a handshake
+      // channel
+      if (isa<handshake::UnbundleOp>(op) &&
+          !isa<handshake::ControlType>(res.getType()))
+        continue;
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))
         return failure();
