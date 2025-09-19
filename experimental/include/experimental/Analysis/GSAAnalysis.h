@@ -117,7 +117,7 @@ struct Gate {
 
   /// list of condition cofactors
   std::vector<std::string> cofactorList;
-  
+
   /// Block in which the gate is placed
   Block *gateBlock;
 
@@ -136,9 +136,10 @@ struct Gate {
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
        Block *c = nullptr,
        boolean::BoolExpression *cond = boolean::BoolExpression::boolZero(),
-       std::vector<std::string> cof = {},  bool muGen = false)
+       std::vector<std::string> cof = {}, bool muGen = false)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
-        condition(cond), cofactorList(cof), gateBlock(v.getParentBlock()), muGenerated(muGen), index(i) {}
+        condition(cond), cofactorList(cof), gateBlock(v.getParentBlock()),
+        muGenerated(muGen), index(i) {}
 
   /// Print the information about the gate.
   void print();

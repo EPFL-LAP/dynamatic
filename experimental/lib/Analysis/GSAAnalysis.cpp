@@ -223,11 +223,14 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
       ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(),
       BoolExpression::boolVar(conditionToUse),
       {conditionToUse}); // since condition is one block boolvar is enough
-  
-  // If the Gamma is a result of the expansion of a Mu that has more than two inputs, force its placement in the block of its condition
-  // because placing it in the block of the Mu, which is always a loop header, will mess up the control dependence analysis betweem the newly inserted Gamma and its producers that are in the loop body in this case
+
+  // If the Gamma is a result of the expansion of a Mu that has more than two
+  // inputs, force its placement in the block of its condition because placing
+  // it in the block of the Mu, which is always a loop header, will mess up the
+  // control dependence analysis betweem the newly inserted Gamma and its
+  // producers that are in the loop body in this case
   if (originalPhi->muGenerated)
-              newGate->gateBlock = newGate->conditionBlock;
+    newGate->gateBlock = newGate->conditionBlock;
 
   gatesPerBlock[newGate->getBlock()].push_back(newGate);
 
@@ -628,7 +631,8 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
         operandLoop = loopInputs[0];
       else {
         Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
-                                 ++uniqueGateIndex, nullptr, BoolExpression::boolZero(), {}, true);
+                                 ++uniqueGateIndex, nullptr,
+                                 BoolExpression::boolZero(), {}, true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
         operandLoop = new GateInput(loopPhi);
         gateInputList.push_back(operandLoop);
@@ -641,7 +645,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
       // innermost loop the MU is in
       phi->conditionBlock =
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
-      
+
       // Mu condition is the negation of loop exit-> if loop exit == false ? use
       // loop input : use initial input
       phi->condition = getLoopExitCondition(loopInfo.getLoopFor(phiBlock),
