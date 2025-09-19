@@ -859,10 +859,23 @@
     "dependencies": ["join"]
   },
   {
+    "name": "handshake.blocker",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }, { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/blocker.vhd",
+    "dependencies": ["join"]
+  },
+  {
     "name": "handshake.gate",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }, { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/gate.vhd",
     "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.unbundle",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/unbundle.vhd"
   },
   {
     "name": "handshake.not",

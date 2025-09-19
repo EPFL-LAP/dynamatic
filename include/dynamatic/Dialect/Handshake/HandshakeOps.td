@@ -615,7 +615,6 @@ def JoinOp : Handshake_Op<"join", [
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
 ]> {
   let summary = "blocker operation";
   let description = [{
@@ -631,7 +630,12 @@ def BlockerOp : Handshake_Op<"blocker", [
 
   let arguments = (ins Variadic<ChannelType>:$data);
   let results = (outs ChannelType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
+  let assemblyFormat = "$data attr-dict `:` type($data) `to` type($result)";
+  let builders = [OpBuilder<
+    (ins "ValueRange":$data), [{
+      $_state.addOperands(data);
+      $_state.addTypes(data.front().getType());
+  }]>];
 }
 
 def GateOp : Handshake_Op<"gate", [
@@ -674,6 +678,27 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
     ```
   }];
   let arguments = (ins ChannelType:$operand);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
+}
+
+def AndOp : Handshake_Op<"and", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical and";
+  let description = [{
+    Bitwise logical and.
+
+  }];
+  let arguments = (ins Variadic<ChannelType>:$operand);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
+}
+
+def OrOp : Handshake_Op<"or", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical or";
+  let description = [{
+    Bitwise logical or.
+  }];
+  let arguments = (ins Variadic<ChannelType>:$operand);
   let results = (outs ChannelType:$result);
   let assemblyFormat = "$operand attr-dict `:` type($result)";
 }

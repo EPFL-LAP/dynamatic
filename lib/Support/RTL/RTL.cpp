@@ -935,17 +935,10 @@ bool RTLConfiguration::hasMatchingComponent(const RTLRequest &request) {
 }
 
 RTLMatch *RTLConfiguration::getMatchingComponent(const RTLRequest &request) {
-  llvm::errs() << "Searching for matching component for request at "
-               << request.loc << "\n";
   notifyRequest(request);
   std::vector<RTLMatch> matches;
-  for (const RTLComponent &component : components) {
-    llvm::errs() << "bi rabt : " << component.getName() << "\n";
-  }
 
-  llvm::errs() << "____\n";
   for (const RTLComponent &component : components) {
-    llvm::errs() << "Checking component " << component.getName() << "\n";
     if (RTLMatch *match = request.tryToMatch(component))
       return match;
   }
