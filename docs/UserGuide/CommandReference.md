@@ -1,4 +1,4 @@
-#Command Reference
+# Command Reference
 The Dynamatic shell is an interactive command line-based interface (you can launch it from Dynamatic's top level directory with `./bin/dynamatic` after building Dynamatic) that allows users to interact with Dynamatic and use the different commands available to generate dataflow circuits from C code.  
 
 This document provides an overview of the different commands available in the Dynamatic frontend and their respective flags and options.
