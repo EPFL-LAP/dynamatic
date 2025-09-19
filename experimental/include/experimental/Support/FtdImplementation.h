@@ -91,7 +91,22 @@ BoolExpression *enumeratePaths(Block *start, Block *end,
 Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
                    const ftd::BlockIndexing &bi);
 
-void eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2);
+/// Given two sets containing object of type `Block*`, remove the common
+/// entries.
+static void eliminateCommonBlocks(DenseSet<Block *> &s1,
+                                  DenseSet<Block *> &s2) {
+
+  SmallVector<Block *> intersection;
+  for (auto &e1 : s1) {
+    if (s2.contains(e1))
+      intersection.push_back(e1);
+  }
+
+  for (auto &bb : intersection) {
+    s1.erase(bb);
+    s2.erase(bb);
+  }
+}
 
 }; // namespace ftd
 }; // namespace experimental

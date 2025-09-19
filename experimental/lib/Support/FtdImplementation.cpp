@@ -160,23 +160,6 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
   return result;
 };
 
-/// Given two sets containing object of type `Block*`, remove the common
-/// entries.
-static void eliminateCommonBlocks(DenseSet<Block *> &s1,
-                                  DenseSet<Block *> &s2) {
-
-  SmallVector<Block *> intersection;
-  for (auto &e1 : s1) {
-    if (s2.contains(e1))
-      intersection.push_back(e1);
-  }
-
-  for (auto &bb : intersection) {
-    s1.erase(bb);
-    s2.erase(bb);
-  }
-}
-
 /// Given an operation, returns true if the operation is a conditional branch
 /// which terminates a for loop. This is the case if it is in one of the exiting
 /// blocks of the innermost loop it is in.
@@ -879,7 +862,7 @@ static void insertDirectSuppression(
   }
 
   // Get rid of common entries in the two sets
-  eliminateCommonBlocks(prodControlDeps, consControlDeps);
+  experimental::ftd::eliminateCommonBlocks(prodControlDeps, consControlDeps);
 
   // Compute the activation function of producer and consumer
   BoolExpression *fProd =
