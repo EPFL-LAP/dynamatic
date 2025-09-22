@@ -305,6 +305,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
       modName == "handshake.fptosi" || modName == "handshake.ndwire" ||
       modName == "handshake.blocker" || modName == "handshake.ready_remover" ||
+      modName == "handshake.absf" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -316,6 +317,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.constant") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (modName == "handshake.unconstant") {
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.control_merge") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
@@ -386,6 +389,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.andi" || modName == "handshake.buffer" ||
       modName == "handshake.cmpf" || modName == "handshake.cmpi" ||
       modName == "handshake.cond_br" || modName == "handshake.constant" ||
+      modName == "handshake.divf" || modName == "handshake.absf" ||
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
       modName == "handshake.muli" || modName == "handshake.not" ||

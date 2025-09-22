@@ -719,6 +719,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::SpecV2NDSpeculatorOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::UnconstantOp>([&](auto) {
+        // No parameters needed for these operations
+      })
       .Case<handshake::NDSourceOp, handshake::NDConstantOp>([&](auto) {
         // No parameters needed for these operations
       })
@@ -1859,6 +1862,7 @@ public:
                     ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
+                    ConvertToHWInstance<handshake::UnconstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,
                     ConvertToHWInstance<handshake::ForkOp>,
                     ConvertToHWInstance<handshake::LazyForkOp>,
