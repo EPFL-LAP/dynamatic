@@ -9,7 +9,7 @@ def generate_one_slot_break_dvr(name, params):
     verilog_dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, params)
 
     verilog_one_slot_break_dvr_body = f"""
-// one_slot_break_dvr Module
+// Module of one_slot_break_dvr
 module {name} #(
   parameter DATA_TYPE = {data_type}
 ) (

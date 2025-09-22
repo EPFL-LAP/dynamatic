@@ -14,7 +14,7 @@ def generate_control_merge(name, params):
     verilog_dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, params)
 
     verilog_control_merge_body = f"""
-//control_merge Module
+// Module of control_merge
   module {name} #(
     parameter SIZE = {size},
     parameter DATA_TYPE = {data_type},

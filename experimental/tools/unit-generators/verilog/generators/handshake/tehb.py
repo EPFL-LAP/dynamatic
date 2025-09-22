@@ -11,7 +11,7 @@ def generate_tehb(name, params):
     verilog_dataless_tehb = generate_dataless_tehb(tehb_name, params)
 
     verilog_tehb_body = f"""
-//tehb Module
+// Module of tehb
 module {name} #(
 	parameter DATA_TYPE = {data_type}
 )(

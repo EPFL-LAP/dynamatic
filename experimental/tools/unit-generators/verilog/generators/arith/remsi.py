@@ -13,7 +13,7 @@ def generate_remsi(name, params):
     verilog_delay_buffer = generate_delay_buffer(delay_buffer_name, params)
 
     verilog_remsi_body = f"""
-//remsi Module
+// Module of remsi
 module {name} #(
   parameter DATA_TYPE = {datatype}
 )(

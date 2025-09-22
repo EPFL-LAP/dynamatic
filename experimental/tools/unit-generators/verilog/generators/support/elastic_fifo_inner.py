@@ -5,7 +5,7 @@ def generate_elastic_fifo_inner(name, params):
 
     return f"""
 `timescale 1ns/1ps
-// Elastic FIFO Inner Module
+// Module of elastic_fifo_inner
 module {name} #(
   parameter NUM_SLOTS = {num_slots},
   parameter DATA_TYPE = {data_type}

@@ -11,7 +11,7 @@ def generate_merge(name, params):
     return f"""
 `timescale 1ns/1ps
 
-//merge Module
+// Module of merge
 
 module {name} # (
   parameter SIZE = {size},

@@ -26,9 +26,7 @@ def generate_mc_support(name, params):
     return f"""
 `timescale 1ns / 1ps
 
-//
-//  read_address_mux Module
-//
+// Module of mc_support
 
 module {read_address_mux_name} #(
   parameter ARBITER_SIZE = 1,

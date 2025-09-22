@@ -14,7 +14,7 @@ def generate_mem_controller_storeless(name, params):
 
     verilog_mem_controller_storeless_body = f"""
 
-//mem_controller_storeless Module
+// Module of mem_controller_storeless
 module {name} #(
   parameter NUM_LOADS  = {num_loads},
   parameter DATA_TYPE = {data_type},

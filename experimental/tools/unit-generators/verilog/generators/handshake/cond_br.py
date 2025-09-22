@@ -10,7 +10,7 @@ def generate_cond_br(name, params):
     verilog_dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, params)
 
     verilog_body_cond_br = f"""
-//cond br Module
+// Module of cond_br
 module {name} #(
 	parameter DATA_TYPE = {bitwidth}
 )(

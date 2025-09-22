@@ -13,7 +13,7 @@ def generate_divui(name, params):
     verilog_delay_buffer = generate_delay_buffer(delay_buffer_name, params)
 
     verilog_divui_body = f"""
-//divui Module
+// Module of divui
 module {name} #(
   parameter DATA_TYPE = {datatype}
 )(

@@ -3,6 +3,7 @@ def generate_sink(name, params):
 
     empty_sink = f"""
 `timescale 1ns/1ps
+// Module of sink
 module {name} (
     input  clk,    
     input  rst,     

@@ -1,7 +1,7 @@
 def generate_tehb(name, params):
     return f"""
 `timescale 1ns/1ps
-//tehb Module
+// Module of tehb
 module {name} (
 	input  clk,
 	input  rst,

@@ -9,7 +9,7 @@ def generate_mux(name, params):
 
     verilog_dataless_mux = f"""
 `timescale 1ns/1ps
-//mux Module
+// Module of smux
 module {name} #(
   parameter SIZE = {size},
   parameter DATA_TYPE = {data_type},

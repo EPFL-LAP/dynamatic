@@ -4,7 +4,7 @@ def generate_store(name, params):
     return f"""
 `timescale 1ns/1ps
 
-// Store Module
+// Module of Store
 module {name} #(
   parameter DATA_TYPE = {data_type},
   parameter ADDR_TYPE = {addr_type}

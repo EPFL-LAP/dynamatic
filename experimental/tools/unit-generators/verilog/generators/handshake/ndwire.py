@@ -3,7 +3,7 @@ def generate_ndwire(name, params):
 
     verilog_ndwire = f"""
 `timescale 1ns/1ps
-// Module ndwire
+// Module of ndwire
 module ndwire #(
   parameter DATA_TYPE = {bitwidth}
 ) (

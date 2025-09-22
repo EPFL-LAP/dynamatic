@@ -3,7 +3,7 @@ def generate_constant(name, params):
     value = params["value"]
 
     verilog_constant = f"""
-//constant Module
+// Module of constant
 
 `timescale 1ns / 1ps
 module {name} #(

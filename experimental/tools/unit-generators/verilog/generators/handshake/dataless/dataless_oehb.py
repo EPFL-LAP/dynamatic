@@ -2,7 +2,7 @@ def generate_dataless_oehb(name, params):
   verilog_oehb = f"""
   `timescale 1ns/1ps
 
-//oehb dataless Module
+// Module of dataless_oehb
 module {name} (
   input  clk,
   input  rst,

@@ -2,7 +2,7 @@ def generate_dataless_one_slot_break_dvr(name, params):
 
     return f"""
 `timescale 1ns/1ps
-// dataless one_slot_break_dvr Module
+// Module of dataless_one_slot_break_dvr
 module {name} (
   input  clk,
   input  rst,

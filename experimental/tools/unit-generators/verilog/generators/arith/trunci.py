@@ -4,7 +4,7 @@ def generate_trunci(name, params):
 
     verilog_extui = f"""
 `timescale 1ns/1ps
-//module trunci
+// Module of trunci
 module {name} #(
   parameter INPUT_TYPE = {input_type},
   parameter OUTPUT_TYPE = {output_type}

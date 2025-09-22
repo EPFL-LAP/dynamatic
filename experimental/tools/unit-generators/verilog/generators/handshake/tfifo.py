@@ -8,7 +8,7 @@ def generate_tfifo(name, params):
     verilog_elastic_fifo_inner = generate_elastic_fifo_inner(elastic_fifo_inner_name, {"num_slots": num_slots, "data_type": data_type})
 
     verilog_tfifo_body = f"""
-// tfifo Module
+// Module of tfifo
 module {name} #(
   parameter NUM_SLOTS = {num_slots},
   parameter DATA_TYPE = {data_type}

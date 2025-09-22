@@ -9,7 +9,7 @@ def generate_oehb(name, params):
   verilog_oehb_dataless = generate_dataless_oehb(oehb_dataless_name, params)
 
   verilog_oehb_body = f"""
-//oehb Module
+// Module of oehb
 module {name} #(
   parameter DATA_TYPE = {data_type}
 ) (

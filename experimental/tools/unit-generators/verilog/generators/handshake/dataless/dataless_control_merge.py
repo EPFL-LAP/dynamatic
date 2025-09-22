@@ -19,7 +19,7 @@ def generate_dataless_control_merge(name, params):
     verilog_fork_dataless = generate_datalessFork(fork_dataless_name, params)
 
     verilog_dataless_controll_merge_body=f"""
-//dataless_control_merge module
+// Module of dataless_control_merge
 module {name} #(
   parameter SIZE = {size},
   parameter INDEX_TYPE = {index_type}

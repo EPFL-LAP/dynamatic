@@ -5,7 +5,7 @@ def generate_join(name, params):
     verilogjoin = f"""
 `timescale 1ns / 1ps
 
-//join Module
+// Module of join
 module {name} #(
 	parameter SIZE = {size}
 )(

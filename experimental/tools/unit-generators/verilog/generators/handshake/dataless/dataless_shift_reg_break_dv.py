@@ -4,7 +4,7 @@ def generate_dataless_shift_reg_break_dv(name, params):
 
     return f"""
 `timescale 1ns/1ps
-// dataless shift_reg_break_dv Module
+// Module of dataless_shift_reg_break_dv
 
 module {name} #(
   parameter integer NUM_SLOTS = {num_slots}

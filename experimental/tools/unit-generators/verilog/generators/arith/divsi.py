@@ -13,7 +13,7 @@ def generate_divsi(name, params):
     verilog_delay_buffer = generate_delay_buffer(delay_buffer_name, params)
 
     verilog_divsi_body = f"""
-//divsi Module
+// Module of divsi
 module {name} #(
   parameter DATA_TYPE = {datatype}
 )(

@@ -10,7 +10,7 @@ def generate_dataless_cond_br(name, params):
     verilog_join_instance = generate_join(join_name, {"size":2})
 
     verilog_body_dataless_cond_br = f"""
-//dataless cond_br Module
+// Module of dataless_cond_br
 
 // In the original implementation
 // Data Organization: out2-:32, out1+:32

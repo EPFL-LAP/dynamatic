@@ -2,7 +2,7 @@ def generate_dataless_br(name, params):
 
     body_dataless_br = f"""
 `timescale 1ns/1ps
-//dataless_br Module
+// Module of dataless_br
 module {name} (
 	input  clk,
 	input  rst,

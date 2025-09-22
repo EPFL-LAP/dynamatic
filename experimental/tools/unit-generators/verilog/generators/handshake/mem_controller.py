@@ -19,7 +19,7 @@ def generate_mem_controller(name, params):
 
     verilog_mem_controller_body = f"""
 
-//mem_controller Module
+// Module of mem_controller
 module {name} #(
   parameter NUM_CONTROLS = {num_controls},
   parameter NUM_LOADS    = {num_loads},

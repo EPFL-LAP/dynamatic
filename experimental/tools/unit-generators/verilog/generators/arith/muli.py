@@ -12,7 +12,7 @@ def generate_muli(name, params):
 
     mul_4_stage_name = name + "_mul_4_stage"
     dependencies = f"""
-//mul_4_stage module
+// Module of mul_4_stage
 module {mul_4_stage_name} #(
   parameter DATA_TYPE = {bitwidth}
 )(

@@ -3,7 +3,7 @@ def generate_delay_buffer(name, params):
     verilog_delay_buffer = f"""
 `timescale 1ns/1ps
 
-// Delay Buffer Module
+// Module of delay_buffer
 module {name} #(
   parameter SIZE = 32
 ) (

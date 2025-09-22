@@ -6,7 +6,7 @@ def generate_mem_to_bram(name, params):
     return f"""
 `timescale 1ns / 1ps
 
-//mem_to_bram Module
+// Module of mem_to_bram
 module {name} #(
   parameter DATA_WIDTH = {data_width},
   parameter ADDR_WIDTH = {addr_width}

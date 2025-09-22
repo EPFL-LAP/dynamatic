@@ -9,7 +9,7 @@ def generate_dataless_tfifo(name, params):
 
     verilog_dataless_tfifo_body = f"""
 
-// dataless tfifo Module
+// Module of dataless_tfifo
 module {name} #(
   parameter NUM_SLOTS = {num_slots}
 )(

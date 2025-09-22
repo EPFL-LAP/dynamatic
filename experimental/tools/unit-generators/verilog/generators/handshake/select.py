@@ -7,7 +7,7 @@ def generate_select(name, params):
 `timescale 1ns/1ps
 """
     verilog_antitokens = f"""
-//module {antitoken_module_name} - Antitoken generation logic for handshake select
+// Module of {antitoken_module_name} - Antitoken generation logic for handshake select
 module {antitoken_module_name} (
   // inputs
   input  clk,
@@ -49,7 +49,7 @@ endmodule
 """
 
     verilog_selector = f"""
-//module {name} - Handshake select (mux) antitoken  
+// Module of select
 module {name} #(
   parameter DATA_TYPE = {bitwidth}
 )(

@@ -4,7 +4,7 @@ def generate_extsi(name, params):
 
     verilog_extsi = f"""
 `timescale 1ns/1ps
-// Module extsi
+// Module of extsi
 module {name} #(
   parameter INPUT_TYPE = {input_type},
   parameter OUTPUT_TYPE = {output_type}

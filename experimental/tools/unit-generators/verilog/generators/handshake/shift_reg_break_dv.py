@@ -10,7 +10,7 @@ def generate_shift_reg_break_dv(name, params):
     verilog_dataless_shift_reg_break_dvr = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dr_name, params)
 
     verilog_shift_reg_break_dvr_body = f"""
-// shift_reg_break_dv Module
+// Module of shift_reg_break_dv
 
 module {name} #(
   parameter integer NUM_SLOTS = {num_slots},

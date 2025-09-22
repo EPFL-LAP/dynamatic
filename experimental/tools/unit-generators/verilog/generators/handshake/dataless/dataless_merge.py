@@ -6,6 +6,7 @@ def generate_dataless_merge(name, params):
 
     return f"""
 `timescale 1ns/1ps
+// Module of dataless_merge
 module {name} #(
   parameter SIZE = {size}
 )(

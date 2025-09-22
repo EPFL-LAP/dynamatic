@@ -56,7 +56,7 @@ def _generate_arith2(
 
   # all 2 input arithmetic units have the same entity
   entity = f"""
-//{handshake_op} Module
+// Module of {handshake_op}
 module {name}(
   // inputs
   input  clk,

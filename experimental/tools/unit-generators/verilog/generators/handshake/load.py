@@ -14,7 +14,7 @@ def generate_load(name, params):
 
     verilog_load_body = f"""
 
-// Load Module
+// Module of Load
 module {name} #(
   parameter DATA_TYPE = {data_type},
   parameter ADDR_TYPE = {addr_type}

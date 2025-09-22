@@ -15,7 +15,7 @@ def generate_fork(name, params):
 
     verilog_datalessFork = generate_datalessFork(datalessFork_name, params)
     verilog_Fork = f"""
-//Fork Module
+// Module of Fork
 module {name} #(
 	parameter SIZE = {size},
 	parameter DATA_TYPE = {bitwidth}

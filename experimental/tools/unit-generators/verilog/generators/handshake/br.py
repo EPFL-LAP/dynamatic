@@ -7,7 +7,7 @@ def generate_br(name, params):
     verilog_dataless_br = generate_dataless_br(dataless_br_name, params)
     
     verilog_body_br = f"""
-//br Module
+// Module of br
 module {name} #(
 	parameter DATA_TYPE = {bitwidth}
 )(
