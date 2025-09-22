@@ -1,0 +1,56 @@
+vlib work
+vmap work work
+project new . simulation work modelsim.ini 0
+project open simulation
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_load_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mem_controller_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_fork_3.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_constant_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_extsi_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_addf_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/types.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_trunci_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_extsi_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_trunci_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mux_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_constant_3.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/subdiag_fast_wrapper.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_source_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_buffer_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/single_argument.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_cond_br_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/two_port_RAM.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_extsi_3.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_fork_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_cond_br_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_constant_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_cmpi_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_buffer_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_buffer_3.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_load_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mem_controller_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_cond_br_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mulf_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/tb_subdiag_fast.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_buffer_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_addi_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_cmpf_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_constant_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/flopoco_ip_cores.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/subdiag_fast.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_fork_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mux_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/tb_join.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_mem_controller_2.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_control_merge_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_load_0.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/simpackage.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_fork_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/handshake_extsi_1.vhd
+project addfile /home/shundroid/dynamatic/integration-test/subdiag_fast/out_standard/sim/HDL_SRC/mem_to_bram_32_10.vhd
+project calculateorder
+project compileall
+eval vsim tb
+log -r *
+run 40000ns -all
+exit

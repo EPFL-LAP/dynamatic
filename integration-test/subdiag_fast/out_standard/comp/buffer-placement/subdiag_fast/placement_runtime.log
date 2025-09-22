@@ -1,0 +1,49 @@
+
+Gurobi 12.0.2 (linux64) logging started Sun Sep 21 21:05:16 2025
+
+Set parameter LogFile to value "buffer-placement/subdiag_fast/placement_runtime.log"
+Gurobi Optimizer version 12.0.2 build v12.0.2rc0 (linux64 - "Ubuntu 24.04.3 LTS")
+
+CPU model: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Non-default parameters:
+TimeLimit  300
+LogToConsole  0
+
+Optimize a model with 634 rows, 574 columns and 1188 nonzeros
+Model fingerprint: 0xe7a944c6
+Variable types: 219 continuous, 355 integer (213 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 2e+02]
+  Objective range  [1e-05, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e-03, 2e+01]
+Found heuristic solution: objective -0.0010809
+Presolve removed 418 rows and 402 columns
+Presolve time: 0.00s
+Presolved: 216 rows, 172 columns, 527 nonzeros
+Found heuristic solution: objective -0.0009728
+Variable types: 70 continuous, 102 integer (73 binary)
+
+Root relaxation: objective 7.003112e-02, 82 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    0.07003    0    4   -0.00097    0.07003  7299%     -    0s
+H    0     0                       0.0698625    0.07003  0.24%     -    0s
+     0     0          -    0         0.06986    0.06986  0.00%     -    0s
+
+Cutting planes:
+  Gomory: 2
+  MIR: 3
+  Flow cover: 5
+
+Explored 1 nodes (89 simplex iterations) in 0.01 seconds (0.00 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 3: 0.0698625 -0.000972789 -0.00108088 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 6.986254184213e-02, best bound 6.986324371018e-02, gap 0.0010%

@@ -11,7 +11,7 @@ int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
   do {
     i = next_i;
     float dd = d1[i] + d2[i + 1];
-    float x = 0.001;
+    float x = 0.001f;
     next_i = i + 1;
     cond_break = (e[i]) <= x * dd;
   } while (next_i < N_DEC && !cond_break);

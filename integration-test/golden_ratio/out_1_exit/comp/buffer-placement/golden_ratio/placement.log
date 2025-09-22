@@ -1,0 +1,620 @@
+# ===== #
+# Archs #
+# ===== #
+
+0 -> 1 with 1 executions
+2 -> 2 with 548 executions (backedge)
+2 -> 3 with 100 executions
+1 -> 2 with 100 executions
+3 -> 4 with 1 executions
+3 -> 1 with 99 executions (backedge)
+
+# ================ #
+# Extracted CFDFCs #
+# ================ #
+
+CFDFC #0: 2
+  - Number of executions: 548
+  - Number of units: 33
+  - Number of channels: 47
+  - Number of backedges: 6
+
+CFDFC #1: 2 -> 3 -> 1
+  - Number of executions: 99
+  - Number of units: 67
+  - Number of channels: 94
+  - Number of backedges: 4
+
+# ========================== #
+# Buffer Placement Decisions #
+# ========================== #
+
+fork1_outs_1_index_mux1:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+mux4_outs_ins_fork26:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  1 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+mux6_outs_ins_fork27:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  1 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+spec_v2_repeating_init0_outs_ins_fork2:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 1, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  1 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork2_outs_2_ctrl_passer8:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork2_outs_4_ctrl_passer9:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork2_outs_5_rhs_andi0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork2_outs_6_ins_init4:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 1, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork3_outs_1_index_mux5:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork33_outs_6_ctrl_passer13:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork27_outs_0_data_passer3:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork28_outs_1_rhs_subf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork28_outs_2_lhs_addf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork28_outs_3_lhs_mulf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork29_outs_0_data_passer11:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork7_outs_0_lhs_divf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork30_outs_0_data_passer12:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+passer16_result_condition_cond_br8:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+# ================= #
+# CFDFC Throughputs #
+# ================= #
+
+Throughput of CFDFC #0: 5.882353e-02
+Throughput of CFDFC #1: 3.636364e-02
+
+# =================== #
+# Channel Throughputs #
+# =================== #
+
+Per-channel throughputs of CFDFC #0:
+  mux3_outs_ins_fork28: 0.000000e+00
+  mux4_outs_ins_fork26: 1.000000e+00
+  mux5_outs_ins_fork29: 0.000000e+00
+  mux6_outs_ins_fork27: 1.000000e+00
+  source0_outs_ctrl_constant6: 0.000000e+00
+  constant6_outs_rhs_mulf1: 0.000000e+00
+  source1_outs_ctrl_constant7: 0.000000e+00
+  constant7_outs_rhs_cmpf0: 0.000000e+00
+  mulf0_result_rhs_addf0: 0.000000e+00
+  addf0_result_lhs_mulf1: 0.000000e+00
+  passer7_result_ins_1_mux3: 0.000000e+00
+  fork4_outs_0_data_passer7: 0.000000e+00
+  fork4_outs_1_lhs_subf0: 0.000000e+00
+  mulf1_result_ins_fork4: 0.000000e+00
+  subf0_result_ins_absf0: 0.000000e+00
+  absf0_outs_lhs_cmpf0: 0.000000e+00
+  cmpf0_result_ins_fork6: 0.000000e+00
+  fork6_outs_0_ins_not0: 0.000000e+00
+  fork6_outs_1_lhs_andi0: 0.000000e+00
+  passer8_result_ins_spec_v2_repeating_init0: 0.000000e+00
+  not0_outs_data_passer8: 0.000000e+00
+  spec_v2_repeating_init0_outs_ins_fork2: 4.705882e-01
+  fork2_outs_0_ctrl_passer11: 0.000000e+00
+  fork2_outs_1_ctrl_passer7: 0.000000e+00
+  fork2_outs_2_ctrl_passer8: 5.294118e-01
+  fork2_outs_3_ctrl_passer10: 0.000000e+00
+  fork2_outs_4_ctrl_passer9: 0.000000e+00
+  fork2_outs_5_rhs_andi0: 5.294118e-01
+  fork2_outs_6_ins_init4: 0.000000e+00
+  init4_outs_ins_fork3: 0.000000e+00
+  fork3_outs_0_index_mux6: 0.000000e+00
+  fork3_outs_1_index_mux5: 0.000000e+00
+  fork3_outs_2_index_mux4: 0.000000e+00
+  fork3_outs_3_index_mux3: 0.000000e+00
+  andi0_result_ins_fork33: 0.000000e+00
+  fork33_outs_0_ctrl_passer3: 0.000000e+00
+  passer9_result_ins_1_mux4: 0.000000e+00
+  fork26_outs_0_data_passer9: 0.000000e+00
+  passer10_result_ins_1_mux6: 0.000000e+00
+  fork27_outs_0_data_passer3: 5.294118e-01
+  fork27_outs_1_data_passer10: 0.000000e+00
+  fork28_outs_1_rhs_subf0: 1.000000e+00
+  fork28_outs_2_lhs_addf0: 2.352941e-01
+  fork28_outs_3_lhs_mulf0: 0.000000e+00
+  passer11_result_ins_1_mux5: 0.000000e+00
+  fork29_outs_0_data_passer11: 1.000000e+00
+  fork29_outs_1_rhs_mulf0: 0.000000e+00
+
+Per-channel throughputs of CFDFC #1:
+  mux0_outs_ins_0_mux4: 0.000000e+00
+  mux1_outs_ins_0_mux5: 0.000000e+00
+  mux2_outs_ins_0_mux3: 0.000000e+00
+  control_merge0_outs_ins_0_mux6: 0.000000e+00
+  control_merge0_index_ins_fork1: 0.000000e+00
+  fork1_outs_0_index_mux0: 0.000000e+00
+  fork1_outs_1_index_mux1: 5.454545e-02
+  fork1_outs_2_index_mux2: 0.000000e+00
+  mux3_outs_ins_fork28: 0.000000e+00
+  mux4_outs_ins_fork26: 1.000000e+00
+  mux5_outs_ins_fork29: 0.000000e+00
+  mux6_outs_ins_fork27: 6.727273e-01
+  source0_outs_ctrl_constant6: 0.000000e+00
+  constant6_outs_rhs_mulf1: 0.000000e+00
+  source1_outs_ctrl_constant7: 0.000000e+00
+  constant7_outs_rhs_cmpf0: 0.000000e+00
+  mulf0_result_rhs_addf0: 0.000000e+00
+  addf0_result_lhs_mulf1: 0.000000e+00
+  fork4_outs_0_data_passer7: 0.000000e+00
+  fork4_outs_1_lhs_subf0: 0.000000e+00
+  mulf1_result_ins_fork4: 0.000000e+00
+  subf0_result_ins_absf0: 0.000000e+00
+  absf0_outs_lhs_cmpf0: 0.000000e+00
+  cmpf0_result_ins_fork6: 0.000000e+00
+  fork6_outs_0_ins_not0: 0.000000e+00
+  fork6_outs_1_lhs_andi0: 0.000000e+00
+  not0_outs_data_passer8: 0.000000e+00
+  spec_v2_repeating_init0_outs_ins_fork2: 3.636364e-02
+  fork2_outs_0_ctrl_passer11: 0.000000e+00
+  fork2_outs_1_ctrl_passer7: 0.000000e+00
+  fork2_outs_2_ctrl_passer8: 3.272727e-01
+  fork2_outs_3_ctrl_passer10: 0.000000e+00
+  fork2_outs_4_ctrl_passer9: 3.272727e-01
+  fork2_outs_5_rhs_andi0: 3.272727e-01
+  init4_outs_ins_fork3: 0.000000e+00
+  fork3_outs_0_index_mux6: 0.000000e+00
+  fork3_outs_1_index_mux5: 5.454545e-02
+  fork3_outs_2_index_mux4: 0.000000e+00
+  fork3_outs_3_index_mux3: 0.000000e+00
+  andi0_result_ins_fork33: 0.000000e+00
+  fork33_outs_0_ctrl_passer3: 0.000000e+00
+  fork33_outs_1_ctrl_passer18: 0.000000e+00
+  fork33_outs_2_ctrl_passer17: 0.000000e+00
+  fork33_outs_3_ctrl_passer16: 0.000000e+00
+  fork33_outs_4_ctrl_passer15: 0.000000e+00
+  fork33_outs_5_ctrl_passer14: 0.000000e+00
+  fork33_outs_6_ctrl_passer13: 5.454545e-02
+  fork33_outs_7_ctrl_passer12: 0.000000e+00
+  fork26_outs_0_data_passer9: 0.000000e+00
+  fork26_outs_1_ins_extsi4: 0.000000e+00
+  passer3_result_data_cond_br10: 0.000000e+00
+  fork27_outs_0_data_passer3: 3.272727e-01
+  fork27_outs_1_data_passer10: 0.000000e+00
+  fork28_outs_0_lhs_addf1: 0.000000e+00
+  fork28_outs_1_rhs_subf0: 6.727273e-01
+  fork28_outs_2_lhs_addf0: 2.000000e-01
+  fork28_outs_3_lhs_mulf0: 5.454545e-02
+  fork29_outs_0_data_passer11: 6.181818e-01
+  fork29_outs_1_rhs_mulf0: 0.000000e+00
+  extsi4_outs_lhs_addi0: 0.000000e+00
+  source2_outs_ctrl_constant8: 0.000000e+00
+  constant8_outs_ins_fork7: 0.000000e+00
+  fork7_outs_0_lhs_divf0: 3.272727e-01
+  fork7_outs_1_rhs_addf1: 0.000000e+00
+  source3_outs_ctrl_constant1: 0.000000e+00
+  constant1_outs_ins_extsi5: 0.000000e+00
+  extsi5_outs_rhs_addi0: 0.000000e+00
+  source4_outs_ctrl_constant2: 0.000000e+00
+  constant2_outs_ins_extsi6: 0.000000e+00
+  extsi6_outs_rhs_cmpi0: 0.000000e+00
+  passer12_result_data_cond_br9: 0.000000e+00
+  fork30_outs_0_data_passer12: 6.727273e-01
+  fork30_outs_1_rhs_divf0: 0.000000e+00
+  addf1_result_ins_fork30: 0.000000e+00
+  passer13_result_data_cond_br8: 0.000000e+00
+  divf0_result_data_passer13: 0.000000e+00
+  fork31_outs_0_ins_trunci0: 0.000000e+00
+  fork31_outs_1_lhs_cmpi0: 0.000000e+00
+  addi0_result_ins_fork31: 0.000000e+00
+  passer14_result_data_cond_br7: 0.000000e+00
+  trunci0_outs_data_passer14: 0.000000e+00
+  passer15_result_condition_cond_br7: 0.000000e+00
+  passer16_result_condition_cond_br8: 5.454545e-02
+  passer17_result_condition_cond_br9: 0.000000e+00
+  passer18_result_condition_cond_br10: 0.000000e+00
+  fork32_outs_0_data_passer15: 0.000000e+00
+  fork32_outs_1_data_passer16: 0.000000e+00
+  fork32_outs_2_data_passer17: 0.000000e+00
+  fork32_outs_3_data_passer18: 0.000000e+00
+  cmpi0_result_ins_fork32: 0.000000e+00
+  cond_br7_trueOut_ins_1_mux0: 0.000000e+00
+  cond_br8_trueOut_ins_1_mux1: 0.000000e+00
+  cond_br9_trueOut_ins_1_mux2: 0.000000e+00
+  cond_br10_trueOut_ins_1_control_merge0: 0.000000e+00
+
+
+# =================== #
+# Unit Retimings #
+# =================== #
+
+Unit retimings of CFDFC #0:
+  mux3: (in: 0.000000e+00, out: 0.000000e+00)
+  mux4: (in: 0.000000e+00, out: 0.000000e+00)
+  mux5: (in: 0.000000e+00, out: 0.000000e+00)
+  mux6: (in: 0.000000e+00, out: 0.000000e+00)
+  source0: (in: 7.647059e-01, out: 7.647059e-01)
+  constant6: (in: 7.647059e-01, out: 7.647059e-01)
+  source1: (in: 1.529412e+00, out: 1.529412e+00)
+  constant7: (in: 1.529412e+00, out: 1.529412e+00)
+  mulf0: (in: 0.000000e+00, out: 2.352941e-01)
+  addf0: (in: 2.352941e-01, out: 7.647059e-01)
+  passer7: (in: 1.000000e+00, out: 1.000000e+00)
+  fork4: (in: 1.000000e+00, out: 1.000000e+00)
+  mulf1: (in: 7.647059e-01, out: 1.000000e+00)
+  subf0: (in: 1.000000e+00, out: 1.529412e+00)
+  absf0: (in: 1.529412e+00, out: 1.529412e+00)
+  cmpf0: (in: 1.529412e+00, out: 1.529412e+00)
+  fork6: (in: 1.529412e+00, out: 1.529412e+00)
+  passer8: (in: 1.529412e+00, out: 1.529412e+00)
+  not0: (in: 1.529412e+00, out: 1.529412e+00)
+  spec_v2_repeating_init0: (in: 5.294118e-01, out: 5.294118e-01)
+  fork2: (in: 1.000000e+00, out: 1.000000e+00)
+  init4: (in: 0.000000e+00, out: 0.000000e+00)
+  fork3: (in: 0.000000e+00, out: 0.000000e+00)
+  andi0: (in: 1.529412e+00, out: 1.529412e+00)
+  fork33: (in: 1.529412e+00, out: 1.529412e+00)
+  passer9: (in: 1.000000e+00, out: 1.000000e+00)
+  fork26: (in: 1.000000e+00, out: 1.000000e+00)
+  passer3: (in: 1.529412e+00, out: 1.529412e+00)
+  passer10: (in: 1.000000e+00, out: 1.000000e+00)
+  fork27: (in: 1.000000e+00, out: 1.000000e+00)
+  fork28: (in: 0.000000e+00, out: 0.000000e+00)
+  passer11: (in: 1.000000e+00, out: 1.000000e+00)
+  fork29: (in: 0.000000e+00, out: 0.000000e+00)
+
+Unit retimings of CFDFC #1:
+  mux0: (in: 0.000000e+00, out: 0.000000e+00)
+  mux1: (in: 5.454545e-02, out: 5.454545e-02)
+  mux2: (in: 0.000000e+00, out: 0.000000e+00)
+  control_merge0: (in: 0.000000e+00, out: 0.000000e+00)
+  fork1: (in: 0.000000e+00, out: 0.000000e+00)
+  mux3: (in: 0.000000e+00, out: 0.000000e+00)
+  mux4: (in: 0.000000e+00, out: 0.000000e+00)
+  mux5: (in: 5.454545e-02, out: 5.454545e-02)
+  mux6: (in: 0.000000e+00, out: 0.000000e+00)
+  source0: (in: 5.272727e-01, out: 5.272727e-01)
+  constant6: (in: 5.272727e-01, out: 5.272727e-01)
+  source1: (in: 1.000000e+00, out: 1.000000e+00)
+  constant7: (in: 1.000000e+00, out: 1.000000e+00)
+  mulf0: (in: 5.454545e-02, out: 2.000000e-01)
+  addf0: (in: 2.000000e-01, out: 5.272727e-01)
+  passer7: (in: 6.727273e-01, out: 6.727273e-01)
+  fork4: (in: 6.727273e-01, out: 6.727273e-01)
+  mulf1: (in: 5.272727e-01, out: 6.727273e-01)
+  subf0: (in: 6.727273e-01, out: 1.000000e+00)
+  absf0: (in: 1.000000e+00, out: 1.000000e+00)
+  cmpf0: (in: 1.000000e+00, out: 1.000000e+00)
+  fork6: (in: 1.000000e+00, out: 1.000000e+00)
+  passer8: (in: 1.000000e+00, out: 1.000000e+00)
+  not0: (in: 1.000000e+00, out: 1.000000e+00)
+  spec_v2_repeating_init0: (in: 6.363636e-01, out: 6.363636e-01)
+  fork2: (in: 6.727273e-01, out: 6.727273e-01)
+  init4: (in: 0.000000e+00, out: 0.000000e+00)
+  fork3: (in: 0.000000e+00, out: 0.000000e+00)
+  andi0: (in: 1.000000e+00, out: 1.000000e+00)
+  fork33: (in: 1.000000e+00, out: 1.000000e+00)
+  passer9: (in: 1.000000e+00, out: 1.000000e+00)
+  fork26: (in: 1.000000e+00, out: 1.000000e+00)
+  passer3: (in: 1.000000e+00, out: 1.000000e+00)
+  passer10: (in: 6.727273e-01, out: 6.727273e-01)
+  fork27: (in: 6.727273e-01, out: 6.727273e-01)
+  fork28: (in: 0.000000e+00, out: 0.000000e+00)
+  passer11: (in: 6.727273e-01, out: 6.727273e-01)
+  fork29: (in: 5.454545e-02, out: 5.454545e-02)
+  extsi4: (in: 1.000000e+00, out: 1.000000e+00)
+  source2: (in: 0.000000e+00, out: 0.000000e+00)
+  constant8: (in: 0.000000e+00, out: 0.000000e+00)
+  fork7: (in: 0.000000e+00, out: 0.000000e+00)
+  source3: (in: 1.000000e+00, out: 1.000000e+00)
+  constant1: (in: 1.000000e+00, out: 1.000000e+00)
+  extsi5: (in: 1.000000e+00, out: 1.000000e+00)
+  source4: (in: 1.000000e+00, out: 1.000000e+00)
+  constant2: (in: 1.000000e+00, out: 1.000000e+00)
+  extsi6: (in: 1.000000e+00, out: 1.000000e+00)
+  passer12: (in: 1.000000e+00, out: 1.000000e+00)
+  fork30: (in: 3.272727e-01, out: 3.272727e-01)
+  addf1: (in: 0.000000e+00, out: 3.272727e-01)
+  passer13: (in: 1.054545e+00, out: 1.054545e+00)
+  divf0: (in: 3.272727e-01, out: 1.054545e+00)
+  fork31: (in: 1.000000e+00, out: 1.000000e+00)
+  addi0: (in: 1.000000e+00, out: 1.000000e+00)
+  passer14: (in: 1.000000e+00, out: 1.000000e+00)
+  trunci0: (in: 1.000000e+00, out: 1.000000e+00)
+  passer15: (in: 1.000000e+00, out: 1.000000e+00)
+  passer16: (in: 1.000000e+00, out: 1.000000e+00)
+  passer17: (in: 1.000000e+00, out: 1.000000e+00)
+  passer18: (in: 1.000000e+00, out: 1.000000e+00)
+  fork32: (in: 1.000000e+00, out: 1.000000e+00)
+  cmpi0: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br7: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br8: (in: 1.054545e+00, out: 1.054545e+00)
+  cond_br9: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br10: (in: 1.000000e+00, out: 1.000000e+00)
+

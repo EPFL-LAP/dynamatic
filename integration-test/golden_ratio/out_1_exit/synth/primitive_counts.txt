@@ -1,0 +1,12 @@
+All Primitives:
+Total Primitive Count: 6819
+
+Spec*:
+Total Primitive Count: 3
+
+Buffers:
+Total Primitive Count: 1140
+
+Others:
+Total Primitive Count: 5676
+

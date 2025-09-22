@@ -7,11 +7,12 @@ void if_convert(in_int_t a[N], inout_int_t b[N]) {
   int i = 1;
   while (i < N2) {
     int tmp = a[i];
-    if (i * tmp < 10000) {
-      i++;
-    }
-    i++;
     b[i] = 1;
+    if (i * tmp < 10000) {
+      i += 2;
+    } else {
+      i += 1;
+    }
   }
 }
 

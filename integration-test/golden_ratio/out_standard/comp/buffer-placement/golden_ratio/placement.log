@@ -1,0 +1,433 @@
+# ===== #
+# Archs #
+# ===== #
+
+1 -> 2 with 100 executions
+0 -> 1 with 1 executions
+2 -> 3 with 100 executions
+3 -> 4 with 1 executions
+2 -> 2 with 548 executions (backedge)
+3 -> 1 with 99 executions (backedge)
+
+# ================ #
+# Extracted CFDFCs #
+# ================ #
+
+CFDFC #0: 2
+  - Number of executions: 548
+  - Number of units: 24
+  - Number of channels: 35
+  - Number of backedges: 4
+
+CFDFC #1: 2 -> 3 -> 1
+  - Number of executions: 99
+  - Number of units: 51
+  - Number of channels: 70
+  - Number of backedges: 4
+
+# ========================== #
+# Buffer Placement Decisions #
+# ========================== #
+
+fork3_outs_0_data_cond_br2:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork3_outs_1_rhs_subf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork3_outs_2_lhs_addf0:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork4_outs_0_data_cond_br6:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+mux5_outs_data_cond_br3:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  1 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+control_merge1_outs_data_cond_br4:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork6_outs_0_data_cond_br5:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork7_outs_3_condition_cond_br4:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork8_outs_0_lhs_divf1:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+fork9_outs_0_data_cond_br9:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  0 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  1 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+addi0_result_ins_fork10:
+  - Buffering constraints: {
+  	transparent slots: [0, inf]
+  	opaque slots: [0, inf]
+  	Total slots: 0, 
+  	in/out delays: (0, 0)
+  	total delay: 0
+  }
+
+  - MILP decision: 1 slot(s)
+  - Placement decision: 
+  1 OneSlotDV slot(s)
+  0 OneSlotR slot(s)
+  0 FifoDV slot(s)
+  0 FifoNone slot(s)
+  0 OneSlotDVR slot(s)
+  0 ShiftRegDV slot(s)
+
+# ================= #
+# CFDFC Throughputs #
+# ================= #
+
+Throughput of CFDFC #0: 3.846154e-02
+Throughput of CFDFC #1: 1.818182e-02
+
+# =================== #
+# Channel Throughputs #
+# =================== #
+
+Per-channel throughputs of CFDFC #0:
+  mux3_outs_ins_fork3: 0.000000e+00
+  fork3_outs_0_data_cond_br2: 1.000000e+00
+  fork3_outs_1_rhs_subf0: 6.538462e-01
+  fork3_outs_2_lhs_addf0: 1.538462e-01
+  fork3_outs_3_lhs_mulf0: 0.000000e+00
+  mux4_outs_ins_fork4: 0.000000e+00
+  fork4_outs_0_data_cond_br6: 1.000000e+00
+  fork4_outs_1_rhs_mulf0: 0.000000e+00
+  mux5_outs_data_cond_br3: 1.000000e+00
+  control_merge1_outs_data_cond_br4: 1.000000e+00
+  control_merge1_index_ins_fork5: 0.000000e+00
+  fork5_outs_0_index_mux5: 0.000000e+00
+  fork5_outs_1_index_mux3: 0.000000e+00
+  fork5_outs_2_index_mux4: 0.000000e+00
+  source1_outs_ctrl_constant6: 0.000000e+00
+  constant6_outs_rhs_mulf1: 0.000000e+00
+  source2_outs_ctrl_constant7: 0.000000e+00
+  constant7_outs_rhs_cmpf0: 0.000000e+00
+  mulf0_result_rhs_addf0: 0.000000e+00
+  addf0_result_lhs_mulf1: 0.000000e+00
+  mulf1_result_ins_fork6: 0.000000e+00
+  fork6_outs_0_data_cond_br5: 3.461538e-01
+  fork6_outs_1_lhs_subf0: 0.000000e+00
+  subf0_result_ins_absf0: 0.000000e+00
+  absf0_outs_lhs_cmpf0: 0.000000e+00
+  cmpf0_result_ins_fork7: 0.000000e+00
+  fork7_outs_0_condition_cond_br3: 0.000000e+00
+  fork7_outs_1_condition_cond_br6: 0.000000e+00
+  fork7_outs_2_condition_cond_br5: 0.000000e+00
+  fork7_outs_3_condition_cond_br4: 0.000000e+00
+  fork7_outs_4_condition_cond_br2: 0.000000e+00
+  cond_br3_falseOut_ins_1_mux5: 0.000000e+00
+  cond_br4_falseOut_ins_1_control_merge1: 0.000000e+00
+  cond_br5_falseOut_ins_1_mux3: 0.000000e+00
+  cond_br6_falseOut_ins_1_mux4: 0.000000e+00
+
+Per-channel throughputs of CFDFC #1:
+  mux0_outs_ins_0_mux4: 0.000000e+00
+  mux1_outs_ins_0_mux5: 0.000000e+00
+  mux2_outs_ins_0_mux3: 0.000000e+00
+  control_merge0_outs_ins_0_control_merge1: 0.000000e+00
+  control_merge0_index_ins_fork2: 0.000000e+00
+  fork2_outs_0_index_mux1: 0.000000e+00
+  fork2_outs_1_index_mux0: 0.000000e+00
+  fork2_outs_2_index_mux2: 0.000000e+00
+  mux3_outs_ins_fork3: 0.000000e+00
+  fork3_outs_0_data_cond_br2: 4.727273e-01
+  fork3_outs_1_rhs_subf0: 3.090909e-01
+  fork3_outs_2_lhs_addf0: 7.272727e-02
+  fork3_outs_3_lhs_mulf0: 0.000000e+00
+  mux4_outs_ins_fork4: 0.000000e+00
+  fork4_outs_0_data_cond_br6: 4.727273e-01
+  fork4_outs_1_rhs_mulf0: 0.000000e+00
+  mux5_outs_data_cond_br3: 4.727273e-01
+  control_merge1_outs_data_cond_br4: 1.000000e+00
+  control_merge1_index_ins_fork5: 0.000000e+00
+  fork5_outs_0_index_mux5: 0.000000e+00
+  fork5_outs_1_index_mux3: 0.000000e+00
+  fork5_outs_2_index_mux4: 0.000000e+00
+  source1_outs_ctrl_constant6: 0.000000e+00
+  constant6_outs_rhs_mulf1: 0.000000e+00
+  source2_outs_ctrl_constant7: 0.000000e+00
+  constant7_outs_rhs_cmpf0: 0.000000e+00
+  mulf0_result_rhs_addf0: 0.000000e+00
+  addf0_result_lhs_mulf1: 0.000000e+00
+  mulf1_result_ins_fork6: 0.000000e+00
+  fork6_outs_0_data_cond_br5: 1.636364e-01
+  fork6_outs_1_lhs_subf0: 0.000000e+00
+  subf0_result_ins_absf0: 0.000000e+00
+  absf0_outs_lhs_cmpf0: 0.000000e+00
+  cmpf0_result_ins_fork7: 0.000000e+00
+  fork7_outs_0_condition_cond_br3: 0.000000e+00
+  fork7_outs_1_condition_cond_br6: 0.000000e+00
+  fork7_outs_2_condition_cond_br5: 0.000000e+00
+  fork7_outs_3_condition_cond_br4: 5.272727e-01
+  fork7_outs_4_condition_cond_br2: 0.000000e+00
+  cond_br2_trueOut_lhs_addf1: 0.000000e+00
+  cond_br3_trueOut_ins_extsi4: 0.000000e+00
+  cond_br4_trueOut_data_cond_br10: 0.000000e+00
+  extsi4_outs_lhs_addi0: 0.000000e+00
+  source3_outs_ctrl_constant8: 0.000000e+00
+  constant8_outs_ins_fork8: 0.000000e+00
+  fork8_outs_0_lhs_divf1: 1.636364e-01
+  fork8_outs_1_rhs_addf1: 0.000000e+00
+  source4_outs_ctrl_constant1: 0.000000e+00
+  constant1_outs_ins_extsi5: 0.000000e+00
+  extsi5_outs_rhs_addi0: 0.000000e+00
+  source5_outs_ctrl_constant2: 0.000000e+00
+  constant2_outs_ins_extsi6: 0.000000e+00
+  extsi6_outs_rhs_cmpi0: 0.000000e+00
+  addf1_result_ins_fork9: 0.000000e+00
+  fork9_outs_0_data_cond_br9: 3.636364e-01
+  fork9_outs_1_rhs_divf1: 0.000000e+00
+  addi0_result_ins_fork10: 5.272727e-01
+  fork10_outs_0_ins_trunci0: 0.000000e+00
+  fork10_outs_1_lhs_cmpi0: 0.000000e+00
+  trunci0_outs_data_cond_br8: 0.000000e+00
+  divf1_result_data_cond_br7: 0.000000e+00
+  cmpi0_result_ins_fork11: 0.000000e+00
+  fork11_outs_0_condition_cond_br8: 0.000000e+00
+  fork11_outs_1_condition_cond_br7: 0.000000e+00
+  fork11_outs_2_condition_cond_br9: 0.000000e+00
+  fork11_outs_3_condition_cond_br10: 0.000000e+00
+  cond_br7_trueOut_ins_1_mux0: 0.000000e+00
+  cond_br8_trueOut_ins_1_mux1: 0.000000e+00
+  cond_br9_trueOut_ins_1_mux2: 0.000000e+00
+  cond_br10_trueOut_ins_1_control_merge0: 0.000000e+00
+
+
+# =================== #
+# Unit Retimings #
+# =================== #
+
+Unit retimings of CFDFC #0:
+  mux3: (in: 0.000000e+00, out: 0.000000e+00)
+  fork3: (in: 0.000000e+00, out: 0.000000e+00)
+  mux4: (in: 0.000000e+00, out: 0.000000e+00)
+  fork4: (in: 0.000000e+00, out: 0.000000e+00)
+  mux5: (in: 0.000000e+00, out: 0.000000e+00)
+  control_merge1: (in: 0.000000e+00, out: 0.000000e+00)
+  fork5: (in: 0.000000e+00, out: 0.000000e+00)
+  source1: (in: 5.000000e-01, out: 5.000000e-01)
+  constant6: (in: 5.000000e-01, out: 5.000000e-01)
+  source2: (in: 1.000000e+00, out: 1.000000e+00)
+  constant7: (in: 1.000000e+00, out: 1.000000e+00)
+  mulf0: (in: 0.000000e+00, out: 1.538462e-01)
+  addf0: (in: 1.538462e-01, out: 5.000000e-01)
+  mulf1: (in: 5.000000e-01, out: 6.538462e-01)
+  fork6: (in: 6.538462e-01, out: 6.538462e-01)
+  subf0: (in: 6.538462e-01, out: 1.000000e+00)
+  absf0: (in: 1.000000e+00, out: 1.000000e+00)
+  cmpf0: (in: 1.000000e+00, out: 1.000000e+00)
+  fork7: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br2: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br3: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br4: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br5: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br6: (in: 1.000000e+00, out: 1.000000e+00)
+
+Unit retimings of CFDFC #1:
+  mux0: (in: 0.000000e+00, out: 0.000000e+00)
+  mux1: (in: 0.000000e+00, out: 0.000000e+00)
+  mux2: (in: 0.000000e+00, out: 0.000000e+00)
+  control_merge0: (in: 0.000000e+00, out: 0.000000e+00)
+  fork2: (in: 0.000000e+00, out: 0.000000e+00)
+  mux3: (in: 0.000000e+00, out: 0.000000e+00)
+  fork3: (in: 0.000000e+00, out: 0.000000e+00)
+  mux4: (in: 0.000000e+00, out: 0.000000e+00)
+  fork4: (in: 0.000000e+00, out: 0.000000e+00)
+  mux5: (in: 0.000000e+00, out: 0.000000e+00)
+  control_merge1: (in: 0.000000e+00, out: 0.000000e+00)
+  fork5: (in: 0.000000e+00, out: 0.000000e+00)
+  source1: (in: 2.363636e-01, out: 2.363636e-01)
+  constant6: (in: 2.363636e-01, out: 2.363636e-01)
+  source2: (in: 4.727273e-01, out: 4.727273e-01)
+  constant7: (in: 4.727273e-01, out: 4.727273e-01)
+  mulf0: (in: 0.000000e+00, out: 7.272727e-02)
+  addf0: (in: 7.272727e-02, out: 2.363636e-01)
+  mulf1: (in: 2.363636e-01, out: 3.090909e-01)
+  fork6: (in: 3.090909e-01, out: 3.090909e-01)
+  subf0: (in: 3.090909e-01, out: 4.727273e-01)
+  absf0: (in: 4.727273e-01, out: 4.727273e-01)
+  cmpf0: (in: 4.727273e-01, out: 4.727273e-01)
+  fork7: (in: 4.727273e-01, out: 4.727273e-01)
+  cond_br2: (in: 4.727273e-01, out: 4.727273e-01)
+  cond_br3: (in: 4.727273e-01, out: 4.727273e-01)
+  cond_br4: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br5: (in: 4.727273e-01, out: 4.727273e-01)
+  cond_br6: (in: 4.727273e-01, out: 4.727273e-01)
+  extsi4: (in: 4.727273e-01, out: 4.727273e-01)
+  source3: (in: 4.727273e-01, out: 4.727273e-01)
+  constant8: (in: 4.727273e-01, out: 4.727273e-01)
+  fork8: (in: 4.727273e-01, out: 4.727273e-01)
+  source4: (in: 4.727273e-01, out: 4.727273e-01)
+  constant1: (in: 4.727273e-01, out: 4.727273e-01)
+  extsi5: (in: 4.727273e-01, out: 4.727273e-01)
+  source5: (in: 1.000000e+00, out: 1.000000e+00)
+  constant2: (in: 1.000000e+00, out: 1.000000e+00)
+  extsi6: (in: 1.000000e+00, out: 1.000000e+00)
+  addf1: (in: 4.727273e-01, out: 6.363636e-01)
+  fork9: (in: 6.363636e-01, out: 6.363636e-01)
+  addi0: (in: 4.727273e-01, out: 4.727273e-01)
+  fork10: (in: 1.000000e+00, out: 1.000000e+00)
+  trunci0: (in: 1.000000e+00, out: 1.000000e+00)
+  divf1: (in: 6.363636e-01, out: 1.000000e+00)
+  cmpi0: (in: 1.000000e+00, out: 1.000000e+00)
+  fork11: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br7: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br8: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br9: (in: 1.000000e+00, out: 1.000000e+00)
+  cond_br10: (in: 1.000000e+00, out: 1.000000e+00)
+

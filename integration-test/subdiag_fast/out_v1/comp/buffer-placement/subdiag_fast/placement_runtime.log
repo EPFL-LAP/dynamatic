@@ -1,0 +1,59 @@
+
+Gurobi 12.0.2 (linux64) logging started Sun Sep 21 21:05:35 2025
+
+Set parameter LogFile to value "buffer-placement/subdiag_fast/placement_runtime.log"
+Gurobi Optimizer version 12.0.2 build v12.0.2rc0 (linux64 - "Ubuntu 24.04.3 LTS")
+
+CPU model: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Non-default parameters:
+TimeLimit  300
+LogToConsole  0
+
+Optimize a model with 930 rows, 804 columns and 1766 nonzeros
+Model fingerprint: 0x3ed573f2
+Variable types: 309 continuous, 495 integer (297 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 2e+02]
+  Objective range  [1e-05, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e-03, 2e+01]
+Presolve removed 598 rows and 550 columns
+Presolve time: 0.00s
+Presolved: 332 rows, 254 columns, 824 nonzeros
+Variable types: 91 continuous, 163 integer (104 binary)
+
+Root relaxation: objective 1.141018e+00, 226 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    1.14102    0  124          -    1.14102      -     -    0s
+H    0     0                       0.9824016    1.14102  16.1%     -    0s
+H    0     0                       0.9829921    1.14102  16.1%     -    0s
+H    0     0                       0.9830118    1.14102  16.1%     -    0s
+     0     0    0.98355    0  120    0.98301    0.98355  0.05%     -    0s
+H    0     0                       0.9831004    0.98355  0.05%     -    0s
+     0     0    0.98354    0  121    0.98310    0.98354  0.04%     -    0s
+     0     0    0.98345    0  127    0.98310    0.98345  0.04%     -    0s
+     0     0    0.98345    0  138    0.98310    0.98345  0.04%     -    0s
+     0     2    0.98345    0  138    0.98310    0.98345  0.04%     -    0s
+
+Cutting planes:
+  Gomory: 15
+  Cover: 1
+  Implied bound: 9
+  Dual implied bound: 47
+  MIR: 15
+  Flow cover: 56
+  Relax-and-lift: 1
+
+Explored 46 nodes (946 simplex iterations) in 0.04 seconds (0.04 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 4: 0.9831 0.983012 0.982992 0.982402 
+No other solutions better than 0.9831
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 9.831003937008e-01, best bound 9.831003937008e-01, gap 0.0000%

@@ -1,0 +1,37 @@
+#-----------------------------------------------------------
+# Vivado v2025.1 (64-bit)
+# SW Build 6140274 on Wed May 21 22:58:25 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Mon Sep 15 00:32:40 2025
+# Process ID         : 1011606
+# Current directory  : /home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth
+# Command line       : vivado -mode tcl -source /home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth/synthesize.tcl
+# Log file           : /home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth/vivado.log
+# Journal file       : /home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth/vivado.jou
+# Running On         : shp
+# Platform           : Ubuntu
+# Operating System   : Ubuntu 24.04.3 LTS
+# Processor Detail   : AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+# CPU Frequency      : 3617.888 MHz
+# CPU Physical cores : 8
+# CPU Logical cores  : 16
+# Host memory        : 32905 MB
+# Swap memory        : 0 MB
+# Total Virtual      : 32905 MB
+# Available Virtual  : 21124 MB
+#-----------------------------------------------------------
+source /home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth/synthesize.tcl
+# set_param general.maxThreads 8
+# set vivado_ver [version -short]
+# set fpo_ver 7.1
+# if {[regexp -nocase {2015\.1.*}  match]} {
+#     set fpo_ver 7.0
+# }
+# source /home/shundroid/dynamatic/tools/backend/synth-resources/addf_vitis_hls_single_precision_lat_8.tcl
+## create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name addf_vitis_hls_single_precision_lat_8
+ERROR: [Common 17-53] User Exception: No open project. Please create or open a project before executing this command.
+
+    while executing
+"source /home/shundroid/dynamatic/tools/backend/synth-resources/addf_vitis_hls_single_precision_lat_8.tcl"
+    (file "/home/shundroid/dynamatic/integration-test/collision_donut/out_4/synth/synthesize.tcl" line 11)

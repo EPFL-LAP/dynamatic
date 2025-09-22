@@ -7,7 +7,7 @@ int subdiag(in_float_t d[N], in_float_t e[N]) {
 
   for (i = 0; i < N_DEC; i++) {
     float dd = d[i] + d[i + 1];
-    float x = 0.001;
+    float x = 0.001f;
     if ((e[i]) <= x * dd)
       break;
   }

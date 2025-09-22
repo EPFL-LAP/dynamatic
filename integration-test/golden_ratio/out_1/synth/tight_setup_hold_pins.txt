@@ -1,0 +1,55 @@
++====================+===================+===============================================================+
+| Launch Setup Clock | Launch Hold Clock | Pin                                                           |
++====================+===================+===============================================================+
+| clk                | clk               | fork2/control/generateBlocks[1].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork2/control/generateBlocks[3].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork2/control/generateBlocks[4].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork2/control/generateBlocks[6].regblock/transmitValue_reg/D  |
+| clk                | clk               | buffer12/fifo/control/outputValid_reg/D                       |
+| clk                | clk               | buffer10/dataReg_reg[0]/D                                     |
+| clk                | clk               | fork20/control/generateBlocks[0].regblock/transmitValue_reg/D |
+| clk                | clk               | fork20/control/generateBlocks[1].regblock/transmitValue_reg/D |
+| clk                | clk               | buffer12/fifo/outs_reg[0]/D                                   |
+| clk                | clk               | fork19/control/generateBlocks[2].regblock/transmitValue_reg/D |
+| clk                | clk               | fork19/control/generateBlocks[0].regblock/transmitValue_reg/D |
+| clk                | clk               | fork2/control/generateBlocks[2].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork19/control/generateBlocks[3].regblock/transmitValue_reg/D |
+| clk                | clk               | buffer6/control/fullReg_reg/D                                 |
+| clk                | clk               | fork2/control/generateBlocks[5].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork19/control/generateBlocks[1].regblock/transmitValue_reg/D |
+| clk                | clk               | addf1/ip/expDiff_d1_reg[6]/D                                  |
+| clk                | clk               | fork16/control/generateBlocks[0].regblock/transmitValue_reg/D |
+| clk                | clk               | addf1/ip/expDiff_d1_reg[7]/D                                  |
+| clk                | clk               | addf1/ip/expDiff_d1_reg[3]/D                                  |
+| clk                | clk               | addf1/ip/expDiff_d1_reg[4]/D                                  |
+| clk                | clk               | fork16/control/generateBlocks[2].regblock/transmitValue_reg/D |
+| clk                | clk               | addf0/ip/signR_d1_reg/D                                       |
+| clk                | clk               | fork7/control/generateBlocks[1].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork7/control/generateBlocks[0].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork6/control/generateBlocks[1].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork4/control/generateBlocks[0].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork16/control/generateBlocks[1].regblock/transmitValue_reg/D |
+| clk                | clk               | addf1/ip/signY_d1_reg/D                                       |
+| clk                | clk               | addf1/ip/signX_d1_reg/D                                       |
+| clk                | clk               | fork18/generateBlocks[1].regblock/transmitValue_reg/D         |
+| clk                | clk               | addf1/ip/expX_d1_reg[7]/D                                     |
+| clk                | clk               | buffer20/fifo/control/outputValid_reg/D                       |
+| clk                | clk               | fork4/control/generateBlocks[1].regblock/transmitValue_reg/D  |
+| clk                | clk               | mulf0/one_slot_break_dv/outputValid_reg/D                     |
+| clk                | clk               | addf0/ip/signR2_d1_reg/D                                      |
+| clk                | clk               | addf0/one_slot_break_dv/outputValid_reg/D                     |
+| clk                | clk               | buffer19/fifo/control/outputValid_reg/D                       |
+| clk                | clk               | buffer5/control/fullReg_reg/D                                 |
+| clk                | clk               | fork17/control/generateBlocks[1].regblock/transmitValue_reg/D |
+| clk                | clk               | fork17/control/generateBlocks[0].regblock/transmitValue_reg/D |
+| clk                | clk               | fork6/control/generateBlocks[0].regblock/transmitValue_reg/D  |
+| clk                | clk               | fork18/generateBlocks[0].regblock/transmitValue_reg/D         |
+| clk                | clk               | buffer18/fifo/Empty_reg/D                                     |
+| clk                | clk               | buffer17/fifo/outputValid_reg/D                               |
+| clk                | clk               | buffer18/fifo/Full_reg/D                                      |
+| clk                | clk               | buffer15/fifo/control/outputValid_reg/D                       |
+| clk                | clk               | buffer18/fifo/Tail_reg[0]/D                                   |
+| clk                | clk               | buffer18/fifo/Head_reg[0]/D                                   |
+| clk                | clk               | spec_v2_repeating_init0/emit_init_reg/D                       |
+| clk                | clk               | buffer9/outs_reg[0]/D                                         |
++--------------------+-------------------+---------------------------------------------------------------+

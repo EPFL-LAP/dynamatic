@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Vivado v2025.1 (64-bit)
+# SW Build 6140274 on Wed May 21 22:58:25 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Mon Sep 22 11:16:54 2025
+# Process ID         : 995639
+# Current directory  : /home/shundroid/dynamatic/integration-test/golden_ratio/out_1_exit/synth
+# Command line       : vivado -mode tcl -source /home/shundroid/dynamatic/integration-test/golden_ratio/out_1_exit/synth/synthesize.tcl
+# Log file           : /home/shundroid/dynamatic/integration-test/golden_ratio/out_1_exit/synth/vivado.log
+# Journal file       : /home/shundroid/dynamatic/integration-test/golden_ratio/out_1_exit/synth/vivado.jou
+# Running On         : shp
+# Platform           : Ubuntu
+# Operating System   : Ubuntu 24.04.3 LTS
+# Processor Detail   : AMD Ryzen 7 8840HS w/ Radeon 780M Graphics
+# CPU Frequency      : 3247.523 MHz
+# CPU Physical cores : 8
+# CPU Logical cores  : 16
+# Host memory        : 32905 MB
+# Swap memory        : 0 MB
+# Total Virtual      : 32905 MB
+# Available Virtual  : 14272 MB
+#-----------------------------------------------------------
+source /home/shundroid/dynamatic/integration-test/golden_ratio/out_1_exit/synth/synthesize.tcl

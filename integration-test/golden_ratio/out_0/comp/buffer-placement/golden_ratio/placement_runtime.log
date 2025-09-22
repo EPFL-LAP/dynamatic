@@ -1,0 +1,72 @@
+
+Gurobi 12.0.2 (linux64) logging started Mon Sep 22 11:02:05 2025
+
+Set parameter LogFile to value "buffer-placement/golden_ratio/placement_runtime.log"
+Gurobi Optimizer version 12.0.2 build v12.0.2rc0 (linux64 - "Ubuntu 24.04.3 LTS")
+
+CPU model: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Non-default parameters:
+TimeLimit  300
+LogToConsole  0
+
+Optimize a model with 1199 rows, 897 columns and 2435 nonzeros
+Model fingerprint: 0x1ad8bbb8
+Variable types: 417 continuous, 480 integer (288 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+02]
+  Objective range  [8e-06, 8e-01]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e-03, 1e+01]
+Found heuristic solution: objective -0.0023321
+Presolve removed 691 rows and 520 columns
+Presolve time: 0.00s
+Presolved: 508 rows, 377 columns, 1327 nonzeros
+Variable types: 167 continuous, 210 integer (143 binary)
+Found heuristic solution: objective -0.0023094
+
+Root relaxation: objective 3.328797e-02, 224 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    0.03329    0   34   -0.00231    0.03329  1541%     -    0s
+H    0     0                      -0.0020823    0.03329  1699%     -    0s
+H    0     0                       0.0029503    0.03329  1028%     -    0s
+H    0     0                       0.0030336    0.03329   997%     -    0s
+H    0     0                       0.0305777    0.03329  8.86%     -    0s
+H    0     0                       0.0308276    0.03329  7.98%     -    0s
+     0     0    0.03281    0   39    0.03083    0.03281  6.42%     -    0s
+H    0     0                       0.0319062    0.03281  2.82%     -    0s
+H    0     0                       0.0320728    0.03281  2.29%     -    0s
+H    0     0                       0.0321561    0.03273  1.78%     -    0s
+     0     0    0.03273    0    9    0.03216    0.03273  1.78%     -    0s
+     0     0    0.03264    0   17    0.03216    0.03264  1.50%     -    0s
+H    0     0                       0.0323227    0.03264  0.97%     -    0s
+H    0     0                       0.0324060    0.03264  0.71%     -    0s
+H    0     0                       0.0324893    0.03263  0.43%     -    0s
+     0     0    0.03263    0   26    0.03249    0.03263  0.43%     -    0s
+     0     0    0.03256    0   31    0.03249    0.03256  0.21%     -    0s
+     0     0    0.03256    0   31    0.03249    0.03256  0.21%     -    0s
+     0     0    0.03254    0   31    0.03249    0.03254  0.16%     -    0s
+     0     0    0.03249    0    4    0.03249    0.03249  0.01%     -    0s
+
+Cutting planes:
+  Learned: 9
+  Gomory: 9
+  Cover: 1
+  Implied bound: 18
+  Dual implied bound: 1
+  MIR: 9
+  Flow cover: 24
+  Inf proof: 4
+
+Explored 1 nodes (701 simplex iterations) in 0.05 seconds (0.03 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 0.0324893 0.032406 0.0323227 ... 0.00295031
+No other solutions better than 0.0324893
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.248926364719e-02, best bound 3.248926364719e-02, gap 0.0000%

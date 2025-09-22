@@ -6,20 +6,14 @@
 void if_convert(in_int_t a[N], inout_int_t b[N]) {
   int i = 1;
   do {
-    int pred_i = i;
     do {
-      int tmp = a[pred_i];
-
-      // Manual CSE
-      int plus_1 = pred_i + 1;
-
-      int true_addition = pred_i * tmp < 10000 ? 2 : 1;
-      i = pred_i + true_addition;
+      int tmp = a[i];
       b[i] = 1;
-
-      // Prediction
-      pred_i = plus_1;
-    } while (pred_i < N2 && pred_i == i);
+      if (!(i * tmp >= 10000))
+        break;
+      i += 1;
+    } while (i < N2);
+    i += 2;
   } while (i < N2);
 }
 
