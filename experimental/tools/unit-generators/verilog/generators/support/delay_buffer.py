@@ -1,12 +1,12 @@
 
 def generate_delay_buffer(name, params):
+    size = params["size"]
+
     delay_buffer = f"""
 `timescale 1ns/1ps
 
 // Module of delay_buffer
-module {name} #(
-  parameter SIZE = 32
-) (
+module {name}(
   input  clk,
   input  rst,
   input  valid_in,
@@ -14,7 +14,7 @@ module {name} #(
   output valid_out
 );
   integer i;
-  reg [SIZE - 1 : 0] regs = 0;
+  reg [{size} - 1 : 0] regs = 0;
 
   always @(posedge clk) begin
     if (rst)
@@ -25,17 +25,17 @@ module {name} #(
 
   always @(posedge clk) begin
     if (rst) begin
-      for (i = 1; i < SIZE; i = i + 1) begin
+      for (i = 1; i < {size}; i = i + 1) begin
         regs[i] <= 0;
       end
     end else if (ready_in) begin
-      for (i = 1; i < SIZE; i = i + 1) begin
+      for (i = 1; i < {size}; i = i + 1) begin
         regs[i] <= regs[i - 1];
       end
     end
   end
 
-  assign valid_out = regs[SIZE - 1];
+  assign valid_out = regs[{size} - 1];
 endmodule
 """
     return delay_buffer

@@ -6,9 +6,7 @@ def generate_dataless_shift_reg_break_dv(name, params):
 `timescale 1ns/1ps
 // Module of dataless_shift_reg_break_dv
 
-module {name} #(
-  parameter integer NUM_SLOTS = {num_slots}
-)(
+module {name}(
   input  clk,
   input  rst,
   // Inputs
@@ -20,7 +18,7 @@ module {name} #(
 );
 
   // Internal signals
-  reg  [NUM_SLOTS-1:0] valid_reg;
+  reg  [{num_slots}-1:0] valid_reg;
   wire             regEn;
 
   // See 'docs/Specs/Buffering/Buffering.md'
@@ -28,16 +26,16 @@ module {name} #(
   // accept or stall inputs together.
   always @(posedge clk) begin
     if (rst) begin
-      valid_reg <= {{NUM_SLOTS{{1'b0}}}};
+      valid_reg <= {{{num_slots}{{1'b0}}}};
     end else begin
       if (regEn) begin
-        valid_reg[NUM_SLOTS-1:1] <= valid_reg[NUM_SLOTS-2:0];
+        valid_reg[{num_slots}-1:1] <= valid_reg[{num_slots}-2:0];
         valid_reg[0]         <= ins_valid;
       end
     end
   end
 
-  assign outs_valid = valid_reg[NUM_SLOTS-1];
+  assign outs_valid = valid_reg[{num_slots}-1];
   assign regEn      = ~outs_valid | outs_ready;
   assign ins_ready  = regEn;
 

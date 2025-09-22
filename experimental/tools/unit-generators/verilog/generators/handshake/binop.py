@@ -101,16 +101,14 @@ endmodule
     join_name = f"{name}_join"
     dependencies += generate_join(join_name, {"size": 2})
     oehb_name = f"{name}_oehb"
-    dependencies += generate_dataless_oehb(oehb_name, {"bitwidth": 0, "latency": latency})
+    dependencies += generate_dataless_oehb(oehb_name, {})
 
     architecture = f"""
   wire join_valid;
   wire oehb_ready;
 
   // Instantiate the join node
-  {join_name} #(
-    .SIZE(2)
-  ) join_inputs (
+  {join_name} join_inputs (
     .ins_valid  ({{rhs_valid, lhs_valid}}),
     .outs_ready (oehb_ready             ),
     .ins_ready  ({{rhs_ready, lhs_ready}}  ),
@@ -139,9 +137,9 @@ endmodule
     join_name = f"{name}_join"
     dependencies += generate_join(join_name, {"size": 2})
     delay_buffer_name = f"{name}_delay_buffer"
-    dependencies += generate_delay_buffer(delay_buffer_name, {"bitwidth": 0, "latency": latency - 1})
+    dependencies += generate_delay_buffer(delay_buffer_name, {"size": latency - 1})
     oehb_name = f"{name}_oehb"
-    dependencies += generate_dataless_oehb(oehb_name, {"bitwidth": 0, "latency": latency})
+    dependencies += generate_dataless_oehb(oehb_name, {})
 
     architecture = f"""
   wire join_valid;
@@ -149,18 +147,14 @@ endmodule
   wire buff_valid;
 
   // Instantiate the join node
-  {join_name} #(
-    .SIZE(2)
-  ) join_inputs (
+  {join_name} join_inputs (
     .ins_valid  ({{rhs_valid, lhs_valid}}),
     .outs_ready (oehb_ready             ),
     .ins_ready  ({{rhs_ready, lhs_ready}}  ),
     .outs_valid (join_valid             )
   );
 
-  {delay_buffer_name} #(
-    .SIZE( {latency} - 1)
-  ) buff (
+  {delay_buffer_name} buff (
     .clk(clk),
     .rst(rst),
     .valid_in(join_valid),

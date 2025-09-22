@@ -5,23 +5,20 @@ def generate_extui(name, params):
     extui = f"""
 `timescale 1ns/1ps
 // Module of extui
-module {name} #(
-  parameter INPUT_TYPE = {input_type},
-  parameter OUTPUT_TYPE = {output_type}
-)(
+module {name}(
   // inputs
   input  clk,
   input  rst,
-  input  [INPUT_TYPE - 1 : 0] ins,
+  input  [{input_type} - 1 : 0] ins,
   input  ins_valid,
   output  ins_ready,
   // outputs
-  output [OUTPUT_TYPE - 1 : 0] outs,
+  output [{output_type} - 1 : 0] outs,
   output outs_valid,
   input outs_ready
 );
 
-  assign outs = {{{{(OUTPUT_TYPE - INPUT_TYPE){{1'b0}}}}, ins}};
+  assign outs = {{{{({output_type} - {input_type}){{1'b0}}}}, ins}};
   assign outs_valid = ins_valid;
   assign ins_ready = outs_ready;
 

@@ -5,7 +5,7 @@ def generate_fork(name, params):
     bitwidth = params["bitwidth"]
 
     if(bitwidth == 0):
-        return generate_datalessFork(name, params)
+        return generate_datalessFork(name, {"size": size})
     
     datalessFork_name = name + "_datalessFork"
 
@@ -13,28 +13,23 @@ def generate_fork(name, params):
 
 
 
-    datalessFork = generate_datalessFork(datalessFork_name, params)
+    datalessFork = generate_datalessFork(datalessFork_name, {"size": size})
     Fork = f"""
 // Module of Fork
-module {name} #(
-	parameter SIZE = {size},
-	parameter DATA_TYPE = {bitwidth}
-)(
+module {name}(
 	input  clk,
 	input  rst,
   // Input Channel
-	input  [DATA_TYPE - 1 : 0] ins,
+	input  [{bitwidth} - 1 : 0] ins,
 	input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [SIZE * (DATA_TYPE) - 1 : 0] outs,
-  output [SIZE - 1 : 0] outs_valid,
-	input  [SIZE - 1 : 0] outs_ready
+  output [{size} * ({bitwidth}) - 1 : 0] outs,
+  output [{size} - 1 : 0] outs_valid,
+	input  [{size} - 1 : 0] outs_ready
 );
 
-  {datalessFork_name} #(
-    .SIZE(SIZE)
-  ) control (
+  {datalessFork_name} control (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins_valid  (ins_valid  ),
@@ -44,7 +39,7 @@ module {name} #(
   );
 
   // Broadcast the input data to all output channels
-  assign outs = {{SIZE{{ins}}}};
+  assign outs = {{{size}{{ins}}}};
 
 endmodule
 """

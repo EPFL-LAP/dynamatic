@@ -3,21 +3,19 @@ def generate_cond_br(name, params):
     bitwidth = params["bitwidth"]
 
     if(bitwidth == 0):
-        return generate_dataless_cond_br(name, params)
+        return generate_dataless_cond_br(name, {})
 
     dataless_cond_br_name = name + "_dataless_cond_br"
     header = "`timescale 1ns/1ps\n"
-    dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, params)
+    dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, {})
 
     body_cond_br = f"""
 // Module of cond_br
-module {name} #(
-	parameter DATA_TYPE = {bitwidth}
-)(
+module {name}(
 	input clk,
 	input rst,
   // Data Input Channel
-	input [DATA_TYPE - 1 : 0] data,				
+	input [{bitwidth} - 1 : 0] data,				
 	input data_valid,
   output data_ready,
   // Condition Input Channel
@@ -25,11 +23,11 @@ module {name} #(
 	input condition_valid,
   output condition_ready,
   // True Output Channel
-  output [DATA_TYPE - 1 : 0] trueOut,
+  output [{bitwidth} - 1 : 0] trueOut,
   output trueOut_valid,
 	input trueOut_ready,
   // False Output Channel
-  output [DATA_TYPE - 1 : 0] falseOut,
+  output [{bitwidth} - 1 : 0] falseOut,
   output falseOut_valid,
 	input falseOut_ready
 );

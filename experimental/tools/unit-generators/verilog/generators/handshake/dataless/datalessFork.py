@@ -38,20 +38,18 @@ endmodule
     datalessFork = f"""
 // Module of datalessFork
 
-module {name} #(
-	parameter SIZE = {size}
-)(
+module {name}(
 	input  clk,
 	input  rst,
   // Input Channel
 	input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [SIZE - 1 : 0] outs_valid,
-	input  [SIZE - 1: 0] outs_ready
+  output [{size} - 1 : 0] outs_valid,
+	input  [{size} - 1: 0] outs_ready
 );
 	// Internal Signal Definition
-	wire [SIZE - 1 : 0] blockStopArray;
+	wire [{size} - 1 : 0] blockStopArray;
 	wire anyBlockStop;
 	wire backpressure;
 
@@ -64,7 +62,7 @@ module {name} #(
 	genvar gen;
 
 	generate
-		for (gen = SIZE - 1; gen >= 0; gen = gen - 1) begin: regBlock
+		for (gen = {size} - 1; gen >= 0; gen = gen - 1) begin: regBlock
 			{eager_fork_register_block_name} regblock (
 				.clk 			    (clk				        ),
 				.rst 			    (rst				        ),

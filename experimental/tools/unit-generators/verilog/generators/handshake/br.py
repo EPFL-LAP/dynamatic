@@ -4,21 +4,19 @@ def generate_br(name, params):
 
     dataless_br_name = name + "_dataless_br"
     header = "`timescale 1ns/1ps\n"
-    dataless_br = generate_dataless_br(dataless_br_name, params)
+    dataless_br = generate_dataless_br(dataless_br_name, {})
     
     body_br = f"""
 // Module of br
-module {name} #(
-	parameter DATA_TYPE = {bitwidth}
-)(
+module {name}(
 	input clk,
 	input rst,
   // Input Channel
-	input [DATA_TYPE - 1 : 0] ins,   
+	input [{bitwidth} - 1 : 0] ins,   
 	input ins_valid,
   output ins_ready,
   // Output Channel 	
-  output [DATA_TYPE - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid	,
 	input outs_ready			        
 );

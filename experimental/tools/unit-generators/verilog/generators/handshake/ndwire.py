@@ -4,23 +4,21 @@ def generate_ndwire(name, params):
     ndwire = f"""
 `timescale 1ns/1ps
 // Module of ndwire
-module ndwire #(
-  parameter DATA_TYPE = {bitwidth}
-) (
+module ndwire(
   input  clk,
   input  rst,
   // Input channel
-  input  [DATA_TYPE - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [DATA_TYPE - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
 
   ndwire_dataless #(
-    .SIZE(DATA_TYPE)
+    .SIZE({bitwidth})
   ) control (
     .clk        (clk        ),
     .rst        (rst        ),

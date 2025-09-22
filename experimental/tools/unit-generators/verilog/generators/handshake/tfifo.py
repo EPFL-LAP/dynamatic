@@ -9,23 +9,20 @@ def generate_tfifo(name, params):
 
     tfifo_body = f"""
 // Module of tfifo
-module {name} #(
-  parameter NUM_SLOTS = {num_slots},
-  parameter DATA_TYPE = {data_type}
-)(
+module {name}(
   input  clk,
   input  rst,
-  input  [DATA_TYPE - 1 : 0] ins,
+  input  [{data_type} - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [DATA_TYPE - 1 : 0] outs,
+  output [{data_type} - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
   wire mux_sel;
   wire fifo_valid, fifo_ready;
   wire fifo_pvalid, fifo_nready;
-  wire [DATA_TYPE - 1 : 0] fifo_in, fifo_out;
+  wire [{data_type} - 1 : 0] fifo_in, fifo_out;
 
   // Dataout assignment
   assign outs = mux_sel ? fifo_out : ins;
@@ -38,10 +35,7 @@ module {name} #(
   assign fifo_nready = outs_ready;
   assign fifo_in = ins;
 
-  {elastic_fifo_inner_name} #(
-    .NUM_SLOTS  (NUM_SLOTS ), 
-    .DATA_TYPE (DATA_TYPE)
-  ) fifo (
+  {elastic_fifo_inner_name} fifo (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins        (fifo_in    ),

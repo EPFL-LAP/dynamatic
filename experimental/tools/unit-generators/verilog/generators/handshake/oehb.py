@@ -6,26 +6,24 @@ def generate_oehb(name, params):
   header = "`timescale 1ns/1ps\n"
 
   oehb_dataless_name = name + "_dataless"
-  oehb_dataless = generate_dataless_oehb(oehb_dataless_name, params)
+  oehb_dataless = generate_dataless_oehb(oehb_dataless_name, {})
 
   oehb_body = f"""
 // Module of oehb
-module {name} #(
-  parameter DATA_TYPE = {data_type}
-) (
+module {name}(
   input  clk,
   input  rst,
   // Input channel
-  input  [DATA_TYPE - 1 : 0] ins,
+  input  [{data_type} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [DATA_TYPE - 1 : 0] outs,
+  output [{data_type} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
   wire regEn, inputReady;
-  reg [DATA_TYPE - 1 : 0] dataReg = 0;
+  reg [{data_type} - 1 : 0] dataReg = 0;
   
   // Instance of oehb_dataless to manage handshaking
   {oehb_dataless_name} control (
@@ -39,7 +37,7 @@ module {name} #(
 
   always @(posedge clk) begin
     if (rst) begin
-      dataReg <= {{DATA_TYPE{{1'b0}}}};
+      dataReg <= {{{data_type}{{1'b0}}}};
     end else if (regEn) begin
       dataReg <= ins;
     end

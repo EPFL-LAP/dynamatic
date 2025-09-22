@@ -10,9 +10,7 @@ def generate_dataless_tfifo(name, params):
     dataless_tfifo_body = f"""
 
 // Module of dataless_tfifo
-module {name} #(
-  parameter NUM_SLOTS = {num_slots}
-)(
+module {name}(
   input  clk,
   input  rst,
   // Input channel
@@ -30,9 +28,7 @@ module {name} #(
   assign fifo_pvalid = ins_valid && (!outs_ready || fifo_valid);
   assign fifo_nready = outs_ready;
 
-  {elastic_fifo_inner_dataless_name} #(
-    .NUM_SLOTS(NUM_SLOTS)
-  ) fifo (
+  {elastic_fifo_inner_dataless_name} fifo (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins_valid  (fifo_pvalid),

@@ -41,9 +41,7 @@ module {name} (
 	// Assign individual signals to the vector
 	assign ins_valid_vec = {{condition_valid, data_valid}};
 
-	{join_name} #(
-		.SIZE(2)
-	) join_branch (
+	{join_name} join_branch (
 		.ins_valid  (ins_valid_vec     ),
 		.outs_ready (branch_ready      ),
 		.ins_ready  (ins_ready_vec     ),

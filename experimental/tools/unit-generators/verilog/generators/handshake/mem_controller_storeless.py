@@ -15,11 +15,7 @@ def generate_mem_controller_storeless(name, params):
     mem_controller_storeless_body = f"""
 
 // Module of mem_controller_storeless
-module {name} #(
-  parameter NUM_LOADS  = {num_loads},
-  parameter DATA_TYPE = {data_type},
-  parameter ADDR_TYPE = {addr_type}
-) (
+module {name}(
   input                                     clk,
   input                                     rst,
   // start input control
@@ -32,34 +28,34 @@ module {name} #(
   input                                     ctrlEnd_valid,
   output                                    ctrlEnd_ready,
   // Load address input channels
-  input  [(NUM_LOADS * ADDR_TYPE) - 1 : 0] ldAddr,
-  input  [               NUM_LOADS - 1 : 0] ldAddr_valid,
-  output [               NUM_LOADS - 1 : 0] ldAddr_ready,
+  input  [({num_loads} * {addr_type}) - 1 : 0] ldAddr,
+  input  [               {num_loads} - 1 : 0] ldAddr_valid,
+  output [               {num_loads} - 1 : 0] ldAddr_ready,
   // Load data output channels
-  output [(NUM_LOADS * DATA_TYPE) - 1 : 0] ldData,
-  output [               NUM_LOADS - 1 : 0] ldData_valid,
-  input  [               NUM_LOADS - 1 : 0] ldData_ready,
+  output [({num_loads} * {data_type}) - 1 : 0] ldData,
+  output [               {num_loads} - 1 : 0] ldData_valid,
+  input  [               {num_loads} - 1 : 0] ldData_ready,
   // Interface to dual-port BRAM
-  input  [              DATA_TYPE - 1 : 0] loadData,
+  input  [              {data_type} - 1 : 0] loadData,
   output                                    loadEn,
-  output [              ADDR_TYPE - 1 : 0] loadAddr,
+  output [              {addr_type} - 1 : 0] loadAddr,
   output                                    storeEn,
-  output [              ADDR_TYPE - 1 : 0] storeAddr,
-  output [              DATA_TYPE - 1 : 0] storeData
+  output [              {addr_type} - 1 : 0] storeAddr,
+  output [              {data_type} - 1 : 0] storeData
 );
   wire allRequestsDone;
 
   // No stores will ever be issused
-  assign storeAddr = {{ADDR_TYPE{{1'b0}}}};
-  assign storeData = {{DATA_TYPE{{1'b0}}}};
+  assign storeAddr = {{{addr_type}{{1'b0}}}};
+  assign storeData = {{{data_type}{{1'b0}}}};
   assign storeEn   = 1'b0;
 
   // MC is "always done with stores"
 
   read_memory_arbiter #(
-    .ARBITER_SIZE(NUM_LOADS),
-    .ADDR_TYPE  (ADDR_TYPE),
-    .DATA_TYPE  (DATA_TYPE)
+    .ARBITER_SIZE({num_loads}),
+    .ADDR_TYPE  ({addr_type}),
+    .DATA_TYPE  ({data_type})
   ) read_arbiter (
     .rst             (rst),
     .clk             (clk),

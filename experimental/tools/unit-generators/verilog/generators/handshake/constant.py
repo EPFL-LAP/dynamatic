@@ -6,16 +6,14 @@ def generate_constant(name, params):
 // Module of constant
 
 `timescale 1ns / 1ps
-module {name} #(
-  parameter DATA_WIDTH = {bitwidth}
-) (
+module {name}(
   input                       clk,
   input                       rst,
   // Input Channel
   input                       ctrl_valid,
   output                      ctrl_ready,
   // Output Channel
-  output [DATA_WIDTH - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output                      outs_valid,
   input                       outs_ready
 );

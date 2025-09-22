@@ -7,9 +7,7 @@ def generate_dataless_elastic_fifo_inner(name, params):
 
 // Module of dataless_elastic_fifo_inner
 
-module {name} #(
-  parameter NUM_SLOTS = {num_slots}
-)(
+module {name}(
   input  clk,
   input  rst,
   input  ins_valid,
@@ -19,7 +17,7 @@ module {name} #(
   output outs_valid
 );
   wire ReadEn, WriteEn;
-  reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
+  reg [$clog2({num_slots}) - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 1;
 
   // Ready if there is space in the FIFO
@@ -36,7 +34,7 @@ module {name} #(
       Tail <= 0;
     end else begin
       if (WriteEn) begin
-        Tail <= (Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1;
+        Tail <= (Tail + 1 == {num_slots}) ? 0 : Tail + 1;
       end
     end  
   end
@@ -47,7 +45,7 @@ module {name} #(
       Head <= 0;
     end else begin
       if (ReadEn) begin
-        Head <= (Head + 1 == NUM_SLOTS) ? 0 : Head + 1;
+        Head <= (Head + 1 == {num_slots}) ? 0 : Head + 1;
       end
     end 
   end
@@ -60,7 +58,7 @@ module {name} #(
       // If only filling but not emptying
       if (WriteEn & ~ReadEn) begin
         // If new tail index will reach head index
-        if (((Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1) == Head) begin
+        if (((Tail + 1 == {num_slots}) ? 0 : Tail + 1) == Head) begin
           Full <= 1;
         end
       end else if (~WriteEn & ReadEn) begin
@@ -77,7 +75,7 @@ module {name} #(
     end else begin
       // If only emptying but not filling
       if (~WriteEn & ReadEn) begin
-        if (((Head + 1 == NUM_SLOTS) ? 0 : Head + 1) == Tail) begin
+        if (((Head + 1 == {num_slots}) ? 0 : Head + 1) == Tail) begin
           Empty <= 1;
         end
       end else if (WriteEn & ~ReadEn) begin

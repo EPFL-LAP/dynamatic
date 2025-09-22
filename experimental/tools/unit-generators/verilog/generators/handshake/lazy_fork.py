@@ -5,37 +5,32 @@ def generate_lazy_fork(name, params):
     bitwidth = params["bitwidth"]
 
     if(bitwidth == 0):
-        return generate_dataless_lazy_fork(name, params)
-    
+        return generate_dataless_lazy_fork(name, {"size": size})
+
     dataless_lazy_fork_name = name + "_dataless_lazy_fork"
 
     header = "`timescale 1ns/1ps\n"
 
 
 
-    datalessFork = generate_dataless_lazy_fork(dataless_lazy_fork_name, params)
+    datalessFork = generate_dataless_lazy_fork(dataless_lazy_fork_name, {"size": size})
     lazy_fork = f"""
 // Module of lazy_fork
 `timescale 1ns/1ps
-module {name} #(
-  parameter SIZE = {size},
-  parameter DATA_TYPE = {bitwidth}
-)(
+module {name}(
   input  clk,
 	input  rst,
   // Input Channels
-  input  [DATA_TYPE - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [SIZE * (DATA_TYPE) - 1 : 0] outs,
-	output [SIZE - 1 : 0] outs_valid,
-	input  [SIZE - 1 : 0] outs_ready
+  output [{size} * ({bitwidth}) - 1 : 0] outs,
+	output [{size} - 1 : 0] outs_valid,
+	input  [{size} - 1 : 0] outs_ready
 );
 
-  {dataless_lazy_fork_name} #(
-    .SIZE(SIZE)
-  ) control (
+  {dataless_lazy_fork_name} control (
     .clk 			    (clk				        ),
     .rst 			    (rst				        ),
     .ins_valid 		(ins_valid			    ),
@@ -44,7 +39,7 @@ module {name} #(
     .outs_ready 	(outs_ready         )
   );
 
-  assign outs = {{SIZE{{ins}}}};
+  assign outs = {{{size}{{ins}}}};
 
 endmodule
 """

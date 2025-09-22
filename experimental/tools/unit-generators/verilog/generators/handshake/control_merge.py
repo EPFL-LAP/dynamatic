@@ -6,41 +6,34 @@ def generate_control_merge(name, params):
     index_type = params["index_type"]
 
     if(data_type == 0):
-      return generate_dataless_control_merge(name, params)
+      return generate_dataless_control_merge(name, {"size": size, "index_type": index_type})
 
     header = "`timescale 1ns/1ps\n"
 
     dataless_control_merge_name = name + "_control_merge_dataless"
-    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, params)
+    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, {"size": size, "index_type": index_type})
 
     control_merge_body = f"""
 // Module of control_merge
-  module {name} #(
-    parameter SIZE = {size},
-    parameter DATA_TYPE = {data_type},
-    parameter INDEX_TYPE = {index_type}
-  )(
+  module {name}(
     input  clk,
     input  rst,
     // Input Channels
-    input  [SIZE * (DATA_TYPE) - 1 : 0] ins,
-    input  [SIZE - 1 : 0] ins_valid,
-    output [SIZE - 1 : 0] ins_ready,
+    input  [{size} * ({data_type}) - 1 : 0] ins,
+    input  [{size} - 1 : 0] ins_valid,
+    output [{size} - 1 : 0] ins_ready,
     // Data Output Channel
-    output [DATA_TYPE - 1 : 0] outs,
+    output [{data_type} - 1 : 0] outs,
     output outs_valid,
     input  outs_ready,
     // Index Output Channel
-    output [INDEX_TYPE - 1 : 0] index,
+    output [{index_type} - 1 : 0] index,
     output index_valid,
     input  index_ready
   );
-    wire [INDEX_TYPE - 1 : 0] index_internal;
+    wire [{index_type} - 1 : 0] index_internal;
 
-    {dataless_control_merge_name} #(
-      .SIZE(SIZE),
-      .INDEX_TYPE(INDEX_TYPE)
-    ) control (
+    {dataless_control_merge_name} control (
       .clk          (clk            ),
       .rst          (rst            ),
       .ins_valid    (ins_valid      ),
@@ -54,7 +47,7 @@ def generate_control_merge(name, params):
 
     assign index = index_internal;
 
-    assign outs = ins[index_internal * DATA_TYPE +: DATA_TYPE];
+    assign outs = ins[index_internal * {data_type} +: {data_type}];
   endmodule
 
 """

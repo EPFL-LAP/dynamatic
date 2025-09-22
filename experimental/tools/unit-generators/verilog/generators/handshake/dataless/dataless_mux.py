@@ -6,17 +6,14 @@ def generate_dataless_mux(name, params):
     dataless_mux = f"""
 `timescale 1ns/1ps
 // Module of dataless_mux
-module {name} #(
-  parameter SIZE = {size},
-  parameter SELECT_TYPE = {select_type}
-)(
+module {name}(
   input  clk,
   input  rst,
   // Data input channels
-  input  [SIZE - 1 : 0] ins_valid,
-  output reg [SIZE - 1 : 0] ins_ready,
+  input  [{size} - 1 : 0] ins_valid,
+  output reg [{size} - 1 : 0] ins_ready,
   // Index input channel
-  input  [SELECT_TYPE - 1 : 0] index,
+  input  [{select_type} - 1 : 0] index,
   input  index_valid,
   output index_ready,
   // Output channel
@@ -29,13 +26,13 @@ module {name} #(
   always @(*) begin
     selectedData_valid = 0;
 
-    for (i = SIZE - 1; i >= 0 ; i = i - 1) begin
-      if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & ins_valid[i] & outs_ready) | ~ins_valid[i])
+    for (i = {size} - 1; i >= 0 ; i = i - 1) begin
+      if (((i[{select_type} - 1 : 0] == index) & index_valid & ins_valid[i] & outs_ready) | ~ins_valid[i])
         ins_ready[i] = 1;
       else
         ins_ready[i] = 0;
 
-      if (index == i[SELECT_TYPE - 1 : 0] && index_valid && ins_valid[i]) begin
+      if (index == i[{select_type} - 1 : 0] && index_valid && ins_valid[i]) begin
         selectedData_valid = 1;
       end    
     end

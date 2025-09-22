@@ -5,26 +5,23 @@ def generate_store(name, params):
 `timescale 1ns/1ps
 
 // Module of Store
-module {name} #(
-  parameter DATA_TYPE = {data_type},
-  parameter ADDR_TYPE = {addr_type}
-)(
+module {name}(
   input  clk,
   input  rst,
   // Data from Circuit Channel
-  input  [DATA_TYPE - 1 : 0] dataIn,
+  input  [{data_type} - 1 : 0] dataIn,
   input  dataIn_valid,
   output dataIn_ready,
   // Address from Circuit Channel
-  input  [ADDR_TYPE - 1 : 0] addrIn,
+  input  [{addr_type} - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Data to Interface Channel
-  output [DATA_TYPE - 1 : 0] dataToMem,
+  output [{data_type} - 1 : 0] dataToMem,
   output dataToMem_valid,
   input  dataToMem_ready,
   // Address to Interface Channel
-  output [ADDR_TYPE - 1 : 0] addrOut,
+  output [{addr_type} - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready 
 );

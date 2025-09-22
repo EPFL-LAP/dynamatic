@@ -16,12 +16,11 @@ endmodule
 """
     non_empty_sink = f"""
 `timescale 1ns/1ps
-module {name} #(
-  parameter DATA_TYPE = {bitwidth}
-) (
+// Module of sink
+module {name}(
   input  clk,      
   input  rst,       
-  input  [DATA_TYPE-1:0] ins, 
+  input  [{bitwidth}-1:0] ins, 
   input  ins_valid, 
   output ins_ready 
 );

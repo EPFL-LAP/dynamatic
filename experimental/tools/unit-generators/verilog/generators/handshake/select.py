@@ -50,21 +50,19 @@ endmodule
 
     selector = f"""
 // Module of select
-module {name} #(
-  parameter DATA_TYPE = {bitwidth}
-)(
+module {name}(
   // inputs
   input  clk,
   input  rst,
   input  condition,
   input  condition_valid,
-  input  [DATA_TYPE-1 : 0] trueValue,
+  input  [{bitwidth}-1 : 0] trueValue,
   input  trueValue_valid,
-  input  [DATA_TYPE-1 : 0] falseValue,
+  input  [{bitwidth}-1 : 0] falseValue,
   input  falseValue_valid,
   input  result_ready,
   // outputs
-  output  [DATA_TYPE-1 : 0] result,
+  output  [{bitwidth}-1 : 0] result,
   output  result_valid,
   output  condition_ready,
   output  trueValue_ready,

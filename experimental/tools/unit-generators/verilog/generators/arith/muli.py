@@ -13,24 +13,22 @@ def generate_muli(name, params):
     mul_4_stage_name = name + "_mul_4_stage"
     dependencies = f"""
 // Module of mul_4_stage
-module {mul_4_stage_name} #(
-  parameter DATA_TYPE = {bitwidth}
-)(
+module {mul_4_stage_name}(
   // inputs
   input  clk,
   input  ce,
-  input  [DATA_TYPE - 1 : 0] a,
-  input  [DATA_TYPE - 1 : 0] b,
+  input  [{bitwidth} - 1 : 0] a,
+  input  [{bitwidth} - 1 : 0] b,
   // outputs
-  output [DATA_TYPE - 1 : 0] p
+  output [{bitwidth} - 1 : 0] p
 );
 
-  reg  [DATA_TYPE - 1 : 0] a_reg = 0;
-  reg  [DATA_TYPE - 1 : 0] b_reg = 0;
-  reg  [DATA_TYPE - 1 : 0] q0 = 0;
-  reg  [DATA_TYPE - 1 : 0] q1 = 0;
-  reg  [DATA_TYPE - 1 : 0] q2 = 0;
-  wire  [DATA_TYPE - 1 : 0] mul;
+  reg  [{bitwidth} - 1 : 0] a_reg = 0;
+  reg  [{bitwidth} - 1 : 0] b_reg = 0;
+  reg  [{bitwidth} - 1 : 0] q0 = 0;
+  reg  [{bitwidth} - 1 : 0] q1 = 0;
+  reg  [{bitwidth} - 1 : 0] q2 = 0;
+  wire  [{bitwidth} - 1 : 0] mul;
 
   assign mul = a_reg * b_reg;
 
@@ -49,9 +47,7 @@ module {mul_4_stage_name} #(
 endmodule
 """
     muli_body = f"""
-  {mul_4_stage_name} #(
-    .DATA_TYPE({bitwidth})
-  ) mul_4_stage_inst (
+  {mul_4_stage_name} mul_4_stage_inst (
     .clk(clk),
     .ce(oehb_ready),
     .a(lhs),

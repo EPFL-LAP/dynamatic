@@ -3,32 +3,30 @@ from generators.handshake.dataless.tehb import generate_tehb as generate_datales
 def generate_tehb(name, params):
     data_type = params["data_type"]
     if(data_type == 0):
-        return generate_dataless_tehb(name, params)
+        return generate_dataless_tehb(name, {})
 
     header = "`timescale 1ns/1ps\n"
 
     tehb_name = name + "_dataless_tehb"
-    dataless_tehb = generate_dataless_tehb(tehb_name, params)
+    dataless_tehb = generate_dataless_tehb(tehb_name, {})
 
     tehb_body = f"""
 // Module of tehb
-module {name} #(
-	parameter DATA_TYPE = {data_type}
-)(
+module {name}(
 	input  clk,
 	input  rst,
   // Input Channel
-	input  [DATA_TYPE - 1 : 0] ins,
+	input  [{data_type} - 1 : 0] ins,
 	input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [DATA_TYPE - 1 : 0]	outs,
+  output [{data_type} - 1 : 0]	outs,
   output outs_valid,
 	input  outs_ready
 );
 	// Signal Definition
 	wire regEnable, regNotFull;
-	reg [DATA_TYPE - 1 : 0] dataReg = 0;
+	reg [{data_type} - 1 : 0] dataReg = 0;
 
 	// Instantiate control logic part
 	{tehb_name} control (

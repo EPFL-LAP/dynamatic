@@ -7,10 +7,10 @@ def generate_load(name, params):
     header = "`timescale 1ns/1ps\n"
 
     tehb_address_name = name + "_tehb_address"
-    tehb_address = generate_tehb(tehb_address_name, params)
+    tehb_address = generate_tehb(tehb_address_name, { "data_type": addr_type })
 
     tehb_data_name = name + "_tehb_data"
-    tehb_data = generate_tehb(tehb_data_name, params)
+    tehb_data = generate_tehb(tehb_data_name, { "data_type": data_type })
 
     load_body = f"""
 
@@ -22,25 +22,23 @@ module {name} #(
   input clk,
   input rst,
   // Address from Circuit Channel
-  input  [ADDR_TYPE - 1 : 0] addrIn,
+  input  [{addr_type} - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Address to Interface Channel
-  output [ADDR_TYPE - 1 : 0] addrOut,
+  output [{addr_type} - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready,
   // Data from Interface Channel
-  input  [DATA_TYPE - 1 : 0] dataFromMem,
+  input  [{data_type} - 1 : 0] dataFromMem,
   input  dataFromMem_valid,
   output dataFromMem_ready,
   // Data from Memory Channel
-  output [DATA_TYPE - 1 : 0] dataOut,
+  output [{data_type} - 1 : 0] dataOut,
   output dataOut_valid,
   input  dataOut_ready
 );
-  {tehb_address_name} #(
-    .DATA_TYPE(ADDR_TYPE)
-  ) addr_tehb (
+  {tehb_address_name} addr_tehb (
     .clk        (clk            ),
     .rst        (rst            ),
     .ins        (addrIn         ),
@@ -51,9 +49,7 @@ module {name} #(
     .outs_ready (addrOut_ready  )
   );
 
-  {tehb_data_name} #(
-    .DATA_TYPE(DATA_TYPE)
-  ) data_tehb (
+  {tehb_data_name} data_tehb (
     .clk        (clk                ),
     .rst        (rst                ),
     .ins        (dataFromMem        ),

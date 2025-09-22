@@ -15,12 +15,7 @@ def generate_mem_controller_loadless(name, params):
     mem_controller_loadless_body = f"""
 
 // Module of mem_controller_loadless
-module {name} #(
-  parameter NUM_CONTROLS = {num_controls},
-  parameter NUM_STORES   = {num_stores},
-  parameter DATA_TYPE   = {data_type},
-  parameter ADDR_TYPE   = {addr_type}
-) (
+module {name}(
   input                                      clk,
   input                                      rst,
   // start input control
@@ -33,24 +28,24 @@ module {name} #(
   input                                      ctrlEnd_valid,
   output                                     ctrlEnd_ready,
   // Control Input Channels
-  input  [      (NUM_CONTROLS * 32) - 1 : 0] ctrl,
-  input  [             NUM_CONTROLS - 1 : 0] ctrl_valid,
-  output [             NUM_CONTROLS - 1 : 0] ctrl_ready,
+  input  [      ({num_controls} * 32) - 1 : 0] ctrl,
+  input  [             {num_controls} - 1 : 0] ctrl_valid,
+  output [             {num_controls} - 1 : 0] ctrl_ready,
   // Store Address Input Channels
-  input  [(NUM_STORES * ADDR_TYPE) - 1 : 0] stAddr,
-  input  [               NUM_STORES - 1 : 0] stAddr_valid,
-  output [               NUM_STORES - 1 : 0] stAddr_ready,
+  input  [({num_stores} * {addr_type}) - 1 : 0] stAddr,
+  input  [               {num_stores} - 1 : 0] stAddr_valid,
+  output [               {num_stores} - 1 : 0] stAddr_ready,
   // Store Data Input Channels
-  input  [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
-  input  [               NUM_STORES - 1 : 0] stData_valid,
-  output [               NUM_STORES - 1 : 0] stData_ready,
+  input  [({num_stores} * {data_type}) - 1 : 0] stData,
+  input  [               {num_stores} - 1 : 0] stData_valid,
+  output [               {num_stores} - 1 : 0] stData_ready,
   // Interface to Dual-port BRAM
-  input  [               DATA_TYPE - 1 : 0] loadData,
+  input  [               {data_type} - 1 : 0] loadData,
   output                                     loadEn,
-  output [               ADDR_TYPE - 1 : 0] loadAddr,
+  output [               {addr_type} - 1 : 0] loadAddr,
   output                                     storeEn,
-  output [               ADDR_TYPE - 1 : 0] storeAddr,
-  output [               DATA_TYPE - 1 : 0] storeData
+  output [               {addr_type} - 1 : 0] storeAddr,
+  output [               {data_type} - 1 : 0] storeData
 );
   // Terminology:
   // Access ports    : circuit to memory_controller;
@@ -60,28 +55,28 @@ module {name} #(
   wire [31 : 0] remainingStores;
   // Indicating the store interface port that there is a valid store request
   // (currently not used).
-  wire [NUM_STORES - 1 : 0] interface_port_valid;
+  wire [{num_stores} - 1 : 0] interface_port_valid;
   // Indicating a store port has both a valid data and a valid address.
-  wire [NUM_STORES - 1 : 0] store_access_port_complete_request;
+  wire [{num_stores} - 1 : 0] store_access_port_complete_request;
   // Indicating the store port is selected by the arbiter.
-  wire [NUM_STORES - 1 : 0] store_access_port_selected;
+  wire [{num_stores} - 1 : 0] store_access_port_selected;
   wire allRequestsDone;
 
   // Local Parameter
   localparam [31:0] zeroStore = 32'b0;
-  localparam [NUM_CONTROLS-1:0] zeroCtrl = {{NUM_CONTROLS{{1'b0}}}};
+  localparam [{num_controls}-1:0] zeroCtrl = {{{num_controls}{{1'b0}}}};
 
   assign loadEn   = 0;
-  assign loadAddr = {{ADDR_TYPE{{1'b0}}}};
+  assign loadAddr = {{{addr_type}{{1'b0}}}};
 
   // A store request is complete if both address and data are valid.
   assign store_access_port_complete_request = stAddr_valid & stData_valid;
 
   // Instantiate write memory arbiter
   write_memory_arbiter #(
-    .ARBITER_SIZE(NUM_STORES),
-    .ADDR_TYPE  (ADDR_TYPE),
-    .DATA_TYPE  (DATA_TYPE)
+    .ARBITER_SIZE({num_stores}),
+    .ADDR_TYPE  ({addr_type}),
+    .DATA_TYPE  ({data_type})
   ) write_arbiter (
     .rst           (rst),
     .clk           (clk),
@@ -89,7 +84,7 @@ module {name} #(
     .ready         (store_access_port_selected),
     .address_in    (stAddr),
     .data_in       (stData),
-    .nReady        ({{NUM_STORES{{1'b1}}}}),
+    .nReady        ({{{num_stores}{{1'b1}}}}),
     .valid         (interface_port_valid),
     .write_enable  (storeEn),
     .write_address (storeAddr),
@@ -98,7 +93,7 @@ module {name} #(
 
   assign stData_ready = store_access_port_selected;
   assign stAddr_ready = store_access_port_selected;
-  assign ctrl_ready   = {{NUM_CONTROLS{{1'b1}}}};
+  assign ctrl_ready   = {{{num_controls}{{1'b1}}}};
 
   integer          i;
   reg     [31 : 0] counter = 32'd0;
@@ -108,7 +103,7 @@ module {name} #(
     if (rst) begin
       counter = 32'd0;
     end else begin
-      for (i = 0; i <= NUM_CONTROLS - 1; i = i + 1) begin
+      for (i = 0; i <= {num_controls} - 1; i = i + 1) begin
         if (ctrl_valid[i]) begin
           counter = counter + ctrl[i*32+:32];
         end
