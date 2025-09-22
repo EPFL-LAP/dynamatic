@@ -2,6 +2,7 @@ import argparse
 import ast
 import sys
 
+import generators.handshake.absf as absf
 import generators.handshake.addf as addf
 import generators.handshake.addi as addi
 import generators.handshake.andi as andi
@@ -48,10 +49,13 @@ import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
 import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
 import generators.handshake.shrui as shrui
 import generators.handshake.sharing_wrapper as sharing_wrapper
+import generators.handshake.divf as divf
 
 
 def generate_code(name, mod_type, parameters):
     match mod_type:
+        case "absf":
+            return absf.generate_absf(name, parameters)
         case "addf":
             return addf.generate_addf(name, parameters)
         case "addi":
@@ -70,6 +74,8 @@ def generate_code(name, mod_type, parameters):
             return constant.generate_constant(name, parameters)
         case "control_merge":
             return control_merge.generate_control_merge(name, parameters)
+        case "divf":
+            return divf.generate_divf(name, parameters)
         case "extsi":
             return extsi.generate_extsi(name, parameters)
         case "fork":
