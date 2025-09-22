@@ -21,22 +21,32 @@ run() {
 }
 
 # Rewrite A
-run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
+# run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
+# run general_sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=3&2=4"
+# run extension1 --allow_nonacceptance --timing_insensitive
+# run extension2 --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}<={out:0}"
+# run extension3 --allow_nonacceptance --timing_insensitive
+# run extension4 --allow_nonacceptance --timing_insensitive
+# run extension5 --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}<={out:0}"
+# run general_sup_mumux_copy --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
+# run general_sup_mumux --timing_insensitive --seq_length="0=2&0=3"
+# run sup_gamma_mux1 --timing_insensitive --seq_length="0=1&0=2"
+run sup_gamma_mux2 --timing_insensitive --seq_length="0=1&0=2"
 
-# Rewrites B
-run sup_mul --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={in:2}&{in:0}<={out:0}"
-run sup_fork --allow_nonacceptance --timing_insensitive
-run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
-run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}<={out:0}"
+# # Rewrites B
+# run sup_mul --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={in:2}&{in:0}<={out:0}"
+# run sup_fork --allow_nonacceptance --timing_insensitive
+# run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
+# run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}<={out:0}"
 
-# Rewrite C
-run simpleInduction --allow_nonacceptance --timing_insensitive
+# # Rewrite C
+# run simpleInduction --allow_nonacceptance --timing_insensitive
 
-# Rewrite D
-run unify_sup --allow_nonacceptance --timing_insensitive --seq_length="0=1"
+# # Rewrite D
+# run unify_sup --allow_nonacceptance --timing_insensitive --seq_length="0=1"
 
-# Rewrite E
-run muxForkSwap --allow_nonacceptance --timing_insensitive
+# # Rewrite E
+# run muxForkSwap --allow_nonacceptance --timing_insensitive
 
 # run repeating_init --disable_ndwire --disable_decoupling --allow_nonacceptance
 # run newInduction --disable_ndwire --disable_decoupling --allow_nonacceptance --custom-context="$REWRITES/newInduction_ctx.mlir" --infinite_tokens

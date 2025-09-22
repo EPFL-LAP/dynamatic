@@ -1,0 +1,37 @@
+#include "general_sup_mux_lhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_sel : bool_input_exact(general_sup_mux_lhs.sel_ready, 2);
+  VAR seq_generator_ctrl1 : bool_input_exact(general_sup_mux_lhs.ctrl1_ready, 2);
+  VAR seq_generator_ctrl2 : bool_input_exact(general_sup_mux_lhs.ctrl2_ready, 2);
+  VAR seq_generator_a_in : bool_input_exact(general_sup_mux_lhs.a_in_ready, 2);
+  VAR seq_generator_b_in : bool_input_exact(general_sup_mux_lhs.b_in_ready, 2);
+
+  VAR general_sup_mux_lhs : general_sup_mux_lhs (seq_generator_sel.outs, seq_generator_sel.outs_valid, seq_generator_ctrl1.outs, seq_generator_ctrl1.outs_valid, seq_generator_ctrl2.outs, seq_generator_ctrl2.outs_valid, seq_generator_a_in.outs, seq_generator_a_in.outs_valid, seq_generator_b_in.outs, seq_generator_b_in.outs_valid, sink_res.ins_ready);
+
+  VAR sink_res : sink_main(general_sup_mux_lhs.res_valid);
+

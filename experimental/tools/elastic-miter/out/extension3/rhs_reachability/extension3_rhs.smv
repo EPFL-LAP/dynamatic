@@ -1,0 +1,37 @@
+#include "handshake_fork_1.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_init_0.smv"
+
+
+MODULE extension3_rhs (arg, arg_valid, res_ready)
+
+
+-- input and output
+DEFINE res := passer.result;
+DEFINE res_valid := passer.result_valid;
+DEFINE passer_result_ready := res_ready;
+DEFINE arg_fork_ins := arg;
+DEFINE arg_fork_ins_valid := arg_valid;
+DEFINE arg_ready := arg_fork.ins_ready;
+
+
+VAR arg_fork : handshake_fork_0(arg_fork_ins, arg_fork_ins_valid, ri_mux.ins_1_ready, arg_buff.ins_ready);
+VAR arg_buff : handshake_buffer_0(arg_fork.outs_1, arg_fork.outs_1_valid, mux.ins_1_ready);
+VAR buff : handshake_buffer_1(ri_mux.outs, ri_mux.outs_valid, initop.ins_ready);
+VAR initop : handshake_init_0(buff.outs, buff.outs_valid, ri_fork.ins_ready);
+VAR ri_fork : handshake_fork_1(initop.outs, initop.outs_valid, ri_mux.index_ready, mux.index_ready, passer.data_ready);
+VAR source1 : handshake_source_0(constant1.ctrl_ready);
+VAR constant1 : handshake_constant_0(source1.outs_valid, ri_mux.ins_0_ready);
+VAR ri_mux : handshake_mux_0(ri_fork.outs_0, ri_fork.outs_0_valid, constant1.outs, arg_fork.outs_0, constant1.outs_valid, arg_fork.outs_0_valid, buff.ins_ready);
+VAR source2 : handshake_source_0(constant2.ctrl_ready);
+VAR constant2 : handshake_constant_0(source2.outs_valid, mux.ins_0_ready);
+VAR mux : handshake_mux_0(ri_fork.outs_1, ri_fork.outs_1_valid, constant2.outs, arg_buff.outs, constant2.outs_valid, arg_buff.outs_valid, passer.ctrl_ready);
+VAR passer : handshake_passer_0(ri_fork.outs_2, ri_fork.outs_2_valid, mux.outs, mux.outs_valid, passer_result_ready);
+
+-- properties

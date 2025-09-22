@@ -1,0 +1,31 @@
+#include "handshake_not_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE sup_gamma_mux2_lhs (cond, cond_valid, dataT, dataT_valid, dataF, dataF_valid, res_ready)
+
+
+-- input and output
+DEFINE res := res_mux.outs;
+DEFINE res_valid := res_mux.outs_valid;
+DEFINE res_mux_outs_ready := res_ready;
+DEFINE cond_fork_ins := cond;
+DEFINE cond_fork_ins_valid := cond_valid;
+DEFINE cond_ready := cond_fork.ins_ready;
+DEFINE dataT_passer_data := dataT;
+DEFINE dataT_passer_data_valid := dataT_valid;
+DEFINE dataT_ready := dataT_passer.data_ready;
+DEFINE dataF_passer_data := dataF;
+DEFINE dataF_passer_data_valid := dataF_valid;
+DEFINE dataF_ready := dataF_passer.data_ready;
+
+
+VAR cond_fork : handshake_fork_0(cond_fork_ins, cond_fork_ins_valid, dataT_passer.ctrl_ready, not.ins_ready, res_mux.index_ready);
+VAR dataT_passer : handshake_passer_0(dataT_passer_data, dataT_passer_data_valid, cond_fork.outs_0, cond_fork.outs_0_valid, res_mux.ins_1_ready);
+VAR not : handshake_not_0(cond_fork.outs_1, cond_fork.outs_1_valid, dataF_passer.ctrl_ready);
+VAR dataF_passer : handshake_passer_0(dataF_passer_data, dataF_passer_data_valid, not.outs, not.outs_valid, res_mux.ins_0_ready);
+VAR res_mux : handshake_mux_0(cond_fork.outs_2, cond_fork.outs_2_valid, dataF_passer.result, dataT_passer.result, dataF_passer.result_valid, dataT_passer.result_valid, res_mux_outs_ready);
+
+-- properties

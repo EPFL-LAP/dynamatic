@@ -1,9 +1,10 @@
+#include "handshake_mux_0.smv"
 #include "handshake_passer_0.smv"
+#include "handshake_init_0.smv"
 #include "handshake_buffer_0.smv"
 #include "handshake_fork_0.smv"
-#include "handshake_spec_v2_repeating_init_0.smv"
-#include "handshake_mux_0.smv"
-#include "handshake_init_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
 
 
 MODULE sup_mux_rhs (loopLiveIn, loopLiveIn_valid, iterLiveOut, iterLiveOut_valid, oldContinue, oldContinue_valid, iterLiveIn_ready)
@@ -19,18 +20,19 @@ DEFINE loopLiveIn_ready := data_mux.ins_0_ready;
 DEFINE data_mux_ins_1 := iterLiveOut;
 DEFINE data_mux_ins_1_valid := iterLiveOut_valid;
 DEFINE iterLiveOut_ready := data_mux.ins_1_ready;
-DEFINE fork_continue_ins := oldContinue;
-DEFINE fork_continue_ins_valid := oldContinue_valid;
-DEFINE oldContinue_ready := fork_continue.ins_ready;
+DEFINE ctrl_mux_ins_1 := oldContinue;
+DEFINE ctrl_mux_ins_1_valid := oldContinue_valid;
+DEFINE oldContinue_ready := ctrl_mux.ins_1_ready;
 
 
-VAR fork_continue : handshake_fork_0(fork_continue_ins, fork_continue_ins_valid, ri1.ins_ready, ri2.ins_ready);
-VAR ri1 : handshake_spec_v2_repeating_init_0(fork_continue.outs_0, fork_continue.outs_0_valid, buffer1.ins_ready);
-VAR buffer1 : handshake_buffer_0(ri1.outs, ri1.outs_valid, newInit.ins_ready);
-VAR newInit : handshake_init_0(buffer1.outs, buffer1.outs_valid, data_mux.index_ready);
+VAR source : handshake_source_0(constant.ctrl_ready);
+VAR constant : handshake_constant_0(source.outs_valid, ctrl_mux.ins_0_ready);
+VAR ctrl_mux : handshake_mux_0(newInit2.outs, newInit2.outs_valid, constant.outs, ctrl_mux_ins_1, constant.outs_valid, ctrl_mux_ins_1_valid, fork_continue.ins_ready);
+VAR fork_continue : handshake_fork_0(ctrl_mux.outs, ctrl_mux.outs_valid, newInit.ins_ready, buff.ins_ready, passer.ctrl_ready);
+VAR newInit : handshake_init_0(fork_continue.outs_0, fork_continue.outs_0_valid, data_mux.index_ready);
+VAR buff : handshake_buffer_0(fork_continue.outs_1, fork_continue.outs_1_valid, newInit2.ins_ready);
+VAR newInit2 : handshake_init_0(buff.outs, buff.outs_valid, ctrl_mux.index_ready);
 VAR data_mux : handshake_mux_0(newInit.outs, newInit.outs_valid, data_mux_ins_0, data_mux_ins_1, data_mux_ins_0_valid, data_mux_ins_1_valid, passer.data_ready);
-VAR ri2 : handshake_spec_v2_repeating_init_0(fork_continue.outs_1, fork_continue.outs_1_valid, buffer2.ins_ready);
-VAR buffer2 : handshake_buffer_0(ri2.outs, ri2.outs_valid, passer.ctrl_ready);
-VAR passer : handshake_passer_0(data_mux.outs, data_mux.outs_valid, buffer2.outs, buffer2.outs_valid, passer_result_ready);
+VAR passer : handshake_passer_0(data_mux.outs, data_mux.outs_valid, fork_continue.outs_2, fork_continue.outs_2_valid, passer_result_ready);
 
 -- properties

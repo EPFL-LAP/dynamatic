@@ -1,0 +1,357 @@
+cycle, src_component, src_port, dst_component, dst_port, state, data
+0, out_buf_lhs_nds_ctrlRes, 0, lhs_out_bl_ctrlRes, 1, idle, 
+0, out_lf_dataRes, 1, out_buf_rhs_nds_dataRes, 0, transfer, 
+0, rhs_ctrl_fork, 0, rhs_ctrl_not, 0, idle, 0
+0, rhs_ori, 0, rhs_ri, 2, accept, 1
+0, rhs_in_buf_ctrl, 0, rhs_ctrl_fork, 0, idle, 0
+0, rhs_init_fork, 2, rhs_ctrl_mux, 0, stall, 0
+0, rhs_ri_buff, 0, rhs_initop, 0, idle, 0
+0, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, stall, 1
+0, rhs_initop, 0, rhs_init_fork, 0, stall, 0
+0, rhs_init_fork, 0, rhs_ri, 0, stall, 0
+0, out_eq_dataRes, 0, EQ_dataRes, 1, accept, u
+0, rhs_in_buf_cond, 0, rhs_ori, 1, idle, 0
+0, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, idle, 1
+0, out_lf_ctrlRes, 1, out_buf_rhs_nds_ctrlRes, 0, transfer, 
+0, rhs_constant2, 0, rhs_ctrl_mux, 1, stall, 1
+0, rhs_in_buf_dataF, 0, rhs_data_mux, 1, accept, u
+0, lhs_ri, 0, lhs_ri_fork, 0, stall, 1
+0, lhs_out_bl_dataRes, 0, out_eq_dataRes, 0, idle, u
+0, rhs_ri_fork, 1, rhs_ctrlRes_passer, 0, stall, 1
+0, in_fork_dataT, 1, rhs_in_buf_dataT, 0, transfer, u
+0, out_lf_dataRes, 0, out_buf_lhs_nds_dataRes, 0, transfer, 
+0, rhs_source1, 0, rhs_constant1, 0, stall, 
+0, out_buf_rhs_nds_ctrlRes, 0, rhs_out_bl_ctrlRes, 1, idle, 
+0, lhs_ri_fork, 0, lhs_ri_buff, 0, transfer, 1
+0, lhs_ctrl_fork, 0, lhs_cond_passer, 1, idle, 0
+0, rhs_ctrl_fork, 1, rhs_ctrl_mux, 2, accept, 0
+0, lhs_initop, 0, lhs_init_fork, 0, stall, 0
+0, cond, 2, ctx_cond_fork, 0, transfer, 1
+0, in_fork_dataF, 0, lhs_in_buf_dataF, 0, transfer, u
+0, rhs_init_fork, 1, rhs_data_mux, 0, stall, 0
+0, in_fork_cond, 0, lhs_in_buf_cond, 0, transfer, 1
+0, ctx_cond_fork, 1, ctx_passer, 0, transfer, 1
+0, ctrl, 3, ctx_ctrl_fork, 0, transfer, 0
+0, ctx_ctrl_fork, 1, ctx_passer, 1, transfer, 0
+0, out_eq_ctrlRes, 0, EQ_ctrlRes, 0, accept, 1
+0, out_buf_lhs_nds_dataRes, 0, lhs_out_bl_dataRes, 1, idle, 
+0, rhs_ri_fork, 0, rhs_ri_buff, 0, transfer, 1
+0, lhs_in_buf_dataF, 0, lhs_data_mux, 1, accept, u
+0, in_fork_ctrl, 1, rhs_in_buf_ctrl, 0, transfer, 0
+0, rhs_ctrl_muxed_fork, 0, rhs_ctrlRes_passer, 1, stall, 1
+0, out_src_ctrlRes, 0, out_lf_ctrlRes, 0, transfer, 
+0, in_fork_ctrl, 0, lhs_in_buf_ctrl, 0, transfer, 0
+0, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, idle, 0
+0, rhs_source2, 0, rhs_constant2, 0, stall, 
+0, ctx_ctrl_fork, 0, in_fork_ctrl, 0, transfer, 0
+0, rhs_dataRes_passer, 0, rhs_out_bl_dataRes, 0, idle, u
+0, lhs_data_mux, 0, lhs_out_bl_dataRes, 0, idle, u
+0, lhs_in_buf_dataT, 0, lhs_dataT_passer, 0, idle, u
+0, lhs_init_fork, 1, lhs_data_mux, 0, stall, 0
+0, in_fork_dataF, 1, rhs_in_buf_dataF, 0, transfer, u
+0, rhs_ri, 0, rhs_ri_fork, 0, stall, 1
+0, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, idle, 0
+0, lhs_source1, 0, lhs_constant1, 0, stall, 
+0, rhs_constant1, 0, rhs_ri, 1, stall, 1
+0, rhs_in_buf_dataT, 0, rhs_data_mux, 2, accept, u
+0, rhs_ctrl_muxed_fork, 1, rhs_dataRes_passer, 1, stall, 1
+0, out_src_dataRes, 0, out_lf_dataRes, 0, transfer, 
+0, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, stall, 1
+0, ctx_passer, 0, ctx_sink, 0, accept, 1
+0, in_fork_dataT, 0, lhs_in_buf_dataT, 0, transfer, u
+0, ctx_cond_fork, 0, in_fork_cond, 0, transfer, 1
+0, in_fork_cond, 1, rhs_in_buf_cond, 0, transfer, 1
+0, out_lf_ctrlRes, 0, out_buf_lhs_nds_ctrlRes, 0, transfer, 
+0, dataF, 1, in_fork_dataF, 0, transfer, u
+0, rhs_ctrl_not, 0, rhs_ori, 0, idle, 1
+0, lhs_ri_buff, 0, lhs_initop, 0, idle, 0
+0, rhs_out_bl_dataRes, 0, out_eq_dataRes, 1, idle, u
+0, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, idle, 1
+0, rhs_data_mux, 0, rhs_dataRes_passer, 0, idle, u
+0, lhs_init_fork, 0, lhs_ri, 0, stall, 0
+0, lhs_in_buf_cond, 0, lhs_cond_passer, 0, idle, 0
+0, rhs_ctrl_mux, 0, rhs_ctrl_muxed_fork, 0, stall, 1
+0, lhs_cond_passer, 0, lhs_ri, 2, accept, 0
+0, lhs_dataT_passer, 0, lhs_data_mux, 2, accept, u
+0, dataT, 0, in_fork_dataT, 0, transfer, u
+0, lhs_constant1, 0, lhs_ri, 1, stall, 1
+0, out_buf_rhs_nds_dataRes, 0, rhs_out_bl_dataRes, 1, idle, 
+1, out_buf_lhs_nds_ctrlRes, 0, lhs_out_bl_ctrlRes, 1, transfer, 
+1, rhs_ctrl_fork, 0, rhs_ctrl_not, 0, stall, 0
+1, rhs_ori, 0, rhs_ri, 2, stall, 1
+1, rhs_in_buf_ctrl, 0, rhs_ctrl_fork, 0, stall, 0
+1, rhs_init_fork, 2, rhs_ctrl_mux, 0, transfer, 0
+1, rhs_ri_buff, 0, rhs_initop, 0, stall, 1
+1, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, transfer, 1
+1, rhs_initop, 0, rhs_init_fork, 0, transfer, 0
+1, rhs_init_fork, 0, rhs_ri, 0, transfer, 0
+1, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, transfer, 1
+1, rhs_in_buf_cond, 0, rhs_ori, 1, stall, 1
+1, out_eq_dataRes, 0, EQ_dataRes, 1, transfer, u
+1, rhs_constant2, 0, rhs_ctrl_mux, 1, transfer, 1
+1, rhs_in_buf_dataF, 0, rhs_data_mux, 1, transfer, u
+1, lhs_ri, 0, lhs_ri_fork, 0, transfer, 1
+1, lhs_out_bl_dataRes, 0, out_eq_dataRes, 0, transfer, u
+1, rhs_init_fork, 1, rhs_data_mux, 0, transfer, 0
+1, in_fork_dataT, 1, rhs_in_buf_dataT, 0, stall, u
+1, out_buf_rhs_nds_ctrlRes, 0, rhs_out_bl_ctrlRes, 1, transfer, 
+1, rhs_source1, 0, rhs_constant1, 0, transfer, 
+1, lhs_ri_fork, 0, lhs_ri_buff, 0, idle, 1
+1, lhs_ctrl_fork, 0, lhs_cond_passer, 1, transfer, 0
+1, rhs_ctrl_fork, 1, rhs_ctrl_mux, 2, stall, 0
+1, lhs_initop, 0, lhs_init_fork, 0, transfer, 0
+1, cond, 2, ctx_cond_fork, 0, stall, 0
+1, in_fork_dataF, 0, lhs_in_buf_dataF, 0, accept, u
+1, in_fork_cond, 0, lhs_in_buf_cond, 0, accept, 0
+1, ctx_cond_fork, 1, ctx_passer, 0, transfer, 0
+1, ctrl, 3, ctx_ctrl_fork, 0, stall, 1
+1, ctx_ctrl_fork, 1, ctx_passer, 1, transfer, 1
+1, out_eq_ctrlRes, 0, EQ_ctrlRes, 0, transfer, 1
+1, rhs_ri_fork, 1, rhs_ctrlRes_passer, 0, transfer, 1
+1, out_buf_lhs_nds_dataRes, 0, lhs_out_bl_dataRes, 1, transfer, 
+1, rhs_ri_fork, 0, rhs_ri_buff, 0, idle, 1
+1, lhs_in_buf_dataF, 0, lhs_data_mux, 1, transfer, u
+1, in_fork_ctrl, 1, rhs_in_buf_ctrl, 0, stall, 1
+1, rhs_ctrl_muxed_fork, 0, rhs_ctrlRes_passer, 1, transfer, 1
+1, in_fork_ctrl, 0, lhs_in_buf_ctrl, 0, accept, 1
+1, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, transfer, 0
+1, rhs_source2, 0, rhs_constant2, 0, transfer, 
+1, ctx_ctrl_fork, 0, in_fork_ctrl, 0, stall, 1
+1, rhs_dataRes_passer, 0, rhs_out_bl_dataRes, 0, transfer, u
+1, lhs_data_mux, 0, lhs_out_bl_dataRes, 0, transfer, u
+1, lhs_in_buf_dataT, 0, lhs_dataT_passer, 0, transfer, u
+1, lhs_init_fork, 1, lhs_data_mux, 0, transfer, 0
+1, in_fork_dataF, 1, rhs_in_buf_dataF, 0, accept, u
+1, rhs_ri, 0, rhs_ri_fork, 0, transfer, 1
+1, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, transfer, 0
+1, lhs_source1, 0, lhs_constant1, 0, transfer, 
+1, rhs_constant1, 0, rhs_ri, 1, transfer, 1
+1, rhs_in_buf_dataT, 0, rhs_data_mux, 2, stall, u
+1, rhs_ctrl_muxed_fork, 1, rhs_dataRes_passer, 1, transfer, 1
+1, ctx_passer, 0, ctx_sink, 0, transfer, 0
+1, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, transfer, 1
+1, in_fork_dataT, 0, lhs_in_buf_dataT, 0, accept, u
+1, ctx_cond_fork, 0, in_fork_cond, 0, stall, 0
+1, in_fork_cond, 1, rhs_in_buf_cond, 0, stall, 0
+1, dataF, 1, in_fork_dataF, 0, accept, u
+1, rhs_ctrl_not, 0, rhs_ori, 0, stall, 1
+1, lhs_ri_buff, 0, lhs_initop, 0, stall, 1
+1, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, transfer, 1
+1, rhs_out_bl_dataRes, 0, out_eq_dataRes, 1, transfer, u
+1, rhs_data_mux, 0, rhs_dataRes_passer, 0, transfer, u
+1, lhs_init_fork, 0, lhs_ri, 0, transfer, 0
+1, lhs_in_buf_cond, 0, lhs_cond_passer, 0, transfer, 1
+1, rhs_ctrl_mux, 0, rhs_ctrl_muxed_fork, 0, transfer, 1
+1, lhs_cond_passer, 0, lhs_ri, 2, accept, 1
+1, dataT, 0, in_fork_dataT, 0, stall, u
+1, lhs_constant1, 0, lhs_ri, 1, transfer, 1
+1, out_buf_rhs_nds_dataRes, 0, rhs_out_bl_dataRes, 1, transfer, 
+2, out_buf_lhs_nds_ctrlRes, 0, lhs_out_bl_ctrlRes, 1, stall, 
+2, out_lf_dataRes, 1, out_buf_rhs_nds_dataRes, 0, idle, 
+2, rhs_ctrl_fork, 0, rhs_ctrl_not, 0, transfer, 0
+2, rhs_ori, 0, rhs_ri, 2, transfer, 1
+2, rhs_in_buf_ctrl, 0, rhs_ctrl_fork, 0, transfer, 0
+2, rhs_init_fork, 2, rhs_ctrl_mux, 0, transfer, 1
+2, rhs_ri_buff, 0, rhs_initop, 0, transfer, 1
+2, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, idle, 1
+2, rhs_initop, 0, rhs_init_fork, 0, transfer, 1
+2, rhs_init_fork, 0, rhs_ri, 0, transfer, 1
+2, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, idle, 1
+2, out_eq_dataRes, 0, EQ_dataRes, 1, accept, u
+2, rhs_in_buf_cond, 0, rhs_ori, 1, transfer, 1
+2, out_lf_ctrlRes, 1, out_buf_rhs_nds_ctrlRes, 0, idle, 
+2, rhs_constant2, 0, rhs_ctrl_mux, 1, stall, 1
+2, rhs_in_buf_dataF, 0, rhs_data_mux, 1, accept, u
+2, lhs_ri, 0, lhs_ri_fork, 0, idle, 1
+2, lhs_out_bl_dataRes, 0, out_eq_dataRes, 0, idle, u
+2, rhs_init_fork, 1, rhs_data_mux, 0, transfer, 1
+2, in_fork_dataT, 1, rhs_in_buf_dataT, 0, transfer, u
+2, out_buf_rhs_nds_ctrlRes, 0, rhs_out_bl_ctrlRes, 1, stall, 
+2, rhs_source1, 0, rhs_constant1, 0, stall, 
+2, out_lf_dataRes, 0, out_buf_lhs_nds_dataRes, 0, idle, 
+2, lhs_ri_fork, 0, lhs_ri_buff, 0, accept, 1
+2, lhs_ctrl_fork, 0, lhs_cond_passer, 1, idle, 0
+2, rhs_ctrl_fork, 1, rhs_ctrl_mux, 2, transfer, 0
+2, lhs_initop, 0, lhs_init_fork, 0, stall, 1
+2, cond, 2, ctx_cond_fork, 0, transfer, 0
+2, in_fork_cond, 0, lhs_in_buf_cond, 0, transfer, 0
+2, ctx_cond_fork, 1, ctx_passer, 0, idle, 0
+2, ctrl, 3, ctx_ctrl_fork, 0, transfer, 1
+2, ctx_ctrl_fork, 1, ctx_passer, 1, idle, 1
+2, out_eq_ctrlRes, 0, EQ_ctrlRes, 0, accept, 1
+2, out_buf_lhs_nds_dataRes, 0, lhs_out_bl_dataRes, 1, stall, 
+2, rhs_ri_fork, 0, rhs_ri_buff, 0, transfer, 1
+2, lhs_in_buf_dataF, 0, lhs_data_mux, 1, accept, u
+2, in_fork_ctrl, 1, rhs_in_buf_ctrl, 0, transfer, 1
+2, rhs_ctrl_muxed_fork, 0, rhs_ctrlRes_passer, 1, transfer, 0
+2, out_src_ctrlRes, 0, out_lf_ctrlRes, 0, stall, 
+2, in_fork_ctrl, 0, lhs_in_buf_ctrl, 0, transfer, 1
+2, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, idle, 0
+2, rhs_source2, 0, rhs_constant2, 0, stall, 
+2, ctx_ctrl_fork, 0, in_fork_ctrl, 0, transfer, 1
+2, rhs_dataRes_passer, 0, rhs_out_bl_dataRes, 0, idle, u
+2, lhs_data_mux, 0, lhs_out_bl_dataRes, 0, idle, u
+2, lhs_in_buf_dataT, 0, lhs_dataT_passer, 0, idle, u
+2, lhs_init_fork, 1, lhs_data_mux, 0, stall, 1
+2, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, idle, 0
+2, lhs_source1, 0, lhs_constant1, 0, stall, 
+2, rhs_constant1, 0, rhs_ri, 1, stall, 1
+2, rhs_in_buf_dataT, 0, rhs_data_mux, 2, transfer, u
+2, rhs_ctrl_muxed_fork, 1, rhs_dataRes_passer, 1, transfer, 0
+2, out_src_dataRes, 0, out_lf_dataRes, 0, stall, 
+2, ctx_passer, 0, ctx_sink, 0, accept, 0
+2, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, idle, 1
+2, in_fork_dataT, 0, lhs_in_buf_dataT, 0, transfer, u
+2, ctx_cond_fork, 0, in_fork_cond, 0, transfer, 0
+2, in_fork_cond, 1, rhs_in_buf_cond, 0, transfer, 0
+2, out_lf_ctrlRes, 0, out_buf_lhs_nds_ctrlRes, 0, idle, 
+2, lhs_init_fork, 0, lhs_ri, 0, stall, 1
+2, rhs_ctrl_not, 0, rhs_ori, 0, transfer, 1
+2, lhs_ri_buff, 0, lhs_initop, 0, transfer, 1
+2, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, idle, 1
+2, rhs_out_bl_dataRes, 0, out_eq_dataRes, 1, idle, u
+2, rhs_ctrl_mux, 0, rhs_ctrl_muxed_fork, 0, transfer, 0
+2, lhs_in_buf_cond, 0, lhs_cond_passer, 0, idle, 1
+2, dataT, 0, in_fork_dataT, 0, transfer, u
+2, lhs_constant1, 0, lhs_ri, 1, stall, 1
+2, out_buf_rhs_nds_dataRes, 0, rhs_out_bl_dataRes, 1, stall, 
+3, out_buf_lhs_nds_ctrlRes, 0, lhs_out_bl_ctrlRes, 1, transfer, 
+3, out_lf_dataRes, 1, out_buf_rhs_nds_dataRes, 0, transfer, 
+3, rhs_ctrl_fork, 0, rhs_ctrl_not, 0, transfer, 1
+3, rhs_ori, 0, rhs_ri, 2, transfer, 0
+3, rhs_in_buf_ctrl, 0, rhs_ctrl_fork, 0, transfer, 1
+3, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, transfer, 0
+3, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, transfer, 0
+3, rhs_in_buf_cond, 0, rhs_ori, 1, transfer, 0
+3, out_eq_dataRes, 0, EQ_dataRes, 1, transfer, u
+3, out_lf_ctrlRes, 1, out_buf_rhs_nds_ctrlRes, 0, transfer, 
+3, lhs_ri, 0, lhs_ri_fork, 0, transfer, 0
+3, lhs_out_bl_dataRes, 0, out_eq_dataRes, 0, transfer, u
+3, rhs_ri_fork, 1, rhs_ctrlRes_passer, 0, transfer, 0
+3, out_buf_rhs_nds_ctrlRes, 0, rhs_out_bl_ctrlRes, 1, transfer, 
+3, out_lf_dataRes, 0, out_buf_lhs_nds_dataRes, 0, transfer, 
+3, lhs_ri_fork, 0, lhs_ri_buff, 0, transfer, 0
+3, lhs_ctrl_fork, 0, lhs_cond_passer, 1, transfer, 1
+3, rhs_ctrl_fork, 1, rhs_ctrl_mux, 2, transfer, 1
+3, lhs_initop, 0, lhs_init_fork, 0, transfer, 1
+3, ctx_cond_fork, 1, ctx_passer, 0, transfer, 0
+3, ctrl, 3, ctx_ctrl_fork, 0, transfer, 0
+3, ctx_ctrl_fork, 1, ctx_passer, 1, transfer, 0
+3, out_eq_ctrlRes, 0, EQ_ctrlRes, 0, transfer, 1
+3, out_buf_lhs_nds_dataRes, 0, lhs_out_bl_dataRes, 1, transfer, 
+3, rhs_ri_fork, 0, rhs_ri_buff, 0, transfer, 0
+3, in_fork_ctrl, 1, rhs_in_buf_ctrl, 0, transfer, 0
+3, rhs_ctrl_muxed_fork, 0, rhs_ctrlRes_passer, 1, transfer, 1
+3, out_src_ctrlRes, 0, out_lf_ctrlRes, 0, transfer, 
+3, in_fork_ctrl, 0, lhs_in_buf_ctrl, 0, transfer, 0
+3, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, transfer, 1
+3, ctx_ctrl_fork, 0, in_fork_ctrl, 0, transfer, 0
+3, rhs_dataRes_passer, 0, rhs_out_bl_dataRes, 0, transfer, u
+3, lhs_data_mux, 0, lhs_out_bl_dataRes, 0, transfer, u
+3, lhs_in_buf_dataT, 0, lhs_dataT_passer, 0, transfer, u
+3, lhs_init_fork, 1, lhs_data_mux, 0, transfer, 1
+3, rhs_ri, 0, rhs_ri_fork, 0, transfer, 0
+3, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, transfer, 1
+3, rhs_ctrl_muxed_fork, 1, rhs_dataRes_passer, 1, transfer, 1
+3, out_src_dataRes, 0, out_lf_dataRes, 0, transfer, 
+3, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, transfer, 0
+3, rhs_ctrl_not, 0, rhs_ori, 0, transfer, 0
+3, rhs_ctrl_mux, 0, rhs_ctrl_muxed_fork, 0, transfer, 1
+3, lhs_init_fork, 0, lhs_ri, 0, transfer, 1
+3, out_lf_ctrlRes, 0, out_buf_lhs_nds_ctrlRes, 0, transfer, 
+3, lhs_ri_buff, 0, lhs_initop, 0, idle, 1
+3, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, transfer, 0
+3, rhs_out_bl_dataRes, 0, out_eq_dataRes, 1, transfer, u
+3, lhs_in_buf_cond, 0, lhs_cond_passer, 0, transfer, 0
+3, lhs_cond_passer, 0, lhs_ri, 2, transfer, 0
+3, lhs_dataT_passer, 0, lhs_data_mux, 2, transfer, u
+3, out_buf_rhs_nds_dataRes, 0, rhs_out_bl_dataRes, 1, transfer, 
+4, out_lf_dataRes, 1, out_buf_rhs_nds_dataRes, 0, idle, 
+4, rhs_ctrl_fork, 0, rhs_ctrl_not, 0, stall, 0
+4, rhs_ori, 0, rhs_ri, 2, stall, 1
+4, rhs_in_buf_ctrl, 0, rhs_ctrl_fork, 0, stall, 0
+4, rhs_init_fork, 2, rhs_ctrl_mux, 0, stall, 0
+4, rhs_ri_buff, 0, rhs_initop, 0, transfer, 0
+4, rhs_initop, 0, rhs_init_fork, 0, stall, 0
+4, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, transfer, 1
+4, rhs_init_fork, 0, rhs_ri, 0, transfer, 0
+4, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, transfer, 1
+4, out_eq_dataRes, 0, EQ_dataRes, 1, accept, u
+4, rhs_in_buf_cond, 0, rhs_ori, 1, stall, 0
+4, lhs_ri, 0, lhs_ri_fork, 0, transfer, 1
+4, lhs_out_bl_dataRes, 0, out_eq_dataRes, 0, idle, u
+4, rhs_ri_fork, 1, rhs_ctrlRes_passer, 0, transfer, 1
+4, in_fork_dataT, 1, rhs_in_buf_dataT, 0, idle, u
+4, out_lf_dataRes, 0, out_buf_lhs_nds_dataRes, 0, idle, 
+4, rhs_source1, 0, rhs_constant1, 0, transfer, 
+4, lhs_ri_fork, 0, lhs_ri_buff, 0, transfer, 1
+4, rhs_init_fork, 1, rhs_data_mux, 0, stall, 0
+4, lhs_ctrl_fork, 0, lhs_cond_passer, 1, transfer, 0
+4, rhs_ctrl_fork, 1, rhs_ctrl_mux, 2, stall, 0
+4, lhs_initop, 0, lhs_init_fork, 0, stall, 0
+4, cond, 2, ctx_cond_fork, 0, idle, 0
+4, in_fork_cond, 0, lhs_in_buf_cond, 0, accept, 0
+4, ctx_cond_fork, 1, ctx_passer, 0, idle, 0
+4, ctrl, 3, ctx_ctrl_fork, 0, idle, 0
+4, ctx_ctrl_fork, 1, ctx_passer, 1, idle, 0
+4, out_buf_lhs_nds_dataRes, 0, lhs_out_bl_dataRes, 1, stall, 
+4, rhs_ri_fork, 0, rhs_ri_buff, 0, transfer, 1
+4, in_fork_ctrl, 1, rhs_in_buf_ctrl, 0, idle, 0
+4, in_fork_ctrl, 0, lhs_in_buf_ctrl, 0, accept, 0
+4, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, transfer, 0
+4, ctx_ctrl_fork, 0, in_fork_ctrl, 0, idle, 0
+4, rhs_dataRes_passer, 0, rhs_out_bl_dataRes, 0, idle, u
+4, lhs_data_mux, 0, lhs_out_bl_dataRes, 0, idle, u
+4, lhs_init_fork, 1, lhs_data_mux, 0, stall, 0
+4, rhs_ri, 0, rhs_ri_fork, 0, transfer, 1
+4, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, transfer, 0
+4, lhs_source1, 0, lhs_constant1, 0, transfer, 
+4, rhs_constant1, 0, rhs_ri, 1, transfer, 1
+4, rhs_in_buf_dataT, 0, rhs_data_mux, 2, stall, u
+4, rhs_ctrl_muxed_fork, 1, rhs_dataRes_passer, 1, stall, 1
+4, out_src_dataRes, 0, out_lf_dataRes, 0, stall, 
+4, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, transfer, 1
+4, rhs_ctrl_not, 0, rhs_ori, 0, stall, 1
+4, in_fork_dataT, 0, lhs_in_buf_dataT, 0, accept, u
+4, ctx_cond_fork, 0, in_fork_cond, 0, idle, 0
+4, in_fork_cond, 1, rhs_in_buf_cond, 0, idle, 0
+4, lhs_init_fork, 0, lhs_ri, 0, transfer, 0
+4, rhs_ctrl_mux, 0, rhs_ctrl_muxed_fork, 0, stall, 1
+4, lhs_ri_buff, 0, lhs_initop, 0, transfer, 0
+4, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, transfer, 1
+4, rhs_out_bl_dataRes, 0, out_eq_dataRes, 1, idle, u
+4, rhs_data_mux, 0, rhs_dataRes_passer, 0, idle, u
+4, lhs_cond_passer, 0, lhs_ri, 2, accept, 0
+4, lhs_dataT_passer, 0, lhs_data_mux, 2, accept, u
+4, dataT, 0, in_fork_dataT, 0, idle, u
+4, lhs_constant1, 0, lhs_ri, 1, transfer, 1
+4, out_buf_rhs_nds_dataRes, 0, rhs_out_bl_dataRes, 1, stall, 
+5, out_buf_lhs_nds_ctrlRes, 0, lhs_out_bl_ctrlRes, 1, stall, 
+5, rhs_ri_buff, 0, rhs_initop, 0, stall, 1
+5, rhs_ctrlRes_passer, 0, rhs_out_bl_ctrlRes, 0, idle, 1
+5, rhs_init_fork, 0, rhs_ri, 0, accept, 0
+5, lhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 0, idle, 1
+5, out_lf_ctrlRes, 1, out_buf_rhs_nds_ctrlRes, 0, idle, 
+5, lhs_ri, 0, lhs_ri_fork, 0, idle, 1
+5, rhs_ri_fork, 1, rhs_ctrlRes_passer, 0, idle, 1
+5, out_buf_rhs_nds_ctrlRes, 0, rhs_out_bl_ctrlRes, 1, stall, 
+5, rhs_source1, 0, rhs_constant1, 0, stall, 
+5, lhs_ri_fork, 0, lhs_ri_buff, 0, idle, 1
+5, lhs_ctrl_fork, 0, lhs_cond_passer, 1, idle, 0
+5, out_eq_ctrlRes, 0, EQ_ctrlRes, 0, accept, 1
+5, rhs_ri_fork, 0, rhs_ri_buff, 0, idle, 1
+5, rhs_ctrl_muxed_fork, 0, rhs_ctrlRes_passer, 1, idle, 1
+5, out_src_ctrlRes, 0, out_lf_ctrlRes, 0, stall, 
+5, lhs_in_buf_ctrl, 0, lhs_ctrl_fork, 0, idle, 0
+5, lhs_in_buf_dataT, 0, lhs_dataT_passer, 0, idle, u
+5, rhs_ri, 0, rhs_ri_fork, 0, idle, 1
+5, lhs_ctrl_fork, 1, lhs_dataT_passer, 1, idle, 0
+5, lhs_source1, 0, lhs_constant1, 0, stall, 
+5, rhs_constant1, 0, rhs_ri, 1, stall, 1
+5, lhs_ri_fork, 1, lhs_out_bl_ctrlRes, 0, idle, 1
+5, lhs_init_fork, 0, lhs_ri, 0, accept, 0
+5, out_lf_ctrlRes, 0, out_buf_lhs_nds_ctrlRes, 0, idle, 
+5, lhs_ri_buff, 0, lhs_initop, 0, stall, 1
+5, rhs_out_bl_ctrlRes, 0, out_eq_ctrlRes, 1, idle, 1
+5, lhs_in_buf_cond, 0, lhs_cond_passer, 0, idle, 0
+5, lhs_constant1, 0, lhs_ri, 1, stall, 1

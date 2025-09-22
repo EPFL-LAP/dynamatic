@@ -1,0 +1,273 @@
+*** This is NuSMV 2.7.0 (compiled on (unknown))
+*** Enabled addons are: compass
+*** For more information on NuSMV see <http://nusmv.fbk.eu>
+*** or email to <nusmv-users@list.fbk.eu>.
+*** Please report bugs to <Please report bugs to <nusmv-users@fbk.eu>>
+
+*** Copyright (c) 2010-2025, Fondazione Bruno Kessler
+
+*** This version of NuSMV is linked to the CUDD library version 2.4.1
+*** Copyright (c) 1995-2004, Regents of the University of Colorado
+
+######################################################################
+system diameter: 3
+reachable states: 16 (2^4) out of 32768 (2^15)
+  ------- State    1 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    2 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = FALSE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = FALSE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = TRUE
+  ------- State    3 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    4 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    5 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    6 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = FALSE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = FALSE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = TRUE
+  ------- State    7 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    8 ------
+  seq_generator_arg.outs = FALSE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State    9 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State   10 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = FALSE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State   11 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = FALSE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = FALSE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = TRUE
+  ------- State   12 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = FALSE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = FALSE
+  extension5_rhs.buff.data = FALSE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = TRUE
+  ------- State   13 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State   14 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = FALSE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State   15 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  ------- State   16 ------
+  seq_generator_arg.outs = TRUE
+  seq_generator_ctrl.outs = FALSE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.arg_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.or_buff.reg = TRUE
+  extension5_rhs.or_buff.full = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  extension5_rhs.ri_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  extension5_rhs.buff.inner_one_slot_break_dv.outs_valid_i = TRUE
+  extension5_rhs.buff.data = TRUE
+  extension5_rhs.initop.reg = FALSE
+  extension5_rhs.initop.full = FALSE
+  -------------------------
+######################################################################
+elapse: 0.08 seconds, total: 0.08 seconds

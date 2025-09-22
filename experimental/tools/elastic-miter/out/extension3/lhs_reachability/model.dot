@@ -1,0 +1,9 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "arg" ["style"="solid", "shape"="diamond", "label"="arg", "mlir_op"="handshake.func"]
+  "res" ["style"="solid", "shape"="diamond", "label"="res", "mlir_op"="handshake.func"]
+  "initop" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="init", "mlir_op"="handshake.init"]
+  "arg" -> "initop" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="arg", "to_idx"="0"]
+  "initop" -> "res" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="res", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+}

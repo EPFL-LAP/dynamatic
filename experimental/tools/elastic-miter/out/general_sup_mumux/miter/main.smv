@@ -1,0 +1,73 @@
+#include "elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.smv"
+
+
+MODULE bool_input(nReady0, max_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_dataT : bool_input(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.dataT_ready, 10);
+  VAR seq_generator_dataF : bool_input(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.dataF_ready, 10);
+  VAR seq_generator_cond : bool_input(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.cond_ready, 10);
+  VAR seq_generator_ctrl : bool_input(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.ctrl_ready, 10);
+
+  VAR elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs : elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs (seq_generator_dataT.outs, seq_generator_dataT.outs_valid, seq_generator_dataF.outs, seq_generator_dataF.outs_valid, seq_generator_cond.outs, seq_generator_cond.outs_valid, seq_generator_ctrl.outs, seq_generator_ctrl.outs_valid, sink_EQ_ctrlRes.ins_ready, sink_EQ_dataRes.ins_ready);
+
+  VAR sink_EQ_ctrlRes : sink_main(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_ctrlRes_valid);
+  VAR sink_EQ_dataRes : sink_main(elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_dataRes_valid);
+
+INVARSPEC (elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_ctrlRes_valid -> elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_ctrlRes);
+INVARSPEC (elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_dataRes_valid -> elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.EQ_dataRes);
+CTLSPEC AF (AG ((elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_in_buf_dataT.debug_counter.counter = elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_in_buf_dataT.debug_counter.counter) & (elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_in_buf_dataF.debug_counter.counter = elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_in_buf_dataF.debug_counter.counter) & (elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_in_buf_cond.debug_counter.counter = elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_in_buf_cond.debug_counter.counter) & (elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_in_buf_ctrl.debug_counter.counter = elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_in_buf_ctrl.debug_counter.counter) & (!elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_out_bl_ctrlRes.outs_valid) & (!elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_out_bl_ctrlRes.outs_valid) & (!elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.lhs_out_bl_dataRes.outs_valid) & (!elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.rhs_out_bl_dataRes.outs_valid)));
+
+INVAR  seq_generator_dataT.exact_tokens = seq_generator_cond.exact_tokens & seq_generator_dataT.exact_tokens = seq_generator_ctrl.exact_tokens ;
+
+VAR
+last_cond_valid : boolean;
+last_ctrl_valid : boolean;
+last_cond : boolean;
+last_ctrl : boolean;
+
+ASSIGN
+init(last_cond_valid) := FALSE;
+next(last_cond_valid) := seq_generator_cond.outs_valid | last_cond_valid;
+init(last_ctrl_valid) := FALSE;
+next(last_ctrl_valid) := seq_generator_ctrl.outs_valid | last_ctrl_valid;
+init(last_cond) := FALSE;
+next(last_cond) := seq_generator_cond.outs_valid ? seq_generator_cond.outs : last_cond;
+init(last_ctrl) := FALSE;
+next(last_ctrl) := seq_generator_ctrl.outs_valid ? seq_generator_ctrl.outs : last_ctrl;
+
+FAIRNESS last_cond_valid;
+FAIRNESS last_ctrl_valid;
+FAIRNESS !last_cond;
+FAIRNESS last_ctrl;
+
+VAR
+zero_ctrl_count : 0..31;
+
+ASSIGN
+init(zero_ctrl_count) := 0;
+next(zero_ctrl_count) := elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.ctx_passer.result_valid & !elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs.ctx_passer.result & zero_ctrl_count < 31 ? zero_ctrl_count + 1 : zero_ctrl_count;
+
+FAIRNESS (zero_ctrl_count = seq_generator_dataF.exact_tokens);

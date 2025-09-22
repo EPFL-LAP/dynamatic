@@ -1,0 +1,31 @@
+#include "handshake_fork_1.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_not_0.smv"
+
+
+MODULE extension1_rhs (arg, arg_valid, res_ready)
+
+
+-- input and output
+DEFINE res := cst_passer.result;
+DEFINE res_valid := cst_passer.result_valid;
+DEFINE cst_passer_result_ready := res_ready;
+DEFINE arg_fork_ins := arg;
+DEFINE arg_fork_ins_valid := arg_valid;
+DEFINE arg_ready := arg_fork.ins_ready;
+
+
+VAR initop : handshake_init_0(buff.outs, buff.outs_valid, cst_dup_fork.ins_ready);
+VAR cst_dup_fork : handshake_fork_0(initop.outs, initop.outs_valid, arg_mux.index_ready, cst_passer.data_ready, not.ins_ready);
+VAR not : handshake_not_0(cst_dup_fork.outs_2, cst_dup_fork.outs_2_valid, buff.ins_ready);
+VAR buff : handshake_buffer_0(not.outs, not.outs_valid, initop.ins_ready);
+VAR arg_fork : handshake_fork_1(arg_fork_ins, arg_fork_ins_valid, arg_not.ins_ready, arg_mux.ins_1_ready);
+VAR arg_not : handshake_not_0(arg_fork.outs_0, arg_fork.outs_0_valid, arg_mux.ins_0_ready);
+VAR arg_mux : handshake_mux_0(cst_dup_fork.outs_0, cst_dup_fork.outs_0_valid, arg_not.outs, arg_fork.outs_1, arg_not.outs_valid, arg_fork.outs_1_valid, cst_passer.ctrl_ready);
+VAR cst_passer : handshake_passer_0(cst_dup_fork.outs_1, cst_dup_fork.outs_1_valid, arg_mux.outs, arg_mux.outs_valid, cst_passer_result_ready);
+
+-- properties

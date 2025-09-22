@@ -1,0 +1,18 @@
+#include "handshake_init_0.smv"
+
+
+MODULE extension3_lhs_wrapper (arg, arg_valid, res_ready)
+
+
+-- input and output
+DEFINE res := extension3_lhs_wrapped.res;
+DEFINE res_valid := extension3_lhs_wrapped.res_valid;
+DEFINE extension3_lhs_wrapped_res_ready := res_ready;
+DEFINE extension3_lhs_wrapped_arg := arg;
+DEFINE extension3_lhs_wrapped_arg_valid := arg_valid;
+DEFINE arg_ready := extension3_lhs_wrapped.arg_ready;
+
+
+VAR extension3_lhs_wrapped : extension3_lhs(extension3_lhs_wrapped_arg, extension3_lhs_wrapped_arg_valid, extension3_lhs_wrapped_res_ready);
+
+-- properties

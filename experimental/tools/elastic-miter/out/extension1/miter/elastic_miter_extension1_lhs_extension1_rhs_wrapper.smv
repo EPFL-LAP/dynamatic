@@ -1,0 +1,31 @@
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_buffer_2.smv"
+#include "handshake_init_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_fork_1.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_not_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE elastic_miter_extension1_lhs_extension1_rhs_wrapper (arg, arg_valid, EQ_res_ready)
+
+
+-- input and output
+DEFINE EQ_res := elastic_miter_extension1_lhs_extension1_rhs_wrapped.EQ_res;
+DEFINE EQ_res_valid := elastic_miter_extension1_lhs_extension1_rhs_wrapped.EQ_res_valid;
+DEFINE elastic_miter_extension1_lhs_extension1_rhs_wrapped_EQ_res_ready := EQ_res_ready;
+DEFINE elastic_miter_extension1_lhs_extension1_rhs_wrapped_arg := arg;
+DEFINE elastic_miter_extension1_lhs_extension1_rhs_wrapped_arg_valid := arg_valid;
+DEFINE arg_ready := elastic_miter_extension1_lhs_extension1_rhs_wrapped.arg_ready;
+
+
+VAR elastic_miter_extension1_lhs_extension1_rhs_wrapped : elastic_miter_extension1_lhs_extension1_rhs(elastic_miter_extension1_lhs_extension1_rhs_wrapped_arg, elastic_miter_extension1_lhs_extension1_rhs_wrapped_arg_valid, elastic_miter_extension1_lhs_extension1_rhs_wrapped_EQ_res_ready);
+
+-- properties

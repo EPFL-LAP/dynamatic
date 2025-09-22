@@ -1,0 +1,73 @@
+*** This is NuSMV 2.7.0 (compiled on (unknown))
+*** Enabled addons are: compass
+*** For more information on NuSMV see <http://nusmv.fbk.eu>
+*** or email to <nusmv-users@list.fbk.eu>.
+*** Please report bugs to <Please report bugs to <nusmv-users@fbk.eu>>
+
+*** Copyright (c) 2010-2025, Fondazione Bruno Kessler
+
+*** This version of NuSMV is linked to the CUDD library version 2.4.1
+*** Copyright (c) 1995-2004, Regents of the University of Colorado
+
+######################################################################
+system diameter: 1
+reachable states: 8 (2^3) out of 64 (2^6)
+  ------- State    1 ------
+  seq_generator_cond.outs = TRUE
+  seq_generator_dataT.outs = TRUE
+  seq_generator_dataF.outs = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    2 ------
+  seq_generator_cond.outs = FALSE
+  seq_generator_dataT.outs = TRUE
+  seq_generator_dataF.outs = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    3 ------
+  seq_generator_cond.outs = TRUE
+  seq_generator_dataT.outs = FALSE
+  seq_generator_dataF.outs = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    4 ------
+  seq_generator_cond.outs = FALSE
+  seq_generator_dataT.outs = FALSE
+  seq_generator_dataF.outs = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    5 ------
+  seq_generator_cond.outs = TRUE
+  seq_generator_dataT.outs = TRUE
+  seq_generator_dataF.outs = FALSE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    6 ------
+  seq_generator_cond.outs = FALSE
+  seq_generator_dataT.outs = TRUE
+  seq_generator_dataF.outs = FALSE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    7 ------
+  seq_generator_cond.outs = TRUE
+  seq_generator_dataT.outs = FALSE
+  seq_generator_dataF.outs = FALSE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  ------- State    8 ------
+  seq_generator_cond.outs = FALSE
+  seq_generator_dataT.outs = FALSE
+  seq_generator_dataF.outs = FALSE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_0.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
+  sup_gamma_mux1_lhs.cond_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
+  -------------------------
+######################################################################
+elapse: 0.01 seconds, total: 0.01 seconds

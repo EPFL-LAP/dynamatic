@@ -1,0 +1,21 @@
+-- handshake_not_0 : not(['latency=0', 'bitwidth=1'])
+
+
+
+MODULE handshake_not_0(ins, ins_valid, outs_ready)
+  VAR inner_delay_buffer : handshake_not_0__delay_buffer(ins_valid, outs_ready);
+
+  -- output
+  DEFINE ins_ready := inner_delay_buffer.ins_ready;
+  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+
+  DEFINE outs := !ins;
+  
+  
+MODULE handshake_not_0__delay_buffer(ins_valid, outs_ready)
+
+  -- output
+  DEFINE ins_ready := outs_ready;
+  DEFINE outs_valid := ins_valid;
+
+

@@ -174,4 +174,4 @@ reachable states: 20 (2^4.32193) out of 128 (2^7)
   sup_mux_lhs.oldInit.full = FALSE
   -------------------------
 ######################################################################
-elapse: 0.00 seconds, total: 0.00 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

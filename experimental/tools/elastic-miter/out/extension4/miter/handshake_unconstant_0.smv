@@ -1,0 +1,10 @@
+-- handshake_unconstant_0 : unconstant(['bitwidth=1'])
+
+
+MODULE handshake_unconstant_0(data, data_valid, ctrl_ready)
+
+  -- output
+  DEFINE
+  data_ready := ctrl_ready;
+  ctrl_valid := data_valid;
+

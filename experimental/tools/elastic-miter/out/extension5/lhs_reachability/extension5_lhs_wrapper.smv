@@ -1,0 +1,21 @@
+#include "handshake_passer_0.smv"
+
+
+MODULE extension5_lhs_wrapper (arg, arg_valid, ctrl, ctrl_valid, res_ready)
+
+
+-- input and output
+DEFINE res := extension5_lhs_wrapped.res;
+DEFINE res_valid := extension5_lhs_wrapped.res_valid;
+DEFINE extension5_lhs_wrapped_res_ready := res_ready;
+DEFINE extension5_lhs_wrapped_arg := arg;
+DEFINE extension5_lhs_wrapped_arg_valid := arg_valid;
+DEFINE arg_ready := extension5_lhs_wrapped.arg_ready;
+DEFINE extension5_lhs_wrapped_ctrl := ctrl;
+DEFINE extension5_lhs_wrapped_ctrl_valid := ctrl_valid;
+DEFINE ctrl_ready := extension5_lhs_wrapped.ctrl_ready;
+
+
+VAR extension5_lhs_wrapped : extension5_lhs(extension5_lhs_wrapped_arg, extension5_lhs_wrapped_arg_valid, extension5_lhs_wrapped_ctrl, extension5_lhs_wrapped_ctrl_valid, extension5_lhs_wrapped_res_ready);
+
+-- properties

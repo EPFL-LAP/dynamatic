@@ -1,0 +1,39 @@
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_ori_0.smv"
+#include "handshake_fork_1.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_not_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_init_0.smv"
+
+
+MODULE general_sup_mumux_rhs_wrapper (dataT, dataT_valid, dataF, dataF_valid, cond, cond_valid, ctrl, ctrl_valid, ctrlRes_ready, dataRes_ready)
+
+
+-- input and output
+DEFINE ctrlRes := general_sup_mumux_rhs_wrapped.ctrlRes;
+DEFINE ctrlRes_valid := general_sup_mumux_rhs_wrapped.ctrlRes_valid;
+DEFINE general_sup_mumux_rhs_wrapped_ctrlRes_ready := ctrlRes_ready;
+DEFINE dataRes := general_sup_mumux_rhs_wrapped.dataRes;
+DEFINE dataRes_valid := general_sup_mumux_rhs_wrapped.dataRes_valid;
+DEFINE general_sup_mumux_rhs_wrapped_dataRes_ready := dataRes_ready;
+DEFINE general_sup_mumux_rhs_wrapped_dataT := dataT;
+DEFINE general_sup_mumux_rhs_wrapped_dataT_valid := dataT_valid;
+DEFINE dataT_ready := general_sup_mumux_rhs_wrapped.dataT_ready;
+DEFINE general_sup_mumux_rhs_wrapped_dataF := dataF;
+DEFINE general_sup_mumux_rhs_wrapped_dataF_valid := dataF_valid;
+DEFINE dataF_ready := general_sup_mumux_rhs_wrapped.dataF_ready;
+DEFINE general_sup_mumux_rhs_wrapped_cond := cond;
+DEFINE general_sup_mumux_rhs_wrapped_cond_valid := cond_valid;
+DEFINE cond_ready := general_sup_mumux_rhs_wrapped.cond_ready;
+DEFINE general_sup_mumux_rhs_wrapped_ctrl := ctrl;
+DEFINE general_sup_mumux_rhs_wrapped_ctrl_valid := ctrl_valid;
+DEFINE ctrl_ready := general_sup_mumux_rhs_wrapped.ctrl_ready;
+
+
+VAR general_sup_mumux_rhs_wrapped : general_sup_mumux_rhs(general_sup_mumux_rhs_wrapped_dataT, general_sup_mumux_rhs_wrapped_dataT_valid, general_sup_mumux_rhs_wrapped_dataF, general_sup_mumux_rhs_wrapped_dataF_valid, general_sup_mumux_rhs_wrapped_cond, general_sup_mumux_rhs_wrapped_cond_valid, general_sup_mumux_rhs_wrapped_ctrl, general_sup_mumux_rhs_wrapped_ctrl_valid, general_sup_mumux_rhs_wrapped_ctrlRes_ready, general_sup_mumux_rhs_wrapped_dataRes_ready);
+
+-- properties

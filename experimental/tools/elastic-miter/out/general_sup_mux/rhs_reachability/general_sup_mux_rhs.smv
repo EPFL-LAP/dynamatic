@@ -1,0 +1,35 @@
+#include "handshake_mux_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+
+
+MODULE general_sup_mux_rhs (sel, sel_valid, ctrl1, ctrl1_valid, ctrl2, ctrl2_valid, a_in, a_in_valid, b_in, b_in_valid, res_ready)
+
+
+-- input and output
+DEFINE res := data_passer.result;
+DEFINE res_valid := data_passer.result_valid;
+DEFINE data_passer_result_ready := res_ready;
+DEFINE fork_sel_ins := sel;
+DEFINE fork_sel_ins_valid := sel_valid;
+DEFINE sel_ready := fork_sel.ins_ready;
+DEFINE sel_mux_ins_0 := ctrl1;
+DEFINE sel_mux_ins_0_valid := ctrl1_valid;
+DEFINE ctrl1_ready := sel_mux.ins_0_ready;
+DEFINE sel_mux_ins_1 := ctrl2;
+DEFINE sel_mux_ins_1_valid := ctrl2_valid;
+DEFINE ctrl2_ready := sel_mux.ins_1_ready;
+DEFINE data_mux_ins_0 := a_in;
+DEFINE data_mux_ins_0_valid := a_in_valid;
+DEFINE a_in_ready := data_mux.ins_0_ready;
+DEFINE data_mux_ins_1 := b_in;
+DEFINE data_mux_ins_1_valid := b_in_valid;
+DEFINE b_in_ready := data_mux.ins_1_ready;
+
+
+VAR fork_sel : handshake_fork_0(fork_sel_ins, fork_sel_ins_valid, sel_mux.index_ready, data_mux.index_ready);
+VAR sel_mux : handshake_mux_0(fork_sel.outs_0, fork_sel.outs_0_valid, sel_mux_ins_0, sel_mux_ins_1, sel_mux_ins_0_valid, sel_mux_ins_1_valid, data_passer.ctrl_ready);
+VAR data_mux : handshake_mux_0(fork_sel.outs_1, fork_sel.outs_1_valid, data_mux_ins_0, data_mux_ins_1, data_mux_ins_0_valid, data_mux_ins_1_valid, data_passer.data_ready);
+VAR data_passer : handshake_passer_0(data_mux.outs, data_mux.outs_valid, sel_mux.outs, sel_mux.outs_valid, data_passer_result_ready);
+
+-- properties

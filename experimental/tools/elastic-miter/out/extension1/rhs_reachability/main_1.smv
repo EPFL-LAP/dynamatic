@@ -1,0 +1,33 @@
+#include "extension1_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_arg : bool_input_exact(extension1_rhs.arg_ready, 1);
+
+  VAR extension1_rhs : extension1_rhs (seq_generator_arg.outs, seq_generator_arg.outs_valid, sink_res.ins_ready);
+
+  VAR sink_res : sink_main(extension1_rhs.res_valid);
+

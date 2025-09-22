@@ -1,0 +1,19 @@
+#include "handshake_not_0.smv"
+
+
+MODULE extension1_lhs (arg, arg_valid, res_ready)
+
+
+-- input and output
+DEFINE res := not2.outs;
+DEFINE res_valid := not2.outs_valid;
+DEFINE not2_outs_ready := res_ready;
+DEFINE not1_ins := arg;
+DEFINE not1_ins_valid := arg_valid;
+DEFINE arg_ready := not1.ins_ready;
+
+
+VAR not1 : handshake_not_0(not1_ins, not1_ins_valid, not2.ins_ready);
+VAR not2 : handshake_not_0(not1.outs, not1.outs_valid, not2_outs_ready);
+
+-- properties

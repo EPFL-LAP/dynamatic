@@ -1,0 +1,26 @@
+#include "handshake_init_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_fork_1.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE extension2_rhs_wrapper (arg, arg_valid, res_ready)
+
+
+-- input and output
+DEFINE res := extension2_rhs_wrapped.res;
+DEFINE res_valid := extension2_rhs_wrapped.res_valid;
+DEFINE extension2_rhs_wrapped_res_ready := res_ready;
+DEFINE extension2_rhs_wrapped_arg := arg;
+DEFINE extension2_rhs_wrapped_arg_valid := arg_valid;
+DEFINE arg_ready := extension2_rhs_wrapped.arg_ready;
+
+
+VAR extension2_rhs_wrapped : extension2_rhs(extension2_rhs_wrapped_arg, extension2_rhs_wrapped_arg_valid, extension2_rhs_wrapped_res_ready);
+
+-- properties

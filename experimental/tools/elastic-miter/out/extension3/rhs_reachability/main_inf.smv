@@ -1,0 +1,25 @@
+#include "extension3_rhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_arg : bool_input_inf(extension3_rhs.arg_ready);
+
+  VAR extension3_rhs : extension3_rhs (seq_generator_arg.outs, seq_generator_arg.outs_valid, sink_res.ins_ready);
+
+  VAR sink_res : sink_main(extension3_rhs.res_valid);
+

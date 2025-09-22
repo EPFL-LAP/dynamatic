@@ -1,0 +1,46 @@
+#include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
+
+
+MODULE general_sup_mumux_lhs (dataT, dataT_valid, dataF, dataF_valid, cond, cond_valid, ctrl, ctrl_valid, ctrlRes_ready, dataRes_ready)
+
+
+-- input and output
+DEFINE ctrlRes := ri_fork.outs_1;
+DEFINE ctrlRes_valid := ri_fork.outs_1_valid;
+DEFINE ri_fork_outs_1_ready := ctrlRes_ready;
+DEFINE dataRes := data_mux.outs;
+DEFINE dataRes_valid := data_mux.outs_valid;
+DEFINE data_mux_outs_ready := dataRes_ready;
+DEFINE dataT_passer_data := dataT;
+DEFINE dataT_passer_data_valid := dataT_valid;
+DEFINE dataT_ready := dataT_passer.data_ready;
+DEFINE data_mux_ins_0 := dataF;
+DEFINE data_mux_ins_0_valid := dataF_valid;
+DEFINE dataF_ready := data_mux.ins_0_ready;
+DEFINE cond_passer_data := cond;
+DEFINE cond_passer_data_valid := cond_valid;
+DEFINE cond_ready := cond_passer.data_ready;
+DEFINE ctrl_fork_ins := ctrl;
+DEFINE ctrl_fork_ins_valid := ctrl_valid;
+DEFINE ctrl_ready := ctrl_fork.ins_ready;
+
+
+VAR ctrl_fork : handshake_fork_0(ctrl_fork_ins, ctrl_fork_ins_valid, cond_passer.ctrl_ready, dataT_passer.ctrl_ready);
+VAR cond_passer : handshake_passer_0(cond_passer_data, cond_passer_data_valid, ctrl_fork.outs_0, ctrl_fork.outs_0_valid, ri.ins_1_ready);
+VAR dataT_passer : handshake_passer_0(dataT_passer_data, dataT_passer_data_valid, ctrl_fork.outs_1, ctrl_fork.outs_1_valid, data_mux.ins_1_ready);
+VAR ri_fork : handshake_fork_0(ri.outs, ri.outs_valid, ri_buff.ins_ready, ri_fork_outs_1_ready);
+VAR ri_buff : handshake_buffer_0(ri_fork.outs_0, ri_fork.outs_0_valid, initop.ins_ready);
+VAR initop : handshake_init_0(ri_buff.outs, ri_buff.outs_valid, init_fork.ins_ready);
+VAR init_fork : handshake_fork_0(initop.outs, initop.outs_valid, ri.index_ready, data_mux.index_ready);
+VAR source1 : handshake_source_0(constant1.ctrl_ready);
+VAR constant1 : handshake_constant_0(source1.outs_valid, ri.ins_0_ready);
+VAR ri : handshake_mux_0(init_fork.outs_0, init_fork.outs_0_valid, constant1.outs, cond_passer.result, constant1.outs_valid, cond_passer.result_valid, ri_fork.ins_ready);
+VAR data_mux : handshake_mux_0(init_fork.outs_1, init_fork.outs_1_valid, data_mux_ins_0, dataT_passer.result, data_mux_ins_0_valid, dataT_passer.result_valid, data_mux_outs_ready);
+
+-- properties

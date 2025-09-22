@@ -1,0 +1,39 @@
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE general_sup_mux_lhs (sel, sel_valid, ctrl1, ctrl1_valid, ctrl2, ctrl2_valid, a_in, a_in_valid, b_in, b_in_valid, res_ready)
+
+
+-- input and output
+DEFINE res := data_mux.outs;
+DEFINE res_valid := data_mux.outs_valid;
+DEFINE data_mux_outs_ready := res_ready;
+DEFINE fork_sel_ins := sel;
+DEFINE fork_sel_ins_valid := sel_valid;
+DEFINE sel_ready := fork_sel.ins_ready;
+DEFINE fork_ctrl1_ins := ctrl1;
+DEFINE fork_ctrl1_ins_valid := ctrl1_valid;
+DEFINE ctrl1_ready := fork_ctrl1.ins_ready;
+DEFINE fork_ctrl2_ins := ctrl2;
+DEFINE fork_ctrl2_ins_valid := ctrl2_valid;
+DEFINE ctrl2_ready := fork_ctrl2.ins_ready;
+DEFINE a_passer_data := a_in;
+DEFINE a_passer_data_valid := a_in_valid;
+DEFINE a_in_ready := a_passer.data_ready;
+DEFINE b_passer_data := b_in;
+DEFINE b_passer_data_valid := b_in_valid;
+DEFINE b_in_ready := b_passer.data_ready;
+
+
+VAR fork_sel : handshake_fork_0(fork_sel_ins, fork_sel_ins_valid, sel_mux.index_ready, sel_passer.data_ready);
+VAR fork_ctrl1 : handshake_fork_0(fork_ctrl1_ins, fork_ctrl1_ins_valid, sel_mux.ins_0_ready, a_passer.ctrl_ready);
+VAR fork_ctrl2 : handshake_fork_0(fork_ctrl2_ins, fork_ctrl2_ins_valid, sel_mux.ins_1_ready, b_passer.ctrl_ready);
+VAR sel_mux : handshake_mux_0(fork_sel.outs_0, fork_sel.outs_0_valid, fork_ctrl1.outs_0, fork_ctrl2.outs_0, fork_ctrl1.outs_0_valid, fork_ctrl2.outs_0_valid, sel_passer.ctrl_ready);
+VAR sel_passer : handshake_passer_0(fork_sel.outs_1, fork_sel.outs_1_valid, sel_mux.outs, sel_mux.outs_valid, data_mux.index_ready);
+VAR a_passer : handshake_passer_0(a_passer_data, a_passer_data_valid, fork_ctrl1.outs_1, fork_ctrl1.outs_1_valid, data_mux.ins_0_ready);
+VAR b_passer : handshake_passer_0(b_passer_data, b_passer_data_valid, fork_ctrl2.outs_1, fork_ctrl2.outs_1_valid, data_mux.ins_1_ready);
+VAR data_mux : handshake_mux_0(sel_passer.result, sel_passer.result_valid, a_passer.result, b_passer.result, a_passer.result_valid, b_passer.result_valid, data_mux_outs_ready);
+
+-- properties

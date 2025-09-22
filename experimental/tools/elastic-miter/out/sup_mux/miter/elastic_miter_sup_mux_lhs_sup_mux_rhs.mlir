@@ -14,20 +14,21 @@ module {
     %11 = buffer %10#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_iterLiveIn"} : <>
     %12 = buffer %10#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_iterLiveIn"} : <>
     %13 = blocker %19[%11] {handshake.bb = 3 : ui32, handshake.name = "lhs_out_bl_iterLiveIn"} : <i1>, <>
-    %14 = blocker %27[%12] {handshake.bb = 3 : ui32, handshake.name = "rhs_out_bl_iterLiveIn"} : <i1>, <>
+    %14 = blocker %28[%12] {handshake.bb = 3 : ui32, handshake.name = "rhs_out_bl_iterLiveIn"} : <i1>, <>
     %15 = cmpi eq, %13, %14 {handshake.bb = 3 : ui32, handshake.name = "out_eq_iterLiveIn"} : <i1>
     %16:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "lhs_fork_continue"} : <i1>
     %17 = passer %4[%16#0] {handshake.bb = 1 : ui32, handshake.name = "lhs_passer"} : <i1>, <i1>
     %18 = init %16#1 {handshake.bb = 1 : ui32, handshake.name = "lhs_oldInit", initToken = 0 : ui1} : <i1>
     %19 = mux %18 [%1, %17] {handshake.bb = 1 : ui32, handshake.name = "lhs_data_mux"} : <i1>, [<i1>, <i1>] to <i1>
-    %20:2 = fork [2] %8 {handshake.bb = 2 : ui32, handshake.name = "rhs_fork_continue"} : <i1>
-    %21 = spec_v2_repeating_init %20#0 {handshake.bb = 2 : ui32, handshake.name = "rhs_ri1", initToken = 1 : ui1} : <i1>
-    %22 = buffer %21, bufferType = FIFO_BREAK_NONE, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "rhs_buffer1"} : <i1>
-    %23 = init %22 {handshake.bb = 2 : ui32, handshake.name = "rhs_newInit", initToken = 0 : ui1} : <i1>
-    %24 = mux %23 [%2, %5] {handshake.bb = 2 : ui32, handshake.name = "rhs_data_mux"} : <i1>, [<i1>, <i1>] to <i1>
-    %25 = spec_v2_repeating_init %20#1 {handshake.bb = 2 : ui32, handshake.name = "rhs_ri2", initToken = 1 : ui1} : <i1>
-    %26 = buffer %25, bufferType = FIFO_BREAK_NONE, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "rhs_buffer2"} : <i1>
-    %27 = passer %24[%26] {handshake.bb = 2 : ui32, handshake.name = "rhs_passer"} : <i1>, <i1>
+    %20 = source {handshake.bb = 2 : ui32, handshake.name = "rhs_source"} : <>
+    %21 = constant %20 {handshake.bb = 2 : ui32, handshake.name = "rhs_constant", value = true} : <>, <i1>
+    %22 = mux %26 [%21, %8] {handshake.bb = 2 : ui32, handshake.name = "rhs_ctrl_mux"} : <i1>, [<i1>, <i1>] to <i1>
+    %23:3 = fork [3] %22 {handshake.bb = 2 : ui32, handshake.name = "rhs_fork_continue"} : <i1>
+    %24 = init %23#0 {handshake.bb = 2 : ui32, handshake.name = "rhs_newInit", initToken = 0 : ui1} : <i1>
+    %25 = buffer %23#1, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 2 : ui32, handshake.name = "rhs_buff"} : <i1>
+    %26 = init %25 {handshake.bb = 2 : ui32, handshake.name = "rhs_newInit2", initToken = 0 : ui1} : <i1>
+    %27 = mux %24 [%2, %5] {handshake.bb = 2 : ui32, handshake.name = "rhs_data_mux"} : <i1>, [<i1>, <i1>] to <i1>
+    %28 = passer %27[%23#2] {handshake.bb = 2 : ui32, handshake.name = "rhs_passer"} : <i1>, <i1>
     end {handshake.bb = 3 : ui32, handshake.name = "end"} %15 : <i1>
   }
 }

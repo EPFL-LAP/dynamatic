@@ -1,0 +1,37 @@
+#include "general_sup_mumux_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_dataT : bool_input_exact(general_sup_mumux_rhs.dataT_ready, 1);
+  VAR seq_generator_dataF : bool_input_exact(general_sup_mumux_rhs.dataF_ready, 1);
+  VAR seq_generator_cond : bool_input_exact(general_sup_mumux_rhs.cond_ready, 1);
+  VAR seq_generator_ctrl : bool_input_exact(general_sup_mumux_rhs.ctrl_ready, 1);
+
+  VAR general_sup_mumux_rhs : general_sup_mumux_rhs (seq_generator_dataT.outs, seq_generator_dataT.outs_valid, seq_generator_dataF.outs, seq_generator_dataF.outs_valid, seq_generator_cond.outs, seq_generator_cond.outs_valid, seq_generator_ctrl.outs, seq_generator_ctrl.outs_valid, sink_ctrlRes.ins_ready, sink_dataRes.ins_ready);
+
+  VAR sink_ctrlRes : sink_main(general_sup_mumux_rhs.ctrlRes_valid);
+  VAR sink_dataRes : sink_main(general_sup_mumux_rhs.dataRes_valid);
+
