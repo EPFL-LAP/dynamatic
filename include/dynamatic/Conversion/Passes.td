@@ -101,7 +101,7 @@ def LLVMToControlFlow : Pass<"convert-llvm-to-cf"> {
   let dependentDialects = [
   "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
   "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
-  "mlir::index::IndexDialect"];
+  "mlir::index::IndexDialect", "mlir::math::MathDialect"];
 
 }
 
