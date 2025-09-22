@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -37,6 +38,14 @@ void setHandshakeName(OpBuilder &builder, Operation *op,
                       const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
   op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, nameAttr);
+}
+
+std::string getHandshakeName(Operation *op) {
+  StringAttr nameAttr =
+      op->getAttrOfType<StringAttr>(dynamatic::NameAnalysis::ATTR_NAME);
+  if (nameAttr)
+    return nameAttr.getValue().str();
+  return "";
 }
 
 void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
@@ -624,6 +633,51 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   return std::make_pair(miterModule, config);
 }
 
+void addCustomCtx(llvm::StringRef rewriteName, ModuleOp modOp) {
+  FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
+  OpBuilder builder(funcOp.getContext());
+  if (rewriteName == "elastic_miter_extension4_lhs_extension4_rhs") {
+    llvm::errs() << "Adding custom ctx for extension4_lhs_extension4_rhs\n";
+    for (auto passer : funcOp.getOps<PasserOp>()) {
+      if (getHandshakeName(passer) == "lhs_passer") {
+        builder.setInsertionPoint(passer);
+        auto fork =
+            builder.create<ForkOp>(builder.getUnknownLoc(), passer.getResult(),
+                                   /*numOutputs=*/2);
+        setHandshakeAttributes(builder, fork, 1, "ctx_passer_fork");
+        passer.getResult().replaceAllUsesExcept(fork->getResult(0), fork);
+        auto unconstant = builder.create<UnconstantOp>(builder.getUnknownLoc(),
+                                                       fork->getResult(1));
+        setHandshakeAttributes(builder, unconstant, 3, "ctx_unconstant");
+
+        NDSourceOp nds = *funcOp.getOps<NDSourceOp>().begin();
+        nds.getResult().replaceAllUsesWith(unconstant.getResult());
+        nds->erase();
+      }
+    }
+  } else if (rewriteName ==
+             "elastic_miter_general_sup_mumux_lhs_general_sup_mumux_rhs") {
+    llvm::errs() << "Adding custom ctx for "
+                    "general_sup_mumux_lhs_general_sup_mumux_rhs\n";
+    builder.setInsertionPointToStart(&funcOp.getBlocks().front());
+    Value condArg = funcOp.getArgument(2);
+    Value ctrlArg = funcOp.getArgument(3);
+    auto condFork = builder.create<ForkOp>(builder.getUnknownLoc(), condArg, 2);
+    setHandshakeAttributes(builder, condFork, 0, "ctx_cond_fork");
+    condArg.replaceAllUsesExcept(condFork->getResult(0), condFork);
+    auto ctrlFork = builder.create<ForkOp>(builder.getUnknownLoc(), ctrlArg, 2);
+    setHandshakeAttributes(builder, ctrlFork, 0, "ctx_ctrl_fork");
+    ctrlArg.replaceAllUsesExcept(ctrlFork->getResult(0), ctrlFork);
+    auto passer = builder.create<PasserOp>(builder.getUnknownLoc(),
+                                           condFork->getResult(1),
+                                           ctrlFork->getResult(1));
+    setHandshakeAttributes(builder, passer, 0, "ctx_passer");
+    auto sink =
+        builder.create<SinkOp>(builder.getUnknownLoc(), passer.getResult());
+    setHandshakeAttributes(builder, sink, 0, "ctx_sink");
+  }
+}
+
 FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
@@ -652,6 +706,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
     return failure();
   }
   auto [miterModule, config] = ret.value();
+  addCustomCtx(config.funcName, miterModule);
 
   std::string mlirFilename = config.funcName + ".mlir";
 
