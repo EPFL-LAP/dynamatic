@@ -77,6 +77,10 @@ def main():
     parser.add_argument(
         "--transformed-code", type=str, help="If we perform code-level transformation, specify the file name (e.g., <kernel_name>_transformed.c)", default=None)
     parser.add_argument(
+        "--transformed-cf", type=str, help="cf filename", default=None)
+    parser.add_argument(
+        "--gate-binarized", type=str, help="gate binarized", default=None)
+    parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
     parser.add_argument(
         "--disable-initial-motion", action='store_true',
@@ -90,6 +94,10 @@ def main():
         "--use-prof-cache", action='store_true', help="Use profiling cache")
     parser.add_argument(
         "--decide-n", action='store_true', help="Decide n. No generation")
+    parser.add_argument(
+        "--synth-control", action='store_true')
+    parser.add_argument(
+        "--exit-eager-eval", action='store_true')
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -127,105 +135,113 @@ def main():
     Path(comp_out_dir).mkdir()
 
     # Custom compilation flow
-    clang_file = os.path.join(comp_out_dir, f"clang.ll")
-    with open(clang_file, "w") as f:
-        result = subprocess.run([
-            LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", transformed_code,
-            "-I", DYNAMATIC_ROOT / "include",
-            "-Xclang", "-ffp-contract=off",
-            "-o", clang_file
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Compiled C file to LLVM IR")
-        else:
-            color_print("Failed to compile C file to LLVM IR", TermColors.FAIL)
-            return False
+    if args.transformed_cf:
+        cf_file = os.path.join(comp_out_dir, "cf.mlir")
+        shutil.copy(os.path.join(c_file_dir, args.transformed_cf), cf_file)
+    else:
+        clang_file = os.path.join(comp_out_dir, f"clang.ll")
+        with open(clang_file, "w") as f:
+            result = subprocess.run([
+                LLVM_BINS / "clang", "-O0", "-S", "-emit-llvm", transformed_code,
+                "-I", DYNAMATIC_ROOT / "include",
+                "-Xclang", "-ffp-contract=off",
+                "-o", clang_file
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Compiled C file to LLVM IR")
+            else:
+                color_print("Failed to compile C file to LLVM IR",
+                            TermColors.FAIL)
+                return False
 
-    clang_optnone_removed = os.path.join(
-        comp_out_dir, "clang_optnone_removed.ll")
-    with open(clang_optnone_removed, "w") as f:
-        result = subprocess.run([
-            "sed", "s/optnone//g", clang_file
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Removed optnone flgas")
-        else:
-            color_print(
-                "Failed to remove optnone flags", TermColors.FAIL)
-            return False
+        clang_optnone_removed = os.path.join(
+            comp_out_dir, "clang_optnone_removed.ll")
+        with open(clang_optnone_removed, "w") as f:
+            result = subprocess.run([
+                "sed", "s/optnone//g", clang_file
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Removed optnone flgas")
+            else:
+                color_print(
+                    "Failed to remove optnone flags", TermColors.FAIL)
+                return False
 
-    clang_optimized = os.path.join(comp_out_dir, "clang_optimized.ll")
-    with open(clang_optimized, "w") as f:
-        result = subprocess.run([
-            LLVM_BINS / "opt", "-S",
-            "-passes=mem2reg,instcombine,loop-rotate,consthoist,simplifycfg",
-            "-strip-debug",
-            clang_optnone_removed
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Optimized LLVM IR")
-        else:
-            color_print("Failed to optimize LLVM IR", TermColors.FAIL)
-            return False
+        clang_optimized = os.path.join(comp_out_dir, "clang_optimized.ll")
+        with open(clang_optimized, "w") as f:
+            result = subprocess.run([
+                LLVM_BINS / "opt", "-S",
+                "-passes=mem2reg,instcombine,loop-rotate,consthoist,simplifycfg",
+                "-strip-debug",
+                clang_optnone_removed
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Optimized LLVM IR")
+            else:
+                color_print("Failed to optimize LLVM IR", TermColors.FAIL)
+                return False
 
-    mlir_file = os.path.join(comp_out_dir, "translated.mlir")
-    with open(mlir_file, "w") as f:
-        result = subprocess.run([
-            LLVM_BINS / "mlir-translate",
-            "--import-llvm",
-            clang_optimized
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Translated LLVM IR to MLIR")
-        else:
-            color_print("Failed to translate LLVM IR to MLIR", TermColors.FAIL)
-            return False
+        mlir_file = os.path.join(comp_out_dir, "translated.mlir")
+        with open(mlir_file, "w") as f:
+            result = subprocess.run([
+                LLVM_BINS / "mlir-translate",
+                "--import-llvm",
+                clang_optimized
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Translated LLVM IR to MLIR")
+            else:
+                color_print("Failed to translate LLVM IR to MLIR",
+                            TermColors.FAIL)
+                return False
 
-    remove_polygeist_attr = os.path.join(
-        comp_out_dir, "removed_polygeist_attr.mlir")
-    with open(remove_polygeist_attr, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, mlir_file,
-            "--remove-polygeist-attributes",
-            f"--drop-unlisted-functions=function-names={kernel_name}",
-            "--allow-unregistered-dialect"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Removed polygeist attrs")
-        else:
-            color_print("Failed to remove polygeist attrs", TermColors.FAIL)
-            return False
+        remove_polygeist_attr = os.path.join(
+            comp_out_dir, "removed_polygeist_attr.mlir")
+        with open(remove_polygeist_attr, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, mlir_file,
+                "--remove-polygeist-attributes",
+                f"--drop-unlisted-functions=function-names={kernel_name}",
+                "--allow-unregistered-dialect"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Removed polygeist attrs")
+            else:
+                color_print("Failed to remove polygeist attrs",
+                            TermColors.FAIL)
+                return False
 
-    cf_file = os.path.join(comp_out_dir, "cf.mlir")
-    with open(cf_file, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, remove_polygeist_attr,
-            f"--convert-llvm-to-cf=source={transformed_code} dynamatic-path={DYNAMATIC_ROOT}",
-            "--remove-polygeist-attributes"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Removed polygeist attrs")
-        else:
-            color_print("Failed to remove polygeist attrs", TermColors.FAIL)
-            return False
+        cf_file = os.path.join(comp_out_dir, "cf.mlir")
+        with open(cf_file, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, remove_polygeist_attr,
+                f"--convert-llvm-to-cf=source={transformed_code} dynamatic-path={DYNAMATIC_ROOT}",
+                "--remove-polygeist-attributes"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Removed polygeist attrs")
+            else:
+                color_print("Failed to remove polygeist attrs",
+                            TermColors.FAIL)
+                return False
 
     cf_file_2 = os.path.join(comp_out_dir, "cf_2.mlir")
     with open(cf_file_2, "w") as f:
@@ -295,6 +311,10 @@ def main():
         else:
             return fail(id, "Failed to apply gate binarization")
 
+    if args.gate_binarized:
+        shutil.copy(os.path.join(
+            c_file_dir, args.gate_binarized), gate_binarized)
+
     # cf level -> handshake level
     handshake = os.path.join(comp_out_dir, "handshake.mlir")
     with open(handshake, "w") as f:
@@ -330,7 +350,7 @@ def main():
             return fail(id, "Failed to apply transformations to handshake")
 
     # Profiling
-    run_prof = False
+    run_prof = True
     frequencies = os.path.join(c_file_dir, "frequencies-cache.csv")
     if args.use_prof_cache:
         if os.path.isfile(frequencies):
@@ -477,6 +497,9 @@ def main():
                     if line.startswith("CFDFC") or line.startswith("Throughput of CFDFC"):
                         print(line)
 
+            shutil.move(os.path.join(comp_out_dir, "buffer-placement"),
+                        os.path.join(comp_out_dir, "buffer-placement-n-0"))
+
             # Buffer placement 2
             timing_model = DYNAMATIC_ROOT / "data" / "components.json"
             result = subprocess.run([
@@ -512,7 +535,7 @@ def main():
             print(f"n={n}, variable={variable}")
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""}",
+                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""} {"exit-eager-eval" if args.exit_eager_eval else ""}",
                 "--handshake-materialize",
                 "--handshake-canonicalize"
             ],
@@ -601,7 +624,8 @@ def main():
             f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
-            stderr=sys.stdout
+            stderr=sys.stdout,
+            cwd=comp_out_dir
         )
         if result.returncode == 0:
             print("Placed simple buffers")
