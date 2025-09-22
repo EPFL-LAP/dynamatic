@@ -453,6 +453,40 @@ def NDConstantOp : Handshake_Op<"ndconstant", [
   }];
 }
 
+def UnconstantOp : Handshake_Op<"unconstant", [
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "";
+  let description = [{
+  }];
+
+  let arguments = (ins ChannelType:$data);
+  let results = (outs ControlType:$ctrl);
+
+  let builders = [OpBuilder<
+    (ins "Value":$data), [{
+      $_state.addOperands(data);
+      auto controlType = ::dynamatic::handshake::ControlType::get($_builder.getContext());
+      $_state.addTypes({controlType});
+  }]>];
+
+  let assemblyFormat = [{
+    $data attr-dict `:` type($data) `,` type($ctrl)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "data";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "ctrl";
+    }
+  }];
+}
+
 def BlockerOp : Handshake_Op<"blocker", [
   HasClock, AllTypesMatch<["ins", "outs"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>

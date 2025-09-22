@@ -7,6 +7,7 @@ import generators.handshake.br as br
 import generators.handshake.buffer as buffer
 import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
+import generators.handshake.unconstant as unconstant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.join as join
 import generators.handshake.fork as fork
@@ -73,6 +74,8 @@ def generate_code(name, mod_type, parameters):
             return cond_br.generate_cond_br(name, parameters)
         case "constant":
             return constant.generate_constant(name, parameters)
+        case "unconstant":
+            return unconstant.generate_unconstant(name, parameters)
         case "control_merge":
             return control_merge.generate_control_merge(name, parameters)
         case "join":

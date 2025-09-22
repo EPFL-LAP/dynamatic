@@ -34,6 +34,11 @@
     "hdl": "smv"
   },
   {
+    "name": "handshake.unconstant",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t unconstant -p bitwidth=$BITWIDTH",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.control_merge",
    "parameters": [
     {"name": "SIZE", "type": "unsigned"}
