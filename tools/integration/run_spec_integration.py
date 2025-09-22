@@ -427,7 +427,8 @@ def main():
             f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
-            stderr=sys.stdout
+            stderr=sys.stdout,
+            cwd=comp_out_dir
         )
         if result.returncode == 0:
             print("Placed simple buffers")
