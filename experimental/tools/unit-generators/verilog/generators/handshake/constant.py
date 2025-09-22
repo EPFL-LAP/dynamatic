@@ -2,7 +2,7 @@ def generate_constant(name, params):
     bitwidth = params["bitwidth"]
     value = params["value"]
 
-    verilog_constant = f"""
+    constant = f"""
 // Module of constant
 
 `timescale 1ns / 1ps
@@ -27,4 +27,4 @@ endmodule
 """
 
 
-    return verilog_constant
+    return constant

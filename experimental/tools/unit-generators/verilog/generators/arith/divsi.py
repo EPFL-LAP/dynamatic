@@ -4,15 +4,15 @@ def generate_divsi(name, params):
 
     datatype = params["datatype"]
     
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
-    verilog_join = generate_join(join_name, {"size": 2})
+    join = generate_join(join_name, {"size": 2})
 
     delay_buffer_name = name + "_delay_buffer"
-    verilog_delay_buffer = generate_delay_buffer(delay_buffer_name, params)
+    delay_buffer = generate_delay_buffer(delay_buffer_name, params)
 
-    verilog_divsi_body = f"""
+    divsi_body = f"""
 // Module of divsi
 module {name} #(
   parameter DATA_TYPE = {datatype}
@@ -259,4 +259,4 @@ endmodule
 
 
 
-    return verilog_header + verilog_join + verilog_delay_buffer + verilog_divsi_body
+    return header + join + delay_buffer + divsi_body

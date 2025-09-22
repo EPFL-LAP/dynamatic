@@ -3,12 +3,12 @@ def generate_one_slot_break_dvr(name, params):
 
     data_type = params["data_type"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     dataless_one_slot_break_dvr_name = "one_slot_break_dvr_dataless"
-    verilog_dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, params)
+    dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, params)
 
-    verilog_one_slot_break_dvr_body = f"""
+    one_slot_break_dvr_body = f"""
 // Module of one_slot_break_dvr
 module {name} #(
   parameter DATA_TYPE = {data_type}
@@ -52,4 +52,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_header + verilog_dataless_one_slot_break_dvr + verilog_one_slot_break_dvr_body
+    return header + dataless_one_slot_break_dvr + one_slot_break_dvr_body

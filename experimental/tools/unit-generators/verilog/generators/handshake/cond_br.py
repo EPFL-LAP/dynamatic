@@ -6,10 +6,10 @@ def generate_cond_br(name, params):
         return generate_dataless_cond_br(name, params)
 
     dataless_cond_br_name = name + "_dataless_cond_br"
-    verilog_header = "`timescale 1ns/1ps\n"
-    verilog_dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, params)
+    header = "`timescale 1ns/1ps\n"
+    dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, params)
 
-    verilog_body_cond_br = f"""
+    body_cond_br = f"""
 // Module of cond_br
 module {name} #(
 	parameter DATA_TYPE = {bitwidth}
@@ -54,4 +54,4 @@ endmodule
 
 """
 
-    return verilog_header + verilog_dataless_cond_br + verilog_body_cond_br
+    return header + dataless_cond_br + body_cond_br

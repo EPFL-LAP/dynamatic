@@ -3,11 +3,11 @@ def generate_tfifo(name, params):
     num_slots = params["num_slots"]
     data_type = params["data_type"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
     elastic_fifo_inner_name = "elastic_fifo_inner"
-    verilog_elastic_fifo_inner = generate_elastic_fifo_inner(elastic_fifo_inner_name, {"num_slots": num_slots, "data_type": data_type})
+    elastic_fifo_inner = generate_elastic_fifo_inner(elastic_fifo_inner_name, {"num_slots": num_slots, "data_type": data_type})
 
-    verilog_tfifo_body = f"""
+    tfifo_body = f"""
 // Module of tfifo
 module {name} #(
   parameter NUM_SLOTS = {num_slots},
@@ -55,4 +55,4 @@ endmodule
 
 """
 
-    return verilog_header + verilog_elastic_fifo_inner + verilog_tfifo_body
+    return header + elastic_fifo_inner + tfifo_body

@@ -3,10 +3,10 @@ def generate_select(name, params):
 
     antitoken_module_name = name + "_antitokens"
 
-    verilog_header = f"""
+    header = f"""
 `timescale 1ns/1ps
 """
-    verilog_antitokens = f"""
+    antitokens = f"""
 // Module of {antitoken_module_name} - Antitoken generation logic for handshake select
 module {antitoken_module_name} (
   // inputs
@@ -48,7 +48,7 @@ module {antitoken_module_name} (
 endmodule
 """
 
-    verilog_selector = f"""
+    selector = f"""
 // Module of select
 module {name} #(
   parameter DATA_TYPE = {bitwidth}
@@ -102,4 +102,4 @@ module {name} #(
 
 endmodule
 """
-    return verilog_header + verilog_antitokens + verilog_selector
+    return header + antitokens + selector

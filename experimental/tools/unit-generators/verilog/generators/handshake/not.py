@@ -1,7 +1,7 @@
 def generate_not(name, params):
     bitwidth = params["bitwidth"]
 
-    verilognot = f"""
+    return f"""
 `timescale 1ns/1ps
 // Module of not
 module {name} #(
@@ -24,5 +24,3 @@ module {name} #(
 
 endmodule
 """
-
-    return verilognot

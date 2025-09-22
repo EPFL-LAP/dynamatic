@@ -3,12 +3,12 @@ from generators.handshake.dataless.dataless_oehb import generate_dataless_oehb
 def generate_oehb(name, params):
   data_type = params["data_type"]
 
-  verilog_header = "`timescale 1ns/1ps\n"
+  header = "`timescale 1ns/1ps\n"
 
   oehb_dataless_name = name + "_dataless"
-  verilog_oehb_dataless = generate_dataless_oehb(oehb_dataless_name, params)
+  oehb_dataless = generate_dataless_oehb(oehb_dataless_name, params)
 
-  verilog_oehb_body = f"""
+  oehb_body = f"""
 // Module of oehb
 module {name} #(
   parameter DATA_TYPE = {data_type}
@@ -53,4 +53,4 @@ endmodule
 
 """
 
-  return verilog_header + verilog_oehb_dataless + verilog_oehb_body
+  return header + oehb_dataless + oehb_body

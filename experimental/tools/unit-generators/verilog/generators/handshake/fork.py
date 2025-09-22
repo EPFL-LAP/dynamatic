@@ -9,12 +9,12 @@ def generate_fork(name, params):
     
     datalessFork_name = name + "_datalessFork"
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
 
 
-    verilog_datalessFork = generate_datalessFork(datalessFork_name, params)
-    verilog_Fork = f"""
+    datalessFork = generate_datalessFork(datalessFork_name, params)
+    Fork = f"""
 // Module of Fork
 module {name} #(
 	parameter SIZE = {size},
@@ -50,4 +50,4 @@ endmodule
 """
 
 
-    return verilog_header + verilog_datalessFork + verilog_Fork
+    return header + datalessFork + Fork

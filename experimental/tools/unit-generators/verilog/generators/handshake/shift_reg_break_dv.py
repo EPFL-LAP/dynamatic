@@ -4,12 +4,12 @@ def generate_shift_reg_break_dv(name, params):
     num_slots = params["num_slots"]
     data_type = params["data_type"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     dataless_shift_reg_break_dr_name = "shift_reg_break_dv_dataless"
-    verilog_dataless_shift_reg_break_dvr = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dr_name, params)
+    dataless_shift_reg_break_dvr = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dr_name, params)
 
-    verilog_shift_reg_break_dvr_body = f"""
+    shift_reg_break_dvr_body = f"""
 // Module of shift_reg_break_dv
 
 module {name} #(
@@ -64,4 +64,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_header + verilog_dataless_shift_reg_break_dvr + verilog_shift_reg_break_dvr_body
+    return header + dataless_shift_reg_break_dvr + shift_reg_break_dvr_body

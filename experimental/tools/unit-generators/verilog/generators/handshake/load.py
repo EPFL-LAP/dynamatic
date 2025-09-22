@@ -4,15 +4,15 @@ def generate_load(name, params):
     data_type = params["data_type"]
     addr_type = params["addr_type"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     tehb_address_name = name + "_tehb_address"
-    verilog_tehb_address = generate_tehb(tehb_address_name, params)
+    tehb_address = generate_tehb(tehb_address_name, params)
 
     tehb_data_name = name + "_tehb_data"
-    verilog_tehb_data = generate_tehb(tehb_data_name, params)
+    tehb_data = generate_tehb(tehb_data_name, params)
 
-    verilog_load_body = f"""
+    load_body = f"""
 
 // Module of Load
 module {name} #(
@@ -67,4 +67,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_header + verilog_tehb_address + verilog_tehb_data +verilog_load_body
+    return header + tehb_address + tehb_data +load_body

@@ -1,6 +1,6 @@
 
 def generate_delay_buffer(name, params):
-    verilog_delay_buffer = f"""
+    delay_buffer = f"""
 `timescale 1ns/1ps
 
 // Module of delay_buffer
@@ -38,4 +38,4 @@ module {name} #(
   assign valid_out = regs[SIZE - 1];
 endmodule
 """
-    return verilog_delay_buffer
+    return delay_buffer

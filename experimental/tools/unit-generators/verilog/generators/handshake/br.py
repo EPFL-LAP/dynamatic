@@ -3,10 +3,10 @@ def generate_br(name, params):
     bitwidth = params["bitwidth"]
 
     dataless_br_name = name + "_dataless_br"
-    verilog_header = "`timescale 1ns/1ps\n"
-    verilog_dataless_br = generate_dataless_br(dataless_br_name, params)
+    header = "`timescale 1ns/1ps\n"
+    dataless_br = generate_dataless_br(dataless_br_name, params)
     
-    verilog_body_br = f"""
+    body_br = f"""
 // Module of br
 module {name} #(
 	parameter DATA_TYPE = {bitwidth}
@@ -37,4 +37,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_header + verilog_dataless_br + verilog_body_br
+    return header + dataless_br + body_br

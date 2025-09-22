@@ -1,5 +1,5 @@
 def generate_dataless_oehb(name, params):
-  verilog_oehb = f"""
+  oehb = f"""
   `timescale 1ns/1ps
 
 // Module of dataless_oehb
@@ -30,4 +30,4 @@ module {name} (
 endmodule
 """
 
-  return verilog_oehb
+  return oehb

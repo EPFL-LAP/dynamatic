@@ -10,14 +10,14 @@ def generate_mem_controller(name, params):
     addr_type = params["addr_type"]
 
     
-    verilog_header = "`timescale 1ns / 1ps\n"
+    header = "`timescale 1ns / 1ps\n"
 
-    verilog_mc_support = generate_mc_support("TODO", {})
+    mc_support = generate_mc_support("TODO", {})
   
     mem_controller_loadless_name = name + "_mem_controller_loadless"
-    verilog_mem_controller_loadless = generate_mem_controller_loadless(mem_controller_loadless_name, params)
+    mem_controller_loadless = generate_mem_controller_loadless(mem_controller_loadless_name, params)
 
-    verilog_mem_controller_body = f"""
+    mem_controller_body = f"""
 
 // Module of mem_controller
 module {name} #(
@@ -122,4 +122,4 @@ module {name} #(
 
 endmodule
 """
-    return verilog_header + verilog_mem_controller_loadless + verilog_mc_support + verilog_mem_controller_body
+    return header + mem_controller_loadless + mc_support + mem_controller_body

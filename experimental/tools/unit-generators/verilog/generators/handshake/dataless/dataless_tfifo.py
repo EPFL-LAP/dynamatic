@@ -2,12 +2,12 @@ from generators.support.dataless.dataless_elastic_fifo_inner import generate_dat
 def generate_dataless_tfifo(name, params):
     num_slots = params["num_slots"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     elastic_fifo_inner_dataless_name = "elastic_fifo_inner_dataless"
-    verilog_elastic_fifo_inner_dataless = generate_dataless_elastic_fifo_inner(elastic_fifo_inner_dataless_name, {"num_slots": num_slots})
+    elastic_fifo_inner_dataless = generate_dataless_elastic_fifo_inner(elastic_fifo_inner_dataless_name, {"num_slots": num_slots})
 
-    verilog_dataless_tfifo_body = f"""
+    dataless_tfifo_body = f"""
 
 // Module of dataless_tfifo
 module {name} #(
@@ -45,4 +45,4 @@ endmodule
 
 """
 
-    return verilog_header + verilog_elastic_fifo_inner_dataless + verilog_dataless_tfifo_body
+    return header + elastic_fifo_inner_dataless + dataless_tfifo_body

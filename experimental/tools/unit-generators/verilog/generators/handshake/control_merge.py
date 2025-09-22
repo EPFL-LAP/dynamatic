@@ -8,12 +8,12 @@ def generate_control_merge(name, params):
     if(data_type == 0):
       return generate_dataless_control_merge(name, params)
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     dataless_control_merge_name = name + "_control_merge_dataless"
-    verilog_dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, params)
+    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, params)
 
-    verilog_control_merge_body = f"""
+    control_merge_body = f"""
 // Module of control_merge
   module {name} #(
     parameter SIZE = {size},
@@ -59,4 +59,4 @@ def generate_control_merge(name, params):
 
 """
 
-    return verilog_header + verilog_dataless_control_merge + verilog_control_merge_body
+    return header + dataless_control_merge + control_merge_body

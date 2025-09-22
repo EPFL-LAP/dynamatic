@@ -1,9 +1,9 @@
 def generate_dataless_lazy_fork(name, params):
     size = params["size"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
-    verilog_datalessFork = f"""
+    datalessFork = f"""
 // Module of dataless_lazy_fork
 `timescale 1ns/1ps
 module {name} #(
@@ -48,4 +48,4 @@ endmodule
 """
 
 
-    return verilog_header + verilog_datalessFork
+    return header + datalessFork

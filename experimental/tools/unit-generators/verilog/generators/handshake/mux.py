@@ -7,7 +7,7 @@ def generate_mux(name, params):
     if(data_type == 0):
         return generate_dataless_mux(name, params)
 
-    verilog_dataless_mux = f"""
+    dataless_mux = f"""
 `timescale 1ns/1ps
 // Module of smux
 module {name} #(
@@ -70,4 +70,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_dataless_mux
+    return dataless_mux

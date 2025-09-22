@@ -8,11 +8,11 @@ def generate_mem_controller_storeless(name, params):
     addr_type = params["addr_type"]
 
     
-    verilog_header = "`timescale 1ns / 1ps\n"
+    header = "`timescale 1ns / 1ps\n"
 
-    verilog_mc_support = generate_mc_support("TODO", {})
+    mc_support = generate_mc_support("TODO", {})
 
-    verilog_mem_controller_storeless_body = f"""
+    mem_controller_storeless_body = f"""
 
 // Module of mem_controller_storeless
 module {name} #(
@@ -94,4 +94,4 @@ module {name} #(
 
 endmodule
 """
-    return verilog_header + verilog_mc_support + verilog_mem_controller_storeless_body
+    return header + mc_support + mem_controller_storeless_body

@@ -1,9 +1,9 @@
 def generate_datalessFork(name, params):
     size = params["size"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
     eager_fork_register_block_name = name + "_eager_fork_register_block"
-    verilog_eager_fork_register_block = f"""
+    eager_fork_register_block = f"""
 // Module of eager_fork_register_block
 module {eager_fork_register_block_name} (
 	input clk,
@@ -35,7 +35,7 @@ module {eager_fork_register_block_name} (
 endmodule
 """
 
-    verilog_datalessFork = f"""
+    datalessFork = f"""
 // Module of datalessFork
 
 module {name} #(
@@ -83,4 +83,4 @@ endmodule
 """
 
 
-    return verilog_header + verilog_eager_fork_register_block + verilog_datalessFork
+    return header + eager_fork_register_block + datalessFork

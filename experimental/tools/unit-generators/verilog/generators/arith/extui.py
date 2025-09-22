@@ -2,7 +2,7 @@ def generate_extui(name, params):
     output_type = params["output_type"]
     input_type = params["input_type"]
 
-    verilog_extui = f"""
+    extui = f"""
 `timescale 1ns/1ps
 // Module of extui
 module {name} #(
@@ -28,4 +28,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_extui
+    return extui

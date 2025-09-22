@@ -3,7 +3,7 @@ def generate_dataless_mux(name, params):
     size = params["size"]
     select_type = params["select_type"]
 
-    verilog_dataless_mux = f"""
+    dataless_mux = f"""
 `timescale 1ns/1ps
 // Module of dataless_mux
 module {name} #(
@@ -47,4 +47,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_dataless_mux
+    return dataless_mux

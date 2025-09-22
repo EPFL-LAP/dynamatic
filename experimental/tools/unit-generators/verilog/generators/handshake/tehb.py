@@ -5,12 +5,12 @@ def generate_tehb(name, params):
     if(data_type == 0):
         return generate_dataless_tehb(name, params)
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     tehb_name = name + "_dataless_tehb"
-    verilog_dataless_tehb = generate_dataless_tehb(tehb_name, params)
+    dataless_tehb = generate_dataless_tehb(tehb_name, params)
 
-    verilog_tehb_body = f"""
+    tehb_body = f"""
 // Module of tehb
 module {name} #(
 	parameter DATA_TYPE = {data_type}
@@ -58,4 +58,4 @@ module {name} #(
 endmodule
 
 """
-    return verilog_header + verilog_dataless_tehb + verilog_tehb_body
+    return header + dataless_tehb + tehb_body

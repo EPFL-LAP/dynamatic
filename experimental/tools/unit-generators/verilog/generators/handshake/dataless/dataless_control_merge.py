@@ -7,18 +7,18 @@ def generate_dataless_control_merge(name, params):
     size = params["size"]
     index_type = params["index_type"]
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     dataless_merge_name = name + "_dataless_merge"
-    verilog_dataless_merge = generate_dataless_merge(dataless_merge_name, params)
+    dataless_merge = generate_dataless_merge(dataless_merge_name, params)
 
     tehb_name = name + "_tehb"
-    verilog_tehb = generate_tehb(tehb_name, {"data_type": index_type})
+    tehb = generate_tehb(tehb_name, {"data_type": index_type})
 
     fork_dataless_name = name + "_fork_dataless"
-    verilog_fork_dataless = generate_datalessFork(fork_dataless_name, params)
+    fork_dataless = generate_datalessFork(fork_dataless_name, params)
 
-    verilog_dataless_controll_merge_body=f"""
+    dataless_controll_merge_body=f"""
 // Module of dataless_control_merge
 module {name} #(
   parameter SIZE = {size},
@@ -98,4 +98,4 @@ module {name} #(
 endmodule
 """
 
-    return verilog_header + verilog_dataless_merge + verilog_tehb + verilog_fork_dataless + verilog_dataless_controll_merge_body
+    return header + dataless_merge + tehb + fork_dataless + dataless_controll_merge_body

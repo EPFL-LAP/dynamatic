@@ -3,13 +3,13 @@ from generators.handshake.join import generate_join
 def generate_dataless_cond_br(name, params):
 
 
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
 
-    verilog_join_instance = generate_join(join_name, {"size":2})
+    join_instance = generate_join(join_name, {"size":2})
 
-    verilog_body_dataless_cond_br = f"""
+    body_dataless_cond_br = f"""
 // Module of dataless_cond_br
 
 // In the original implementation
@@ -61,4 +61,4 @@ module {name} (
 endmodule
 """
 
-    return verilog_header + verilog_join_instance + verilog_body_dataless_cond_br
+    return header + join_instance + body_dataless_cond_br

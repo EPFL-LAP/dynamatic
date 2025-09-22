@@ -4,15 +4,15 @@ def generate_remsi(name, params):
 
     datatype = params["datatype"]
     
-    verilog_header = "`timescale 1ns/1ps\n"
+    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
-    verilog_join = generate_join(join_name, {"size": 2})
+    join = generate_join(join_name, {"size": 2})
 
     delay_buffer_name = name + "_delay_buffer"
-    verilog_delay_buffer = generate_delay_buffer(delay_buffer_name, params)
+    delay_buffer = generate_delay_buffer(delay_buffer_name, params)
 
-    verilog_remsi_body = f"""
+    remsi_body = f"""
 // Module of remsi
 module {name} #(
   parameter DATA_TYPE = {datatype}
@@ -259,4 +259,4 @@ endmodule
 
 
 
-    return verilog_header + verilog_join + verilog_delay_buffer + verilog_remsi_body
+    return header + join + delay_buffer + remsi_body
