@@ -442,6 +442,8 @@ LogicalResult StdExecuter::execute(mlir::arith::CmpFOp op, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   APFloat in0 = APFloat(any_cast<APFloat>(in[0]).convertToDouble());
   APFloat in1 = APFloat(any_cast<APFloat>(in[1]).convertToDouble());
+  // APFloat in0 = any_cast<APFloat>(in[0]);
+  // APFloat in1 = any_cast<APFloat>(in[1]);
   APInt out0(1, mlir::arith::applyCmpPredicate(op.getPredicate(), in0, in1));
   out[0] = out0;
   return success();
@@ -455,6 +457,8 @@ LogicalResult StdExecuter::execute(mlir::arith::SubIOp, std::vector<Any> &in,
 
 LogicalResult StdExecuter::execute(mlir::arith::SubFOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
+  // any_cast<APFloat>(in[0]).dump();
+  // any_cast<APFloat>(in[1]).print(llvm::errs());
   out[0] = any_cast<APFloat>(in[0]) - any_cast<APFloat>(in[1]);
   return success();
 }
