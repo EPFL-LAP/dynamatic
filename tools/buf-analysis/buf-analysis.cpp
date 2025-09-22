@@ -1,5 +1,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -58,13 +59,17 @@ int main(int argc, char **argv) {
 
   int numBufferOps = 0;
   int numSlots = 0;
+  int numResources = 0;
   for (auto bufferOp : funcOp.getOps<handshake::BufferOp>()) {
     numBufferOps++;
     numSlots += bufferOp.getNumSlots();
+    numResources += bufferOp.getNumSlots() *
+                    getHandshakeTypeBitWidth(bufferOp.getResult().getType());
   }
 
   std::cout << "Number of Buffer Ops: " << numBufferOps << "\n";
   std::cout << "Number of Slots: " << numSlots << "\n";
+  std::cout << "Number of Resources: " << numResources << "\n";
 
   return 0;
 }
