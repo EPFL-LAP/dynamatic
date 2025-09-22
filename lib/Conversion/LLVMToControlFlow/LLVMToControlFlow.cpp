@@ -1,4 +1,5 @@
 #include "dynamatic/Conversion/LLVMToControlFlow.h"
+#include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -591,6 +592,19 @@ struct LLVMToArithUnaryOpPattern : public OpConversionPattern<LLVMUnaryOp> {
   }
 };
 
+struct LLVMFAbsToMathAbsFPattern : public OpConversionPattern<LLVM::FAbsOp> {
+  using OpConversionPattern<LLVM::FAbsOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LLVM::FAbsOp op,
+                  typename OpConversionPattern<LLVM::FAbsOp>::OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<math::AbsFOp>(op, op.getRes().getType(),
+                                              adapter.getIn());
+    return success();
+  }
+};
+
 struct LLVMICmpToArithICmp : OpConversionPattern<LLVM::ICmpOp> {
   using OpConversionPattern<LLVM::ICmpOp>::OpConversionPattern;
 
@@ -770,6 +784,7 @@ using SIToFPOpConversion  = LLVMToArithUnaryOpPattern<LLVM::SIToFPOp, arith::SIT
 using UIToFPOpConversion  = LLVMToArithUnaryOpPattern<LLVM::UIToFPOp, arith::UIToFPOp>;
 using FPToSIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::FPToSIOp, arith::FPToSIOp>;
 using FPToUIOpConversion  = LLVMToArithUnaryOpPattern<LLVM::FPToUIOp, arith::FPToUIOp>;
+
 // clang-format on
 
 namespace {
@@ -818,7 +833,7 @@ void LLVMToControlFlowPass::runOnOperation() {
   target.addLegalOp<mlir::ModuleOp>();
   target.addLegalDialect<arith::ArithDialect, func::FuncDialect,
                          memref::MemRefDialect, index::IndexDialect,
-                         cf::ControlFlowDialect>();
+                         cf::ControlFlowDialect, math::MathDialect>();
 
   RewritePatternSet convertLLVMToFuncDialectPatterns(ctx);
 
@@ -862,6 +877,7 @@ void LLVMToControlFlowPass::runOnOperation() {
       UIToFPOpConversion,
       FPToSIOpConversion,
       FPToUIOpConversion,
+      LLVMFAbsToMathAbsFPattern,
 
       // Binary operations:
       AddIOpConversion,
