@@ -87,6 +87,12 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numOneSlotR = 1;
     }
 
+    if (srcOp && isa<handshake::SpecV2RepeatingInitOp>(srcOp)) {
+      if (srcOp->hasAttr("specv2_top_ri")) {
+        result.numOneSlotR = 1;
+      }
+    }
+
     placement[channel] = result;
   }
 

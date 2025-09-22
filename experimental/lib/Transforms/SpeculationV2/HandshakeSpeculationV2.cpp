@@ -598,6 +598,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
                          getLogicBB(getUniqueUser(passerOp.getResult()))) ==
               loopBBs.end()) {
             // The passer is exiting the loop. Do not move it.
+            // (Exit passer motion is performed later if enabled)
             continue;
           }
 
@@ -662,6 +663,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
     Value riResult = frontiers.begin()->getCtrl();
     auto newRI = moveRepeatingInitsUp(riResult.getDefiningOp()->getOperand(0));
+    if (i == 0) {
+      newRI->setAttr("specv2_top_ri", builder.getBoolAttr(true));
+    }
 
     repeatingInits[i] = newRI;
 
@@ -723,18 +727,40 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     for (auto andOp : andChain) {
       moveAndIUp(andOp);
     }
+  }
 
-    // Simplify the exit passers.
-    SmallVector<PasserOp> ctrlDefiningPassers;
-    for (auto passer : funcOp.getOps<PasserOp>()) {
-      if (isPasserSimplifiable(passer)) {
-        ctrlDefiningPassers.push_back(passer);
+  // Simplify the exit passers.
+  SmallVector<PasserOp> ctrlDefiningPassers;
+  for (auto passer : funcOp.getOps<PasserOp>()) {
+    if (isPasserSimplifiable(passer)) {
+      ctrlDefiningPassers.push_back(passer);
+    }
+  }
+  frontiers.clear();
+  for (auto passer : ctrlDefiningPassers) {
+    AndIOp andIOp = simplifyPasser(passer);
+    if (exitEagerEval) {
+      PasserOp exitPasser = cast<PasserOp>(getUniqueUser(andIOp.getResult()));
+      frontiers.insert(exitPasser);
+    }
+    moveAndIUp(andIOp);
+  }
+  if (exitEagerEval) {
+    llvm::errs() << "Performing exit eager evaluation\n";
+    bool frontiersUpdated;
+    do {
+      frontiersUpdated = false;
+      for (auto passerOp : frontiers) {
+        if (isEligibleForPasserMotionOverPM(passerOp)) {
+          performPasserMotionPastPM(passerOp, frontiers);
+          frontiersUpdated = true;
+          // If frontiers are updated, the iterator is outdated.
+          // Break and restart the loop.
+          break;
+        }
       }
-    }
-    for (auto passer : ctrlDefiningPassers) {
-      AndIOp andIOp = simplifyPasser(passer);
-      moveAndIUp(andIOp);
-    }
+      // If no frontiers were updated, we can stop.
+    } while (frontiersUpdated);
   }
 
   DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
