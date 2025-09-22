@@ -133,6 +133,29 @@ def SpecV2CutCondDep : DynamaticPass<"handshake-spec-v2-cut-cond-dep"> {
   ];
 }
 
+def PreSpecV2Gamma : DynamaticPass<"handshake-pre-spec-v2-gamma"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
+    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
+  ];
+}
+
+def SpecV2Gamma : DynamaticPass<"handshake-spec-v2-gamma"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
+    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
+    Option<"oneSided", "one-sided", "bool", "false", "one-sided spec">,
+    Option<"bbMapping", "bb-mapping", "std::string", "",
+           "Path to the output bb mapping file.">,
+  ];
+}
+
 def CfGateBinarization : DynamaticPass<"cf-gate-binarization"> {
   let summary = "Limit entries to at most 2";
   let description = [{
