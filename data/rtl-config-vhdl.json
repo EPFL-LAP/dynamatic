@@ -843,7 +843,8 @@
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/vhdl/support/join.vhd"
+    "generic": "$DYNAMATIC/data/vhdl/support/join.vhd",
+    "dependencies": ["logic"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",
