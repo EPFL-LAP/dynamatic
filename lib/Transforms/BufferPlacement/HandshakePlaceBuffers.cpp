@@ -430,7 +430,18 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
   // Get CFDFCs from the function unless the functions has no archs (i.e.,
   // it has a single block) in which case there are no CFDFCs
   std::vector<CFDFC> cfdfcs;
-  if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
+
+  // If the CFG does not have any backedges (e.g., it only has one or many
+  // if-else blocks), then we don't need to size buffers for performance
+  // reasons.
+  bool cfgHasBackedge =
+      std::any_of(info.archs.begin(), info.archs.end(),
+                  [](ArchBB arch) { return arch.isBackEdge; });
+
+  assert((not info.archs.empty() or not cfgHasBackedge) &&
+         "Sanity check failed: no BB edges -> CFG does not have any backedges");
+
+  if (cfgHasBackedge && failed(getCFDFCs(info, logger, cfdfcs)))
     return failure();
 
   // All extracted CFDFCs must be optimized
