@@ -1,5 +1,6 @@
 #include "PostSpecV2.h"
 #include "JSONImporter.h"
+#include "SpecV2Lib.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -82,29 +83,6 @@ static InitOp moveInitsUp(Value fedValue, unsigned headBB) {
   materializeValue(newInit.getResult());
 
   return newInit;
-}
-
-bool tryErasePasser(PasserOp passer) {
-  Value result = passer.getResult();
-
-  if (result.use_empty()) {
-    passer->erase();
-    return true;
-  }
-  assert(result.hasOneUse());
-  Operation *user = getUniqueUser(result);
-  if (isa<SinkOp>(user)) {
-    user->erase();
-    passer->erase();
-    return true;
-  }
-  if (auto childPasser = dyn_cast<PasserOp>(user)) {
-    if (tryErasePasser(childPasser)) {
-      passer->erase();
-      return true;
-    }
-  }
-  return false;
 }
 
 void PostSpecV2Pass::runDynamaticPass() {

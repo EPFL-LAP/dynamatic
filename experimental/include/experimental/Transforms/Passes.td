@@ -151,6 +151,8 @@ def SpecV2Gamma : DynamaticPass<"handshake-spec-v2-gamma"> {
     Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
     Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
     Option<"oneSided", "one-sided", "bool", "false", "one-sided spec">,
+    Option<"prioritizedSide", "prioritized-side", "unsigned", "", "">,
+    Option<"stepsUntil", "steps-until", "unsigned", "", "">,
     Option<"bbMapping", "bb-mapping", "std::string", "",
            "Path to the output bb mapping file.">,
   ];

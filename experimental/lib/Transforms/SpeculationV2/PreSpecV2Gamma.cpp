@@ -1,5 +1,6 @@
 #include "PreSpecV2Gamma.h"
 #include "JSONImporter.h"
+#include "SpecV2Lib.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -47,78 +48,6 @@ struct PreSpecV2GammaPass
   using PreSpecV2GammaBase<PreSpecV2GammaPass>::PreSpecV2GammaBase;
   void runDynamaticPass() override;
 };
-
-static LogicalResult replaceBranchesWithPassers(FuncOp &funcOp, unsigned bb) {
-  // Find one ConditionBranchOp in the BB
-  ConditionalBranchOp referenceBranch = nullptr;
-  for (auto candidate : funcOp.getOps<ConditionalBranchOp>()) {
-    auto condBB = getLogicBB(candidate);
-    if (condBB && *condBB == bb) {
-      referenceBranch = candidate;
-      break;
-    }
-  }
-
-  if (!referenceBranch)
-    return funcOp.emitError("Could not find ConditionalBranchOp in the BB: " +
-                            std::to_string(bb));
-
-  Value condition = referenceBranch.getConditionOperand();
-
-  // Build a NotOp to invert the condition
-  OpBuilder builder(funcOp->getContext());
-  builder.setInsertionPoint(referenceBranch);
-  NotOp invertCondition = builder.create<NotOp>(condition.getLoc(), condition);
-  setBB(invertCondition, bb);
-
-  // Replace all branches in the BB with passers
-  for (auto branch :
-       llvm::make_early_inc_range(funcOp.getOps<ConditionalBranchOp>())) {
-    if (getLogicBB(branch) != bb)
-      continue;
-
-    // The condition must be the same (ignoring the difference of the fork
-    // outputs)
-    if (!equalsIndirectly(condition, branch.getConditionOperand()))
-      return branch.emitError("Branch condition does not match the condition "
-                              "of the reference branch");
-
-    Value data = branch.getDataOperand();
-
-    builder.setInsertionPoint(branch);
-
-    if (auto sink = dyn_cast<SinkOp>(getUniqueUser(branch.getTrueResult()))) {
-      sink->erase();
-    } else {
-      // Build a passer for the trueResult
-      PasserOp trueResultPasser =
-          builder.create<PasserOp>(branch.getLoc(), data, condition);
-      setBB(trueResultPasser, bb);
-      branch.getTrueResult().replaceAllUsesWith(trueResultPasser.getResult());
-    }
-
-    if (auto sink = dyn_cast<SinkOp>(getUniqueUser(branch.getFalseResult()))) {
-      sink->erase();
-    } else {
-      // Build a passer for the falseResult
-      // The passer ctrl is inverted condition.
-      PasserOp falseResultPasser = builder.create<PasserOp>(
-          branch.getLoc(), data, invertCondition.getResult());
-      setBB(falseResultPasser, bb);
-      branch.getFalseResult().replaceAllUsesWith(falseResultPasser.getResult());
-    }
-
-    // Erase the branch
-    branch->erase();
-  }
-
-  if (invertCondition.getResult().use_empty()) {
-    // If the inverted condition is not used, erase it.
-    invertCondition->erase();
-  }
-
-  return success();
-}
 
 static void introduceGSA(FuncOp &funcOp, unsigned branchBB) {
   OpBuilder builder(funcOp->getContext());

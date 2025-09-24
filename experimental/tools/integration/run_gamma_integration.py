@@ -82,6 +82,10 @@ def main():
     parser.add_argument(
         "--merge-bb", type=int)
     parser.add_argument(
+        "--prioritized-side", type=int)
+    parser.add_argument(
+        "--steps-until", type=int, default=3)
+    parser.add_argument(
         "--disable-spec", action='store_true',
         help="Disable speculation")
 
@@ -371,42 +375,43 @@ def main():
             else:
                 return fail(id, "Failed to profile cf-level")
 
-    handshake_pre_speculation = os.path.join(
-        comp_out_dir, "handshake_pre_speculation.mlir")
-    with open(handshake_pre_speculation, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_transformed,
-            f"--handshake-pre-spec-v2-gamma=branch-bb={args.branch_bb} merge-bb={args.merge_bb}",
-            "--handshake-materialize",
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Added speculative units")
-        else:
-            return fail(id, "Failed to add speculative units")
-
-    handshake_speculation = os.path.join(
-        comp_out_dir, "handshake_speculation.mlir")
-    bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
-    with open(handshake_speculation, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-            f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} {"one-sided" if args.one_sided else ""}",
-            "--handshake-materialize",
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Added speculative units")
-        else:
-            return fail(id, "Failed to add speculative units")
-
     if args.disable_spec:
         updated_frequencies = frequencies
+        handshake_speculation = handshake_transformed
     else:
+        handshake_pre_speculation = os.path.join(
+            comp_out_dir, "handshake_pre_speculation.mlir")
+        with open(handshake_pre_speculation, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_transformed,
+                f"--handshake-pre-spec-v2-gamma=branch-bb={args.branch_bb} merge-bb={args.merge_bb}",
+                "--handshake-materialize",
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Added speculative units")
+            else:
+                return fail(id, "Failed to add speculative units")
+
+        handshake_speculation = os.path.join(
+            comp_out_dir, "handshake_speculation.mlir")
+        bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+        with open(handshake_speculation, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+                f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} prioritized-side={args.prioritized_side} steps-until={args.steps_until} {"one-sided" if args.one_sided else ""}",
+                "--handshake-materialize",
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Added speculative units")
+            else:
+                return fail(id, "Failed to add speculative units")
+
         updated_frequencies = os.path.join(
             comp_out_dir, "updated_frequencies.csv")
         with open(updated_frequencies, "w") as f:
