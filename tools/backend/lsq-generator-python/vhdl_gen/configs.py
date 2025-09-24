@@ -12,10 +12,12 @@ import sys
 # example json format in README
 
 
-def GetConfigs(config_json_path: str):
-    with open(config_json_path, 'r') as file:
-        configString = file.read()
+def GetConfigs(path: str, load, store):
+    with open(path, 'r') as file:
+        configString = file.read()      
         configs = json.loads(configString)
+        configs["fifoDepth_L"] = load
+        configs["fifoDepth_S"] = store
         return Configs(configs)
 
 
