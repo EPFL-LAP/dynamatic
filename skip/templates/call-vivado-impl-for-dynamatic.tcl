@@ -7,7 +7,7 @@ if {[catch {
     puts "No verilog files found: $result2"
   }
   read_xdc PATH_TO_CONSTRAINTS_FILE
-  synth_design -top TOP_MODULE -part xc7k160tfbg484-3 -no_iobuf -mode out_of_context
+  synth_design -top TOP_MODULE -part xc7k160tfbg484-3 -no_iobuf -mode out_of_context -shreg_min_size 1000
   report_utilization > PATH_TO_TEST_FOLDER/out/vivado/utilization_post_syn.rpt
   report_timing > PATH_TO_TEST_FOLDER/out/vivado/timing_post_syn.rpt
   place_design

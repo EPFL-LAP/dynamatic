@@ -25,6 +25,8 @@ parser.add_argument("--output-dir", "-o",
 parser.add_argument(
     "--config-file", "-c", required=True, dest="config_files", default="", type=str
 )
+parser.add_argument('--load', '-l', dest='load', default='8', type=int)
+parser.add_argument('--store', '-s', dest='store', default='8', type=int)
 
 # Build the target
 args = parser.parse_args()
@@ -1112,7 +1114,7 @@ def main():
         os.makedirs(args.output_path)
 
     # Parse the config file
-    lsqConfig = GetConfigs(args.config_files)
+    lsqConfig = GetConfigs(args.config_files, args.load, args.store)
 
     # STEP 1: Generate the desired core lsq logic
     codeGen(args.output_path, lsqConfig)

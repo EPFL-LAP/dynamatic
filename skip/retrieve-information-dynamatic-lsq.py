@@ -126,7 +126,6 @@ def main(test_name, load, store, cp):
                 integration_directory + cp_rpt,
                 integration_directory + compilation_time_rpt,
                 integration_directory + compilation_time_rpt,
-                integration_directory + modelsim_rpt,
                 integration_directory + timing_rpt,
                 integration_directory + utilization_rpt,
                 integration_directory + utilization_rpt,
@@ -145,6 +144,7 @@ def main(test_name, load, store, cp):
         )
     )
 
+    print(data)
     write_to_csv(data, OUTPUT_NAME)
     print(f"Wrote a csv file with the dynamatic compilation stats to {OUTPUT_NAME}")
 
