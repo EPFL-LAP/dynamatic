@@ -3,6 +3,7 @@ from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from vhdl_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from vhdl_gen.utils import MaskLess
 from vhdl_gen.configs import Configs
+from vhdl_gen.utils import *
 
 
 class GroupAllocator:
@@ -137,10 +138,19 @@ class GroupAllocator:
         arch += WrapSub(ctx, stores_sub, stq_head_i,
                         stq_tail_i, self.configs.numStqEntries)
 
-        arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
+        if (isPow2(self.configs.numLdqEntries)):
+            arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
                    '(', '\'0\'', '&', loads_sub, ')')
-        arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
+        else:
+            arch += Op(ctx, empty_loads, self.configs.numLdqEntries,
+                       'when', ldq_empty_i, 'else', loads_sub)
+        if (isPow2(self.configs.numStqEntries)):
+            arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
                    '(', '\'0\'', '&', stores_sub, ')')
+        else:
+            arch += Op(ctx, empty_stores, self.configs.numStqEntries,
+                       'when', stq_empty_i, 'else', stores_sub)
+
 
         # Generate handshake signals
         group_init_ready = LogicArray(
