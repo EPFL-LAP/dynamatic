@@ -1,0 +1,15 @@
+# Set the source file to run
+set-src PATH_TO_C_FILE
+
+# Set clock period
+set-clock-period CLOCK_PERIOD   
+
+# Compile (from source to Handshake IR/DOT)
+compile --buffer-algorithm fpl22
+#compile --buffer-algorithm fpga20
+
+# Generate the VHDL design corresponding to the source code
+write-hdl
+
+# Exit the frontend
+exit
