@@ -1,22 +1,24 @@
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.support.buffer_counter import generate_buffer_counter, generate_buffer_counter_embedding
 
 
 def generate_fifo_break_none(name, params):
     bitwidth = params["bitwidth"]
     num_slots = params["num_slots"]
     extra_signals = params.get("extra_signals", None)
+    debug_counter = params.get("debug_counter", False)
 
     if extra_signals:
-        return _generate_fifo_break_none_signal_manager(name, num_slots, bitwidth, extra_signals)
+        return _generate_fifo_break_none_signal_manager(name, num_slots, bitwidth, extra_signals, debug_counter)
     elif bitwidth == 0:
-        return _generate_fifo_break_none_dataless(name, num_slots)
+        return _generate_fifo_break_none_dataless(name, num_slots, debug_counter)
     else:
-        return _generate_fifo_break_none(name, num_slots, bitwidth)
+        return _generate_fifo_break_none(name, num_slots, bitwidth, debug_counter)
 
 
-def _generate_fifo_break_none(name, num_slots, bitwidth):
+def _generate_fifo_break_none(name, num_slots, bitwidth, debug_counter):
     fifo_inner_name = f"{name}_fifo"
     dependencies = \
         generate_fifo_break_dv(fifo_inner_name,
@@ -24,6 +26,10 @@ def _generate_fifo_break_none(name, num_slots, bitwidth):
                                    "num_slots": num_slots,
                                    "bitwidth": bitwidth,
                                })
+
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies += generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
 
     entity = f"""
 library ieee;
@@ -86,18 +92,24 @@ begin
       outs_valid => fifo_valid,
       ins_ready  => fifo_ready
     );
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
     return dependencies + entity + architecture
 
 
-def _generate_fifo_break_none_dataless(name, num_slots):
+def _generate_fifo_break_none_dataless(name, num_slots, debug_counter):
     fifo_inner_name = f"{name}_fifo"
     dependencies = generate_fifo_break_dv(
         fifo_inner_name,
         {"num_slots": num_slots,
-         "bitwdith": 0})
+         "bitwidth": 0})
+
+    debug_counter_name = f"{name}_debug_counter"
+    dependencies += generate_buffer_counter(
+        debug_counter_name, num_slots) if debug_counter else ""
 
     entity = f"""
 library ieee;
@@ -143,13 +155,15 @@ begin
       outs_valid => fifo_valid,
       ins_ready  => fifo_ready
     );
+
+  {generate_buffer_counter_embedding(debug_counter_name) if debug_counter else ""}
 end architecture;
 """
 
     return dependencies + entity + architecture
 
 
-def _generate_fifo_break_none_signal_manager(name, size, bitwidth, extra_signals):
+def _generate_fifo_break_none_signal_manager(name, size, bitwidth, extra_signals, debug_counter):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -164,4 +178,4 @@ def _generate_fifo_break_none_signal_manager(name, size, bitwidth, extra_signals
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_fifo_break_none(name, size, bitwidth + extra_signals_bitwidth))
+        lambda name: _generate_fifo_break_none(name, size, bitwidth + extra_signals_bitwidth, debug_counter))
