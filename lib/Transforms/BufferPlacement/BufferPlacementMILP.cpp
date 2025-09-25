@@ -308,12 +308,14 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       // llvm::errs() << out.getUses().begin()->getOwner()->getName() << "\n";
 
       if (isa<handshake::UnbundleOp>(unit) && !out.getType().isa<ControlType>())
-        llvm::errs() << "skipping\n";
+        // llvm::errs() << "skipping\n";
+        ;
       else if (isa<handshake::MemoryControllerOp>(*out.getUsers().begin())) {
-        llvm::errs() << "skipping mem\n";
+        // llvm::errs() << "skipping mem\n";
+        ;
       } else {
         model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
-        llvm::errs() << "success\n";
+        // llvm::errs() << "success\n";
       }
     });
 
@@ -1224,6 +1226,11 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   os << "# ========================== #\n\n";
 
   for (auto &[value, chVars] : vars.channelVars) {
+    if (auto op = value.getDefiningOp(); op)
+      if (isa<handshake::UnbundleOp>(op) &&
+          !isa<handshake::ControlType>(value.getType())) {
+        continue;
+      }
     if (chVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
       continue;
 
@@ -1285,6 +1292,12 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   os << "# Backedge Buffering Decisions #\n";
   os << "# ========================= #\n\n";
   for (auto &[value, chVars] : vars.channelVars) {
+    if (auto op = value.getDefiningOp(); op)
+      if (isa<handshake::UnbundleOp>(op) &&
+          !isa<handshake::ControlType>(value.getType())) {
+        continue;
+      }
+
     if (chVars.isBackedge.get(GRB_DoubleAttr_X) == 0)
       continue;
 
@@ -1309,6 +1322,11 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   os << "# Ready/Data Buffering Decisions #\n";
   os << "# ========================= #\n\n";
   for (auto &[value, chVars] : vars.channelVars) {
+    if (auto op = value.getDefiningOp(); op)
+      if (isa<handshake::UnbundleOp>(op) &&
+          !isa<handshake::ControlType>(value.getType())) {
+        continue;
+      }
     if (chVars.signalVars.count(SignalType::READY)) {
       os << "Channel " << getUniqueName(*value.getUses().begin())
          << " ready buffer present: "

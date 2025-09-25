@@ -50,8 +50,17 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
+    if (auto op = channel.getDefiningOp(); op)
+      if (isa<handshake::UnbundleOp>(op) &&
+          !isa<handshake::ControlType>(channel.getType())) {
+        llvm::errs() << "skipping" << channel << "\n";
+        continue;
+      }
+    llvm::errs() << channel << " has " << channel.getType()
+                 << "slots to place.\n";
     unsigned numSlotsToPlace =
         static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    llvm::errs() << "  - numSlotsToPlace = " << numSlotsToPlace << "\n";
 
     // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
     // nothing.
@@ -171,6 +180,12 @@ void FPGA20Buffers::setup() {
   // Create channel variables and constraints
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
+    // llvm::errs() << "Adding vars for channel: " << channel << "\n";
+    // llvm::errs() <<  channel.getDefiningOp()->getName().getStringRef() <<
+    // "\n";
+    if (auto op = channel.getDefiningOp(); op)
+      if (isa<handshake::UnbundleOp>(op))
+        llvm::errs() << channel << " is unbundle\n";
     allChannels.push_back(channel);
     addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
