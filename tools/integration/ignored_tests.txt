@@ -5,7 +5,6 @@ covariance_float
 while_loop_2
 correlation_float
 dct
-cordic
 complexdiv
 covariance
 trisolv
