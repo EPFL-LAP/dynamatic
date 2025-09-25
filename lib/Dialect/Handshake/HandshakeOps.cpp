@@ -670,6 +670,7 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
     return success();
   }
   if (width != inputWidth) {
+    // llvm::errs() << memInput.getType() << *memInput.getDefiningOp() << "\n";
     return memInput.getUsers().begin()->emitError()
            << "Inconsistent bitwidths in inputs, expected signal with " << width
            << " bits but got signal with " << inputWidth << " bits.";

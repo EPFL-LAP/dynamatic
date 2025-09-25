@@ -243,11 +243,14 @@ experimental::ftd::enumeratePaths(Block *start, Block *end,
   return sop->boolMinimizeSop();
 }
 
+namespace dynamatic {
+namespace experimental {
+namespace ftd {
 /// Get a boolean expression representing the exit condition of the current
 /// loop block.
-static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                                 CFGLoopInfo &li,
-                                                 const ftd::BlockIndexing &bi) {
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                          CFGLoopInfo &li,
+                                          const ftd::BlockIndexing &bi) {
 
   // Get the boolean expression associated to the block exit
   BoolExpression *blockCond =
@@ -265,6 +268,9 @@ static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
 
   return blockCond;
 }
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic
 
 /// Run the Cytron algorithm to determine, give a set of values, in which blocks
 /// should we add a merge in order for those values to be merged
@@ -634,13 +640,16 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
 
+namespace dynamatic {
+namespace experimental {
+namespace ftd {
 /// Starting from a boolean expression which is a single variable (either
 /// direct or complement) return its corresponding circuit equivalent. This
 /// means, either we obtain the output of the operation determining the
 /// condition, or we add a `not` to complement.
-static Value boolVariableToCircuit(PatternRewriter &rewriter,
-                                   experimental::boolean::BoolExpression *expr,
-                                   Block *block, const ftd::BlockIndexing &bi) {
+Value boolVariableToCircuit(PatternRewriter &rewriter,
+                            experimental::boolean::BoolExpression *expr,
+                            Block *block, const ftd::BlockIndexing &bi) {
 
   // Convert the expression into a single condition (for instance, `c0` or
   // `~c0`).
@@ -667,6 +676,9 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   condition.setType(ftd::channelifyType(condition.getType()));
   return condition;
 }
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic
 
 /// Get a circuit out a boolean expression, depending on the different kinds
 /// of expressions you might have.

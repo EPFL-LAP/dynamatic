@@ -12,6 +12,7 @@
 #include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
@@ -48,6 +49,8 @@ using BlockIndexing = ftd::BlockIndexing;
 
 namespace {
 
+std::ofstream outFile;
+
 struct HandshakeInsertSkippableSeqPass
     : public dynamatic::impl::HandshakeInsertSkippableSeqBase<
           HandshakeInsertSkippableSeqPass> {
@@ -61,57 +64,72 @@ struct HandshakeInsertSkippableSeqPass
 } // namespace
 
 class FTDBoolExpressions {
-  BoolExpression *supp, *skip, *prodCons;
+  BoolExpression *supp, *regen, *prodCons;
+  bool needsShanon;
 
 public:
   FTDBoolExpressions(){};
 
-  FTDBoolExpressions(BoolExpression *supp, BoolExpression *skip,
-                     BoolExpression *prodCons) {
+  FTDBoolExpressions(BoolExpression *supp, BoolExpression *regen,
+                     BoolExpression *prodCons, bool needsShanon) {
     this->supp = supp;
-    this->skip = skip;
+    this->regen = regen;
     this->prodCons = prodCons;
+    this->needsShanon = needsShanon;
   }
 
   BoolExpression *getSupp() { return supp; }
 
-  BoolExpression *getSkip() { return skip; }
+  BoolExpression *getRegen() { return regen; }
 
   BoolExpression *getProdcons() { return prodCons; }
 
-  SmallVector<BoolExpression *> getAsVector() { return {supp, skip, prodCons}; }
+  bool DoesNeedShanon() { return needsShanon; }
+
+  void SetNeedsShanon(bool needsShanon) { this->needsShanon = needsShanon; }
+
+  SmallVector<BoolExpression *> getAsVector() {
+    return {supp, regen, prodCons};
+  }
 };
 
 using FTDBoolExpForPair =
     DenseMap<StringRef, DenseMap<StringRef, FTDBoolExpressions>>;
 
 class FTDConditionValues {
-  Value supp, skip, prodCons;
+  Value supp, regen, prodCons;
 
 public:
   FTDConditionValues(SmallVector<Value> values) {
     supp = values[0];
-    skip = values[1];
+    regen = values[1];
     prodCons = values[2];
   }
 
   Value getSupp() { return supp; }
 
-  Value getSkip() { return skip; }
+  Value getRegen() { return regen; }
 
   Value getProdCons() { return prodCons; }
 
-  SmallVector<Value> getAsVector() { return {supp, skip, prodCons}; }
+  SmallVector<Value> getAsVector() { return {supp, regen, prodCons}; }
 };
 
 class FuncOpInformation {
 
 private:
   FuncOp funcOp;
+  Region &region;
+  mlir::DominanceInfo domInfo;
   BlockIndexing blockIndexing;
+  mlir::CFGLoopInfo loopInfo;
+  BlockControlDepsMap cdAnalysis;
 
 public:
-  FuncOpInformation(FuncOp funcOp) : blockIndexing(funcOp.getBody()) {
+  FuncOpInformation(FuncOp funcOp)
+      : region(funcOp.getBody()), domInfo(),
+        loopInfo(domInfo.getDomTree(&region)), blockIndexing(region),
+        cdAnalysis(ControlDependenceAnalysis(region).getAllBlockDeps()) {
     this->funcOp = funcOp;
   }
 
@@ -119,13 +137,15 @@ public:
 
   Value getStartSignal() { return (Value)funcOp.getArguments().back(); }
 
-  BlockControlDepsMap getCdAnalysis() {
-    BlockControlDepsMap cdAnalysis =
-        ControlDependenceAnalysis(funcOp.getBody()).getAllBlockDeps();
-    return cdAnalysis;
-  }
+  BlockControlDepsMap getCdAnalysis() { return cdAnalysis; }
 
   BlockIndexing getBlockIndexing() { return blockIndexing; }
+
+  Region &getRegion() { return region; }
+
+  mlir::CFGLoopInfo &getLoopInfo() { return loopInfo; }
+
+  FuncOp getFuncOp() { return funcOp; }
 };
 
 /// These maps are used to distribute the start signal to all blocks in the CFG.
@@ -134,7 +154,7 @@ std::unordered_set<Block *> visited;
 
 /// This initializes the startCopies map with the start signal for the start
 /// block.
-void initializeStartCopies(FuncOpInformation funcOpInformation) {
+void initializeStartCopies(FuncOpInformation &funcOpInformation) {
   Block *block = funcOpInformation.getStartBlock();
   Value startSignal = funcOpInformation.getStartSignal();
   startCopies[block] = startSignal;
@@ -201,7 +221,7 @@ int getBBNumberFromOp(Operation *op) {
 Block *getBlockFromOp(Operation *op, BlockIndexing blockIndexing) {
 
   int opBBNum = getBBNumberFromOp(op);
-  llvm::errs() << "num of block: " << opBBNum << "\n";
+  // llvm::errs() << "num of block: " << opBBNum << "\n";
 
   std::optional<Block *> blockOptional =
       blockIndexing.getBlockFromIndex(opBBNum);
@@ -213,11 +233,68 @@ Block *getBlockFromOp(Operation *op, BlockIndexing blockIndexing) {
   }
 }
 
+bool doesNeedShanon(Block *first, Block *second, DenseSet<Block *> firstDeps,
+                    DenseSet<Block *> secondDeps) {
+  return firstDeps.contains(second) || secondDeps.contains(first);
+}
+
+void handleConditionForLoop(Block *predecessorBlock, Block *successorBlock,
+                            BoolExpression *&fSuppress,
+                            FuncOpInformation &funcOpInformation,
+                            ConversionPatternRewriter &rewriter) {
+  BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
+  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
+
+  for (CFGLoop *loop = loopInfo.getLoopFor(predecessorBlock); loop;
+       loop = loop->getParentLoop()) {
+
+    if (!loop->contains(successorBlock)) {
+      if (Block *loopExit = loop->getExitingBlock(); loopExit) {
+        auto *exitCondition =
+            getBlockLoopExitCondition(loopExit, loop, loopInfo, blockIndexing);
+
+        fSuppress =
+            BoolExpression::boolOr(fSuppress, exitCondition->boolNegate());
+
+        llvm::errs() << "Added loop exit condition for suppress signal: "
+                     << exitCondition->toString() << "to "
+                     << fSuppress->toString() << "\n";
+      }
+    }
+  }
+}
+
+void updateRegenConditionForLoop(Block *predecessorBlock, Block *successorBlock,
+                                 BoolExpression *&fRegen,
+                                 FuncOpInformation &funcOpInformation,
+                                 ConversionPatternRewriter &rewriter) {
+  BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
+  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
+
+  for (CFGLoop *loop = loopInfo.getLoopFor(successorBlock); loop;
+       loop = loop->getParentLoop()) {
+
+    if (!loop->contains(predecessorBlock)) {
+      if (Block *loopExit = loop->getExitingBlock(); loopExit) {
+        auto *exitCondition =
+
+            getBlockLoopExitCondition(loopExit, loop, loopInfo, blockIndexing);
+
+        fRegen = BoolExpression::boolOr(fRegen, exitCondition->boolNegate());
+
+        llvm::errs() << "Added loop exit condition for suppress signal: "
+                     << exitCondition->toString() << "to " << fRegen->toString()
+                     << "\n";
+      }
+    }
+  }
+}
+
 /// This function calculates the FTD conditions for a pair of memory accesses.
 FTDBoolExpressions calculateFTDConditions(Block *predecessorBlock,
                                           Block *successorBlock,
                                           std::string kernelName,
-                                          FuncOpInformation funcOpInformation,
+                                          FuncOpInformation &funcOpInformation,
                                           ConversionPatternRewriter &rewriter) {
 
   BlockControlDepsMap cdAnalysis = funcOpInformation.getCdAnalysis();
@@ -256,15 +333,48 @@ FTDBoolExpressions calculateFTDConditions(Block *predecessorBlock,
   BoolExpression *fRegen =
       BoolExpression::boolAnd(fProd3->boolNegate(), fCons3);
 
-  std::ofstream outFile("./integration-test/" + kernelName + "/out/" +
-                        kernelName + ".txt");
+  BoolExpression *ajib = enumeratePaths(predecessorBlock, successorBlock,
+                                        blockIndexing, succControlDeps);
 
-  outFile << "Supp: " << fSuppress->toString() << "\n";
-  outFile << "Reg:  " << fRegen->toString() << "\n";
+  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
+  bool producingGtUsing =
+      loopInfo.getLoopFor(predecessorBlock) &&
+      !loopInfo.getLoopFor(predecessorBlock)->contains(successorBlock);
+
+  if (producingGtUsing) {
+    handleConditionForLoop(predecessorBlock, successorBlock, fSuppress,
+                           funcOpInformation, rewriter);
+  }
+
+  bool usingGtProducing =
+      loopInfo.getLoopFor(successorBlock) &&
+      !loopInfo.getLoopFor(successorBlock)->contains(predecessorBlock);
+  if (usingGtProducing) {
+    updateRegenConditionForLoop(predecessorBlock, successorBlock, fRegen,
+                                funcOpInformation, rewriter);
+  }
+
+  outFile << "----------------------------------------------\n";
   outFile << "Prod: " << fProd1->toString() << "\n";
   outFile << "Cons: " << fCons1->toString() << "\n";
+  outFile << "Supp: " << fSuppress->toString() << "\n";
+  outFile << "Reg:  " << fRegen->toString() << "\n";
+  outFile << "Ajib: " << ajib->toString() << "\n";
+  outFile << "Pred Block: " << getBBNumberFromOp(&predecessorBlock->front())
+          << "\n";
+  outFile << "Succ Block: " << getBBNumberFromOp(&successorBlock->front())
+          << "\n";
+  outFile << "----------------------------------------------\n";
+  outFile.flush();
 
-  return FTDBoolExpressions(fSuppress, fRegen, fProdAndCons);
+  llvm::errs() << "Supp: " << fSuppress->toString() << "\n";
+  llvm::errs() << "Reg:  " << fRegen->toString() << "\n";
+  llvm::errs() << "Prod: " << fProd1->toString() << "\n";
+  llvm::errs() << "Cons: " << fCons1->toString() << "\n";
+
+  return FTDBoolExpressions(fSuppress, fRegen, fProdAndCons,
+                            doesNeedShanon(predecessorBlock, successorBlock,
+                                           predControlDeps, succControlDeps));
 }
 
 /// This function calculates the FTD conditions for all pairs of memory
@@ -272,7 +382,7 @@ FTDBoolExpressions calculateFTDConditions(Block *predecessorBlock,
 /// function to do so.
 FTDBoolExpForPair calculateFtdConditionsForEachPair(
     DenseMap<StringRef, Operation *> &memAccesses, std::string kernelName,
-    FuncOpInformation funcOpInformation, ConversionPatternRewriter &rewriter) {
+    FuncOpInformation &funcOpInformation, ConversionPatternRewriter &rewriter) {
 
   FTDBoolExpForPair ftdConditionsForEachPair;
 
@@ -291,6 +401,10 @@ FTDBoolExpForPair calculateFtdConditionsForEachPair(
             predecessorOpPointer, funcOpInformation.getBlockIndexing());
         Block *successorBlock = getBlockFromOp(
             successorOpPointer, funcOpInformation.getBlockIndexing());
+
+        llvm::errs() << "------------\n";
+        llvm::errs() << getBBNumberFromOp(predecessorOpPointer) << "\n";
+        llvm::errs() << getBBNumberFromOp(successorOpPointer) << "\n";
 
         FTDBoolExpressions boolConditions =
             calculateFTDConditions(predecessorBlock, successorBlock, kernelName,
@@ -317,7 +431,8 @@ Value distributStartSignalToDstBlock(Value lastStartCopy, Block *block,
     lastStartCopy = startCopies[block];
   else {
     /// ManualBuff (trick)
-    // auto bb = block->front().getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME);
+    // auto bb =
+    // block->front().getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME);
 
     handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
         block->front().getLoc(), lastStartCopy, 1, BufferType::FIFO_BREAK_NONE);
@@ -347,10 +462,11 @@ bool hasAtLeastOneActiveDep(MemDependenceArrayAttr deps) {
 }
 
 /// This function returns the delayed values (N values) for the given initial
-/// value which is delayed by a constant value.
+/// value.
 /// It does two type of delays: 0 to N-1 and 1 to N.
 std::tuple<SmallVector<Value>, SmallVector<Value>>
-getNDelayedValues(Value initialVal, Value constVal, Operation *BBOp, unsigned N,
+getNDelayedValues(Value initialVal, Operation *BBOp, unsigned N,
+                  SmallVector<Operation *> &opList,
                   ConversionPatternRewriter &rewriter) {
   Value prevResult = initialVal;
   SmallVector<Value> delayedVals = {initialVal};
@@ -362,34 +478,10 @@ getNDelayedValues(Value initialVal, Value constVal, Operation *BBOp, unsigned N,
   if (N == 0)
     effective_N = 1;
   for (unsigned i = 0; i < effective_N; i++) {
-    // values = {prevResult, constVal};
-    // handshake::MergeOp mergeOp =
-    //     rewriter.create<handshake::MergeOp>(BBOp->getLoc(), values);
-    // inheritBB(BBOp, mergeOp);
-
-    // if (i != N - 1)
-    //   delayedVals.push_back(mergeOp->getResult(0));
-    // extraDelayedVals.push_back(mergeOp->getResult(0));
-
-    // prevResult = mergeOp->getResult(0);
-
     handshake::InitOp initOp =
         rewriter.create<handshake::InitOp>(BBOp->getLoc(), prevResult);
     inheritBB(BBOp, initOp);
-    // mlir::BoolAttr initTokenAttr = mlir::BoolAttr::get(ctx, true);
-    // mlir::NamedAttrList attrList;
-    // attrList.append("INIT_TOKEN", initTokenAttr);
-
-    // mlir::DictionaryAttr paramsAttr =
-    //     mlir::DictionaryAttr::get(context, attrList);
-
-    // auto dictionaryAttr = initOp->getAttrDictionary();
-    // dictionaryAttr = dictionaryAttr.set("params", paramsAttr);
-
-    // setDialectAttr(initOp, ["INIT_TOKEN"] =); //
-
-    // initOp
-    //     ->setDialectAttr<INIT_TOKEN>()
+    opList.push_back(initOp);
 
     if (i != N - 1)
       delayedVals.push_back(initOp.getResult());
@@ -402,6 +494,40 @@ getNDelayedValues(Value initialVal, Value constVal, Operation *BBOp, unsigned N,
                                                             extraDelayedVals);
 }
 
+Value addExtraSourceToDoneForRegen(Value doneSignal, Value regenCond,
+                                   Operation *BBOp,
+                                   SmallVector<Operation *> &opList,
+                                   ConversionPatternRewriter &rewriter) {
+
+  handshake::SourceOp sourceOp =
+      rewriter.create<handshake::SourceOp>(BBOp->getLoc());
+  inheritBB(BBOp, sourceOp);
+  opList.push_back(sourceOp);
+
+  handshake::ConditionalBranchOp conditionalBranchOp =
+      rewriter.create<handshake::ConditionalBranchOp>(BBOp->getLoc(), regenCond,
+                                                      sourceOp.getResult());
+  inheritBB(BBOp, conditionalBranchOp);
+  opList.push_back(conditionalBranchOp);
+
+  // buffer for deadlock
+  handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
+      BBOp->getLoc(), conditionalBranchOp.getTrueResult(), 5,
+      BufferType::FIFO_BREAK_NONE);
+  inheritBB(BBOp, bufferOp);
+  opList.push_back(bufferOp);
+
+  handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(
+      BBOp->getLoc(), ValueRange{
+                          doneSignal,
+                          bufferOp.getResult(),
+                      });
+  inheritBB(BBOp, mergeOp);
+  opList.push_back(mergeOp);
+
+  return mergeOp.getResult();
+}
+
 /// This function checks if the two operations are in the same basic block.
 bool AreOpsinSameBB(Operation *first, Operation *second) {
   int firstBBNum = getBBNumberFromOp(first);
@@ -410,11 +536,31 @@ bool AreOpsinSameBB(Operation *first, Operation *second) {
 }
 
 /// This function checks if the consumer operation is before the producer
-bool isInitialConsWithoutProd(Operation *prod, Operation *cons) {
-  if (!AreOpsinSameBB(prod, cons))
-    return false;
+bool isInitialConsWithoutProdInSameBB(Operation *prod, Operation *cons) {
+  mlir::DominanceInfo domInfo;
+  if (!AreOpsinSameBB(prod, cons)) {
+    llvm::errs() << getBBNumberFromOp(prod) << getBBNumberFromOp(cons)
+                 << "))))\n";
+    llvm::errs() << domInfo.dominates(cons, prod) << "))))\n";
+    return domInfo.dominates(cons, prod);
+  }
+
+  llvm::errs() << getBBNumberFromOp(prod) << getBBNumberFromOp(cons)
+               << "((((\n";
   return cons->isBeforeInBlock(prod);
 }
+
+// Value constructConditionNormally(BDD *bdd) {
+
+//   boolVariabletoCircuit();
+
+//   Value node = boolExpressionToCircuit(rewriter, bdd->boolVariable, block,
+//   bi);
+
+//   Value falseValue =
+//   constructConditionNormally(bdd->successors.value().first); Value
+//   TrueValue = constructConditionNormally(bdd->successors.value().second);
+// }
 
 /// This function creates the circuit for a specific FTD condition.
 Value constructCircuitForCondition(BoolExpression *fBool,
@@ -446,7 +592,6 @@ Value constructCircuitForCondition(BoolExpression *fBool,
 
   handshake::SourceOp sourceOpConstOp =
       rewriter.create<handshake::SourceOp>(opPointer->getLoc());
-
   inheritBB(opPointer, sourceOpConstOp);
 
   handshake::ConstantOp falseConstOp = rewriter.create<handshake::ConstantOp>(
@@ -459,8 +604,7 @@ Value constructCircuitForCondition(BoolExpression *fBool,
 /// accesses.
 FTDConditionValues constructCircuitForAllConditions(
     FTDBoolExpressions ftdBoolExpressions, BlockIndexing blockIndexing,
-    Operation *opPointer, bool addInitialTrueToSkip, Value startSignalInBB,
-    ConversionPatternRewriter &rewriter) {
+    Operation *opPointer, ConversionPatternRewriter &rewriter) {
 
   Block *block = getBlockFromOp(opPointer, blockIndexing);
 
@@ -476,21 +620,36 @@ FTDConditionValues constructCircuitForAllConditions(
 
 /// This function creates the regeneration block for the given main values
 SmallVector<Value> insertRegenBlock(SmallVector<Value> mainValues,
-                                    Value regenCond, Operation *BBOp,
+                                    Value regenCond,
+                                    bool initialConsWithoutProd,
+                                    Operation *BBOp,
+                                    SmallVector<Operation *> &opList,
                                     ConversionPatternRewriter &rewriter) {
+
+  if (initialConsWithoutProd) {
+    regenCond = rewriter.create<handshake::InitOp>(BBOp->getLoc(), regenCond);
+  }
   SmallVector<Value> results;
   for (Value mainValue : mainValues) {
+    // The second operand will change later
     SmallVector<Value, 2> muxOpValues = {mainValue, mainValue};
     handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(
         BBOp->getLoc(), mainValue.getType(), regenCond, muxOpValues);
     inheritBB(BBOp, muxOp);
+    opList.push_back(muxOp);
+
+    handshake::InitOp initOp =
+        rewriter.create<handshake::InitOp>(BBOp->getLoc(), muxOp.getResult());
+    inheritBB(BBOp, initOp);
+    opList.push_back(initOp);
 
     handshake::ConditionalBranchOp conditionalBranchOp =
         rewriter.create<handshake::ConditionalBranchOp>(
-            BBOp->getLoc(), regenCond, muxOp.getResult());
+            BBOp->getLoc(), regenCond, initOp.getResult());
     inheritBB(BBOp, conditionalBranchOp);
+    opList.push_back(conditionalBranchOp);
 
-    muxOp.setOperand(2, conditionalBranchOp.getResult(0));
+    muxOp.setOperand(2, conditionalBranchOp.getTrueResult());
     results.push_back(muxOp.getResult());
   }
 
@@ -498,37 +657,16 @@ SmallVector<Value> insertRegenBlock(SmallVector<Value> mainValues,
 }
 
 /// This function gates the channel value by the control value.
-/// It creates a `Join` operation to combine the channel value and the control.
+/// It creates a `Join` operation to combine the channel value and the
+/// control.
 Value gateChannelValue(Value channelValue, Value gatingValue, Operation *BBOp,
+                       SmallVector<Operation *> &createdOperations,
                        ConversionPatternRewriter &rewriter) {
-  // handshake::UnbundleOp unbundleOp =
-  //     rewriter.create<handshake::UnbundleOp>(BBOp->getLoc(), channelValue);
-  // inheritBB(BBOp, unbundleOp);
-
-  // SmallVector<Value, 2> joinOpValues = {unbundleOp.getResult(0),
-  // gatingValue}; handshake::JoinOp joinOp =
-  //     rewriter.create<handshake::JoinOp>(BBOp->getLoc(), joinOpValues);
-  // inheritBB(BBOp, joinOp);
-  // ValueRange *ab = new ValueRange();
-  // handshake::ChannelType ch =
-  //     handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-  // handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(
-  //     BBOp->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
-  // inheritBB(BBOp, bundleOp);
-  // return bundleOp.getResult(0);
-
-  /// need to decide
-  if (isa<ControlType>(gatingValue.getType())) {
-    handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
-        BBOp->getLoc(), channelValue, gatingValue);
-    inheritBB(BBOp, gateOp);
-    return gateOp.getResult();
-  } else {
-    handshake::BlockerOp blockerOp = rewriter.create<handshake::BlockerOp>(
-        BBOp->getLoc(), ValueRange{channelValue, gatingValue});
-    inheritBB(BBOp, blockerOp);
-    return blockerOp.getResult();
-  }
+  handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
+      BBOp->getLoc(), channelValue, gatingValue);
+  inheritBB(BBOp, gateOp);
+  createdOperations.push_back(gateOp);
+  return gateOp.getResult();
 }
 
 /// This condition insets suppresses in front ot the main values based on the
@@ -537,32 +675,40 @@ Value gateChannelValue(Value channelValue, Value gatingValue, Operation *BBOp,
 /// for the `Conditional Sequentializer` component.
 SmallVector<Value> insertBranches(SmallVector<Value> mainValues,
                                   SmallVector<Value> conds, Operation *BBOp,
+                                  SmallVector<Operation *> &ops,
                                   ConversionPatternRewriter &rewriter) {
   SmallVector<Value> results;
   for (auto [mainValue, cond] : llvm::zip(mainValues, conds)) {
     /// ManualBuff
-    bool manualBuff_insertBranches =
-        true; // Best execution time with manual buffer present
-    handshake::BufferOp bufferOp;
-    handshake::ConditionalBranchOp conditionalBranchOp;
-    if (manualBuff_insertBranches) {
-      bufferOp = rewriter.create<handshake::BufferOp>(
-          BBOp->getLoc(), cond, 5, BufferType::FIFO_BREAK_NONE);
-      inheritBB(BBOp, bufferOp);
-      conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          BBOp->getLoc(), bufferOp.getResult(), mainValue);
-    } else {
-      conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          BBOp->getLoc(), cond, mainValue);
-    }
+    // bool manualBuff_insertBranches = true;
+    // handshake::BufferOp bufferOp;
+    // handshake::ConditionalBranchOp conditionalBranchOp;
+    // if (manualBuff_insertBranches) {
+    //   bufferOp = rewriter.create<handshake::BufferOp>(
+    //       BBOp->getLoc(), cond, 5, BufferType::FIFO_BREAK_NONE);
+    //   inheritBB(BBOp, bufferOp);
+    //   ops.push_back(bufferOp);
+    //   conditionalBranchOp =
+    //   rewriter.create<handshake::ConditionalBranchOp>(
+    //       BBOp->getLoc(), bufferOp.getResult(), mainValue);
+    // } else {
+    //   conditionalBranchOp =
+    //   rewriter.create<handshake::ConditionalBranchOp>(
+    //       BBOp->getLoc(), cond, mainValue);
+    // }
+
+    handshake::ConditionalBranchOp conditionalBranchOp =
+        rewriter.create<handshake::ConditionalBranchOp>(BBOp->getLoc(), cond,
+                                                        mainValue);
     inheritBB(BBOp, conditionalBranchOp);
+    ops.push_back(conditionalBranchOp);
     results.push_back(conditionalBranchOp.getResult(1));
   }
   return results;
 }
 
-/// This function returns the start signal if the real value is a control type.
-/// Otherwise, it creates a dummy constant value.
+/// This function returns the start signal if the real value is a control
+/// type. Otherwise, it creates a dummy constant value.
 Value getDummyValue(Value realValue, Value startSignalInBB,
                     Operation *BBOpPointer,
                     ConversionPatternRewriter &rewriter) {
@@ -577,31 +723,23 @@ Value getDummyValue(Value realValue, Value startSignalInBB,
   }
 }
 
+void addDrawingAttrToList(ArrayRef<Operation *> operations, StringRef attr) {
+  for (auto op : operations) {
+    auto drawAttr = handshake::DrawingAttr::get(op->getContext(), attr);
+    op->setAttr("drawing", drawAttr);
+  }
+}
+
 /// This function creates the suppression block for the given main values.
 SmallVector<Value> insertSuppressBlock(
     SmallVector<Value> mainValues, Value predecessorOpDoneSignal,
-    Value suppressCond, Operation *predecessorOpPointer,
-    Operation *succcessorOpPointer, Value startSignalInPredecessorBB,
-    unsigned N, ConversionPatternRewriter &rewriter) {
-
-  // SmallVector<Value> diffTokens = {predecessorOpDoneSignal};
-  // Value dummyValue =
-  //     getDummyValue(predecessorOpDoneSignal, startSignalInPredecessorBB,
-  //                   predecessorOpPointer, rewriter);
-  // unsigned effective_N_for_suppress = N - 1;
-  // if (isInitialConsWithoutProd(predecessorOpPointer, succcessorOpPointer)) {
-  //   effective_N_for_suppress = N;
-  // }
-  // if (effective_N_for_suppress > 0) {
-  //   diffTokens.append(effective_N_for_suppress, dummyValue);
-  // }
-
-  // handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(
-  //     predecessorOpPointer->getLoc(), diffTokens);
-  // inheritBB(predecessorOpPointer, mergeOp);
+    Value suppressCond, Value regenCond, Operation *predecessorOpPointer,
+    Operation *succcessorOpPointer, unsigned N,
+    SmallVector<Operation *> &opList, ConversionPatternRewriter &rewriter) {
 
   unsigned effective_N_for_suppress = N - 1;
-  if (isInitialConsWithoutProd(predecessorOpPointer, succcessorOpPointer)) {
+  if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
+                                       succcessorOpPointer)) {
     effective_N_for_suppress = N;
   }
 
@@ -610,37 +748,39 @@ SmallVector<Value> insertSuppressBlock(
     handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
         predecessorOpPointer->getLoc(), prevResult);
     inheritBB(predecessorOpPointer, initOp);
+    opList.push_back(initOp);
     prevResult = initOp.getResult();
   }
 
-  /// ManualBuff (Init)
-  // unsigned effective_N = N;
-  // if (N == 0)
-  //   effective_N = 1;
+  Value mergedWithExtra = prevResult;
+  if (regenCond) {
+    mergedWithExtra = addExtraSourceToDoneForRegen(
+        prevResult, regenCond, predecessorOpPointer, opList, rewriter);
+  }
 
-  // Value next_value = mergeOp.getResult();
-  // if (effective_N > 1) {
-  //   handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-  //       predecessorOpPointer->getLoc(), mergeOp.getResult(), effective_N - 1,
-  //       BufferType::FIFO_BREAK_NONE);
-  //   inheritBB(predecessorOpPointer, bufferOp);
-  //   next_value = bufferOp.getResult();
-  // }
+  Value gatedSuppressCond = gateChannelValue(
+      suppressCond, mergedWithExtra, predecessorOpPointer, opList, rewriter);
 
-  Value gatedSuppressCond = gateChannelValue(suppressCond, prevResult,
-                                             predecessorOpPointer, rewriter);
-
-  handshake::ConditionalBranchOp conditionalBranchOp =
+  handshake::ConditionalBranchOp conditionalBranchOpForGated =
       rewriter.create<handshake::ConditionalBranchOp>(
           predecessorOpPointer->getLoc(), suppressCond, gatedSuppressCond);
-  inheritBB(predecessorOpPointer, conditionalBranchOp);
+  inheritBB(predecessorOpPointer, conditionalBranchOpForGated);
+  opList.push_back(conditionalBranchOpForGated);
 
-  SmallVector<Value, 2> muxOpValues = {suppressCond,
-                                       conditionalBranchOp.getResult(0)};
+  handshake::ConditionalBranchOp conditionalBranchOpForNormal =
+      rewriter.create<handshake::ConditionalBranchOp>(
+          predecessorOpPointer->getLoc(), suppressCond, suppressCond);
+  inheritBB(predecessorOpPointer, conditionalBranchOpForNormal);
+  opList.push_back(conditionalBranchOpForNormal);
+
+  SmallVector<Value, 2> muxOpValues = {
+      conditionalBranchOpForNormal.getFalseResult(),
+      conditionalBranchOpForGated.getTrueResult()};
   handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(
       predecessorOpPointer->getLoc(), suppressCond.getType(), suppressCond,
       muxOpValues);
   inheritBB(predecessorOpPointer, muxOp);
+  opList.push_back(muxOp);
 
   SmallVector<Value> conds;
 
@@ -648,49 +788,39 @@ SmallVector<Value> insertSuppressBlock(
   if (N == 0)
     effective_N = 1;
 
-  for (unsigned i = 0; i < effective_N; i++) {
-    /// ManualBuff
-    handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-        predecessorOpPointer->getLoc(), muxOp.getResult(), 3,
-        BufferType::FIFO_BREAK_NONE);
-    inheritBB(predecessorOpPointer, bufferOp);
-    conds.push_back(bufferOp.getResult());
-  }
-  return insertBranches(mainValues, conds, predecessorOpPointer, rewriter);
+  // for (unsigned i = 0; i < effective_N; i++) {
+  //   /// ManualBuff
+  //   handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
+  //       predecessorOpPointer->getLoc(), muxOp.getResult(), 3,
+  //       BufferType::FIFO_BREAK_NONE);
+  //   inheritBB(predecessorOpPointer, bufferOp);
+  //   conds.push_back(bufferOp.getResult());
+  // }
+
+  for (unsigned i = 0; i < effective_N; i++)
+    conds.push_back(muxOp.getResult());
+
+  auto result =
+      insertBranches(mainValues, conds, predecessorOpPointer, opList, rewriter);
+
+  return result;
 }
 
 /// This function creates the skip condition for a pair of memory accesses.
 SmallVector<Value> createSkipConditionForPair(
     Value predecessorOpDoneSignal, Operation *predecessorOpPointer,
     Operation *successorOpPointer, SmallVector<Value> delayedAddresses,
-    Value startSignalInBB, FTDBoolExpressions ftdConditions,
-    BlockIndexing blockIndexing, unsigned N,
+    FTDBoolExpressions ftdConditions, BlockIndexing blockIndexing, unsigned N,
     ConversionPatternRewriter &rewriter) {
 
+  SmallVector<Operation *> skipConditionGeneratorOps;
+
   FTDConditionValues ftdValues = constructCircuitForAllConditions(
-      ftdConditions, blockIndexing, predecessorOpPointer,
-      AreOpsinSameBB(predecessorOpPointer, successorOpPointer), startSignalInBB,
-      rewriter);
-
-  // SmallVector<Value> diffTokens = {predecessorOpDoneSignal};
-  // Value dummyValue = getDummyValue(predecessorOpDoneSignal, startSignalInBB,
-  //                                  predecessorOpPointer, rewriter);
-  // // diffTokens.append(N, conditionalBranchOp2.getResult(0));
-  // if (N > 0) {
-  //   // mark
-  //   unsigned effective_N = N;
-  //   if (isInitialConsWithoutProd(predecessorOpPointer, successorOpPointer)) {
-  //     effective_N = N + 1;
-  //   }
-  //   diffTokens.append(effective_N, dummyValue);
-  // }
-
-  // handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(
-  //     predecessorOpPointer->getLoc(), diffTokens);
-  // inheritBB(predecessorOpPointer, mergeOp);
+      ftdConditions, blockIndexing, predecessorOpPointer, rewriter);
 
   unsigned effective_N = N;
-  if (isInitialConsWithoutProd(predecessorOpPointer, successorOpPointer)) {
+  if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
+                                       successorOpPointer)) {
     effective_N = N + 1;
   }
   Value prevResult = predecessorOpDoneSignal;
@@ -698,91 +828,69 @@ SmallVector<Value> createSkipConditionForPair(
     handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
         predecessorOpPointer->getLoc(), prevResult);
     inheritBB(predecessorOpPointer, initOp);
+    skipConditionGeneratorOps.push_back(initOp);
     prevResult = initOp.getResult();
   }
 
-  /// ManualBuff (Init)
-  // bool manualBuff_skip_cond =
-  //     true; // Best execution time with manual buffer present
-  // handshake::BufferOp bufferOp;
-  // handshake::ConditionalBranchOp conditionalBranchOp;
-  // if (manualBuff_skip_cond) {
-  //   bufferOp = rewriter.create<handshake::BufferOp>(
-  //       predecessorOpPointer->getLoc(), mergeOp.getResult(), N,
-  //       BufferType::FIFO_BREAK_NONE);
-  //   inheritBB(predecessorOpPointer, bufferOp);
-  //   conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-  //       successorOpPointer->getLoc(), ftdValues.getSupp(),
-  //       bufferOp.getResult());
-  // } else {
-  //   conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-  //       successorOpPointer->getLoc(), ftdValues.getSupp(),
-  //       mergeOp.getResult());
-  // }
-  // inheritBB(successorOpPointer, conditionalBranchOp);
-
-  handshake::ConditionalBranchOp conditionalBranchOp =
-      rewriter.create<handshake::ConditionalBranchOp>(
-          successorOpPointer->getLoc(), ftdValues.getSupp(), prevResult);
-  inheritBB(successorOpPointer, conditionalBranchOp);
-
-  // handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(
-  //     predecessorOpPointer->getLoc(), successorOpPointer->getOperand(0));
-  // inheritBB(predecessorOpPointer, unbundleOp);
-
-  // SmallVector<Value, 2> JoinOpValues = {conditionalBranchOp.getResult(1),
-  //                                       unbundleOp.getResult(0)};
-  // handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(
-  //     predecessorOpPointer->getLoc(), JoinOpValues);
-  // inheritBB(predecessorOpPointer, joinOp);
-
-  // ValueRange *ab = new ValueRange();
-  // handshake::ChannelType ch =
-  //     handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-  // handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(
-  //     predecessorOpPointer->getLoc(), joinOp.getResult(),
-  //     unbundleOp.getResult(1), *ab, ch);
-  // inheritBB(predecessorOpPointer, bundleOp);
-
-  // Value gatedSuccessorOpaddr = bundleOp.getResult(0);
-
-  // need to decide
-
-  // second comment
-  // handshake::BlockerOp blockerOp = rewriter.create<handshake::BlockerOp>(
-  //     predecessorOpPointer->getLoc(),
-  //     ValueRange{successorOpPointer->getOperand(0),
-  //                conditionalBranchOp.getResult(1)});
-  // inheritBB(predecessorOpPointer, blockerOp);
-
-  Value gatedSuccessorOpaddr = gateChannelValue(
-      successorOpPointer->getOperand(0), conditionalBranchOp.getResult(1),
-      predecessorOpPointer, rewriter);
-
-  SmallVector<Value> delayedAddressesAfterRegen = delayedAddresses;
-  if (ftdConditions.getSupp()->boolMinimize()->type !=
+  Value mergedWithExtra = prevResult;
+  if (ftdConditions.getRegen()->boolMinimize()->type !=
       experimental::boolean::ExpressionType::Zero) {
-    delayedAddressesAfterRegen = insertRegenBlock(
-        delayedAddresses, ftdValues.getSkip(), predecessorOpPointer, rewriter);
+    mergedWithExtra = addExtraSourceToDoneForRegen(
+        prevResult, ftdValues.getRegen(), predecessorOpPointer,
+        skipConditionGeneratorOps, rewriter);
   }
 
-  SmallVector<Value> delayedAddressesAfterSuppress = delayedAddressesAfterRegen;
+  Value suppressedWithSupp = mergedWithExtra;
   if (ftdConditions.getSupp()->boolMinimize()->type !=
       experimental::boolean::ExpressionType::Zero) {
-    delayedAddressesAfterSuppress =
-        insertSuppressBlock(delayedAddressesAfterRegen, predecessorOpDoneSignal,
-                            ftdValues.getSupp(), predecessorOpPointer,
-                            successorOpPointer, startSignalInBB, N, rewriter);
+    handshake::ConditionalBranchOp conditionalBranchOp =
+        rewriter.create<handshake::ConditionalBranchOp>(
+            successorOpPointer->getLoc(), ftdValues.getSupp(), mergedWithExtra);
+    inheritBB(successorOpPointer, conditionalBranchOp);
+    skipConditionGeneratorOps.push_back(conditionalBranchOp);
+    suppressedWithSupp = conditionalBranchOp.getFalseResult();
+  }
+
+  Value gatedSuccessorOpaddr = gateChannelValue(
+      successorOpPointer->getOperand(0), suppressedWithSupp,
+      predecessorOpPointer, skipConditionGeneratorOps, rewriter);
+
+  SmallVector<Value> delayedAddressesAfterSuppress = delayedAddresses;
+  if (ftdConditions.getSupp()->boolMinimize()->type !=
+      experimental::boolean::ExpressionType::Zero) {
+    SmallVector<Operation *> suppressOpList;
+    delayedAddressesAfterSuppress = insertSuppressBlock(
+        delayedAddresses, predecessorOpDoneSignal, ftdValues.getSupp(),
+        ftdValues.getRegen(), predecessorOpPointer, successorOpPointer, N,
+        suppressOpList, rewriter);
+    addDrawingAttrToList(suppressOpList, "Suppress_Block_Cond");
+  }
+
+  SmallVector<Value> delayedAddressesAfterRegen = delayedAddressesAfterSuppress;
+  if (ftdConditions.getRegen()->boolMinimize()->type !=
+      experimental::boolean::ExpressionType::Zero) {
+    llvm::errs() << "ey khoda\n";
+    SmallVector<Operation *> regenOpList;
+    bool initialConsWithoutProd = isInitialConsWithoutProdInSameBB(
+        predecessorOpPointer, successorOpPointer);
+    delayedAddressesAfterRegen = insertRegenBlock(
+        delayedAddressesAfterSuppress, ftdValues.getRegen(),
+        initialConsWithoutProd, predecessorOpPointer, regenOpList, rewriter);
+    llvm::errs() << "----" << regenOpList.size() << "\n";
+    addDrawingAttrToList(regenOpList, "Regen_Block_Cond");
   }
 
   SmallVector<Value> skipConditions;
-  for (Value delayedAddress : delayedAddressesAfterSuppress) {
+  for (Value delayedAddress : delayedAddressesAfterRegen) {
     handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(
         predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr,
         delayedAddress);
     inheritBB(predecessorOpPointer, cmpIOp);
+    skipConditionGeneratorOps.push_back(cmpIOp);
     skipConditions.push_back(cmpIOp.getResult());
   }
+
+  addDrawingAttrToList(skipConditionGeneratorOps, "Condition_Generator");
   return skipConditions;
 }
 
@@ -794,13 +902,21 @@ SmallVector<Value> createSkipConditionForPair(
 Value getDoneSignalFromMemoryOp(Operation *memOp,
                                 ConversionPatternRewriter &rewriter) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp)) {
-    // Value loadResult = loadOp->getResult(0);
-    // Location loc = loadOp->getLoc();
-    // handshake::UnbundleOp unbundleOp =
-    //     rewriter.create<handshake::UnbundleOp>(loc, loadResult);
-    // inheritBB(loadOp, unbundleOp);
-    // return unbundleOp.getResult(0);
-    return loadOp->getResult(0);
+    Value loadResult = loadOp->getResult(1);
+    Location loc = loadOp->getLoc();
+    handshake::UnbundleOp unbundleOp =
+        rewriter.create<handshake::UnbundleOp>(loc, loadResult);
+    inheritBB(loadOp, unbundleOp);
+
+    // ValueRange *ab = new ValueRange();
+    // handshake::ChannelType ch =
+    //     handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+    // handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(
+    //     loc, unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
+    // inheritBB(loadOp, bundleOp);
+
+    return unbundleOp.getResult(0);
+    // return loadOp->getResult(0);
   } else if (auto storeOp = dyn_cast<handshake::StoreOp>(memOp)) {
     return storeOp->getResult(2);
   } else {
@@ -809,18 +925,19 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
   }
 }
 
-/// This function creates the skip conditions for all pairs of memory accesses.
-/// This means that it creates the left side of the circuit for each pair.
-/// This includes the delay generator which is shared for the same predecessor.
-/// The regeneration/suppression block and the skip condition generator are
-/// created specifically for each pair in `createSkipConditionForPair`.
+/// This function creates the skip conditions for all pairs of memory
+/// accesses. This means that it creates the left side of the circuit for each
+/// pair. This includes the delay generator which is shared for the same
+/// predecessor. The regeneration/suppression block and the skip condition
+/// generator are created specifically for each pair in
+/// `createSkipConditionForPair`.
 SkipConditionForPair createSkipConditionsForAllPairs(
     MemAccesses &memAccesses, FTDBoolExpForPair &ftdConditionsForEachPair,
-    FuncOpInformation funcOpInformation, std::vector<unsigned> Nvector,
+    FuncOpInformation &funcOpInformation, std::vector<unsigned> Nvector,
     ConversionPatternRewriter &rewriter) {
 
   SkipConditionForPair skipConditionForEachPair;
-  Value startSignal = funcOpInformation.getStartSignal();
+  // Value startSignal = funcOpInformation.getStartSignal();
 
   unsigned NvectorIndex = 0;
   unsigned N;
@@ -832,19 +949,10 @@ SkipConditionForPair createSkipConditionsForAllPairs(
     Value predecessorOpAddr = predecessorOpPointer->getOperand(0);
 
     BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
-    Block *predecessorBlock =
-        getBlockFromOp(predecessorOpPointer, blockIndexing);
+    // Block *predecessorBlock =
+    //     getBlockFromOp(predecessorOpPointer, blockIndexing);
 
-    Block *startBlock = funcOpInformation.getStartBlock();
-
-    Value startSignalInBB = distributStartSignalToDstBlock(
-        startSignal, startBlock, predecessorBlock, true, rewriter);
-
-    // This dummy constant is the dummy value for addresses used to create delay
-    handshake::ConstantOp dummyConstOp = rewriter.create<handshake::ConstantOp>(
-        predecessorOpPointer->getLoc(),
-        rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), startSignalInBB);
-    inheritBB(predecessorOpPointer, dummyConstOp);
+    // Block *startBlock = funcOpInformation.getStartBlock();
 
     if (auto deps =
             getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
@@ -866,14 +974,17 @@ SkipConditionForPair createSkipConditionsForAllPairs(
           N = Nvector[NvectorIndex];
           NvectorIndex++;
 
-          if (N != 0) {
+          if (NvectorIndex == Nvector.size()) {
+            NvectorIndex = 0;
+          }
 
-            llvm::errs() << "[SKIP][INFO] predecessorOpName: "
-                         << predecessorOpName << " N: " << N << "\n";
+          if (N != 0) {
+            SmallVector<Operation *> addressDelayGenerator;
 
             auto bothDelayedAddresses =
-                getNDelayedValues(predecessorOpAddr, dummyConstOp,
-                                  predecessorOpPointer, N, rewriter);
+                getNDelayedValues(predecessorOpAddr, predecessorOpPointer, N,
+                                  addressDelayGenerator, rewriter);
+            addDrawingAttrToList(addressDelayGenerator, "Addr_Delay_Generator");
             SmallVector<Value> delayedAddresses =
                 std::get<0>(bothDelayedAddresses);
             SmallVector<Value> extraDelayedAddresses =
@@ -887,14 +998,14 @@ SkipConditionForPair createSkipConditionsForAllPairs(
             // If the first successor does not have a producer, we need to
             // use the extra delayed addresses.
             SmallVector<Value> effectiveDelayedAddresses = delayedAddresses;
-            if (isInitialConsWithoutProd(predecessorOpPointer,
-                                         successorOpPointer))
+            if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
+                                                 successorOpPointer))
               effectiveDelayedAddresses = extraDelayedAddresses;
 
             SmallVector<Value> skipConditions = createSkipConditionForPair(
                 predecessorOpDoneSignal, predecessorOpPointer,
-                successorOpPointer, effectiveDelayedAddresses, startSignalInBB,
-                ftdConditions, blockIndexing, N, rewriter);
+                successorOpPointer, effectiveDelayedAddresses, ftdConditions,
+                blockIndexing, N, rewriter);
             skipConditionForEachPair[predecessorOpName][successorOpName] =
                 skipConditions;
           }
@@ -908,17 +1019,31 @@ SkipConditionForPair createSkipConditionsForAllPairs(
 
 /// This function creates the skip condtional skip component which is a mux
 /// connected to a source operation.
-Value createSkip(Value waitingToken, Value cond, Value startSignal,
-                 Operation *predecessorOp,
+Value createSkip(Value waitingToken, Value cond, Operation *predecessorOp,
+                 SmallVector<Operation *> &opList,
                  ConversionPatternRewriter &rewriter) {
+
+  SmallVector<Value, 2> muxOpValues;
   handshake::SourceOp sourceOp =
       rewriter.create<handshake::SourceOp>(predecessorOp->getLoc());
-
   inheritBB(predecessorOp, sourceOp);
-  SmallVector<Value, 2> muxOpValues = {waitingToken, sourceOp.getResult()};
+  opList.push_back(sourceOp);
+
+  if (isa<ControlType>(waitingToken.getType())) {
+    muxOpValues = {waitingToken, sourceOp};
+  } else {
+    handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(
+        predecessorOp->getLoc(),
+        rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), sourceOp);
+    inheritBB(predecessorOp, constOp);
+    opList.push_back(constOp);
+    muxOpValues = {waitingToken, constOp.getResult()};
+  }
+
   handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(
       predecessorOp->getLoc(), waitingToken.getType(), cond, muxOpValues);
   inheritBB(predecessorOp, muxOp);
+  opList.push_back(muxOp);
 
   return muxOp.getResult();
 }
@@ -927,68 +1052,115 @@ Value createSkip(Value waitingToken, Value cond, Value startSignal,
 SmallVector<Value> insertConditionalSkips(SmallVector<Value> mainValues,
                                           SmallVector<Value> conds,
                                           Operation *predecessorOp,
-                                          Value startSignal,
+                                          SmallVector<Operation *> &opList,
                                           ConversionPatternRewriter &rewriter) {
   SmallVector<Value> results;
   for (auto [mainValue, cond] : llvm::zip(mainValues, conds)) {
     Value skipValue =
-        createSkip(mainValue, cond, startSignal, predecessorOp, rewriter);
+        createSkip(mainValue, cond, predecessorOp, opList, rewriter);
     results.push_back(skipValue);
   }
   return results;
 }
 
-Value createWaitingSignalForPair(
-    Value predecessorOpDoneSignal, SmallVector<Value> delayedDoneSignals,
-    SmallVector<Value> conds, Operation *predecessorOp, Operation *successorOp,
-    Value startSignal, Value startSignalInBB, FTDBoolExpressions ftdConditions,
-    BlockIndexing blockIndexing, unsigned N,
-    ConversionPatternRewriter &rewriter) {
+Value joinValues(SmallVector<Value> valuesToJoin, Operation *BBOp,
+                 ConversionPatternRewriter &rewriter) {
+
+  if (valuesToJoin.size() == 1)
+    return valuesToJoin[0];
+
+  if (isa<ControlType>(valuesToJoin[0].getType()) &&
+      isa<ControlType>(valuesToJoin[1].getType())) {
+    handshake::JoinOp joinOp =
+        rewriter.create<handshake::JoinOp>(BBOp->getLoc(), valuesToJoin);
+    inheritBB(BBOp, joinOp);
+    return joinOp.getResult();
+  } else if (isa<ControlType>(valuesToJoin[1].getType())) {
+    // extract the values beside the first one
+    SmallVector<Value> values;
+    for (unsigned i = 1; i < valuesToJoin.size(); i++) {
+      values.push_back(valuesToJoin[i]);
+    }
+
+    handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
+        BBOp->getLoc(), valuesToJoin[0], values);
+    inheritBB(BBOp, gateOp);
+    return gateOp.getResult();
+  } else {
+    handshake::BlockerOp blockerOp = rewriter.create<handshake::BlockerOp>(
+        BBOp->getLoc(), ValueRange{valuesToJoin});
+    inheritBB(BBOp, blockerOp);
+    return blockerOp.getResult();
+  }
+}
+
+Value createWaitingSignalForPair(Value predecessorOpDoneSignal,
+                                 SmallVector<Value> delayedDoneSignals,
+                                 SmallVector<Value> conds,
+                                 Operation *predecessorOp,
+                                 Operation *successorOp, Value startSignal,
+                                 FTDBoolExpressions ftdConditions,
+                                 BlockIndexing blockIndexing, unsigned N,
+                                 ConversionPatternRewriter &rewriter) {
+
+  SmallVector<Operation *> conditionalSequentializerOps;
 
   FTDConditionValues ftdValues = constructCircuitForAllConditions(
-      ftdConditions, blockIndexing, predecessorOp,
-      AreOpsinSameBB(predecessorOp, successorOp), startSignalInBB, rewriter);
+      ftdConditions, blockIndexing, predecessorOp, rewriter);
 
-  SmallVector<Value> delayedDoneSignalsAfterRegen = delayedDoneSignals;
-
-  if (ftdConditions.getSkip()->boolMinimize()->type !=
-      experimental::boolean::ExpressionType::Zero) {
-    delayedDoneSignalsAfterRegen = insertRegenBlock(
-        delayedDoneSignals, ftdValues.getSkip(), predecessorOp, rewriter);
-  } else {
-    llvm::errs() << "[SKIP][INFO] Skipping Regen\n";
-  }
-
-  SmallVector<Value> delayedDoneSignalsAfterSuppress =
-      delayedDoneSignalsAfterRegen;
+  SmallVector<Value> delayedDoneSignalsAfterSuppress = delayedDoneSignals;
   if (ftdConditions.getSupp()->boolMinimize()->type !=
       experimental::boolean::ExpressionType::Zero) {
+    llvm::errs() << "[SKIP][INFO] Inserting Suppression\n";
+    SmallVector<Operation *> suppressOpList;
     delayedDoneSignalsAfterSuppress = insertSuppressBlock(
-        delayedDoneSignalsAfterRegen, predecessorOpDoneSignal,
-        ftdValues.getSupp(), predecessorOp, successorOp, startSignalInBB, N,
+        delayedDoneSignals, predecessorOpDoneSignal, ftdValues.getSupp(),
+        ftdValues.getRegen(), predecessorOp, successorOp, N, suppressOpList,
         rewriter);
+    addDrawingAttrToList(suppressOpList, "Suppress_Block_Done");
+
   } else {
     llvm::errs() << "[SKIP][INFO] Skipping Suppression\n";
   }
 
+  SmallVector<Value> delayedDoneSignalsAfterRegen =
+      delayedDoneSignalsAfterSuppress;
+
+  if (ftdConditions.getRegen()->boolMinimize()->type !=
+      experimental::boolean::ExpressionType::Zero) {
+    llvm::errs() << "[SKIP][INFO] Inserting Regen\n";
+    SmallVector<Operation *> regenOpList;
+    bool initialConsWithoutProd =
+        isInitialConsWithoutProdInSameBB(predecessorOp, successorOp);
+    delayedDoneSignalsAfterRegen = insertRegenBlock(
+        delayedDoneSignalsAfterSuppress, ftdValues.getRegen(),
+        initialConsWithoutProd, predecessorOp, regenOpList, rewriter);
+    addDrawingAttrToList(regenOpList, "Regen_Block_Done");
+  } else {
+    llvm::errs() << "[SKIP][INFO] Skipping Regen\n";
+  }
+
   if (N == 0)
-    return delayedDoneSignalsAfterSuppress[0];
+    return delayedDoneSignalsAfterRegen[0];
 
-  SmallVector<Value> branchedDoneSignals = insertBranches(
-      delayedDoneSignalsAfterSuppress, conds, predecessorOp, rewriter);
-  SmallVector<Value> conditionallySkippedDoneSignals = insertConditionalSkips(
-      branchedDoneSignals, conds, successorOp, startSignal, rewriter);
-
-  llvm::errs() << "lanat" << conds.size() << "  "
-               << delayedDoneSignalsAfterSuppress.size() << "  "
-               << branchedDoneSignals.size() << "  "
-               << conditionallySkippedDoneSignals.size() << "\n";
+  SmallVector<Value> branchedDoneSignals =
+      insertBranches(delayedDoneSignalsAfterRegen, conds, predecessorOp,
+                     conditionalSequentializerOps, rewriter);
+  SmallVector<Value> conditionallySkippedDoneSignals =
+      insertConditionalSkips(branchedDoneSignals, conds, successorOp,
+                             conditionalSequentializerOps, rewriter);
 
   handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(
       predecessorOp->getLoc(), conditionallySkippedDoneSignals);
   inheritBB(predecessorOp, joinOp);
+  conditionalSequentializerOps.push_back(joinOp);
 
+  addDrawingAttrToList(conditionalSequentializerOps,
+                       "Conditional_Sequentializer");
   return joinOp.getResult();
+
+  // return joinValues(conditionallySkippedDoneSignals, predecessorOp,
+  // rewriter);
 }
 
 /// This function returns the inactivated version of a given dependency.
@@ -998,21 +1170,22 @@ MemDependenceAttr getInactivatedDependency(MemDependenceAttr dependency) {
                                 dependency.getLoopDepth(), false);
 }
 
-/// This function creates the waiting signals for all pairs of memory accesses.
-/// This means that it creates the right side of the circuit for each pair.
-/// This includes the delay generator which is shared for the same predecessor.
-/// The regeneration/suppression block and the conditional sequentializer
-/// are created specifically for each pair in `createWaitingSignalForPair`.
+/// This function creates the waiting signals for all pairs of memory
+/// accesses. This means that it creates the right side of the circuit for
+/// each pair. This includes the delay generator which is shared for the same
+/// predecessor. The regeneration/suppression block and the conditional
+/// sequentializer are created specifically for each pair in
+/// `createWaitingSignalForPair`.
 WaitingSignalForSucc createWaitingSignals(
     MemAccesses &memAccesses, SkipConditionForPair &skipConditionForEachPair,
-    MLIRContext *ctx, FuncOpInformation funcOpInformation,
+    MLIRContext *ctx, FuncOpInformation &funcOpInformation,
     FTDBoolExpForPair &ftdConditionsForEachPair, std::vector<unsigned> NVector,
     ConversionPatternRewriter &rewriter) {
 
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
   BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
   Value startSignal = funcOpInformation.getStartSignal();
-  Block *startBlock = funcOpInformation.getStartBlock();
+  // Block *startBlock = funcOpInformation.getStartBlock();
 
   unsigned NvectorIndex = 0;
   unsigned N;
@@ -1035,18 +1208,19 @@ WaitingSignalForSucc createWaitingSignals(
         N = NVector[NvectorIndex];
         NvectorIndex++;
 
-        Block *predecessorBlock =
-            getBlockFromOp(predecessorOpPointer, blockIndexing);
+        if (NvectorIndex == NVector.size()) {
+          NvectorIndex = 0;
+        }
 
-        Value startSignalInBB = distributStartSignalToDstBlock(
-            startSignal, startBlock, predecessorBlock, true, rewriter);
+        // Block *predecessorBlock =
+        //     getBlockFromOp(predecessorOpPointer, blockIndexing);
 
-        Value dummyValue =
-            getDummyValue(predecessorOpDoneSignal, startSignalInBB,
-                          predecessorOpPointer, rewriter);
+        SmallVector<Operation *> doneDelayGenerator;
+
         auto bothDelayedDoneSignals =
-            getNDelayedValues(predecessorOpDoneSignal, dummyValue,
-                              predecessorOpPointer, N, rewriter);
+            getNDelayedValues(predecessorOpDoneSignal, predecessorOpPointer, N,
+                              doneDelayGenerator, rewriter);
+        addDrawingAttrToList(doneDelayGenerator, "Done_Delay_Generator");
         SmallVector<Value> delayedDoneSignals =
             std::get<0>(bothDelayedDoneSignals);
         SmallVector<Value> extraDelayedDoneSignals =
@@ -1062,13 +1236,14 @@ WaitingSignalForSucc createWaitingSignals(
             ftdConditionsForEachPair[predecessorOpName][successorName];
 
         SmallVector<Value> effectiveDelayedDoneSignals = delayedDoneSignals;
-        if (isInitialConsWithoutProd(predecessorOpPointer, successorOpPointer))
+        if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
+                                             successorOpPointer))
           effectiveDelayedDoneSignals = extraDelayedDoneSignals;
 
         Value waitingSignal = createWaitingSignalForPair(
             predecessorOpDoneSignal, effectiveDelayedDoneSignals, conds,
             predecessorOpPointer, successorOpPointer, startSignal,
-            startSignalInBB, ftdConditions, blockIndexing, N, rewriter);
+            ftdConditions, blockIndexing, N, rewriter);
         waitingSignalsForEachSuccessor[successorName].push_back(waitingSignal);
 
         newDeps.push_back(getInactivatedDependency(dependency));
@@ -1085,32 +1260,11 @@ WaitingSignalForSucc createWaitingSignals(
 void gateAddress(Operation *op, SmallVector<Value> waitingValues,
                  ConversionPatternRewriter &rewriter, Location loc) {
   Value address = op->getOperand(0);
-  // handshake::UnbundleOp unbundleOp =
-  //     rewriter.create<handshake::UnbundleOp>(loc, address);
-  // inheritBB(op, unbundleOp);
-  // waitingValues.push_back(unbundleOp.getResult(0));
-  // handshake::JoinOp joinOp =
-  //     rewriter.create<handshake::JoinOp>(loc, waitingValues);
-  // inheritBB(op, joinOp);
-  // ValueRange *ab = new ValueRange();
-  // handshake::ChannelType ch =
-  //     handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-  // handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(
-  //     loc, joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
-  // inheritBB(op, bundleOp);
 
-  if (isa<ControlType>(waitingValues[0].getType())) {
-    handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
-        loc, address, ValueRange(waitingValues));
-    inheritBB(op, gateOp);
-    op->setOperand(0, gateOp.getResult());
-  } else {
-    waitingValues.insert(waitingValues.begin(), address);
-    handshake::BlockerOp blockerOp =
-        rewriter.create<handshake::BlockerOp>(loc, ValueRange(waitingValues));
-    inheritBB(op, blockerOp);
-    op->setOperand(0, blockerOp.getResult());
-  }
+  handshake::GateOp gateOp =
+      rewriter.create<handshake::GateOp>(loc, address, waitingValues);
+  inheritBB(op, gateOp);
+  op->setOperand(0, gateOp.getResult());
 }
 
 void gateAllSuccessorAccesses(
@@ -1142,6 +1296,8 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
                                                    MLIRContext *ctx) {
   ConversionPatternRewriter rewriter(ctx);
   FuncOpInformation funcOpInformation(funcOp);
+
+  outFile.open("./skip/" + kernelName + ".txt");
 
   std::vector<unsigned> NVector = getNVector(NStr);
 
@@ -1181,6 +1337,15 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
     handleFuncOp(funcOp, ctx);
 
+    experimental::cfg::markBasicBlocks(funcOp, rewriter);
+
+    // open a file to dump funcOp
+    llvm::errs() << "Dumping funcOp after inserting skippable seq:\n";
+
+    std::error_code EC;
+    llvm::raw_fd_ostream file("funcOp_after_inserting_skippable_seq.mlir", EC);
+    funcOp.print(file);
+    file.close();
     // funcOp.print(llvm::errs());
     if (failed(cfg::flattenFunction(funcOp)))
       signalPassFailure();

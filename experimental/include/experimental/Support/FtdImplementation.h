@@ -19,11 +19,14 @@
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+using namespace mlir;
+using namespace dynamatic;
 using namespace boolean;
 
 /// This function implements the regeneration mechanism over a pair made of a
@@ -107,6 +110,20 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
     s2.erase(bb);
   }
 }
+
+/// Get a boolean expression representing the exit condition of the current
+/// loop block.
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                          CFGLoopInfo &li,
+                                          const ftd::BlockIndexing &bi);
+
+/// Starting from a boolean expression which is a single variable (either
+/// direct or complement) return its corresponding circuit equivalent. This
+/// means, either we obtain the output of the operation determining the
+/// condition, or we add a `not` to complement.
+Value boolVariableToCircuit(PatternRewriter &rewriter,
+                            experimental::boolean::BoolExpression *expr,
+                            Block *block, const ftd::BlockIndexing &bi);
 
 }; // namespace ftd
 }; // namespace experimental

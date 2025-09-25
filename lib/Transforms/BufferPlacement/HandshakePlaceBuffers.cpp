@@ -251,31 +251,34 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       }
     }
 
-    std::optional<unsigned> srcBB = opBlocks[&op];
-    for (OpResult res : op.getResults()) {
-      Operation *user = *res.getUsers().begin();
-      std::optional<unsigned> dstBB = opBlocks[user];
+    // std::optional<unsigned> srcBB = opBlocks[&op];
+    // for (OpResult res : op.getResults()) {
+    //   Operation *user = *res.getUsers().begin();
+    //   std::optional<unsigned> dstBB = opBlocks[user];
 
-      // All transitions between blocks must exist in the original CFG
-      if (srcBB && dstBB && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB)) {
-        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
-        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
-            dstBB == endBB) {
-          /// NOTE: (lucas-rami) This is probably the start->end control channel
-          /// which goes from the entry block to the exit block. This is fine in
-          /// general so we let this pass without triggering a warning or error
-          continue;
-        }
+    //   // All transitions between blocks must exist in the original CFG
+    //   if (srcBB && dstBB && *srcBB != *dstBB &&
+    //       !transitions[*srcBB].contains(*dstBB)) {
+    //     auto endBB =
+    //     *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator()); if
+    //     (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+    //         dstBB == endBB) {
+    //       /// NOTE: (lucas-rami) This is probably the start->end control
+    //       channel
+    //       /// which goes from the entry block to the exit block. This is fine
+    //       in
+    //       /// general so we let this pass without triggering a warning or
+    //       error continue;
+    //     }
 
-        return op.emitError()
-               << "Result " << res.getResultNumber() << " defined in block "
-               << *srcBB << " is used in block " << *dstBB
-               << ". This connection does not exist according to the CFG "
-                  "graph. Solving the buffer placement MILP would yield an "
-                  "incorrect placement.";
-      }
-    }
+    //     return op.emitError()
+    //            << "Result " << res.getResultNumber() << " defined in block "
+    //            << *srcBB << " is used in block " << *dstBB
+    //            << ". This connection does not exist according to the CFG "
+    //               "graph. Solving the buffer placement MILP would yield an "
+    //               "incorrect placement.";
+    //   }
+    // }
   }
   return success();
 }
@@ -332,33 +335,34 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   }
   Logger *logger = dumpLogs ? *bufLogger : nullptr;
 
-  // Get CFDFCs from the function unless the functions has no archs (i.e.,
-  // it has a single block) in which case there are no CFDFCs
-  SmallVector<CFDFC> cfdfcs;
-  if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
-    return failure();
+  // // Get CFDFCs from the function unless the functions has no archs (i.e.,
+  // // it has a single block) in which case there are no CFDFCs
+  // SmallVector<CFDFC> cfdfcs;
+  // if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
+  //   return failure();
 
-  // All extracted CFDFCs must be optimized
-  for (CFDFC &cf : cfdfcs)
-    info.cfdfcs[&cf] = true;
+  // // All extracted CFDFCs must be optimized
+  // for (CFDFC &cf : cfdfcs)
+  //   info.cfdfcs[&cf] = true;
 
-  // Create a new map for the cfdfc extraction
-  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+  // // Create a new map for the cfdfc extraction
+  // llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
 
-  // Iterate through all extracted cfdfc
-  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-    auto &[cf, _] = cfAndOpt;
-    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
-      // Add the bb to the corresponding in the cfdfc result map
-      cfdfcResult[idx].push_back(cf->cycle[i]);
-    }
-    cfdfcResult[idx].push_back(cf->cycle.back());
-  }
+  // // Iterate through all extracted cfdfc
+  // for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+  //   auto &[cf, _] = cfAndOpt;
+  //   for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+  //     // Add the bb to the corresponding in the cfdfc result map
+  //     cfdfcResult[idx].push_back(cf->cycle[i]);
+  //   }
+  //   cfdfcResult[idx].push_back(cf->cycle.back());
+  // }
 
-  // Create and add the handshake.cfdfc attribute
-  auto cfdfcMap =
-      handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
-  setDialectAttr(info.funcOp, cfdfcMap);
+  // // Create and add the handshake.cfdfc attribute
+  // auto cfdfcMap =
+  //     handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(),
+  //     cfdfcResult);
+  // setDialectAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);

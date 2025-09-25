@@ -192,23 +192,25 @@ void FPGA20Buffers::setup() {
 
   // Create CFDFC variables and add throughput constraints for each CFDFC that
   // was marked to be optimized
-  SmallVector<CFDFC *> cfdfcs;
-  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-    if (!optimize)
-      continue;
-    cfdfcs.push_back(cfdfc);
-    addCFDFCVars(*cfdfc);
-    // addMuxConstraint(*cfdfc);
-    addSteadyStateReachabilityConstraints(*cfdfc);
-    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
-    addUnitThroughputConstraints(*cfdfc);
-  }
-  addBackedgeConstraints();
-  addDataBufConstraint();
+  // SmallVector<CFDFC *> cfdfcs;
+  // for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
+  //   if (!optimize)
+  //     continue;
+  //   cfdfcs.push_back(cfdfc);
+  //   addCFDFCVars(*cfdfc);
+  //   // addMuxConstraint(*cfdfc);
+  //   addSteadyStateReachabilityConstraints(*cfdfc);
+  //   addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
+  //   addUnitThroughputConstraints(*cfdfc);
+  // }
+  // addBackedgeConstraints();
+  // addDataBufConstraint();
 
-  GRBLinExpr objective = addBackedgeObjective(allChannels);
+  // GRBLinExpr objective = addBackedgeObjective(allChannels);
   // Add the MILP objective and mark the MILP ready to be optimized
-  addMaxThroughputObjective(allChannels, cfdfcs, objective);
+  // addMaxThroughputObjective(allChannels, cfdfcs, objective);
+
+  addMinBufferAreaObjective(allChannels);
   markReadyToOptimize();
 }
 

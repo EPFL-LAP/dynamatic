@@ -365,13 +365,16 @@ protected:
 
   GRBLinExpr addBackedgeObjective(ValueRange allChannels);
 
-  /// Adds the MILP model's objective. The objective maximizes throughput while
-  /// minimizing buffer usage, with throughput prioritized. It has a positive
-  /// "throughput term" for every provided CFDFC. These terms are weighted by
-  /// the "importance" of the CFDFC compared to the others, which is determined
-  /// using an estimation of the total number of executions over each provided
-  /// channel. The objective has a negative term for each buffer placement
-  /// decision and for each buffer slot placed on any of the provide channels.
+  void addMinBufferAreaObjective(ValueRange channels);
+
+  /// Adds the MILP model's objective. The objective maximizes throughput
+  /// while minimizing buffer usage, with throughput prioritized. It has a
+  /// positive "throughput term" for every provided CFDFC. These terms are
+  /// weighted by the "importance" of the CFDFC compared to the others,
+  /// which is determined using an estimation of the total number of
+  /// executions over each provided channel. The objective has a negative
+  /// term for each buffer placement decision and for each buffer slot
+  /// placed on any of the provide channels.
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.

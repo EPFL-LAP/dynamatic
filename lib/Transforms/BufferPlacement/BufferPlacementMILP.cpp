@@ -294,11 +294,27 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       if (signalType == SignalType::READY)
         std::swap(in, out);
 
+      // llvm::errs() << "Unit: " << *unit << "\n";
       GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
       GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
+      // llvm::errs() << "In: " << in << ", Out: " << out << "\n";
+
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
-      model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+      // llvm::errs() << "Adding unit timing constraint for " << uniqueName
+      //              << " on signal " << getSignalName(signalType) << delay
+      //              << "- " << in << out.getu << "\n";
+      // llvm::errs() << out << "\n";
+      // llvm::errs() << out.getUses().begin()->getOwner()->getName() << "\n";
+
+      if (isa<handshake::UnbundleOp>(unit) && !out.getType().isa<ControlType>())
+        llvm::errs() << "skipping\n";
+      else if (isa<handshake::MemoryControllerOp>(*out.getUsers().begin())) {
+        llvm::errs() << "skipping mem\n";
+      } else {
+        model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+        llvm::errs() << "success\n";
+      }
     });
 
     return;
@@ -508,8 +524,8 @@ void BufferPlacementMILP::addMuxConstraint(CFDFC &cfdfc) {
         llvm::errs() << "data operand: " << dataOp << "\n";
         // check if this value is created by a source operation
         if (isa<handshake::SourceOp>(dataOp.getDefiningOp())) {
-          GRBVar &chTokenOccupancy =
-              cfVars.channelThroughputs[muxOp.getResult()];
+          // GRBVar &chTokenOccupancy =
+          //     cfVars.channelThroughputs[muxOp.getResult()];
 
           // model.addConstr(chTokenOccupancy == 1, "rouzbeh");
           llvm::errs() << muxOp.getResult() << "adding mux constraint\n";
@@ -1049,6 +1065,23 @@ GRBLinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
   return objective;
 }
 
+void BufferPlacementMILP::addMinBufferAreaObjective(ValueRange channels) {
+  GRBLinExpr objective = 0;
+
+  for (Value channel : channels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    objective -= chVars.bufPresent;
+    objective -= 0.1 * chVars.bufNumSlots;
+  }
+
+  // llvm::errs() << "Objective: " << "\n";
+  // model.computeIIS();
+
+  // model.write("model.ilp");
+  // llvm::errs() << "wrote IIS" << "\n";
+  model.setObjective(objective, GRB_MAXIMIZE);
+}
+
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
                                                     ArrayRef<CFDFC *> cfdfcs,
                                                     GRBLinExpr objective) {
@@ -1169,11 +1202,14 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
 void BufferPlacementMILP::forEachIOPair(
     Operation *op, const std::function<void(Value, Value)> &callback) {
+  // llvm::errs() << "OP: " << *op << "\n";
   for (Value opr : op->getOperands()) {
     if (!isa<MemRefType>(opr.getType())) {
       for (OpResult res : op->getResults()) {
-        if (!isa<MemRefType>(res.getType()))
+        if (!isa<MemRefType>(res.getType())) {
+          // llvm::errs() << "OPR: " << opr << ", RES: " << res << "\n";
           callback(opr, res);
+        }
       }
     }
   }
