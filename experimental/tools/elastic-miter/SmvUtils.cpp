@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
-#include <utility>
 
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -80,7 +79,7 @@ static int executeWithRedirect(const std::string &command,
 
   // Redirect stdout, keep default of stdin and stderr
   std::string stdoutFileString = stdoutFile.string();
-  ArrayRef<std::optional<StringRef>> redirects = {
+  SmallVector<std::optional<StringRef>> redirects = {
       std::nullopt, stdoutFileString, std::nullopt};
 
   std::string errMsg;
@@ -131,16 +130,36 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 #endif
 }
 
-FailureOr<std::pair<std::filesystem::path, std::string>>
-handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool generateCircuitPng) {
+LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
+                            const std::filesystem::path &outputDir,
+                            bool generateCircuitPng) {
 
-  std::filesystem::path dotFile = outputDir / "model.dot";
+  std::filesystem::path hwFile = outputDir / "hw.mlir";
+
+  // Convert Handshake to HW
+  std::string cmd =
+      "bin/dynamatic-opt " + mlirPath.string() + " --lower-handshake-to-hw";
+  int ret = executeWithRedirect(cmd, hwFile);
+  if (ret != 0) {
+    llvm::errs() << "Failed to convert to HW\n";
+    return failure();
+  }
+
+  // Convert the HW file to SMV
+  cmd = "bin/export-rtl " + hwFile.string() + " " + outputDir.string() +
+        " ./data/rtl-config-smv-elasticmiter.json " + " --dynamatic-path=." +
+        " --hdl=smv";
+  ret = executeWithRedirect(cmd, "/dev/null");
+  if (ret != 0) {
+    llvm::errs() << "Failed to convert to SMV\n";
+    return failure();
+  }
 
   // Convert the handshake to dot
-  std::string cmd =
-      "bin/export-dot " + mlirPath.string() + " --edge-style=spline";
-  int ret = executeWithRedirect(cmd, dotFile);
+  // Used by the counterexample visualizer
+  std::filesystem::path dotFile = outputDir / "model.dot";
+  cmd = "bin/export-dot " + mlirPath.string() + " --edge-style=spline";
+  ret = executeWithRedirect(cmd, dotFile);
   if (ret != 0) {
     llvm::errs() << "Failed to convert to dot\n";
     return failure();
@@ -158,27 +177,6 @@ handshake2smv(const std::filesystem::path &mlirPath,
     }
   }
 
-  // Convert the dotfile to SMV
-  // The current implementation of dot2smv uses the hardcoded name "model.smv"
-  // in the dotfile's directory.
-  // For the conversion to work dot2smv is required.
-  // Run build.sh with the --enable-leq-binaries flag
-  std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
-  cmd = "python3 ext/dot2smv/dot2smv " + dotFile.string();
-  ret = executeWithRedirect(cmd, "/dev/null");
-  // Check if bits 15-8 are set to 0x7F. In this case the command was not
-  // found.
-  if (ret == -1) {
-    llvm::errs() << "dot2smv not found. Run build.sh with the "
-                    "--enable-leq-binaries flag\n";
-  }
-  if (ret != 0) {
-    llvm::errs() << "Failed to convert to SMV\n";
-    return failure();
-  }
-  // Currently dot2smv only supports "model" as the model's name
-  std::string moduleName = "model";
-
-  return std::make_pair(smvFile, moduleName);
+  return success();
 }
 } // namespace dynamatic::experimental

@@ -58,12 +58,12 @@ LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
 }
 
 FailureOr<std::pair<FuncOp, Block *>>
-buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
+buildNewFuncWithBlock(OpBuilder builder, llvm::StringRef name,
                       ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
                       NamedAttribute argNamedAttr,
                       NamedAttribute resNamedAttr) {
 
-  ArrayRef<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
+  SmallVector<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
 
   FunctionType funcType = builder.getFunctionType(inputTypes, outputTypes);
 
@@ -80,7 +80,8 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
 // The result names have EQ_ prefixed.
 FailureOr<std::pair<FuncOp, Block *>>
-buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
+buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
+                      llvm::StringRef funcName) {
 
   // Check equality of interfaces
   if (lhsFuncOp.getArgumentTypes() != rhsFuncOp.getArgumentTypes()) {
@@ -132,12 +133,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   // Now, you have the modified SmallVector<Type>
   mlir::ArrayRef<mlir::Type> newArrayRef(outputTypes);
 
-  // The name of the new function is: elastic_miter_<LHS_NAME>_<RHS_NAME>
-  std::string miterName = "elastic_miter_" + lhsFuncOp.getNameAttr().str() +
-                          "_" + rhsFuncOp.getNameAttr().str();
-
   // Create the elastic-miter function
-  return buildNewFuncWithBlock(builder, miterName, lhsFuncOp.getArgumentTypes(),
+  return buildNewFuncWithBlock(builder, funcName, lhsFuncOp.getArgumentTypes(),
                                outputTypes, argNamedAttr, resNamedAttr);
 }
 
@@ -249,6 +246,9 @@ createReachabilityCircuit(MLIRContext &context,
   // circuit.
   for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
     BlockArgument arg = funcOp.getArgument(i);
+    if (getHandshakeTypeBitWidth(arg.getType()) > 1)
+      return funcOp.emitError("ElasticMiter currently supports only 1-bit or "
+                              "control inputs.");
 
     std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
@@ -338,8 +338,18 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     return failure();
   }
 
+  // Create the config
+  ElasticMiterConfig config;
+  config.lhsFuncName = lhsFuncOp.getNameAttr().str();
+  config.rhsFuncName = rhsFuncOp.getNameAttr().str();
+
+  // The name of the new function is: elastic_miter_<LHS_NAME>_<RHS_NAME>
+  config.funcName =
+      "elastic_miter_" + config.lhsFuncName + "_" + config.rhsFuncName;
+
   // Create a new FuncOp containing an entry Block
-  auto pairOrFailure = buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp);
+  auto pairOrFailure =
+      buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp, config.funcName);
   if (failed(pairOrFailure)) {
     llvm::errs() << "Failed to create new funcOp.\n";
     return failure();
@@ -367,11 +377,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   builder.setInsertionPointToStart(newBlock);
 
-  // Create the config
-  ElasticMiterConfig config;
-  config.lhsFuncName = lhsFuncOp.getNameAttr().str();
-  config.rhsFuncName = rhsFuncOp.getNameAttr().str();
-
   Operation *nextLocation;
 
   // Create the input side auxillary logic:
@@ -386,6 +391,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     BlockArgument lhsArg = lhsFuncOp.getArgument(i);
     BlockArgument rhsArg = rhsFuncOp.getArgument(i);
     BlockArgument miterArg = newFuncOp.getArgument(i);
+    if (getHandshakeTypeBitWidth(miterArg.getType()) > 1) {
+      return lhsFuncOp.emitError(
+          "ElasticMiter currently supports only 1-bit or "
+          "control inputs.");
+    }
 
     std::string forkName = "in_fork_" + lhsFuncOp.getArgName(i).str();
     std::string lhsBufName = "lhs_in_buf_" + lhsFuncOp.getArgName(i).str();
@@ -489,8 +499,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
     if (lhsResult.getType().isa<handshake::ControlType>()) {
-      ValueRange joinInputs = {lhsEndBufferOp.getResult(),
-                               rhsEndBufferOp.getResult()};
+      SmallVector<Value> joinInputs = {lhsEndBufferOp.getResult(),
+                                       rhsEndBufferOp.getResult()};
       JoinOp joinOp =
           builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
       setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);
@@ -570,8 +580,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   }
   auto [miterModule, config] = ret.value();
 
-  std::string mlirFilename = "elastic_miter_" + config.rhsFuncName + "_" +
-                             config.rhsFuncName + ".mlir";
+  std::string mlirFilename = config.funcName + ".mlir";
 
   if (failed(createMlirFile(outputDir / mlirFilename, miterModule))) {
     llvm::errs() << "Failed to write MLIR miter file.\n";

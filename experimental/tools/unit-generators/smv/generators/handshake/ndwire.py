@@ -14,7 +14,6 @@ def _generate_ndwire_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR state : {{SLEEPING, RUNNING}};
-
   ASSIGN
   init(state) := {{SLEEPING, RUNNING}};
   next(state) := case
@@ -42,6 +41,5 @@ MODULE {name}(ins, ins_valid, outs_ready)
   outs := ins;
   outs_valid :=  inner_ndwire.outs_valid;
   ins_ready  :=  inner_ndwire.ins_ready;
-
 {_generate_ndwire_dataless(f"{name}__ndwire_dataless")}
 """

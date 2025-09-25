@@ -49,6 +49,8 @@ import generators.arith.subi as subi
 import generators.arith.truncf as truncf
 import generators.arith.trunci as trunci
 import generators.arith.xori as xori
+import generators.handshake.ndwire as ndwire
+import generators.handshake.init as init
 
 import generators.memory.memory_controller as memory_controller
 import generators.memory.lsq as lsq
@@ -148,6 +150,8 @@ def generate_code(name, mod_type, parameters):
             return memory_controller.generate_memory_controller(name, parameters)
         case "ndwire":
             return ndwire.generate_ndwire(name, parameters)
+        case "init":
+            return init.generate_init(name, parameters)
         case "lsq":
             return lsq.generate_lsq(name, parameters)
         case _:
