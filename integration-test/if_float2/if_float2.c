@@ -8,10 +8,10 @@ float if_float2(float x0, float a[ITERS], float minus_trace[ITERS]) {
   float x = x0;
   for (int i = 0; i < ITERS; i++) {
     if (a[i] * x + (-0.6f) * x <= 0.0f) {
-      x += 3.0f;
+      x *= 1.1f;
     } else {
       minus_trace[i] = x;
-      x += 1.0f;
+      x *= 1.2f;
     }
     x = 1 / x;
   }
