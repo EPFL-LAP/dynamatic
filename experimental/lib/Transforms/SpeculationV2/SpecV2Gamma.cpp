@@ -63,6 +63,16 @@ void SpecV2GammaPass::runDynamaticPass() {
 
   DenseSet<PasserOp> frontiers;
   for (auto passer : funcOp.getOps<PasserOp>()) {
+    if (emulatePrediction) {
+      Operation *ctrlDefOp = getIndirectDefiningOp(passer.getCtrl());
+      if (isa<NotOp>(ctrlDefOp)) {
+        if (prioritizedSide != 0)
+          continue;
+      } else {
+        if (prioritizedSide != 1)
+          continue;
+      }
+    }
     frontiers.insert(passer);
   }
 

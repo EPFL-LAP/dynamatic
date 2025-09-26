@@ -72,6 +72,8 @@ def main():
         "--one-sided", action='store_true',
         help="Run one-sided speculation")
     parser.add_argument(
+        "--emulate-prediction", action='store_true')
+    parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
     parser.add_argument(
         "--cp", type=str, help="clock period", default="10.000")
@@ -401,7 +403,7 @@ def main():
         with open(handshake_speculation, "w") as f:
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-                f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} prioritized-side={args.prioritized_side} steps-until={args.steps_until} {"one-sided" if args.one_sided else ""}",
+                f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} prioritized-side={args.prioritized_side} steps-until={args.steps_until} {"one-sided" if args.one_sided else ""} {"emulate-prediction" if args.emulate_prediction else ""}",
                 "--handshake-materialize",
             ],
                 stdout=f,

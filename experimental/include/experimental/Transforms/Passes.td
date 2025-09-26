@@ -180,6 +180,8 @@ def SpecV2Gamma : DynamaticPass<"handshake-spec-v2-gamma"> {
     Option<"stepsUntil", "steps-until", "unsigned", "", "">,
     Option<"bbMapping", "bb-mapping", "std::string", "",
            "Path to the output bb mapping file.">,
+    Option<"emulatePrediction", "emulate-prediction", "bool", "false",
+           "Emulate prediction behavior (with oneSided option)">,
   ];
 }
 
