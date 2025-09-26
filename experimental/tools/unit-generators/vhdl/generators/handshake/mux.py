@@ -3,6 +3,7 @@ from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding
 from generators.support.signal_manager.utils.internal_signal import create_internal_channel_decl
 from generators.support.signal_manager.utils.types import ExtraSignals
+from generators.support.utils import data
 
 
 def generate_mux(name, params):
@@ -271,7 +272,7 @@ begin
   -- Forwarding logic
   {forwarding_assignments}
 
-  outs <= outs_inner;
+  {data("outs <= outs_inner;", data_bitwidth)}
   outs_valid <= outs_inner_valid;
   outs_inner_ready <= outs_ready;
 

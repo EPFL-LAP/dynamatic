@@ -9,9 +9,11 @@ def generate_divf(name, params):
     extra_signals = params["extra_signals"]
 
     assert not is_double, "Double precision division is not supported."
-    assert not extra_signals, "Extra signals are not supported."
 
-    return _generate_divf(name, is_double)
+    if extra_signals:
+        return _generate_divf_signal_manager(name, is_double, extra_signals)
+    else:
+        return _generate_divf(name, is_double)
 
 
 def _generate_divf(name, is_double):
@@ -129,3 +131,26 @@ end architecture;
 """
 
     return dependencies + entity + architecture
+
+
+def _generate_divf_signal_manager(name, is_double, extra_signals):
+    bitwidth = 64 if is_double else 32
+    return generate_buffered_signal_manager(
+        name,
+        [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_divf(name, is_double),
+        _get_latency(is_double))

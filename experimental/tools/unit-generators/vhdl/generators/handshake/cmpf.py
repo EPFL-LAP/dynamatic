@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_buffered_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 
@@ -99,10 +99,6 @@ end architecture;
 """
 
     return dependencies + entity + architecture
-
-
-def _get_latency(is_double):
-    return 1  # todo
 
 
 def _generate_cmpf_single_precision(name):
@@ -289,7 +285,7 @@ end architecture;
 
 def _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals):
     bitwidth = 64 if is_double else 32
-    return generate_buffered_signal_manager(
+    return generate_default_signal_manager(
         name,
         [{
             "name": "lhs",
@@ -306,5 +302,4 @@ def _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_cmpf(name, is_double, predicate),
-        _get_latency(is_double))
+        lambda name: _generate_cmpf(name, is_double, predicate))
