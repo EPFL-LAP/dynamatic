@@ -1,8 +1,7 @@
-#include "fixed.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
-float fixed(in_float_t y) {
+float fixed(float y) {
   float c = 1000.0f;
   float x1 = 0.0f;
   float x0 = 1.0f;
@@ -16,7 +15,7 @@ float fixed(in_float_t y) {
 }
 
 int main(void) {
-  in_float_t y = 0.7f;
+  float y = 0.7f;
   CALL_KERNEL(fixed, y);
   return 0;
 }

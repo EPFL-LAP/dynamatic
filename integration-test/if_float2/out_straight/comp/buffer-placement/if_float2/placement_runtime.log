@@ -1,0 +1,81 @@
+
+Gurobi 12.0.2 (linux64) logging started Tue Sep 23 22:35:23 2025
+
+Set parameter LogFile to value "buffer-placement/if_float2/placement_runtime.log"
+Gurobi Optimizer version 12.0.2 build v12.0.2rc0 (linux64 - "Ubuntu 24.04.3 LTS")
+
+CPU model: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Non-default parameters:
+TimeLimit  300
+LogToConsole  0
+
+Optimize a model with 1442 rows, 1180 columns and 2798 nonzeros
+Model fingerprint: 0x1e328a63
+Variable types: 480 continuous, 700 integer (420 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+02]
+  Objective range  [1e-05, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e-03, 1e+01]
+Found heuristic solution: objective -0.0034787
+Presolve removed 860 rows and 723 columns
+Presolve time: 0.00s
+Presolved: 582 rows, 457 columns, 1435 nonzeros
+Found heuristic solution: objective -0.0033700
+Variable types: 167 continuous, 290 integer (181 binary)
+Found heuristic solution: objective -0.0033107
+
+Root relaxation: objective 2.970016e-02, 282 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    0.02970    0   32   -0.00331    0.02970   997%     -    0s
+H    0     0                      -0.0027178    0.02970  1193%     -    0s
+H    0     0                       0.0279910    0.02970  6.11%     -    0s
+H    0     0                       0.0282084    0.02970  5.29%     -    0s
+     0     0    0.02937    0   56    0.02821    0.02937  4.12%     -    0s
+H    0     0                       0.0283171    0.02937  3.72%     -    0s
+H    0     0                       0.0284259    0.02937  3.32%     -    0s
+     0     0    0.02937    0   55    0.02843    0.02937  3.32%     -    0s
+     0     0    0.02925    0   52    0.02843    0.02925  2.91%     -    0s
+     0     0    0.02925    0   63    0.02843    0.02925  2.91%     -    0s
+     0     0    0.02910    0   61    0.02843    0.02910  2.38%     -    0s
+     0     0    0.02908    0   47    0.02843    0.02908  2.31%     -    0s
+     0     0    0.02901    0   52    0.02843    0.02901  2.06%     -    0s
+     0     0    0.02901    0   74    0.02843    0.02901  2.06%     -    0s
+     0     0    0.02890    0   57    0.02843    0.02890  1.68%     -    0s
+     0     0    0.02890    0   63    0.02843    0.02890  1.68%     -    0s
+     0     0    0.02874    0   31    0.02843    0.02874  1.11%     -    0s
+     0     0    0.02873    0   26    0.02843    0.02873  1.08%     -    0s
+     0     0    0.02873    0   63    0.02843    0.02873  1.08%     -    0s
+     0     0    0.02872    0   50    0.02843    0.02872  1.03%     -    0s
+H    0     0                       0.0285346    0.02870  0.57%     -    0s
+     0     0    0.02870    0   73    0.02853    0.02870  0.57%     -    0s
+     0     0    0.02865    0   32    0.02853    0.02865  0.39%     -    0s
+     0     0    0.02863    0   21    0.02853    0.02863  0.34%     -    0s
+     0     0    0.02863    0   22    0.02853    0.02863  0.34%     -    0s
+H    0     0                       0.0286235    0.02863  0.03%     -    0s
+     0     0    0.02863    0   10    0.02862    0.02863  0.03%     -    0s
+     0     0    0.02863    0    7    0.02862    0.02863  0.03%     -    0s
+     0     0    0.02863    0   11    0.02862    0.02863  0.02%     -    0s
+     0     0     cutoff    0         0.02862    0.02862  0.00%     -    0s
+
+Cutting planes:
+  Learned: 1
+  Gomory: 4
+  Cover: 2
+  MIR: 1
+  Flow cover: 6
+  Inf proof: 1
+
+Explored 1 nodes (2014 simplex iterations) in 0.12 seconds (0.09 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 0.0286235 0.0286235 0.0285346 ... -0.00271776
+No other solutions better than 0.0286235
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.862350581555e-02, best bound 2.862350581555e-02, gap 0.0000%

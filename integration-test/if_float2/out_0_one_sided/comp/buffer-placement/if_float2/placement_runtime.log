@@ -1,0 +1,86 @@
+
+Gurobi 12.0.2 (linux64) logging started Tue Sep 23 22:33:28 2025
+
+Set parameter LogFile to value "buffer-placement/if_float2/placement_runtime.log"
+Gurobi Optimizer version 12.0.2 build v12.0.2rc0 (linux64 - "Ubuntu 24.04.3 LTS")
+
+CPU model: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Non-default parameters:
+TimeLimit  300
+LogToConsole  0
+
+Optimize a model with 1476 rows, 1206 columns and 2866 nonzeros
+Model fingerprint: 0xe8423b70
+Variable types: 491 continuous, 715 integer (429 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+02]
+  Objective range  [1e-05, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e-03, 1e+01]
+Presolve removed 872 rows and 732 columns
+Presolve time: 0.00s
+Presolved: 604 rows, 474 columns, 1489 nonzeros
+Variable types: 174 continuous, 300 integer (188 binary)
+Found heuristic solution: objective -0.0878988
+
+Root relaxation: objective 3.382781e-02, 313 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    0.03383    0   49   -0.08790    0.03383   138%     -    0s
+H    0     0                      -0.0039901    0.03383   948%     -    0s
+H    0     0                       0.0308785    0.03383  9.55%     -    0s
+H    0     0                       0.0313134    0.03383  8.03%     -    0s
+H    0     0                       0.0319058    0.03383  6.02%     -    0s
+     0     0    0.03374    0   58    0.03191    0.03374  5.73%     -    0s
+H    0     0                       0.0323407    0.03367  4.10%     -    0s
+     0     0    0.03367    0   48    0.03234    0.03367  4.10%     -    0s
+H    0     0                       0.0324494    0.03366  3.74%     -    0s
+     0     0    0.03366    0   66    0.03245    0.03366  3.74%     -    0s
+     0     0    0.03336    0   77    0.03245    0.03336  2.82%     -    0s
+     0     0    0.03328    0   62    0.03245    0.03328  2.55%     -    0s
+H    0     0                       0.0326668    0.03328  1.87%     -    0s
+     0     0    0.03313    0   62    0.03267    0.03313  1.42%     -    0s
+     0     0    0.03312    0   71    0.03267    0.03312  1.39%     -    0s
+     0     0    0.03302    0   62    0.03267    0.03302  1.09%     -    0s
+     0     0    0.03301    0   63    0.03267    0.03301  1.06%     -    0s
+     0     0    0.03299    0   59    0.03267    0.03299  0.99%     -    0s
+     0     0    0.03298    0   72    0.03267    0.03298  0.96%     -    0s
+H    0     0                       0.0327755    0.03294  0.49%     -    0s
+     0     0    0.03294    0   62    0.03278    0.03294  0.49%     -    0s
+     0     0    0.03293    0   72    0.03278    0.03293  0.48%     -    0s
+     0     0    0.03292    0   69    0.03278    0.03292  0.46%     -    0s
+     0     0    0.03292    0   65    0.03278    0.03292  0.46%     -    0s
+     0     0    0.03292    0   60    0.03278    0.03292  0.43%     -    0s
+     0     0    0.03292    0   68    0.03278    0.03292  0.43%     -    0s
+     0     0    0.03291    0   71    0.03278    0.03291  0.42%     -    0s
+     0     0    0.03291    0   57    0.03278    0.03291  0.41%     -    0s
+     0     0    0.03291    0   66    0.03278    0.03291  0.41%     -    0s
+     0     0    0.03290    0   58    0.03278    0.03290  0.38%     -    0s
+     0     2    0.03290    0   56    0.03278    0.03290  0.38%     -    0s
+
+Cutting planes:
+  Learned: 1
+  Gomory: 8
+  Cover: 9
+  Implied bound: 48
+  Dual implied bound: 14
+  Clique: 1
+  MIR: 30
+  Flow cover: 42
+  Flow path: 4
+  Inf proof: 5
+  RLT: 3
+  Relax-and-lift: 4
+
+Explored 119 nodes (6166 simplex iterations) in 0.21 seconds (0.19 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 9: 0.0327755 0.0326668 0.0324494 ... -0.0878988
+No other solutions better than 0.0327755
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.277552968947e-02, best bound 3.277552968947e-02, gap 0.0000%

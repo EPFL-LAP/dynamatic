@@ -1,0 +1,8 @@
+{
+  "speculator": {
+    "operation-name": "fork14",
+    "operand-idx": 0,
+    "fifo-depth": 30
+  },
+  "save-commits-fifo-depth": 30
+}
