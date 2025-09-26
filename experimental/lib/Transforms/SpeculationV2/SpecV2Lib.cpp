@@ -335,3 +335,61 @@ bool tryErasePasser(PasserOp passer) {
   }
   return false;
 }
+
+std::optional<ControlMergeOp> getConfluencePoint(Value value) {
+  Operation *user = getUniqueUser(value);
+  if (auto cmerge = dyn_cast<ControlMergeOp>(user)) {
+    if (cmerge.getNumOperands() == 1) {
+      assert(isa<SinkOp>(getUniqueUser(cmerge.getIndex())));
+      return getConfluencePoint(cmerge.getResult());
+    }
+    return cmerge;
+  }
+  if (auto branch = dyn_cast<BranchOp>(user)) {
+    return getConfluencePoint(branch.getResult());
+  }
+  if (auto fork = dyn_cast<ForkOp>(user)) {
+    for (auto res : fork->getResults()) {
+      auto confluence = getConfluencePoint(res);
+      if (confluence.has_value())
+        return confluence;
+    }
+  }
+  return std::nullopt;
+}
+
+void introduceGSAMux(FuncOp &funcOp, unsigned branchBB) {
+  OpBuilder builder(funcOp->getContext());
+  for (auto branchOp : funcOp.getOps<ConditionalBranchOp>()) {
+    if (getLogicBB(branchOp) != branchBB)
+      continue;
+    if (!branchOp.getDataOperand().getType().isa<ControlType>())
+      continue;
+
+    Value trueValue = branchOp.getTrueResult();
+    auto confluenceCMerge = getConfluencePoint(trueValue);
+    assert(confluenceCMerge.has_value());
+    if (getUniqueUser(trueValue) != *confluenceCMerge &&
+        getLogicBB(getUniqueUser(trueValue)) !=
+            getLogicBB(
+                confluenceCMerge->getDataOperands()[1].getDefiningOp())) {
+      llvm::report_fatal_error("Invalid structure");
+    }
+
+    Value condition = branchOp.getConditionOperand();
+
+    builder.setInsertionPoint(confluenceCMerge.value());
+    MuxOp newMux = builder.create<MuxOp>(
+        builder.getUnknownLoc(), confluenceCMerge->getResult().getType(),
+        condition,
+        ArrayRef<Value>{confluenceCMerge->getDataOperands()[0],
+                        confluenceCMerge->getDataOperands()[1]});
+    inheritBB(confluenceCMerge.value(), newMux);
+
+    confluenceCMerge->getResult().replaceAllUsesWith(newMux.getResult());
+    confluenceCMerge->getIndex().replaceAllUsesWith(condition);
+    confluenceCMerge->erase();
+
+    materializeValue(condition);
+  }
+}

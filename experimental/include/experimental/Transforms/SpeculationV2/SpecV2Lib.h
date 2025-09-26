@@ -50,3 +50,5 @@ DenseMap<unsigned, unsigned> unifyBBs(ArrayRef<unsigned> loopBBs,
 void recalculateMCBlocks(FuncOp funcOp);
 
 bool tryErasePasser(PasserOp passer);
+
+void introduceGSAMux(FuncOp &funcOp, unsigned branchBB);

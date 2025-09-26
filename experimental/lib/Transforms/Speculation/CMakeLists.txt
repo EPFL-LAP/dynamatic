@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticSpeculation
   HandshakeSpeculation.cpp
   HandshakeSpecPostBuffer.cpp
   PlacementFinder.cpp
+  HandshakeSpeculationAdapted.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

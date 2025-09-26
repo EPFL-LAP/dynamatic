@@ -10,6 +10,7 @@ add_dynamatic_library(DynamaticSpeculationV2
   SpecV2Gamma.cpp
   PreSpecV2Gamma.cpp
   SpecV2Lib.cpp
+  SpecV1Adaptor.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

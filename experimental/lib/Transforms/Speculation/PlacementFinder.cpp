@@ -46,7 +46,8 @@ static void markSpeculativePathsForSaves(Operation *currOp,
                                          DenseSet<Value> &specValues) {
   // End traversal when reaching a branch, because save units are only
   // placed inside the speculation BB
-  if (isa<handshake::ConditionalBranchOp>(currOp))
+  if (isa<handshake::ConditionalBranchOp>(currOp) &&
+      !currOp->hasAttr("specv1_adaptor_inner_loop"))
     return;
 
   for (OpResult res : currOp->getResults()) {
@@ -359,7 +360,8 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
       continue;
 
     Operation *succOp = target->getOwner();
-    if (isa<handshake::ConditionalBranchOp>(succOp)) {
+    if (isa<handshake::ConditionalBranchOp>(succOp) &&
+        !succOp->hasAttr("specv1_adaptor_inner_loop")) {
       // A SaveCommit is needed in front of the branch
       placements.addSaveCommit(*target);
       // End traversal
@@ -389,6 +391,9 @@ LogicalResult PlacementFinder::findSaveCommits() {
   for (auto controlMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
     if (auto mergeBB = getLogicBB(controlMergeOp);
         !mergeBB || mergeBB != specBB)
+      continue;
+
+    if (controlMergeOp->hasAttr("specv1_adaptor_inner_loop"))
       continue;
 
     // Found a control merge in the speculation BB

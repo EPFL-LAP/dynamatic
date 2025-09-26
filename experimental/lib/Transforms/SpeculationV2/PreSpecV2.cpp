@@ -60,17 +60,17 @@ static bool hasBranch(FuncOp &funcOp, unsigned bb) {
 
 /// Calculate the loop condition fed by Init ops.
 /// Currently the implementation is based on the BBs specified in the json, and
-/// the internal control flow is unsupported.
+/// the internal control flow is only partially supported (no nesting).
 /// TODO: integrate this with the GSA implementation for fast token delivery.
-static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> bbs) {
+static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
+                                    ArrayRef<unsigned> loopBBs) {
   OpBuilder builder(funcOp.getContext());
   builder.setInsertionPoint(funcOp.getBodyBlock(),
                             funcOp.getBodyBlock()->begin());
 
   Value condition = nullptr;
-  for (size_t i = 0; i < bbs.size(); i++) {
-    unsigned bb = bbs[i];
-    unsigned nextBB = bbs[(i + 1) % bbs.size()];
+  for (size_t i = 0; i < exitBBs.size(); i++) {
+    unsigned bb = exitBBs[i];
     auto passers = funcOp.getOps<PasserOp>();
     auto passer = llvm::find_if(passers, [&](PasserOp passer) {
       if (getLogicBB(passer) != bb)
@@ -83,7 +83,7 @@ static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> bbs) {
         // Connected to outside the loop.
         return false;
       }
-      return outputBBOrNull.value() == nextBB;
+      return llvm::find(loopBBs, outputBBOrNull.value()) != loopBBs.end();
     });
     if (passer != passers.end()) {
       // Add the condition to loop conditions
@@ -107,6 +107,7 @@ static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> bbs) {
       }
     } else {
       llvm::errs() << "didn't find passer for bb " << bb << "\n";
+      llvm_unreachable("");
     }
   }
 
@@ -206,6 +207,21 @@ static LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
   return success();
 }
 
+static bool isExitingBBWithBranch(FuncOp funcOp, unsigned bb,
+                                  ArrayRef<unsigned> loopBBs) {
+  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+    auto brBB = getLogicBB(branch);
+    if (brBB && *brBB == bb) {
+      auto trueBranchBB = getLogicBB(getUniqueUser(branch.getTrueResult()));
+      auto falseBranchBB = getLogicBB(getUniqueUser(branch.getFalseResult()));
+      return llvm::find(loopBBs, trueBranchBB.value()) == loopBBs.end() ||
+             llvm::find(loopBBs, falseBranchBB.value()) == loopBBs.end();
+    }
+  }
+  // No branch
+  return false;
+}
+
 void PreSpecV2Pass::runDynamaticPass() {
   // Parse json (jsonPath is a member variable handled by tablegen)
   auto bbOrFailure = readFromJSON(jsonPath);
@@ -223,16 +239,32 @@ void PreSpecV2Pass::runDynamaticPass() {
 
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
+  SmallVector<unsigned> exitingBBs;
+
+  for (unsigned bb : loopBBs) {
+    if (hasBranch(funcOp, bb) && !isExitingBBWithBranch(funcOp, bb, loopBBs)) {
+      introduceGSAMux(funcOp, bb);
+    }
+  }
+
   // Replace branches with passers
-  for (unsigned exitBB : loopBBs) {
-    if (!hasBranch(funcOp, exitBB))
+  for (unsigned bb : loopBBs) {
+    if (isExitingBBWithBranch(funcOp, bb, loopBBs))
+      exitingBBs.push_back(bb);
+
+    if (!hasBranch(funcOp, bb))
       continue;
 
-    if (failed(replaceBranchesWithPassers(funcOp, exitBB)))
+    if (failed(replaceBranchesWithPassers(funcOp, bb)))
       return signalPassFailure();
   }
 
-  Value loopCondition = calculateLoopCondition(funcOp, loopBBs);
+  Value loopCondition = calculateLoopCondition(funcOp, exitingBBs, loopBBs);
+
+  loopCondition.dump();
+  for (unsigned bb : exitingBBs) {
+    llvm::errs() << "Exiting BB with branch: " << bb << "\n";
+  }
 
   // Update the loop header (CMerge -> Init)
   if (failed(updateLoopHeader(funcOp, loopBBs, loopCondition)))

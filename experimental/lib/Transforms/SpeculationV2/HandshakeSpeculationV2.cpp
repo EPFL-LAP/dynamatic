@@ -76,12 +76,18 @@ static bool isMuxPasserToAndEligible(MuxOp muxOp) {
   auto *data0 = muxOp.getDataOperands()[0].getDefiningOp();
   auto *data1 = muxOp.getDataOperands()[1].getDefiningOp();
 
+  if (!data0 || !data1) {
+    llvm::errs() << "data0 or data1 has no defining op\n";
+    return false;
+  }
+
   if (!isa<ConstantOp>(data0)) {
     llvm::errs() << "data0 is not constant\n";
     return false;
   }
   auto constOp = cast<ConstantOp>(data0);
-  if (constOp.getValue().cast<IntegerAttr>().getValue() != 0) {
+  if (isa<IntegerAttr>(constOp.getValue()) &&
+      constOp.getValue().cast<IntegerAttr>().getValue() != 0) {
     llvm::errs() << "data0 is not constant 0\n";
     return false;
   }
@@ -308,6 +314,172 @@ static AndIOp moveAndIUp(AndIOp candidateAndI) {
   return newAndI;
 }
 
+static bool isMotionPastGammaEligible(MuxOp muxOp) {
+  Operation *falseDefiningOp = muxOp.getDataOperands()[0].getDefiningOp();
+  Operation *trueDefiningOp = muxOp.getDataOperands()[1].getDefiningOp();
+
+  if (!falseDefiningOp || !trueDefiningOp) {
+    llvm::errs() << "data0 or data1 has no defining op\n";
+    return false;
+  }
+
+  if (!isa<PasserOp>(falseDefiningOp)) {
+    llvm::errs() << "data0 is not passer\n";
+    return false;
+  }
+  auto falsePasser = cast<PasserOp>(falseDefiningOp);
+
+  if (!isa<PasserOp>(trueDefiningOp)) {
+    llvm::errs() << "data1 is not passer\n";
+    return false;
+  }
+  auto truePasser = cast<PasserOp>(trueDefiningOp);
+
+  Operation *falsePasserCtrlDefOp = falsePasser.getCtrl().getDefiningOp();
+  Operation *truePasserCtrlDefOp = truePasser.getCtrl().getDefiningOp();
+
+  if (!isa<PasserOp>(falsePasserCtrlDefOp)) {
+    llvm::errs() << "passer ctrl not defined by passer\n";
+    return false;
+  }
+  auto falsePasserCtrlDef = cast<PasserOp>(falsePasserCtrlDefOp);
+
+  if (!isa<PasserOp>(truePasserCtrlDefOp)) {
+    llvm::errs() << "passer ctrl not defined by passer\n";
+    return false;
+  }
+  auto truePasserCtrlDef = cast<PasserOp>(truePasserCtrlDefOp);
+
+  Operation *falsePasserDataDefOp = falsePasser.getData().getDefiningOp();
+  Operation *truePasserDataDefOp = truePasser.getData().getDefiningOp();
+
+  if (!isa<PasserOp>(falsePasserDataDefOp)) {
+    llvm::errs() << "passer data not defined by passer\n";
+    return false;
+  }
+  auto falsePasserDataDef = cast<PasserOp>(falsePasserDataDefOp);
+
+  if (!isa<PasserOp>(truePasserDataDefOp)) {
+    llvm::errs() << "passer data not defined by passer\n";
+    return false;
+  }
+  auto truePasserDataDef = cast<PasserOp>(truePasserDataDefOp);
+
+  Operation *selDefiningOp = muxOp.getSelectOperand().getDefiningOp();
+  if (!isa<PasserOp>(selDefiningOp)) {
+    llvm::errs() << "mux select not defined by passer\n";
+    return false;
+  }
+  auto selPasser = cast<PasserOp>(selDefiningOp);
+
+  if (!equalsIndirectly(falsePasserCtrlDef.getCtrl(),
+                        truePasserCtrlDef.getCtrl()) ||
+      !equalsIndirectly(falsePasserCtrlDef.getCtrl(), selPasser.getCtrl()) ||
+      !equalsIndirectly(falsePasserCtrlDef.getCtrl(),
+                        falsePasserDataDef.getCtrl()) ||
+      !equalsIndirectly(falsePasserCtrlDef.getCtrl(),
+                        truePasserDataDef.getCtrl())) {
+    llvm::errs() << "ctrl1 not equal\n";
+    return false;
+  }
+
+  if (!equalsIndirectly(selPasser.getData(), truePasserCtrlDef.getData())) {
+    llvm::errs() << "ctrl2 not equal\n";
+    return false;
+  }
+  Operation *defOp = getIndirectDefiningOp(selPasser.getData());
+  if (auto notOp = dyn_cast<NotOp>(defOp)) {
+    if (!equalsIndirectly(notOp.getOperand(), falsePasserCtrlDef.getData())) {
+      llvm::errs() << "ctrl3 not equal\n";
+      return false;
+    }
+  } else {
+    Operation *defOp2 = getIndirectDefiningOp(falsePasserCtrlDef.getData());
+    if (auto notOp2 = dyn_cast<NotOp>(defOp2)) {
+      if (!equalsIndirectly(notOp2.getOperand(), selPasser.getData())) {
+        llvm::errs() << "ctrl4 not equal\n";
+        return false;
+      }
+    } else {
+      llvm::errs() << "mux select not defined by NotOp\n";
+      return false;
+    }
+  }
+
+  return true;
+}
+static void erasePassersBeforeMotionPastGamma(MuxOp muxOp,
+                                              DenseSet<PasserOp> &frontiers) {
+  auto falsePasser = cast<PasserOp>(muxOp.getDataOperands()[0].getDefiningOp());
+  auto truePasser = cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp());
+
+  auto falsePasserCtrlDef =
+      cast<PasserOp>(falsePasser.getCtrl().getDefiningOp());
+  auto truePasserCtrlDef = cast<PasserOp>(truePasser.getCtrl().getDefiningOp());
+
+  auto falsePasserDataDef =
+      cast<PasserOp>(falsePasser.getData().getDefiningOp());
+  auto truePasserDataDef = cast<PasserOp>(truePasser.getData().getDefiningOp());
+
+  auto selPasser = cast<PasserOp>(muxOp.getSelectOperand().getDefiningOp());
+
+  frontiers.erase(falsePasserCtrlDef);
+  frontiers.erase(truePasserCtrlDef);
+  frontiers.erase(falsePasserDataDef);
+  frontiers.erase(truePasserDataDef);
+  frontiers.erase(selPasser);
+}
+
+static PasserOp performMotionPastGamma(MuxOp muxOp) {
+  PasserOp selPasser = cast<PasserOp>(muxOp.getSelectOperand().getDefiningOp());
+  PasserOp falsePasser =
+      cast<PasserOp>(muxOp.getDataOperands()[0].getDefiningOp());
+  PasserOp truePasser =
+      cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp());
+  PasserOp falsePasserCtrlDef =
+      cast<PasserOp>(falsePasser.getCtrl().getDefiningOp());
+  PasserOp truePasserCtrlDef =
+      cast<PasserOp>(truePasser.getCtrl().getDefiningOp());
+  PasserOp falsePasserDataDef =
+      cast<PasserOp>(falsePasser.getData().getDefiningOp());
+  PasserOp truePasserDataDef =
+      cast<PasserOp>(truePasser.getData().getDefiningOp());
+
+  Value ctrl1 = selPasser.getCtrl();
+  Value ctrl2 = truePasserCtrlDef.getData();
+  Value ctrl2inv = falsePasserCtrlDef.getData();
+
+  OpBuilder builder(muxOp.getContext());
+  builder.setInsertionPoint(muxOp);
+  PasserOp newPasser =
+      builder.create<PasserOp>(muxOp->getLoc(), muxOp.getResult(), ctrl1);
+  inheritBB(muxOp, newPasser);
+  muxOp.getResult().replaceAllUsesExcept(newPasser.getResult(), newPasser);
+
+  selPasser.getResult().replaceAllUsesWith(ctrl2);
+  selPasser->erase();
+
+  falsePasserCtrlDef.getResult().replaceAllUsesWith(
+      falsePasserCtrlDef.getData());
+  falsePasserCtrlDef->erase();
+
+  truePasserCtrlDef.getResult().replaceAllUsesWith(truePasserCtrlDef.getData());
+  truePasserCtrlDef->erase();
+
+  falsePasserDataDef.getResult().replaceAllUsesWith(
+      falsePasserDataDef.getData());
+  falsePasserDataDef->erase();
+
+  truePasserDataDef.getResult().replaceAllUsesWith(truePasserDataDef.getData());
+  truePasserDataDef->erase();
+
+  materializeValue(ctrl1);
+  materializeValue(ctrl2);
+  materializeValue(ctrl2inv);
+
+  return newPasser;
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   // Parse json (jsonPath is a member variable handled by tablegen)
   auto bbOrFailure = readFromJSON(jsonPath);
@@ -357,6 +529,17 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
           // If frontiers are updated, the iterator is outdated.
           // Break and restart the loop.
           break;
+        }
+
+        if (auto mux = dyn_cast<MuxOp>(getUniqueUser(passerOp.getResult()))) {
+          if (isMotionPastGammaEligible(mux)) {
+            erasePassersBeforeMotionPastGamma(mux, frontiers);
+            frontiers.insert(performMotionPastGamma(mux));
+            frontiersUpdated = true;
+            // If frontiers are updated, the iterator is outdated.
+            // Break and restart the loop.
+            break;
+          }
         }
       }
       // If no frontiers were updated, we can stop.
@@ -440,14 +623,25 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
           // Break and restart the loop.
           break;
         }
+
+        if (auto mux = dyn_cast<MuxOp>(getUniqueUser(passerOp.getResult()))) {
+          if (isMotionPastGammaEligible(mux)) {
+            erasePassersBeforeMotionPastGamma(mux, frontiers);
+            frontiers.insert(performMotionPastGamma(mux));
+            frontiersUpdated = true;
+            // If frontiers are updated, the iterator is outdated.
+            // Break and restart the loop.
+            break;
+          }
+        }
       }
       // If no frontiers were updated, we can stop.
     } while (frontiersUpdated);
   }
 
   if (n >= 2) {
-    // // Reduce the passer chain by introducing interpolator op and performing
-    // // induction.
+    // Reduce the passer chain by introducing interpolator op and performing
+    // induction.
 
     SmallVector<PasserOp> bottomPassers;
     for (Operation *user :

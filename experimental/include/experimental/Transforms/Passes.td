@@ -53,6 +53,31 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
+def HandshakeSpeculationAdapted : DynamaticPass<"handshake-speculation-adapted"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+      Speculative execution involves speculating on the output of a long 
+      latency operation or chain of operations, allowing operations that 
+      depend on it to begin execution early, without impacting correctness. 
+      
+      There are several situations that can benefit from early execution, 
+      including reducing the initiation interval (II) of loops with conditions 
+      that take several cycles to calculate, or loops with 
+      loop-carried dependencies. 
+      
+      The pass needs to specify the position of the Speculation Units by 
+      means of an input JSON file.
+  }];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the positions for speculative "
+           "operations.">,
+    Option<"automatic", "automatic", "bool", "true",
+           "When the automatic mode is enabled, the speculative unit positions are "
+           "automatically detected. The speculator position still needs to be "
+           "specified in the JSON-formatted file.">];
+}
+
 def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
   let summary = "post buffering spec pass";
   let description = [{
@@ -153,6 +178,18 @@ def SpecV2Gamma : DynamaticPass<"handshake-spec-v2-gamma"> {
     Option<"oneSided", "one-sided", "bool", "false", "one-sided spec">,
     Option<"prioritizedSide", "prioritized-side", "unsigned", "", "">,
     Option<"stepsUntil", "steps-until", "unsigned", "", "">,
+    Option<"bbMapping", "bb-mapping", "std::string", "",
+           "Path to the output bb mapping file.">,
+  ];
+}
+
+def SpecV1Adaptor : DynamaticPass<"handshake-spec-v1-adaptor"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
+    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
     Option<"bbMapping", "bb-mapping", "std::string", "",
            "Path to the output bb mapping file.">,
   ];

@@ -122,6 +122,8 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
     if (getLogicBB(branch) != getLogicBB(speculator))
       continue;
+    if (branch->hasAttr("specv1_adaptor_inner_loop"))
+      continue;
     if (isBranchBackedge(branch.getTrueResult())) {
       mergeOperands.push_back(branchReplicated.getTrueResult());
       branchFound = true;
