@@ -47,8 +47,8 @@ ASSIGN next(oldContinue_false_token_cnt) := case
 esac;
 INVAR (((seq_generator_loopLiveIn.exact_tokens - oldContinue_false_token_cnt) = (seq_generator_oldContinue.exact_tokens - seq_generator_oldContinue.counter)) &
   ((seq_generator_loopLiveIn.exact_tokens - oldContinue_false_token_cnt) >= 1)) -> seq_generator_oldContinue.outs = FALSE;
-INVAR (((seq_generator_loopLiveIn.exact_tokens - oldContinue_false_token_cnt) = 1) &
-((seq_generator_oldContinue.exact_tokens - seq_generator_oldContinue.counter) >= 2)) ->
+INVAR (((seq_generator_loopLiveIn.exact_tokens - oldContinue_false_token_cnt) = 0) &
+((seq_generator_oldContinue.exact_tokens - seq_generator_oldContinue.counter) >= 1)) ->
 (seq_generator_oldContinue.outs = TRUE);
 INVAR (seq_generator_oldContinue.exact_tokens >= seq_generator_loopLiveIn.exact_tokens);
 INVAR (seq_generator_loopLiveIn.exact_tokens = 0) -> (seq_generator_oldContinue.exact_tokens = 0);

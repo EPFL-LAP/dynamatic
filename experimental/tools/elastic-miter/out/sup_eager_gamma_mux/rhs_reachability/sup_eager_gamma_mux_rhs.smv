@@ -1,0 +1,37 @@
+#include "handshake_fork_1.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_not_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_mux_0.smv"
+
+
+MODULE sup_eager_gamma_mux_rhs (A_in, A_in_valid, B_in, B_in_valid, ctrl, ctrl_valid, res_ready)
+
+
+-- input and output
+DEFINE res := res_passer.result;
+DEFINE res_valid := res_passer.result_valid;
+DEFINE res_passer_result_ready := res_ready;
+DEFINE mux_ins_1 := A_in;
+DEFINE mux_ins_1_valid := A_in_valid;
+DEFINE A_in_ready := mux.ins_1_ready;
+DEFINE mux_ins_0 := B_in;
+DEFINE mux_ins_0_valid := B_in_valid;
+DEFINE B_in_ready := mux.ins_0_ready;
+DEFINE ctrl_fork_ins := ctrl;
+DEFINE ctrl_fork_ins_valid := ctrl_valid;
+DEFINE ctrl_ready := ctrl_fork.ins_ready;
+
+
+VAR initop : handshake_init_0(buff.outs, buff.outs_valid, cst_dup_fork.ins_ready);
+VAR cst_dup_fork : handshake_fork_0(initop.outs, initop.outs_valid, not.ins_ready, ctrl_mux.index_ready, mux.index_ready);
+VAR not : handshake_not_0(cst_dup_fork.outs_0, cst_dup_fork.outs_0_valid, buff.ins_ready);
+VAR buff : handshake_buffer_0(not.outs, not.outs_valid, initop.ins_ready);
+VAR ctrl_fork : handshake_fork_1(ctrl_fork_ins, ctrl_fork_ins_valid, ctrl_mux.ins_1_ready, ctrl_mux.ins_0_ready);
+VAR ctrl_mux : handshake_mux_0(cst_dup_fork.outs_1, cst_dup_fork.outs_1_valid, ctrl_fork.outs_1, ctrl_fork.outs_0, ctrl_fork.outs_1_valid, ctrl_fork.outs_0_valid, res_passer.ctrl_ready);
+VAR mux : handshake_mux_0(cst_dup_fork.outs_2, cst_dup_fork.outs_2_valid, mux_ins_0, mux_ins_1, mux_ins_0_valid, mux_ins_1_valid, res_passer.data_ready);
+VAR res_passer : handshake_passer_0(mux.outs, mux.outs_valid, ctrl_mux.outs, ctrl_mux.outs_valid, res_passer_result_ready);
+
+-- properties

@@ -1,0 +1,27 @@
+#include "sup_gamma_mux2_mini_lhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_cond : bool_input_inf(sup_gamma_mux2_mini_lhs.cond_ready);
+  VAR seq_generator_dataT : bool_input_inf(sup_gamma_mux2_mini_lhs.dataT_ready);
+  VAR seq_generator_dataF : bool_input_inf(sup_gamma_mux2_mini_lhs.dataF_ready);
+
+  VAR sup_gamma_mux2_mini_lhs : sup_gamma_mux2_mini_lhs (seq_generator_cond.outs, seq_generator_cond.outs_valid, seq_generator_dataT.outs, seq_generator_dataT.outs_valid, seq_generator_dataF.outs, seq_generator_dataF.outs_valid, sink_res.ins_ready);
+
+  VAR sink_res : sink_main(sup_gamma_mux2_mini_lhs.res_valid);
+

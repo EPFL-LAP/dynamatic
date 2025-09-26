@@ -20,18 +20,30 @@ run() {
     exit_on_fail "($NAME): Equivalence checking failed"
 }
 
-# Rewrite A
-# run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
+# Rewrite D (new)
+# run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop=0,2
+
 # run general_sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=3&2=4"
 # run extension1 --allow_nonacceptance --timing_insensitive
 # run extension2 --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}<={out:0}"
 # run extension3 --allow_nonacceptance --timing_insensitive
 # run extension4 --allow_nonacceptance --timing_insensitive
 # run extension5 --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}<={out:0}"
+
 # run general_sup_mumux_copy --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
 # run general_sup_mumux --timing_insensitive --seq_length="0=2&0=3"
-# run sup_gamma_mux1 --timing_insensitive --seq_length="0=1&0=2"
-run sup_gamma_mux2 --timing_insensitive --seq_length="0=1&0=2"
+
+# Rewrite B (new)
+run sup_gamma_mux1 --timing_insensitive --seq_length="1=2"
+
+# run sup_gamma_mux2 --timing_insensitive --seq_length="0=1&0=2"
+
+# Rewrite C (new)
+# run sup_gamma_mux2_mini --timing_insensitive --seq_length="0=1" --loop=2,0
+
+# run sup_gamma_new --timing_insensitive --allow_nonacceptance --seq_length="0=2&1=2&2=3"
+
+# run sup_eager_gamma_mux --timing_insensitive --allow_nonacceptance --seq_length="0=1"
 
 # # Rewrites B
 # run sup_mul --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={in:2}&{in:0}<={out:0}"

@@ -638,4 +638,4 @@ reachable states: 48 (2^5.58496) out of 4096 (2^12)
   sup_mux_rhs.newInit2.full = FALSE
   -------------------------
 ######################################################################
-elapse: 0.01 seconds, total: 0.01 seconds
+elapse: 0.02 seconds, total: 0.02 seconds
