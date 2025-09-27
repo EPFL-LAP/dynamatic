@@ -398,9 +398,9 @@ struct HandshakeMaterializePass
     int num = 0;
     int allResults = 0;
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-      llvm::errs() << "ghabl shoro ----------------\n";
-      funcOp.print(llvm::errs());
-      llvm::errs() << "ghabl tamoom----------------\n";
+      // llvm::errs() << "ghabl shoro ----------------\n";
+      // funcOp.print(llvm::errs());
+      // llvm::errs() << "ghabl tamoom----------------\n";
       for (Operation &op : funcOp.getOps()) {
         if (isa<handshake::ForkOp>(op)) {
           // llvm::errs() << "operation " << op << "\n";
@@ -455,9 +455,9 @@ struct HandshakeMaterializePass
         }
       }
 
-      llvm::errs() << "bad shoro----------------\n";
-      funcOp.print(llvm::errs());
-      llvm::errs() << "bad tamoom----------------\n";
+      // llvm::errs() << "bad shoro----------------\n";
+      // funcOp.print(llvm::errs());
+      // llvm::errs() << "bad tamoom----------------\n";
     }
     llvm::errs() << "bah " << num << "ah " << allResults << "\n";
 
