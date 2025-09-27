@@ -262,6 +262,8 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+dot -Tpng "$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" > "$COMP_DIR/${KERNEL_NAME}_DEP_G.png"
+
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
   bash $RIGIDIFICATION_SH $DYNAMATIC_DIR $OUTPUT_DIR $KERNEL_NAME $F_HANDSHAKE_EXPORT \

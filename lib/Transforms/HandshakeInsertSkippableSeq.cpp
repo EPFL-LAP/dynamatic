@@ -148,6 +148,21 @@ public:
   FuncOp getFuncOp() { return funcOp; }
 };
 
+class DependenceGraphEdge {
+public:
+  Operation *srcOp;
+  Operation *dstOp;
+  int comparatoreNum;
+  DependenceGraphEdge(Operation *srcOp, Operation *dstOp, int comparatoreNum) {
+    this->srcOp = srcOp;
+    this->dstOp = dstOp;
+    this->comparatoreNum = comparatoreNum;
+  }
+};
+
+using DependenceGraph = SmallVector<DependenceGraphEdge, 2>;
+DependenceGraph dependenceGraph;
+
 /// These maps are used to distribute the start signal to all blocks in the CFG.
 DenseMap<Block *, Value> startCopies;
 std::unordered_set<Block *> visited;
@@ -855,33 +870,34 @@ SmallVector<Value> createSkipConditionForPair(
       successorOpPointer->getOperand(0), suppressedWithSupp,
       predecessorOpPointer, skipConditionGeneratorOps, rewriter);
 
-  SmallVector<Value> delayedAddressesAfterSuppress = delayedAddresses;
-  if (ftdConditions.getSupp()->boolMinimize()->type !=
-      experimental::boolean::ExpressionType::Zero) {
-    SmallVector<Operation *> suppressOpList;
-    delayedAddressesAfterSuppress = insertSuppressBlock(
-        delayedAddresses, predecessorOpDoneSignal, ftdValues.getSupp(),
-        ftdValues.getRegen(), predecessorOpPointer, successorOpPointer, N,
-        suppressOpList, rewriter);
-    addDrawingAttrToList(suppressOpList, "Suppress_Block_Cond");
-  }
+  // SmallVector<Value> delayedAddressesAfterSuppress = delayedAddresses;
+  // if (ftdConditions.getSupp()->boolMinimize()->type !=
+  //     experimental::boolean::ExpressionType::Zero) {
+  //   SmallVector<Operation *> suppressOpList;
+  //   delayedAddressesAfterSuppress = insertSuppressBlock(
+  //       delayedAddresses, predecessorOpDoneSignal, ftdValues.getSupp(),
+  //       ftdValues.getRegen(), predecessorOpPointer, successorOpPointer, N,
+  //       suppressOpList, rewriter);
+  //   addDrawingAttrToList(suppressOpList, "Suppress_Block_Cond");
+  // }
 
-  SmallVector<Value> delayedAddressesAfterRegen = delayedAddressesAfterSuppress;
-  if (ftdConditions.getRegen()->boolMinimize()->type !=
-      experimental::boolean::ExpressionType::Zero) {
-    llvm::errs() << "ey khoda\n";
-    SmallVector<Operation *> regenOpList;
-    bool initialConsWithoutProd = isInitialConsWithoutProdInSameBB(
-        predecessorOpPointer, successorOpPointer);
-    delayedAddressesAfterRegen = insertRegenBlock(
-        delayedAddressesAfterSuppress, ftdValues.getRegen(),
-        initialConsWithoutProd, predecessorOpPointer, regenOpList, rewriter);
-    llvm::errs() << "----" << regenOpList.size() << "\n";
-    addDrawingAttrToList(regenOpList, "Regen_Block_Cond");
-  }
+  // SmallVector<Value> delayedAddressesAfterRegen =
+  // delayedAddressesAfterSuppress; if
+  // (ftdConditions.getRegen()->boolMinimize()->type !=
+  //     experimental::boolean::ExpressionType::Zero) {
+  //   llvm::errs() << "ey khoda\n";
+  //   SmallVector<Operation *> regenOpList;
+  //   bool initialConsWithoutProd = isInitialConsWithoutProdInSameBB(
+  //       predecessorOpPointer, successorOpPointer);
+  //   delayedAddressesAfterRegen = insertRegenBlock(
+  //       delayedAddressesAfterSuppress, ftdValues.getRegen(),
+  //       initialConsWithoutProd, predecessorOpPointer, regenOpList, rewriter);
+  //   llvm::errs() << "----" << regenOpList.size() << "\n";
+  //   addDrawingAttrToList(regenOpList, "Regen_Block_Cond");
+  // }
 
   SmallVector<Value> skipConditions;
-  for (Value delayedAddress : delayedAddressesAfterRegen) {
+  for (Value delayedAddress : delayedAddresses) {
     handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(
         predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr,
         delayedAddress);
@@ -967,9 +983,15 @@ SkipConditionForPair createSkipConditionsForAllPairs(
         // inheritBB(predecessorOpPointer, bufferOp);
         // predecessorOpPointer->setOperand(0, bufferOp.getResult());
 
+        SmallVector<StringRef> handledSuccessors;
         for (MemDependenceAttr dependency : deps.getDependencies()) {
           if (!dependency.getIsActive())
             continue;
+
+          if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
+                        dependency.getDstAccess()) != handledSuccessors.end()) {
+            continue;
+          }
 
           N = Nvector[NvectorIndex];
           NvectorIndex++;
@@ -1008,6 +1030,7 @@ SkipConditionForPair createSkipConditionsForAllPairs(
                 blockIndexing, N, rewriter);
             skipConditionForEachPair[predecessorOpName][successorOpName] =
                 skipConditions;
+            handledSuccessors.push_back(successorOpName);
           }
         }
       }
@@ -1108,43 +1131,43 @@ Value createWaitingSignalForPair(Value predecessorOpDoneSignal,
   FTDConditionValues ftdValues = constructCircuitForAllConditions(
       ftdConditions, blockIndexing, predecessorOp, rewriter);
 
-  SmallVector<Value> delayedDoneSignalsAfterSuppress = delayedDoneSignals;
-  if (ftdConditions.getSupp()->boolMinimize()->type !=
-      experimental::boolean::ExpressionType::Zero) {
-    llvm::errs() << "[SKIP][INFO] Inserting Suppression\n";
-    SmallVector<Operation *> suppressOpList;
-    delayedDoneSignalsAfterSuppress = insertSuppressBlock(
-        delayedDoneSignals, predecessorOpDoneSignal, ftdValues.getSupp(),
-        ftdValues.getRegen(), predecessorOp, successorOp, N, suppressOpList,
-        rewriter);
-    addDrawingAttrToList(suppressOpList, "Suppress_Block_Done");
+  // SmallVector<Value> delayedDoneSignalsAfterSuppress = delayedDoneSignals;
+  // if (ftdConditions.getSupp()->boolMinimize()->type !=
+  //     experimental::boolean::ExpressionType::Zero) {
+  //   llvm::errs() << "[SKIP][INFO] Inserting Suppression\n";
+  //   SmallVector<Operation *> suppressOpList;
+  //   delayedDoneSignalsAfterSuppress = insertSuppressBlock(
+  //       delayedDoneSignals, predecessorOpDoneSignal, ftdValues.getSupp(),
+  //       ftdValues.getRegen(), predecessorOp, successorOp, N, suppressOpList,
+  //       rewriter);
+  //   addDrawingAttrToList(suppressOpList, "Suppress_Block_Done");
 
-  } else {
-    llvm::errs() << "[SKIP][INFO] Skipping Suppression\n";
-  }
+  // } else {
+  //   llvm::errs() << "[SKIP][INFO] Skipping Suppression\n";
+  // }
 
-  SmallVector<Value> delayedDoneSignalsAfterRegen =
-      delayedDoneSignalsAfterSuppress;
+  // SmallVector<Value> delayedDoneSignalsAfterRegen =
+  //     delayedDoneSignalsAfterSuppress;
 
-  if (ftdConditions.getRegen()->boolMinimize()->type !=
-      experimental::boolean::ExpressionType::Zero) {
-    llvm::errs() << "[SKIP][INFO] Inserting Regen\n";
-    SmallVector<Operation *> regenOpList;
-    bool initialConsWithoutProd =
-        isInitialConsWithoutProdInSameBB(predecessorOp, successorOp);
-    delayedDoneSignalsAfterRegen = insertRegenBlock(
-        delayedDoneSignalsAfterSuppress, ftdValues.getRegen(),
-        initialConsWithoutProd, predecessorOp, regenOpList, rewriter);
-    addDrawingAttrToList(regenOpList, "Regen_Block_Done");
-  } else {
-    llvm::errs() << "[SKIP][INFO] Skipping Regen\n";
-  }
+  // if (ftdConditions.getRegen()->boolMinimize()->type !=
+  //     experimental::boolean::ExpressionType::Zero) {
+  //   llvm::errs() << "[SKIP][INFO] Inserting Regen\n";
+  //   SmallVector<Operation *> regenOpList;
+  //   bool initialConsWithoutProd =
+  //       isInitialConsWithoutProdInSameBB(predecessorOp, successorOp);
+  //   delayedDoneSignalsAfterRegen = insertRegenBlock(
+  //       delayedDoneSignalsAfterSuppress, ftdValues.getRegen(),
+  //       initialConsWithoutProd, predecessorOp, regenOpList, rewriter);
+  //   addDrawingAttrToList(regenOpList, "Regen_Block_Done");
+  // } else {
+  //   llvm::errs() << "[SKIP][INFO] Skipping Regen\n";
+  // }
 
   if (N == 0)
-    return delayedDoneSignalsAfterRegen[0];
+    return delayedDoneSignals[0];
 
   SmallVector<Value> branchedDoneSignals =
-      insertBranches(delayedDoneSignalsAfterRegen, conds, predecessorOp,
+      insertBranches(delayedDoneSignals, conds, predecessorOp,
                      conditionalSequentializerOps, rewriter);
   SmallVector<Value> conditionallySkippedDoneSignals =
       insertConditionalSkips(branchedDoneSignals, conds, successorOp,
@@ -1195,6 +1218,7 @@ WaitingSignalForSucc createWaitingSignals(
     Value predecessorOpDoneSignal =
         getDoneSignalFromMemoryOp(predecessorOpPointer, rewriter);
 
+    SmallVector<StringRef> handledSuccessors;
     SmallVector<MemDependenceAttr> newDeps;
     if (auto deps =
             getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
@@ -1202,6 +1226,12 @@ WaitingSignalForSucc createWaitingSignals(
       for (MemDependenceAttr dependency : deps.getDependencies()) {
         if (!dependency.getIsActive()) {
           newDeps.push_back(dependency);
+          continue;
+        }
+
+        if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
+                      dependency.getDstAccess()) != handledSuccessors.end()) {
+          newDeps.push_back(getInactivatedDependency(dependency));
           continue;
         }
 
@@ -1229,6 +1259,9 @@ WaitingSignalForSucc createWaitingSignals(
         StringRef successorName = dependency.getDstAccess();
         Operation *successorOpPointer = memAccesses[successorName];
 
+        dependenceGraph.push_back(
+            DependenceGraphEdge(predecessorOpPointer, successorOpPointer, N));
+
         SmallVector<Value> conds =
             skipConditionForEachPair[predecessorOpName][successorName];
 
@@ -1247,6 +1280,7 @@ WaitingSignalForSucc createWaitingSignals(
         waitingSignalsForEachSuccessor[successorName].push_back(waitingSignal);
 
         newDeps.push_back(getInactivatedDependency(dependency));
+        handledSuccessors.push_back(successorName);
       }
       setDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer, ctx,
                                              newDeps);
@@ -1325,6 +1359,21 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
                            rewriter);
 }
 
+// write dep graph to a dot file
+void writeDepGraphToDotFile(const std::string &filename) {
+  std::ofstream file(filename);
+  file << "digraph G {\n";
+  for (const auto &edge : dependenceGraph) {
+    std::string predName = getUniqueName(edge.srcOp).str();
+    std::string succName = getUniqueName(edge.dstOp).str();
+    file << "  \"" << predName << "\" -> \"" << succName
+         << "\" [label=\"N=" << edge.comparatoreNum << "\"];\n";
+  }
+  file << "}\n";
+  file.close();
+  llvm::errs() << "Dependency graph written to " << filename << "\n";
+}
+
 void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
   mlir::ModuleOp modOp = getOperation();
@@ -1351,6 +1400,14 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
       signalPassFailure();
   }
 
+  std::string extra = "";
+  if (kernelName.find("memory") != std::string::npos)
+    extra = "memory/";
+
+  std::string path = "./integration-test/" + extra + kernelName + "/out/comp/" +
+                     kernelName + "_DEP_G.dot";
+
+  writeDepGraphToDotFile(path);
   llvm::errs() << "done! \n";
 }
 
