@@ -18,7 +18,7 @@ Consider the following control-flow graph and its corresponding `cf_dyn_transfor
 
 - The argument of bb3 (%7) comes from two mutually exclusive control-flow paths (bb1 or bb2). This corresponds to a γ function.
 
-![CFG](./Figures/if_loop_add_CFG.png)
+![if_loop_add_CFG](./Figures/if_loop_add_CFG.png)
 
 ```
 module {
@@ -96,6 +96,59 @@ For each block in the region:
 ```
 After all ϕ gates are created, the final step is to connect the missing inputs recorded in phisToConnect. 
 
+### What is a “missing phi”?
+The input of a ϕ gate can itself be another ϕ. This happens when the input comes from a block argument of another block (excluding bb0). In this case, the ϕ input cannot be connected immediately. Instead, it is marked as missing and the necessary information is stored. After all ϕ gates are extracted, these missing inputs are revisited and the connections are reconstructed.
+
+### `isBlockArgAlreadyPresent` and `isValueAlreadyPresent`
+These helper functions prevent duplicate inputs from being recorded.
+
+// TODO: explain their implementation details later.
+
+### Why can a value appear multiple times?
+// TODo
+
 ## Convert ϕ Gates into μ Gates
 
+### Checks
+A ϕ gate is classified as a μ gate if the following conditions hold:
+
+1. It is inside a loop.
+
+2. It has at least two operands.
+
+3. It is located in the loop header.
+
+### Input Grouping
+
+Once a candidate μ is identified, its operands (inputs) are divided into two groups:
+
+- **Loop inputs:** values produced inside the same loop as the ϕ.
+
+- **Initial inputs:** values originating from outside the loop.
+
+#### Notice: Inputs from Nested Loops
+Blocks only report their innermost loop as the one they belong to. Because of this, inputs from nested loops might be mistakenly recognized as “initial inputs” instead of loop inputs.
+
+*Example:* in the CFG below, an input value from block `bb3` may appear to belong to a different loop than the one containing `bb1` (the ϕ’s loop). To prevent this, the `IsBlockInLoop` function checks whether any parent loop of the input matches the ϕ’s loop.
+
+![gemm_CFG](./Figures/gemm_CFG.png)
+
+### Creating μ Gates
+
+A valid μ gate must have exactly two inputs: one from outside the loop and one from inside the loop. The grouping step above ensures we can identify these two roles.
+
+- If either group is empty → the ϕ cannot be a μ.
+
+- If a group has exactly one member → that value becomes the corresponding μ input (loop or initial).
+
+- If a group has multiple members → an intermediate ϕ is created in the block to merge them. This extra ϕ will later be replaced by a γ (or tree of γs) during the ϕ to γ conversion phase.
+
+### Condition of the μ Gate
+
+The μ gate outputs its initial value during the first iteration of the loop. On subsequent iterations, if the loop continues (i.e., the exit condition is false), it selects the loop-generated value. When the loop finally exits, the initial input will be used again if the loop is re-entered.
+
+Therefore, the condition of a μ gate is defined as the **negation of the loop exit condition**.
+
+#### Note:
+The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
 ## Convert ϕ Gates into γ Gates
