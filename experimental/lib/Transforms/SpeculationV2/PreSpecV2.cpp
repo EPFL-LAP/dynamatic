@@ -207,13 +207,27 @@ static LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
   return success();
 }
 
+static Operation *getEffectiveUser(Value value) {
+  Operation *user = getUniqueUser(value);
+  if (auto extsi = dyn_cast<ExtSIOp>(user)) {
+    return getEffectiveUser(extsi.getResult());
+  }
+  if (auto trunci = dyn_cast<TruncIOp>(user)) {
+    return getEffectiveUser(trunci.getResult());
+  }
+  return user;
+}
+
 static bool isExitingBBWithBranch(FuncOp funcOp, unsigned bb,
                                   ArrayRef<unsigned> loopBBs) {
   for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
     auto brBB = getLogicBB(branch);
     if (brBB && *brBB == bb) {
-      auto trueBranchBB = getLogicBB(getUniqueUser(branch.getTrueResult()));
-      auto falseBranchBB = getLogicBB(getUniqueUser(branch.getFalseResult()));
+      auto trueBranchBB = getLogicBB(getEffectiveUser(branch.getTrueResult()));
+      auto falseBranchBB =
+          getLogicBB(getEffectiveUser(branch.getFalseResult()));
+      if (!trueBranchBB.has_value() || !falseBranchBB.has_value())
+        return true;
       return llvm::find(loopBBs, trueBranchBB.value()) == loopBBs.end() ||
              llvm::find(loopBBs, falseBranchBB.value()) == loopBBs.end();
     }
