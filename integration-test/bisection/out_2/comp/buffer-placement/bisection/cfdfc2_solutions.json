@@ -1,1 +1,0 @@
-{ "SolutionInfo": { "Status": 2, "Runtime": 1.1301040649414062e-04, "Work": 4.0240666666666669e-05, "ObjVal": 0, "ObjBound": 0, "ObjBoundC": 0, "MIPGap": 0, "IntVio": 0, "BoundVio": 0, "ConstrVio": 0, "IterCount": 0, "BarIterCount": 0, "NodeCount": 0, "SolCount": 1, "PoolObjBound": 0, "PoolObjVal": [ 0]}, "Vars": [ { "VarName": "sBB_2", "X": 1}, { "VarName": "sArc_2_2", "X": 1}]}
