@@ -1060,6 +1060,12 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       frontiersUpdated = false;
       for (auto passerOp : frontiers) {
         if (isEligibleForPasserMotionOverPM(passerOp)) {
+          Operation *uniqueUser = getUniqueUser(passerOp.getResult());
+          auto bbOrNull = getLogicBB(uniqueUser);
+          if (bbOrNull.has_value() &&
+              llvm::find(loopBBs, bbOrNull) == loopBBs.end()) {
+            loopBBs.push_back(bbOrNull.value());
+          }
           performPasserMotionPastPM(passerOp, frontiers);
           frontiersUpdated = true;
           // If frontiers are updated, the iterator is outdated.
