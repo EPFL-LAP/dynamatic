@@ -444,8 +444,10 @@ FailureOr<Value> HandshakeSpeculationPass::generateSaveCommitCtrl() {
           controlBranch.getLoc(),
           /*trueResultType=*/conditionOperand.getType(),
           /*falseResultType=*/conditionOperand.getType(),
-          /*specTag=*/specOp1.getDataOut(), conditionOperand);
+          /*specTag=*/conditionOperand, conditionOperand);
   inheritBB(specOp1, branchDiscardCondNonSpec);
+  branchDiscardCondNonSpec->setAttr("specv1_branchDiscardCondNonSpec",
+                                    builder.getUnitAttr());
 
   // Second, discard if speculation happened but it was correct
   // Create a conditional branch driven by SCBranchControl from speculator
@@ -837,6 +839,23 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
+
+  // quick fix
+  handshake::FuncOp funcOp = specOp1->getParentOfType<handshake::FuncOp>();
+  for (auto branch : funcOp.getOps<handshake::SpeculatingBranchOp>()) {
+    if (branch->getAttr("specv1_branchDiscardCondNonSpec")) {
+      unsigned bb = getLogicBB(specOp1).value();
+      ConditionalBranchOp controlBranch = findControlBranch(funcOp, bb);
+      if (controlBranch == nullptr) {
+        specOp1->emitError()
+            << "Could not find backedge within speculation bb.\n";
+        return signalPassFailure();
+      }
+      auto conditionOperand = controlBranch.getConditionOperand();
+      branch->setOperand(0, conditionOperand);
+      branch->setOperand(1, conditionOperand);
+    }
+  }
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
