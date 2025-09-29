@@ -80,7 +80,7 @@ static cl::list<std::string> seqLengthRelationConstraints(
 static cl::list<std::string> seqLengthRelationEnhancedConstraint(
     "seq_length_enhanced", cl::Prefix,
     cl::desc("Specify constraints for the relation of sequence lengths (with "
-             "output. heavier)."),
+             "outputs)."),
     cl::cat(constraintsCategory));
 
 // Specify a Loop Condition sequence contraint.
