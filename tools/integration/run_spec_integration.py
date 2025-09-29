@@ -70,6 +70,8 @@ def main():
         "--cp", type=str, help="clock period", default="10.000")
     parser.add_argument(
         "--default-value", type=str, help="default speculated value", default="1")
+    parser.add_argument(
+        "--manual-buffer", action="store_true")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -349,31 +351,6 @@ def main():
                 color_print("Failed to add speculative units", TermColors.FAIL)
                 return False
 
-        # buffer_json = os.path.join(c_file_dir, "buffer.json")
-        # handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-        # with open(buffer_json, "r") as f:
-        #     buffers = json.load(f)
-        #     buffer_pass_args = []
-        #     for buffer in buffers:
-        #         buffer_pass_args.append(
-        #             "--handshake-placebuffers-custom=" +
-        #             f"pred={buffer['pred']} " +
-        #             f"outid={buffer['outid']} " +
-        #             f"slots={buffer['slots']} " +
-        #             f"type={buffer['type']}")
-        #     with open(handshake_export, "w") as f:
-        #         result = subprocess.run([
-        #             DYNAMATIC_OPT_BIN, handshake_speculation,
-        #             *buffer_pass_args
-        #         ],
-        #             stdout=f,
-        #             stderr=sys.stdout
-        #         )
-        #         if result.returncode == 0:
-        #             print("Exported Handshake")
-        #         else:
-        #             color_print("Failed to export Handshake", TermColors.FAIL)
-        #             return False
     else:
         shutil.copy(handshake_canonicalized, handshake_speculation)
 
@@ -454,11 +431,41 @@ def main():
     handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
     shutil.copy(handshake_spec_post_buffer, handshake_export)
 
+    if args.manual_buffer:
+        buffer_json = os.path.join(c_file_dir, "buffer.json")
+        handshake_manual_buffer = os.path.join(
+            comp_out_dir, "handshake_manual_buffer.mlir")
+        with open(buffer_json, "r") as f:
+            buffers = json.load(f)
+            buffer_pass_args = []
+            for buffer in buffers:
+                buffer_pass_args.append(
+                    "--handshake-placebuffers-custom=" +
+                    f"pred={buffer['pred']} " +
+                    f"outid={buffer['outid']} " +
+                    f"slots={buffer['slots']} " +
+                    f"type={buffer['type']}")
+            with open(handshake_manual_buffer, "w") as f:
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_export,
+                    *buffer_pass_args
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Exported Handshake")
+                else:
+                    color_print("Failed to export Handshake", TermColors.FAIL)
+                    return False
+    else:
+        handshake_manual_buffer = handshake_export
+
     # Export dot file
     dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
     with open(dot, "w") as f:
         result = subprocess.run([
-            EXPORT_DOT_BIN, handshake_export,
+            EXPORT_DOT_BIN, handshake_manual_buffer,
             "--edge-style=spline", "--label-type=uname"
         ],
             stdout=f,
@@ -489,7 +496,7 @@ def main():
     hw = os.path.join(comp_out_dir, "hw.mlir")
     with open(hw, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_export,
+            DYNAMATIC_OPT_BIN, handshake_manual_buffer,
             "--lower-handshake-to-hw"
         ],
             stdout=f,
