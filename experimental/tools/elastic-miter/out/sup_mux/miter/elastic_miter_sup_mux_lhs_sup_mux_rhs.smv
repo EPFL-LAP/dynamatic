@@ -1,18 +1,17 @@
-#include "handshake_buffer_0.smv"
-#include "handshake_cmpi_0.smv"
 #include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_ndsource_0.smv"
-#include "handshake_buffer_1.smv"
-#include "handshake_buffer_2.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_fork_1.smv"
-#include "handshake_constant_0.smv"
 #include "handshake_source_0.smv"
+#include "handshake_constant_0.smv"
 #include "handshake_init_0.smv"
+#include "handshake_buffer_2.smv"
+#include "handshake_buffer_1.smv"
 #include "handshake_blocker_0.smv"
 #include "handshake_lazy_fork_1.smv"
 #include "handshake_mux_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_fork_1.smv"
 
 
 MODULE elastic_miter_sup_mux_lhs_sup_mux_rhs (loopLiveIn, loopLiveIn_valid, iterLiveOut, iterLiveOut_valid, oldContinue, oldContinue_valid, EQ_iterLiveIn_ready)
@@ -42,8 +41,8 @@ VAR rhs_in_buf_iterLiveOut : handshake_buffer_0(in_fork_iterLiveOut.outs_1, in_f
 VAR in_fork_oldContinue : handshake_lazy_fork_0(in_fork_oldContinue_ins, in_fork_oldContinue_ins_valid, lhs_in_buf_oldContinue.ins_ready, rhs_in_buf_oldContinue.ins_ready);
 VAR lhs_in_buf_oldContinue : handshake_buffer_0(in_fork_oldContinue.outs_0, in_fork_oldContinue.outs_0_valid, lhs_fork_continue.ins_ready);
 VAR rhs_in_buf_oldContinue : handshake_buffer_0(in_fork_oldContinue.outs_1, in_fork_oldContinue.outs_1_valid, rhs_ctrl_mux.ins_1_ready);
-VAR out_nds_iterLiveIn : handshake_ndsource_0(out_lf_iterLiveIn.ins_ready);
-VAR out_lf_iterLiveIn : handshake_lazy_fork_1(out_nds_iterLiveIn.result_valid, out_buf_lhs_nds_iterLiveIn.ins_ready, out_buf_rhs_nds_iterLiveIn.ins_ready);
+VAR out_src_iterLiveIn : handshake_source_0(out_lf_iterLiveIn.ins_ready);
+VAR out_lf_iterLiveIn : handshake_lazy_fork_1(out_src_iterLiveIn.outs_valid, out_buf_lhs_nds_iterLiveIn.ins_ready, out_buf_rhs_nds_iterLiveIn.ins_ready);
 VAR out_buf_lhs_nds_iterLiveIn : handshake_buffer_1(out_lf_iterLiveIn.outs_0_valid, lhs_out_bl_iterLiveIn.ctrl_ready);
 VAR out_buf_rhs_nds_iterLiveIn : handshake_buffer_1(out_lf_iterLiveIn.outs_1_valid, rhs_out_bl_iterLiveIn.ctrl_ready);
 VAR lhs_out_bl_iterLiveIn : handshake_blocker_0(lhs_data_mux.outs, lhs_data_mux.outs_valid, out_buf_lhs_nds_iterLiveIn.outs_valid, out_eq_iterLiveIn.lhs_ready);

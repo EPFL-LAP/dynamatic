@@ -1,0 +1,26 @@
+#include "interpInduction_rhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_short_in : bool_input_inf(interpInduction_rhs.short_in_ready);
+  VAR seq_generator_long_in : bool_input_inf(interpInduction_rhs.long_in_ready);
+
+  VAR interpInduction_rhs : interpInduction_rhs (seq_generator_short_in.outs, seq_generator_short_in.outs_valid, seq_generator_long_in.outs, seq_generator_long_in.outs_valid, sink_B_out.ins_ready);
+
+  VAR sink_B_out : sink_main(interpInduction_rhs.B_out_valid);
+

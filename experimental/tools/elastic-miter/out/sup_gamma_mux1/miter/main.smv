@@ -37,3 +37,4 @@ MODULE main
 INVARSPEC (elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.EQ_res_valid -> elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.EQ_res);
 CTLSPEC AF (AG ((elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.lhs_in_buf_cond.debug_counter.counter = elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.rhs_in_buf_cond.debug_counter.counter) & (elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.lhs_in_buf_dataT.debug_counter.counter = elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.rhs_in_buf_dataT.debug_counter.counter) & (elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.lhs_in_buf_dataF.debug_counter.counter = elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.rhs_in_buf_dataF.debug_counter.counter) & (!elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.lhs_out_bl_res.outs_valid) & (!elastic_miter_sup_gamma_mux1_lhs_sup_gamma_mux1_rhs.rhs_out_bl_res.outs_valid)));
 
+INVAR  seq_generator_dataT.exact_tokens = seq_generator_dataF.exact_tokens ;

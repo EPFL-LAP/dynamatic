@@ -1,0 +1,25 @@
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_buffer_0.smv"
+
+
+MODULE interpInduction_rhs (short_in, short_in_valid, long_in, long_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := interpolate.result;
+DEFINE B_out_valid := interpolate.result_valid;
+DEFINE interpolate_result_ready := B_out_ready;
+DEFINE interpolate_short := short_in;
+DEFINE interpolate_short_valid := short_in_valid;
+DEFINE short_in_ready := interpolate.short_ready;
+DEFINE spec_v2_repeating_init_ins := long_in;
+DEFINE spec_v2_repeating_init_ins_valid := long_in_valid;
+DEFINE long_in_ready := spec_v2_repeating_init.ins_ready;
+
+
+VAR spec_v2_repeating_init : handshake_spec_v2_repeating_init_0(spec_v2_repeating_init_ins, spec_v2_repeating_init_ins_valid, buffer.ins_ready);
+VAR buffer : handshake_buffer_0(spec_v2_repeating_init.outs, spec_v2_repeating_init.outs_valid, interpolate.long_ready);
+VAR interpolate : handshake_spec_v2_interpolator_0(interpolate_short, interpolate_short_valid, buffer.outs, buffer.outs_valid, interpolate_result_ready);
+
+-- properties

@@ -734,4 +734,4 @@ reachable states: 48 (2^5.58496) out of 6.71089e+07 (2^26)
   sup_eager_gamma_mux_lhs.ctrl_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.03 seconds, total: 0.03 seconds
+elapse: 0.04 seconds, total: 0.04 seconds

@@ -1,0 +1,30 @@
+#include "handshake_mux_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_not_0.smv"
+
+
+MODULE sup_gamma_lhs_wrapper (a1, a1_valid, a2, a2_valid, c1, c1_valid, c2, c2_valid, b_ready)
+
+
+-- input and output
+DEFINE b := sup_gamma_lhs_wrapped.b;
+DEFINE b_valid := sup_gamma_lhs_wrapped.b_valid;
+DEFINE sup_gamma_lhs_wrapped_b_ready := b_ready;
+DEFINE sup_gamma_lhs_wrapped_a1 := a1;
+DEFINE sup_gamma_lhs_wrapped_a1_valid := a1_valid;
+DEFINE a1_ready := sup_gamma_lhs_wrapped.a1_ready;
+DEFINE sup_gamma_lhs_wrapped_a2 := a2;
+DEFINE sup_gamma_lhs_wrapped_a2_valid := a2_valid;
+DEFINE a2_ready := sup_gamma_lhs_wrapped.a2_ready;
+DEFINE sup_gamma_lhs_wrapped_c1 := c1;
+DEFINE sup_gamma_lhs_wrapped_c1_valid := c1_valid;
+DEFINE c1_ready := sup_gamma_lhs_wrapped.c1_ready;
+DEFINE sup_gamma_lhs_wrapped_c2 := c2;
+DEFINE sup_gamma_lhs_wrapped_c2_valid := c2_valid;
+DEFINE c2_ready := sup_gamma_lhs_wrapped.c2_ready;
+
+
+VAR sup_gamma_lhs_wrapped : sup_gamma_lhs(sup_gamma_lhs_wrapped_a1, sup_gamma_lhs_wrapped_a1_valid, sup_gamma_lhs_wrapped_a2, sup_gamma_lhs_wrapped_a2_valid, sup_gamma_lhs_wrapped_c1, sup_gamma_lhs_wrapped_c1_valid, sup_gamma_lhs_wrapped_c2, sup_gamma_lhs_wrapped_c2_valid, sup_gamma_lhs_wrapped_b_ready);
+
+-- properties

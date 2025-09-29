@@ -1,0 +1,37 @@
+#include "handshake_source_0.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_not_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+
+
+MODULE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapper (a1, a1_valid, a2, a2_valid, c1, c1_valid, c2, c2_valid, EQ_b_ready)
+
+
+-- input and output
+DEFINE EQ_b := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.EQ_b;
+DEFINE EQ_b_valid := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.EQ_b_valid;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_EQ_b_ready := EQ_b_ready;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a1 := a1;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a1_valid := a1_valid;
+DEFINE a1_ready := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.a1_ready;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a2 := a2;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a2_valid := a2_valid;
+DEFINE a2_ready := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.a2_ready;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c1 := c1;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c1_valid := c1_valid;
+DEFINE c1_ready := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.c1_ready;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c2 := c2;
+DEFINE elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c2_valid := c2_valid;
+DEFINE c2_ready := elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped.c2_ready;
+
+
+VAR elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped : elastic_miter_sup_gamma_lhs_sup_gamma_rhs(elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a1, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a1_valid, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a2, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_a2_valid, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c1, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c1_valid, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c2, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_c2_valid, elastic_miter_sup_gamma_lhs_sup_gamma_rhs_wrapped_EQ_b_ready);
+
+-- properties

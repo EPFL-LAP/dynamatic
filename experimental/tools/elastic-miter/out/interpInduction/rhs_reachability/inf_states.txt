@@ -1,0 +1,101 @@
+*** This is NuSMV 2.7.0 (compiled on (unknown))
+*** Enabled addons are: compass
+*** For more information on NuSMV see <http://nusmv.fbk.eu>
+*** or email to <nusmv-users@list.fbk.eu>.
+*** Please report bugs to <Please report bugs to <nusmv-users@fbk.eu>>
+
+*** Copyright (c) 2010-2025, Fondazione Bruno Kessler
+
+*** This version of NuSMV is linked to the CUDD library version 2.4.1
+*** Copyright (c) 1995-2004, Regents of the University of Colorado
+
+######################################################################
+system diameter: 2
+reachable states: 12 (2^3.58496) out of 64 (2^6)
+  ------- State    1 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = TRUE
+  ------- State    2 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = TRUE
+  ------- State    3 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = TRUE
+  ------- State    4 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = TRUE
+  ------- State    5 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State    6 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State    7 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State    8 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = FALSE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State    9 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = TRUE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State   10 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = TRUE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = TRUE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State   11 ------
+  seq_generator_short_in.outs = TRUE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = TRUE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  ------- State   12 ------
+  seq_generator_short_in.outs = FALSE
+  seq_generator_long_in.outs = FALSE
+  interpInduction_rhs.spec_v2_repeating_init.emit_init = TRUE
+  interpInduction_rhs.buffer.reg = FALSE
+  interpInduction_rhs.buffer.full = FALSE
+  interpInduction_rhs.interpolate.interpolate = FALSE
+  -------------------------
+######################################################################
+elapse: 0.00 seconds, total: 0.00 seconds

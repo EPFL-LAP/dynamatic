@@ -1,0 +1,20 @@
+#include "handshake_fork_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE introduceIdentInterpolator_lhs (A_in, A_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := interpolate.result;
+DEFINE B_out_valid := interpolate.result_valid;
+DEFINE interpolate_result_ready := B_out_ready;
+DEFINE a_fork_ins := A_in;
+DEFINE a_fork_ins_valid := A_in_valid;
+DEFINE A_in_ready := a_fork.ins_ready;
+
+
+VAR a_fork : handshake_fork_0(a_fork_ins, a_fork_ins_valid, interpolate.short_ready, interpolate.long_ready);
+VAR interpolate : handshake_spec_v2_interpolator_0(a_fork.outs_0, a_fork.outs_0_valid, a_fork.outs_1, a_fork.outs_1_valid, interpolate_result_ready);
+
+-- properties

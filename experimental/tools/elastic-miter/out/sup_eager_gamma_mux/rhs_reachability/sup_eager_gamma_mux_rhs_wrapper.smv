@@ -1,10 +1,10 @@
+#include "handshake_mux_0.smv"
 #include "handshake_fork_1.smv"
 #include "handshake_init_0.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_not_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_buffer_0.smv"
-#include "handshake_mux_0.smv"
+#include "handshake_fork_0.smv"
 
 
 MODULE sup_eager_gamma_mux_rhs_wrapper (A_in, A_in_valid, B_in, B_in_valid, ctrl, ctrl_valid, res_ready)

@@ -1,10 +1,10 @@
 #include "handshake_fork_1.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_buffer_0.smv"
 #include "handshake_mux_0.smv"
 #include "handshake_init_0.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_not_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
 
 
 MODULE sup_gamma_mux1_rhs (cond, cond_valid, dataT, dataT_valid, dataF, dataF_valid, res_ready)

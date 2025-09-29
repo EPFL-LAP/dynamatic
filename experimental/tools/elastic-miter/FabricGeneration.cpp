@@ -675,6 +675,23 @@ void addCustomCtx(llvm::StringRef rewriteName, ModuleOp modOp) {
     auto sink =
         builder.create<SinkOp>(builder.getUnknownLoc(), passer.getResult());
     setHandshakeAttributes(builder, sink, 0, "ctx_sink");
+  } else if (rewriteName ==
+             "elastic_miter_interpInduction_lhs_interpInduction_rhs") {
+    llvm::errs()
+        << "Adding custom ctx for interpInduction_lhs_interpInduction_rhs\n";
+    Value shortArg = funcOp.getArgument(0);
+    Value longArg = funcOp.getArgument(1);
+    builder.setInsertionPointToStart(&funcOp.getBlocks().front());
+    auto shortFork = builder.create<ForkOp>(builder.getUnknownLoc(), shortArg,
+                                            /*numOutputs=*/2);
+    setHandshakeAttributes(builder, shortFork, 0, "ctx_short_fork");
+    shortArg.replaceAllUsesExcept(shortFork->getResult(0), shortFork);
+    auto nri = builder.create<SpecV2NDSpeculatorOp>(builder.getUnknownLoc(),
+                                                    shortFork->getResult(1));
+    setHandshakeAttributes(builder, nri, 0, "ctx_n_repeating_init");
+    longArg.replaceAllUsesWith(nri.getResult());
+    auto sink = builder.create<SinkOp>(builder.getUnknownLoc(), longArg);
+    setHandshakeAttributes(builder, sink, 0, "ctx_sink");
   }
 }
 

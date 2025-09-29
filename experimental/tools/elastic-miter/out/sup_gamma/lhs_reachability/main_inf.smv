@@ -1,0 +1,28 @@
+#include "sup_gamma_lhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_a1 : bool_input_inf(sup_gamma_lhs.a1_ready);
+  VAR seq_generator_a2 : bool_input_inf(sup_gamma_lhs.a2_ready);
+  VAR seq_generator_c1 : bool_input_inf(sup_gamma_lhs.c1_ready);
+  VAR seq_generator_c2 : bool_input_inf(sup_gamma_lhs.c2_ready);
+
+  VAR sup_gamma_lhs : sup_gamma_lhs (seq_generator_a1.outs, seq_generator_a1.outs_valid, seq_generator_a2.outs, seq_generator_a2.outs_valid, seq_generator_c1.outs, seq_generator_c1.outs_valid, seq_generator_c2.outs, seq_generator_c2.outs_valid, sink_b.ins_ready);
+
+  VAR sink_b : sink_main(sup_gamma_lhs.b_valid);
+

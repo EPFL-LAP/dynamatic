@@ -1,0 +1,11 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "A_in" ["style"="solid", "shape"="diamond", "label"="A_in", "mlir_op"="handshake.func"]
+  "B_out" ["style"="solid", "shape"="diamond", "label"="B_out", "mlir_op"="handshake.func"]
+  "not1" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="not", "mlir_op"="handshake.not"]
+  "not2" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="not", "mlir_op"="handshake.not"]
+  "A_in" -> "not1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="A_in", "to_idx"="0"]
+  "not1" -> "not2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "not2" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+}

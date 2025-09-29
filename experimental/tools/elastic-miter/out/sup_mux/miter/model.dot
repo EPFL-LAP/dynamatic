@@ -37,14 +37,14 @@ Digraph G {
   }
   subgraph cluster3 {
     graph ["label"="BB 3"]
-    "out_nds_iterLiveIn" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndsource", "mlir_op"="handshake.ndsource"]
+    "out_src_iterLiveIn" ["style"="filled", "fillcolor"="gainsboro", "shape"="box", "label"="source", "mlir_op"="handshake.source"]
     "out_lf_iterLiveIn" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
     "out_buf_lhs_nds_iterLiveIn" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "out_buf_rhs_nds_iterLiveIn" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="FIFO_BREAK_DV [1]", "mlir_op"="handshake.buffer"]
     "lhs_out_bl_iterLiveIn" ["style"="filled", "fillcolor"="cyan", "shape"="box", "label"="blocker", "mlir_op"="handshake.blocker"]
     "rhs_out_bl_iterLiveIn" ["style"="filled", "fillcolor"="cyan", "shape"="box", "label"="blocker", "mlir_op"="handshake.blocker"]
     "out_eq_iterLiveIn" ["style"="filled", "fillcolor"="moccasin", "shape"="oval", "label"="==", "mlir_op"="handshake.cmpi=="]
-    "out_nds_iterLiveIn" -> "out_lf_iterLiveIn" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+    "out_src_iterLiveIn" -> "out_lf_iterLiveIn" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
     "out_lf_iterLiveIn" -> "out_buf_lhs_nds_iterLiveIn" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
     "out_lf_iterLiveIn" -> "out_buf_rhs_nds_iterLiveIn" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
     "out_buf_lhs_nds_iterLiveIn" -> "lhs_out_bl_iterLiveIn" ["dir"="both", "style"="dotted", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs", "to_idx"="1"]

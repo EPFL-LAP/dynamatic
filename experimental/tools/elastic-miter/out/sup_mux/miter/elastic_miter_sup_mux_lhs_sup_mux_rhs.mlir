@@ -9,7 +9,7 @@ module {
     %6:2 = lazy_fork [2] %arg2 {handshake.bb = 0 : ui32, handshake.name = "in_fork_oldContinue"} : <i1>
     %7 = buffer %6#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 0 : ui32, handshake.name = "lhs_in_buf_oldContinue"} : <i1>
     %8 = buffer %6#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = true, handshake.bb = 0 : ui32, handshake.name = "rhs_in_buf_oldContinue"} : <i1>
-    %9 = ndsource {handshake.bb = 3 : ui32, handshake.name = "out_nds_iterLiveIn"} : <>
+    %9 = source {handshake.bb = 3 : ui32, handshake.name = "out_src_iterLiveIn"} : <>
     %10:2 = lazy_fork [2] %9 {handshake.bb = 3 : ui32, handshake.name = "out_lf_iterLiveIn"} : <>
     %11 = buffer %10#0, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_iterLiveIn"} : <>
     %12 = buffer %10#1, bufferType = FIFO_BREAK_DV, numSlots = 1 {debugCounter = false, handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_iterLiveIn"} : <>

@@ -20,8 +20,31 @@ run() {
     exit_on_fail "($NAME): Equivalence checking failed"
 }
 
+# Rewrite A (new)
+# run sup_mul --timing_insensitive --seq_length="0=1&0=2"
+# run sup_fork --allow_nonacceptance --timing_insensitive
+# run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
+# run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}<={out:0}"
+
+# Rewrite B (new)
+# run sup_gamma_mux1 --timing_insensitive --seq_length="1=2"
+
+# Rewrite C (new)
+# run sup_gamma_mux2_mini --timing_insensitive --seq_length="0=1" --loop=2,0
+
 # Rewrite D (new)
-# run sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop=0,2
+# run sup_mux --timing_insensitive --seq_length="1=2" --loop=0,2
+
+# Rewrite E (new)
+# run sup_sup --timing_insensitive --seq_length="0=1&1=2"
+
+# Rewrite F (new)
+# run sup_gamma --timing_insensitive
+
+# Rewrite G (new)
+# run sup_eager_gamma_mux --timing_insensitive --seq_length="0=1"
+
+# Rewrite H (new)
 
 # run general_sup_mux --allow_nonacceptance --timing_insensitive --seq_length="1=3&2=4"
 # run extension1 --allow_nonacceptance --timing_insensitive
@@ -33,17 +56,16 @@ run() {
 # run general_sup_mumux_copy --allow_nonacceptance --timing_insensitive --seq_length="1=2" --seq_length_enhanced="{in:1}<={out:0}" --loop_strict=0,2
 # run general_sup_mumux --timing_insensitive --seq_length="0=2&0=3"
 
-# Rewrite B (new)
-run sup_gamma_mux1 --timing_insensitive --seq_length="1=2"
+
+# run sup_mu_mux1 --timing_insensitive --seq_length="2=3"
+# run repeating_init --timing_insensitive
+
+# run introduceIdentInterpolator --timing_insensitive
+run interpInduction --timing_insensitive
 
 # run sup_gamma_mux2 --timing_insensitive --seq_length="0=1&0=2"
 
-# Rewrite C (new)
-# run sup_gamma_mux2_mini --timing_insensitive --seq_length="0=1" --loop=2,0
-
 # run sup_gamma_new --timing_insensitive --allow_nonacceptance --seq_length="0=2&1=2&2=3"
-
-# run sup_eager_gamma_mux --timing_insensitive --allow_nonacceptance --seq_length="0=1"
 
 # # Rewrites B
 # run sup_mul --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}={in:2}&{in:0}<={out:0}"

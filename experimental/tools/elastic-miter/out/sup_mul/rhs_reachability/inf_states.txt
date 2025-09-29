@@ -334,4 +334,4 @@ reachable states: 40 (2^5.32193) out of 128 (2^7)
   sup_mul_rhs.muli.inner_handshake_manager.inner_delay_buffer.v2 = TRUE
   -------------------------
 ######################################################################
-elapse: 0.00 seconds, total: 0.00 seconds
+elapse: 0.01 seconds, total: 0.01 seconds

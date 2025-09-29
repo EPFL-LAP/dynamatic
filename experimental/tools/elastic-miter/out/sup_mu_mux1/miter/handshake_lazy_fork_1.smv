@@ -1,0 +1,17 @@
+-- handshake_lazy_fork_1 : lazy_fork(['size=2', 'bitwidth=0'])
+
+
+MODULE handshake_lazy_fork_1(ins_valid, outs_0_ready, outs_1_ready)
+
+  DEFINE
+  all_ready := outs_0_ready & outs_1_ready;
+  others_ready_0 := outs_1_ready;
+  others_ready_1 := outs_0_ready;
+
+
+  -- output
+  DEFINE
+  ins_ready := all_ready;
+  outs_0_valid := ins_valid & others_ready_0;
+  outs_1_valid := ins_valid & others_ready_1;
+

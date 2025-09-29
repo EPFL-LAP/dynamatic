@@ -494,4 +494,4 @@ reachable states: 32 (2^5) out of 16384 (2^14)
   sup_gamma_mux2_mini_rhs.buff.data = FALSE
   -------------------------
 ######################################################################
-elapse: 0.06 seconds, total: 0.06 seconds
+elapse: 0.07 seconds, total: 0.07 seconds
