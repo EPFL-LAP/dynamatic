@@ -15,4 +15,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
   outs := interpolate ? TRUE : ins;
   outs_valid := interpolate ? TRUE : ins_valid;
   ins_ready := interpolate ? FALSE : outs_ready;
+
+  FAIRNESS !interpolate
 """
