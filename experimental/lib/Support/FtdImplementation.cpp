@@ -15,6 +15,7 @@
 #include "experimental/Support/FtdImplementation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
@@ -354,11 +355,14 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // Check that all the values have the same type, then collet them according to
   // their input blocks
   for (auto &val : vals) {
+    llvm::errs() << "val " << val << "\n";
     if (val.getType() != valueType) {
       llvm::errs() << "All values must have the same type\n";
       return failure();
     }
     auto *bb = val.getParentBlock();
+    llvm::errs() << "bb num "
+                 << bb->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
     valuesPerBlock[bb].push_back(val);
   }
 
@@ -366,6 +370,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // get only the last input value for each block. This is necessary in case in
   // the input sets there is more than one value per blocks
   for (auto &[bb, vals] : valuesPerBlock) {
+
+    llvm::errs() << vals[0] << "\n";
     std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
       if (!a.getDefiningOp())
         return false;
@@ -373,12 +379,19 @@ LogicalResult experimental::ftd::createPhiNetwork(
         return true;
       return domInfo.dominates(b.getDefiningOp(), a.getDefiningOp());
     });
+    llvm::errs() << "inserting for "
+                 << bb->getOperations().front().getAttr(BB_ATTR_NAME)
+                 << " ---- \n " << vals[0] << "\n ---- \n";
     inputBlocks.insert({bb, vals[0]});
   }
 
   // In which block a new phi is necessary
   DenseSet<Block *> blocksToAddPhi =
       runCrytonAlgorithm(funcRegion, inputBlocks);
+
+  for (auto a : blocksToAddPhi)
+    llvm::errs() << " needs "
+                 << a->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
 
   // A backedge is created for each block in `blocksToAddPhi`, and it will
   // contain the value used as placeholder for the phi
@@ -388,8 +401,13 @@ LogicalResult experimental::ftd::createPhiNetwork(
     resultPerPhi.insert({bb, mergeResult});
   }
 
+  llvm::errs() << "444\n";
+
   // For each phi, we need one input for every predecessor of the block
   for (auto &bb : blocksToAddPhi) {
+
+    llvm::errs() << " iterating "
+                 << bb->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
 
     // Avoid to cover a predecessor twice
     llvm::DenseSet<Block *> coveredPred;
@@ -400,16 +418,28 @@ LogicalResult experimental::ftd::createPhiNetwork(
         continue;
       coveredPred.insert(pred);
 
+      llvm::errs() << "pred "
+                   << pred->getOperations().front().getAttr(BB_ATTR_NAME)
+                   << "\n";
+
       // If the predecessor does not contains a definition of the value, we move
       // to its immediate dominator, until we have found a definition.
       Block *predecessorOrDominator = nullptr;
       Value valueToUse = nullptr;
 
       do {
+        llvm::errs() << "lanat pred "
+                     << pred->getOperations().front().getAttr(BB_ATTR_NAME)
+                     << "\n";
         predecessorOrDominator =
             !predecessorOrDominator
                 ? pred
                 : getImmediateDominator(funcRegion, predecessorOrDominator);
+
+        llvm::errs() << "lanat pred "
+                     << predecessorOrDominator->getOperations().front().getAttr(
+                            BB_ATTR_NAME)
+                     << "\n";
 
         if (inputBlocks.contains(predecessorOrDominator))
           valueToUse = inputBlocks[predecessorOrDominator];
@@ -422,6 +452,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
     }
   }
 
+  llvm::errs() << "555\n";
+
   // Create the merge and then replace the values
   DenseMap<Block *, handshake::MergeOp> newMergePerPhi;
 
@@ -432,6 +464,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
     mergeOp->setAttr(NEW_PHI, rewriter.getUnitAttr());
     newMergePerPhi.insert({bb, mergeOp});
   }
+
+  llvm::errs() << "666\n";
 
   for (auto *bb : blocksToAddPhi)
     resultPerPhi.find(bb)->getSecond().setValue(newMergePerPhi[bb].getResult());
@@ -462,6 +496,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
     inputPerBlock[&bb] = foundValue;
   }
 
+  llvm::errs() << "777\n";
+
   for (auto &op : toSubstitue)
     op->set(inputPerBlock[op->getOwner()->getBlock()]);
 
@@ -477,8 +513,27 @@ LogicalResult ftd::createPhiNetworkDeps(
   // For each pair of operand and its dependencies
   for (auto &[operand, dependencies] : dependenciesMap) {
 
+    llvm::errs() << "Processing operand " << " - " << dependencies[0] << "\n";
     Operation *operandOwner = operand->getOwner();
-    auto startValue = (Value)funcRegion.getArguments().back();
+
+    Value startSignal = (Value)funcRegion.getArguments().back();
+    Value startValue = startSignal;
+
+    if (!isa<handshake::ControlType>(dependencies[0].getType())) {
+
+      // set the rewriter insertion point to bb = 0
+      rewriter.setInsertionPointToStart(&funcRegion.front());
+      handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(
+          startSignal.getLoc(),
+          rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), startSignal);
+      // constOp->moveBefore(operandOwner);
+      setBB(constOp, 0);
+      llvm::errs() << "in const " << constOp << "\n";
+
+      startValue = constOp.getResult();
+    }
+
+    llvm::errs() << "start value " << startValue << "\n";
 
     /// Lambda to run the SSA analysis over the pair of values {dep, startValue}
     /// and properly connect the operand `op` to the correct value in the
@@ -490,12 +545,15 @@ LogicalResult ftd::createPhiNetworkDeps(
       // producer properly dominates the consumer (i.e. comes before in a linear
       // sense) then the consumer is directly connected to the producer without
       // further mechanism.
+
+      llvm::errs() << "aval \n";
       if (dep.getParentBlock() == operandOwner->getBlock() &&
           domInfo.properlyDominates(depOwner, operandOwner)) {
         op->set(dep);
         return success();
       }
 
+      llvm::errs() << "dovom \n";
       // Otherwise, we run the SSA insertion
       SmallVector<mlir::OpOperand *> operandsToChange = {op};
       SmallVector<Value> inputValues = {startValue, dep};
@@ -517,6 +575,7 @@ LogicalResult ftd::createPhiNetworkDeps(
 
     // If the operand has one dependency only, there is no need for a join.
     if (dependencies.size() == 1) {
+      llvm::errs() << "tabe  \n";
       if (failed(connect(operand, dependencies[0])))
         return failure();
       continue;
@@ -597,19 +656,26 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
         loop->getExitingBlock()->getTerminator()->getOperand(0);
 
     // Create the false constant to feed `init`
-    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+    // auto constOp =
+    // rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
+    //                                                       cstAttr,
+    //                                                       startValue);
+    // constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
-    // Create the `init` operation
-    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+    // // Create the `init` operation
+    // SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
+    // auto initMergeOp =
+    // rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+    //                                                        mergeOperands);
+    // initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+    handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
+        consumerOp->getLoc(), conditionValue);
+    initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
-    auto selectSignal = initMergeOp.getResult();
+    auto selectSignal = initOp.getResult();
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
@@ -638,6 +704,8 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   // Final replace the usage of the operand in the consumer with the output of
   // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
+
+  llvm::errs() << "vaghan \n";
 }
 
 namespace dynamatic {
@@ -948,7 +1016,8 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     return;
 
   // Do not take into account conditional branch
-  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp))
+  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
+      !consumerOp->hasAttr("drawing"))
     return;
 
   // The consumer block is the block which contains the consumer
@@ -972,7 +1041,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     // has the `FTD_NEW_SUPP` annotation, set in `addMoreSuppressionInLoop`. In
     // any other cases, suppressing a branch ends up with incorrect results.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
-        !producerOp->hasAttr(FTD_NEW_SUPP))
+        !producerOp->hasAttr(FTD_NEW_SUPP) && !producerOp->hasAttr("drawing"))
       return;
 
     // Skip the prod-cons if the consumer is part of the operations
@@ -990,7 +1059,6 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         llvm::isa_and_nonnull<handshake::LSQOp>(consumerOp) ||
         llvm::isa_and_nonnull<handshake::ControlMergeOp>(producerOp) ||
         llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-        llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) ||
         llvm::isa_and_nonnull<cf::CondBranchOp>(consumerOp) ||
         llvm::isa_and_nonnull<cf::BranchOp>(consumerOp) ||
         (llvm::isa<memref::LoadOp>(consumerOp) &&
@@ -998,6 +1066,10 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         (llvm::isa<memref::StoreOp>(consumerOp) &&
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
+      return;
+
+    if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
+        !consumerOp->hasAttr("drawing"))
       return;
 
     // The next step is to identify the relationship between the producer
@@ -1188,28 +1260,32 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // The inputs of the merge are the condition value and a `false`
         // constant driven by the start value of the function. This will
         // created later on, so we use a dummy value.
-        SmallVector<Value> mergeOperands;
-        mergeOperands.push_back(conditionValue);
-        mergeOperands.push_back(conditionValue);
+        // SmallVector<Value> mergeOperands;
+        // mergeOperands.push_back(conditionValue);
+        // mergeOperands.push_back(conditionValue);
 
-        auto initMergeOp =
-            rewriter.create<handshake::MergeOp>(loc, mergeOperands);
+        // auto initMergeOp =
+        //     rewriter.create<handshake::MergeOp>(loc, mergeOperands);
 
-        initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        // initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+        handshake::InitOp initOp =
+            rewriter.create<handshake::InitOp>(loc, conditionValue);
+        initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
         // Replace the new condition value
-        conditionValue = initMergeOp->getResult(0);
+        conditionValue = initOp->getResult(0);
         conditionValue.setType(channelifyType(conditionValue.getType()));
 
         // Add the activation constant driven by the backedge value, which will
         // be then updated with the real start value, once available
         auto cstType = rewriter.getIntegerType(1);
         auto cstAttr = IntegerAttr::get(cstType, 0);
-        rewriter.setInsertionPointToStart(initMergeOp->getBlock());
-        auto constOp = rewriter.create<handshake::ConstantOp>(
-            initMergeOp->getLoc(), cstAttr, startValue);
-        constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-        initMergeOp->setOperand(0, constOp.getResult());
+        rewriter.setInsertionPointToStart(initOp->getBlock());
+        // auto constOp = rewriter.create<handshake::ConstantOp>(
+        //     initMergeOp->getLoc(), cstAttr, startValue);
+        // constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        // initMergeOp->setOperand(0, constOp.getResult());
       }
 
       // When a single input gamma is encountered, a mux is inserted as a
