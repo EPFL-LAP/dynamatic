@@ -1,28 +1,28 @@
-#include "nested_loop.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
-void nested_loop(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
-  for (int j = 0; j < 2; j++) {
+#define N 1000
+void nested_loop(int a[N], int b[N], int c[N]) {
+  for (int j = 0; j < 20; j++) {
     int i = 0;
     int bound = 1000;
     int sum = 0;
     while (sum < bound) {
       sum = a[i] * b[i];
-      c[i + j * 400] = sum;
+      c[i + j * 40] = sum;
       i++;
     }
   }
 }
 
 int main(void) {
-  in_int_t a[N];
-  in_int_t b[N];
-  inout_int_t c[N];
+  int a[N];
+  int b[N];
+  int c[N];
 
   srand(13);
   for (int j = 0; j < N; ++j) {
-    a[j] = 5;
+    a[j] = 20;
     b[j] = j;
     c[j] = 0;
   }

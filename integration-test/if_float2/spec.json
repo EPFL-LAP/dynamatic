@@ -2,7 +2,7 @@
   "speculator": {
     "operation-name": "fork13",
     "operand-idx": 0,
-    "fifo-depth": 30
+    "fifo-depth": 3
   },
-  "save-commits-fifo-depth": 30
+  "save-commits-fifo-depth": 3
 }

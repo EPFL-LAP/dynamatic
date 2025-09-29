@@ -3,7 +3,7 @@
 
 #define N 1000
 
-int collision_count(int x[N], int y[N]) {
+int collision_count(int x[N], int y[N], int positive[N]) {
   int count1 = 0;
   int count2 = 0;
   for (int i = 0; i < N; i++) {
@@ -14,9 +14,7 @@ int collision_count(int x[N], int y[N]) {
       break;
     }
     if (xi > 0 && yi > 0) {
-      count1++;
-    } else if (xi < 0 && yi < 0) {
-      count2++;
+      positive[i] = 1;
     }
   }
   return count1 + count2;
@@ -25,12 +23,14 @@ int collision_count(int x[N], int y[N]) {
 int main(void) {
   int x[N];
   int y[N];
+  int positive[N];
 
   srand(13);
   for (int j = 0; j < N; ++j) {
     x[j] = rand() % 200 - 100;
     y[j] = rand() % 200 - 100;
+    positive[j] = 0;
   }
 
-  CALL_KERNEL(collision_count, x, y);
+  CALL_KERNEL(collision_count, x, y, positive);
 }

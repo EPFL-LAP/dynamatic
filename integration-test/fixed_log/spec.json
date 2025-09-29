@@ -1,8 +1,8 @@
 {
   "speculator": {
-    "operation-name": "fork5",
+    "operation-name": "fork11",
     "operand-idx": 0,
-    "fifo-depth": 4
+    "fifo-depth": 5
   },
-  "save-commits-fifo-depth": 4
+  "save-commits-fifo-depth": 5
 }

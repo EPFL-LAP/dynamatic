@@ -7,12 +7,11 @@ float golden_ratio(float x0, float x1) {
   float x = x0;
   float original_x = x1;
   for (int i = 0; i < ITERS; i++) {
-    while (true) {
-      float next_x = 0.5f * (x + x * original_x);
-      if (fabs(next_x - x) < 0.1f)
-        break;
-      x = next_x;
-    }
+    float old_x;
+    do {
+      old_x = x;
+      x = 0.5f * (x + x * original_x);
+    } while (fabs(x - old_x) >= 0.1f);
     x += 1.0f;
     original_x = 1 / x;
   }
