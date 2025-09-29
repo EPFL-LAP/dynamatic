@@ -98,6 +98,8 @@ def main():
         "--synth-control", action='store_true')
     parser.add_argument(
         "--exit-eager-eval", action='store_true')
+    parser.add_argument(
+        "--resolver", action='store_true')
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -535,7 +537,7 @@ def main():
             print(f"n={n}, variable={variable}")
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""} {"exit-eager-eval" if args.exit_eager_eval else ""}",
+                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""} {"exit-eager-eval" if args.exit_eager_eval else ""} {"resolver" if args.resolver else ""}",
                 "--handshake-materialize",
                 "--handshake-canonicalize"
             ],

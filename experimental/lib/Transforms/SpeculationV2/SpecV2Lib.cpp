@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 
 using namespace llvm::sys;
@@ -187,7 +188,7 @@ LogicalResult movePassersDownPM(Operation *pmOp) {
   return success();
 }
 
-bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
+bool isEligibleForPasserMotionOverPM(PasserOp passerOp, bool reason = false) {
   Value passerControl = passerOp.getCtrl();
 
   Operation *targetOp = getUniqueUser(passerOp.getResult());
@@ -196,8 +197,11 @@ bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
   if (!isa<ArithOpInterface, NotOp, ForkOp, LazyForkOp, BufferOp, LoadOp,
            BranchOp>(targetOp)) {
     if (!isa<MergeOp, ControlMergeOp>(targetOp) ||
-        targetOp->getNumOperands() != 1)
+        targetOp->getNumOperands() != 1) {
+      if (reason)
+        llvm::errs() << "Target op is not a PM unit\n";
       return false;
+    }
   }
 
   // Iterate over operands of the targetOp to decide the eligibility for
@@ -206,11 +210,16 @@ bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
     if (auto passerOp = dyn_cast<PasserOp>(operand.getDefiningOp())) {
       // If this passerOp is controlled by different control from the specified
       // one, not eligible.
-      if (!equalsIndirectly(passerControl, passerOp.getCtrl()))
+      if (!equalsIndirectly(passerControl, passerOp.getCtrl())) {
+        if (reason)
+          llvm::errs() << "Passer ctrl mismatch\n";
         return false;
+      }
     } else if (!isSourced(operand)) {
       // Each operand must be defined by a passer, except when it is driven by a
       // source op.
+      if (reason)
+        llvm::errs() << "Operand not from passer or source\n";
       return false;
     }
   }
@@ -220,7 +229,7 @@ bool isEligibleForPasserMotionOverPM(PasserOp passerOp) {
 
 void performPasserMotionPastPM(PasserOp passerOp,
                                DenseSet<PasserOp> &frontiers) {
-  Value passerControl = passerOp.getCtrl();
+  Value passerControl = getForkTop(passerOp.getCtrl());
   OpBuilder builder(passerOp->getContext());
   builder.setInsertionPoint(passerOp);
 
@@ -244,6 +253,7 @@ void performPasserMotionPastPM(PasserOp passerOp,
   // Add new passers to the frontiers
   for (auto result : getEffectiveResults(targetOp)) {
     auto newPasser = cast<PasserOp>(getUniqueUser(result));
+    newPasser->setAttr("specv2_frontier", builder.getBoolAttr(false));
     frontiers.insert(newPasser);
     // Materialize the result of the new passer for further rewriting.
     materializeValue(newPasser.getResult());

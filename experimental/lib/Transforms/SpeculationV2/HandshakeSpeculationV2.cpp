@@ -15,6 +15,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 
 using namespace llvm::sys;
@@ -46,24 +47,27 @@ struct HandshakeSpeculationV2Pass
 };
 
 /// Returns if the circuit is eligible for MuxPasserSwap.
-static bool isEligibleForMuxPasserSwap(MuxOp muxOp) {
+static bool isEligibleForMuxPasserSwap(MuxOp muxOp, bool reason = false) {
   // Ensure the rewritten subcircuit structure.
   Operation *backedgeDefiningOp = muxOp.getDataOperands()[1].getDefiningOp();
   if (!isa<PasserOp>(backedgeDefiningOp)) {
-    llvm::errs() << "data1 is not passer\n";
+    if (reason)
+      llvm::errs() << "data1 is not passer\n";
     return false;
   }
   auto passerOp = cast<PasserOp>(backedgeDefiningOp);
 
   Operation *selectorDefiningOp = muxOp.getSelectOperand().getDefiningOp();
   if (!isa<InitOp>(selectorDefiningOp)) {
-    llvm::errs() << "mux select is not init\n";
+    if (reason)
+      llvm::errs() << "mux select is not init\n";
     return false;
   }
   auto initOp = cast<InitOp>(selectorDefiningOp);
 
   if (!equalsIndirectly(passerOp.getCtrl(), initOp.getOperand())) {
-    llvm::errs() << "mux select and passer ctrl not equal\n";
+    if (reason)
+      llvm::errs() << "mux select and passer ctrl not equal\n";
     return false;
   }
 
@@ -72,39 +76,45 @@ static bool isEligibleForMuxPasserSwap(MuxOp muxOp) {
   return true;
 }
 
-static bool isMuxPasserToAndEligible(MuxOp muxOp) {
+static bool isMuxPasserToAndEligible(MuxOp muxOp, bool reason = false) {
   auto *data0 = muxOp.getDataOperands()[0].getDefiningOp();
   auto *data1 = muxOp.getDataOperands()[1].getDefiningOp();
 
   if (!data0 || !data1) {
-    llvm::errs() << "data0 or data1 has no defining op\n";
+    if (reason)
+      llvm::errs() << "data0 or data1 has no defining op\n";
     return false;
   }
 
   if (!isa<ConstantOp>(data0)) {
-    llvm::errs() << "data0 is not constant\n";
+    if (reason)
+      llvm::errs() << "data0 is not constant\n";
     return false;
   }
   auto constOp = cast<ConstantOp>(data0);
   if (isa<IntegerAttr>(constOp.getValue()) &&
       constOp.getValue().cast<IntegerAttr>().getValue() != 0) {
-    llvm::errs() << "data0 is not constant 0\n";
+    if (reason)
+      llvm::errs() << "data0 is not constant 0\n";
     return false;
   }
   auto *constDefiningOp = constOp.getOperand().getDefiningOp();
   if (!isa<SourceOp>(constDefiningOp)) {
-    llvm::errs() << "data0 is not from source\n";
+    if (reason)
+      llvm::errs() << "data0 is not from source\n";
     return false;
   }
 
   if (!isa<PasserOp>(data1)) {
-    llvm::errs() << "data1 is not passer\n";
+    if (reason)
+      llvm::errs() << "data1 is not passer\n";
     return false;
   }
   auto passerOp = cast<PasserOp>(data1);
 
   if (!equalsIndirectly(passerOp.getCtrl(), muxOp.getSelectOperand())) {
-    llvm::errs() << "mux select and passer ctrl not equal\n";
+    if (reason)
+      llvm::errs() << "mux select and passer ctrl not equal\n";
     return false;
   }
 
@@ -214,29 +224,34 @@ static SpecV2RepeatingInitOp moveRepeatingInitsUp(Value fedValue) {
 }
 
 /// Returns if the simplification of 3 passers is possible.
-static bool isPasserSimplifiable(PasserOp ctrlDefiningPasser) {
+static bool isPasserSimplifiable(PasserOp ctrlDefiningPasser,
+                                 bool reason = false) {
   // Ensure the structure
   Operation *bottomOp = getUniqueUser(ctrlDefiningPasser.getResult());
   if (!isa<PasserOp>(bottomOp)) {
-    llvm::errs() << "Bottom passer not found\n";
+    if (reason)
+      llvm::errs() << "Bottom passer not found\n";
     return false;
   }
   auto bottomPasser = cast<PasserOp>(bottomOp);
   if (ctrlDefiningPasser.getResult() != bottomPasser.getCtrl()) {
-    llvm::errs() << "Ctrl mismatch\n";
+    if (reason)
+      llvm::errs() << "Ctrl mismatch\n";
     return false;
   }
 
   Operation *topOp = bottomPasser.getData().getDefiningOp();
   if (!isa<PasserOp>(topOp)) {
-    llvm::errs() << "Top passer not found\n";
+    if (reason)
+      llvm::errs() << "Top passer not found\n";
     return false;
   }
   auto topPasser = cast<PasserOp>(topOp);
 
   // Confirm the context
   if (!equalsIndirectly(ctrlDefiningPasser.getCtrl(), topPasser.getCtrl())) {
-    llvm::errs() << "Ctrl mismatch\n";
+    if (reason)
+      llvm::errs() << "Ctrl mismatch\n";
     return false;
   }
 
@@ -268,6 +283,34 @@ static AndIOp simplifyPasser(PasserOp ctrlDefiningPasser) {
   materializeValue(andOp.getResult());
 
   return andOp;
+}
+
+static bool isAndIUpEligible(AndIOp candidateAndI) {
+  Value lhs = getForkTop(candidateAndI.getLhs());
+  Value rhs = getForkTop(candidateAndI.getRhs());
+
+  materializeValue(lhs);
+
+  Operation *lhsUniqueUser = getUniqueUser(lhs);
+
+  if (!isa<ForkOp>(lhsUniqueUser)) {
+    return false;
+  }
+
+  ForkOp lhsFork = cast<ForkOp>(lhsUniqueUser);
+
+  for (auto res : lhsFork->getResults()) {
+    if (auto andI = dyn_cast<AndIOp>(getUniqueUser(res))) {
+      if (andI == candidateAndI)
+        continue;
+      if ((andI.getLhs() == res && equalsIndirectly(andI.getRhs(), rhs)) ||
+          (andI.getRhs() == res && equalsIndirectly(andI.getLhs(), rhs))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 static AndIOp moveAndIUp(AndIOp candidateAndI) {
@@ -314,23 +357,26 @@ static AndIOp moveAndIUp(AndIOp candidateAndI) {
   return newAndI;
 }
 
-static bool isMotionPastGammaEligible(MuxOp muxOp) {
+static bool isMotionPastGammaEligible(MuxOp muxOp, bool reason = false) {
   Operation *falseDefiningOp = muxOp.getDataOperands()[0].getDefiningOp();
   Operation *trueDefiningOp = muxOp.getDataOperands()[1].getDefiningOp();
 
   if (!falseDefiningOp || !trueDefiningOp) {
-    llvm::errs() << "data0 or data1 has no defining op\n";
+    if (reason)
+      llvm::errs() << "data0 or data1 has no defining op\n";
     return false;
   }
 
   if (!isa<PasserOp>(falseDefiningOp)) {
-    llvm::errs() << "data0 is not passer\n";
+    if (reason)
+      llvm::errs() << "data0 is not passer\n";
     return false;
   }
   auto falsePasser = cast<PasserOp>(falseDefiningOp);
 
   if (!isa<PasserOp>(trueDefiningOp)) {
-    llvm::errs() << "data1 is not passer\n";
+    if (reason)
+      llvm::errs() << "data1 is not passer\n";
     return false;
   }
   auto truePasser = cast<PasserOp>(trueDefiningOp);
@@ -339,13 +385,15 @@ static bool isMotionPastGammaEligible(MuxOp muxOp) {
   Operation *truePasserCtrlDefOp = truePasser.getCtrl().getDefiningOp();
 
   if (!isa<PasserOp>(falsePasserCtrlDefOp)) {
-    llvm::errs() << "passer ctrl not defined by passer\n";
+    if (reason)
+      llvm::errs() << "passer ctrl not defined by passer\n";
     return false;
   }
   auto falsePasserCtrlDef = cast<PasserOp>(falsePasserCtrlDefOp);
 
   if (!isa<PasserOp>(truePasserCtrlDefOp)) {
-    llvm::errs() << "passer ctrl not defined by passer\n";
+    if (reason)
+      llvm::errs() << "passer ctrl not defined by passer\n";
     return false;
   }
   auto truePasserCtrlDef = cast<PasserOp>(truePasserCtrlDefOp);
@@ -354,20 +402,23 @@ static bool isMotionPastGammaEligible(MuxOp muxOp) {
   Operation *truePasserDataDefOp = truePasser.getData().getDefiningOp();
 
   if (!isa<PasserOp>(falsePasserDataDefOp)) {
-    llvm::errs() << "passer data not defined by passer\n";
+    if (reason)
+      llvm::errs() << "passer data not defined by passer\n";
     return false;
   }
   auto falsePasserDataDef = cast<PasserOp>(falsePasserDataDefOp);
 
   if (!isa<PasserOp>(truePasserDataDefOp)) {
-    llvm::errs() << "passer data not defined by passer\n";
+    if (reason)
+      llvm::errs() << "passer data not defined by passer\n";
     return false;
   }
   auto truePasserDataDef = cast<PasserOp>(truePasserDataDefOp);
 
   Operation *selDefiningOp = muxOp.getSelectOperand().getDefiningOp();
   if (!isa<PasserOp>(selDefiningOp)) {
-    llvm::errs() << "mux select not defined by passer\n";
+    if (reason)
+      llvm::errs() << "mux select not defined by passer\n";
     return false;
   }
   auto selPasser = cast<PasserOp>(selDefiningOp);
@@ -379,29 +430,34 @@ static bool isMotionPastGammaEligible(MuxOp muxOp) {
                         falsePasserDataDef.getCtrl()) ||
       !equalsIndirectly(falsePasserCtrlDef.getCtrl(),
                         truePasserDataDef.getCtrl())) {
-    llvm::errs() << "ctrl1 not equal\n";
+    if (reason)
+      llvm::errs() << "ctrl1 not equal\n";
     return false;
   }
 
   if (!equalsIndirectly(selPasser.getData(), truePasserCtrlDef.getData())) {
-    llvm::errs() << "ctrl2 not equal\n";
+    if (reason)
+      llvm::errs() << "ctrl2 not equal\n";
     return false;
   }
   Operation *defOp = getIndirectDefiningOp(selPasser.getData());
   if (auto notOp = dyn_cast<NotOp>(defOp)) {
     if (!equalsIndirectly(notOp.getOperand(), falsePasserCtrlDef.getData())) {
-      llvm::errs() << "ctrl3 not equal\n";
+      if (reason)
+        llvm::errs() << "ctrl3 not equal\n";
       return false;
     }
   } else {
     Operation *defOp2 = getIndirectDefiningOp(falsePasserCtrlDef.getData());
     if (auto notOp2 = dyn_cast<NotOp>(defOp2)) {
       if (!equalsIndirectly(notOp2.getOperand(), selPasser.getData())) {
-        llvm::errs() << "ctrl4 not equal\n";
+        if (reason)
+          llvm::errs() << "ctrl4 not equal\n";
         return false;
       }
     } else {
-      llvm::errs() << "mux select not defined by NotOp\n";
+      if (reason)
+        llvm::errs() << "mux select not defined by NotOp\n";
       return false;
     }
   }
@@ -480,6 +536,263 @@ static PasserOp performMotionPastGamma(MuxOp muxOp) {
   return newPasser;
 }
 
+static SpecV2InterpolatorOp introduceIdentInterpolator(Value value) {
+  assertMaterialization(value);
+
+  OpBuilder builder(value.getContext());
+  builder.setInsertionPointAfterValue(value);
+
+  SpecV2InterpolatorOp interpolatorOp =
+      builder.create<SpecV2InterpolatorOp>(value.getLoc(), value, value);
+  inheritBB(value.getDefiningOp(), interpolatorOp);
+
+  value.replaceAllUsesExcept(interpolatorOp.getResult(), interpolatorOp);
+
+  materializeValue(value);
+
+  return interpolatorOp;
+}
+
+static bool isInterpolatorInductionEligible(SpecV2InterpolatorOp interpOp) {
+  Operation *user = getUniqueUser(interpOp.getResult());
+  if (!user) {
+    llvm::errs() << "no unique user\n";
+    return false;
+  }
+
+  if (!isa<AndIOp>(user)) {
+    llvm::errs() << "user is not AndI\n";
+    return false;
+  }
+
+  auto andI = cast<AndIOp>(user);
+  if (!andI->hasAttr("specv2_tmp_and")) {
+    llvm::errs() << "AndI is not a tmp_and\n";
+    return false;
+  }
+
+  if (andI.getLhs() != interpOp.getResult()) {
+    llvm::errs() << "interpOp result is not lhs of AndI\n";
+    return false;
+  }
+
+  Operation *defOp = getIndirectDefiningOp(andI.getRhs());
+  if (!defOp || !isa<SpecV2RepeatingInitOp>(defOp)) {
+    llvm::errs() << "rhs of AndI not defined by repeating init\n";
+    return false;
+  }
+
+  auto ri = cast<SpecV2RepeatingInitOp>(defOp);
+  if (!equalsIndirectly(ri.getOperand(), interpOp.getLongOperand())) {
+    llvm::errs()
+        << "repeating init operand does not match interpOp long operand\n";
+    return false;
+  }
+
+  bool equal = false;
+  Value longOperandUpstream = interpOp.getLongOperand();
+  while (true) {
+    if (equalsIndirectly(longOperandUpstream, interpOp.getShortOperand())) {
+      equal = true;
+      break;
+    }
+    if (auto ri = dyn_cast<SpecV2RepeatingInitOp>(
+            getIndirectDefiningOp(longOperandUpstream))) {
+      longOperandUpstream = ri.getOperand();
+      continue;
+    }
+    break;
+  }
+
+  if (!equal) {
+    llvm::errs() << "long operand does not reach short operand upstream\n";
+    return false;
+  }
+
+  return true;
+}
+
+static SpecV2InterpolatorOp
+performInterpolatorInduction(SpecV2InterpolatorOp interpOp) {
+  OpBuilder builder(interpOp.getContext());
+  builder.setInsertionPointAfterValue(interpOp);
+
+  auto andI = cast<AndIOp>(getUniqueUser(interpOp.getResult()));
+
+  // Value oldLongOperand = getForkTop(interpOp.getLongOperand());
+
+  SpecV2InterpolatorOp newInterpOp = builder.create<SpecV2InterpolatorOp>(
+      interpOp->getLoc(), interpOp.getShortOperand(), andI.getRhs());
+  inheritBB(andI, newInterpOp);
+
+  andI.getResult().replaceAllUsesWith(newInterpOp.getResult());
+
+  andI->erase();
+  interpOp->erase();
+
+  // materializeValue(oldLongOperand);
+
+  return newInterpOp;
+}
+
+// static Value moveRepeatingInitDown(SpecV2RepeatingInitOp ri) {
+//   OpBuilder builder(ri->getContext());
+
+//   materializeValue(ri);
+//   Operation *user = getUniqueUser(ri.getResult());
+//   ForkOp fork = cast<ForkOp>(user);
+//   builder.setInsertionPoint(fork);
+//   for (auto res : fork->getResults()) {
+//     SpecV2RepeatingInitOp newRI =
+//         builder.create<SpecV2RepeatingInitOp>(ri.getLoc(), res, 1);
+//     inheritBB(ri, newRI);
+//     res.replaceAllUsesExcept(newRI.getResult(), newRI);
+//   }
+
+//   Value riOperand = ri.getOperand();
+
+//   ri.getResult().replaceAllUsesWith(riOperand);
+//   ri->erase();
+
+//   // Possibly two forks are nested, so flatten them
+//   materializeValue(riOperand);
+
+//   return riOperand;
+// }
+
+// /// Move the top (least recently added) repeating init and passer below the
+// fork
+// /// as the preparation for the resolver insertion.
+// static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator) {
+//   auto topRI = cast<SpecV2RepeatingInitOp>(
+//       getIndirectDefiningOp(interpolator.getShortOperand()));
+//   auto oldPasserOp = cast<PasserOp>(topRI.getOperand().getDefiningOp());
+
+//   materializeValue(interpolator.getShortOperand());
+//   materializeValue(interpolator.getLongOperand());
+
+//   OpBuilder builder(topRI->getContext());
+
+//   moveRepeatingInitDown(topRI);
+
+//   Operation *fork = getUniqueUser(oldPasserOp.getResult());
+//   builder.setInsertionPoint(fork);
+//   // getUniqueUser(oldPasserOp.getResult())->dump();
+
+//   if (movePassersDownPM(fork).failed()) {
+//     llvm::errs() << "Failed to perform motion for PasserOp";
+//     llvm_unreachable("SpeculationV2 algorithm failed");
+//   }
+// }
+
+// /// Returns if the circuit is eligible for the introduction of the resolver.
+// static bool
+// isEligibleForResolverIntroduction(SpecV2InterpolatorOp interpolator) {
+//   // Ensure the structure
+//   Operation *shortOperandDefiningOp =
+//       interpolator.getShortOperand().getDefiningOp();
+//   if (!isa<SpecV2RepeatingInitOp>(shortOperandDefiningOp)) {
+//     llvm::errs() << "No repeating init\n";
+//     return false;
+//   }
+//   auto riOp = cast<SpecV2RepeatingInitOp>(shortOperandDefiningOp);
+
+//   Operation *riOpUpstream = riOp.getOperand().getDefiningOp();
+//   if (!isa<PasserOp>(riOpUpstream)) {
+//     llvm::errs() << "No passer\n";
+//     return false;
+//   }
+//   auto passerOp = cast<PasserOp>(riOpUpstream);
+
+//   if (!equalsIndirectly(passerOp.getCtrl(), interpolator.getResult())) {
+//     llvm::errs() << "Passer ctrl and interpolator result doesn't match\n";
+//     return false;
+//   }
+
+//   // TODO: Confirm the longOperand
+//   return true;
+// }
+
+// /// Introduces a spec resolver.
+// /// Returns the resolver result value.
+// static SpecV2ResolverOp
+// introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
+//   auto riOp = cast<SpecV2RepeatingInitOp>(
+//       (interpolator.getShortOperand().getDefiningOp()));
+//   auto passerOp = cast<PasserOp>(riOp.getOperand().getDefiningOp());
+
+//   OpBuilder builder(interpolator->getContext());
+//   builder.setInsertionPoint(interpolator);
+
+//   auto resolverOp = builder.create<SpecV2ResolverOp>(
+//       interpolator.getLoc(), passerOp.getData(),
+//       interpolator.getLongOperand());
+//   inheritBB(interpolator, resolverOp);
+
+//   interpolator.getResult().replaceAllUsesWith(resolverOp.getResult());
+//   interpolator->erase();
+//   riOp->erase();
+//   passerOp->erase();
+//   return resolverOp;
+// }
+
+static bool isAndAssociativityEligible(AndIOp andI) {
+  Operation *user = getUniqueUser(andI.getResult());
+  if (!user)
+    return false;
+  if (!isa<AndIOp>(user))
+    return false;
+  auto userAndI = cast<AndIOp>(user);
+  auto userLhs = userAndI.getLhs();
+  auto userRhs = userAndI.getRhs();
+  auto theOtherValue = (userLhs == andI.getResult()) ? userRhs : userLhs;
+  Operation *theOtherValueDefOp = theOtherValue.getDefiningOp();
+  if (!theOtherValueDefOp) {
+    llvm::errs() << "not supported: andI user other value has no defOp\n";
+    return false;
+  }
+  Operation *andILhsDefOp = andI.getLhs().getDefiningOp();
+  Operation *andIRhsDefOp = andI.getRhs().getDefiningOp();
+  if (!andILhsDefOp || !andIRhsDefOp) {
+    llvm::errs() << "not supported: andI lhs or rhs has no defOp\n";
+    return false;
+  }
+  return (theOtherValueDefOp->isBeforeInBlock(andILhsDefOp) ||
+          theOtherValueDefOp->isBeforeInBlock(andIRhsDefOp));
+}
+
+static void performAndAssociativity(AndIOp andI) {
+  auto userAndI = cast<AndIOp>(getUniqueUser(andI.getResult()));
+  auto userLhs = userAndI.getLhs();
+  auto userRhs = userAndI.getRhs();
+  auto theOtherValue = (userLhs == andI.getResult()) ? userRhs : userLhs;
+  Operation *andILhsDefOp = andI.getLhs().getDefiningOp();
+  Operation *andIRhsDefOp = andI.getRhs().getDefiningOp();
+  Value keep;
+  Value goDown;
+  if (andILhsDefOp->isBeforeInBlock(andIRhsDefOp)) {
+    keep = andI.getLhs();
+    goDown = andI.getRhs();
+  } else {
+    keep = andI.getRhs();
+    goDown = andI.getLhs();
+  }
+
+  OpBuilder builder(andI.getContext());
+  builder.setInsertionPoint(andI);
+
+  auto newAndI1 = builder.create<AndIOp>(andI.getLoc(), keep, theOtherValue);
+  inheritBB(andI, newAndI1);
+
+  auto newAndI2 =
+      builder.create<AndIOp>(andI.getLoc(), newAndI1.getResult(), goDown);
+  inheritBB(andI, newAndI2);
+
+  userAndI.getResult().replaceAllUsesWith(newAndI2.getResult());
+  userAndI->erase();
+  andI->erase();
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   // Parse json (jsonPath is a member variable handled by tablegen)
   auto bbOrFailure = readFromJSON(jsonPath);
@@ -509,59 +822,97 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     for (auto passer : funcOp.getOps<PasserOp>()) {
       if (llvm::find(loopBBs, getLogicBB(passer)) == loopBBs.end())
         continue;
+      passer->setAttr("specv2_frontier", builder.getBoolAttr(false));
       frontiers.insert(passer);
     }
 
     bool frontiersUpdated;
     do {
-      frontiersUpdated = false;
-      for (auto passerOp : frontiers) {
-        if (llvm::find(loopBBs, getLogicBB(getUniqueUser(
-                                    passerOp.getResult()))) == loopBBs.end()) {
-          // The passer is exiting the loop. Do not move it.
-          // (Exit passer motion is performed later if enabled)
-          continue;
-        }
+      do {
+        frontiersUpdated = false;
+        for (auto passerOp : frontiers) {
+          Operation *uniqueUser = getUniqueUser(passerOp.getResult());
+          if (llvm::find(loopBBs, getLogicBB(uniqueUser)) == loopBBs.end()) {
+            // The passer is exiting the loop. Do not move it.
+            // (Exit passer motion is performed later if enabled)
+            continue;
+          }
 
-        if (isEligibleForPasserMotionOverPM(passerOp)) {
-          performPasserMotionPastPM(passerOp, frontiers);
-          frontiersUpdated = true;
-          // If frontiers are updated, the iterator is outdated.
-          // Break and restart the loop.
-          break;
-        }
-
-        if (auto mux = dyn_cast<MuxOp>(getUniqueUser(passerOp.getResult()))) {
-          if (isMotionPastGammaEligible(mux)) {
-            erasePassersBeforeMotionPastGamma(mux, frontiers);
-            frontiers.insert(performMotionPastGamma(mux));
+          if (isEligibleForPasserMotionOverPM(passerOp)) {
+            performPasserMotionPastPM(passerOp, frontiers);
             frontiersUpdated = true;
             // If frontiers are updated, the iterator is outdated.
             // Break and restart the loop.
             break;
           }
-        }
-      }
-      // If no frontiers were updated, we can stop.
-    } while (frontiersUpdated);
 
-    do {
-      frontiersUpdated = false;
-      for (auto passer : frontiers) {
-        if (isPasserSimplifiable(passer)) {
-          auto bottomPasser = cast<PasserOp>(getUniqueUser(passer.getResult()));
-          auto topPasser =
-              cast<PasserOp>(bottomPasser.getData().getDefiningOp());
-          frontiers.erase(bottomPasser);
-          frontiers.erase(topPasser);
-          frontiers.erase(passer);
-          AndIOp andIOp = simplifyPasser(passer);
-          frontiers.insert(cast<PasserOp>(getUniqueUser(andIOp.getResult())));
-          moveAndIUp(andIOp);
-          frontiersUpdated = true;
-          break;
+          if (auto mux = dyn_cast<MuxOp>(getUniqueUser(passerOp.getResult()))) {
+            if (isMotionPastGammaEligible(mux)) {
+              erasePassersBeforeMotionPastGamma(mux, frontiers);
+              auto passer = performMotionPastGamma(mux);
+              passer->setAttr("specv2_frontier", builder.getBoolAttr(false));
+              frontiers.insert(passer);
+              frontiersUpdated = true;
+              // If frontiers are updated, the iterator is outdated.
+              // Break and restart the loop.
+              break;
+            }
+          }
         }
-      }
+        // If no frontiers were updated, we can stop.
+      } while (frontiersUpdated);
+
+      bool passerSimplified;
+      do {
+        passerSimplified = false;
+        for (auto passer : frontiers) {
+          if (isPasserSimplifiable(passer)) {
+            auto bottomPasser =
+                cast<PasserOp>(getUniqueUser(passer.getResult()));
+            auto topPasser =
+                cast<PasserOp>(bottomPasser.getData().getDefiningOp());
+            frontiers.erase(bottomPasser);
+            frontiers.erase(topPasser);
+            frontiers.erase(passer);
+            AndIOp andIOp = simplifyPasser(passer);
+            auto newFrontier =
+                cast<PasserOp>(getUniqueUser(andIOp.getResult()));
+            newFrontier->setAttr("specv2_frontier", builder.getBoolAttr(false));
+            frontiers.insert(newFrontier);
+            // moveAndIUp(andIOp);
+            frontiersUpdated = true;
+            passerSimplified = true;
+            break;
+          }
+        }
+      } while (passerSimplified);
+
+      bool andMovedUp;
+      do {
+        andMovedUp = false;
+        for (auto andi : funcOp.getOps<AndIOp>()) {
+          if (llvm::find(loopBBs, getLogicBB(andi)) == loopBBs.end())
+            continue;
+
+          if (andi->hasAttr("specv2_tmp_and"))
+            continue;
+
+          if (isAndIUpEligible(andi)) {
+            moveAndIUp(andi);
+            andMovedUp = true;
+            frontiersUpdated = true;
+            break;
+          }
+
+          if (isAndAssociativityEligible(andi)) {
+            performAndAssociativity(andi);
+            andMovedUp = true;
+            frontiersUpdated = true;
+            break;
+          }
+        }
+      } while (andMovedUp);
+      // Passer simplification may have some passers eligible for motion
     } while (frontiersUpdated);
 
     bool muxUpdated;
@@ -594,12 +945,13 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       if (!isEligibleForMuxPasserSwap(muxOp)) {
         muxOp.emitWarning(
             "MuxOp is not eligible for Passer swap, exiting the pass.");
-        return signalPassFailure();
+        return;
       }
 
       auto passerOp = performMuxPasserSwap(muxOp);
 
       // Add the moved passer to the frontiers
+      passerOp->setAttr("specv2_frontier", builder.getBoolAttr(false));
       frontiers.insert(passerOp);
     }
 
@@ -627,7 +979,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
         if (auto mux = dyn_cast<MuxOp>(getUniqueUser(passerOp.getResult()))) {
           if (isMotionPastGammaEligible(mux)) {
             erasePassersBeforeMotionPastGamma(mux, frontiers);
-            frontiers.insert(performMotionPastGamma(mux));
+            auto passer = performMotionPastGamma(mux);
+            passer->setAttr("specv2_frontier", builder.getBoolAttr(false));
+            frontiers.insert(passer);
             frontiersUpdated = true;
             // If frontiers are updated, the iterator is outdated.
             // Break and restart the loop.
@@ -694,6 +1048,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     AndIOp andIOp = simplifyPasser(passer);
     if (exitEagerEval) {
       PasserOp exitPasser = cast<PasserOp>(getUniqueUser(andIOp.getResult()));
+      exitPasser->setAttr("specv2_frontier", builder.getBoolAttr(false));
       frontiers.insert(exitPasser);
     }
     moveAndIUp(andIOp);
@@ -714,6 +1069,37 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       }
       // If no frontiers were updated, we can stop.
     } while (frontiersUpdated);
+  }
+
+  if (resolver && n >= 2) {
+    std::optional<SpecV2InterpolatorOp> interpolator = std::nullopt;
+    for (Operation *user :
+         iterateOverPossiblyIndirectUsers(repeatingInits[0].getResult())) {
+      if (auto andI = dyn_cast<AndIOp>(user)) {
+        if (andI->hasAttr("specv2_tmp_and")) {
+          interpolator = introduceIdentInterpolator(andI.getLhs());
+          break;
+        }
+      }
+    }
+    if (!interpolator) {
+      llvm::errs() << "No AndI found for introducing interpolator\n";
+      return signalPassFailure();
+    }
+    while (isInterpolatorInductionEligible(interpolator.value())) {
+      interpolator = performInterpolatorInduction(interpolator.value());
+    }
+
+    // // Preparation for the resolver insertion
+    // moveTopRIAndPasser(interpolator.value());
+
+    // // Introduce the resolver
+    // if (!isEligibleForResolverIntroduction(interpolator.value())) {
+    //   interpolator.value().emitError(
+    //       "The circuit is not eligible for the resolver introduction");
+    //   return signalPassFailure();
+    // }
+    // introduceSpecResolver(interpolator.value());
   }
 
   DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);

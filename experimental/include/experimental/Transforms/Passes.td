@@ -137,6 +137,7 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
            "Path to the output bb mapping file.">,
     Option<"disableInitialMotion", "disable-initial-motion", "bool", "false", "disable initial motion of suppressors when loop consists of multiple BBs">,
     Option<"exitEagerEval", "exit-eager-eval", "bool", "false", "enable eager evaluation of exit conditions">,
+    Option<"resolver", "resolver", "bool", "false", "introduce spec resolver for better circuit construct">
   ];
 }
 

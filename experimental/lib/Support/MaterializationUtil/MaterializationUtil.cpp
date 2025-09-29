@@ -71,6 +71,10 @@ void iterateUsesOverNestedForkResults(Value result,
 void eraseOpRecursively(Operation *op) {
   for (auto res : op->getResults()) {
     for (Operation *user : res.getUsers()) {
+      if (!isa<SinkOp, ForkOp, BufferOp>(user)) {
+        user->emitError("trying to erase this op");
+        llvm_unreachable("");
+      }
       eraseOpRecursively(user);
     }
   }
@@ -95,11 +99,11 @@ void materializeValue(Value val) {
   unsigned numUses = std::distance(uses.begin(), uses.end());
 
   if (numUses == 1) {
+    uses[0]->set(val);
     for (Operation *user : val.getUsers()) {
       if (user != uses[0]->getOwner())
         eraseOpRecursively(user);
     }
-    uses[0]->set(val);
     return;
   }
 
@@ -155,6 +159,10 @@ void assertMaterialization(Value val) {
     return;
   val.getDefiningOp()->emitError("Expected the value to be materialized, but "
                                  "it has zero or multiple users");
+  getIndirectDefiningOp(val)->emitError("this is the indirect defining op");
+  for (Operation *user : val.getUsers()) {
+    user->emitError("User of the value");
+  }
   llvm_unreachable("MaterializationUtil failed");
 }
 

@@ -38,7 +38,7 @@ llvm::SmallVector<Value> getEffectiveResults(Operation *op);
 LogicalResult movePassersDownPM(Operation *pmOp);
 
 /// Returns if the specified PasserOp is eligible for motion past a PM unit.
-bool isEligibleForPasserMotionOverPM(PasserOp passerOp);
+bool isEligibleForPasserMotionOverPM(PasserOp passerOp, bool reason = false);
 
 /// Move the specified passer past a PM unit.
 void performPasserMotionPastPM(PasserOp passerOp,

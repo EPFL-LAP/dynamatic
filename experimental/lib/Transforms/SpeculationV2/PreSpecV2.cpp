@@ -78,7 +78,11 @@ static Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
 
       // Use the polarity of the passer connected inside the loop
       // Might not be materialized, due to the introduction of PasserOp
-      auto outputBBOrNull = getLogicBB(*passer.getResult().getUsers().begin());
+      Operation *user = *passer.getResult().getUsers().begin();
+      while (isa<ExtSIOp, TruncIOp, ForkOp>(user)) {
+        user = *user->getUsers().begin();
+      }
+      auto outputBBOrNull = getLogicBB(user);
       if (!outputBBOrNull.has_value()) {
         // Connected to outside the loop.
         return false;
@@ -209,11 +213,8 @@ static LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
 
 static Operation *getEffectiveUser(Value value) {
   Operation *user = getUniqueUser(value);
-  if (auto extsi = dyn_cast<ExtSIOp>(user)) {
-    return getEffectiveUser(extsi.getResult());
-  }
-  if (auto trunci = dyn_cast<TruncIOp>(user)) {
-    return getEffectiveUser(trunci.getResult());
+  if (isa<ExtSIOp, TruncIOp, ForkOp>(user)) {
+    return getEffectiveUser(user->getResult(0));
   }
   return user;
 }
