@@ -600,9 +600,12 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
-void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
-                                  handshake::FuncOp &funcOp,
-                                  Operation *consumerOp, Value operand) {
+std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
+                                                      handshake::FuncOp &funcOp,
+                                                      Operation *consumerOp,
+                                                      Value operand) {
+
+  std::vector<Operation *> newUnits;
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -614,26 +617,27 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   if (consumerOp->hasAttr(FTD_REGEN) || consumerOp->hasAttr(FTD_EXPLICIT_PHI) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
-    return;
+    return newUnits;
 
   // Skip if the consumer has to do with memory operations, cmerge networks or
   // if it is a conditional branch.
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp))
-    return;
+      (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
+       !consumerOp->hasAttr("drawing")))
+    return newUnits;
 
   mlir::Operation *producerOp = operand.getDefiningOp();
 
   // Skip if the producer was added by this function or if it is an op to skip
   if (producerOp &&
       (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
-    return;
+    return newUnits;
 
   // Skip if the producer has to do with memory operations
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
       llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-    return;
+    return newUnits;
 
   // Last regenerated value
   Value regeneratedValue = operand;
@@ -699,6 +703,8 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
     auto muxOp = createRegenMux(loops[i]);
     regeneratedValue = muxOp.getResult();
+
+    newUnits.push_back(muxOp);
   }
 
   // Final replace the usage of the operand in the consumer with the output of
@@ -706,6 +712,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 
   llvm::errs() << "vaghan \n";
+  return newUnits;
 }
 
 namespace dynamatic {
@@ -999,9 +1006,18 @@ static void insertDirectSuppression(
   }
 }
 
-void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
-                                 handshake::FuncOp &funcOp,
-                                 Operation *consumerOp, Value operand) {
+std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
+                                                     handshake::FuncOp &funcOp,
+                                                     Operation *consumerOp,
+                                                     Value operand) {
+  // Aya: this variable will ways be returned empty for now, but it is ok
+  // because it is the last function in the FTD flow so we do not need to run
+  // any further delivery after this function is done
+  std::vector<Operation *> newUnits;
+
+  llvm::errs() << "\n\n\nEntering addSuppOperandConsumer:\n";
+  consumerOp->print(llvm::errs());
+  llvm::errs() << "\n\n\n";
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -1013,12 +1029,12 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   // the BDD expansion or INIT merges
   if (consumerOp->hasAttr(FTD_OP_TO_SKIP) ||
       consumerOp->hasAttr(FTD_INIT_MERGE))
-    return;
+    return newUnits;
 
   // Do not take into account conditional branch
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
       !consumerOp->hasAttr("drawing"))
-    return;
+    return newUnits;
 
   // The consumer block is the block which contains the consumer
   Block *consumerBlock = consumerOp->getBlock();
@@ -1033,7 +1049,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   // consumer being a multiplexer skip because no delivery is needed
   if (consumerBlock == producerBlock &&
       !llvm::isa<handshake::MuxOp>(consumerOp))
-    return;
+    return newUnits;
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
@@ -1042,13 +1058,13 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     // any other cases, suppressing a branch ends up with incorrect results.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         !producerOp->hasAttr(FTD_NEW_SUPP) && !producerOp->hasAttr("drawing"))
-      return;
+      return newUnits;
 
     // Skip the prod-cons if the consumer is part of the operations
     // related to the BDD expansion or INIT merges
     if (producerOp->hasAttr(FTD_OP_TO_SKIP) ||
         producerOp->hasAttr(FTD_INIT_MERGE))
-      return;
+      return newUnits;
 
     // Skip if either the producer of the consumer are
     // related to memory operations, or if the consumer is a conditional
@@ -1066,11 +1082,11 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         (llvm::isa<memref::StoreOp>(consumerOp) &&
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
-      return;
+      return newUnits;
 
     if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
         !consumerOp->hasAttr("drawing"))
-      return;
+      return newUnits;
 
     // The next step is to identify the relationship between the producer
     // and consumer in hand: Are they in the same loop or at different
@@ -1109,7 +1125,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
       for (auto &pair : newToCover)
         addSuppOperandConsumer(rewriter, funcOp, pair.second, pair.first);
 
-      return;
+      return newUnits;
     }
 
     // We need to suppress a token if the consumer is the producer itself
@@ -1118,7 +1134,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         !producerOp->hasAttr(FTD_NEW_SUPP)) {
       addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
                            SelfRegeneration, loopInfo, newToCover, bi);
-      return;
+      return newUnits;
     }
 
     // We need to suppress a token if the consumer comes before the
@@ -1130,13 +1146,14 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         consumerLoop) {
       addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
                            BackwardRelationship, loopInfo, newToCover, bi);
-      return;
+      return newUnits;
     }
   }
 
   // Handle the suppression in all the other cases (including the operand being
   // a function argument)
   insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
+  return newUnits;
 }
 
 void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
@@ -1169,6 +1186,7 @@ void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 LogicalResult experimental::ftd::addGsaGates(Region &region,
                                              PatternRewriter &rewriter,
                                              const gsa::GSAAnalysis &gsa,
+                                             std::vector<Operation *> &newUnits,
                                              Backedge startValue,
                                              bool removeTerminators) {
 
@@ -1310,6 +1328,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
       gsaList.insert({gate->index, mux});
       mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
+
+      newUnits.push_back(mux);
     }
   }
 
@@ -1367,7 +1387,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 }
 
 LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                     PatternRewriter &rewriter) {
+                                     PatternRewriter &rewriter,
+                                     std::vector<Operation *> &newUnits) {
   auto startValue = (Value)funcOp.getArguments().back();
   auto *ctx = funcOp->getContext();
   OpBuilder builder(ctx);
@@ -1383,8 +1404,11 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
        llvm::make_early_inc_range(funcOp.getOps<handshake::MergeOp>())) {
     if (!merge->hasAttr(NEW_PHI))
       continue;
+
+    // Aya: temporarily added the newUnits vector to export the newly added
+    // Muxes to the outside, which is needed in Rouzbeh's pass
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
-    if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa,
+    if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa, newUnits,
                                 startValueBackedge, false)))
       return failure();
 

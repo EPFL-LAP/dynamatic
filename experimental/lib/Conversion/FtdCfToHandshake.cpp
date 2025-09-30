@@ -244,6 +244,10 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
+  // Aya: temporarily added this to export the newly added Muxes to the outside,
+  // which is needed in Rouzbeh's pass
+  std::vector<Operation *> newUnits;
+
   // Add the muxes as obtained by the GSA analysis pass. This requires the start
   // value, as init merges need it as one of their output. However, the start
   // value is not available yet here, so a backedge is adopted instead.
@@ -251,7 +255,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
   if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
-                         startValueBackedge)))
+                         newUnits, startValueBackedge)))
     return failure();
 
   // First lower the parent function itself, without modifying its body

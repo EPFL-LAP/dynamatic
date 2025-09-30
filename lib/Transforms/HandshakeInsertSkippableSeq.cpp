@@ -50,7 +50,7 @@ using BlockIndexing = ftd::BlockIndexing;
 namespace {
 
 std::ofstream outFile;
-DenseMap<Operation *, int> consumerOpAndOperandIndexForFTD;
+DenseMap<Operation *, std::vector<int>> consumerOpAndOperandIndexForFTD;
 
 struct HandshakeInsertSkippableSeqPass
     : public dynamatic::impl::HandshakeInsertSkippableSeqBase<
@@ -69,7 +69,7 @@ class FTDBoolExpressions {
   bool needsShanon;
 
 public:
-  FTDBoolExpressions(){};
+  FTDBoolExpressions() {};
 
   FTDBoolExpressions(BoolExpression *supp, BoolExpression *regen,
                      BoolExpression *prodCons, bool needsShanon) {
@@ -480,21 +480,21 @@ bool hasAtLeastOneActiveDep(MemDependenceArrayAttr deps) {
 /// This function returns the delayed values (N values) for the given initial
 /// value.
 /// It does two type of delays: 0 to N-1 and 1 to N.
-std::tuple<SmallVector<Value>, SmallVector<Value>>
-getNDelayedValues(Value initialVal, Operation *BBOp, unsigned N,
-                  SmallVector<Operation *> &opList,
-                  ConversionPatternRewriter &rewriter) {
+SmallVector<Value> getNDelayedValues(Value initialVal, Operation *BBOp,
+                                     unsigned N,
+                                     SmallVector<Operation *> &opList,
+                                     ConversionPatternRewriter &rewriter) {
 
   rewriter.setInsertionPoint(BBOp);
 
-  handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-      BBOp->getLoc(), initialVal, 1, BufferType::FIFO_BREAK_NONE);
-  inheritBB(BBOp, bufferOp);
-  opList.push_back(bufferOp);
+  // handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
+  //     BBOp->getLoc(), initialVal, 1, BufferType::FIFO_BREAK_NONE);
+  // inheritBB(BBOp, bufferOp);
+  // opList.push_back(bufferOp);
 
-  Value prevResult = bufferOp.getResult();
+  Value prevResult = initialVal;
   SmallVector<Value> delayedVals = {prevResult};
-  SmallVector<Value> extraDelayedVals;
+  // SmallVector<Value> extraDelayedVals;
 
   SmallVector<Value, 2> values;
 
@@ -509,13 +509,12 @@ getNDelayedValues(Value initialVal, Operation *BBOp, unsigned N,
 
     if (i != N - 1)
       delayedVals.push_back(initOp.getResult());
-    extraDelayedVals.push_back(initOp.getResult());
+    // extraDelayedVals.push_back(initOp.getResult());
 
     prevResult = initOp.getResult();
   }
 
-  return std::tuple<SmallVector<Value>, SmallVector<Value>>(delayedVals,
-                                                            extraDelayedVals);
+  return delayedVals;
 }
 
 Value addExtraSourceToDoneForRegen(Value doneSignal, Value regenCond,
@@ -696,7 +695,7 @@ Value gateChannelValue(
   llvm::errs() << "Gating value: " << *gatingValue.getDefiningOp() << " - "
                << gatingValue << "\n";
   dependenciesMapForPhiNetwork[&gateOp->getOpOperand(1)] = {gatingValue};
-  consumerOpAndOperandIndexForFTD[gateOp] = 1;
+  consumerOpAndOperandIndexForFTD[gateOp].push_back(1);
   return gateOp.getResult();
 }
 
@@ -740,7 +739,7 @@ SmallVector<Value> insertBranches(
                  << cond << "\n";
     llvm::errs() << "Branching value: " << *mainValue.getDefiningOp() << " - "
                  << mainValue << "\n";
-    consumerOpAndOperandIndexForFTD[conditionalBranchOp] = 1;
+    consumerOpAndOperandIndexForFTD[conditionalBranchOp].push_back(1);
   }
   return results;
 }
@@ -865,15 +864,16 @@ SmallVector<Value> createSkipConditionForPair(
   //                                      successorOpPointer)) {
   //   effective_N = N + 1;
   // }
-  rewriter.setInsertionPoint(predecessorOpPointer);
-  Value prevResult = predecessorOpDoneSignal;
-  for (unsigned i = 0; i < N; i++) {
-    handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
-        predecessorOpPointer->getLoc(), prevResult);
-    inheritBB(predecessorOpPointer, initOp);
-    skipConditionGeneratorOps.push_back(initOp);
-    prevResult = initOp.getResult();
-  }
+  // paolo join
+  // rewriter.setInsertionPoint(predecessorOpPointer);
+  // Value prevResult = predecessorOpDoneSignal;
+  // for (unsigned i = 0; i < N; i++) {
+  //   handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
+  //       predecessorOpPointer->getLoc(), prevResult);
+  //   inheritBB(predecessorOpPointer, initOp);
+  //   skipConditionGeneratorOps.push_back(initOp);
+  //   prevResult = initOp.getResult();
+  // }
 
   // Value mergedWithExtra = prevResult;
   // if (ftdConditions.getRegen()->boolMinimize()->type !=
@@ -895,9 +895,9 @@ SmallVector<Value> createSkipConditionForPair(
   //   suppressedWithSupp = conditionalBranchOp.getFalseResult();
   // }
 
-  Value gatedSuccessorOpaddr = gateChannelValue(
-      successorOpPointer->getOperand(0), prevResult, successorOpPointer,
-      dependenciesMapForPhiNetwork, skipConditionGeneratorOps, rewriter);
+  // Value gatedSuccessorOpaddr = gateChannelValue(
+  //     successorOpPointer->getOperand(0), prevResult, successorOpPointer,
+  //     dependenciesMapForPhiNetwork, skipConditionGeneratorOps, rewriter);
 
   // SmallVector<Value> delayedAddressesAfterSuppress = delayedAddresses;
   // if (ftdConditions.getSupp()->boolMinimize()->type !=
@@ -929,8 +929,8 @@ SmallVector<Value> createSkipConditionForPair(
   rewriter.setInsertionPoint(successorOpPointer);
   for (Value delayedAddress : delayedAddresses) {
     handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(
-        successorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr,
-        delayedAddress);
+        successorOpPointer->getLoc(), CmpIPredicate::ne,
+        successorOpPointer->getOperand(0), delayedAddress);
     inheritBB(successorOpPointer, cmpIOp);
 
     llvm::errs() << "**********  " << cmpIOp << "\n";
@@ -941,7 +941,7 @@ SmallVector<Value> createSkipConditionForPair(
     llvm::errs() << *successorOpPointer << " \n  ey khoda\n";
     dependenciesMapForPhiNetwork[&cmpIOp->getOpOperand(1)].push_back(
         delayedAddress);
-    consumerOpAndOperandIndexForFTD[cmpIOp] = 1;
+    consumerOpAndOperandIndexForFTD[cmpIOp].push_back(1);
   }
 
   addDrawingAttrToList(skipConditionGeneratorOps, "Condition_Generator");
@@ -1043,14 +1043,18 @@ SkipConditionForPair createSkipConditionsForAllPairs(
           if (N != 0) {
             SmallVector<Operation *> addressDelayGenerator;
 
-            auto bothDelayedAddresses =
+            // auto bothDelayedAddresses =
+            //     getNDelayedValues(predecessorOpAddr, predecessorOpPointer, N,
+            //                       addressDelayGenerator, rewriter);
+            // addDrawingAttrToList(addressDelayGenerator,
+            // "Addr_Delay_Generator"); SmallVector<Value> delayedAddresses =
+            //     std::get<0>(bothDelayedAddresses);
+            // SmallVector<Value> extraDelayedAddresses =
+            //     std::get<1>(bothDelayedAddresses);
+
+            SmallVector<Value> delayedAddresses =
                 getNDelayedValues(predecessorOpAddr, predecessorOpPointer, N,
                                   addressDelayGenerator, rewriter);
-            addDrawingAttrToList(addressDelayGenerator, "Addr_Delay_Generator");
-            SmallVector<Value> delayedAddresses =
-                std::get<0>(bothDelayedAddresses);
-            SmallVector<Value> extraDelayedAddresses =
-                std::get<1>(bothDelayedAddresses);
 
             StringRef successorOpName = dependency.getDstAccess();
             Operation *successorOpPointer = memAccesses[successorOpName];
@@ -1063,6 +1067,23 @@ SkipConditionForPair createSkipConditionsForAllPairs(
             // if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
             //                                      successorOpPointer))
             //   effectiveDelayedAddresses = extraDelayedAddresses;
+
+            // paolo join
+
+            rewriter.setInsertionPoint(predecessorOpPointer);
+            Value prevResult = predecessorOpDoneSignal;
+            for (unsigned i = 0; i < N - 1; i++) {
+              handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
+                  predecessorOpPointer->getLoc(), prevResult);
+              inheritBB(predecessorOpPointer, initOp);
+              prevResult = initOp.getResult();
+            }
+
+            rewriter.setInsertionPoint(predecessorOpPointer);
+            handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
+                predecessorOpPointer->getLoc(), delayedAddresses.back(),
+                prevResult);
+            inheritBB(predecessorOpPointer, gateOp);
 
             SmallVector<Value> skipConditions = createSkipConditionForPair(
                 predecessorOpDoneSignal, predecessorOpPointer,
@@ -1294,14 +1315,19 @@ WaitingSignalForSucc createWaitingSignals(
 
         SmallVector<Operation *> doneDelayGenerator;
 
-        auto bothDelayedDoneSignals =
+        // auto bothDelayedDoneSignals =
+        //     getNDelayedValues(predecessorOpDoneSignal, predecessorOpPointer,
+        //     N,
+        //                       doneDelayGenerator, rewriter);
+        // addDrawingAttrToList(doneDelayGenerator, "Done_Delay_Generator");
+        // SmallVector<Value> delayedDoneSignals =
+        //     std::get<0>(bothDelayedDoneSignals);
+        // SmallVector<Value> extraDelayedDoneSignals =
+        //     std::get<1>(bothDelayedDoneSignals);
+
+        SmallVector<Value> delayedDoneSignals =
             getNDelayedValues(predecessorOpDoneSignal, predecessorOpPointer, N,
                               doneDelayGenerator, rewriter);
-        addDrawingAttrToList(doneDelayGenerator, "Done_Delay_Generator");
-        SmallVector<Value> delayedDoneSignals =
-            std::get<0>(bothDelayedDoneSignals);
-        SmallVector<Value> extraDelayedDoneSignals =
-            std::get<1>(bothDelayedDoneSignals);
 
         StringRef successorName = dependency.getDstAccess();
         Operation *successorOpPointer = memAccesses[successorName];
@@ -1425,14 +1451,28 @@ void writeDepGraphToDotFile(const std::string &filename) {
   llvm::errs() << "Dependency graph written to " << filename << "\n";
 }
 
-void runFTDOnSpecificConsumerOps(FuncOp funcOp, PatternRewriter &rewriter,
-                                 void (*ftdFunc)(PatternRewriter &, FuncOp &,
-                                                 Operation *, Value)) {
-  for (auto const [consumerOp, index] : consumerOpAndOperandIndexForFTD) {
+void runFTDOnSpecificConsumerOps(
+    FuncOp funcOp, PatternRewriter &rewriter,
+    std::vector<Operation *> (*ftdFunc)(PatternRewriter &, FuncOp &,
+                                        Operation *, Value)) {
+  std::vector<std::vector<Operation *>> allNewUnits;
+  for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
+    for (auto index : indices) {
+      llvm::errs() << "Running FTD on consumer op: " << *consumerOp
+                   << " - operand index: " << index << "\n";
+      std::vector<Operation *> newUnits =
+          ftdFunc(rewriter, funcOp, consumerOp, consumerOp->getOperand(index));
+      allNewUnits.push_back(newUnits);
+    }
 
-    llvm::errs() << "Running FTD on consumer op: " << *consumerOp
-                 << " - operand index: " << index << "\n";
-    ftdFunc(rewriter, funcOp, consumerOp, consumerOp->getOperand(index));
+  for (auto &someNewUnits : allNewUnits) {
+    for (auto *unit : someNewUnits) {
+      int i = 0;
+      for (auto operand : unit->getOperands()) {
+        consumerOpAndOperandIndexForFTD[unit].push_back(i);
+        i++;
+      }
+    }
   }
 }
 
@@ -1446,9 +1486,19 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
       signalPassFailure();
 
+    // internally calls `createPhiNetworkDeps`
     handleFuncOp(funcOp, ctx);
 
-    replaceMergeToGSA(funcOp, rewriter);
+    std::vector<Operation *> newUnits;
+    replaceMergeToGSA(funcOp, rewriter, newUnits);
+
+    for (auto *unit : newUnits) {
+      int i = 0;
+      for (auto operand : unit->getOperands()) {
+        consumerOpAndOperandIndexForFTD[unit].push_back(i);
+        i++;
+      }
+    }
 
     runFTDOnSpecificConsumerOps(funcOp, rewriter, addRegenOperandConsumer);
     runFTDOnSpecificConsumerOps(funcOp, rewriter, addSuppOperandConsumer);

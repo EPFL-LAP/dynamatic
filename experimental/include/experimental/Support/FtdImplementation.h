@@ -31,15 +31,17 @@ using namespace boolean;
 
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
-void addRegenOperandConsumer(PatternRewriter &rewriter,
-                             dynamatic::handshake::FuncOp &funcOp,
-                             Operation *consumerOp, Value operand);
+std::vector<Operation *>
+addRegenOperandConsumer(PatternRewriter &rewriter,
+                        dynamatic::handshake::FuncOp &funcOp,
+                        Operation *consumerOp, Value operand);
 
 /// This function implements the suppression mechanism over a pair made of a
 /// producer and a consumer (see `addSupp` description).
-void addSuppOperandConsumer(PatternRewriter &rewriter,
-                            handshake::FuncOp &funcOp, Operation *consumerOp,
-                            Value operand);
+std::vector<Operation *> addSuppOperandConsumer(PatternRewriter &rewriter,
+                                                handshake::FuncOp &funcOp,
+                                                Operation *consumerOp,
+                                                Value operand);
 
 /// When the consumer is in a loop while the producer is not, the value must
 /// be regenerated as many times as needed. This function is in charge of
@@ -61,13 +63,15 @@ void addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 /// terminators in the function are modified to stop feeding the successive
 /// blocks.
 LogicalResult addGsaGates(Region &region, PatternRewriter &rewriter,
-                          const gsa::GSAAnalysis &gsa, Backedge startValue,
-                          bool removeTerminators = true);
+                          const gsa::GSAAnalysis &gsa,
+                          std::vector<Operation *> &newUnits,
+                          Backedge startValue, bool removeTerminators = true);
 
 /// For each non-init merge in the IR, run the GSA analysis to obtain its GSA
 /// equivalent, then use `addGsaGates` to instantiate such operations in the IR.
 LogicalResult replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                PatternRewriter &rewriter);
+                                PatternRewriter &rewriter,
+                                std::vector<Operation *> &newUnits);
 
 /// Connect the values in `vals` by inserting some appropriate new SSA-nodes
 /// (merges) across the control flow graph of the function. The new
