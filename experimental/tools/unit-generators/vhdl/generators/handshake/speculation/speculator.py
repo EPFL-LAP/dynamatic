@@ -553,7 +553,7 @@ begin
   process(clk, rst) is
   begin
     if (rst = '1') then
-      data_reg <= std_logic_vector(to_unsigned({default_value}, {bitwidth}))
+      data_reg <= std_logic_vector(to_unsigned({default_value}, {bitwidth}));
     elsif (rising_edge(clk)) then
       if (data_in_valid = '1') then
         data_reg <= data_in;
