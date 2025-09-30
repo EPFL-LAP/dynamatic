@@ -1,4 +1,4 @@
-from generators.handshake.binop import generate_binop
+from generators.support.binop import generate_arith_binary
 from generators.handshake.join import generate_join
 
 
@@ -47,7 +47,7 @@ def generate_cmpi(name, params):
     assign result = (lhs {predicate} rhs) ? constant_one : constant_zero;
 """
     
-    return generate_binop(
+    return generate_arith_binary(
         name=name,
         op_body=body,
         handshake_op="cmpi",

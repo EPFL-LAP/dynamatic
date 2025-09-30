@@ -1,4 +1,4 @@
-from generators.handshake.binop import generate_binop
+from generators.support.binop import generate_arith_binary
 
 def generate_muli(name, params):
     bitwidth = params["bitwidth"]
@@ -52,7 +52,7 @@ endmodule
   );
 """
 
-    return generate_binop(
+    return generate_arith_binary(
       name=name,
       op_body=muli_body,
       handshake_op="muli",

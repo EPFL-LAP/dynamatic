@@ -1,4 +1,4 @@
-from generators.handshake.binop import generate_binop
+from generators.support.binop import generate_arith_binary
 
 def generate_xori(name, params):
 
@@ -6,7 +6,7 @@ def generate_xori(name, params):
 
   body = "assign result = lhs ^ rhs;"
 
-  return generate_binop(
+  return generate_arith_binary(
     name=name,
     op_body=body,
     handshake_op="xori",

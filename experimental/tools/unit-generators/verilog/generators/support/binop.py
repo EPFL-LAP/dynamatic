@@ -3,7 +3,7 @@ from generators.support.utils import ExtraSignals
 from generators.handshake.dataless.dataless_oehb import generate_dataless_oehb
 from generators.support.delay_buffer import generate_delay_buffer
 
-def generate_binop(
+def generate_arith_binary(
   name:str,
   handshake_op:str,
   extra_signals:ExtraSignals,
@@ -26,7 +26,7 @@ def generate_binop(
     if (lhs_bitwidth is None) or (rhs_bitwidth is None) or (output_bitwidth is None):
       raise RuntimeError("If bitwidth is not specified, lhs, rhs, and output bitwidth must all be specified")
 
-  def generate_inner(name):return _generate_arith2(
+  def generate_inner(name):return _generate_arith_binary(
     name,
     handshake_op,
     lhs_bitwidth,
@@ -42,7 +42,7 @@ def generate_binop(
     return generate_inner(name)
 
 
-def _generate_arith2(
+def _generate_arith_binary(
         name,
         handshake_op,
         lhs_bitwidth,

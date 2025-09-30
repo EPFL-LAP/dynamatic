@@ -1,4 +1,4 @@
-from generators.handshake.binop import generate_binop
+from generators.support.binop import generate_arith_binary
 
 def generate_shrsi(name, params):
   bitwidth = params["bitwidth"]
@@ -11,7 +11,7 @@ def generate_shrsi(name, params):
     assign result = temp_result;
   """
 
-  return generate_binop(
+  return generate_arith_binary(
     name=name,
     op_body=body,
     handshake_op="shrsi",
