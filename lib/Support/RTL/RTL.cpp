@@ -401,6 +401,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||
       modName == "handshake.fptosi" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.passer" || modName == "handshake.init" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

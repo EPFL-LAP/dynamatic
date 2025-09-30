@@ -317,11 +317,11 @@
         "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p init_token=$INIT_TOKEN"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p init_token=$INIT_TOKEN extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.passer",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t passer -p bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t passer -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.spec_v2_resolver",

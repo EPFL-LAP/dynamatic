@@ -1,12 +1,18 @@
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_passer(name, params):
     bitwidth = params["bitwidth"]
-    if bitwidth == 0:
-        return _generate_passer_dataless(name)
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_passer_signal_manager(name, bitwidth, extra_signals)
     else:
-        return _generate_passer(name, bitwidth)
+        if bitwidth == 0:
+            return _generate_passer_dataless(name)
+        else:
+            return _generate_passer(name, bitwidth)
 
 
 def _generate_passer_dataless(name):
@@ -97,3 +103,26 @@ begin
   result <= data;
 end architecture;
 """
+
+
+def _generate_passer_signal_manager(name, bitwidth, extra_signals):
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "data",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name:
+            (_generate_passer_dataless(name) if bitwidth == 0
+             else _generate_passer(name, bitwidth)))
