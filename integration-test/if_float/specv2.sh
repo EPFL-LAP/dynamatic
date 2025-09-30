@@ -4,7 +4,7 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd $DYNAMATIC_DIR
 
 # Baseline
-python3 experimental/tools/integration/run_gamma_integration.py if_float --baseline --out out_baseline --cp 5.00
+python3 experimental/tools/integration/run_gamma_integration.py if_float --branch-bb=1 --merge-bb=4 --steps-until 0 --prioritized-side 0 --out out_baseline --cp 5.00
 
 # spec v1
 python3 experimental/tools/integration/run_adapted_spec_integration.py if_float --branch-bb=1 --merge-bb=4 --default-value=0 --out out_v1

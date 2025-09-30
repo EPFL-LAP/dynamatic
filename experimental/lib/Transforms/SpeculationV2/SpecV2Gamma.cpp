@@ -61,215 +61,217 @@ void SpecV2GammaPass::runDynamaticPass() {
 
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
-  DenseSet<PasserOp> frontiers;
-  for (auto passer : funcOp.getOps<PasserOp>()) {
-    if (emulatePrediction) {
-      Operation *ctrlDefOp = getIndirectDefiningOp(passer.getCtrl());
-      if (isa<NotOp>(ctrlDefOp)) {
-        if (prioritizedSide != 0)
-          continue;
-      } else {
-        if (prioritizedSide != 1)
-          continue;
-      }
-    }
-    frontiers.insert(passer);
-  }
-
-  bool frontiersUpdated;
-  do {
-    frontiersUpdated = false;
-    for (auto passerOp : frontiers) {
-      if (isEligibleForPasserMotionOverPM(passerOp)) {
-        performPasserMotionPastPM(passerOp, frontiers);
-        frontiersUpdated = true;
-        // If frontiers are updated, the iterator is outdated.
-        // Break and restart the loop.
-        break;
-      }
-    }
-    // If no frontiers were updated, we can stop.
-  } while (frontiersUpdated);
-
   if (stepsUntil >= 1) {
-    OpBuilder builder(funcOp->getContext());
-    MuxOp candidate;
-    for (auto frontier : frontiers) {
-      if (auto mux = dyn_cast<MuxOp>(getUniqueUser(frontier.getResult()))) {
-        candidate = mux;
-        break;
-      }
-    }
-    assert(candidate && "No Mux found at the frontier");
-    Value index = getForkTop(candidate.getSelectOperand());
-
-    if (oneSided) {
-      Value cond = index;
-      if (prioritizedSide == 0) {
-        NotOp notOp;
-        for (Operation *user : iterateOverPossiblyIndirectUsers(cond)) {
-          if (auto n = dyn_cast<NotOp>(user)) {
-            notOp = n;
-            break;
-          }
-        }
-        assert(notOp && "No NotOp found for the Mux condition");
-        cond = notOp.getResult();
-      }
-      builder.setInsertionPointAfterValue(cond);
-      auto ri = builder.create<SpecV2RepeatingInitOp>(builder.getUnknownLoc(),
-                                                      cond, 1);
-      inheritBB(cond.getDefiningOp(), ri);
-      Value newIndex = ri.getResult();
-      if (prioritizedSide == 0) {
-        NotOp newNotOp =
-            builder.create<NotOp>(builder.getUnknownLoc(), newIndex);
-        inheritBB(ri, newNotOp);
-        newIndex = newNotOp.getResult();
-      }
-      for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
-        if (auto mux = dyn_cast<MuxOp>(user)) {
-          mux.getSelectOperandMutable()[0].set(newIndex);
-        }
-      }
-
-      auto src = builder.create<SourceOp>(builder.getUnknownLoc());
-      inheritBB(ri, src);
-
-      auto cst = builder.create<ConstantOp>(
-          builder.getUnknownLoc(),
-          IntegerAttr::get(builder.getIntegerType(1), 1), src.getResult());
-      inheritBB(ri, cst);
-
-      MuxOp newCondGenMux;
-      if (prioritizedSide == 0) {
-        newCondGenMux = builder.create<MuxOp>(
-            builder.getUnknownLoc(), cond.getType(), newIndex,
-            ArrayRef<Value>{cond, cst.getResult()});
-      } else {
-        newCondGenMux = builder.create<MuxOp>(
-            builder.getUnknownLoc(), cond.getType(), newIndex,
-            ArrayRef<Value>{cst.getResult(), cond});
-      }
-      inheritBB(ri, newCondGenMux);
-
-      for (Operation *user : iterateOverPossiblyIndirectUsers(newIndex)) {
-        if (auto mux = dyn_cast<MuxOp>(user)) {
-          if (mux == newCondGenMux)
+    DenseSet<PasserOp> frontiers;
+    for (auto passer : funcOp.getOps<PasserOp>()) {
+      if (emulatePrediction) {
+        Operation *ctrlDefOp = getIndirectDefiningOp(passer.getCtrl());
+        if (isa<NotOp>(ctrlDefOp)) {
+          if (prioritizedSide != 0)
             continue;
-          Operation *dataDefOp =
-              mux.getDataOperands()[prioritizedSide].getDefiningOp();
-          if (auto passer = dyn_cast<PasserOp>(dataDefOp)) {
-            if (equalsIndirectly(passer.getCtrl(), cond)) {
-              auto newPasser = builder.create<PasserOp>(
-                  builder.getUnknownLoc(), mux.getResult(),
-                  newCondGenMux.getResult());
-              inheritBB(mux, newPasser);
-              mux.getResult().replaceAllUsesExcept(newPasser.getResult(),
-                                                   newPasser);
-              passer.getResult().replaceAllUsesWith(passer.getData());
-              frontiers.insert(newPasser);
-              frontiers.erase(passer);
-              passer->erase();
-            } else {
-              llvm::errs() << "mux dataT passer ctrl not equal to cond\n";
-            }
-          } else {
-            llvm::errs() << "mux dataT not passer\n";
-          }
+        } else {
+          if (prioritizedSide != 1)
+            continue;
         }
       }
+      frontiers.insert(passer);
+    }
 
-      materializeValue(newCondGenMux.getResult());
-    } else {
-      builder.setInsertionPointAfterValue(index);
-      Value newIndex;
-
-      BufferOp rBufOp = builder.create<BufferOp>(
-          builder.getUnknownLoc(), /*tmp*/ index, 1,
-          dynamatic::handshake::BufferType::ONE_SLOT_BREAK_R);
-      inheritBB(candidate, rBufOp);
-
-      InitOp init = builder.create<InitOp>(builder.getUnknownLoc(),
-                                           rBufOp.getResult(), 0);
-      inheritBB(candidate, init);
-
-      NotOp notOp =
-          builder.create<NotOp>(builder.getUnknownLoc(), init.getResult());
-      inheritBB(init, notOp);
-      rBufOp.getOperandMutable()[0].set(notOp.getResult());
-
-      if (prioritizedSide == 0) {
-        newIndex = init.getResult();
-      } else {
-        newIndex = notOp.getResult();
-      }
-
-      NotOp inverseIndex;
-      for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
-        if (auto n = dyn_cast<NotOp>(user)) {
-          inverseIndex = n;
+    bool frontiersUpdated;
+    do {
+      frontiersUpdated = false;
+      for (auto passerOp : frontiers) {
+        if (isEligibleForPasserMotionOverPM(passerOp)) {
+          performPasserMotionPastPM(passerOp, frontiers);
+          frontiersUpdated = true;
+          // If frontiers are updated, the iterator is outdated.
+          // Break and restart the loop.
           break;
         }
       }
-      assert(inverseIndex && "No NotOp found for the Mux condition");
-      MuxOp newCondGenMux = builder.create<MuxOp>(
-          builder.getUnknownLoc(), index.getType(), newIndex,
-          ArrayRef<Value>{inverseIndex.getResult(), index});
-      inheritBB(init, newCondGenMux);
-
-      for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
-        if (auto mux = dyn_cast<MuxOp>(user)) {
-          if (mux == newCondGenMux)
-            continue;
-
-          mux.getSelectOperandMutable()[0].set(newIndex);
-          PasserOp newPasser =
-              builder.create<PasserOp>(builder.getUnknownLoc(), mux.getResult(),
-                                       newCondGenMux.getResult());
-          inheritBB(mux, newPasser);
-          mux.getResult().replaceAllUsesExcept(newPasser.getResult(),
-                                               newPasser);
-          frontiers.insert(newPasser);
-
-          mux.getDataOperands()[1].getDefiningOp()->dump();
-          PasserOp dataTPasser =
-              cast<PasserOp>(mux.getDataOperands()[1].getDefiningOp());
-          dataTPasser.getResult().replaceAllUsesWith(dataTPasser.getData());
-          frontiers.erase(dataTPasser);
-          dataTPasser->erase();
-
-          mux.getDataOperands()[0].getDefiningOp()->dump();
-          PasserOp dataFPasser =
-              cast<PasserOp>(mux.getDataOperands()[0].getDefiningOp());
-          dataFPasser.getResult().replaceAllUsesWith(dataFPasser.getData());
-          frontiers.erase(dataFPasser);
-          dataFPasser->erase();
-        }
-      }
-
-      materializeValue(newCondGenMux.getResult());
-    }
+      // If no frontiers were updated, we can stop.
+    } while (frontiersUpdated);
 
     if (stepsUntil >= 2) {
-      do {
-        frontiersUpdated = false;
-        for (auto passerOp : frontiers) {
-          if (isEligibleForPasserMotionOverPM(passerOp)) {
-            performPasserMotionPastPM(passerOp, frontiers);
-            frontiersUpdated = true;
-            // If frontiers are updated, the iterator is outdated.
-            // Break and restart the loop.
+      OpBuilder builder(funcOp->getContext());
+      MuxOp candidate;
+      for (auto frontier : frontiers) {
+        if (auto mux = dyn_cast<MuxOp>(getUniqueUser(frontier.getResult()))) {
+          candidate = mux;
+          break;
+        }
+      }
+      assert(candidate && "No Mux found at the frontier");
+      Value index = getForkTop(candidate.getSelectOperand());
+
+      if (oneSided) {
+        Value cond = index;
+        if (prioritizedSide == 0) {
+          NotOp notOp;
+          for (Operation *user : iterateOverPossiblyIndirectUsers(cond)) {
+            if (auto n = dyn_cast<NotOp>(user)) {
+              notOp = n;
+              break;
+            }
+          }
+          assert(notOp && "No NotOp found for the Mux condition");
+          cond = notOp.getResult();
+        }
+        builder.setInsertionPointAfterValue(cond);
+        auto ri = builder.create<SpecV2RepeatingInitOp>(builder.getUnknownLoc(),
+                                                        cond, 1);
+        inheritBB(cond.getDefiningOp(), ri);
+        Value newIndex = ri.getResult();
+        if (prioritizedSide == 0) {
+          NotOp newNotOp =
+              builder.create<NotOp>(builder.getUnknownLoc(), newIndex);
+          inheritBB(ri, newNotOp);
+          newIndex = newNotOp.getResult();
+        }
+        for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
+          if (auto mux = dyn_cast<MuxOp>(user)) {
+            mux.getSelectOperandMutable()[0].set(newIndex);
+          }
+        }
+
+        auto src = builder.create<SourceOp>(builder.getUnknownLoc());
+        inheritBB(ri, src);
+
+        auto cst = builder.create<ConstantOp>(
+            builder.getUnknownLoc(),
+            IntegerAttr::get(builder.getIntegerType(1), 1), src.getResult());
+        inheritBB(ri, cst);
+
+        MuxOp newCondGenMux;
+        if (prioritizedSide == 0) {
+          newCondGenMux = builder.create<MuxOp>(
+              builder.getUnknownLoc(), cond.getType(), newIndex,
+              ArrayRef<Value>{cond, cst.getResult()});
+        } else {
+          newCondGenMux = builder.create<MuxOp>(
+              builder.getUnknownLoc(), cond.getType(), newIndex,
+              ArrayRef<Value>{cst.getResult(), cond});
+        }
+        inheritBB(ri, newCondGenMux);
+
+        for (Operation *user : iterateOverPossiblyIndirectUsers(newIndex)) {
+          if (auto mux = dyn_cast<MuxOp>(user)) {
+            if (mux == newCondGenMux)
+              continue;
+            Operation *dataDefOp =
+                mux.getDataOperands()[prioritizedSide].getDefiningOp();
+            if (auto passer = dyn_cast<PasserOp>(dataDefOp)) {
+              if (equalsIndirectly(passer.getCtrl(), cond)) {
+                auto newPasser = builder.create<PasserOp>(
+                    builder.getUnknownLoc(), mux.getResult(),
+                    newCondGenMux.getResult());
+                inheritBB(mux, newPasser);
+                mux.getResult().replaceAllUsesExcept(newPasser.getResult(),
+                                                     newPasser);
+                passer.getResult().replaceAllUsesWith(passer.getData());
+                frontiers.insert(newPasser);
+                frontiers.erase(passer);
+                passer->erase();
+              } else {
+                llvm::errs() << "mux dataT passer ctrl not equal to cond\n";
+              }
+            } else {
+              llvm::errs() << "mux dataT not passer\n";
+            }
+          }
+        }
+
+        materializeValue(newCondGenMux.getResult());
+      } else {
+        builder.setInsertionPointAfterValue(index);
+        Value newIndex;
+
+        BufferOp rBufOp = builder.create<BufferOp>(
+            builder.getUnknownLoc(), /*tmp*/ index, 1,
+            dynamatic::handshake::BufferType::ONE_SLOT_BREAK_R);
+        inheritBB(candidate, rBufOp);
+
+        InitOp init = builder.create<InitOp>(builder.getUnknownLoc(),
+                                             rBufOp.getResult(), 0);
+        inheritBB(candidate, init);
+
+        NotOp notOp =
+            builder.create<NotOp>(builder.getUnknownLoc(), init.getResult());
+        inheritBB(init, notOp);
+        rBufOp.getOperandMutable()[0].set(notOp.getResult());
+
+        if (prioritizedSide == 0) {
+          newIndex = init.getResult();
+        } else {
+          newIndex = notOp.getResult();
+        }
+
+        NotOp inverseIndex;
+        for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
+          if (auto n = dyn_cast<NotOp>(user)) {
+            inverseIndex = n;
             break;
           }
         }
-        // If no frontiers were updated, we can stop.
-      } while (frontiersUpdated);
+        assert(inverseIndex && "No NotOp found for the Mux condition");
+        MuxOp newCondGenMux = builder.create<MuxOp>(
+            builder.getUnknownLoc(), index.getType(), newIndex,
+            ArrayRef<Value>{inverseIndex.getResult(), index});
+        inheritBB(init, newCondGenMux);
 
-      // Erase unused PasserOps
-      for (auto passerOp :
-           llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
-        tryErasePasser(passerOp);
+        for (Operation *user : iterateOverPossiblyIndirectUsers(index)) {
+          if (auto mux = dyn_cast<MuxOp>(user)) {
+            if (mux == newCondGenMux)
+              continue;
+
+            mux.getSelectOperandMutable()[0].set(newIndex);
+            PasserOp newPasser = builder.create<PasserOp>(
+                builder.getUnknownLoc(), mux.getResult(),
+                newCondGenMux.getResult());
+            inheritBB(mux, newPasser);
+            mux.getResult().replaceAllUsesExcept(newPasser.getResult(),
+                                                 newPasser);
+            frontiers.insert(newPasser);
+
+            mux.getDataOperands()[1].getDefiningOp()->dump();
+            PasserOp dataTPasser =
+                cast<PasserOp>(mux.getDataOperands()[1].getDefiningOp());
+            dataTPasser.getResult().replaceAllUsesWith(dataTPasser.getData());
+            frontiers.erase(dataTPasser);
+            dataTPasser->erase();
+
+            mux.getDataOperands()[0].getDefiningOp()->dump();
+            PasserOp dataFPasser =
+                cast<PasserOp>(mux.getDataOperands()[0].getDefiningOp());
+            dataFPasser.getResult().replaceAllUsesWith(dataFPasser.getData());
+            frontiers.erase(dataFPasser);
+            dataFPasser->erase();
+          }
+        }
+
+        materializeValue(newCondGenMux.getResult());
+      }
+
+      if (stepsUntil >= 3) {
+        do {
+          frontiersUpdated = false;
+          for (auto passerOp : frontiers) {
+            if (isEligibleForPasserMotionOverPM(passerOp)) {
+              performPasserMotionPastPM(passerOp, frontiers);
+              frontiersUpdated = true;
+              // If frontiers are updated, the iterator is outdated.
+              // Break and restart the loop.
+              break;
+            }
+          }
+          // If no frontiers were updated, we can stop.
+        } while (frontiersUpdated);
+
+        // Erase unused PasserOps
+        for (auto passerOp :
+             llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
+          tryErasePasser(passerOp);
+        }
       }
     }
   }
