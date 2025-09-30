@@ -58,6 +58,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_ROUZBEH="$COMP_DIR/handshake_rouzbeh.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
@@ -188,12 +189,21 @@ if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
       --handshake-inactivate-enforced-deps \
       --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME" \
       --handshake-replace-memory-interfaces \
-      --handshake-minimize-cst-width \
-      --handshake-optimize-bitwidths \
-      --handshake-materialize --handshake-infer-basic-blocks \
-      > "$F_HANDSHAKE_TRANSFORMED"
+      --handshake-combine-steering-logic \
+   > "$F_HANDSHAKE_ROUZBEH"
   exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
     "Applied transformations to handshake with skippable sequentializer"
+  
+  F_HANDSHAKE=$F_HANDSHAKE_ROUZBEH
+
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-minimize-cst-width \
+    --handshake-optimize-bitwidths \
+    --handshake-materialize --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+
 # without skippable sequentializer
 else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
