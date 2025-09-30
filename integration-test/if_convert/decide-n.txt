@@ -1,0 +1,35 @@
+/home/shundroid/dynamatic/integration-test/if_convert/if_convert.c:0:0: warning: unhandled data layout token: m:e
+/home/shundroid/dynamatic/integration-test/if_convert/if_convert.c:0:0: warning: unhandled data layout token: n8:16:32:64
+%27:2 = handshake.fork [2] %26 {handshake.bb = 1 : ui32, handshake.name = "fork7"} : <i1>
+Exiting BB with branch: 1
+/home/shundroid/dynamatic/integration-test/if_convert/if_convert.c
+Compiled C file to LLVM IR
+Removed optnone flgas
+Optimized LLVM IR
+Translated LLVM IR to MLIR
+Removed polygeist attrs
+Removed polygeist attrs
+Applied standard transformations to cf
+Applied standard transformations to cf
+Applied Dynamatic transformations to cf
+Applied gate binarization
+Compiled cf to handshake
+Applied transformations to handshake
+Built kernel for profiling
+Ran kernel for profiling
+Profiled cf-level
+Pre-speculation
+Deciding n
+Added speculative units
+Cut conditional dependencies
+Updated frequencies.csv
+Buffer placement (pre spec)
+CFDFC #0: 1
+
+Throughput of CFDFC #0: 2.000000e-01
+
+Buffer placement (post spec)
+CFDFC #0: 1
+
+Throughput of CFDFC #0: 2.000000e-01
+

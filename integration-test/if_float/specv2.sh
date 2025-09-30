@@ -7,7 +7,7 @@ cd $DYNAMATIC_DIR
 python3 experimental/tools/integration/run_gamma_integration.py if_float --branch-bb=1 --merge-bb=4 --steps-until 0 --prioritized-side 0 --out out_baseline --cp 5.00
 
 # spec v1
-python3 experimental/tools/integration/run_adapted_spec_integration.py if_float --branch-bb=1 --merge-bb=4 --default-value=0 --out out_v1
+python3 experimental/tools/integration/run_adapted_spec_integration.py if_float --default-value=0 --out out_v1
 
 python3 experimental/tools/integration/run_gamma_integration.py if_float --disable-spec --out out_standard
 python3 experimental/tools/integration/run_gamma_integration.py if_float --branch-bb=1 --merge-bb=4 --prioritized-side 0 --one-sided --out out_0_one_sided --use-prof-cache

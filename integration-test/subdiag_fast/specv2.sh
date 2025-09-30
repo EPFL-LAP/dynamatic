@@ -6,7 +6,6 @@ cd $DYNAMATIC_DIR
 # Baseline:
 # - No CMerge
 # - No Branch
-# The loop consists of multiple BB, so we disable initial motion
 python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --baseline --out out_baseline --cp 8.00
 
 # Spec v1
@@ -16,6 +15,6 @@ python3 experimental/tools/integration/run_adapted_spec_integration.py subdiag_f
 # python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --disable-spec --out out_standard --cp 8.00
 
 # python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 12 --out out_12 --cp 15.00
-# python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 13 --out out_13 --cp 15.00
+# python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 13 --out out_13 --cp 8.00 --resolver
 # python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 14 --out out_14 --cp 15.00
 # python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --variable --out out_variable --cp 5.00

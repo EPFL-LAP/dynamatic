@@ -5,15 +5,14 @@
 
 void if_convert(in_int_t a[N], inout_int_t b[N]) {
   int i = 1;
-  while (i < N2) {
+  do {
     int tmp = a[i];
-    b[i] = 1;
     if (i * tmp < 10000) {
-      i += 2;
-    } else {
-      i += 1;
+      i++;
     }
-  }
+    i++;
+    b[i] = 1;
+  } while (i < N2);
 }
 
 int main(void) {
