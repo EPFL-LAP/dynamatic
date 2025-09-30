@@ -100,6 +100,9 @@ def main():
         "--exit-eager-eval", action='store_true')
     parser.add_argument(
         "--resolver", action='store_true')
+    parser.add_argument(
+        "--baseline", action='store_true',
+        help="Baseline generation")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -529,61 +532,65 @@ def main():
                 "msg": "Decided n",
                 "status": "pass"
             }
-        # Speculation
-        handshake_initial_speculation = os.path.join(
-            comp_out_dir, "handshake_speculation.mlir")
-        bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
-        with open(handshake_initial_speculation, "w") as f:
-            print(f"n={n}, variable={variable}")
-            result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-                f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""} {"exit-eager-eval" if args.exit_eager_eval else ""} {"resolver" if args.resolver else ""}",
-                "--handshake-materialize",
-                "--handshake-canonicalize"
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Added speculative units")
-            else:
-                return fail(id, "Failed to add speculative units")
 
-        # Export dot file
-        dot = os.path.join(comp_out_dir, f"{kernel_name}_spec.dot")
-        with open(dot, "w") as f:
-            result = subprocess.run([
-                EXPORT_DOT_BIN, handshake_initial_speculation,
-                "--edge-style=spline", "--label-type=uname"
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Created dot file")
-            else:
-                return fail(id, "Failed to export dot file")
+        if args.baseline:
+            handshake_speculation = handshake_pre_speculation
+        else:
+            # Speculation
+            handshake_speculation = os.path.join(
+                comp_out_dir, "handshake_speculation.mlir")
+            bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+            with open(handshake_speculation, "w") as f:
+                print(f"n={n}, variable={variable}")
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+                    f"--handshake-speculation-v2=json-path={spec_json_path} bb-mapping={bb_mapping} n={n} {"variable" if variable else ""} {"disable-initial-motion" if args.disable_initial_motion else ""} {"exit-eager-eval" if args.exit_eager_eval else ""} {"resolver" if args.resolver else ""}",
+                    "--handshake-materialize",
+                    "--handshake-canonicalize"
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Added speculative units")
+                else:
+                    return fail(id, "Failed to add speculative units")
 
-        # Convert DOT graph to PNG
-        png = os.path.join(comp_out_dir, f"{kernel_name}_spec.png")
-        with open(png, "w") as f:
-            result = subprocess.run([
-                "dot", "-Tpng", dot
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Created PNG file")
-            else:
-                return fail(id, "Failed to create PNG file")
+            # Export dot file
+            dot = os.path.join(comp_out_dir, f"{kernel_name}_spec.dot")
+            with open(dot, "w") as f:
+                result = subprocess.run([
+                    EXPORT_DOT_BIN, handshake_speculation,
+                    "--edge-style=spline", "--label-type=uname"
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Created dot file")
+                else:
+                    return fail(id, "Failed to export dot file")
+
+            # Convert DOT graph to PNG
+            png = os.path.join(comp_out_dir, f"{kernel_name}_spec.png")
+            with open(png, "w") as f:
+                result = subprocess.run([
+                    "dot", "-Tpng", dot
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Created PNG file")
+                else:
+                    return fail(id, "Failed to create PNG file")
 
         # Post-speculation
         handshake_post_speculation = os.path.join(
             comp_out_dir, "handshake_post_speculation.mlir")
         with open(handshake_post_speculation, "w") as f:
             result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_initial_speculation,
+                DYNAMATIC_OPT_BIN, handshake_speculation,
                 f"--handshake-post-spec-v2=json-path={spec_json_path}",
                 "--handshake-materialize",
                 "--handshake-canonicalize"
@@ -597,7 +604,7 @@ def main():
                 return fail(id, "Failed on post-speculation")
 
     # Update frequencies.csv
-    if args.disable_spec:
+    if args.disable_spec or args.baseline:
         updated_frequencies = frequencies
     else:
         updated_frequencies = os.path.join(

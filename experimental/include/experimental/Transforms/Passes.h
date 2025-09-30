@@ -29,6 +29,7 @@
 #include "experimental/Transforms/SpeculationV2/PreSpecV2.h"
 #include "experimental/Transforms/SpeculationV2/PreSpecV2Gamma.h"
 #include "experimental/Transforms/SpeculationV2/SpecV1Adaptor.h"
+#include "experimental/Transforms/SpeculationV2/SpecV1PostAdaptor.h"
 #include "experimental/Transforms/SpeculationV2/SpecV2CutCondDep.h"
 #include "experimental/Transforms/SpeculationV2/SpecV2Gamma.h"
 #include "experimental/Transforms/SpeculationV2/SpecV2PostBuffering.h"

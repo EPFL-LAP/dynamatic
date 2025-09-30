@@ -118,26 +118,26 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   // the branch in the SaveCommit control path.
 
   // Check if trueResult of controlBranch leads to a backedge (loop)
-  bool branchFound = false;
-  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
-    if (getLogicBB(branch) != getLogicBB(speculator))
+  bool passerFound = false;
+  unsigned specBB = getLogicBB(speculator).value();
+  for (auto passer : funcOp.getOps<PasserOp>()) {
+    if (getLogicBB(passer) != specBB)
       continue;
-    if (branch->hasAttr("specv1_adaptor_inner_loop"))
+    if (passer->hasAttr("specv1_adaptor_inner_loop"))
       continue;
-    if (isBranchBackedge(branch.getTrueResult())) {
-      mergeOperands.push_back(branchReplicated.getTrueResult());
-      branchFound = true;
-      break;
-    }
-    // Check if falseResult of controlBranch leads to a backedge (loop)
-    if (isBranchBackedge(branch.getFalseResult())) {
-      mergeOperands.push_back(branchReplicated.getFalseResult());
-      branchFound = true;
+    if (isBranchBackedge(passer.getResult())) {
+      Operation *defOp = getDefiningOpSkippingBuffersAndFork(passer.getCtrl());
+      if (!isa<NotOp>(defOp)) {
+        mergeOperands.push_back(branchReplicated.getTrueResult());
+      } else {
+        mergeOperands.push_back(branchReplicated.getFalseResult());
+      }
+      passerFound = true;
       break;
     }
   }
-  if (!branchFound) {
-    llvm::report_fatal_error("No valid branch found");
+  if (!passerFound) {
+    llvm::report_fatal_error("No valid passer found");
     return signalPassFailure();
   }
 

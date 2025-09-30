@@ -52,3 +52,27 @@ void recalculateMCBlocks(FuncOp funcOp);
 bool tryErasePasser(PasserOp passer);
 
 void introduceGSAMux(FuncOp &funcOp, unsigned branchBB);
+
+bool hasBranch(FuncOp &funcOp, unsigned bb);
+
+bool isExitingBBWithBranch(FuncOp funcOp, unsigned bb,
+                           ArrayRef<unsigned> loopBBs);
+
+Operation *getEffectiveUser(Value value);
+
+/// Calculate the loop condition fed by Init ops.
+/// Currently the implementation is based on the BBs specified in the json, and
+/// the internal control flow is only partially supported (no nesting).
+/// TODO: integrate this with the GSA implementation for fast token delivery.
+Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
+                             ArrayRef<unsigned> loopBBs);
+
+Value calculateLoopConditionWithBranch(FuncOp &funcOp,
+                                       ArrayRef<unsigned> exitBBs,
+                                       ArrayRef<unsigned> loopBBs);
+
+/// Replace the CMerge-controlled loop header with Init[False]-controlled one.
+LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
+                               Value loopCondition);
+
+bool isInsideLoop(Value value, ArrayRef<unsigned> loopBBs);

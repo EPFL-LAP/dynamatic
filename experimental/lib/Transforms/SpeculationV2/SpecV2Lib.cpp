@@ -403,3 +403,257 @@ void introduceGSAMux(FuncOp &funcOp, unsigned branchBB) {
     materializeValue(condition);
   }
 }
+
+bool hasBranch(FuncOp &funcOp, unsigned bb) {
+  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+    auto brBB = getLogicBB(branch);
+    if (brBB && *brBB == bb)
+      return true;
+  }
+  return false;
+}
+
+bool isInsideLoop(Value value, ArrayRef<unsigned> loopBBs) {
+  // Might not be materialized
+  Operation *user = *value.getUsers().begin();
+  while (isa<ExtSIOp, TruncIOp, ForkOp>(user)) {
+    user = *user->getUsers().begin();
+  }
+  auto outputBBOrNull = getLogicBB(user);
+  if (!outputBBOrNull.has_value()) {
+    // Connected to outside the loop.
+    return false;
+  }
+  return llvm::find(loopBBs, outputBBOrNull.value()) != loopBBs.end();
+}
+
+Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
+                             ArrayRef<unsigned> loopBBs) {
+  OpBuilder builder(funcOp.getContext());
+  builder.setInsertionPoint(funcOp.getBodyBlock(),
+                            funcOp.getBodyBlock()->begin());
+
+  Value condition = nullptr;
+  for (size_t i = 0; i < exitBBs.size(); i++) {
+    unsigned bb = exitBBs[i];
+    auto passers = funcOp.getOps<PasserOp>();
+    auto passer = llvm::find_if(passers, [&](PasserOp passer) {
+      if (getLogicBB(passer) != bb)
+        return false;
+
+      // Use the polarity of the passer connected inside the loop
+      return isInsideLoop(passer.getResult(), loopBBs);
+    });
+    if (passer != passers.end()) {
+      // Add the condition to loop conditions
+      if (condition == nullptr) {
+        // Simply use the condition
+        condition = (*passer).getCtrl();
+      } else {
+        // TODO: consider the basic block
+        SourceOp src = builder.create<SourceOp>(builder.getUnknownLoc());
+        setBB(src, bb);
+        ConstantOp cst = builder.create<ConstantOp>(
+            builder.getUnknownLoc(),
+            IntegerAttr::get(builder.getIntegerType(1), 0), src);
+        setBB(cst, bb);
+        MuxOp mux = builder.create<MuxOp>(
+            builder.getUnknownLoc(), condition.getType(), condition,
+            ArrayRef<Value>{cst.getResult(), (*passer).getCtrl()});
+        setBB(mux, bb);
+        mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
+        condition = mux.getResult();
+      }
+    } else {
+      llvm::errs() << "didn't find passer for bb " << bb << "\n";
+      llvm_unreachable("");
+    }
+  }
+
+  return condition;
+}
+
+Value calculateLoopConditionWithBranch(FuncOp &funcOp,
+                                       ArrayRef<unsigned> exitBBs,
+                                       ArrayRef<unsigned> loopBBs) {
+  OpBuilder builder(funcOp.getContext());
+  builder.setInsertionPoint(funcOp.getBodyBlock(),
+                            funcOp.getBodyBlock()->begin());
+
+  Value condition = nullptr;
+  for (size_t i = 0; i < exitBBs.size(); i++) {
+    unsigned bb = exitBBs[i];
+    Value ctrl;
+    for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+      auto brBB = getLogicBB(branch);
+      if (!brBB || *brBB != bb)
+        continue;
+      if (isInsideLoop(branch.getTrueResult(), loopBBs)) {
+        ctrl = branch.getConditionOperand();
+        break;
+      }
+      if (isInsideLoop(branch.getFalseResult(), loopBBs)) {
+        Value rawCtrl = branch.getConditionOperand();
+        builder.setInsertionPointAfterValue(rawCtrl);
+        NotOp notOp = builder.create<NotOp>(builder.getUnknownLoc(), rawCtrl);
+        ctrl = notOp.getResult();
+        break;
+      }
+      llvm::errs() << "Branch in exit BB does not go to inside the loop\n";
+      llvm_unreachable("");
+    }
+    // Add the condition to loop conditions
+    if (condition == nullptr) {
+      // Simply use the condition
+      condition = ctrl;
+    } else {
+      // TODO: consider the basic block
+      SourceOp src = builder.create<SourceOp>(builder.getUnknownLoc());
+      setBB(src, bb);
+      ConstantOp cst = builder.create<ConstantOp>(
+          builder.getUnknownLoc(),
+          IntegerAttr::get(builder.getIntegerType(1), 0), src);
+      setBB(cst, bb);
+      MuxOp mux = builder.create<MuxOp>(builder.getUnknownLoc(),
+                                        condition.getType(), condition,
+                                        ArrayRef<Value>{cst.getResult(), ctrl});
+      setBB(mux, bb);
+      mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
+      condition = mux.getResult();
+    }
+  }
+
+  return condition;
+}
+
+LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
+                               Value loopCondition) {
+  OpBuilder builder(funcOp->getContext());
+  builder.setInsertionPoint(funcOp.getBodyBlock(),
+                            funcOp.getBodyBlock()->begin());
+  unsigned headBB = bbs[0];
+
+  // Find control merge in the loop head BB.
+  ControlMergeOp cmergeOp = nullptr;
+  for (auto cmergeCandidate :
+       llvm::make_early_inc_range(funcOp.getOps<handshake::ControlMergeOp>())) {
+    if (getLogicBB(cmergeCandidate) != headBB)
+      continue;
+    if (cmergeCandidate->hasAttr("specv1_adaptor_inner_loop"))
+      continue;
+
+    if (cmergeOp)
+      return funcOp.emitError(
+          "Multiple ControlMergeOps found in the loop head BB");
+
+    cmergeOp = cmergeCandidate;
+  }
+
+  // Only support basic blocks with two predecessors.
+  assert(cmergeOp.getDataOperands().size() == 2 &&
+         "The loop head BB must have exactly two predecessors (you can run "
+         "gate binarization pass)");
+
+  // The backedge must be the second operand. If it is the first operand, we
+  // need to swap operands.
+  bool needsSwapping;
+  Operation *definingOp0 = cmergeOp.getDataOperands()[0].getDefiningOp();
+  if (definingOp0) {
+    if (auto nonspec = dyn_cast<NonSpecOp>(definingOp0)) {
+      definingOp0 = nonspec.getOperand().getDefiningOp();
+    }
+  }
+  Operation *definingOp1 = cmergeOp.getDataOperands()[1].getDefiningOp();
+  if (definingOp1) {
+    if (auto nonspec = dyn_cast<NonSpecOp>(definingOp1)) {
+      definingOp1 = nonspec.getOperand().getDefiningOp();
+    }
+  }
+  Value entry, backedge;
+  if (definingOp0 && llvm::find(bbs, getLogicBB(definingOp0)) != bbs.end()) {
+    needsSwapping = true;
+    entry = cmergeOp.getDataOperands()[1];
+    backedge = cmergeOp.getDataOperands()[0];
+  } else if (definingOp1 &&
+             llvm::find(bbs, getLogicBB(definingOp1)) != bbs.end()) {
+    needsSwapping = false;
+    entry = cmergeOp.getDataOperands()[0];
+    backedge = cmergeOp.getDataOperands()[1];
+  } else {
+    return cmergeOp.emitError(
+        "Expected one of the operands to be defined in the loop tail BB");
+  }
+
+  // Before replacing CMerge with Mux, update existing Muxes
+  for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (getLogicBB(muxOp) != headBB)
+      continue;
+    if (muxOp->hasAttr("specv2_loop_cond_mux"))
+      continue;
+    if (muxOp->hasAttr("specv1_adaptor_inner_loop"))
+      continue;
+
+    assert(muxOp.getDataOperands().size() == 2);
+
+    // Build an InitOp[False] for each MuxOp
+    builder.setInsertionPoint(muxOp);
+    InitOp initOp =
+        builder.create<InitOp>(loopCondition.getLoc(), loopCondition, 0);
+    setBB(initOp, headBB);
+
+    // Update the select operand
+    muxOp.getSelectOperandMutable()[0].set(initOp.getResult());
+
+    if (needsSwapping) {
+      // Swap operands
+      Value entry = muxOp.getDataOperands()[1];
+      muxOp.getDataOperandsMutable()[1].set(muxOp.getDataOperands()[0]);
+      muxOp.getDataOperandsMutable()[0].set(entry);
+    }
+  }
+
+  // Build an InitOp[False] for CMerge-replacing Mux
+  InitOp initOp =
+      builder.create<InitOp>(loopCondition.getLoc(), loopCondition, 0);
+  setBB(initOp, headBB);
+
+  // Build a MuxOp to replace the CMergeOp
+  // Use the result of the init as the selector.
+  builder.setInsertionPoint(cmergeOp);
+  MuxOp muxOp = builder.create<MuxOp>(
+      cmergeOp.getLoc(), cmergeOp.getResult().getType(),
+      /*selector=*/initOp.getResult(), llvm::ArrayRef{entry, backedge});
+  setBB(muxOp, headBB);
+  cmergeOp.getResult().replaceAllUsesWith(muxOp.getResult());
+
+  // Erase CMerge (and possibly connected fork)
+  eraseMaterializedOperation(cmergeOp);
+
+  return success();
+}
+
+Operation *getEffectiveUser(Value value) {
+  Operation *user = getUniqueUser(value);
+  if (isa<ExtSIOp, TruncIOp, ForkOp>(user)) {
+    return getEffectiveUser(user->getResult(0));
+  }
+  return user;
+}
+
+bool isExitingBBWithBranch(FuncOp funcOp, unsigned bb,
+                           ArrayRef<unsigned> loopBBs) {
+  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+    auto brBB = getLogicBB(branch);
+    if (brBB && *brBB == bb) {
+      auto trueBranchBB = getLogicBB(getEffectiveUser(branch.getTrueResult()));
+      auto falseBranchBB =
+          getLogicBB(getEffectiveUser(branch.getFalseResult()));
+      if (!trueBranchBB.has_value() || !falseBranchBB.has_value())
+        return true;
+      return llvm::find(loopBBs, trueBranchBB.value()) == loopBBs.end() ||
+             llvm::find(loopBBs, falseBranchBB.value()) == loopBBs.end();
+    }
+  }
+  // No branch
+  return false;
+}

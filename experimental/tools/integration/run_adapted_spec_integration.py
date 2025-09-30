@@ -71,9 +71,7 @@ def main():
     parser.add_argument(
         "--default-value", type=str, help="default speculated value", default="1")
     parser.add_argument(
-        "--branch-bb", type=int)
-    parser.add_argument(
-        "--merge-bb", type=int)
+        "--disable-constant-predictor", action="store_false")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -259,11 +257,26 @@ def main():
                 "Failed to apply Dynamatic transformations to cf", TermColors.FAIL)
             return False
 
+    gate_binarized = os.path.join(comp_out_dir, "gate_binarized.mlir")
+    with open(gate_binarized, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, cf_dyn_transformed,
+            "--cf-gate-binarization"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Applied gate binarization")
+        else:
+            color_print("Failed to apply gate binarization", TermColors.FAIL)
+            return False
+
     # cf level -> handshake level
     handshake = os.path.join(comp_out_dir, "handshake.mlir")
     with open(handshake, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, cf_dyn_transformed,
+            DYNAMATIC_OPT_BIN, gate_binarized,
             "--lower-cf-to-handshake"
         ],
             stdout=f,
@@ -334,10 +347,11 @@ def main():
     handshake_adapted = os.path.join(
         comp_out_dir, "handshake_adapted.mlir")
     bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+    spec_json_path = os.path.join(c_file_dir, "specv2.json")
     with open(handshake_adapted, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_canonicalized,
-            f"--handshake-spec-v1-adaptor=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb}",
+            f"--handshake-spec-v1-adaptor=bb-mapping={bb_mapping} json-path={spec_json_path}",
             "--handshake-materialize",
         ],
             stdout=f,
@@ -374,6 +388,40 @@ def main():
     else:
         shutil.copy(handshake_canonicalized, handshake_speculation)
 
+    handshake_post_spec_adapted = os.path.join(
+        comp_out_dir, "handshake_post_spec_adapted.mlir")
+    with open(handshake_post_spec_adapted, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_speculation,
+            f"--handshake-spec-v1-post-adaptor",
+            "--handshake-materialize",
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Post-adapted")
+        else:
+            color_print("Failed to post-adapt", TermColors.FAIL)
+            return False
+
+    handshake_post_spec = os.path.join(
+        comp_out_dir, "handshake_post_spec.mlir")
+    with open(handshake_post_spec, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_post_spec_adapted,
+            f"--handshake-post-spec-v2",
+            "--handshake-materialize",
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Post-spec")
+        else:
+            color_print("Failed to post-spec", TermColors.FAIL)
+            return False
+
     # Buffer placement (fpga20)
     profiler_bin = os.path.join(comp_out_dir, "profile")
     result = subprocess.run([
@@ -402,7 +450,7 @@ def main():
     frequencies = os.path.join(comp_out_dir, "frequencies.csv")
     with open(frequencies, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_PROFILER_BIN, cf_dyn_transformed,
+            DYNAMATIC_PROFILER_BIN, gate_binarized,
             "--top-level-function=" + kernel_name,
             "--input-args-file=" + profiler_inputs,
         ],
@@ -436,7 +484,7 @@ def main():
     timing_model = DYNAMATIC_ROOT / "data" / "components.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_speculation,
+            DYNAMATIC_OPT_BIN, handshake_post_spec,
             "--handshake-set-buffering-properties=version=fpga20",
             f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
@@ -454,7 +502,7 @@ def main():
     with open(handshake_spec_post_buffer, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_buffered,
-            f"--handshake-spec-post-buffer=default-value={args.default_value}",
+            f"--handshake-spec-post-buffer=default-value={args.default_value} {'constant=false' if not args.disable_constant_predictor else ''}",
             "--handshake-materialize"
         ],
             stdout=f,
@@ -465,33 +513,35 @@ def main():
         else:
             print("Failed to create handshake spec post buffer")
 
-    buffer_json = os.path.join(c_file_dir, "buffer.json")
     handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-    with open(buffer_json, "r") as f:
-        buffers = json.load(f)
-        buffer_pass_args = []
-        for buffer in buffers:
-            buffer_pass_args.append(
-                "--handshake-placebuffers-custom=" +
-                f"pred={buffer['pred']} " +
-                f"outid={buffer['outid']} " +
-                f"slots={buffer['slots']} " +
-                f"type={buffer['type']}")
-        with open(handshake_export, "w") as f:
-            result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_spec_post_buffer,
-                *buffer_pass_args
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Exported Handshake")
-            else:
-                color_print("Failed to export Handshake", TermColors.FAIL)
-                return False
-    # handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-    # shutil.copy(handshake_spec_post_buffer, handshake_export)
+    buffer_json = os.path.join(c_file_dir, "buffer.json")
+    # exist?
+    if os.path.exists(buffer_json):
+        with open(buffer_json, "r") as f:
+            buffers = json.load(f)
+            buffer_pass_args = []
+            for buffer in buffers:
+                buffer_pass_args.append(
+                    "--handshake-placebuffers-custom=" +
+                    f"pred={buffer['pred']} " +
+                    f"outid={buffer['outid']} " +
+                    f"slots={buffer['slots']} " +
+                    f"type={buffer['type']}")
+            with open(handshake_export, "w") as f:
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_spec_post_buffer,
+                    *buffer_pass_args
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Exported Handshake")
+                else:
+                    color_print("Failed to export Handshake", TermColors.FAIL)
+                    return False
+    else:
+        shutil.copy(handshake_spec_post_buffer, handshake_export)
 
     # Export dot file
     dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")

@@ -257,6 +257,8 @@ static void routeCommitControlRecursive(
             branchDiscardNonSpec->getLoc(),
             /*condition=*/branchDiscardNonSpec->getTrueResult(),
             /*data=*/ctrlSignal);
+        branchReplicated.value()->setAttr("specv1_cond_br",
+                                          builder.getUnitAttr());
         inheritBB(*branchDiscardNonSpec, *branchReplicated);
       }
 
@@ -469,6 +471,8 @@ FailureOr<Value> HandshakeSpeculationAdaptedPass::generateSaveCommitCtrl() {
           /*falseResultType=*/conditionOperand.getType(),
           /*specTag=*/conditionOperand, conditionOperand);
   inheritBB(specOp1, branchDiscardCondNonSpec);
+  branchDiscardCondNonSpec->setAttr("specv1_branchDiscardCondNonSpec",
+                                    builder.getUnitAttr());
 
   // Second, discard if speculation happened but it was correct
   // Create a conditional branch driven by SCBranchControl from speculator
@@ -478,6 +482,7 @@ FailureOr<Value> HandshakeSpeculationAdaptedPass::generateSaveCommitCtrl() {
           branchDiscardCondNonSpec.getLoc(), specOp2.getSCIsMisspec(),
           branchDiscardCondNonSpec.getTrueResult());
   inheritBB(specOp2, branchDiscardCondNonMisspec);
+  branchDiscardCondNonMisspec->setAttr("specv1_cond_br", builder.getUnitAttr());
 
   // Tentatively use specOp1.getSCSaveCtrl for the control signal for
   // save-commits Post-buffering pass replaces this
@@ -858,4 +863,21 @@ void HandshakeSpeculationAdaptedPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
+
+  // quick fix
+  handshake::FuncOp funcOp = specOp1->getParentOfType<handshake::FuncOp>();
+  for (auto branch : funcOp.getOps<handshake::SpeculatingBranchOp>()) {
+    if (branch->getAttr("specv1_branchDiscardCondNonSpec")) {
+      unsigned bb = getLogicBB(specOp1).value();
+      ConditionalBranchOp controlBranch = findControlBranch(funcOp, bb);
+      if (controlBranch == nullptr) {
+        specOp1->emitError()
+            << "Could not find backedge within speculation bb.\n";
+        return signalPassFailure();
+      }
+      auto conditionOperand = controlBranch.getConditionOperand();
+      branch->setOperand(0, conditionOperand);
+      branch->setOperand(1, conditionOperand);
+    }
+  }
 }

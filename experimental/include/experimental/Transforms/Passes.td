@@ -120,8 +120,6 @@ def PostSpecV2 : DynamaticPass<"handshake-post-spec-v2"> {
   let description = [{
   }];
   let options = [
-    Option<"jsonPath", "json-path", "std::string", "",
-           "Path to JSON-formatted file containing the kernel information related to speculation.">,
   ];
 }
 
@@ -192,10 +190,18 @@ def SpecV1Adaptor : DynamaticPass<"handshake-spec-v1-adaptor"> {
   let description = [{
   }];
   let options = [
-    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
-    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the kernel information related to speculation.">,
     Option<"bbMapping", "bb-mapping", "std::string", "",
            "Path to the output bb mapping file.">,
+  ];
+}
+
+def SpecV1PostAdaptor : DynamaticPass<"handshake-spec-v1-post-adaptor"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
   ];
 }
 
