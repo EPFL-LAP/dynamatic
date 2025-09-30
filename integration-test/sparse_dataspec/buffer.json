@@ -1,9 +1,2 @@
 [
-  {
-    "pred": "cond_br3",
-    "outid": 1,
-    "slots": 1,
-    "type": "fifo_break_none",
-    "comment": "To avoid deadlock"
-  }
 ]

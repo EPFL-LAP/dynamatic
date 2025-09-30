@@ -3,7 +3,14 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
-python3 tools/integration/run_spec_integration.py golden_ratio --out out_v1 --cp 7.00
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --baseline --out out_baseline --cp 7.00
+
+# Spec v1
+python3 experimental/tools/integration/run_adapted_spec_integration.py golden_ratio --out out_v1 --cp 7.00 --default-value 0
+
+python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --disable-spec --out out_disabled --cp 7.00
+
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 0 --out out_0 --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 1 --out out_1 --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 1 --out out_1_exit --cp 7.00 --exit-eager-eval --resolver

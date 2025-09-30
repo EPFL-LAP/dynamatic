@@ -3,8 +3,14 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
+# Estimation
+python3 experimental/tools/integration/run_specv2_integration.py newton --decide-n > integration-test/newton/decide-n.txt
+
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py newton --baseline --out out_baseline --cp 8.00
+
 # Spec v1
-python3 tools/integration/run_spec_integration.py newton --out out_v1 --cp 8.00 --default-value 0
+python3 experimental/tools/integration/run_adapted_spec_integration.py newton --out out_v1 --cp 8.00 --default-value 0
 
 python3 experimental/tools/integration/run_specv2_integration.py newton --disable-initial-motion --n 0 --out out_default --cp 8.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py newton --n 0 --out out_0 --cp 8.00 --resolver

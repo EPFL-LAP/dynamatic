@@ -3,7 +3,12 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
-python3 tools/integration/run_spec_integration.py sparse_dataspec --out out_v1 --cp 10.00 --default-value 0 --manual-buffer --disable-constant-predictor
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --baseline --out out_baseline --cp 10.00
+
+# Spec v1
+python3 experimental/tools/integration/run_adapted_spec_integration.py sparse_dataspec --out out_v1 --cp 10.00 --default-value 0 --disable-constant-predictor
+
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --n 0 --out out_0 --cp 10.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --n 9 --out out_9 --cp 10.00 --resolver
 

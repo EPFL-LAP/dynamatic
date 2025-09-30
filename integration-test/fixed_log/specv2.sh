@@ -3,8 +3,11 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py fixed_log --baseline --out out_baseline --cp 8.00
+
 # Spec v1
-python3 experimental/tools/integration/run_adapted_spec_integration.py fixed_log --branch-bb=1 --merge-bb=3 --default-value=0 --out out_v1 --cp 8.00
+python3 experimental/tools/integration/run_adapted_spec_integration.py fixed_log --default-value=0 --out out_v1 --cp 8.00
 
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --disable-initial-motion --n 0 --out out_default --cp 8.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --n 0 --out out_0 --cp 8.00 --resolver

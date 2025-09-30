@@ -3,6 +3,10 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py bisection --gate-binarized cf_transformed.mlir --baseline --out out_baseline --cp 10.00
+# python3 experimental/tools/integration/run_specv2_integration.py bisection --gate-binarized cf_transformed.mlir --disable-spec --out out_0_cfg_modified --cp 10.00
+
 # python3 experimental/tools/integration/run_specv2_integration.py bisection --disable-spec --cp 10.00 --out out_standard
 # python3 experimental/tools/integration/run_specv2_integration.py bisection --gate-binarized cf_transformed.mlir --n 0 --out out_pre --cp 10.00 --disable-initial-motion --resolver
 python3 experimental/tools/integration/run_specv2_integration.py bisection --gate-binarized cf_transformed.mlir --n 1 --out out_1 --cp 10.00 --use-prof-cache --resolver

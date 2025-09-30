@@ -3,6 +3,9 @@ DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd $DYNAMATIC_DIR
 
+# Baseline
+python3 experimental/tools/integration/run_specv2_integration.py collision_donut --baseline --out out_baseline --cp 10.00
+
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --disable-spec --out out_standard --cp 5.00
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 0 --out out_0 --cp 5.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 1 --out out_1 --cp 5.00 --use-prof-cache --resolver
