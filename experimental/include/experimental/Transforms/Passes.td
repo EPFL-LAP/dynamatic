@@ -42,7 +42,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       The pass needs to specify the position of the Speculation Units by 
       means of an input JSON file.
   }];
-  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the positions for speculative "
@@ -50,7 +49,9 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
     Option<"automatic", "automatic", "bool", "true",
            "When the automatic mode is enabled, the speculative unit positions are "
            "automatically detected. The speculator position still needs to be "
-           "specified in the JSON-formatted file.">];
+           "specified in the JSON-formatted file.">,
+    Option<"sparsePredictor", "sparse-predictor", "bool", "false", "custom predictor for sparse benchmark">,
+  ];
 }
 
 def HandshakeSpeculationAdapted : DynamaticPass<"handshake-speculation-adapted"> {
