@@ -182,7 +182,8 @@ static Operation *backtrackToBranch(Operation *op) {
 /// of the merge-like operations reached by a def-use chain (or the passed
 /// operation if it was itself merge-like); otherwise, returns nullptr.
 static Operation *followToMerge(Operation *op) {
-  if (isa<handshake::MergeLikeOpInterface>(op))
+  if (isa<handshake::MergeLikeOpInterface>(op) &&
+      !op->hasAttr("specv2_loop_cond_mux"))
     return op;
   if (canGoThroughOutsideBlocks(op)) {
     // All users of the operation's results must lead to merges within a unique
@@ -254,8 +255,10 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
     Operation *user = *val.user_begin();
     if (isa<handshake::InitOp, handshake::SpecV2RepeatingInitOp>(user))
       return true;
+    // ??? Is this correct?
     if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
-      if (val != muxOp.getSelectOperand())
+      if (!muxOp->hasAttr("specv2_loop_cond_mux") &&
+          val != muxOp.getSelectOperand())
         return true;
     }
   }

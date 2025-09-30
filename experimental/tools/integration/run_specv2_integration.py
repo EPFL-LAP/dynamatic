@@ -591,7 +591,7 @@ def main():
         with open(handshake_post_speculation, "w") as f:
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_speculation,
-                f"--handshake-post-spec-v2=json-path={spec_json_path}",
+                f"--handshake-post-spec-v2",
                 "--handshake-materialize",
                 "--handshake-canonicalize"
             ],

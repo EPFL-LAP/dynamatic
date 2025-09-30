@@ -473,59 +473,6 @@ Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
   return condition;
 }
 
-Value calculateLoopConditionWithBranch(FuncOp &funcOp,
-                                       ArrayRef<unsigned> exitBBs,
-                                       ArrayRef<unsigned> loopBBs) {
-  OpBuilder builder(funcOp.getContext());
-  builder.setInsertionPoint(funcOp.getBodyBlock(),
-                            funcOp.getBodyBlock()->begin());
-
-  Value condition = nullptr;
-  for (size_t i = 0; i < exitBBs.size(); i++) {
-    unsigned bb = exitBBs[i];
-    Value ctrl;
-    for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
-      auto brBB = getLogicBB(branch);
-      if (!brBB || *brBB != bb)
-        continue;
-      if (isInsideLoop(branch.getTrueResult(), loopBBs)) {
-        ctrl = branch.getConditionOperand();
-        break;
-      }
-      if (isInsideLoop(branch.getFalseResult(), loopBBs)) {
-        Value rawCtrl = branch.getConditionOperand();
-        builder.setInsertionPointAfterValue(rawCtrl);
-        NotOp notOp = builder.create<NotOp>(builder.getUnknownLoc(), rawCtrl);
-        ctrl = notOp.getResult();
-        break;
-      }
-      llvm::errs() << "Branch in exit BB does not go to inside the loop\n";
-      llvm_unreachable("");
-    }
-    // Add the condition to loop conditions
-    if (condition == nullptr) {
-      // Simply use the condition
-      condition = ctrl;
-    } else {
-      // TODO: consider the basic block
-      SourceOp src = builder.create<SourceOp>(builder.getUnknownLoc());
-      setBB(src, bb);
-      ConstantOp cst = builder.create<ConstantOp>(
-          builder.getUnknownLoc(),
-          IntegerAttr::get(builder.getIntegerType(1), 0), src);
-      setBB(cst, bb);
-      MuxOp mux = builder.create<MuxOp>(builder.getUnknownLoc(),
-                                        condition.getType(), condition,
-                                        ArrayRef<Value>{cst.getResult(), ctrl});
-      setBB(mux, bb);
-      mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
-      condition = mux.getResult();
-    }
-  }
-
-  return condition;
-}
-
 LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
                                Value loopCondition) {
   OpBuilder builder(funcOp->getContext());

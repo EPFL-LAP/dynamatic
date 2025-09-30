@@ -67,10 +67,6 @@ Operation *getEffectiveUser(Value value);
 Value calculateLoopCondition(FuncOp &funcOp, ArrayRef<unsigned> exitBBs,
                              ArrayRef<unsigned> loopBBs);
 
-Value calculateLoopConditionWithBranch(FuncOp &funcOp,
-                                       ArrayRef<unsigned> exitBBs,
-                                       ArrayRef<unsigned> loopBBs);
-
 /// Replace the CMerge-controlled loop header with Init[False]-controlled one.
 LogicalResult updateLoopHeader(FuncOp &funcOp, ArrayRef<unsigned> bbs,
                                Value loopCondition);

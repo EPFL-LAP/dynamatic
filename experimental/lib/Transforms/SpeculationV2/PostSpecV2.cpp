@@ -49,8 +49,23 @@ struct PostSpecV2Pass
   void runDynamaticPass() override;
 };
 
-static InitOp moveInitsUp(Value fedValue, unsigned headBB) {
-  fedValue = getForkTop(fedValue);
+static bool isInitUpEligible(InitOp init) {
+  Value fedValue = getForkTop(init.getOperand());
+  materializeValue(fedValue);
+
+  bool isAlreadyFound = false;
+  for (Operation *user : iterateOverPossiblyIndirectUsers(fedValue)) {
+    if (isa<InitOp>(user)) {
+      if (isAlreadyFound)
+        return true;
+      isAlreadyFound = true;
+    }
+  }
+  return false;
+}
+
+static InitOp moveInitsUp(InitOp init) {
+  Value fedValue = getForkTop(init.getOperand());
   materializeValue(fedValue);
 
   Operation *uniqueUser = getUniqueUser(fedValue);
@@ -65,7 +80,7 @@ static InitOp moveInitsUp(Value fedValue, unsigned headBB) {
   ForkOp fork = cast<ForkOp>(uniqueUser);
 
   auto newInit = builder.create<InitOp>(fedValue.getLoc(), fedValue, 0);
-  setBB(newInit, headBB);
+  inheritBB(init, newInit);
   fedValue.replaceAllUsesExcept(newInit.getResult(), newInit);
 
   for (auto res : fork->getResults()) {
@@ -86,13 +101,6 @@ static InitOp moveInitsUp(Value fedValue, unsigned headBB) {
 }
 
 void PostSpecV2Pass::runDynamaticPass() {
-  // Parse json (jsonPath is a member variable handled by tablegen)
-  auto bbOrFailure = readFromJSON(jsonPath);
-  if (failed(bbOrFailure))
-    return signalPassFailure();
-
-  auto [loopBBs] = bbOrFailure.value();
-
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp
@@ -102,15 +110,18 @@ void PostSpecV2Pass::runDynamaticPass() {
 
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
-  unsigned headBB = loopBBs[0];
-
   // Move the init op up
-  for (auto init : funcOp.getOps<InitOp>()) {
-    if (getLogicBB(init) != headBB)
-      continue;
-    moveInitsUp(init.getOperand(), headBB);
-    break;
-  }
+  bool changed;
+  do {
+    changed = false;
+    for (auto init : funcOp.getOps<InitOp>()) {
+      if (isInitUpEligible(init)) {
+        moveInitsUp(init);
+        changed = true;
+        break;
+      }
+    }
+  } while (changed);
 
   // Erase unused PasserOps
   for (auto passerOp : llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {

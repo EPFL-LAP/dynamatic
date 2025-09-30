@@ -34,6 +34,13 @@ struct SpecV1AdaptorPass
 };
 
 void SpecV1AdaptorPass::runDynamaticPass() {
+  // Parse json (jsonPath is a member variable handled by tablegen)
+  auto bbOrFailure = readFromJSON(jsonPath);
+  if (failed(bbOrFailure))
+    return signalPassFailure();
+
+  auto [loopBBs] = bbOrFailure.value();
+
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp
@@ -43,35 +50,47 @@ void SpecV1AdaptorPass::runDynamaticPass() {
 
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
-  introduceGSAMux(funcOp, branchBB);
+  SmallVector<unsigned> exitingBBs;
 
   OpBuilder builder(funcOp.getContext());
-  for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
-    auto brBB = getLogicBB(branch);
-    if (!brBB || *brBB != branchBB)
-      continue;
 
-    branch->setAttr("specv1_adaptor_inner_loop", builder.getBoolAttr(true));
+  for (unsigned bb : loopBBs) {
+    if (hasBranch(funcOp, bb)) {
+      if (isExitingBBWithBranch(funcOp, bb, loopBBs)) {
+        exitingBBs.push_back(bb);
+      } else {
+        introduceGSAMux(funcOp, bb);
+
+        for (auto branch : funcOp.getOps<ConditionalBranchOp>()) {
+          auto brBB = getLogicBB(branch);
+          if (!brBB || *brBB != bb)
+            continue;
+
+          branch->setAttr("specv1_adaptor_inner_loop",
+                          builder.getBoolAttr(true));
+        }
+      }
+    }
   }
+
   for (auto cmerge : funcOp.getOps<ControlMergeOp>()) {
-    auto cmBB = getLogicBB(cmerge);
-    if (!cmBB || *cmBB != mergeBB)
+    auto cmergeBB = getLogicBB(cmerge);
+    if (!cmergeBB || *cmergeBB == loopBBs[0] ||
+        llvm::find(loopBBs, *cmergeBB) == loopBBs.end())
       continue;
 
     cmerge->setAttr("specv1_adaptor_inner_loop", builder.getBoolAttr(true));
   }
+
   for (auto mux : funcOp.getOps<MuxOp>()) {
     auto muxBB = getLogicBB(mux);
-    if (!muxBB || *muxBB != mergeBB)
+    if (!muxBB || *muxBB == loopBBs[0] ||
+        llvm::find(loopBBs, *muxBB) == loopBBs.end())
       continue;
 
     mux->setAttr("specv1_adaptor_inner_loop", builder.getBoolAttr(true));
   }
 
-  SmallVector<unsigned> loopBBs;
-  for (unsigned bb = branchBB; bb <= mergeBB; bb++) {
-    loopBBs.push_back(bb);
-  }
   DenseMap<unsigned, unsigned> bbMap = unifyBBs(loopBBs, funcOp);
   if (bbMapping != "") {
     // Convert bbMap to a json file
