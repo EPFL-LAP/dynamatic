@@ -1,0 +1,8 @@
+{
+  "speculator": {
+    "operation-name": "cond_br2",
+    "operand-idx": 1,
+    "fifo-depth": 15
+  },
+  "save-commits-fifo-depth": 15
+}
