@@ -45,6 +45,14 @@ void PreSpecV2GammaPass::runDynamaticPass() {
 
   introduceGSAMux(funcOp, branchBB);
 
+  OpBuilder builder(funcOp->getContext());
+  for (auto mux : funcOp.getOps<MuxOp>()) {
+    if (getLogicBB(mux) != mergeBB)
+      continue;
+
+    mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
+  }
+
   if (failed(replaceBranchesWithPassers(funcOp, branchBB))) {
     funcOp.emitError("Failed to replace branches in BB 1 with passers");
     return signalPassFailure();
