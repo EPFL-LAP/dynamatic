@@ -72,6 +72,8 @@ def main():
         "--default-value", type=str, help="default speculated value", default="1")
     parser.add_argument(
         "--manual-buffer", action="store_true")
+    parser.add_argument(
+        "--disable-constant-predictor", action="store_false")
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -417,7 +419,7 @@ def main():
     with open(handshake_spec_post_buffer, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_buffered,
-            f"--handshake-spec-post-buffer=default-value={args.default_value}",
+            f"--handshake-spec-post-buffer=default-value={args.default_value} {'constant=false' if not args.disable_constant_predictor else ''}",
             "--handshake-materialize"
         ],
             stdout=f,
@@ -429,7 +431,6 @@ def main():
             print("Failed to create handshake spec post buffer")
 
     handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-    shutil.copy(handshake_spec_post_buffer, handshake_export)
 
     if args.manual_buffer:
         buffer_json = os.path.join(c_file_dir, "buffer.json")
@@ -447,7 +448,7 @@ def main():
                     f"type={buffer['type']}")
             with open(handshake_manual_buffer, "w") as f:
                 result = subprocess.run([
-                    DYNAMATIC_OPT_BIN, handshake_export,
+                    DYNAMATIC_OPT_BIN, handshake_spec_post_buffer,
                     *buffer_pass_args
                 ],
                     stdout=f,
@@ -458,14 +459,15 @@ def main():
                 else:
                     color_print("Failed to export Handshake", TermColors.FAIL)
                     return False
+        shutil.copy(handshake_manual_buffer, handshake_export)
     else:
-        handshake_manual_buffer = handshake_export
+        shutil.copy(handshake_spec_post_buffer, handshake_export)
 
     # Export dot file
     dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
     with open(dot, "w") as f:
         result = subprocess.run([
-            EXPORT_DOT_BIN, handshake_manual_buffer,
+            EXPORT_DOT_BIN, handshake_export,
             "--edge-style=spline", "--label-type=uname"
         ],
             stdout=f,
@@ -496,7 +498,7 @@ def main():
     hw = os.path.join(comp_out_dir, "hw.mlir")
     with open(hw, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_manual_buffer,
+            DYNAMATIC_OPT_BIN, handshake_export,
             "--lower-handshake-to-hw"
         ],
             stdout=f,
