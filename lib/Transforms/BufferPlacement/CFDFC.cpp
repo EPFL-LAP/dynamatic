@@ -255,6 +255,10 @@ bool CFDFC::isCFDFCBackedge(Value val) {
     return false;
 
   Operation *defOp = val.getDefiningOp();
+
+  if (isa<NonSpecOp>(defOp))
+    return false;
+
   std::optional<unsigned> srcBB = getLogicBB(defOp);
   std::optional<unsigned> dstBB = getLogicBB(*val.getUsers().begin());
 

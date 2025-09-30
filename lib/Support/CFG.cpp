@@ -12,6 +12,7 @@
 
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -231,6 +232,10 @@ bool dynamatic::getBBEndpoints(Value val, BBEndpoints &endpoints) {
 }
 
 bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
+  Operation *defOp = val.getDefiningOp();
+  if (isa_and_nonnull<handshake::NonSpecOp>(defOp))
+    return false;
+
   // Get the value's BB endpoints
   BBEndpoints bbs;
   if (!getBBEndpoints(val, user, bbs))
