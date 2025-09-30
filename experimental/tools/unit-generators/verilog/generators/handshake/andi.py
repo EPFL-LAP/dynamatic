@@ -1,4 +1,4 @@
-from generators.support.binop import generate_arith_binary
+from generators.support.arith_binary import generate_arith_binary
 
 def generate_andi(name, params):
 
