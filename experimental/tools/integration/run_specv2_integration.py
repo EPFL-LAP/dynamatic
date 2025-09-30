@@ -103,6 +103,8 @@ def main():
     parser.add_argument(
         "--baseline", action='store_true',
         help="Baseline generation")
+    parser.add_argument(
+        "--min-buffering", action='store_true')
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -485,7 +487,7 @@ def main():
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_initial_speculation,
                 "--handshake-set-buffering-properties=version=fpga20",
-                f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+                f"--handshake-place-buffers=algorithm={"fpga20" if not args.min_buffering else "on-merges"} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
             ],
                 stdout=subprocess.DEVNULL,
                 stderr=sys.stdout,
@@ -510,7 +512,7 @@ def main():
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_cut_dep,
                 "--handshake-set-buffering-properties=version=fpga20",
-                f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+                f"--handshake-place-buffers=algorithm={"fpga20" if not args.min_buffering else "on-merges"} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
             ],
                 stdout=subprocess.DEVNULL,
                 stderr=sys.stdout,
@@ -630,7 +632,7 @@ def main():
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_post_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm={"fpga20" if not args.min_buffering else "on-merges"} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout,

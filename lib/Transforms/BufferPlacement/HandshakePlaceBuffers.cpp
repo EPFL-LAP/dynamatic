@@ -187,6 +187,9 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
 }
 
 void HandshakePlaceBuffersPass::runOnOperation() {
+  llvm::errs() << "Target CP: " << targetCP << "\n";
+  llvm::errs() << "Algorithm: " << algorithm << "\n";
+
   // Buffer placement requires that all values are used exactly once
   mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
   if (failed(verifyIRMaterialized(modOp))) {
@@ -671,6 +674,18 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
       }
+    }
+
+    for (auto ri : funcOp.getOps<SpecV2RepeatingInitOp>()) {
+      ChannelBufProps &resProps = channelProps[ri.getResult()];
+      resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      resProps.minTrans = std::max(resProps.minTrans, 1U);
+    }
+
+    for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
+      ChannelBufProps &resProps = channelProps[initOp.getResult()];
+      resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      resProps.minTrans = std::max(resProps.minTrans, 1U);
     }
 
     // Place the minimal number of buffers (as specified by the buffering

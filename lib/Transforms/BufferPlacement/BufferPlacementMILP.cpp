@@ -1059,6 +1059,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   assert(logger && "no logger was provided");
   mlir::raw_indented_ostream &os = **logger;
 
+  os << "Target CP: " << targetPeriod << "\n\n";
+
   os << "# ========================== #\n";
   os << "# Buffer Placement Decisions #\n";
   os << "# ========================== #\n\n";
