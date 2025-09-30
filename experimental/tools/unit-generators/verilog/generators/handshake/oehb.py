@@ -1,7 +1,9 @@
 from generators.handshake.dataless.dataless_oehb import generate_dataless_oehb
-
 def generate_oehb(name, params):
   data_type = params["data_type"]
+
+  if(data_type == 0):
+    return generate_dataless_oehb(name, {})
 
   header = "`timescale 1ns/1ps\n"
 

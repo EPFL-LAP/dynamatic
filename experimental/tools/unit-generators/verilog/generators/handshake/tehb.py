@@ -1,5 +1,3 @@
-from generators.handshake.dataless.tehb import generate_tehb as generate_dataless_tehb
-
 def generate_tehb(name, params):
     data_type = params["data_type"]
     if(data_type == 0):
@@ -57,3 +55,33 @@ endmodule
 
 """
     return header + dataless_tehb + tehb_body
+
+def generate_dataless_tehb(name, params):
+    return f"""
+`timescale 1ns/1ps
+// Module of tehb
+module {name} (
+	input  clk,
+	input  rst,
+  // Input Channel
+	input  ins_valid,
+  output ins_ready,
+  // Output Channel
+  output outs_valid,	
+	input  outs_ready
+);
+	reg fullReg = 0;
+	
+	always @(posedge clk) begin
+		if (rst) begin
+			fullReg <= 0;
+		end else begin
+			fullReg <= (ins_valid | fullReg) & ~outs_ready;
+		end
+	end
+
+	assign ins_ready = ~fullReg;
+	assign outs_valid = ins_valid | fullReg;
+
+endmodule
+"""

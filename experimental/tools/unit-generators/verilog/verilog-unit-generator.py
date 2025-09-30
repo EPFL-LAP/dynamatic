@@ -62,15 +62,15 @@ generators.add("handshake", "mem_controller_loadless")
 generators.add("handshake", "mem_controller_storeless")
 
 generators.add("handshake", "tfifo")
-generators.add("handshake.dataless", "dataless_tfifo")
+#generators.add("handshake.dataless", "dataless_tfifo")
 generators.add("handshake", "one_slot_break_dvr")
-generators.add("handshake.dataless", "dataless_one_slot_break_dvr")
+#generators.add("handshake.dataless", "dataless_one_slot_break_dvr")
 generators.add("handshake", "shift_reg_break_dv")
-generators.add("handshake.dataless", "dataless_shift_reg_break_dv")
+#generators.add("handshake.dataless", "dataless_shift_reg_break_dv")
 
 generators.add("support", "mem_to_bram")
 generators.add("support", "elastic_fifo_inner")
-generators.add("support.dataless", "dataless_elastic_fifo_inner")
+#generators.add("support.dataless", "dataless_elastic_fifo_inner")
 
 def parse_parameters(param_list):
     try:

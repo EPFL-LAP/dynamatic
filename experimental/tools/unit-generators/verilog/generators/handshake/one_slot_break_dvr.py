@@ -1,4 +1,3 @@
-from generators.handshake.dataless.dataless_one_slot_break_dvr import generate_dataless_one_slot_break_dvr
 def generate_one_slot_break_dvr(name, params):
 
     data_type = params["data_type"]
@@ -51,3 +50,53 @@ endmodule
 """
 
     return header + dataless_one_slot_break_dvr + one_slot_break_dvr_body
+
+def generate_dataless_one_slot_break_dvr(name, params):
+
+    return f"""
+`timescale 1ns/1ps
+// Module of dataless_one_slot_break_dvr
+module {name} (
+  input  clk,
+  input  rst,
+  // Input channel
+  input  ins_valid,
+  output ins_ready,
+  // Output channel
+  output outs_valid,
+  input  outs_ready
+);
+
+  // Define internal signals
+  reg outputValid = 0;
+  reg inputReady = 1;
+  wire enable;
+  wire stop;
+
+  // Sequential logic for inputReady
+  always @(posedge clk) begin
+    if (rst) begin
+      inputReady <= 1;
+    end else begin
+      inputReady <= (~stop) & (~enable);
+    end
+  end
+
+  // Sequential logic for outputValid
+  always @(posedge clk) begin
+    if (rst) begin
+      outputValid <= 0;
+    end else begin
+      outputValid <= enable | stop;
+    end
+  end
+
+  // Combinational logic
+  assign enable = ins_valid & inputReady;
+  assign stop   = outputValid & (~outs_ready);
+  // Output assignments
+  assign ins_ready  = inputReady;
+  assign outs_valid = outputValid;
+
+endmodule
+"""
