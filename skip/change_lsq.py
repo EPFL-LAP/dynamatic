@@ -1,8 +1,8 @@
 import json
 import argparse
 
-input_path= "/beta/rouzbeh/fpga-main/dynamatic//data/rtl-config-vhdl copy.json"
-output_path= "/beta/rouzbeh/fpga-main/dynamatic//data/rtl-config-vhdl.json"
+input_path= "/beta/rouzbeh/clean/dynamatic//data/rtl-config-vhdl copy.json"
+output_path= "/beta/rouzbeh/clean/dynamatic//data/rtl-config-vhdl.json"
 # Function to replace placeholders in the generator string
 def update_json_file(load_value, store_value):
     # Open the original JSON file
@@ -35,9 +35,11 @@ def main():
     parser.add_argument('store', type=int, help="The value to replace $STORE")
     
     args = parser.parse_args()
+
+    print(f"Updating JSON file with load={args.load} and store={args.store}")
     
     # Call the function to update the file
     update_json_file(args.load, args.store)
 
-if __name__ == "__main__":
-    main()
+
+main()

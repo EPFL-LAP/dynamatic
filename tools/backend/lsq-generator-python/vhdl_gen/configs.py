@@ -14,10 +14,12 @@ import sys
 
 def GetConfigs(path: str, load, store):
     with open(path, 'r') as file:
-        configString = file.read()      
+        configString = file.read()  
+        print(configString)    
         configs = json.loads(configString)
         configs["fifoDepth_L"] = load
         configs["fifoDepth_S"] = store
+        print(configs)
         return Configs(configs)
 
 

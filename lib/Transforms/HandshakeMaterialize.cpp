@@ -371,6 +371,39 @@ struct HandshakeMaterializePass
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
       promoteEagerToLazyForks(funcOp);
 
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+
+      for (Operation &op : funcOp.getOps()) {
+        if (isa<handshake::ForkOp>(op)) {
+         
+          for (Value res : op.getResults()) {
+
+
+            if (isa<handshake::ControlType>(res.getType())) {
+              continue;
+            }
+            for (auto user : res.getUsers()) {
+
+
+              if (isa<handshake::MemoryControllerOp>(user)) {
+                continue;
+              }
+
+              builder.setInsertionPointAfter(user);
+              handshake::BufferOp bufferOp =
+                  builder.create<handshake::BufferOp>(
+                      res.getLoc(), res, 4,
+                      handshake::BufferType::FIFO_BREAK_NONE);
+              inheritBB(user, bufferOp);
+
+              replaceFirstUse(user, res, bufferOp.getResult());
+            }
+          }
+        }
+      }
+
+    }
+
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
   }
 };

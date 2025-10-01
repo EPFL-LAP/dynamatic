@@ -7,7 +7,7 @@ ROOT_DIR = "../integration-test/"
 LAST_REPORT = "timing_post_pr.rpt"
 LAST_REPORT_PATH = "out/vivado/timing_post_pr.rpt"
 
-OUTPUT_NAME = "normal_safe_benchmarks.csv"
+OUTPUT_NAME = "30-Final-Atax.csv"
 
 # === LIST OF REGULAR EXPRESSIONS FOR INFORMATION EXTRACTION ===
 compilation_time_rpt = "out/vivado/compilation-time.txt"

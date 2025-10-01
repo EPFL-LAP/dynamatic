@@ -368,7 +368,7 @@ find_best_timing(){
   l=$2
   s=$3
 
-  cp=6 # Start value of CP
+  cp=5 # Start value of CP
 
   best_cycles=10000000
   best_timing=10000000
@@ -388,7 +388,9 @@ find_best_timing(){
       echo "Running for CP = $cp" >> "$dir/$FIND_CP_OUTPUT"
 
       # Call the compile function (assuming it's a script or command)
-      compile $cp
+      # compile $cp
+      python3 ./buffer.py . $basename $l $s $cp
+
       # Run the simulation (modify this to match your actual simulation command)
       simulate
 
@@ -433,7 +435,7 @@ find_best_timing(){
 
 
       # Break condition (optional): stop after a certain CP value
-      if (( $(echo "$cp > 6" | bc -l) )); then
+      if (( $(echo "$cp > 5.5" | bc -l) )); then
           break
       fi
 
@@ -461,8 +463,8 @@ while IFS= read -r cfile; do
     hfile="$dir/$basename.h"
 
 
-    load_values=(2 3 5 6 7 10 12 14)
-    store_values=(2 3 5 6 7 10 12 14)
+    load_values=(4 6 8 10 12)
+    store_values=(4 6 8 10 12)
 
     for l in "${load_values[@]}"; do
       for s in "${store_values[@]}"; do
@@ -470,7 +472,7 @@ while IFS= read -r cfile; do
             continue
         fi
 
-        python3 ./skip/change-lsq.py $l $s
+        # python3 ./skip/change_lsq.py $l $s
 
         # find_best_cp
         # binary_search

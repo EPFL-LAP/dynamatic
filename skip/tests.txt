@@ -1,1 +1,1 @@
-../integration-test/histogram/histogram.c
+../integration-test/atax/atax.c
