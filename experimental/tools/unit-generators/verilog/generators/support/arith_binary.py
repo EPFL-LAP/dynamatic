@@ -1,7 +1,7 @@
 from generators.handshake.join import generate_join
 from generators.support.utils import ExtraSignals
-from generators.handshake.dataless.dataless_oehb import generate_dataless_oehb
 from generators.support.delay_buffer import generate_delay_buffer
+from generators.handshake.buffer import generate_valid_propagation_buffer
 
 def generate_arith_binary(
   name:str,
@@ -95,78 +95,32 @@ module {name}(
 
 endmodule
 """
-  elif latency == 1: #--------------------------------------------------------------------------------------------------------------------------------
-    # with latency 1,
-    # we need an one_slot_break_dv to store the valid
-    join_name = f"{name}_join"
-    dependencies += generate_join(join_name, {"size": 2})
-    oehb_name = f"{name}_oehb"
-    dependencies += generate_dataless_oehb(oehb_name, {})
-
-    architecture = f"""
-  wire join_valid;
-  wire oehb_ready;
-
-  // Instantiate the join node
-  {join_name} join_inputs (
-    .ins_valid  ({{rhs_valid, lhs_valid}}),
-    .outs_ready (oehb_ready             ),
-    .ins_ready  ({{rhs_ready, lhs_ready}}  ),
-    .outs_valid (join_valid             )
-  );
-
-  {oehb_name} oehb_inst (
-    .clk(clk),
-    .rst(rst),
-    .ins_valid(join_valid),
-    .ins_ready(oehb_ready),
-    .outs_valid(result_valid),
-    .outs_ready(result_ready)
-  );
-
-{op_body}
-
-endmodule
-"""
   else: #--------------------------------------------------------------------------------------------------------------------------------
-    # with latency >1,
-    # we need a delay buffer to propagate the valids
-    # with the same latency as the unit
-    # and we need an one_slot_break_dv to store the final valid
+    # with latency >= 1
     
     join_name = f"{name}_join"
     dependencies += generate_join(join_name, {"size": 2})
-    delay_buffer_name = f"{name}_delay_buffer"
-    dependencies += generate_delay_buffer(delay_buffer_name, {"size": latency - 1})
-    oehb_name = f"{name}_oehb"
-    dependencies += generate_dataless_oehb(oehb_name, {})
+    valid_buffer_name = f"{name}_valid_buffer"
+    dependencies += generate_valid_propagation_buffer(valid_buffer_name, latency)
 
     architecture = f"""
   wire join_valid;
-  wire oehb_ready;
-  wire buff_valid;
+  wire valid_buffer_ready;
 
   // Instantiate the join node
   {join_name} join_inputs (
     .ins_valid  ({{rhs_valid, lhs_valid}}),
-    .outs_ready (oehb_ready             ),
+    .outs_ready (valid_buffer_ready             ),
     .ins_ready  ({{rhs_ready, lhs_ready}}  ),
     .outs_valid (join_valid             )
   );
 
-  {delay_buffer_name} buff (
+  // valid buffer
+  {valid_buffer_name} valid_buffer (
     .clk(clk),
     .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(oehb_ready),
-    .valid_out(buff_valid)
-  );
-
-  {oehb_name} oehb_inst (
-    .clk(clk),
-    .rst(rst),
-    .ins_valid(buff_valid),
-    .ins_ready(oehb_ready),
+    .ins_valid(join_valid),
+    .ins_ready(valid_buffer_ready),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
   );

@@ -1,33 +1,33 @@
-def generate_tehb(name, params):
-    data_type = params["data_type"]
-    if(data_type == 0):
-        return generate_dataless_tehb(name, {})
+def generate_one_slot_break_r(name, params):
+    bitwidth = params["bitwidth"]
+    if(bitwidth == 0):
+        return generate_dataless_one_slot_break_r(name, {})
 
     header = "`timescale 1ns/1ps\n"
 
-    tehb_name = name + "_dataless_tehb"
-    dataless_tehb = generate_dataless_tehb(tehb_name, {})
+    one_slot_break_r_name = name + "_dataless_one_slot_break_r"
+    dataless_one_slot_break_r = generate_dataless_one_slot_break_r(one_slot_break_r_name, {})
 
-    tehb_body = f"""
-// Module of tehb
+    one_slot_break_r_body = f"""
+// Module of one_slot_break_r
 module {name}(
 	input  clk,
 	input  rst,
   // Input Channel
-	input  [{data_type} - 1 : 0] ins,
+	input  [{bitwidth} - 1 : 0] ins,
 	input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [{data_type} - 1 : 0]	outs,
+  output [{bitwidth} - 1 : 0]	outs,
   output outs_valid,
 	input  outs_ready
 );
 	// Signal Definition
 	wire regEnable, regNotFull;
-	reg [{data_type} - 1 : 0] dataReg = 0;
+	reg [{bitwidth} - 1 : 0] dataReg = 0;
 
 	// Instantiate control logic part
-	{tehb_name} control (
+	{one_slot_break_r_name} control (
 		.clk		    (clk	     ),
 		.rst		    (rst	     ),
 		.ins_valid	(ins_valid ),
@@ -54,12 +54,12 @@ module {name}(
 endmodule
 
 """
-    return header + dataless_tehb + tehb_body
+    return header + dataless_one_slot_break_r + one_slot_break_r_body
 
-def generate_dataless_tehb(name, params):
+def generate_dataless_one_slot_break_r(name, params):
     return f"""
 `timescale 1ns/1ps
-// Module of tehb
+// Module of one_slot_break_r
 module {name} (
 	input  clk,
 	input  rst,

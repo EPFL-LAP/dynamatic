@@ -108,48 +108,16 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      {"name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false}
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t dataless_oehb -p data_type=$DATA_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.buffer",
-    "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t oehb -p data_type=$DATA_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.buffer",
-    "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
       {
-        "name": "DATA_TYPE",
-        "type": "dataflow",
-        "data-eq": 0,
-        "extra-eq": 0,
-        "generic": false
+        "name": "NUM_SLOTS",
+        "type": "unsigned"
+      },
+      {
+        "name": "BUFFER_TYPE",
+        "type": "string"
       }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t tehb -p data_type=$DATA_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.buffer",
-    "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t tehb -p data_type=$DATA_TYPE",
-    "hdl": "verilog"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.ndwire",

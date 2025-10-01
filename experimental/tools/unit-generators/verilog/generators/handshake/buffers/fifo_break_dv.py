@@ -1,13 +1,13 @@
-def generate_elastic_fifo_inner(name, params):
+def generate_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
     data_type = params["data_type"]
 
     if(data_type == "0"):
-      return generate_dataless_elastic_fifo_inner(name, params)
+      return generate_dataless_fifo_break_dv(name, params)
 
     return f"""
 `timescale 1ns/1ps
-// Module of elastic_fifo_inner
+// Module of fifo_break_dv
 module {name}(
   input  clk,
   input  rst,
@@ -110,14 +110,14 @@ module {name}(
 endmodule
 """
 
-def generate_dataless_elastic_fifo_inner(name, params):
+def generate_dataless_fifo_break_dv(name, params):
 
     num_slots = params["num_slots"]
 
     return f"""
 `timescale 1ns/1ps
 
-// Module of dataless_elastic_fifo_inner
+// Module of dataless_fifo_break_dv
 
 module {name}(
   input  clk,

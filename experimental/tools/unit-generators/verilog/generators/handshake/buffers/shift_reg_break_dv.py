@@ -1,35 +1,38 @@
 def generate_shift_reg_break_dv(name, params):
 
     num_slots = params["num_slots"]
-    data_type = params["data_type"]
+    bitwidth = params["bitwidth"]
 
     header = "`timescale 1ns/1ps\n"
 
-    dataless_shift_reg_break_dr_name = "shift_reg_break_dv_dataless"
-    dataless_shift_reg_break_dvr = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dr_name, {"num_slots": num_slots})
+    if(bitwidth == 0):
+        return generate_dataless_shift_reg_break_dv(name, {"num_slots": num_slots})
 
-    shift_reg_break_dvr_body = f"""
+    dataless_shift_reg_break_dv_name = "shift_reg_break_dv_dataless"
+    dataless_shift_reg_break_dv = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dv_name, {"num_slots": num_slots})
+
+    shift_reg_break_dv_body = f"""
 // Module of shift_reg_break_dv
 
 module {name}(
   input  clk,
   input  rst,
   // Input channel
-  input  [{data_type} - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [{data_type} - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
 
   // Internal signals
   wire regEn, inputReady;
-  reg [{data_type} - 1 : 0] Memory [0 : {num_slots} - 1];
+  reg [{bitwidth} - 1 : 0] Memory [0 : {num_slots} - 1];
   
   // Instance of shift_reg_break_dv_dataless to manage handshaking
-  {dataless_shift_reg_break_dr_name} control (
+  {dataless_shift_reg_break_dv_name} control (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins_valid  (ins_valid  ),
@@ -58,7 +61,7 @@ module {name}(
 endmodule
 """
 
-    return header + dataless_shift_reg_break_dvr + shift_reg_break_dvr_body
+    return header + dataless_shift_reg_break_dv + shift_reg_break_dv_body
 
 def generate_dataless_shift_reg_break_dv(name, params):
 

@@ -45,7 +45,7 @@ endmodule
     muli_body = f"""
   {mul_4_stage_name} mul_4_stage_inst (
     .clk(clk),
-    .ce(oehb_ready),
+    .ce(valid_buffer_ready),
     .a(lhs),
     .b(rhs),
     .p(result)

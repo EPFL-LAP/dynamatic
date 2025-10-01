@@ -1,4 +1,4 @@
-from generators.handshake.tehb import generate_tehb
+from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 
 def generate_load(name, params):
     data_type = params["data_type"]
@@ -6,11 +6,11 @@ def generate_load(name, params):
 
     header = "`timescale 1ns/1ps\n"
 
-    tehb_address_name = name + "_tehb_address"
-    tehb_address = generate_tehb(tehb_address_name, { "data_type": addr_type })
+    one_slot_break_r_address_name = name + "_one_slot_break_r_address"
+    one_slot_break_r_address = generate_one_slot_break_r(one_slot_break_r_address_name, { "bitwidth": addr_type })
 
-    tehb_data_name = name + "_tehb_data"
-    tehb_data = generate_tehb(tehb_data_name, { "data_type": data_type })
+    one_slot_break_r_data_name = name + "_one_slot_break_r_data"
+    one_slot_break_r_data = generate_one_slot_break_r(one_slot_break_r_data_name, { "bitwidth": data_type })
 
     load_body = f"""
 
@@ -38,7 +38,7 @@ module {name} #(
   output dataOut_valid,
   input  dataOut_ready
 );
-  {tehb_address_name} addr_tehb (
+  {one_slot_break_r_address_name} addr_one_slot_break_r (
     .clk        (clk            ),
     .rst        (rst            ),
     .ins        (addrIn         ),
@@ -49,7 +49,7 @@ module {name} #(
     .outs_ready (addrOut_ready  )
   );
 
-  {tehb_data_name} data_tehb (
+  {one_slot_break_r_data_name} data_one_slot_break_r (
     .clk        (clk                ),
     .rst        (rst                ),
     .ins        (dataFromMem        ),
@@ -63,4 +63,4 @@ module {name} #(
 endmodule
 """
 
-    return header + tehb_address + tehb_data +load_body
+    return header + one_slot_break_r_address + one_slot_break_r_data +load_body
