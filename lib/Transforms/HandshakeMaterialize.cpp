@@ -439,14 +439,14 @@ struct HandshakeMaterializePass
                 continue;
               }
 
-              // builder.setInsertionPointAfter(user);
-              // handshake::BufferOp bufferOp =
-              //     builder.create<handshake::BufferOp>(
-              //         res.getLoc(), res, 4,
-              //         handshake::BufferType::FIFO_BREAK_NONE);
-              // inheritBB(user, bufferOp);
+              builder.setInsertionPointAfter(user);
+              handshake::BufferOp bufferOp =
+                  builder.create<handshake::BufferOp>(
+                      res.getLoc(), res, 4,
+                      handshake::BufferType::FIFO_BREAK_NONE);
+              inheritBB(user, bufferOp);
 
-              // replaceFirstUse(user, res, bufferOp.getResult());
+              replaceFirstUse(user, res, bufferOp.getResult());
 
               if (user->hasAttr("drawing"))
                 num++;

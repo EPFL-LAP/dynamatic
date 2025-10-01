@@ -1,0 +1,8 @@
+# Set the source file to run
+set-src PATH_TO_C_FILE
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

@@ -1,0 +1,14 @@
+# Set the source file to run
+set-src PATH_TO_C_FILE
+
+# Set clock period
+set-clock-period CLOCK_PERIOD   
+
+# Compile
+compile --skippable-seq-n SKIPPABLE_SEQ_N --buffer-algorithm fpga20
+
+# Generate the VHDL design corresponding to the source code
+write-hdl
+
+# Exit the frontend
+exit
