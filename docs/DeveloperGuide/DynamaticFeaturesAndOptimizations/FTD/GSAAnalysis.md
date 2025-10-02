@@ -100,12 +100,28 @@ After all ϕ gates are created, the final step is to connect the missing inputs 
 The input of a ϕ gate can itself be another ϕ. This happens when the input comes from a block argument of another block (excluding bb0). In this case, the ϕ input cannot be connected immediately. Instead, it is marked as missing and the necessary information is stored. After all ϕ gates are extracted, these missing inputs are revisited and the connections are reconstructed.
 
 ### `isBlockArgAlreadyPresent` and `isValueAlreadyPresent`
-These helper functions prevent duplicate inputs from being recorded.
 
-// TODO: explain their implementation details later.
+These two helper functions avoid recording duplicate inputs for a ϕ.
 
-### Why can a value appear multiple times?
-// TODo
+- `isValueAlreadyPresent`
+
+  This one is straightforward: it directly checks if the same SSA value is already in the operand list (`operands`).
+
+  If found, we don’t add it again; instead, we just update its sender list to record that this value can also arrive from the current predecessor (`pred`).
+
+- `isBlockArgAlreadyPresent`
+
+  Block arguments are trickier, because at this stage we may not have the actual value to compare.
+
+  Instead, two block arguments are considered duplicates if:
+
+  - they originate from the same argument position of the same block, and
+
+  - they target the same argument position of the same block.
+
+  If these conditions hold, we treat them as the same missing ϕ input. As with values, we don’t add a new entry; instead, we **update the sender list** of the existing one to include the current predecessor.
+
+In both cases, the key idea is: a duplicate input means the same logical operand is reachable through multiple control-flow edges, so we reuse the operand and just record the extra senders.
 
 ## Convert ϕ Gates into μ Gates
 
