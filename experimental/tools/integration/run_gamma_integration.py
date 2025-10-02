@@ -448,12 +448,29 @@ def main():
         else:
             return fail(id, "Failed to place simple buffers")
 
+    # handshake_gamma_post_buffering = handshake_buffered
+    handshake_gamma_post_buffering = os.path.join(
+        comp_out_dir, "handshake_gamma_post_buffering.mlir")
+    with open(handshake_gamma_post_buffering, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_buffered,
+            f"--handshake-spec-v2-gamma-post-buffering=prioritized-side={args.prioritized_side}"
+        ],
+            stdout=f,
+            stderr=sys.stdout,
+            cwd=comp_out_dir
+        )
+        if result.returncode == 0:
+            print("gamma post buffering")
+        else:
+            return fail(id, "Failed gamma post buffering")
+
     # handshake canonicalization
     handshake_canonicalized = os.path.join(
         comp_out_dir, "handshake_canonicalized.mlir")
     with open(handshake_canonicalized, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_buffered,
+            DYNAMATIC_OPT_BIN, handshake_gamma_post_buffering,
             "--handshake-spec-v2-post-buffering",
             "--handshake-materialize",
             "--handshake-canonicalize",

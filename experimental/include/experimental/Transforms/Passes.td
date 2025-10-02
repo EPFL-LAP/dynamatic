@@ -185,6 +185,15 @@ def SpecV2Gamma : DynamaticPass<"handshake-spec-v2-gamma"> {
   ];
 }
 
+def SpecV2GammaPostBuffering : DynamaticPass<"handshake-spec-v2-gamma-post-buffering"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"prioritizedSide", "prioritized-side", "unsigned", "", "">,
+  ];
+}
+
 def SpecV1Adaptor : DynamaticPass<"handshake-spec-v1-adaptor"> {
   let summary = "Place Speculation operations";
   let description = [{

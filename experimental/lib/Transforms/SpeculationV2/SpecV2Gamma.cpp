@@ -276,6 +276,34 @@ void SpecV2GammaPass::runDynamaticPass() {
     }
   }
 
+  // to prepare for the buffering, we cut the path
+  unsigned gsaId = 0;
+  OpBuilder builder(funcOp->getContext());
+  for (auto mux : llvm::make_early_inc_range(funcOp.getOps<MuxOp>())) {
+    if (mux->hasAttr("specv2_gsa_mux")) {
+      unsigned nonPriSide = (prioritizedSide == 0) ? 1 : 0;
+      builder.setInsertionPoint(mux);
+      SinkOp sink = builder.create<SinkOp>(builder.getUnknownLoc(),
+                                           mux.getDataOperands()[nonPriSide]);
+      inheritBB(mux, sink);
+      sink->setAttr("specv2_gsa_mux_nonpri",
+                    builder.getIntegerAttr(builder.getIntegerType(32), gsaId));
+      // sink->setAttr("specv2_gsa_side",
+      //               builder.getIntegerAttr(builder.getIntegerType(32),
+      //                                      prioritizedSide));
+      PasserOp tmpPasser = builder.create<PasserOp>(
+          builder.getUnknownLoc(), mux.getDataOperands()[prioritizedSide],
+          mux.getSelectOperand());
+      inheritBB(mux, tmpPasser);
+      mux.getResult().replaceAllUsesWith(tmpPasser.getResult());
+      tmpPasser->setAttr(
+          "specv2_gsa_mux_tmp",
+          builder.getIntegerAttr(builder.getIntegerType(32), gsaId));
+      gsaId++;
+      mux->erase();
+    }
+  }
+
   SmallVector<unsigned> loopBBs;
   for (unsigned bb = branchBB; bb <= mergeBB; bb++) {
     loopBBs.push_back(bb);

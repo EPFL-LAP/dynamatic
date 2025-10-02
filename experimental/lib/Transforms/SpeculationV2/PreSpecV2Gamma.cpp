@@ -51,6 +51,7 @@ void PreSpecV2GammaPass::runDynamaticPass() {
       continue;
 
     mux->setAttr("specv2_loop_cond_mux", builder.getBoolAttr(true));
+    mux->setAttr("specv2_gsa_mux", builder.getUnitAttr());
   }
 
   if (failed(replaceBranchesWithPassers(funcOp, branchBB))) {

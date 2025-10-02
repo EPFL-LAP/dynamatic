@@ -72,6 +72,8 @@ def main():
         "--default-value", type=str, help="default speculated value", default="1")
     parser.add_argument(
         "--disable-constant-predictor", action="store_false")
+    parser.add_argument(
+        "--loop-bottom-passer-disabled", action="store_true")
 
     args = parser.parse_args()
     test_name = args.test_name

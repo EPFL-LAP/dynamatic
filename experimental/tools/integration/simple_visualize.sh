@@ -1,3 +1,5 @@
+#!/bin/bash
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DYNAMATIC_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
