@@ -151,4 +151,124 @@ Therefore, the condition of a μ gate is defined as the **negation of the loop e
 
 #### Note:
 The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
+
 ## Convert ϕ Gates into γ Gates
+
+All remaining ϕ gates (i.e., those not turned into μ gates) must be converted into γ gates.
+However, a single γ gate is only a **two-input multiplexer**, while a ϕ can have multiple inputs.
+To handle this, we build a tree of γ gates, each driven by a simple condition.
+The following steps describe the process.
+
+### Input Ordering
+The inputs of a ϕ are sorted based on the dominance relationship between their originating basic blocks.
+
+- If block Bi dominates block Bj, then the input from Bi is placed before Bj.
+
+- This ordering does not affect the semantics of the ϕ (ϕ is order-less), but it simplifies later analysis.
+
+### Step 2. Find Common Dominator
+
+Find **the nearest common dominator** among all input blocks of the ϕ.
+This block acts as the root for path exploration.
+
+### Step 3. Path Identification
+
+For each input operand:
+
+- Find all paths from the common dominator to the ϕ’s block that **pass through the operand’s block** but **avoid later operand blocks**.
+
+- Paths are explored using a modified DFS that:
+
+  - finds all possible paths between two blocks,
+
+  - avoids certain “blocked” nodes,
+
+  - and allows a block to be revisited only if it is both the start and end (for loop cases).
+
+**Operands from the same block:** 
+
+If one block produces multiple values (operands) for the same ϕ, the DFS initially gives them identical paths.
+
+To disambiguate, we filter the paths by the sender block (the block immediately before the ϕ in the path).
+Only paths whose sender matches the operand’s recorded sender are kept.
+
+### Step 4. Boolean Conditions
+
+For each operand, compute a Boolean expression representing when that operand is chosen:
+
+- The condition of a path = AND of all branch conditions along that path.
+
+- The condition of an operand = OR of the conditions of all valid paths.
+
+- The resulting Boolean expressions are minimized.
+
+All Boolean conditions (cofactors) are collected and sorted by the index of their originating block.
+
+### Step 5. Build the γ Tree
+
+The `expandGammaTree` function takes a ϕ gate (with its inputs and Boolean conditions) and recursively builds a binary tree of γ gates.
+Each γ is a two-input MUX driven by one simple Boolean condition.
+
+The process works as follows:
+
+**1. Pick a cofactor (condition):**
+
+The function starts from the queue of cofactors (Boolean conditions associated with blocks). Since they are ordered by block index, the first cofactor we take is guaranteed to be common to all input expressions (because the blocks associated with it dominate the others). This ensures that splitting on this cofactor applies consistently across all inputs.
+
+**2. Split expressions by condition:**
+
+For each input expression (operand + condition):
+
+- Restrict the Boolean expression once assuming the cofactor = `true`.
+
+- Restrict it again assuming the cofactor = `false`.
+
+- Add the non-zero result(s) to either `conditionsTrueExpressions` or `conditionsFalseExpressions`.
+
+**3. Build γ inputs:**
+
+Now we decide what should feed the true and false inputs of the γ gate being built:
+
+- If a side has **more than one expression**, this means multiple operands could be selected under that branch of the condition. To resolve this, we recursively call `expandGammaTree` on that subset. The resulting γ gate from the recursion becomes the input of the current γ.
+
+- If a side has `exactly one expression`, its operand is directly assigned as the input of the current γ.
+
+- If a side has `no expressions`, it means this branch of the condition is never taken. In that case, an empty (null) input is created.
+
+**4. Create the γ gate:**
+
+A new γ is generated:
+
+- Its inputs are the “true” and “false” operands from the step above.
+
+- Its condition is the cofactor currently being expanded.
+
+- Internally, its output is temporarily set to the original ϕ’s result (only the root γ of the tree will preserve this).
+
+**5. Placement rule:**
+
+Normally, new γ gates are placed in the **same block as the original ϕ**.
+
+However, there is one special case: when the ϕ was introduced during `convertPhiToMu` to resolve multiple loop-carried inputs. These temporary ϕs (marked with muGenerated) cannot have their γ replacements placed in the loop header.
+
+**Why is this a problem?**
+
+When we later run direct path analysis for control dependencies, the control signal that drives such a γ is generated inside the loop body.
+If we place the γ in the loop header:
+
+- The γ would appear before its control signal producer.
+
+- In the direct path search from the function entry (bb0) to the γ, we would never encounter the block that generates the control signal.
+
+
+**The fix:**
+
+For γs created from these muGenerated phis, we instead place them **in the same block as their condition producer**. 
+
+### Step 6. Reconnect Uses
+
+Once a ϕ is replaced by its γ tree:
+
+- All gates that previously used the ϕ’s output are updated to use the root γ gate instead.
+
+
