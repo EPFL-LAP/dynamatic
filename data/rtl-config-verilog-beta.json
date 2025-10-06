@@ -258,38 +258,20 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "NUM_CONTROLS",
+        "type": "unsigned"
+      },
+      {
+        "name": "NUM_LOADS",
+        "type": "unsigned"
+      },
+      {
+        "name": "NUM_STORES",
+        "type": "unsigned"
+      }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t mem_controller_storeless -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES data_type=$DATA_TYPE addr_type=$ADDR_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.mem_controller",
-    "parameters": [
-      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t mem_controller_loadless -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES data_type=$DATA_TYPE addr_type=$ADDR_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.mem_controller",
-    "parameters": [
-      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t mem_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES data_type=$DATA_TYPE addr_type=$ADDR_TYPE",
-    "hdl": "verilog"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t mem_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH"
   },
   {
     "name": "handshake.lsq",

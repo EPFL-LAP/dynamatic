@@ -21,7 +21,6 @@ class Generators():
 
 
 generators = Generators()
-#generators.add("handshake", "join")
 generators.add("handshake", "addi")
 generators.add("handshake", "andi")
 generators.add("handshake", "ori")
@@ -38,7 +37,6 @@ generators.add("handshake", "trunci")
 generators.add("handshake", "divsi")
 generators.add("handshake", "remsi")
 generators.add("handshake", "divui")
-
 generators.add("handshake", "not")
 generators.add("handshake", "sink")
 generators.add("handshake", "join")
@@ -54,22 +52,8 @@ generators.add("handshake", "source")
 generators.add("handshake", "control_merge")
 generators.add("handshake", "load")
 generators.add("handshake", "store")
-generators.add("handshake.buffers", "one_slot_break_r")
-generators.add("handshake.buffers", "one_slot_break_dv")
 generators.add("handshake", "mem_controller")
-generators.add("handshake", "mem_controller_loadless")
-generators.add("handshake", "mem_controller_storeless")
-
 generators.add("handshake", "buffer")
-#generators.add("handshake", "tfifo")
-#generators.add("handshake.dataless", "dataless_tfifo")
-generators.add("handshake.buffers", "one_slot_break_dvr")
-#generators.add("handshake.dataless", "dataless_one_slot_break_dvr")
-#generators.add("handshake.buffers", "shift_reg_break_dv")
-#generators.add("handshake.dataless", "dataless_shift_reg_break_dv")
-#generators.add("support", "elastic_fifo_inner")
-#generators.add("support.dataless", "dataless_elastic_fifo_inner")
-
 generators.add("support", "mem_to_bram")
 
 def parse_parameters(param_list):
