@@ -97,4 +97,4 @@ module {name}(
 
 endmodule
 """
-    return header + antitokens + selector
+    return antitokens + selector
