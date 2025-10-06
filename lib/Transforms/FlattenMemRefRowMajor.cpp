@@ -250,7 +250,18 @@ struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
       return failure();
     MemRefType newType = MemRefType::get(
         SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
-    rewriter.replaceOpWithNewOp<memref::AllocOp>(op, newType);
+    auto newOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, newType);
+
+    // Flatten the memory initial value as a 1d vector
+    if (auto attr =
+            getDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(op)) {
+      auto denseAttr = attr.getConstant();
+
+      auto newType = RankedTensorType::get({denseAttr.getNumElements()},
+                                           denseAttr.getElementType());
+      setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+          newOp, op.getContext(), denseAttr.reshape(newType));
+    }
     return success();
   }
 };
@@ -266,7 +277,19 @@ struct AllocaOpConversion : public OpConversionPattern<memref::AllocaOp> {
       return failure();
     MemRefType newType = MemRefType::get(
         SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
-    rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, newType);
+    auto newOp = rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, newType);
+
+    // Flatten the memory initial value as a 1d vector
+    if (auto attr =
+            getDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(op)) {
+      auto denseAttr = attr.getConstant();
+
+      auto newType = RankedTensorType::get({denseAttr.getNumElements()},
+                                           denseAttr.getElementType());
+      setDialectAttr<dynamatic::handshake::MemoryInitialValueAttr>(
+          newOp, op.getContext(), denseAttr.reshape(newType));
+    }
+
     return success();
   }
 };

@@ -31,7 +31,7 @@ architecture arch of uitofp is
   signal q3 : std_logic_vector(32 - 1 downto 0);
   signal q4 : std_logic_vector(32 - 1 downto 0);
   signal buff_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic;
+  signal oehb_dataOut, oehb_datain : std_logic;
   signal float_value : float32;
 begin
 
