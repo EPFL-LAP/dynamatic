@@ -52,8 +52,6 @@ def _generate_arith_binary(
         latency,
         dependencies):
 
-  header = "`timescale 1ns/1ps\n"
-
   # all 2 input arithmetic units have the same entity
   entity = f"""
 // Module of {handshake_op}
@@ -130,4 +128,4 @@ endmodule
 endmodule
 """
   #--------------------------------------------------------------------------------------------------------------------------------
-  return header + dependencies + entity + architecture
+  return dependencies + entity + architecture

@@ -2,7 +2,6 @@ def generate_sink(name, params):
     bitwidth = params["bitwidth"]
 
     empty_sink = f"""
-`timescale 1ns/1ps
 // Module of sink
 module {name} (
     input  clk,    
@@ -15,7 +14,6 @@ module {name} (
 endmodule
 """
     non_empty_sink = f"""
-`timescale 1ns/1ps
 // Module of sink
 module {name}(
   input  clk,      

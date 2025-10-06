@@ -8,7 +8,6 @@ def generate_mux(name, params):
         return generate_dataless_mux(name, {"size": size, "select_type": select_type})
 
     dataless_mux = f"""
-`timescale 1ns/1ps
 // Module of smux
 module {name}(
   input  clk,
@@ -74,7 +73,6 @@ def generate_dataless_mux(name, params):
     select_type = params["select_type"]
 
     dataless_mux = f"""
-`timescale 1ns/1ps
 // Module of dataless_mux
 module {name}(
   input  clk,

@@ -4,8 +4,6 @@ def generate_mem_to_bram(name, params):
     addr_width = params["addr_width"]
 
     return f"""
-`timescale 1ns / 1ps
-
 // Module of mem_to_bram
 module {name}(
   // Inputs from circuit

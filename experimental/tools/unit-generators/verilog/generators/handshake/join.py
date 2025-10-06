@@ -3,8 +3,6 @@ def generate_join(name, params):
     size = params["size"]
 
     verilogjoin = f"""
-`timescale 1ns / 1ps
-
 // Module of join
 module {name}(
 	input [{size} - 1 : 0] ins_valid,

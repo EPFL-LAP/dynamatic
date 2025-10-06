@@ -6,7 +6,6 @@ def generate_fifo_break_dv(name, params):
       return generate_dataless_fifo_break_dv(name, params)
 
     return f"""
-`timescale 1ns/1ps
 // Module of fifo_break_dv
 module {name}(
   input  clk,
@@ -115,8 +114,6 @@ def generate_dataless_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
 
     return f"""
-`timescale 1ns/1ps
-
 // Module of dataless_fifo_break_dv
 
 module {name}(

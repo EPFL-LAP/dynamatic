@@ -2,7 +2,6 @@ def generate_br(name, params):
     bitwidth = params["bitwidth"]
 
     dataless_br_name = name + "_dataless_br"
-    header = "`timescale 1ns/1ps\n"
     dataless_br = generate_dataless_br(dataless_br_name, {})
     
     body_br = f"""
@@ -34,12 +33,11 @@ module {name}(
 endmodule
 """
 
-    return header + dataless_br + body_br
+    return dataless_br + body_br
 
 def generate_dataless_br(name, params):
 
     body_dataless_br = f"""
-`timescale 1ns/1ps
 // Module of dataless_br
 module {name} (
 	input  clk,

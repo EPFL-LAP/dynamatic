@@ -2,7 +2,6 @@ def generate_ndwire(name, params):
     bitwidth = params["bitwidth"]
 
     ndwire = f"""
-`timescale 1ns/1ps
 // Module of ndwire
 module ndwire(
   input  clk,

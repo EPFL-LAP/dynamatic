@@ -24,8 +24,6 @@ def generate_mc_support(name, params):
     write_memory_arbiter_name = "write_memory_arbiter"
 
     return f"""
-`timescale 1ns / 1ps
-
 // Module of mc_support
 
 module {read_address_mux_name} #(

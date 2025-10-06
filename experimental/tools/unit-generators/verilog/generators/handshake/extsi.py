@@ -3,7 +3,6 @@ def generate_extsi(name, params):
     input_type = params["input_type"]
 
     extsi = f"""
-`timescale 1ns/1ps
 // Module of extsi
 module {name}(
   // inputs

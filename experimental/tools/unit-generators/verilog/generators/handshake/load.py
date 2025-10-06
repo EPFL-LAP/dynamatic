@@ -4,8 +4,6 @@ def generate_load(name, params):
     data_type = params["data_type"]
     addr_type = params["addr_type"]
 
-    header = "`timescale 1ns/1ps\n"
-
     one_slot_break_r_address_name = name + "_one_slot_break_r_address"
     one_slot_break_r_address = generate_one_slot_break_r(one_slot_break_r_address_name, { "bitwidth": addr_type })
 
@@ -63,4 +61,4 @@ module {name} #(
 endmodule
 """
 
-    return header + one_slot_break_r_address + one_slot_break_r_data +load_body
+    return one_slot_break_r_address + one_slot_break_r_data +load_body

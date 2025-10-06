@@ -3,9 +3,6 @@ def generate_select(name, params):
 
     antitoken_module_name = name + "_antitokens"
 
-    header = f"""
-`timescale 1ns/1ps
-"""
     antitokens = f"""
 // Module of {antitoken_module_name} - Antitoken generation logic for handshake select
 module {antitoken_module_name} (

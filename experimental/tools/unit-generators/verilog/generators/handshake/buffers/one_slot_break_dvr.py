@@ -2,8 +2,6 @@ def generate_one_slot_break_dvr(name, params):
 
     data_type = params["data_type"]
 
-    header = "`timescale 1ns/1ps\n"
-
     dataless_one_slot_break_dvr_name = "one_slot_break_dvr_dataless"
     dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, {})
 
@@ -49,12 +47,11 @@ module {name}(
 endmodule
 """
 
-    return header + dataless_one_slot_break_dvr + one_slot_break_dvr_body
+    return dataless_one_slot_break_dvr + one_slot_break_dvr_body
 
 def generate_dataless_one_slot_break_dvr(name, params):
 
     return f"""
-`timescale 1ns/1ps
 // Module of dataless_one_slot_break_dvr
 module {name} (
   input  clk,

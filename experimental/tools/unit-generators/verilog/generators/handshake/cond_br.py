@@ -6,7 +6,6 @@ def generate_cond_br(name, params):
         return generate_dataless_cond_br(name, {})
 
     dataless_cond_br_name = name + "_dataless_cond_br"
-    header = "`timescale 1ns/1ps\n"
     dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, {})
 
     body_cond_br = f"""
@@ -52,12 +51,9 @@ endmodule
 
 """
 
-    return header + dataless_cond_br + body_cond_br
+    return dataless_cond_br + body_cond_br
 
 def generate_dataless_cond_br(name, params):
-
-
-    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
 
@@ -113,4 +109,4 @@ module {name} (
 endmodule
 """
 
-    return header + join_instance + body_dataless_cond_br
+    return join_instance + body_dataless_cond_br

@@ -3,8 +3,6 @@ def generate_one_slot_break_r(name, params):
     if(bitwidth == 0):
         return generate_dataless_one_slot_break_r(name, {})
 
-    header = "`timescale 1ns/1ps\n"
-
     one_slot_break_r_name = name + "_dataless_one_slot_break_r"
     dataless_one_slot_break_r = generate_dataless_one_slot_break_r(one_slot_break_r_name, {})
 
@@ -54,11 +52,10 @@ module {name}(
 endmodule
 
 """
-    return header + dataless_one_slot_break_r + one_slot_break_r_body
+    return dataless_one_slot_break_r + one_slot_break_r_body
 
 def generate_dataless_one_slot_break_r(name, params):
     return f"""
-`timescale 1ns/1ps
 // Module of one_slot_break_r
 module {name} (
 	input  clk,

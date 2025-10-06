@@ -3,8 +3,6 @@ def generate_shift_reg_break_dv(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
-    header = "`timescale 1ns/1ps\n"
-
     if(bitwidth == 0):
         return generate_dataless_shift_reg_break_dv(name, {"num_slots": num_slots})
 
@@ -61,14 +59,13 @@ module {name}(
 endmodule
 """
 
-    return header + dataless_shift_reg_break_dv + shift_reg_break_dv_body
+    return dataless_shift_reg_break_dv + shift_reg_break_dv_body
 
 def generate_dataless_shift_reg_break_dv(name, params):
 
     num_slots = params["num_slots"]
 
     return f"""
-`timescale 1ns/1ps
 // Module of dataless_shift_reg_break_dv
 
 module {name}(

@@ -7,9 +7,6 @@ def generate_mem_controller_loadless(name, params):
     data_type = params["data_type"]
     addr_type = params["addr_type"]
 
-    
-    header = "`timescale 1ns / 1ps\n"
-
     mc_support = generate_mc_support("TODO", {})
 
     mem_controller_loadless_body = f"""
@@ -136,4 +133,4 @@ module {name}(
 
 endmodule
 """
-    return header + mc_support + mem_controller_loadless_body
+    return mc_support + mem_controller_loadless_body

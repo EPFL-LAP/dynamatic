@@ -1,6 +1,5 @@
 def generate_source(name, params):
     return f"""
-`timescale 1ns/1ps
 // Module of source
 module {name} (
   input  clk,        

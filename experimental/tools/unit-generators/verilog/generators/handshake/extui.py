@@ -3,7 +3,6 @@ def generate_extui(name, params):
     input_type = params["input_type"]
 
     extui = f"""
-`timescale 1ns/1ps
 // Module of extui
 module {name}(
   // inputs

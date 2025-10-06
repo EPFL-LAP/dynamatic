@@ -3,7 +3,6 @@ def generate_trunci(name, params):
     input_type = params["input_type"]
 
     extui = f"""
-`timescale 1ns/1ps
 // Module of trunci
 module {name}(
   // inputs

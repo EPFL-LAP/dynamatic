@@ -3,8 +3,6 @@ from generators.handshake.join import generate_join
 def generate_remsi(name, params):
 
     datatype = params["datatype"]
-    
-    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
     join = generate_join(join_name, {"size": 2})
@@ -74,7 +72,6 @@ endmodule
 // Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 // Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 // ==============================================================
-`timescale 1 ns / 1 ps
 
 module srem_32ns_32ns_32_36_seq_1_divseq
 #(parameter
@@ -253,4 +250,4 @@ endmodule
 
 
 
-    return header + join + delay_buffer + remsi_body
+    return join + delay_buffer + remsi_body

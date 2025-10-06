@@ -3,8 +3,6 @@ from generators.handshake.join import generate_join
 def generate_divui(name, params):
 
     datatype = params["datatype"]
-    
-    header = "`timescale 1ns/1ps\n"
 
     join_name = name + "_join"
     join = generate_join(join_name, {"size": 2})
@@ -69,4 +67,4 @@ endmodule
 
 
 
-    return header + join + delay_buffer + divui_body
+    return join + delay_buffer + divui_body

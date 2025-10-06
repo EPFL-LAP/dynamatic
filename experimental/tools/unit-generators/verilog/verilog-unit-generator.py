@@ -56,7 +56,6 @@ generators.add("handshake", "load")
 generators.add("handshake", "store")
 generators.add("handshake.buffers", "one_slot_break_r")
 generators.add("handshake.buffers", "one_slot_break_dv")
-generators.add("handshake.dataless", "dataless_oehb")
 generators.add("handshake", "mem_controller")
 generators.add("handshake", "mem_controller_loadless")
 generators.add("handshake", "mem_controller_storeless")
@@ -113,7 +112,7 @@ def main():
         sys.exit(1)
 
     # Printing parameters for diagnostic purposes
-    header = f"// {args.name} : {args.type}({parameters})\n\n"
+    header = f"// {args.name} : {args.type}({parameters})\n\n `timescale 1ns/1ps\n"
 
     if args.type not in generators:
         raise ValueError(f"Module type {args.type} not found")

@@ -7,8 +7,6 @@ def generate_fork(name, params):
     
     datalessFork_name = name + "_datalessFork"
 
-    header = "`timescale 1ns/1ps\n"
-
 
 
     datalessFork = generate_datalessFork(datalessFork_name, {"size": size})
@@ -43,12 +41,11 @@ endmodule
 """
 
 
-    return header + datalessFork + Fork
+    return datalessFork + Fork
 
 def generate_datalessFork(name, params):
     size = params["size"]
 
-    header = "`timescale 1ns/1ps\n"
     eager_fork_register_block_name = name + "_eager_fork_register_block"
     eager_fork_register_block = f"""
 // Module of eager_fork_register_block
@@ -128,4 +125,4 @@ endmodule
 """
 
 
-    return header + eager_fork_register_block + datalessFork
+    return eager_fork_register_block + datalessFork

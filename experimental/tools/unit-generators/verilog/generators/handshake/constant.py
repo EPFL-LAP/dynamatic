@@ -5,7 +5,6 @@ def generate_constant(name, params):
     constant = f"""
 // Module of constant
 
-`timescale 1ns / 1ps
 module {name}(
   input                       clk,
   input                       rst,

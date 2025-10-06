@@ -3,8 +3,6 @@ def generate_delay_buffer(name, params):
     size = params["size"]
 
     delay_buffer = f"""
-`timescale 1ns/1ps
-
 // Module of delay_buffer
 module {name}(
   input  clk,

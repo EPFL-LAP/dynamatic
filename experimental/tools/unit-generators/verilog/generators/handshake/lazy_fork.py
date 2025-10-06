@@ -7,14 +7,11 @@ def generate_lazy_fork(name, params):
 
     dataless_lazy_fork_name = name + "_dataless_lazy_fork"
 
-    header = "`timescale 1ns/1ps\n"
-
 
 
     datalessFork = generate_dataless_lazy_fork(dataless_lazy_fork_name, {"size": size})
     lazy_fork = f"""
 // Module of lazy_fork
-`timescale 1ns/1ps
 module {name}(
   input  clk,
 	input  rst,
@@ -43,16 +40,13 @@ endmodule
 """
 
 
-    return header + datalessFork + lazy_fork
+    return datalessFork + lazy_fork
 
 def generate_dataless_lazy_fork(name, params):
     size = params["size"]
 
-    header = "`timescale 1ns/1ps\n"
-
     datalessFork = f"""
 // Module of dataless_lazy_fork
-`timescale 1ns/1ps
 module {name}(
   input  clk,
 	input  rst,
@@ -93,4 +87,4 @@ endmodule
 """
 
 
-    return header + datalessFork
+    return datalessFork

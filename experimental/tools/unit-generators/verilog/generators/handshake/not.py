@@ -2,7 +2,6 @@ def generate_not(name, params):
     bitwidth = params["bitwidth"]
 
     return f"""
-`timescale 1ns/1ps
 // Module of not
 module {name}(
   input  clk,

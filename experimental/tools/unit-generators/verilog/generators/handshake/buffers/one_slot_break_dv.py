@@ -4,8 +4,6 @@ def generate_one_slot_break_dv(name, params):
   if(bitwidth == 0):
     return generate_dataless_one_slot_break_dv(name, {})
 
-  header = "`timescale 1ns/1ps\n"
-
   one_slot_break_dv_dataless_name = name + "_dataless"
   one_slot_break_dv_dataless = generate_dataless_one_slot_break_dv(one_slot_break_dv_dataless_name, {})
 
@@ -52,12 +50,10 @@ endmodule
 
 """
 
-  return header + one_slot_break_dv_dataless + one_slot_break_dv_body
+  return one_slot_break_dv_dataless + one_slot_break_dv_body
 
 def generate_dataless_one_slot_break_dv(name, params):
   return f"""
-  `timescale 1ns/1ps
-
 // Module of dataless_one_slot_break_dv
 module {name} (
   input  clk,

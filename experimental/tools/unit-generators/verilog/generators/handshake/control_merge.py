@@ -11,8 +11,6 @@ def generate_control_merge(name, params):
     if(data_type == 0):
       return generate_dataless_control_merge(name, {"size": size, "index_type": index_type})
 
-    header = "`timescale 1ns/1ps\n"
-
     dataless_control_merge_name = name + "_control_merge_dataless"
     dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, {"size": size, "index_type": index_type})
 
@@ -55,13 +53,11 @@ def generate_control_merge(name, params):
 
 """
 
-    return header + dataless_control_merge + control_merge_body
+    return dataless_control_merge + control_merge_body
 
 def generate_dataless_control_merge(name, params):
     size = params["size"]
     index_type = params["index_type"]
-
-    header = "`timescale 1ns/1ps\n"
 
     dataless_merge_name = name + "_dataless_merge"
     dataless_merge = generate_dataless_merge(dataless_merge_name, {"size": size})
@@ -143,4 +139,4 @@ module {name}(
 endmodule
 """
 
-    return header + dataless_merge + one_slot_break_r + fork_dataless + dataless_controll_merge_body
+    return dataless_merge + one_slot_break_r + fork_dataless + dataless_controll_merge_body

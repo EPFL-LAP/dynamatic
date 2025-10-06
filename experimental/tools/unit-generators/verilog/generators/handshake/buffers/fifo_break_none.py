@@ -7,7 +7,6 @@ def generate_fifo_break_none(name, params):
     if(data_type == 0):
       return generate_dataless_fifo_break_none(name, {"num_slots": num_slots})
 
-    header = "`timescale 1ns/1ps\n"
     fifo_break_dv_name = "fifo_break_dv"
     fifo_break_dv = generate_fifo_break_dv(fifo_break_dv_name, {"num_slots": num_slots, "data_type": data_type})
 
@@ -53,12 +52,10 @@ endmodule
 
 """
 
-    return header + fifo_break_dv + fifo_break_none_body
+    return fifo_break_dv + fifo_break_none_body
 
 def generate_dataless_fifo_break_none(name, params):
     num_slots = params["num_slots"]
-
-    header = "`timescale 1ns/1ps\n"
 
     fifo_break_dv_dataless_name = "fifo_break_dv_dataless"
     fifo_break_dv_dataless = generate_dataless_fifo_break_dv(fifo_break_dv_dataless_name, {"num_slots": num_slots})
@@ -97,4 +94,4 @@ endmodule
 
 """
 
-    return header + fifo_break_dv_dataless + dataless_fifo_break_none_body
+    return fifo_break_dv_dataless + dataless_fifo_break_none_body
