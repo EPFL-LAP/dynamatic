@@ -350,11 +350,26 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
                                           ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
-    Flattens multidimensional memories and accesses to them into
-    single-dimensional memories using row-major indexing. This pass is almost
-    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
-    of column-major indexing when converting multidimensional load/store
-    operations.}];
+    This pass flattens all multidimensional memories and accesses to them into
+    single-dimensional memories using row-major indexing. Specifically, it
+    transforms all the loads, stores, global, get_global, and alloc(a)
+    operations to use the one dimensional indices and adds the index
+    calculation logic.
+
+    Example: 
+
+    Suppose that A, B, C, and D are constants, i, j, k, and l are iterators.
+    Given an array: my_array[A][B][C][D]; we access it as my_array[i][j][k][l].
+    The goal is to treat it as an one dimensional array my_array[A * B * C * D]
+    and access it through my_array[flattened_index].
+
+    The flattened index is computed as:
+    flattened_index := (B * C * D) * i + (C * D) * j + (D) * k + l
+
+    Additionally, when the multiplier factors are power-of-2 (i.e., the size of
+    the corresponding dimension is a power-of-2), this pass also simplify them
+    to shifts.
+  }];
   let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
 }
 
