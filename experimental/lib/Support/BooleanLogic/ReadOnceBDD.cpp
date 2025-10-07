@@ -63,8 +63,8 @@ ReadOnceBDD::buildFromExpression(BoolExpression *expr,
     nodes.resize(2);
     zeroIndex = 0;
     oneIndex = 1;
-    nodes[zeroIndex] = {"", zeroIndex, zeroIndex};
-    nodes[oneIndex] = {"", oneIndex, oneIndex};
+    nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
+    nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
     rootIndex = (rootExpr->type == ExpressionType::One) ? oneIndex : zeroIndex;
     return success();
   }
@@ -114,7 +114,7 @@ void ReadOnceBDD::expandFrom(unsigned idx, BoolExpression *residual,
 
   const std::string &var = order[idx];
 
-  // Perform Shannon decomposition for the current variable.
+  // Perform Shannon expansion for the current variable.
   BoolExpression *f0 = residual->deepCopy();
   restrict(f0, var, false);
   f0 = f0->boolMinimize();
@@ -237,7 +237,7 @@ bool ReadOnceBDD::sinksUnreachableIfBan(unsigned root, unsigned t1, unsigned t0,
     push(nd.falseSucc);
     push(nd.trueSucc);
   }
-  // Neither sink reachable → valid cut.
+  // Neither sink reachable -> valid cut.
   return true;
 }
 

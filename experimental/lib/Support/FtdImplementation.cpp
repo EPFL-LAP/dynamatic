@@ -791,7 +791,6 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
                           unsigned falseSinkIdx) {
 
   const auto &nodes = bdd.getnodes();
-  const unsigned numNodes = (unsigned)nodes.size();
 
   // Look up the boolean signal for a given condition variable name and
   // return it as the select input of a mux (converted to a handshake channel).

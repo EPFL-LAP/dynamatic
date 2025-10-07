@@ -101,7 +101,7 @@ private:
   /// Index of the constant 1 terminal.
   unsigned oneIndex = 0;
 
-  /// Recursively expand edges for a node according to Shannon decomposition.
+  /// Recursively expand edges for a node according to Shannon expansion.
   /// Avoids duplicating nodes by reusing existing indices.
   void expandFrom(unsigned idx, BoolExpression *residual,
                   std::vector<char> &expanded);
