@@ -770,21 +770,25 @@ static bool isWhileLoop(CFGLoop *loop) {
 /// Build a MUX tree for a read-once BDD subgraph delimited by
 ///   startIdx  ->  {trueSinkIdx, falseSinkIdx}.
 /// Strategy:
-///   1) Enumerate all start–{true,false} two-vertex cuts (u,v) in ascending order,
+///   1) Enumerate all start–{true,false} two-vertex cuts (u,v) in ascending
+///   order,
 ///      each cut instantiates one MUX stage.
 ///   2) Input placement per pair (u,v):
 ///        • Choose the largest common predecessor P of {u,v}.
 ///          Whichever endpoint equals P.trueSucc goes to the TRUE input;
 ///          the other goes to FALSE.
-///        • If u and v are adjacent, the latter one's input is a terminal constant
+///        • If u and v are adjacent, the latter one's input is a terminal
+///        constant
 ///          (true-edge -> 1, false-edge -> 0).
 ///   3) Chain the MUXes: select(mux[0]) is the start condition; for i>0,
 ///      select(mux[i]) = out(mux[i-1]).
 ///   4) For non-constant inputs, recurse on the corresponding sub-region;
-///      the recursion’s sinks are the next vertex-cut pair or the subgraph's sinks.
+///      the recursion’s sinks are the next vertex-cut pair or the subgraph's
+///      sinks.
 static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
-             const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd,
-             unsigned startIdx, unsigned trueSinkIdx, unsigned falseSinkIdx) {
+                          const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd,
+                          unsigned startIdx, unsigned trueSinkIdx,
+                          unsigned falseSinkIdx) {
 
   const auto &nodes = bdd.getnodes();
   const unsigned numNodes = (unsigned)nodes.size();
@@ -842,7 +846,6 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   // to the false/true inputs of a mux.
   auto decideInputsForPair =
       [&](unsigned u, unsigned v) -> std::pair<InputSpec, InputSpec> {
-    
     // Convert a BDD node index to an InputSpec.
     auto nodeToSpec = [&](unsigned idx) -> InputSpec {
       return {false, false, idx};
@@ -881,9 +884,10 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     size_t iu = 0, iv = 0;
     while (iu < predU.size() && iv < predV.size()) {
       if (predU[iu] == predV[iv]) {
-        if (predU[iu] > chosenP) 
+        if (predU[iu] > chosenP)
           chosenP = predU[iu];
-        ++iu; ++iv;
+        ++iu;
+        ++iv;
       } else if (predU[iu] < predV[iv]) {
         ++iu;
       } else {
@@ -891,8 +895,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
       }
     }
 
-    return (nodes[chosenP].trueSucc == B.nodeIdx) ? std::pair{A,B}
-                                                  : std::pair{B,A};
+    return (nodes[chosenP].trueSucc == B.nodeIdx) ? std::pair{A, B}
+                                                  : std::pair{B, A};
   };
 
   // 2-vertex-cut pairs (sorted).
@@ -940,7 +944,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   if (!muxChain[0].select)
     return nullptr;
 
-  // Create each mux with partial inputs; real variable inputs will be filled later
+  // Create each mux with partial inputs; real variable inputs will be filled
+  // later
   for (size_t i = 0; i < muxChain.size(); ++i) {
     if (i > 0)
       muxChain[i].select = muxChain[i - 1].out;
@@ -966,7 +971,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   };
 
   // Fill real inputs for each mux by recursion
-  // False/true sinks default to global sinks; if there is a next mux, use its inputs
+  // False/true sinks default to global sinks; if there is a next mux, use its
+  // inputs
   for (size_t i = 0; i < muxChain.size(); ++i) {
     unsigned subF = falseSinkIdx, subT = trueSinkIdx;
     if (i + 1 < muxChain.size()) {
@@ -1000,7 +1006,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
 /// on the BDD root with terminal nodes {one, zero}. The result is a MUX tree
 /// in which each variable appears exactly once.
 static Value ReadOnceBDDToCircuit(PatternRewriter &rewriter, Block *block,
-                      const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd) {
+                                  const ftd::BlockIndexing &bi,
+                                  const ReadOnceBDD &bdd) {
   return buildMuxTree(rewriter, block, bi, bdd, bdd.root(), bdd.one(),
                       bdd.zero());
 }

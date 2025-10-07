@@ -42,8 +42,9 @@ ReadOnceBDD::ReadOnceBDD() {
   rootIndex = zeroIndex = oneIndex = 0;
 }
 
-LogicalResult ReadOnceBDD::buildFromExpression(BoolExpression *expr,
-                           const std::vector<std::string> &varOrder) {
+LogicalResult
+ReadOnceBDD::buildFromExpression(BoolExpression *expr,
+                                 const std::vector<std::string> &varOrder) {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
@@ -94,7 +95,7 @@ LogicalResult ReadOnceBDD::buildFromExpression(BoolExpression *expr,
   // avoid rebuilding the same subgraph.
   std::vector<char> expanded(nodes.size(), 0);
   expandFrom(rootIndex, rootExpr, expanded);
-  
+
   // After the BDD is fully built, clean up each node's predecessor list:
   // sort in ascending order and remove any duplicates.
   for (auto &nd : nodes) {
