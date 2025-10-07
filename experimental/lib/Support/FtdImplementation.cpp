@@ -777,9 +777,8 @@ static bool isWhileLoop(CFGLoop *loop) {
 ///        • Choose the largest common predecessor P of {u,v}.
 ///          Whichever endpoint equals P.trueSucc goes to the TRUE input;
 ///          the other goes to FALSE.
-///        • If u and v are adjacent, the latter one's input is a terminal
-///        constant
-///          (true-edge -> 1, false-edge -> 0).
+///        • If u and v are adjacent, the successive one's input is a terminal
+///        constant (true-edge -> 1, false-edge -> 0).
 ///   3) Chain the MUXes: select(mux[0]) is the start condition; for i>0,
 ///      select(mux[i]) = out(mux[i-1]).
 ///   4) For non-constant inputs, recurse on the corresponding sub-region;
