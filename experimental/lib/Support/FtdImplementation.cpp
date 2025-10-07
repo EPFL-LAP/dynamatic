@@ -767,34 +767,30 @@ static bool isWhileLoop(CFGLoop *loop) {
          !llvm::is_contained(latchBlocks, headerBlock);
 }
 
-// Build a mux tree for a BDD sub-region (start → {trueSink,falseSink}).
-// - Validate the region (must not hit global 0/1 before the two sinks).
-// - Enumerate 2-vertex-cuts (sorted asc).
-// - Build a mux chain: select of mux[i] = output of mux[i-1]; mux[0] uses
-//   the `start` condition. Pair placement:
-//     * terminal endpoint -> constant 0/1;
-//     * if u→v (or v→u) then successor side is constant (true/false edge);
-//     * else use the largest common predecessor P: P.trueSucc goes to true.
-//       If no common predecessor, place min→false, max→true.
-// - Recurse for non-constant inputs; the sinks for recursion are the next
-//   pair’s two original endpoints (constants mapped to global Z/O).
-static Value
-buildMuxTree(PatternRewriter &rewriter, Block *block,
-             const ftd::BlockIndexing &bi,
-             const dynamatic::experimental::boolean::ReadOnceBDD &bdd,
+/// Build a MUX tree for a read-once BDD subgraph delimited by
+///   startIdx  ->  {trueSinkIdx, falseSinkIdx}.
+/// Strategy:
+///   1) Enumerate all start–{true,false} two-vertex cuts (u,v) in ascending order,
+///      each cut instantiates one MUX stage.
+///   2) Input placement per pair (u,v):
+///        • Choose the largest common predecessor P of {u,v}.
+///          Whichever endpoint equals P.trueSucc goes to the TRUE input;
+///          the other goes to FALSE.
+///        • If u and v are adjacent, the latter one's input is a terminal constant
+///          (true-edge -> 1, false-edge -> 0).
+///   3) Chain the MUXes: select(mux[0]) is the start condition; for i>0,
+///      select(mux[i]) = out(mux[i-1]).
+///   4) For non-constant inputs, recurse on the corresponding sub-region;
+///      the recursion’s sinks are the next vertex-cut pair or the subgraph's sinks.
+static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
+             const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd,
              unsigned startIdx, unsigned trueSinkIdx, unsigned falseSinkIdx) {
 
   const auto &nodes = bdd.getnodes();
-  const unsigned N = (unsigned)nodes.size();
-  const unsigned Z = bdd.zero(), O = bdd.one();
+  const unsigned numNodes = (unsigned)nodes.size();
 
-  auto valid = [&](unsigned x) { return x < N; };
-  if (!valid(startIdx) || !valid(trueSinkIdx) || !valid(falseSinkIdx)) {
-    llvm::errs() << "BddToCircuit: invalid region indices.\n";
-    return nullptr;
-  }
-
-  // Map a variable to its selection value (channelified i1).
+  // Look up the boolean signal for a given condition variable name and
+  // return it as the select input of a mux (converted to a handshake channel).
   auto getSel = [&](const std::string &varName) -> Value {
     auto condBlkOpt = bi.getBlockFromCondition(varName);
     if (!condBlkOpt.has_value()) {
@@ -807,7 +803,8 @@ buildMuxTree(PatternRewriter &rewriter, Block *block,
     return s;
   };
 
-  // Channelified i1 constants.
+  // Create a handshake boolean constant (0 or 1) as a channel signal.
+  // The returned Value can be connected directly to a mux input.
   auto makeConst = [&](bool v) -> Value {
     rewriter.setInsertionPointToStart(block);
     auto src = rewriter.create<handshake::SourceOp>(
@@ -832,57 +829,29 @@ buildMuxTree(PatternRewriter &rewriter, Block *block,
     return notOp.getResult();
   };
 
-  // Region validation: treat (trueSink,falseSink) as local sinks.
-  auto validateSub = [&]() -> bool {
-    std::vector<char> vis(N, 0);
-    std::vector<unsigned> st{startIdx};
-    while (!st.empty()) {
-      unsigned u = st.back();
-      st.pop_back();
-      if (!valid(u) || vis[u])
-        continue;
-      vis[u] = 1;
-      if (u == trueSinkIdx || u == falseSinkIdx)
-        continue;
-      if (u == Z || u == O) {
-        llvm::errs() << "Illegal subgraph: hit global terminal before sinks.\n";
-        return false;
-      }
-      st.push_back(nodes[u].falseSucc);
-      st.push_back(nodes[u].trueSucc);
-    }
-    return true;
-  };
-  if (!validateSub())
-    std::abort();
-
-  // Predecessor lists for placement decisions.
-  auto preds = [&]() {
-    std::vector<std::vector<unsigned>> p(N);
-    for (unsigned i = 0; i < N; ++i) {
-      const auto &n = nodes[i];
-      if (n.falseSucc < N)
-        p[n.falseSucc].push_back(i);
-      if (n.trueSucc < N && n.trueSucc != n.falseSucc)
-        p[n.trueSucc].push_back(i);
-    }
-    return p;
-  }();
-
+  // Describes one mux data input:
+  //  - isConst  : true if this input is a boolean constant
+  //  - constVal : value of the constant if isConst == true
+  //  - nodeIdx  : BDD node index if this input is driven by a variable
   struct InputSpec {
     bool isConst = false, constVal = false;
     unsigned nodeIdx = 0;
   };
 
+  // Decide how to connect the two endpoints (u, v) of a cut pair
+  // to the false/true inputs of a mux.
   auto decideInputsForPair =
       [&](unsigned u, unsigned v) -> std::pair<InputSpec, InputSpec> {
+    
+    // Convert a BDD node index to an InputSpec.
     auto nodeToSpec = [&](unsigned idx) -> InputSpec {
-      if (idx == Z)
-        return {true, false, 0};
-      if (idx == O)
-        return {true, true, 0};
       return {false, false, idx};
     };
+
+    // Check whether there is a direct edge from node a to node b:
+    //  +1 if a.trueSucc == b (true edge)
+    //   0 if a.falseSucc == b (false edge)
+    //  -1 if no direct edge from a to b
     auto edge = [&](unsigned a, unsigned b) -> int {
       if (nodes[a].trueSucc == b)
         return +1;
@@ -891,49 +860,42 @@ buildMuxTree(PatternRewriter &rewriter, Block *block,
       return -1;
     };
 
+    // Wrap the two cut endpoints into InputSpec objects.
     InputSpec A = nodeToSpec(u), B = nodeToSpec(v);
 
-    // Direct edge → successor becomes constant (true/false edge).
-    if (!A.isConst && !B.isConst) {
-      int uv = edge(u, v), vu = edge(v, u);
-      if (uv != -1 && vu == -1) {
-        B.isConst = true;
-        B.constVal = (uv == +1);
-      } else if (vu != -1 && uv == -1) {
-        A.isConst = true;
-        A.constVal = (vu == +1);
-      }
+    // Direct edge -> successor becomes constant.
+    int uv = edge(u, v), vu = edge(v, u);
+    if (uv != -1 && vu == -1) {
+      B.isConst = true;
+      B.constVal = (uv == +1);
+    } else if (vu != -1 && uv == -1) {
+      A.isConst = true;
+      A.constVal = (vu == +1);
     }
 
     // Largest common predecessor decides who goes to true.
-    unsigned chosenP = (unsigned)-1;
-    for (unsigned pu : preds[u])
-      for (unsigned pv : preds[v])
-        if (pu == pv && (chosenP == (unsigned)-1 || pu > chosenP))
-          chosenP = pu;
-
-    InputSpec inF, inT;
-    if (chosenP != (unsigned)-1) {
-      if (!A.isConst && nodes[chosenP].trueSucc == A.nodeIdx)
-        inT = A, inF = B;
-      else if (!B.isConst && nodes[chosenP].trueSucc == B.nodeIdx)
-        inT = B, inF = A;
-      else {
-        if (u < v)
-          inF = A, inT = B;
-        else
-          inF = B, inT = A;
+    // nodes[].preds are already sorted in ascending order.
+    unsigned chosenP = 0;
+    const auto &predU = nodes[u].preds;
+    const auto &predV = nodes[v].preds;
+    size_t iu = 0, iv = 0;
+    while (iu < predU.size() && iv < predV.size()) {
+      if (predU[iu] == predV[iv]) {
+        if (predU[iu] > chosenP) 
+          chosenP = predU[iu];
+        ++iu; ++iv;
+      } else if (predU[iu] < predV[iv]) {
+        ++iu;
+      } else {
+        ++iv;
       }
-    } else {
-      if (u < v)
-        inF = A, inT = B;
-      else
-        inF = B, inT = A;
     }
-    return {inF, inT};
+
+    return (nodes[chosenP].trueSucc == B.nodeIdx) ? std::pair{A,B}
+                                                  : std::pair{B,A};
   };
 
-  // 2-cut pairs (sorted).
+  // 2-vertex-cut pairs (sorted).
   auto pairs = bdd.listTwoVertexCuts(startIdx, trueSinkIdx, falseSinkIdx);
 
   // No pair → no mux; return `start` condition (maybe inverted).
@@ -943,7 +905,7 @@ buildMuxTree(PatternRewriter &rewriter, Block *block,
     bool inv = (nodes[startIdx].trueSucc == falseSinkIdx &&
                 nodes[startIdx].falseSucc == trueSinkIdx);
     if (!dir && !inv) {
-      llvm::errs() << "BddToCircuit: no pair but start doesn't map to sinks.\n";
+      llvm::errs() << "BddToCircuit: start node doesn't map to sinks.\n";
       return nullptr;
     }
     Value sel = getSel(nodes[startIdx].var);
@@ -952,86 +914,93 @@ buildMuxTree(PatternRewriter &rewriter, Block *block,
     return maybeNot(sel, inv);
   }
 
+  // Create handshake constants for Boolean false and true
   Value c0 = makeConst(false);
   Value c1 = makeConst(true);
 
+  // Specification of one Mux stage
   struct MuxSpec {
-    unsigned u, v;
     InputSpec inF, inT;
     Value select, out;
     Operation *op = nullptr;
   };
-  std::vector<MuxSpec> chain;
-  chain.reserve(pairs.size());
+
+  // Build the list of mux stages from the given vertex-cut pairs
+  std::vector<MuxSpec> muxChain;
+  muxChain.reserve(pairs.size());
 
   for (auto [u, v] : pairs) {
     auto [inF, inT] = decideInputsForPair(u, v);
-    chain.push_back(
-        MuxSpec{u, v, inF, inT, /*select*/ nullptr, /*out*/ nullptr, nullptr});
+    muxChain.push_back(MuxSpec{inF, inT, nullptr, nullptr, nullptr});
   }
 
-  // First select = start condition; others chain from previous out.
-  chain[0].select = getSel(nodes[startIdx].var);
-  if (!chain[0].select)
+  // The first mux select signal comes from the starting variable
+  // Later muxes will use the previous mux output as select
+  muxChain[0].select = getSel(nodes[startIdx].var);
+  if (!muxChain[0].select)
     return nullptr;
 
-  for (size_t i = 0; i < chain.size(); ++i) {
+  // Create each mux with partial inputs; real variable inputs will be filled later
+  for (size_t i = 0; i < muxChain.size(); ++i) {
     if (i > 0)
-      chain[i].select = chain[i - 1].out;
+      muxChain[i].select = muxChain[i - 1].out;
 
-    Value inF = chain[i].inF.isConst ? (chain[i].inF.constVal ? c1 : c0)
-                                     : c0; // placeholder
-    Value inT = chain[i].inT.isConst ? (chain[i].inT.constVal ? c1 : c0)
-                                     : c0; // placeholder
+    Value inF = muxChain[i].inF.isConst ? (muxChain[i].inF.constVal ? c1 : c0)
+                                        : c0; // placeholder
+    Value inT = muxChain[i].inT.isConst ? (muxChain[i].inT.constVal ? c1 : c0)
+                                        : c0; // placeholder
 
     rewriter.setInsertionPointToStart(block);
     auto mux = rewriter.create<handshake::MuxOp>(
-        block->getOperations().front().getLoc(), c0.getType(), chain[i].select,
-        ValueRange{inF, inT});
+        block->getOperations().front().getLoc(), c0.getType(),
+        muxChain[i].select, ValueRange{inF, inT});
     mux->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
-    chain[i].op = mux.getOperation();
-    chain[i].out = mux.getResult();
+    muxChain[i].op = mux.getOperation();
+    muxChain[i].out = mux.getResult();
   }
 
-  // Fill variable inputs by recursion; sinks come from the next pair.
+  // Helper lambda to set an operand of an operation at the given position
   auto setOpnd = [&](Operation *op, int pos, Value v) {
     op->setOperand(pos, v);
   };
 
-  for (size_t i = 0; i < chain.size(); ++i) {
+  // Fill real inputs for each mux by recursion
+  // False/true sinks default to global sinks; if there is a next mux, use its inputs
+  for (size_t i = 0; i < muxChain.size(); ++i) {
     unsigned subF = falseSinkIdx, subT = trueSinkIdx;
-    if (i + 1 < chain.size()) {
-      subF = chain[i + 1].inF.isConst ? (chain[i + 1].inF.constVal ? O : Z)
-                                      : chain[i + 1].inF.nodeIdx;
-      subT = chain[i + 1].inT.isConst ? (chain[i + 1].inT.constVal ? O : Z)
-                                      : chain[i + 1].inT.nodeIdx;
+    if (i + 1 < muxChain.size()) {
+      subF = muxChain[i + 1].inF.nodeIdx;
+      subT = muxChain[i + 1].inT.nodeIdx;
     }
 
-    if (!chain[i].inF.isConst) {
-      unsigned s = chain[i].inF.nodeIdx;
+    if (!muxChain[i].inF.isConst) {
+      unsigned s = muxChain[i].inF.nodeIdx;
       Value sub = buildMuxTree(rewriter, block, bi, bdd, s, subT, subF);
       if (!sub)
         return nullptr;
-      setOpnd(chain[i].op, /*1:false*/ 1, sub);
+      // operand index 1 = false
+      setOpnd(muxChain[i].op, 1, sub);
     }
-    if (!chain[i].inT.isConst) {
-      unsigned s = chain[i].inT.nodeIdx;
+    if (!muxChain[i].inT.isConst) {
+      unsigned s = muxChain[i].inT.nodeIdx;
       Value sub = buildMuxTree(rewriter, block, bi, bdd, s, subT, subF);
       if (!sub)
         return nullptr;
-      setOpnd(chain[i].op, /*2:true*/ 2, sub);
+      // operand index 2 = true
+      setOpnd(muxChain[i].op, 2, sub);
     }
   }
 
-  return chain.back().out;
+  // Return the output of the last mux in the chain
+  return muxChain.back().out;
 }
 
-// Top-level: full BDD (root → {1,0}).
-static Value
-ReadOnceBDDToCircuit(PatternRewriter &rewriter, Block *block,
-                     const ftd::BlockIndexing &bi,
-                     const dynamatic::experimental::boolean::ReadOnceBDD &bdd) {
+/// Convert the entire read-once BDD into a circuit by invoking buildMuxTree
+/// on the BDD root with terminal nodes {one, zero}. The result is a MUX tree
+/// in which each variable appears exactly once.
+static Value ReadOnceBDDToCircuit(PatternRewriter &rewriter, Block *block,
+                      const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd) {
   return buildMuxTree(rewriter, block, bi, bdd, bdd.root(), bdd.one(),
                       bdd.zero());
 }

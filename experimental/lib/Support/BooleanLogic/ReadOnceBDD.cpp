@@ -42,9 +42,8 @@ ReadOnceBDD::ReadOnceBDD() {
   rootIndex = zeroIndex = oneIndex = 0;
 }
 
-LogicalResult
-ReadOnceBDD::buildFromExpression(BoolExpression *expr,
-                                 const std::vector<std::string> &varOrder) {
+LogicalResult ReadOnceBDD::buildFromExpression(BoolExpression *expr,
+                           const std::vector<std::string> &varOrder) {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
@@ -84,9 +83,9 @@ ReadOnceBDD::buildFromExpression(BoolExpression *expr,
   zeroIndex = n;
   oneIndex = n + 1;
   for (unsigned i = 0; i < n; ++i)
-    nodes[i] = BDDNode{order[i], zeroIndex, oneIndex};
-  nodes[zeroIndex] = {"", zeroIndex, zeroIndex};
-  nodes[oneIndex] = {"", oneIndex, oneIndex};
+    nodes[i] = BDDNode{order[i], zeroIndex, oneIndex, {}};
+  nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
+  nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
 
   // Root is always the first internal node (smallest variable index).
   rootIndex = 0;
@@ -95,6 +94,14 @@ ReadOnceBDD::buildFromExpression(BoolExpression *expr,
   // avoid rebuilding the same subgraph.
   std::vector<char> expanded(nodes.size(), 0);
   expandFrom(rootIndex, rootExpr, expanded);
+  
+  // After the BDD is fully built, clean up each node's predecessor list:
+  // sort in ascending order and remove any duplicates.
+  for (auto &nd : nodes) {
+    auto &ps = nd.preds;
+    std::sort(ps.begin(), ps.end());
+    ps.erase(std::unique(ps.begin(), ps.end()), ps.end());
+  }
 
   return success();
 }
@@ -148,6 +155,11 @@ void ReadOnceBDD::expandFrom(unsigned idx, BoolExpression *residual,
   // Connect edges for the current node.
   nodes[idx].falseSucc = fSucc;
   nodes[idx].trueSucc = tSucc;
+
+  // While expanding the BDD, record the current node `idx`
+  // as a predecessor of each of its false/true successors.
+  nodes[fSucc].preds.push_back(idx);
+  nodes[tSucc].preds.push_back(idx);
 
   expanded[idx] = 1;
 

@@ -41,10 +41,12 @@ namespace boolean {
 /// - `var`       : variable name (empty string for terminal nodes)
 /// - `falseSucc` : index of the successor if the variable evaluates to false
 /// - `trueSucc`  : index of the successor if the variable evaluates to true
+/// - `preds`     : indices of all predecessor nodes that point to this node
 struct BDDNode {
   std::string var;
   unsigned falseSucc;
   unsigned trueSucc;
+  std::vector<unsigned> preds;
 };
 
 /// Container for a Read-Once BDD.
@@ -77,6 +79,9 @@ public:
 
   /// Accessors
   const std::vector<BDDNode> &getnodes() const { return nodes; }
+  const std::vector<unsigned> &getpreds(unsigned idx) const {
+    return nodes[idx].preds;
+  }
   unsigned root() const { return rootIndex; }
   unsigned one() const { return oneIndex; }
   unsigned zero() const { return zeroIndex; }
