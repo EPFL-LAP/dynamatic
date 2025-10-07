@@ -106,7 +106,7 @@ def generate_buffered_signal_manager(
     buff_name = f"{name}_buff"
     buff = generate_fifo_break_dv(buff_name, {
         "num_slots": latency,
-        "data_type": extra_signals_bitwidth
+        "bitwidth": extra_signals_bitwidth
     })
 
     # Generate transfer handshake logic

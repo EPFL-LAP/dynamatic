@@ -5,14 +5,14 @@ from generators.handshake.merge import generate_dataless_merge
 def generate_control_merge(name, params):
 
     size = params["size"]
-    data_type = params["data_type"]
-    index_type = params["index_type"]
+    data_bitwidth = params["data_bitwidth"]
+    index_bitwidth = params["index_bitwidth"]
 
-    if(data_type == 0):
-      return generate_dataless_control_merge(name, {"size": size, "index_type": index_type})
+    if(data_bitwidth == 0):
+      return generate_dataless_control_merge(name, {"size": size, "index_bitwidth": index_bitwidth})
 
     dataless_control_merge_name = name + "_control_merge_dataless"
-    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, {"size": size, "index_type": index_type})
+    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, {"size": size, "index_bitwidth": index_bitwidth})
 
     control_merge_body = f"""
 // Module of control_merge
@@ -20,19 +20,19 @@ def generate_control_merge(name, params):
     input  clk,
     input  rst,
     // Input Channels
-    input  [{size} * ({data_type}) - 1 : 0] ins,
+    input  [{size} * ({data_bitwidth}) - 1 : 0] ins,
     input  [{size} - 1 : 0] ins_valid,
     output [{size} - 1 : 0] ins_ready,
     // Data Output Channel
-    output [{data_type} - 1 : 0] outs,
+    output [{data_bitwidth} - 1 : 0] outs,
     output outs_valid,
     input  outs_ready,
     // Index Output Channel
-    output [{index_type} - 1 : 0] index,
+    output [{index_bitwidth} - 1 : 0] index,
     output index_valid,
     input  index_ready
   );
-    wire [{index_type} - 1 : 0] index_internal;
+    wire [{index_bitwidth} - 1 : 0] index_internal;
 
     {dataless_control_merge_name} control (
       .clk          (clk            ),
@@ -48,7 +48,7 @@ def generate_control_merge(name, params):
 
     assign index = index_internal;
 
-    assign outs = ins[index_internal * {data_type} +: {data_type}];
+    assign outs = ins[index_internal * {data_bitwidth} +: {data_bitwidth}];
   endmodule
 
 """
@@ -57,13 +57,13 @@ def generate_control_merge(name, params):
 
 def generate_dataless_control_merge(name, params):
     size = params["size"]
-    index_type = params["index_type"]
+    index_bitwidth = params["index_bitwidth"]
 
     dataless_merge_name = name + "_dataless_merge"
     dataless_merge = generate_dataless_merge(dataless_merge_name, {"size": size})
 
     one_slot_break_r_name = name + "_one_slot_break_r"
-    one_slot_break_r = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_type})
+    one_slot_break_r = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_bitwidth})
 
     fork_dataless_name = name + "_fork_dataless"
     fork_dataless = generate_datalessFork(fork_dataless_name, {"size": 2})
@@ -80,7 +80,7 @@ module {name}(
   output outs_valid,
   input  outs_ready,            
   // Index output Channel
-  output [{index_type} - 1 : 0] index,
+  output [{index_bitwidth} - 1 : 0] index,
   output index_valid,
   input  index_ready
 );
@@ -89,16 +89,16 @@ module {name}(
   wire one_slot_break_rOut_valid;
   wire one_slot_break_rOut_ready;
 
-  reg [{index_type} - 1 : 0] index_one_slot_break_r;
+  reg [{index_bitwidth} - 1 : 0] index_one_slot_break_r;
   integer i;
   reg found;
   always @(ins_valid) begin
-    index_one_slot_break_r = {{{index_type}{{1'b0}}}};
+    index_one_slot_break_r = {{{index_bitwidth}{{1'b0}}}};
     found = 1'b0;
 
     for (i = 0; i < {size}; i = i + 1) begin
       if (!found && ins_valid[i]) begin
-        index_one_slot_break_r = i[{index_type} - 1 : 0];
+        index_one_slot_break_r = i[{index_bitwidth} - 1 : 0];
         found = 1'b1; // Set flag to indicate the value has been found
       end
     end

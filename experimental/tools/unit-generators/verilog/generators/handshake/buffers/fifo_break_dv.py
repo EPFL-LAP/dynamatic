@@ -1,8 +1,8 @@
 def generate_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
-    data_type = params["data_type"]
+    bitwidth = params["bitwidth"]
 
-    if(data_type == "0"):
+    if(bitwidth == "0"):
       return generate_dataless_fifo_break_dv(name, params)
 
     return f"""
@@ -10,11 +10,11 @@ def generate_fifo_break_dv(name, params):
 module {name}(
   input  clk,
   input  rst,
-  input  [{data_type} - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
 
-  output [{data_type} - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
@@ -22,7 +22,7 @@ module {name}(
   wire ReadEn, WriteEn;
   reg [$clog2({num_slots}) - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 1;
-  reg [{data_type} - 1 : 0] Memory[0 : {num_slots} - 1];
+  reg [{bitwidth} - 1 : 0] Memory[0 : {num_slots} - 1];
   integer i;
   
   // Ready if there is space in the FIFO

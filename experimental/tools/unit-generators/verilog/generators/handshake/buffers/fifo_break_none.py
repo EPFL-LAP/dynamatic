@@ -2,30 +2,30 @@ from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.handshake.buffers.fifo_break_dv import generate_dataless_fifo_break_dv
 def generate_fifo_break_none(name, params):
     num_slots = params["num_slots"]
-    data_type = params["data_type"]
+    bitwidth = params["bitwidth"]
 
-    if(data_type == 0):
+    if(bitwidth == 0):
       return generate_dataless_fifo_break_none(name, {"num_slots": num_slots})
 
     fifo_break_dv_name = "fifo_break_dv"
-    fifo_break_dv = generate_fifo_break_dv(fifo_break_dv_name, {"num_slots": num_slots, "data_type": data_type})
+    fifo_break_dv = generate_fifo_break_dv(fifo_break_dv_name, {"num_slots": num_slots, "bitwidth": bitwidth})
 
     fifo_break_none_body = f"""
 // Module of fifo_break_none
 module {name}(
   input  clk,
   input  rst,
-  input  [{data_type} - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [{data_type} - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
   wire mux_sel;
   wire fifo_valid, fifo_ready;
   wire fifo_pvalid, fifo_nready;
-  wire [{data_type} - 1 : 0] fifo_in, fifo_out;
+  wire [{bitwidth} - 1 : 0] fifo_in, fifo_out;
 
   // Dataout assignment
   assign outs = mux_sel ? fifo_out : ins;

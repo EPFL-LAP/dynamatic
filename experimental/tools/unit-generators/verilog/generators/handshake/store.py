@@ -1,25 +1,25 @@
 def generate_store(name, params):
-    data_type = params["data_type"]
-    addr_type = params["addr_type"]
+    data_bitwidth = params["data_bitwidth"]
+    addr_bitwidth = params["addr_bitwidth"]
     return f"""
 // Module of Store
 module {name}(
   input  clk,
   input  rst,
   // Data from Circuit Channel
-  input  [{data_type} - 1 : 0] dataIn,
+  input  [{data_bitwidth} - 1 : 0] dataIn,
   input  dataIn_valid,
   output dataIn_ready,
   // Address from Circuit Channel
-  input  [{addr_type} - 1 : 0] addrIn,
+  input  [{addr_bitwidth} - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Data to Interface Channel
-  output [{data_type} - 1 : 0] dataToMem,
+  output [{data_bitwidth} - 1 : 0] dataToMem,
   output dataToMem_valid,
   input  dataToMem_ready,
   // Address to Interface Channel
-  output [{addr_type} - 1 : 0] addrOut,
+  output [{addr_bitwidth} - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready 
 );

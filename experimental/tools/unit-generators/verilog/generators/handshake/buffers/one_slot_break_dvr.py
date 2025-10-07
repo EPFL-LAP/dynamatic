@@ -1,6 +1,6 @@
 def generate_one_slot_break_dvr(name, params):
 
-    data_type = params["data_type"]
+    bitwidth = params["bitwidth"]
 
     dataless_one_slot_break_dvr_name = "one_slot_break_dvr_dataless"
     dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, {})
@@ -11,16 +11,16 @@ module {name}(
   input  clk,
   input  rst,
   // Input channel
-  input  [{data_type} - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [{data_type} - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
   wire enable, inputReady;
-  reg [{data_type} - 1 : 0] dataReg = 0;
+  reg [{bitwidth} - 1 : 0] dataReg = 0;
   
   // Instance of one_slot_break_dvr_dataless to manage handshaking
   {dataless_one_slot_break_dvr_name} control (
@@ -34,7 +34,7 @@ module {name}(
 
   always @(posedge clk) begin
     if (rst) begin
-      dataReg <= {{{data_type}{{1'b0}}}};
+      dataReg <= {{{bitwidth}{{1'b0}}}};
     end else if (enable) begin
       dataReg <= ins;
     end
