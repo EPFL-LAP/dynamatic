@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -75,78 +76,36 @@ struct LinearExpr {
 };
 
 inline LinearExpr operator+(const LinearExpr &left, const LinearExpr &right) {
-  LinearExpr r = left;
-  for (auto &[var, coefficients] : right.coefficients) {
-    if (r.coefficients.count(var))
-      r.coefficients[var] += coefficients;
+  LinearExpr newExpr = left;
+  for (auto &[var, coeff] : right.coefficients) {
+    if (newExpr.coefficients.count(var))
+      newExpr.coefficients[var] += coeff;
     else
-      r.coefficients[var] = coefficients;
+      newExpr.coefficients[var] = coeff;
   }
-  r.constant += right.constant;
-  return r;
+  newExpr.constant += right.constant;
+  return newExpr;
 }
 
 inline LinearExpr operator-(const LinearExpr &left, const LinearExpr &right) {
-  LinearExpr r = left;
-  for (auto &[var, coefficients] : right.coefficients) {
-    if (r.coefficients.count(var))
-      r.coefficients[var] -= coefficients;
+  LinearExpr newExpr = left;
+  for (auto &[var, coeff] : right.coefficients) {
+    if (newExpr.coefficients.count(var))
+      newExpr.coefficients[var] -= coeff;
     else
-      r.coefficients[var] = -coefficients;
+      newExpr.coefficients[var] = -coeff;
   }
-  r.constant -= right.constant;
-  return r;
-}
-
-/// const * var
-inline LinearExpr operator*(double c, const LinearExpr &expr) {
-  LinearExpr r;
-  for (auto &[v, coefficients] : expr.coefficients)
-    r.coefficients[v] = c * coefficients;
-  r.constant = c * expr.constant;
-  return r;
-}
-
-/// Commutativity of mul
-/// var * const
-inline LinearExpr operator*(const LinearExpr &a, double c) { return c * a; }
-
-/// Adding var and constant:
-/// var + const
-inline LinearExpr operator+(const Var &v, double c) {
-  LinearExpr e(v);
-  e.constant += c;
-  return e;
-}
-
-/// Overloading add (commutativity of add):
-/// const + var
-inline LinearExpr operator+(double c, const Var &v) { return v + c; }
-
-/// Adding var and constant:
-/// var + const
-inline LinearExpr operator-(const Var &v, double c) {
-  LinearExpr e(v);
-  e.constant -= c;
-  return e;
-}
-
-inline LinearExpr operator-(const LinearExpr &expr, double c) {
-  LinearExpr e(expr);
-  e.constant -= c;
-  return e;
-}
-
-inline LinearExpr operator-(double c, const LinearExpr &expr) {
-  return ((-expr) + c);
+  newExpr.constant -= right.constant;
+  return newExpr;
 }
 
 /// Overloading mul
 /// const * var
 inline LinearExpr operator*(double c, const Var &v) {
-  LinearExpr e(v);
-  e.coefficients[v] *= c;
-  return e;
+  LinearExpr newExpr(v);
+  newExpr.coefficients[v] *= c;
+  newExpr.constant *= c;
+  return newExpr;
 }
 
 /// Overloading mul (commutativity of mul):
@@ -219,16 +178,20 @@ public:
   virtual void setMaximizeObjective(const LinearExpr &expr) = 0;
   virtual bool solve() = 0;
   virtual double getValue(const Var &var) const = 0;
+  virtual double getObjective() const = 0;
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 class GurobiSolver : CPSolver {
 
   std::unique_ptr<GRBEnv> env;
-  std::unique_ptr<GRBModel> model;
   std::map<Var, GRBVar> variables;
 
+  // Track the added names: prevent adding variables with duplicated names
+  std::set<std::string> names;
+
 public:
+  std::unique_ptr<GRBModel> model;
   GurobiSolver() {
     env = std::make_unique<GRBEnv>(true);
     env->start();
@@ -236,6 +199,12 @@ public:
   }
 
   Var addVariable(const Var &var) override {
+
+    if (names.count(var.name)) {
+      llvm::report_fatal_error("Adding variable with duplicated names is not "
+                               "permitted! Aborting...");
+    }
+
     double lb =
         var.lowerBound.has_value() ? var.lowerBound.value() : -GRB_INFINITY;
     double ub =
@@ -252,6 +221,7 @@ public:
       type = GRB_BINARY;
     }
     variables[var] = model->addVar(lb, ub, 0.0, type, var.name);
+    names.insert(var.name);
     return var;
   }
 
@@ -281,6 +251,7 @@ public:
     for (auto &[name, coeff] : expr.coefficients) {
       obj += coeff * variables[name];
     }
+    obj += expr.constant;
     // NOTE: the constant term can be ignored in the objective
     model->setObjective(obj, GRB_MAXIMIZE);
   }
@@ -296,6 +267,10 @@ public:
   /// auto resultMyVar = solver.getValue(myVar);
   double getValue(const Var &var) const override {
     return variables.at(var).get(GRB_DoubleAttr_X);
+  }
+
+  double getObjective() const override {
+    return model->get(GRB_DoubleAttr_ObjVal);
   }
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED

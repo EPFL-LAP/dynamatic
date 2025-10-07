@@ -10,18 +10,15 @@ TEST(BasicTests, test1) {
   // [Using our API to solve the result]
   auto solver = GurobiSolver();
   auto x = solver.addVariable("x", Var::REAL, /* lb */ 0, std::nullopt);
-  auto y = solver.addVariable("x", Var::REAL, /* lb */ 0, std::nullopt);
+  auto y = solver.addVariable("y", Var::REAL, /* lb */ 0, std::nullopt);
   solver.addLinearConstraint(x + 2 * y <= 14);
   solver.addLinearConstraint(3 * x - y >= 0);
   solver.addLinearConstraint(x - y <= 2);
   solver.setMaximizeObjective(3 * x + 4 * y);
   solver.solve();
-  auto xValue = solver.getValue(x);
-  std::cerr << "Optimal value for x: " << xValue << "\n";
-  auto yValue = solver.getValue(x);
-  std::cerr << "Optimal value for y: " << yValue << "\n";
 
   // [Using Gurobi's API to solve the result]
+  solver.model->write("model.lp");
 
   GRBEnv env = GRBEnv(true);
   env.start();
@@ -46,14 +43,10 @@ TEST(BasicTests, test1) {
   // Optimize the model
   model.optimize();
 
-  // EXPECT_EQ(model.get(GRB_DoubleAttr_ObjVal), solver.getValue(x));
+  // Check: The result from our API and from Gurobi's API must be exactly the
+  // same.
+  EXPECT_EQ(model.get(GRB_DoubleAttr_ObjVal), solver.getObjective());
   EXPECT_EQ(a.get(GRB_DoubleAttr_X), solver.getValue(x));
   EXPECT_EQ(b.get(GRB_DoubleAttr_X), solver.getValue(y));
-
-  // Output results
-  std::cout << "Optimal x: " << a.get(GRB_DoubleAttr_X) << std::endl;
-  std::cout << "Optimal y: " << b.get(GRB_DoubleAttr_X) << std::endl;
-  std::cout << "Optimal objective: " << model.get(GRB_DoubleAttr_ObjVal)
-            << std::endl;
 }
 } // namespace
