@@ -2,6 +2,7 @@ from generators.handshake.join import generate_join
 from generators.support.utils import ExtraSignals
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.buffer import generate_valid_propagation_buffer
+from generators.support.signal_manager import generate_arith_binary_signal_manager
 
 def generate_arith_binary(
   name:str,
@@ -11,33 +12,37 @@ def generate_arith_binary(
   dependencies:str = "",
   latency:int = 0,
   bitwidth: int = None,
-  lhs_bitwidth: int = None,
-  rhs_bitwidth: int = None,
+  input_bitwidth: int = None,
   output_bitwidth: int = None,
 ):
 
   if bitwidth is not None:
-    if (lhs_bitwidth is not None) or (rhs_bitwidth is not None) or (output_bitwidth is not None):
-      raise RuntimeError("If bitwidth is specified, lhs, rhs, and output bitwidth must not be specified")
-    lhs_bitwidth = bitwidth
-    rhs_bitwidth = bitwidth
+    if (input_bitwidth is not None) or (output_bitwidth is not None):
+      raise RuntimeError("If bitwidth is specified, input and output bitwidth must not be specified")
+    input_bitwidth = bitwidth
     output_bitwidth = bitwidth
   else:
-    if (lhs_bitwidth is None) or (rhs_bitwidth is None) or (output_bitwidth is None):
-      raise RuntimeError("If bitwidth is not specified, lhs, rhs, and output bitwidth must all be specified")
+    if (input_bitwidth is None) or (output_bitwidth is None):
+      raise RuntimeError("If bitwidth is not specified, input and output bitwidth must all be specified")
 
   def generate_inner(name):return _generate_arith_binary(
     name,
     handshake_op,
-    lhs_bitwidth,
-    rhs_bitwidth,
+    input_bitwidth,
     output_bitwidth,
     op_body,
     latency,
     dependencies)
 
   if(extra_signals):
-    raise RuntimeError("No support for extra signals added yet.")#TODO (Pass generate_inner)
+    return generate_arith_binary_signal_manager(
+            name,
+            input_bitwidth,
+            output_bitwidth,
+            extra_signals,
+            generate_inner,
+            latency
+        )
   else:
     return generate_inner(name)
 
@@ -45,8 +50,7 @@ def generate_arith_binary(
 def _generate_arith_binary(
         name,
         handshake_op,
-        lhs_bitwidth,
-        rhs_bitwidth,
+        input_bitwidth,
         output_bitwidth,
         op_body,
         latency,
@@ -59,9 +63,9 @@ module {name}(
   // inputs
   input  clk,
   input  rst,
-  input  [{lhs_bitwidth} - 1 : 0] lhs,
+  input  [{input_bitwidth} - 1 : 0] lhs,
   input  lhs_valid,
-  input  [{rhs_bitwidth} - 1 : 0] rhs,
+  input  [{input_bitwidth} - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs

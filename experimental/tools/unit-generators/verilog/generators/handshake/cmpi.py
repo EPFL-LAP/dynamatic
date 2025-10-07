@@ -51,7 +51,6 @@ def generate_cmpi(name, params):
         name=name,
         op_body=body,
         handshake_op="cmpi",
-        lhs_bitwidth=bitwidth,
-        rhs_bitwidth=bitwidth,
+        input_bitwidth=bitwidth,
         output_bitwidth=1,
         extra_signals=params.get("extra_signals", None))
