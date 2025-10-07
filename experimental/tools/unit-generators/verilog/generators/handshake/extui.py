@@ -1,27 +1,19 @@
+from generators.support.unary import generate_unary
+
+
 def generate_extui(name, params):
-    output_type = params["output_type"]
-    input_type = params["input_type"]
+    input_bitwidth = params["input_bitwidth"]
+    output_bitwidth = params["output_bitwidth"]
 
-    extui = f"""
-// Module of extui
-module {name}(
-  // inputs
-  input  clk,
-  input  rst,
-  input  [{input_type} - 1 : 0] ins,
-  input  ins_valid,
-  output  ins_ready,
-  // outputs
-  output [{output_type} - 1 : 0] outs,
-  output outs_valid,
-  input outs_ready
-);
+    body = f"""
+    assign outs = {{{{({output_bitwidth} - {input_bitwidth}){{1'b0}}}}, ins}};
+    """
 
-  assign outs = {{{{({output_type} - {input_type}){{1'b0}}}}, ins}};
-  assign outs_valid = ins_valid;
-  assign ins_ready = outs_ready;
-
-endmodule
-"""
-
-    return extui
+    return generate_unary(
+        name=name,
+        handshake_op="extui",
+        input_bitwidth=input_bitwidth,
+        output_bitwidth=output_bitwidth,
+        body=body,
+        extra_signals=params.get("extra_signals", None),
+    )

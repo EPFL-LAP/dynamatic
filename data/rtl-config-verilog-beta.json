@@ -48,19 +48,11 @@
   },
   {
     "name": "handshake.extsi",
-    "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t extsi -p input_type=$INPUT_TYPE output_type=$OUTPUT_TYPE extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t extsi -p input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.extui",
-    "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t extui -p input_type=$INPUT_TYPE output_type=$OUTPUT_TYPE extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t extui -p input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.muli",
@@ -95,11 +87,7 @@
   },
   {
     "name": "handshake.trunci",
-    "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t trunci -p input_type=$INPUT_TYPE output_type=$OUTPUT_TYPE extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t trunci -p input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.xori",

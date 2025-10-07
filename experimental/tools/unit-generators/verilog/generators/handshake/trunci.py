@@ -1,27 +1,22 @@
+from generators.support.unary import generate_unary
+
+
 def generate_trunci(name, params):
-    output_type = params["output_type"]
-    input_type = params["input_type"]
+    input_bitwidth = params["input_bitwidth"]
+    output_bitwidth = params["output_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-    extui = f"""
-// Module of trunci
-module {name}(
-  // inputs
-  input  clk,
-  input  rst,
-  input  [{input_type} - 1 : 0] ins,
-  input  ins_valid,
-  input  outs_ready,
-  // outputs
-  output [{output_type} - 1 : 0] outs,
-  output outs_valid,
-  output ins_ready
-);
+    op_type = "trunci"
 
-  assign outs = ins[{output_type} - 1 : 0];
-  assign outs_valid = ins_valid;
-  assign ins_ready = ins_valid & outs_ready;
+    body = f"""
+  assign outs = ins[{output_bitwidth} - 1 : 0];
+    """
 
-endmodule
-"""
-
-    return extui
+    return generate_unary(
+        name=name,
+        handshake_op=op_type,
+        input_bitwidth=input_bitwidth,
+        output_bitwidth=output_bitwidth,
+        body=body,
+        extra_signals=extra_signals
+    )
