@@ -302,5 +302,126 @@ public:
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+#if 0
+
+#include "coin/CbcModel.hpp"
+#include "coin/OsiClpSolverInterface.hpp"
+
+
+class CbcSolver : CPSolver {
+
+  OsiClpSolverInterface solver;
+  std::map<Var, int> variables; // map Var -> column index
+  std::set<std::string> names;
+
+public:
+  CbcSolver() = default;
+
+  Var addVariable(const Var &var) override {
+    if (names.count(var.name)) {
+      llvm::report_fatal_error("Adding variable with duplicated names is not "
+                               "permitted! Aborting...");
+    }
+
+    double lb = var.lowerBound.value_or(-1e20);
+    double ub = var.upperBound.value_or(1e20);
+
+    int colIndex = solver.getNumCols();
+
+    // Add an empty column for this variable
+    solver.addCol(0, nullptr, nullptr, lb, ub, 0.0);
+    variables[var] = colIndex;
+
+    // Set variable type
+    if (var.type == Var::INTEGER)
+      solver.setInteger(colIndex);
+    else if (var.type == Var::BOOLEAN) {
+      solver.setInteger(colIndex);
+      solver.setColUpper(colIndex, 1.0);
+      solver.setColLower(colIndex, 0.0);
+    } // REAL is default
+
+    names.insert(var.name);
+    return var;
+  }
+
+  Var addVariable(const std::string &name, Var::VarType type,
+                  std::optional<double> lb, std::optional<double> ub) override {
+    auto var = Var(name, type, lb, ub);
+    return addVariable(var);
+  }
+
+  void addLinearConstraint(const Constraint &constraint) override {
+    int numCoeffs = constraint.expr.coefficients.size();
+    std::vector<int> indices;
+    std::vector<double> values;
+
+    for (auto &[var, coeff] : constraint.expr.coefficients) {
+      indices.push_back(variables.at(var));
+      values.push_back(coeff);
+    }
+
+    double rowLower, rowUpper;
+    if (constraint.pred == Constraint::LE) {
+      rowLower = -1e20;
+      rowUpper = -constraint.expr.constant;
+    } else if (constraint.pred == Constraint::EQ) {
+      rowLower = -constraint.expr.constant;
+      rowUpper = -constraint.expr.constant;
+    } else {
+      llvm_unreachable("Unknown predicate!");
+    }
+
+    solver.addRow(numCoeffs, indices.data(), values.data(), rowLower, rowUpper);
+  }
+
+  void setMaximizeObjective(const LinearExpr &expr) override {
+    // Create objective array
+    std::vector<double> obj(solver.getNumCols(), 0.0);
+    for (auto &[var, coeff] : expr.coefficients) {
+      // Set objective in solver
+      solver.setObjCoeff(variables.at(var), coeff);
+    }
+
+    // CBC minimizes by default; for maximize, multiply by -1
+    solver.setObjSense(-1.0);
+  }
+
+  void optimize() override {
+    CbcModel model(solver);
+    model.branchAndBound();
+
+    int stat = model.status();
+    if (stat == 0) // optimal
+      status = OPTIMAL;
+    else if (stat == 1) // stopped, feasible solution
+      status = NONOPTIMAL;
+    else if (stat == 2) // infeasible
+      status = INFEASIBLE;
+    else if (stat == 3) // unbounded
+      status = UNBOUNDED;
+    else
+      status = ERROR;
+
+    // Update solver with solution for getValue
+    solver.setColSolution(model.bestSolution());
+  }
+
+  std::optional<double> getValue(const Var &var) const override {
+    if (status != OPTIMAL && status != NONOPTIMAL)
+      return std::nullopt;
+    return solver.getColSolution()[variables.at(var)];
+  }
+
+  std::optional<double> getObjective() const override {
+    if (status != OPTIMAL && status != NONOPTIMAL)
+      return std::nullopt;
+    // Multiply by -1 to account for maximization
+    return -solver.getObjValue();
+  }
+};
+
+#endif
+
 } // namespace cp
 } // namespace dynamatic
