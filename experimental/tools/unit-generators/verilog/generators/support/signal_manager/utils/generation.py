@@ -1,96 +1,96 @@
 from .types import Channel
-# from .concat import ConcatLayout
+from .concat import ConcatLayout
 from .forwarding import generate_forwarding_expression_for_signal
 
 
-# def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> list[str]:
-#     """
-#     Generate VHDL assignments for concatenating input channel data and extra
-#     signals into output channel data.
-#     Args:
-#       in_channel_name (str): Name of the input channel.
-#       in_data_bitwidth (int): Bitwidth of the input channel data.
-#       out_channel_name (str): Name of the output channel.
-#       concat_layout (ConcatLayout): Layout for concatenating extra signals.
-#       array_size (int): Size of the array if the channel is an array. Defaults to 0.
-#     Returns:
-#       assignments (list[str]): List of VHDL assignments for the concatenation.
-#       - Example: When `in_channel_name` is `ins` and `in_data_bitwidth` is 32:
-#         ins_concat(32 - 1 downto 0) <= ins;
-#         ins_concat(32 downto 32) <= ins_spec;
-#     """
+def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> list[str]:
+    """
+    Generate Verilog assignments for concatenating input channel data and extra
+    signals into output channel data.
+    Args:
+      in_channel_name (str): Name of the input channel.
+      in_data_bitwidth (int): Bitwidth of the input channel data.
+      out_channel_name (str): Name of the output channel.
+      concat_layout (ConcatLayout): Layout for concatenating extra signals.
+      array_size (int): Size of the array if the channel is an array. Defaults to 0.
+    Returns:
+      assignments (list[str]): List of Verilog assignments for the concatenation.
+      - Example: When `in_channel_name` is `ins` and `in_data_bitwidth` is 32:
+        assign ins_concat[32 - 1:0] = ins;
+        assign ins_concat[32:32] = ins_spec;
+    """
 
-#     assignments = []
+    assignments = []
 
-#     if array_size == 0:
-#         # Include data if present
-#         if in_data_bitwidth > 0:
-#             assignments.append(
-#                 f"{out_channel_name}({in_data_bitwidth} - 1 downto 0) <= {in_channel_name};")
+    if array_size == 0:
+        # Include data if present
+        if in_data_bitwidth > 0:
+            assignments.append(
+                f"{out_channel_name} [{in_data_bitwidth} - 1 : 0] <= {in_channel_name};")
 
-#         # Include all extra signals
-#         for signal_name, (msb, lsb) in concat_layout.mapping:
-#             assignments.append(
-#                 f"{out_channel_name}({msb + in_data_bitwidth} downto {lsb + in_data_bitwidth}) <= {in_channel_name}_{signal_name};")
-#     else:
-#         # Signal is an array
-#         for i in range(array_size):
-#             # Include data if present
-#             if in_data_bitwidth > 0:
-#                 assignments.append(
-#                     f"{out_channel_name}({i})({in_data_bitwidth} - 1 downto 0) <= {in_channel_name}({i});")
+        # Include all extra signals
+        for signal_name, (msb, lsb) in concat_layout.mapping:
+            assignments.append(
+                f"assign {out_channel_name} [{msb + in_data_bitwidth} : {lsb + in_data_bitwidth}] = {in_channel_name}_{signal_name};")
+    else:
+        # Signal is an array
+        for i in range(array_size):
+            # Include data if present
+            if in_data_bitwidth > 0:
+                assignments.append(
+                    f"assign {out_channel_name} [{i}] [{in_data_bitwidth} - 1 : 0] = {in_channel_name} [{i}];")
 
-#             # Include all extra signals
-#             for signal_name, (msb, lsb) in concat_layout.mapping:
-#                 assignments.append(
-#                     f"{out_channel_name}({i})({msb + in_data_bitwidth} downto {lsb + in_data_bitwidth}) <= {in_channel_name}_{i}_{signal_name};")
+            # Include all extra signals
+            for signal_name, (msb, lsb) in concat_layout.mapping:
+                assignments.append(
+                    f"assign {out_channel_name} [{i}] [{msb + in_data_bitwidth} : {lsb + in_data_bitwidth}] = {in_channel_name}_{i}_{signal_name};")
 
-#     return assignments
+    return assignments
 
 
-# def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> list[str]:
-#     """
-#     Generate VHDL assignments for slicing input channel data into output channel
-#     data and extra signals.
-#     Args:
-#       in_channel_name (str): Name of the input channel.
-#       out_channel_name (str): Name of the output channel.
-#       out_data_bitwidth (int): Bitwidth of the output channel data.
-#       concat_layout (ConcatLayout): Layout for slicing extra signals.
-#       array_size (int): Size of the array if the channel is an array. Defaults to 0.
-#     Returns:
-#       assignments (list[str]): List of VHDL assignments for the slicing.
-#       - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
-#         outs <= outs_concat(32 - 1 downto 0);
-#         outs_spec <= outs_concat(32 downto 32);
-#     """
+def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> list[str]:
+    """
+    Generate Verilog assignments for slicing input channel data into output channel
+    data and extra signals.
+    Args:
+      in_channel_name (str): Name of the input channel.
+      out_channel_name (str): Name of the output channel.
+      out_data_bitwidth (int): Bitwidth of the output channel data.
+      concat_layout (ConcatLayout): Layout for slicing extra signals.
+      array_size (int): Size of the array if the channel is an array. Defaults to 0.
+    Returns:
+      assignments (list[str]): List of Verilog assignments for the slicing.
+      - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
+        assign outs = outs_concat[32 - 1 : 0];
+        assign outs_spec = outs_concat[32 : 32];
+    """
 
-#     assignments = []
+    assignments = []
 
-#     if array_size == 0:
-#         # Include data if present
-#         if out_data_bitwidth > 0:
-#             assignments.append(
-#                 f"{out_channel_name} <= {in_channel_name}({out_data_bitwidth} - 1 downto 0);")
+    if array_size == 0:
+        # Include data if present
+        if out_data_bitwidth > 0:
+            assignments.append(
+                f"assign {out_channel_name} = {in_channel_name}[{out_data_bitwidth} - 1 : 0];")
 
-#         # Include all extra signals
-#         for signal_name, (msb, lsb) in concat_layout.mapping:
-#             assignments.append(
-#                 f"{out_channel_name}_{signal_name} <= {in_channel_name}({msb + out_data_bitwidth} downto {lsb + out_data_bitwidth});")
-#     else:
-#         # Signal is an array
-#         for i in range(array_size):
-#             # Include data if present
-#             if out_data_bitwidth > 0:
-#                 assignments.append(
-#                     f"{out_channel_name}({i}) <= {in_channel_name}({i})({out_data_bitwidth} - 1 downto 0);")
+        # Include all extra signals
+        for signal_name, (msb, lsb) in concat_layout.mapping:
+            assignments.append(
+                f"assign {out_channel_name}_{signal_name} = {in_channel_name}[{msb + out_data_bitwidth} : {lsb + out_data_bitwidth}];")
+    else:
+        # Signal is an array
+        for i in range(array_size):
+            # Include data if present
+            if out_data_bitwidth > 0:
+                assignments.append(
+                    f"assign {out_channel_name}({i}) = {in_channel_name}({i})[{out_data_bitwidth} - 1 : 0];")
 
-#             # Include all extra signals
-#             for signal_name, (msb, lsb) in concat_layout.mapping:
-#                 assignments.append(
-#                     f"{out_channel_name}_{i}_{signal_name} <= {in_channel_name}({i})({msb + out_data_bitwidth} downto {lsb + out_data_bitwidth});")
+            # Include all extra signals
+            for signal_name, (msb, lsb) in concat_layout.mapping:
+                assignments.append(
+                    f"assign {out_channel_name}_{i}_{signal_name} = {in_channel_name}({i})[{msb + out_data_bitwidth} : {lsb + out_data_bitwidth}];")
 
-#     return assignments
+    return assignments
 
 
 # def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> list[str]:
@@ -253,8 +253,8 @@ def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_nam
       assignments (list[str]): List of VHDL assignments for the extra signal forwarding.
       - Example: When `in_channel_names` is `["lhs", "rhs"]` and
        `out_channel_names` is `["trueResult", "falseResult"]`:
-       trueResult_spec <= lhs_spec or rhs_spec;
-       falseResult_spec <= lhs_spec or rhs_spec;
+       trueResult_spec = lhs_spec | rhs_spec;
+       falseResult_spec = lhs_spec | rhs_spec;
     """
 
     assignments = []
@@ -272,6 +272,6 @@ def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_nam
     # Assign the expression to each output channel
     for out_channel_name in out_channel_names:
         signal_name = f"{out_channel_name}_{extra_signal_name}"
-        assignments.append(f"{signal_name} <= {expression};")
+        assignments.append(f"assign {signal_name} = {expression};")
 
     return assignments

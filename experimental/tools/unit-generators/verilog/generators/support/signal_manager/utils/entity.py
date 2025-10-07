@@ -20,7 +20,7 @@ def generate_entity(entity_name, in_channels, out_channels) -> str:
     # Add channel declarations for each channel
     for channel in unified_channels:
         dir = channel["direction"]
-        ready_dir = "input" if dir == "input" else "output"
+        ready_dir = "output" if dir == "input" else "input"
 
         name = channel["name"]
         bitwidth = channel["bitwidth"]
@@ -73,5 +73,4 @@ module {entity_name} (
     input rst,
     {channel_decls_str}
 );
-endmodule
 """
