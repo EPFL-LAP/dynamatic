@@ -62,6 +62,16 @@ struct LinearExpr {
   double constant = 0.0;
   LinearExpr() = default;
   LinearExpr(const Var &v) { coefficients[v] = 1.0; }
+  LinearExpr(double value) { constant = value; }
+
+  LinearExpr operator-() const {
+    LinearExpr negated;
+    for (auto &[var, coeff] : coefficients) {
+      negated.coefficients[var] = -coeff;
+    }
+    negated.constant = -constant;
+    return negated;
+  }
 };
 
 inline LinearExpr operator+(const LinearExpr &left, const LinearExpr &right) {
@@ -113,6 +123,24 @@ inline LinearExpr operator+(const Var &v, double c) {
 /// const + var
 inline LinearExpr operator+(double c, const Var &v) { return v + c; }
 
+/// Adding var and constant:
+/// var + const
+inline LinearExpr operator-(const Var &v, double c) {
+  LinearExpr e(v);
+  e.constant -= c;
+  return e;
+}
+
+inline LinearExpr operator-(const LinearExpr &expr, double c) {
+  LinearExpr e(expr);
+  e.constant -= c;
+  return e;
+}
+
+inline LinearExpr operator-(double c, const LinearExpr &expr) {
+  return ((-expr) + c);
+}
+
 /// Overloading mul
 /// const * var
 inline LinearExpr operator*(double c, const Var &v) {
@@ -163,6 +191,10 @@ inline Constraint operator>=(double lhs, const LinearExpr &rhs) {
 
 inline Constraint operator>=(const LinearExpr &lhs, const LinearExpr &rhs) {
   return (rhs <= lhs);
+}
+
+inline Constraint operator>=(const LinearExpr &lhs, double rhs) {
+  return (rhs - lhs <= 0);
 }
 
 inline Constraint operator==(const LinearExpr &lhs, double rhs) {
