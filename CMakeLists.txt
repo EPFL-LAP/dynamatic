@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 if (MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c- /GR-")
 else ()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -frtti")
 endif ()
 
 include(FindPackageHandleStandardArgs)
@@ -149,6 +149,18 @@ else()
                    project.")
   add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
 endif()
+
+#-------------------------------------------------------------------------------
+# CBC solver setup
+#-------------------------------------------------------------------------------
+
+# Find the CBC, Osi, Clp libraries
+find_package(PkgConfig REQUIRED)
+
+# Use pkg-config to get include dirs and libs
+pkg_check_modules(CBC REQUIRED cbc)
+pkg_check_modules(CLPCORE REQUIRED clp)
+pkg_check_modules(OSI REQUIRED osi)
 
 #-------------------------------------------------------------------------------
 # XLS Integration (experimental)
