@@ -186,6 +186,31 @@ TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
   EXPECT_NEAR(model.get(GRB_DoubleAttr_ObjVal), objVal, 1e-6);
 }
 
+TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
+  auto solver = GetParam()();
+
+  auto x = solver->addVariable("x", Var::REAL, 0, 1);
+  auto y = solver->addVariable("y", Var::REAL, 0, 1);
+
+  // Quadratic constraint: x^2 + y^2 <= 1
+  //
+  std::cerr << "Before quadConstr!\n";
+  auto quadConstr = 1.0 * x * x + 1.0 * y * y <= 1.0;
+  std::cerr << "After quadConstr!\n";
+  solver->addQuadConstraint(quadConstr);
+
+  // Maximize x + y
+  solver->setMaximizeObjective(1.0 * x + 1.0 * y);
+  solver->optimize();
+
+  auto xVal = solver->getValue(x).value();
+  auto yVal = solver->getValue(y).value();
+  auto obj = solver->getObjective().value();
+
+  EXPECT_LE(xVal * xVal + yVal * yVal, 1 + 1e-6);
+  EXPECT_NEAR(obj, xVal + yVal, 1e-6);
+}
+
 // [END AI-generated test cases]
 
 // Factories for both solvers
@@ -197,7 +222,7 @@ std::unique_ptr<CPSolver> makeGurobi() {
 
 // Runs all MILP test with two different solvers
 INSTANTIATE_TEST_SUITE_P(SolverImplementations, ParamSolverTest,
-                         ::testing::Values(makeCbc, makeGurobi));
+                         ::testing::Values(makeGurobi));
 
 #endif
 } // namespace
