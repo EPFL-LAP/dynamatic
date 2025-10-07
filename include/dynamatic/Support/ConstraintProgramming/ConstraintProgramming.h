@@ -14,6 +14,9 @@
 #include <set>
 #include <string>
 
+#include "coin/CbcModel.hpp"
+#include "coin/OsiClpSolverInterface.hpp"
+
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -192,7 +195,7 @@ public:
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-class GurobiSolver : CPSolver {
+class GurobiSolver : public CPSolver {
 
   std::unique_ptr<GRBEnv> env;
   std::map<Var, GRBVar> variables;
@@ -302,13 +305,7 @@ public:
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-#if 0
-
-#include "coin/CbcModel.hpp"
-#include "coin/OsiClpSolverInterface.hpp"
-
-
-class CbcSolver : CPSolver {
+class CbcSolver : public CPSolver {
 
   OsiClpSolverInterface solver;
   std::map<Var, int> variables; // map Var -> column index
@@ -416,12 +413,9 @@ public:
   std::optional<double> getObjective() const override {
     if (status != OPTIMAL && status != NONOPTIMAL)
       return std::nullopt;
-    // Multiply by -1 to account for maximization
-    return -solver.getObjValue();
+    return solver.getObjValue();
   }
 };
-
-#endif
 
 } // namespace cp
 } // namespace dynamatic
