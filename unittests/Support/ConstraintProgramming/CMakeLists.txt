@@ -23,6 +23,10 @@ gtest_discover_tests(
   XML_OUTPUT_DIR ${CMAKE_BINARY_DIR}/unittests/Support/ConstraintProgramming/results
 )
 
+# To run this unit test:
+# ```
+# ninja run-constraint-programming-test
+# ```
 add_custom_target(
   run-constraint-programming-test
   COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure
