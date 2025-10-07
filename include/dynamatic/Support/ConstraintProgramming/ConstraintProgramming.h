@@ -45,10 +45,13 @@ struct Var {
     return name == other.name;
   }
 
-  // Non-explicit constructor for
-  // Var newVar = solver.addVariable({"newVar", Var::INTEGER})
-  Var(std::string name, VarType type, std::optional<double> lowerBound,
-      std::optional<double> upperBound)
+  // Explicit constructor:
+  // Var newVar = solver.addVariable("newVar", Var::INTEGER, std::nullopt,
+  // std::nullopt);
+  //
+  // Explicit constructor avoids implicit cast from string to Var.
+  explicit Var(std::string name, VarType type, std::optional<double> lowerBound,
+               std::optional<double> upperBound)
       : name(std::move(name)), type(type), lowerBound(lowerBound),
         upperBound(upperBound) {}
 };
@@ -60,19 +63,19 @@ struct Var {
 /// auto y = Var("y", Var::INTEGER);
 /// Using operator overloading to construct an expression:
 /// auto expr = (x + 2 * y);
-struct LinearExpr {
+struct LinExpr {
 
   // The coefficients in the linear expression
   // For instance, for x + 2 * y + 1
   // We have (x, 1) and (y, 2)
   std::map<Var, double> terms;
   double constant = 0.0;
-  LinearExpr() = default;
-  LinearExpr(const Var &v) { terms[v] = 1.0; }
-  LinearExpr(double value) { constant = value; }
+  LinExpr() = default;
+  LinExpr(const Var &v) { terms[v] = 1.0; }
+  LinExpr(double value) { constant = value; }
 
-  LinearExpr operator-() const {
-    LinearExpr negated;
+  LinExpr operator-() const {
+    LinExpr negated;
     for (auto &[var, coeff] : terms) {
       negated.terms[var] = -coeff;
     }
@@ -81,8 +84,8 @@ struct LinearExpr {
   }
 };
 
-inline LinearExpr operator+(const LinearExpr &left, const LinearExpr &right) {
-  LinearExpr newExpr = left;
+inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
+  LinExpr newExpr = left;
   for (auto &[var, coeff] : right.terms) {
     newExpr.terms[var] += coeff;
   }
@@ -90,8 +93,8 @@ inline LinearExpr operator+(const LinearExpr &left, const LinearExpr &right) {
   return newExpr;
 }
 
-inline LinearExpr operator-(const LinearExpr &left, const LinearExpr &right) {
-  LinearExpr newExpr = left;
+inline LinExpr operator-(const LinExpr &left, const LinExpr &right) {
+  LinExpr newExpr = left;
   for (auto &[var, coeff] : right.terms) {
     newExpr.terms[var] -= coeff;
   }
@@ -101,8 +104,8 @@ inline LinearExpr operator-(const LinearExpr &left, const LinearExpr &right) {
 
 /// Overloading mul
 /// const * var
-inline LinearExpr operator*(double c, const Var &v) {
-  LinearExpr newExpr(v);
+inline LinExpr operator*(double c, const Var &v) {
+  LinExpr newExpr(v);
   newExpr.terms[v] *= c;
   newExpr.constant *= c;
   return newExpr;
@@ -110,17 +113,17 @@ inline LinearExpr operator*(double c, const Var &v) {
 
 /// Overloading mul (commutativity of mul):
 /// var * const
-inline LinearExpr operator*(const Var &v, double c) { return c * v; }
+inline LinExpr operator*(const Var &v, double c) { return c * v; }
 
 struct QuadExpr {
-  LinearExpr linexpr;
+  LinExpr linexpr;
   std::map<std::pair<Var, Var>, double> quadTerms;
   QuadExpr() = default;
-  QuadExpr(double value) { linexpr = LinearExpr(value); }
-  QuadExpr(const LinearExpr &expr) { linexpr = expr; }
+  QuadExpr(double value) { linexpr = LinExpr(value); }
+  QuadExpr(const LinExpr &expr) { linexpr = expr; }
 };
 
-inline QuadExpr operator*(const LinearExpr &lhs, const LinearExpr &rhs) {
+inline QuadExpr operator*(const LinExpr &lhs, const LinExpr &rhs) {
   QuadExpr e;
   // Quadratic terms:
   for (auto &[lhsTerm, lhsCoeff] : lhs.terms) {
@@ -187,25 +190,25 @@ enum Predicate {
 /// - x + 2 * y - z + 1 <= 0
 /// - x + 2 * y - z + 2 == 0
 /// The rhs is always 0
-struct Constraint {
+struct LinConstr {
   // The expression
-  LinearExpr expr;
+  LinExpr expr;
   Predicate pred;
 };
 
-inline Constraint operator<=(const LinearExpr &lhs, const LinearExpr &rhs) {
-  Constraint c;
+inline LinConstr operator<=(const LinExpr &lhs, const LinExpr &rhs) {
+  LinConstr c;
   c.expr = lhs - rhs;
   c.pred = LE;
   return c;
 }
 
-inline Constraint operator>=(const LinearExpr &lhs, const LinearExpr &rhs) {
+inline LinConstr operator>=(const LinExpr &lhs, const LinExpr &rhs) {
   return (rhs <= lhs);
 }
 
-inline Constraint operator==(const LinearExpr &lhs, double rhs) {
-  Constraint c;
+inline LinConstr operator==(const LinExpr &lhs, double rhs) {
+  LinConstr c;
   c.expr = lhs - rhs;
   c.pred = EQ;
   return c;
@@ -249,9 +252,9 @@ public:
   virtual Var addVariable(const std::string &name, Var::VarType type,
                           std::optional<double> lb,
                           std::optional<double> ub) = 0;
-  virtual void addLinearConstraint(const Constraint &constraint) = 0;
+  virtual void addLinearConstraint(const LinConstr &constraint) = 0;
   virtual void addQuadConstraint(const QuadConstr &constraint) = 0;
-  virtual void setMaximizeObjective(const LinearExpr &expr) = 0;
+  virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
   virtual std::optional<double> getValue(const Var &var) const = 0;
   virtual std::optional<double> getObjective() const = 0;
@@ -304,7 +307,7 @@ public:
     return addVariable(var);
   }
 
-  void addLinearConstraint(const Constraint &constraint) override {
+  void addLinearConstraint(const LinConstr &constraint) override {
     GRBLinExpr expr = 0;
     for (auto &[var, coeff] : constraint.expr.terms) {
       expr += coeff * variables[var];
@@ -341,7 +344,7 @@ public:
       llvm_unreachable("Unknown predicate!");
   }
 
-  void setMaximizeObjective(const LinearExpr &expr) override {
+  void setMaximizeObjective(const LinExpr &expr) override {
     GRBLinExpr obj = 0;
     for (auto &[name, coeff] : expr.terms) {
       obj += coeff * variables[name];
@@ -434,7 +437,7 @@ public:
     return addVariable(var);
   }
 
-  void addLinearConstraint(const Constraint &constraint) override {
+  void addLinearConstraint(const LinConstr &constraint) override {
     int numCoeffs = constraint.expr.terms.size();
     std::vector<int> indices;
     std::vector<double> values;
@@ -463,7 +466,7 @@ public:
         "Quadratic constraints is currently unavailable for CBC!");
   }
 
-  void setMaximizeObjective(const LinearExpr &expr) override {
+  void setMaximizeObjective(const LinExpr &expr) override {
     // Create objective array
     std::vector<double> obj(solver.getNumCols(), 0.0);
     for (auto &[var, coeff] : expr.terms) {
