@@ -93,68 +93,68 @@ def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidt
     return assignments
 
 
-# def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> list[str]:
-#     """
-#     Generate VHDL assignments for concatenating input channel data and extra
-#     signals into output channel data, and forwarding the handshake signals.
-#     Args:
-#       in_channel_name (str): Name of the input channel.
-#       in_data_bitwidth (int): Bitwidth of the input channel data.
-#       out_channel_name (str): Name of the output channel.
-#       concat_layout (ConcatLayout): Layout for concatenating extra signals.
-#       array_size (int): Size of the array if the channel is an array. Defaults to 0.
-#     Returns:
-#       assignments (list[str]): List of VHDL assignments for the concatenation and handshake forwarding.
-#       - Example: When `in_channel_name` is `ins` and `out_channel_name` is `ins_concat`:
-#         ins_concat(32 - 1 downto 0) <= ins;
-#         ins_concat(32 downto 32) <= ins_spec;
-#         ins_concat_valid <= ins_valid;
-#         ins_ready <= ins_concat_ready;
-#     """
+def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> list[str]:
+    """
+    Generate Verilog assignments for concatenating input channel data and extra
+    signals into output channel data, and forwarding the handshake signals.
+    Args:
+      in_channel_name (str): Name of the input channel.
+      in_data_bitwidth (int): Bitwidth of the input channel data.
+      out_channel_name (str): Name of the output channel.
+      concat_layout (ConcatLayout): Layout for concatenating extra signals.
+      array_size (int): Size of the array if the channel is an array. Defaults to 0.
+    Returns:
+      assignments (list[str]): List of Verilog assignments for the concatenation and handshake forwarding.
+      - Example: When `in_channel_name` is `ins` and `out_channel_name` is `ins_concat`:
+        assign ins_concat[31:0]  = ins;
+        assign ins_concat[32]    = ins_spec;
+        assign ins_concat_valid  = ins_valid;
+        assign ins_ready         = ins_concat_ready;
+    """
 
-#     assignments = []
+    assignments = []
 
-#     # Concatenate the input channel data and extra signals to create the concat channel
-#     assignments.extend(generate_concat(
-#         in_channel_name, in_data_bitwidth, out_channel_name, concat_layout, array_size))
+    # Concatenate the input channel data and extra signals to create the concat channel
+    assignments.extend(generate_concat(
+        in_channel_name, in_data_bitwidth, out_channel_name, concat_layout, array_size))
 
-#     # Forward the input channel handshake to the concat channel
-#     assignments.append(f"{out_channel_name}_valid <= {in_channel_name}_valid;")
-#     assignments.append(f"{in_channel_name}_ready <= {out_channel_name}_ready;")
+    # Forward the input channel handshake to the concat channel
+    assignments.append(f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
+    assignments.append(f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
 
-#     return assignments
+    return assignments
 
 
-# def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> list[str]:
-#     """
-#     Generate VHDL assignments for slicing input channel data into output channel
-#     data, and forwarding the handshake signals.
-#     Args:
-#       in_channel_name (str): Name of the input channel.
-#       out_channel_name (str): Name of the output channel.
-#       out_data_bitwidth (int): Bitwidth of the output channel data.
-#       concat_layout (ConcatLayout): Layout for slicing extra signals.
-#       array_size (int): Size of the array if the channel is an array. Defaults to 0.
-#     Returns:
-#       assignments (list[str]): List of VHDL assignments for the slicing and handshake forwarding.
-#       - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
-#         outs <= outs_concat(32 - 1 downto 0);
-#         outs_spec <= outs_concat(32 downto 32);
-#         outs_valid <= outs_concat_valid;
-#         outs_concat_ready <= outs_ready;
-#     """
+def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> list[str]:
+    """
+    Generate Verilog assignments for slicing input channel data into output channel
+    data, and forwarding the handshake signals.
+    Args:
+      in_channel_name (str): Name of the input channel.
+      out_channel_name (str): Name of the output channel.
+      out_data_bitwidth (int): Bitwidth of the output channel data.
+      concat_layout (ConcatLayout): Layout for slicing extra signals.
+      array_size (int): Size of the array if the channel is an array. Defaults to 0.
+    Returns:
+      assignments (list[str]): List of Verilog assignments for the slicing and handshake forwarding.
+      - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
+        assign outs = outs_concat[32 - 1 : 0];
+        assign outs_spec = outs_concat[32 : 32];
+        assign outs_valid = outs_concat_valid;
+        assign outs_concat_ready = outs_ready;
+    """
 
-#     assignments = []
+    assignments = []
 
-#     # Slice the concat channel to create the output channel data and extra signals
-#     assignments.extend(generate_slice(
-#         in_channel_name, out_channel_name, out_data_bitwidth, concat_layout, array_size))
+    # Slice the concat channel to create the output channel data and extra signals
+    assignments.extend(generate_slice(
+        in_channel_name, out_channel_name, out_data_bitwidth, concat_layout, array_size))
 
-#     # Forward the concat channel handshake to the output channel
-#     assignments.append(f"{out_channel_name}_valid <= {in_channel_name}_valid;")
-#     assignments.append(f"{in_channel_name}_ready <= {out_channel_name}_ready;")
+    # Forward the concat channel handshake to the output channel
+    assignments.append(f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
+    assignments.append(f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
 
-#     return assignments
+    return assignments
 
 
 def generate_mapping(original_channel_name: str, channel: Channel) -> list[str]:

@@ -102,6 +102,8 @@ def main():
         raise ValueError(f"Module type {args.type} not found")
 
     generate_code = generators[args.type]
+
+    parameters["extra_signals"] = {"spec": 1}
     
     with open(args.output, "w") as file:
         print(header + generate_code(args.name, parameters), file=file)

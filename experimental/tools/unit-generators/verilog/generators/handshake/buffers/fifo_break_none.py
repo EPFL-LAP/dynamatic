@@ -1,5 +1,4 @@
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
-from generators.handshake.buffers.fifo_break_dv import generate_dataless_fifo_break_dv
 def generate_fifo_break_none(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
@@ -58,7 +57,7 @@ def generate_dataless_fifo_break_none(name, params):
     num_slots = params["num_slots"]
 
     fifo_break_dv_dataless_name = "fifo_break_dv_dataless"
-    fifo_break_dv_dataless = generate_dataless_fifo_break_dv(fifo_break_dv_dataless_name, {"num_slots": num_slots})
+    fifo_break_dv_dataless = generate_fifo_break_dv(fifo_break_dv_dataless_name, {"num_slots": num_slots, "bitwidth": 0})
 
     dataless_fifo_break_none_body = f"""
 

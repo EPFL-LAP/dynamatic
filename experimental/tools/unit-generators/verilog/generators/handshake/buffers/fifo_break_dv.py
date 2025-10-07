@@ -1,9 +1,30 @@
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+
+
 def generate_fifo_break_dv(name, params):
+    bitwidth = params["bitwidth"]
+    num_slots = params["num_slots"]
+    extra_signals = params.get("extra_signals", None)
+
+    if num_slots == 1:
+        return generate_one_slot_break_dv(name, params)
+
+    if extra_signals:
+        return _generate_fifo_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_fifo_break_dv_dataless(name, num_slots)
+    else:
+        return _generate_fifo_break_dv(name, {"num_slots": num_slots, "bitwidth": bitwidth})
+
+
+def _generate_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
     if(bitwidth == "0"):
-      return generate_dataless_fifo_break_dv(name, params)
+      return _generate_fifo_break_dv_dataless(name, params)
 
     return f"""
 // Module of fifo_break_dv
@@ -109,12 +130,12 @@ module {name}(
 endmodule
 """
 
-def generate_dataless_fifo_break_dv(name, params):
+def _generate_fifo_break_dv_dataless(name, params):
 
     num_slots = params["num_slots"]
 
     return f"""
-// Module of dataless_fifo_break_dv
+// Module of fifo_break_dv_dataless
 
 module {name}(
   input  clk,
@@ -196,3 +217,20 @@ module {name}(
 
 endmodule
 """
+
+def _generate_fifo_break_dv_signal_manager(name, size, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_fifo_break_dv(name, size, bitwidth + extra_signals_bitwidth))
