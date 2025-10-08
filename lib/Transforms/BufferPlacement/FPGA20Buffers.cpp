@@ -50,13 +50,6 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    //
-    llvm::errs() << "slots " << model->getValue(chVars.bufNumSlots) << "\n";
-    llvm::errs() << "slots (int) "
-                 << static_cast<unsigned>(model->getValue(chVars.bufNumSlots) +
-                                          0.5)
-                 << "\n";
-
     unsigned numSlotsToPlace =
         static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
 
