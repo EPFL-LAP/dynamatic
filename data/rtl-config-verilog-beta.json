@@ -157,19 +157,9 @@
   {
     "name": "handshake.merge",
     "parameters": [
-      { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false}
+      { "name": "SIZE", "type": "unsigned"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t merge -p size=$SIZE data_type=$DATA_TYPE",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.merge",
-    "parameters": [
-      { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t merge -p size=$SIZE data_type=$DATA_TYPE",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t merge -p size=$SIZE bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {

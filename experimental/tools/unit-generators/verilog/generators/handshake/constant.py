@@ -1,6 +1,16 @@
+from generators.support.signal_manager import generate_default_signal_manager
+
 def generate_constant(name, params):
     bitwidth = params["bitwidth"]
     value = params["value"]
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_constant_signal_manager(name, value, bitwidth, extra_signals)
+    else:
+        return _generate_constant(name, value, bitwidth)
+
+def _generate_constant(name, bitwidth, value):
 
     constant = f"""
 // Module of constant
@@ -22,6 +32,20 @@ module {name}(
 
 endmodule
 """
-
-
     return constant
+
+def _generate_constant_signal_manager(name, value, bitwidth, extra_signals):
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "ctrl",
+            "bitwidth": 0,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_constant(name, value, bitwidth))

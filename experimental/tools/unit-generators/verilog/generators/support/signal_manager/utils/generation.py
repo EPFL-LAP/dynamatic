@@ -26,7 +26,7 @@ def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_nam
         # Include data if present
         if in_data_bitwidth > 0:
             assignments.append(
-                f"{out_channel_name} [{in_data_bitwidth} - 1 : 0] <= {in_channel_name};")
+                f"assign {out_channel_name} [{in_data_bitwidth} - 1 : 0] = {in_channel_name};")
 
         # Include all extra signals
         for signal_name, (msb, lsb) in concat_layout.mapping:
@@ -83,12 +83,12 @@ def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidt
             # Include data if present
             if out_data_bitwidth > 0:
                 assignments.append(
-                    f"assign {out_channel_name}({i}) = {in_channel_name}({i})[{out_data_bitwidth} - 1 : 0];")
+                    f"assign {out_channel_name}[{i}] = {in_channel_name}[{i}][{out_data_bitwidth} - 1 : 0];")
 
             # Include all extra signals
             for signal_name, (msb, lsb) in concat_layout.mapping:
                 assignments.append(
-                    f"assign {out_channel_name}_{i}_{signal_name} = {in_channel_name}({i})[{msb + out_data_bitwidth} : {lsb + out_data_bitwidth}];")
+                    f"assign {out_channel_name}_{i}_{signal_name} = {in_channel_name}[{i}][{msb + out_data_bitwidth} : {lsb + out_data_bitwidth}];")
 
     return assignments
 

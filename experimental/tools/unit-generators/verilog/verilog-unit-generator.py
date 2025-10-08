@@ -103,7 +103,9 @@ def main():
 
     generate_code = generators[args.type]
 
-    parameters["extra_signals"] = {"spec": 1}
+    # For testing purposes TODO TODELETE
+    # if args.type not in ["fork", "lazy_fork", "control_merge", "mux"]:
+    #     parameters["extra_signals"] = {"spec": 1}
     
     with open(args.output, "w") as file:
         print(header + generate_code(args.name, parameters), file=file)

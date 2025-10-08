@@ -1,9 +1,23 @@
+
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+
+
 def generate_one_slot_break_dvr(name, params):
-
     bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-    dataless_one_slot_break_dvr_name = "one_slot_break_dvr_dataless"
-    dataless_one_slot_break_dvr = generate_dataless_one_slot_break_dvr(dataless_one_slot_break_dvr_name, {})
+    if extra_signals:
+        return _generate_one_slot_break_dvr_signal_manager(name, bitwidth, extra_signals)
+    if bitwidth == 0:
+        return _generate_one_slot_break_dvr_dataless(name)
+    else:
+        return _generate_one_slot_break_dvr(name, bitwidth)
+
+def _generate_one_slot_break_dvr(name, bitwidth):
+
+    one_slot_break_dvr_dataless_name = "one_slot_break_dvr_dataless"
+    one_slot_break_dvr_dataless = _generate_one_slot_break_dvr_dataless(one_slot_break_dvr_dataless_name)
 
     one_slot_break_dvr_body = f"""
 // Module of one_slot_break_dvr
@@ -23,7 +37,7 @@ module {name}(
   reg [{bitwidth} - 1 : 0] dataReg = 0;
   
   // Instance of one_slot_break_dvr_dataless to manage handshaking
-  {dataless_one_slot_break_dvr_name} control (
+  {one_slot_break_dvr_dataless_name} control (
     .clk        (clk       ),
     .rst        (rst       ),
     .ins_valid  (ins_valid ),
@@ -47,12 +61,12 @@ module {name}(
 endmodule
 """
 
-    return dataless_one_slot_break_dvr + one_slot_break_dvr_body
+    return one_slot_break_dvr_dataless + one_slot_break_dvr_body
 
-def generate_dataless_one_slot_break_dvr(name, params):
+def _generate_one_slot_break_dvr_dataless(name):
 
     return f"""
-// Module of dataless_one_slot_break_dvr
+// Module of one_slot_break_dvr_dataless
 module {name} (
   input  clk,
   input  rst,
@@ -97,3 +111,20 @@ module {name} (
 
 endmodule
 """
+
+def _generate_one_slot_break_dvr_signal_manager(name, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_one_slot_break_dvr(name, bitwidth + extra_signals_bitwidth))

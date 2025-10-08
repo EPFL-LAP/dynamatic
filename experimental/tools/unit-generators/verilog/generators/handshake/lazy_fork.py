@@ -1,15 +1,28 @@
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+
+
 def generate_lazy_fork(name, params):
+    # Number of output ports
     size = params["size"]
+
     bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-    if(bitwidth == 0):
-        return generate_dataless_lazy_fork(name, {"size": size})
+    if extra_signals:
+        return _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_lazy_fork_dataless(name, size)
+    else:
+        return _generate_lazy_fork(name, size, bitwidth)
 
-    dataless_lazy_fork_name = name + "_dataless_lazy_fork"
+def _generate_lazy_fork(name, size, bitwidth):
+
+    lazy_fork_dataless_name = name + "_lazy_fork_dataless"
 
 
 
-    datalessFork = generate_dataless_lazy_fork(dataless_lazy_fork_name, {"size": size})
+    fork_dataless = _generate_lazy_fork_dataless(lazy_fork_dataless_name, size)
     lazy_fork = f"""
 // Module of lazy_fork
 module {name}(
@@ -25,7 +38,7 @@ module {name}(
 	input  [{size} - 1 : 0] outs_ready
 );
 
-  {dataless_lazy_fork_name} control (
+  {lazy_fork_dataless_name} control (
     .clk 			    (clk				        ),
     .rst 			    (rst				        ),
     .ins_valid 		(ins_valid			    ),
@@ -40,13 +53,12 @@ endmodule
 """
 
 
-    return datalessFork + lazy_fork
+    return fork_dataless + lazy_fork
 
-def generate_dataless_lazy_fork(name, params):
-    size = params["size"]
+def _generate_lazy_fork_dataless(name, size):
 
-    datalessFork = f"""
-// Module of dataless_lazy_fork
+    fork_dataless = f"""
+// Module of lazy_fork_dataless
 module {name}(
   input  clk,
 	input  rst,
@@ -87,4 +99,23 @@ endmodule
 """
 
 
-    return datalessFork
+    return fork_dataless
+
+
+def _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        extra_signals,
+        lambda name: _generate_lazy_fork(name, size, bitwidth + extra_signals_bitwidth))

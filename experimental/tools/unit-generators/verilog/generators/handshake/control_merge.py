@@ -1,18 +1,33 @@
-from generators.handshake.fork import generate_datalessFork
+from generators.handshake.fork import generate_fork
 from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
-from generators.handshake.merge import generate_dataless_merge
+from generators.handshake.merge import generate_merge
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake
+from generators.support.signal_manager.utils.types import ExtraSignals
+
 
 def generate_control_merge(name, params):
-
+    # Number of data input ports
     size = params["size"]
+
     data_bitwidth = params["data_bitwidth"]
     index_bitwidth = params["index_bitwidth"]
 
-    if(data_bitwidth == 0):
-      return generate_dataless_control_merge(name, {"size": size, "index_bitwidth": index_bitwidth})
+    # e.g., {"tag0": 8, "spec": 1}
+    extra_signals = params["extra_signals"]
 
-    dataless_control_merge_name = name + "_control_merge_dataless"
-    dataless_control_merge = generate_dataless_control_merge(dataless_control_merge_name, {"size": size, "index_bitwidth": index_bitwidth})
+    if extra_signals:
+        return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
+    elif data_bitwidth == 0:
+        return _generate_control_merge_dataless(name, size, index_bitwidth)
+    else:
+        return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
+
+def _generate_control_merge(name, size, data_bitwidth, index_bitwidth):
+    control_merge_dataless_name = name + "_control_merge_dataless"
+    control_merge_dataless = _generate_control_merge_dataless(control_merge_dataless_name, size, index_bitwidth)
 
     control_merge_body = f"""
 // Module of control_merge
@@ -34,7 +49,7 @@ def generate_control_merge(name, params):
   );
     wire [{index_bitwidth} - 1 : 0] index_internal;
 
-    {dataless_control_merge_name} control (
+    {control_merge_dataless_name} control (
       .clk          (clk            ),
       .rst          (rst            ),
       .ins_valid    (ins_valid      ),
@@ -53,23 +68,21 @@ def generate_control_merge(name, params):
 
 """
 
-    return dataless_control_merge + control_merge_body
+    return control_merge_dataless + control_merge_body
 
-def generate_dataless_control_merge(name, params):
-    size = params["size"]
-    index_bitwidth = params["index_bitwidth"]
+def _generate_control_merge_dataless(name, size, index_bitwidth):
 
-    dataless_merge_name = name + "_dataless_merge"
-    dataless_merge = generate_dataless_merge(dataless_merge_name, {"size": size})
+    merge_dataless_name = name + "_merge_dataless"
+    merge_dataless = generate_merge(merge_dataless_name, {"size": size, "bitwidth": 0})
 
     one_slot_break_r_name = name + "_one_slot_break_r"
     one_slot_break_r = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_bitwidth})
 
     fork_dataless_name = name + "_fork_dataless"
-    fork_dataless = generate_datalessFork(fork_dataless_name, {"size": 2})
+    fork_dataless = generate_fork(fork_dataless_name, {"size": 2, "bitwidth": 0})
 
-    dataless_controll_merge_body=f"""
-// Module of dataless_control_merge
+    controll_merge_dataless_body=f"""
+// Module of control_merge_dataless
 module {name}(
   input  clk,
   input  rst,
@@ -105,7 +118,7 @@ module {name}(
   end
 
   // Instantiate Merge_dataless
-  {dataless_merge_name} merge_ins (
+  {merge_dataless_name} merge_ins (
     .clk        (clk          ),
     .rst        (rst          ),
     .ins_valid  (ins_valid    ),
@@ -139,4 +152,90 @@ module {name}(
 endmodule
 """
 
-    return dataless_merge + one_slot_break_r + fork_dataless + dataless_controll_merge_body
+    return merge_dataless + one_slot_break_r + fork_dataless + controll_merge_dataless_body
+
+# TODO: Update CMerge's type constraints and remove this function
+def _generate_index_extra_signal_assignments(index_name: str, index_extra_signals: ExtraSignals) -> str:
+    """
+    Generate VHDL assignments for extra signals on the index port (cmerge).
+
+    Example:
+      - assign index_tag0 = "0";
+    """
+
+    # TODO: Extra signals on the index port are not tested
+    index_extra_signals_list = []
+    for signal_name in index_extra_signals:
+        index_extra_signals_list.append(
+            f"assign {index_name}_{signal_name} = {get_default_extra_signal_value(signal_name)};")
+    return "\n  ".join(index_extra_signals_list)
+
+def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
+    # Generate signal manager entity
+    entity = generate_entity(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": data_bitwidth,
+            "size": size,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "index",
+            "bitwidth": index_bitwidth,
+            # TODO: Extra signals for index port are not tested
+            "extra_signals": extra_signals
+        }, {
+            "name": "outs",
+            "bitwidth": data_bitwidth,
+            "extra_signals": extra_signals
+        }])
+
+    # Layout info for how extra signals are packed into one std_logic_vector
+    concat_layout = ConcatLayout(extra_signals)
+    extra_signals_bitwidth = concat_layout.total_bitwidth
+
+    inner_name = f"{name}_inner"
+    inner = _generate_control_merge(
+        inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
+
+    assignments = []
+
+    # Concatenate ins data and extra signals to create ins_inner
+    assignments.extend(generate_concat_and_handshake(
+        "ins", data_bitwidth, "ins_inner", concat_layout, size))
+
+    # Slice outs_inner data to create outs data and extra signals
+    assignments.extend(generate_slice_and_handshake(
+        "outs_inner", "outs", data_bitwidth, concat_layout))
+
+    # Assign index extra signals (TODO: Remove this)
+    index_extra_signal_assignments = _generate_index_extra_signal_assignments(
+        "index", extra_signals)
+
+    architecture = f"""
+  // Concat/slice data and extra signals
+  { "\n  ".join(assignments) }
+
+  // Assign index extra signals
+  { index_extra_signal_assignments }
+
+  // Inner module instance
+  {inner_name} inner (
+      .clk(clk),
+      .rst(rst),
+      .ins(ins_inner),
+      .ins_valid(ins_inner_valid),
+      .ins_ready(ins_inner_ready),
+      .outs(outs_inner),
+      .outs_valid(outs_inner_valid),
+      .outs_ready(outs_inner_ready),
+      .index(index),
+      .index_valid(index_valid),
+      .index_ready(index_ready)
+  );
+
+endmodule
+"""
+
+    return inner + entity + architecture

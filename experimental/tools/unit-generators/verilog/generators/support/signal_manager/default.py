@@ -33,7 +33,7 @@ def generate_default_signal_manager(
     out_channel_names = enumerate_channel_names(out_channels)
     extra_signal_assignments = []
     # Signal-wise forwarding of extra signals from input channels to output channels
-    # Example: result_spec <= lhs_spec or rhs_spec;
+    # Example: assign result_spec = lhs_spec or rhs_spec;
     for signal_name in extra_signals:
         extra_signal_assignments.extend(generate_signal_wise_forwarding(
             in_channel_names, out_channel_names, signal_name))

@@ -1,10 +1,20 @@
-def generate_merge(name, params):
-    # Number of input ports
-    size = params["size"]
-    datatype = params["datatype"]
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
-    if(datatype == 0):
-        return generate_dataless_merge(name, {"size": size})
+def generate_merge(name, params):
+    # Number of intput ports
+    size = params["size"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_merge_dataless(name, size)
+    else:
+        return _generate_merge(name, size, bitwidth)
+
+def _generate_merge(name, size, bitwidth):
 
     return f"""
 
@@ -14,30 +24,30 @@ module {name}(
   input  clk,
   input  rst,
   // Input channels
-  input  [{size} * {datatype} - 1 : 0] ins, 
+  input  [{size} * {bitwidth} - 1 : 0] ins, 
   input  [{size} - 1 : 0] ins_valid,
   output [{size} - 1 : 0] ins_ready,
   // Output channel
-  output [{datatype} - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
 
   reg tmp_valid_out;
   reg [{size} - 1 : 0] tmp_ready_out;
-  reg [{datatype} - 1 : 0] tmp_data_out;
+  reg [{bitwidth} - 1 : 0] tmp_data_out;
   integer i;
   integer cnt;
 
   always @(*) begin
     tmp_valid_out = 0;
     tmp_ready_out = {{{size}{{1'b0}}}};
-    tmp_data_out = ins[0 +: {datatype}];
+    tmp_data_out = ins[0 +: {bitwidth}];
 
     cnt = 1;
     for (i = 0; i < {size}; i = i + 1) begin
       if (cnt == 1 && ins_valid[i]) begin
-        tmp_data_out = ins[i * {datatype} +: {datatype}];
+        tmp_data_out = ins[i * {bitwidth} +: {bitwidth}];
         tmp_valid_out = 1;
         tmp_ready_out[i] = outs_ready;
         cnt = 0;
@@ -56,13 +66,10 @@ endmodule
 """
 
 
-def generate_dataless_merge(name, params):
-    # Number of input ports
-    size = params["size"]
-
+def _generate_merge_dataless(name, size):
 
     return f"""
-// Module of dataless_merge
+// Module of merge_dataless
 module {name}(
   input  clk,
   input  rst,
@@ -94,3 +101,22 @@ module {name}(
 
 endmodule
 """
+
+def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
+    # Haven't tested this function yet
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))

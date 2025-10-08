@@ -1,12 +1,21 @@
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
+
 def generate_cond_br(name, params):
     bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-    if(bitwidth == 0):
-        return generate_dataless_cond_br(name, {})
+    if extra_signals:
+        return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_cond_br_dataless(name)
+    else:
+        return _generate_cond_br(name, bitwidth)
 
-    dataless_cond_br_name = name + "_dataless_cond_br"
-    dataless_cond_br = generate_dataless_cond_br(dataless_cond_br_name, {})
+def _generate_cond_br(name, bitwidth):
+
+    cond_br_dataless_name = name + "_cond_br_dataless"
+    cond_br_dataless = _generate_cond_br_dataless(cond_br_dataless_name)
 
     body_cond_br = f"""
 // Module of cond_br
@@ -30,7 +39,7 @@ module {name}(
   output falseOut_valid,
 	input falseOut_ready
 );
-	{dataless_cond_br_name} control (
+	{cond_br_dataless_name} control (
 		.clk			       (clk			       ),
 		.rst			       (rst	    	     ),
 		.data_valid		   (data_valid	   ),
@@ -51,16 +60,16 @@ endmodule
 
 """
 
-    return dataless_cond_br + body_cond_br
+    return cond_br_dataless + body_cond_br
 
-def generate_dataless_cond_br(name, params):
+def _generate_cond_br_dataless(name):
 
     join_name = name + "_join"
 
     join_instance = generate_join(join_name, {"size":2})
 
-    body_dataless_cond_br = f"""
-// Module of dataless_cond_br
+    body_cond_br_dataless = f"""
+// Module of cond_br_dataless
 
 // In the original implementation
 // Data Organization: out2-:32, out1+:32
@@ -109,4 +118,30 @@ module {name} (
 endmodule
 """
 
-    return join_instance + body_dataless_cond_br
+    return join_instance + body_cond_br_dataless
+
+def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
+    return generate_default_signal_manager(
+        name,
+        [{
+            "name": "data",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "condition",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "trueOut",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "falseOut",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name:
+            (_generate_cond_br_dataless(name) if bitwidth == 0
+             else _generate_cond_br(name, bitwidth)))

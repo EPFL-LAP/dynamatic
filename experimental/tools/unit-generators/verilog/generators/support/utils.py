@@ -1,6 +1,12 @@
 from typing import Type, Union
 from enum import Enum
 
+
+def data(code: str, bitwidth: int) -> str:
+    return code if bitwidth else ""
+
+
+# Define the type for extra signals, which are stored as a dictionary with signal names and their bitwidths.
 ExtraSignals = dict[str, int]
 
 

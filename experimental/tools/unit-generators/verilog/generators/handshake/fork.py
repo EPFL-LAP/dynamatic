@@ -1,17 +1,29 @@
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+
 def generate_fork(name, params):
+    # Number of output ports
     size = params["size"]
+
     bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-    if(bitwidth == 0):
-        return generate_datalessFork(name, {"size": size})
-    
-    datalessFork_name = name + "_datalessFork"
+    if extra_signals:
+        return _generate_fork_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_fork_dataless(name, size)
+    else:
+        return _generate_fork(name, size, bitwidth)
+
+def _generate_fork(name, size, bitwidth):
+
+    fork_dataless_name = name + "_fork_dataless"
 
 
 
-    datalessFork = generate_datalessFork(datalessFork_name, {"size": size})
-    Fork = f"""
-// Module of Fork
+    fork_dataless = _generate_fork_dataless(fork_dataless_name, size)
+    fork = f"""
+// Module of fork
 module {name}(
 	input  clk,
 	input  rst,
@@ -25,7 +37,7 @@ module {name}(
 	input  [{size} - 1 : 0] outs_ready
 );
 
-  {datalessFork_name} control (
+  {fork_dataless_name} control (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins_valid  (ins_valid  ),
@@ -41,10 +53,9 @@ endmodule
 """
 
 
-    return datalessFork + Fork
+    return fork_dataless + fork
 
-def generate_datalessFork(name, params):
-    size = params["size"]
+def _generate_fork_dataless(name, size):
 
     eager_fork_register_block_name = name + "_eager_fork_register_block"
     eager_fork_register_block = f"""
@@ -79,8 +90,8 @@ module {eager_fork_register_block_name} (
 endmodule
 """
 
-    datalessFork = f"""
-// Module of datalessFork
+    fork_dataless = f"""
+// Module of fork_dataless
 
 module {name}(
 	input  clk,
@@ -123,6 +134,22 @@ module {name}(
 endmodule
 
 """
+    return eager_fork_register_block + fork_dataless
 
-
-    return eager_fork_register_block + datalessFork
+def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        extra_signals,
+        lambda name: _generate_fork(name, size, bitwidth + extra_signals_bitwidth))

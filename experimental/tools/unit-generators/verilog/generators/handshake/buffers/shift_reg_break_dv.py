@@ -1,13 +1,27 @@
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+
+
 def generate_shift_reg_break_dv(name, params):
+    bitwidth = params["bitwidth"]
+    num_slots = params["num_slots"]
+
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals)
+    if bitwidth == 0:
+        return _generate_shift_reg_break_dv_dataless(name, num_slots)
+    else:
+        return _generate_shift_reg_break_dv(name, num_slots, bitwidth)
+
+def _generate_shift_reg_break_dv(name, params):
 
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
-    if(bitwidth == 0):
-        return generate_dataless_shift_reg_break_dv(name, {"num_slots": num_slots})
-
-    dataless_shift_reg_break_dv_name = "shift_reg_break_dv_dataless"
-    dataless_shift_reg_break_dv = generate_dataless_shift_reg_break_dv(dataless_shift_reg_break_dv_name, {"num_slots": num_slots})
+    shift_reg_break_dv_dataless_name = "shift_reg_break_dv_dataless"
+    shift_reg_break_dv_dataless = _generate_shift_reg_break_dv_dataless(shift_reg_break_dv_dataless_name, num_slots)
 
     shift_reg_break_dv_body = f"""
 // Module of shift_reg_break_dv
@@ -30,7 +44,7 @@ module {name}(
   reg [{bitwidth} - 1 : 0] Memory [0 : {num_slots} - 1];
   
   // Instance of shift_reg_break_dv_dataless to manage handshaking
-  {dataless_shift_reg_break_dv_name} control (
+  {shift_reg_break_dv_dataless_name} control (
     .clk        (clk        ),
     .rst        (rst        ),
     .ins_valid  (ins_valid  ),
@@ -59,14 +73,12 @@ module {name}(
 endmodule
 """
 
-    return dataless_shift_reg_break_dv + shift_reg_break_dv_body
+    return shift_reg_break_dv_dataless + shift_reg_break_dv_body
 
-def generate_dataless_shift_reg_break_dv(name, params):
-
-    num_slots = params["num_slots"]
+def _generate_shift_reg_break_dv_dataless(name, num_slots):
 
     return f"""
-// Module of dataless_shift_reg_break_dv
+// Module of shift_reg_break_dv_dataless
 
 module {name}(
   input  clk,
@@ -103,3 +115,20 @@ module {name}(
 
 endmodule
 """
+
+def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals):
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_shift_reg_break_dv(name, num_slots, bitwidth + extra_signals_bitwidth))

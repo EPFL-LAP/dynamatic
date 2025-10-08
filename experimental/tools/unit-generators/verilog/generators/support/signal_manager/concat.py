@@ -159,7 +159,7 @@ end architecture;
 
     architecture = f"""
     // Declarations
-    {";\n  ".join(decls)}
+    {"\n  ".join(decls)}
 
     // Concatenate/slice data and extra signals
     {"\n  ".join(assignments)}
