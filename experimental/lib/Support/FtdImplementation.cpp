@@ -953,6 +953,20 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     Value inT = muxChain[i].inT.isConst ? (muxChain[i].inT.constVal ? c1 : c0)
                                         : c0; // placeholder
 
+    // Override constants for the last mux if an input is exactly a terminal
+    // node. This ignores inF/inT.constVal and uses the terminal identity
+    // instead.
+    if (i + 1 == muxChain.size()) {
+      if (muxChain[i].inF.nodeIdx == bdd.one())
+        inF = c1;
+      else if (muxChain[i].inF.nodeIdx == bdd.zero())
+        inF = c0;
+      if (muxChain[i].inT.nodeIdx == bdd.one())
+        inT = c1;
+      else if (muxChain[i].inT.nodeIdx == bdd.zero())
+        inT = c0;
+    }
+
     rewriter.setInsertionPointToStart(block);
     auto mux = rewriter.create<handshake::MuxOp>(
         block->getOperations().front().getLoc(), c0.getType(),
