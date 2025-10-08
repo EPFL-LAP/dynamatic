@@ -587,12 +587,15 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
-  // Create Gurobi environment
+  // Create solver
+
+  auto solver = std::make_unique<CbcSolver>();
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, info, timingDB, targetCP);
+        logger, "placement", placement, std::move(solver), info, timingDB,
+        targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -610,25 +613,28 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, info, timingDB, targetCP, cfUnion)))
+              logger, milpName, placement, std::move(solver), info, timingDB,
+              targetCP, cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, info, timingDB, targetCP);
+        logger, "out_of_cycle", placement, std::move(solver), info, timingDB,
+        targetCP);
   }
   if (algorithm == CostAware) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, info, timingDB, targetCP);
+        logger, "placement", placement, std::move(solver), info, timingDB,
+        targetCP);
   }
 
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, info, timingDB, targetCP, blifFiles,
-        lutDelay, lutSize, acyclicType);
+        logger, "placement", placement, std::move(solver), info, timingDB,
+        targetCP, blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");

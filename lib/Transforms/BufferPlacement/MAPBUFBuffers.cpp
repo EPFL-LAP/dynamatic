@@ -38,21 +38,24 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::mapbuf;
 
-MAPBUFBuffers::MAPBUFBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+MAPBUFBuffers::MAPBUFBuffers(std::unique_ptr<CPSolver> solver,
+                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType)
-    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod),
+    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
 
-MAPBUFBuffers::MAPBUFBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+MAPBUFBuffers::MAPBUFBuffers(std::unique_ptr<CPSolver> solver,
+                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType,
                              Logger &logger, StringRef milpName)
-    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod, logger, milpName),
+    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod,
+                          logger, milpName),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)
