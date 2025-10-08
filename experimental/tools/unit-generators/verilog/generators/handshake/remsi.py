@@ -2,7 +2,11 @@ from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.join import generate_join
 def generate_remsi(name, params):
 
-    datatype = params["datatype"]
+    bitwidth = params["bitwidth"]
+    latency = params["latency"]
+    extra_signals = params.get("extra_signals", None)
+
+    assert(latency == 36)
 
     join_name = name + "_join"
     join = generate_join(join_name, {"size": 2})
@@ -16,13 +20,13 @@ module {name}(
   // inputs
   input  clk,
   input  rst,
-  input  [{datatype} - 1 : 0] lhs,
+  input  [{bitwidth} - 1 : 0] lhs,
   input  lhs_valid,
-  input  [{datatype} - 1 : 0] rhs,
+  input  [{bitwidth} - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [{datatype} - 1 : 0] result,
+  output [{bitwidth} - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready

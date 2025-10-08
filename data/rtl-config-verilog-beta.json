@@ -25,25 +25,25 @@
   {
     "name": "handshake.remsi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {"name": "LATENCY","type": "unsigned"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t remsi -p datatype=$DATA_TYPE extra_signals=$EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t remsi -p bitwidth=$BITWIDTH  latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
     "name": "handshake.divsi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {"name": "LATENCY","type": "unsigned"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t divsi -p datatype=$DATA_TYPE extra_signals=$EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t divsi -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
     "name": "handshake.divui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {"name": "LATENCY","type": "unsigned"}
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t divui -p datatype=$DATA_TYPE extra_signals=$EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t divui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
@@ -119,15 +119,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t fork -p bitwidth=$BITWIDTH size=$SIZE extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.fork",
-    "parameters": [
-      { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      {"name": "DATA_TYPE","type": "dataflow","data-eq": 0,"extra-eq": 0,"generic": false}
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t fork -p bitwidth=$BITWIDTH size=$SIZE extra_signals=$EXTRA_SIGNALS",
-    "hdl": "verilog"
-  },
-  {
     "name": "handshake.lazy_fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 }
@@ -164,42 +155,34 @@
   },
   {
     "name": "handshake.br",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t br -p bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t br -p bitwidth=$BITWIDTH  extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
     "name": "handshake.cond_br",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false }
-    ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t cond_br -p bitwidth=$BITWIDTH",
     "hdl": "verilog"
   },
   {
     "name": "handshake.cond_br",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t cond_br -p bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t cond_br -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
     "name": "handshake.source",
     "parameters": [],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t source -p",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t source -p extra_signals=$EXTRA_SIGNALS",
     "hdl": "verilog"
   },
   {
     "name": "handshake.constant",
     "parameters": [
-      { "name": "VALUE", "type": "string" },
-      { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
+      {
+        "name": "VALUE",
+        "type": "string"
+      }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $VALUE",
-    "hdl": "verilog"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t constant -p value=\"'$VALUE'\" bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.load",
@@ -249,14 +232,6 @@
   {
     "name": "handshake.not",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t not -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
-  },
-  {
-    "generic": "$DYNAMATIC/data/verilog/support/delay_buffer.v",
-    "hdl": "verilog"
-  },
-  {
-    "generic": "$DYNAMATIC/data/verilog/support/eager_fork_register_block.v",
-    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/logic.v",
