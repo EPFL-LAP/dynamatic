@@ -46,6 +46,8 @@ struct Var {
     return name == other.name;
   }
 
+  Var() = default;
+
   // Explicit constructor:
   // Var newVar = solver.addVariable("newVar", Var::INTEGER, std::nullopt,
   // std::nullopt);
@@ -94,13 +96,11 @@ inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
   return newExpr;
 }
 
-inline LinExpr operator+=(const LinExpr &left, const LinExpr &right) {
-  LinExpr newExpr = left;
+inline void operator+=(LinExpr &left, const LinExpr &right) {
   for (auto &[var, coeff] : right.terms) {
-    newExpr.terms[var] += coeff;
+    left.terms[var] += coeff;
   }
-  newExpr.constant += right.constant;
-  return newExpr;
+  left.constant += right.constant;
 }
 
 inline LinExpr operator-(const LinExpr &left, const LinExpr &right) {
@@ -110,6 +110,13 @@ inline LinExpr operator-(const LinExpr &left, const LinExpr &right) {
   }
   newExpr.constant -= right.constant;
   return newExpr;
+}
+
+inline void operator-=(LinExpr &left, const LinExpr &right) {
+  for (auto &[var, coeff] : right.terms) {
+    left.terms[var] -= coeff;
+  }
+  left.constant -= right.constant;
 }
 
 /// Overloading mul
@@ -124,6 +131,19 @@ inline LinExpr operator*(double c, const Var &v) {
 /// Overloading mul (commutativity of mul):
 /// var * const
 inline LinExpr operator*(const Var &v, double c) { return c * v; }
+
+/// Overloading mul
+/// const * linexpr
+inline LinExpr operator*(double c, const LinExpr &expr) {
+  LinExpr newExpr(expr);
+  for (auto &[var, coeff] : newExpr.terms) {
+    newExpr.terms[var] = c * coeff;
+  }
+  newExpr.constant *= c;
+  return newExpr;
+}
+
+inline LinExpr operator*(const LinExpr &expr, double c) { return c * expr; }
 
 struct QuadExpr {
   LinExpr linexpr;
@@ -224,6 +244,10 @@ inline LinConstr operator==(const LinExpr &lhs, double rhs) {
   return c;
 }
 
+inline LinConstr operator==(const LinExpr &lhs, const LinExpr &rhs) {
+  return (lhs - rhs == 0);
+}
+
 struct QuadConstr {
   // The expression
   QuadExpr expr;
@@ -236,6 +260,10 @@ inline QuadConstr operator<=(const QuadExpr &lhs, const QuadExpr &rhs) {
   c.expr = e;
   c.pred = LE;
   return c;
+}
+
+inline QuadConstr operator>=(const QuadExpr &lhs, const QuadExpr &rhs) {
+  return (rhs <= lhs);
 }
 
 inline QuadConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
@@ -263,8 +291,12 @@ public:
                           std::optional<double> lb,
                           std::optional<double> ub) = 0;
   virtual void addLinearConstraint(const LinConstr &constraint,
-                                   llvm::StringRef name) = 0;
-  virtual void addQuadConstraint(const QuadConstr &constraint) = 0;
+                                   llvm::StringRef constrName) = 0;
+  void addLinearConstraint(const LinConstr &constraint) {
+    addLinearConstraint(constraint, "");
+  }
+  virtual void addQuadConstraint(const QuadConstr &constraint,
+                                 llvm::StringRef constrName) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
   virtual double getValue(const Var &var) const = 0;
@@ -284,6 +316,7 @@ class GurobiSolver : public CPSolver {
 public:
   GurobiSolver() {
     env = std::make_unique<GRBEnv>(true);
+    env->set(GRB_IntParam_OutputFlag, 0);
     env->start();
     model = std::make_unique<GRBModel>(*env);
   }
@@ -333,7 +366,8 @@ public:
       llvm_unreachable("Unknown predicate!");
   }
 
-  void addQuadConstraint(const QuadConstr &constraint) override {
+  void addQuadConstraint(const QuadConstr &constraint,
+                         llvm::StringRef constrName) override {
     GRBQuadExpr expr = 0;
 
     // Quadratic terms
@@ -349,9 +383,9 @@ public:
     // Constant terms
     expr += constraint.expr.linexpr.constant;
     if (constraint.pred == LE)
-      model->addQConstr(expr <= 0);
+      model->addQConstr(expr <= 0, constrName.str());
     else if (constraint.pred == EQ)
-      model->addQConstr(expr == 0);
+      model->addQConstr(expr == 0, constrName.str());
     else
       llvm_unreachable("Unknown predicate!");
   }
@@ -359,6 +393,8 @@ public:
   void setMaximizeObjective(const LinExpr &expr) override {
     GRBLinExpr obj = 0;
     for (auto &[name, coeff] : expr.terms) {
+      llvm::errs() << "Adding vairable " << name.name << " with coeff " << coeff
+                   << " to grb!\n";
       obj += coeff * variables[name];
     }
     obj += expr.constant;
@@ -367,7 +403,9 @@ public:
   }
 
   void optimize() override {
+    model->write("/tmp/model.lp");
     model->optimize();
+    model->write("/tmp/model.json");
 
     switch (model->get(GRB_IntAttr_Status)) {
     case GRB_OPTIMAL:
@@ -484,7 +522,8 @@ public:
     solver.addRow(row, rowLower, rowUpper, constrName.str());
   }
 
-  void addQuadConstraint(const QuadConstr &constraint) override {
+  void addQuadConstraint(const QuadConstr &constraint,
+                         llvm::StringRef name) override {
     llvm::report_fatal_error(
         "Quadratic constraints is currently unavailable for CBC!");
   }

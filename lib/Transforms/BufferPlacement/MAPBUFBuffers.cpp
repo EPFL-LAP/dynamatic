@@ -38,24 +38,21 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::mapbuf;
 
-MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
+MAPBUFBuffers::MAPBUFBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
+    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
 
-MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
+MAPBUFBuffers::MAPBUFBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType,
                              Logger &logger, StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName),
+    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod, logger, milpName),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)
@@ -68,14 +65,14 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
-                            GRB_DoubleAttr_X) > 0;
-    bool forceBreakR = chVars.signalVars[SignalType::READY].bufPresent.get(
-                           GRB_DoubleAttr_X) > 0;
+    bool forceBreakDV =
+        model->getValue(chVars.signalVars[SignalType::DATA].bufPresent);
+    bool forceBreakR =
+        model->getValue(chVars.signalVars[SignalType::READY].bufPresent);
 
     PlacementResult result;
     // 1. If breaking DV & R:
@@ -118,7 +115,7 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    double tmpThroughput = model->getValue(cfVars.throughput);
 
     cfdfcTPResult[idx] = tmpThroughput;
   }
@@ -172,26 +169,27 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   unsigned minSlots =
       std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
-    model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
-    model.addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");
+    model->addLinearConstraint(chVars.bufPresent == 1, "custom_forceBuffers");
+    model->addLinearConstraint(chVars.bufNumSlots >= minSlots,
+                               "custom_minSlots");
   }
 
   // Set constraints based on minimum number of buffer slots
-  GRBVar &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
-  GRBVar &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
+  Var &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
+  Var &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
   if (props.minOpaque > 0) {
     // Force the MILP to place at least one opaque slot
-    model.addConstr(bufData == 1, "custom_forceData");
+    model->addLinearConstraint(bufData == 1, "custom_forceData");
     // If the MILP decides to also place a ready buffer, then we must reserve
     // an extra slot for it
-    model.addConstr(chVars.bufNumSlots >= props.minOpaque + bufReady,
-                    "custom_minData");
+    model->addLinearConstraint(chVars.bufNumSlots >= props.minOpaque + bufReady,
+                               "custom_minData");
   }
   if (props.minTrans > 0) {
     // If the MILP decides to also place a data buffer, then we must reserve
     // an extra slot for it
-    model.addConstr(chVars.bufNumSlots >= props.minTrans + bufData,
-                    "custom_minReady");
+    model->addLinearConstraint(chVars.bufNumSlots >= props.minTrans + bufData,
+                               "custom_minReady");
   }
 
   // Set constraints based on maximum number of buffer slots
@@ -200,16 +198,16 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
     if (maxSlots == 0) {
       // Forbid buffer placement on the channel entirely when no slots are
       // allowed
-      model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
-      model.addConstr(chVars.bufNumSlots == 0, "custom_maxSlots");
+      model->addLinearConstraint(chVars.bufPresent == 0, "custom_noBuffer");
+      model->addLinearConstraint(chVars.bufNumSlots == 0, "custom_maxSlots");
     } else {
       // Restrict the maximum number of slots allowed. If both types are allowed
       // but the MILP decides to only place one type, then the maximum allowed
       // number is the maximum number of slots we can place for that type
-      model.addConstr(chVars.bufNumSlots <=
-                          maxSlots - *props.maxOpaque * (1 - bufData) -
-                              *props.maxTrans * (1 - bufReady),
-                      "custom_maxSlots");
+      model->addLinearConstraint(
+          chVars.bufNumSlots <= maxSlots - *props.maxOpaque * (1 - bufData) -
+                                    *props.maxTrans * (1 - bufReady),
+          "custom_maxSlots");
     }
   }
 
@@ -217,11 +215,11 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   // slots on each signal
   if (props.maxOpaque && *props.maxOpaque == 0) {
     // Force the MILP to use transparent slots only
-    model.addConstr(bufData == 0, "custom_noData");
+    model->addLinearConstraint(bufData == 0, "custom_noData");
   }
   if (props.maxTrans && *props.maxTrans == 0) {
     // Force the MILP to use opaque slots only
-    model.addConstr(bufReady == 0, "custom_noReady");
+    model->addLinearConstraint(bufReady == 0, "custom_noReady");
   }
 }
 
@@ -293,7 +291,7 @@ void MAPBUFBuffers::setup() {
     addDelayAndCutConflictConstraints(rootNode, cutVector, blifData, lutDelay);
     for (auto &cut : cutVector) {
       auto &leaves = cut.getLeaves();
-      GRBVar &cutSelectionVar = cut.getCutSelectionVariable();
+      Var &cutSelectionVar = cut.getCutSelectionVariable();
       for (auto *leaf : leaves) {
         if ((leaves.size() == 1) && (*leaves.begin() == rootNode)) {
           continue;
