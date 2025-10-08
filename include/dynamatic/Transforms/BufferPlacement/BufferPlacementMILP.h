@@ -401,6 +401,10 @@ protected:
       for (auto &[op, var] : cfVars.unitVars) {
         double occupancy =
             var.retOut.get(GRB_DoubleAttr_X) - var.retIn.get(GRB_DoubleAttr_X);
+        // Approximate occupancy to 0 if it is negative but bigger than 1e-6.
+        if (occupancy < 0.0 && occupancy > -1e-6) {
+          occupancy = 0.0;
+        }
         assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
         cf->unitOccupancy[op] = occupancy;
       }
@@ -408,6 +412,10 @@ protected:
       // Store the channel occupancy into the CFDFC data structure.
       for (auto &[val, var] : cfVars.channelThroughputs) {
         double occupancy = var.get(GRB_DoubleAttr_X);
+        // Approximate occupancy to 0 if it is negative but bigger than 1e-6.
+        if (occupancy < 0.0 && occupancy > -1e-6) {
+          occupancy = 0.0;
+        }
         assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
         cf->channelOccupancy[val] = occupancy;
       }
