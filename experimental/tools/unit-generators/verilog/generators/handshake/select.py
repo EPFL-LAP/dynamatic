@@ -13,6 +13,7 @@ def generate_select(name, parameters):
     else:
         return _generate_select(name, bitwidth)
 
+
 def _generate_select(name, bitwidth):
 
     antitoken_module_name = name + "_antitokens"
@@ -234,15 +235,15 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
 
     architecture = f"""
   // Declarations
-  { "\n  ".join(concat_decls) }
-  { "\n  ".join(slice_decls) }
+  {"\n  ".join(concat_decls)}
+  {"\n  ".join(slice_decls)}
 
   // Concatenate extra signals
-  { "\n  ".join(concat_assignments) }
-  { "\n  ".join(slice_assignments) }
+  {"\n  ".join(concat_assignments)}
+  {"\n  ".join(slice_assignments)}
 
   // Forwarding logic
-  { "\n  ".join(forwarding_assignments) }
+  {"\n  ".join(forwarding_assignments)}
 
   assign result             = result_inner;
   assign result_valid       = result_inner_valid;

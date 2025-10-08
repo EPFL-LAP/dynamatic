@@ -11,6 +11,7 @@ def generate_sink(name, params):
     else:
         return _generate_sink(name, bitwidth)
 
+
 def _generate_sink(name, bitwidth):
 
     empty_sink = f"""

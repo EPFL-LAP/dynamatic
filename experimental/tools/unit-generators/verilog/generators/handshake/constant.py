@@ -1,15 +1,18 @@
 from generators.support.signal_manager import generate_default_signal_manager
 
+
 def generate_constant(name, params):
     bitwidth = params["bitwidth"]
     value = params["value"]
     extra_signals = params.get("extra_signals", None)
-    print(f"Generating constant {name} with value {value} and bitwidth {bitwidth}")
+    print(
+        f"Generating constant {name} with value {value} and bitwidth {bitwidth}")
 
     if extra_signals:
         return _generate_constant_signal_manager(name, value, bitwidth, extra_signals)
     else:
         return _generate_constant(name, value, bitwidth)
+
 
 def _generate_constant(name, value, bitwidth):
 
@@ -34,6 +37,7 @@ module {name}(
 endmodule
 """
     return constant
+
 
 def _generate_constant_signal_manager(name, value, bitwidth, extra_signals):
     return generate_default_signal_manager(

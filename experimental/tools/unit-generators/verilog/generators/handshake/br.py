@@ -1,5 +1,6 @@
 from generators.support.signal_manager import generate_default_signal_manager
 
+
 def generate_br(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
@@ -11,11 +12,12 @@ def generate_br(name, params):
     else:
         return _generate_br(name, bitwidth)
 
+
 def _generate_br(name, bitwidth):
 
     br_dataless_name = name + "_br_dataless"
     br_dataless = _generate_br_dataless(br_dataless_name)
-    
+
     body_br = f"""
 // Module of br
 module {name}(
@@ -46,6 +48,7 @@ endmodule
 """
 
     return br_dataless + body_br
+
 
 def _generate_br_dataless(name):
 

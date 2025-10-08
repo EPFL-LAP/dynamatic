@@ -23,8 +23,8 @@ def _generate_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
-    if(bitwidth == "0"):
-      return _generate_fifo_break_dv_dataless(name, params)
+    if (bitwidth == "0"):
+        return _generate_fifo_break_dv_dataless(name, params)
 
     return f"""
 // Module of fifo_break_dv
@@ -130,6 +130,7 @@ module {name}(
 endmodule
 """
 
+
 def _generate_fifo_break_dv_dataless(name, params):
 
     num_slots = params["num_slots"]
@@ -217,6 +218,7 @@ module {name}(
 
 endmodule
 """
+
 
 def _generate_fifo_break_dv_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

@@ -22,9 +22,10 @@ def generate_mux(name, params):
     else:
         return _generate_mux(name, size, index_bitwidth, data_bitwidth)
 
+
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
 
-  _mux_dataless = f"""
+    _mux_dataless = f"""
 // Module of smux
 module {name}(
   input  clk,
@@ -81,11 +82,12 @@ module {name}(
 
 endmodule
 """
-  return _mux_dataless
+    return _mux_dataless
+
 
 def _generate_mux_dataless(name, size, index_bitwidth):
 
-  _mux_dataless = f"""
+    _mux_dataless = f"""
 // Module of_mux_dataless
 module {name}(
   input  clk,
@@ -125,9 +127,7 @@ module {name}(
 endmodule
 """
 
-  return _mux_dataless
-
-
+    return _mux_dataless
 
 
 def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int) -> tuple[str, str]:

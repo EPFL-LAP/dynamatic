@@ -11,6 +11,6 @@ __all__ = [
     "generate_buffered_signal_manager",
     "generate_unary_signal_manager",
     "generate_arith_binary_signal_manager",
-   "generate_concat_signal_manager",
-#    "generate_spec_units_signal_manager",
+    "generate_concat_signal_manager",
+    #    "generate_spec_units_signal_manager",
 ]

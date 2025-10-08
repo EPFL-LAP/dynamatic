@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
+
 def generate_one_slot_break_dv(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
@@ -12,12 +13,14 @@ def generate_one_slot_break_dv(name, params):
     else:
         return _generate_one_slot_break_dv(name, bitwidth)
 
+
 def _generate_one_slot_break_dv(name, bitwidth):
 
-  one_slot_break_dv_dataless_name = name + "_dataless"
-  one_slot_break_dv_dataless = _generate_one_slot_break_dv_dataless(one_slot_break_dv_dataless_name)
+    one_slot_break_dv_dataless_name = name + "_dataless"
+    one_slot_break_dv_dataless = _generate_one_slot_break_dv_dataless(
+        one_slot_break_dv_dataless_name)
 
-  one_slot_break_dv_body = f"""
+    one_slot_break_dv_body = f"""
 // Module of one_slot_break_dv
 module {name}(
   input  clk,
@@ -60,10 +63,11 @@ endmodule
 
 """
 
-  return one_slot_break_dv_dataless + one_slot_break_dv_body
+    return one_slot_break_dv_dataless + one_slot_break_dv_body
+
 
 def _generate_one_slot_break_dv_dataless(name):
-  return f"""
+    return f"""
 // Module of one_slot_break_dv_dataless
 module {name} (
   input  clk,
@@ -91,6 +95,7 @@ module {name} (
   
 endmodule
 """
+
 
 def _generate_one_slot_break_dv_signal_manager(name, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

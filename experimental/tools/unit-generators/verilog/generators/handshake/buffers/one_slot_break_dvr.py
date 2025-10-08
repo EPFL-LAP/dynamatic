@@ -14,10 +14,12 @@ def generate_one_slot_break_dvr(name, params):
     else:
         return _generate_one_slot_break_dvr(name, bitwidth)
 
+
 def _generate_one_slot_break_dvr(name, bitwidth):
 
     one_slot_break_dvr_dataless_name = "one_slot_break_dvr_dataless"
-    one_slot_break_dvr_dataless = _generate_one_slot_break_dvr_dataless(one_slot_break_dvr_dataless_name)
+    one_slot_break_dvr_dataless = _generate_one_slot_break_dvr_dataless(
+        one_slot_break_dvr_dataless_name)
 
     one_slot_break_dvr_body = f"""
 // Module of one_slot_break_dvr
@@ -62,6 +64,7 @@ endmodule
 """
 
     return one_slot_break_dvr_dataless + one_slot_break_dvr_body
+
 
 def _generate_one_slot_break_dvr_dataless(name):
 
@@ -111,6 +114,7 @@ module {name} (
 
 endmodule
 """
+
 
 def _generate_one_slot_break_dvr_signal_manager(name, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

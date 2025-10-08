@@ -16,11 +16,10 @@ def generate_lazy_fork(name, params):
     else:
         return _generate_lazy_fork(name, size, bitwidth)
 
+
 def _generate_lazy_fork(name, size, bitwidth):
 
     lazy_fork_dataless_name = name + "_lazy_fork_dataless"
-
-
 
     fork_dataless = _generate_lazy_fork_dataless(lazy_fork_dataless_name, size)
     lazy_fork = f"""
@@ -52,8 +51,8 @@ module {name}(
 endmodule
 """
 
-
     return fork_dataless + lazy_fork
+
 
 def _generate_lazy_fork_dataless(name, size):
 
@@ -97,7 +96,6 @@ module {name}(
 endmodule
 
 """
-
 
     return fork_dataless
 

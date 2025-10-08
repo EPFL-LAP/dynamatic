@@ -1,5 +1,6 @@
 from generators.support.mc_support import generate_mc_support
 
+
 def generate_mem_controller(name, params):
     # Number of input ports
     num_controls = params["num_controls"]
@@ -18,9 +19,10 @@ def generate_mem_controller(name, params):
 
 def _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_type, data_type):
     mc_support = generate_mc_support("TODO", {})
-  
+
     mem_controller_loadless_name = name + "_mem_controller_loadless"
-    mem_controller_loadless = _generate_mem_controller_loadless(mem_controller_loadless_name, num_controls, num_stores, addr_type, data_type)
+    mem_controller_loadless = _generate_mem_controller_loadless(
+        mem_controller_loadless_name, num_controls, num_stores, addr_type, data_type)
 
     mem_controller_body = f"""
 // Module of mem_controller
@@ -117,6 +119,7 @@ endmodule
 """
     return mem_controller_loadless + mc_support + mem_controller_body
 
+
 def _generate_mem_controller_storeless(name, num_loads, addr_type, data_type):
 
     mc_support = generate_mc_support("TODO", {})
@@ -200,6 +203,7 @@ module {name}(
 endmodule
 """
     return mc_support + mem_controller_storeless_body
+
 
 def _generate_mem_controller_loadless(name, num_controls, num_stores, addr_type, data_type):
     mc_support = generate_mc_support("TODO", {})

@@ -2,6 +2,7 @@ from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
+
 def generate_fifo_break_none(name, params):
     bitwidth = params["bitwidth"]
     num_slots = params["num_slots"]
@@ -14,12 +15,14 @@ def generate_fifo_break_none(name, params):
     else:
         return _generate_fifo_break_none(name, num_slots, bitwidth)
 
+
 def _generate_fifo_break_none(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
     fifo_break_dv_name = "fifo_break_dv"
-    fifo_break_dv = generate_fifo_break_dv(fifo_break_dv_name, {"num_slots": num_slots, "bitwidth": bitwidth})
+    fifo_break_dv = generate_fifo_break_dv(
+        fifo_break_dv_name, {"num_slots": num_slots, "bitwidth": bitwidth})
 
     fifo_break_none_body = f"""
 // Module of fifo_break_none
@@ -65,11 +68,13 @@ endmodule
 
     return fifo_break_dv + fifo_break_none_body
 
+
 def _generate_fifo_break_none_dataless(name, params):
     num_slots = params["num_slots"]
 
     fifo_break_dv_name_dataless = "fifo_break_dv_dataless"
-    fifo_break_dv_dataless = generate_fifo_break_dv(fifo_break_dv_name_dataless, {"num_slots": num_slots, "bitwidth": 0})
+    fifo_break_dv_dataless = generate_fifo_break_dv(
+        fifo_break_dv_name_dataless, {"num_slots": num_slots, "bitwidth": 0})
 
     fifo_break_none_dataless_body = f"""
 
@@ -106,6 +111,7 @@ endmodule
 """
 
     return fifo_break_dv_dataless + fifo_break_none_dataless_body
+
 
 def _generate_fifo_break_none_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

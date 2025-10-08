@@ -1,10 +1,11 @@
 from generators.support.arith_binary import generate_arith_binary
 
+
 def generate_muli(name, params):
     bitwidth = params["bitwidth"]
     latency = params["latency"]
 
-    assert(latency == 4)
+    assert (latency == 4)
 
     mul_4_stage_name = name + "_mul_4_stage"
     dependencies = f"""
@@ -53,10 +54,10 @@ endmodule
 """
 
     return generate_arith_binary(
-      name=name,
-      op_body=muli_body,
-      handshake_op="muli",
-      latency=latency,
-      bitwidth=bitwidth,
-      dependencies=dependencies,
-      extra_signals=params.get("extra_signals", None))
+        name=name,
+        op_body=muli_body,
+        handshake_op="muli",
+        latency=latency,
+        bitwidth=bitwidth,
+        dependencies=dependencies,
+        extra_signals=params.get("extra_signals", None))

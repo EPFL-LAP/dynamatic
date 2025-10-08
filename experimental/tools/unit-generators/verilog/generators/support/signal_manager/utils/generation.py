@@ -119,8 +119,10 @@ def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, o
         in_channel_name, in_data_bitwidth, out_channel_name, concat_layout, array_size))
 
     # Forward the input channel handshake to the concat channel
-    assignments.append(f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
-    assignments.append(f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
+    assignments.append(
+        f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
+    assignments.append(
+        f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
 
     return assignments
 
@@ -151,8 +153,10 @@ def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, ou
         in_channel_name, out_channel_name, out_data_bitwidth, concat_layout, array_size))
 
     # Forward the concat channel handshake to the output channel
-    assignments.append(f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
-    assignments.append(f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
+    assignments.append(
+        f"assign {out_channel_name}_valid = {in_channel_name}_valid;")
+    assignments.append(
+        f"assign {in_channel_name}_ready = {out_channel_name}_ready;")
 
     return assignments
 

@@ -55,7 +55,7 @@ begin
       {mappings}
     );
 end architecture;
-"""# TODO DELETE
+"""  # TODO DELETE
 
     architecture = f"""
   // Forward extra signals

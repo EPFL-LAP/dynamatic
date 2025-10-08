@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
+
 def generate_cond_br(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
@@ -11,6 +12,7 @@ def generate_cond_br(name, params):
         return _generate_cond_br_dataless(name)
     else:
         return _generate_cond_br(name, bitwidth)
+
 
 def _generate_cond_br(name, bitwidth):
 
@@ -62,11 +64,12 @@ endmodule
 
     return cond_br_dataless + body_cond_br
 
+
 def _generate_cond_br_dataless(name):
 
     join_name = name + "_join"
 
-    join_instance = generate_join(join_name, {"size":2})
+    join_instance = generate_join(join_name, {"size": 2})
 
     body_cond_br_dataless = f"""
 // Module of cond_br_dataless
@@ -119,6 +122,7 @@ endmodule
 """
 
     return join_instance + body_cond_br_dataless
+
 
 def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
     return generate_default_signal_manager(

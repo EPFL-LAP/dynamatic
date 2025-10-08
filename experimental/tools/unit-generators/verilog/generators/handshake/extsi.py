@@ -1,5 +1,6 @@
 from generators.support.unary import generate_unary
 
+
 def generate_extsi(name, params):
     input_bitwidth = params["input_bitwidth"]
     output_bitwidth = params["output_bitwidth"]

@@ -5,6 +5,7 @@ from generators.support.signal_manager.utils.generation import generate_concat, 
 from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 
+
 def generate_load(name, params):
     addr_bitwidth = params["addr_bitwidth"]
     data_bitwidth = params["data_bitwidth"]
@@ -15,13 +16,16 @@ def generate_load(name, params):
     else:
         return _generate_load(name, data_bitwidth, addr_bitwidth)
 
+
 def _generate_load(name, data_bitwidth, addr_bitwidth):
 
     one_slot_break_r_address_name = name + "_one_slot_break_r_address"
-    one_slot_break_r_address = generate_one_slot_break_r(one_slot_break_r_address_name, { "bitwidth": addr_bitwidth })
+    one_slot_break_r_address = generate_one_slot_break_r(
+        one_slot_break_r_address_name, {"bitwidth": addr_bitwidth})
 
     one_slot_break_r_data_name = name + "_one_slot_break_r_data"
-    one_slot_break_r_data = generate_one_slot_break_r(one_slot_break_r_data_name, { "bitwidth": data_bitwidth })
+    one_slot_break_r_data = generate_one_slot_break_r(
+        one_slot_break_r_data_name, {"bitwidth": data_bitwidth})
 
     load_body = f"""
 
@@ -74,7 +78,7 @@ module {name} #(
 endmodule
 """
 
-    return one_slot_break_r_address + one_slot_break_r_data +load_body
+    return one_slot_break_r_address + one_slot_break_r_data + load_body
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
@@ -133,7 +137,7 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   assign transfer_out = dataOut_valid & dataOut_ready;
 
   // Concat/slice extra signals
-  { "\n  ".join(assignments) }
+  {"\n  ".join(assignments)}
 
   // Buffer to store extra signals for in-flight memory requests
   // LoadOp is assumed to be connected to a memory controller

@@ -1,6 +1,7 @@
 from generators.support.utils import data
 from generators.support.signal_manager import generate_unary_signal_manager
 
+
 def generate_ndwire(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)

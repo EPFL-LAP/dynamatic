@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
+
 def generate_fork(name, params):
     # Number of output ports
     size = params["size"]
@@ -15,11 +16,10 @@ def generate_fork(name, params):
     else:
         return _generate_fork(name, size, bitwidth)
 
+
 def _generate_fork(name, size, bitwidth):
 
     fork_dataless_name = name + "_fork_dataless"
-
-
 
     fork_dataless = _generate_fork_dataless(fork_dataless_name, size)
     fork = f"""
@@ -52,8 +52,8 @@ module {name}(
 endmodule
 """
 
-
     return fork_dataless + fork
+
 
 def _generate_fork_dataless(name, size):
 
@@ -135,6 +135,7 @@ endmodule
 
 """
     return eager_fork_register_block + fork_dataless
+
 
 def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

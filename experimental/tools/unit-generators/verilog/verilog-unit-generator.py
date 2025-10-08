@@ -56,6 +56,7 @@ generators.add("handshake", "mem_controller")
 generators.add("handshake", "buffer")
 generators.add("support", "mem_to_bram")
 
+
 def parse_parameters(param_list):
     try:
         param_dict = {}
@@ -106,7 +107,7 @@ def main():
     # For testing purposes TODO TODELETE
     # if args.type not in ["fork", "lazy_fork", "control_merge", "mux"]:
     #     parameters["extra_signals"] = {"spec": 1}
-    
+
     with open(args.output, "w") as file:
         print(header + generate_code(args.name, parameters), file=file)
     # with open(args.output, "w") as file:

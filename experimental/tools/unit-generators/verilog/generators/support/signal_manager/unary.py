@@ -14,13 +14,15 @@ def generate_unary_signal_manager(
 ) -> str:
     if bitwidth is not None:
         if input_bitwidth is not None or output_bitwidth is not None:
-            raise RuntimeError("If bitwidth is specified, input and output bitwidth must not be specified")
+            raise RuntimeError(
+                "If bitwidth is specified, input and output bitwidth must not be specified")
 
         input_bitwidth = bitwidth
         output_bitwidth = bitwidth
 
     elif input_bitwidth is None or output_bitwidth is None:
-        raise RuntimeError("If bitwidth is not specified, both input and output bitwidth must be specified")
+        raise RuntimeError(
+            "If bitwidth is not specified, both input and output bitwidth must be specified")
 
     in_channels = \
         [{

@@ -1,12 +1,14 @@
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.join import generate_join
+
+
 def generate_divsi(name, params):
 
     bitwidth = params["bitwidth"]
     latency = params["latency"]
     extra_signals = params.get("extra_signals", None)
 
-    assert(latency == 36)
+    assert (latency == 36)
 
     join_name = name + "_join"
     join = generate_join(join_name, {"size": 2})
@@ -251,7 +253,5 @@ assign dout = quot;
 
 endmodule
 """
-
-
 
     return join + delay_buffer + divsi_body

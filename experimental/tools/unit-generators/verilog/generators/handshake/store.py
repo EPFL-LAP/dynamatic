@@ -1,5 +1,6 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 
+
 def generate_store(name, params):
     data_bitwidth = params["data_bitwidth"]
     addr_bitwidth = params["addr_bitwidth"]
@@ -9,7 +10,6 @@ def generate_store(name, params):
         return _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
     else:
         return _generate_store(name, data_bitwidth, addr_bitwidth)
-
 
 
 def _generate_store(name, data_bitwidth, addr_bitwidth):

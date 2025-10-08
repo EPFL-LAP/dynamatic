@@ -1,17 +1,19 @@
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.join import generate_join
+
+
 def generate_divui(name, params):
 
     bitwidth = params["bitwidth"]
     latency = params["latency"]
     extra_signals = params.get("extra_signals", None)
-    assert(latency == 36)
+    assert (latency == 36)
 
     join_name = name + "_join"
     join = generate_join(join_name, {"size": 2})
 
     delay_buffer_name = name + "_delay_buffer"
-    delay_buffer = generate_delay_buffer(delay_buffer_name, { "size": 35 })
+    delay_buffer = generate_delay_buffer(delay_buffer_name, {"size": 35})
 
     divui_body = f"""
 // Module of divui
@@ -67,7 +69,5 @@ module {name}(
 
 endmodule
 """
-
-
 
     return join + delay_buffer + divui_body

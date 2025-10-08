@@ -2,6 +2,7 @@ from collections.abc import Callable
 from .utils.types import ExtraSignals
 from generators.support.signal_manager import generate_buffered_signal_manager, generate_default_signal_manager
 
+
 def generate_arith_binary_signal_manager(
         name: str,
         input_bitwidth,

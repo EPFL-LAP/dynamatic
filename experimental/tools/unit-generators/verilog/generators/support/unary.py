@@ -45,13 +45,15 @@ def generate_unary(
     """
     if bitwidth is not None:
         if input_bitwidth is not None or output_bitwidth is not None:
-            raise RuntimeError("If bitwidth is specified, input and output bitwidth must not be specified")
+            raise RuntimeError(
+                "If bitwidth is specified, input and output bitwidth must not be specified")
 
         input_bitwidth = bitwidth
         output_bitwidth = bitwidth
 
     elif input_bitwidth is None or output_bitwidth is None:
-        raise RuntimeError("If bitwidth is not specified, both input and output bitwidth must be specified")
+        raise RuntimeError(
+            "If bitwidth is not specified, both input and output bitwidth must be specified")
 
     # generate inner function takes a name parameter
     # since the top level name is used for the signal manager wrapper
@@ -137,7 +139,8 @@ endmodule
     # otherwise, we need a buffer to propagate the valid
     else:
         valid_buffer_name = f"{name}_valid_buffer"
-        dependencies += generate_valid_propagation_buffer(valid_buffer_name, latency)
+        dependencies += generate_valid_propagation_buffer(
+            valid_buffer_name, latency)
 
         architecture = f"""
   // Signals

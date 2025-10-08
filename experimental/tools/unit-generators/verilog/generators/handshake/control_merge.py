@@ -25,9 +25,11 @@ def generate_control_merge(name, params):
     else:
         return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
 
+
 def _generate_control_merge(name, size, data_bitwidth, index_bitwidth):
     control_merge_dataless_name = name + "_control_merge_dataless"
-    control_merge_dataless = _generate_control_merge_dataless(control_merge_dataless_name, size, index_bitwidth)
+    control_merge_dataless = _generate_control_merge_dataless(
+        control_merge_dataless_name, size, index_bitwidth)
 
     control_merge_body = f"""
 // Module of control_merge
@@ -70,18 +72,22 @@ def _generate_control_merge(name, size, data_bitwidth, index_bitwidth):
 
     return control_merge_dataless + control_merge_body
 
+
 def _generate_control_merge_dataless(name, size, index_bitwidth):
 
     merge_dataless_name = name + "_merge_dataless"
-    merge_dataless = generate_merge(merge_dataless_name, {"size": size, "bitwidth": 0})
+    merge_dataless = generate_merge(
+        merge_dataless_name, {"size": size, "bitwidth": 0})
 
     one_slot_break_r_name = name + "_one_slot_break_r"
-    one_slot_break_r = generate_one_slot_break_r(one_slot_break_r_name, {"bitwidth": index_bitwidth})
+    one_slot_break_r = generate_one_slot_break_r(
+        one_slot_break_r_name, {"bitwidth": index_bitwidth})
 
     fork_dataless_name = name + "_fork_dataless"
-    fork_dataless = generate_fork(fork_dataless_name, {"size": 2, "bitwidth": 0})
+    fork_dataless = generate_fork(
+        fork_dataless_name, {"size": 2, "bitwidth": 0})
 
-    controll_merge_dataless_body=f"""
+    controll_merge_dataless_body = f"""
 // Module of control_merge_dataless
 module {name}(
   input  clk,
@@ -155,6 +161,8 @@ endmodule
     return merge_dataless + one_slot_break_r + fork_dataless + controll_merge_dataless_body
 
 # TODO: Update CMerge's type constraints and remove this function
+
+
 def _generate_index_extra_signal_assignments(index_name: str, index_extra_signals: ExtraSignals) -> str:
     """
     Generate VHDL assignments for extra signals on the index port (cmerge).
@@ -169,6 +177,7 @@ def _generate_index_extra_signal_assignments(index_name: str, index_extra_signal
         index_extra_signals_list.append(
             f"assign {index_name}_{signal_name} = {get_default_extra_signal_value(signal_name)};")
     return "\n  ".join(index_extra_signals_list)
+
 
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
     # Generate signal manager entity
@@ -215,10 +224,10 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
 
     architecture = f"""
   // Concat/slice data and extra signals
-  { "\n  ".join(assignments) }
+  {"\n  ".join(assignments)}
 
   // Assign index extra signals
-  { index_extra_signal_assignments }
+  {index_extra_signal_assignments}
 
   // Inner module instance
   {inner_name} inner (

@@ -21,13 +21,13 @@ def parse_predicate(predicate_string: str):
     except KeyError:
         raise ValueError(f"Unknown predicate: {predicate_string}")
 
+
 def generate_cmpi(name, params):
     bitwidth = params["bitwidth"]
     predicate_string = params["predicate"]
 
-
     predicate, signed = parse_predicate(predicate_string)
-    
+
     if signed:
         body = f"""
     wire constant_one = 1'b1;
@@ -46,7 +46,7 @@ def generate_cmpi(name, params):
     wire constant_zero = 1'b0;
     assign result = (lhs {predicate} rhs) ? constant_one : constant_zero;
 """
-    
+
     return generate_arith_binary(
         name=name,
         op_body=body,

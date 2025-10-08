@@ -9,6 +9,7 @@ def generate_source(name, params):
     else:
         return _generate_source(name)
 
+
 def _generate_source(name):
     return f"""
 // Module of source
@@ -23,6 +24,7 @@ module {name} (
 endmodule
 
 """
+
 
 def _generate_source_signal_manager(name, extra_signals):
     return generate_default_signal_manager(

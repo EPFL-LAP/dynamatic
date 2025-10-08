@@ -15,13 +15,15 @@ def generate_shift_reg_break_dv(name, params):
     else:
         return _generate_shift_reg_break_dv(name, num_slots, bitwidth)
 
+
 def _generate_shift_reg_break_dv(name, params):
 
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
     shift_reg_break_dv_dataless_name = "shift_reg_break_dv_dataless"
-    shift_reg_break_dv_dataless = _generate_shift_reg_break_dv_dataless(shift_reg_break_dv_dataless_name, num_slots)
+    shift_reg_break_dv_dataless = _generate_shift_reg_break_dv_dataless(
+        shift_reg_break_dv_dataless_name, num_slots)
 
     shift_reg_break_dv_body = f"""
 // Module of shift_reg_break_dv
@@ -75,6 +77,7 @@ endmodule
 
     return shift_reg_break_dv_dataless + shift_reg_break_dv_body
 
+
 def _generate_shift_reg_break_dv_dataless(name, num_slots):
 
     return f"""
@@ -115,6 +118,7 @@ module {name}(
 
 endmodule
 """
+
 
 def _generate_shift_reg_break_dv_signal_manager(name, num_slots, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

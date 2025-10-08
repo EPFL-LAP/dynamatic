@@ -17,7 +17,8 @@ def generate_one_slot_break_r(name, params):
 def _generate_one_slot_break_r(name, bitwidth):
 
     one_slot_break_r_dataless_name = name + "_one_slot_break_r_dataless"
-    one_slot_break_r_dataless = _generate_one_slot_break_r_dataless(one_slot_break_r_dataless_name)
+    one_slot_break_r_dataless = _generate_one_slot_break_r_dataless(
+        one_slot_break_r_dataless_name)
 
     one_slot_break_r_body = f"""
 // Module of one_slot_break_r
@@ -67,6 +68,7 @@ endmodule
 """
     return one_slot_break_r_dataless + one_slot_break_r_body
 
+
 def _generate_one_slot_break_r_dataless(name):
     return f"""
 // Module of one_slot_break_r
@@ -95,6 +97,7 @@ module {name} (
 
 endmodule
 """
+
 
 def _generate_one_slot_break_r_signal_manager(name, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)

@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
+
 def generate_merge(name, params):
     # Number of intput ports
     size = params["size"]
@@ -13,6 +14,7 @@ def generate_merge(name, params):
         return _generate_merge_dataless(name, size)
     else:
         return _generate_merge(name, size, bitwidth)
+
 
 def _generate_merge(name, size, bitwidth):
 
@@ -101,6 +103,7 @@ module {name}(
 
 endmodule
 """
+
 
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
     # Haven't tested this function yet
