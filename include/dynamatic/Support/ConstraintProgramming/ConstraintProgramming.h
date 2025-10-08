@@ -301,6 +301,8 @@ public:
   virtual void optimize() = 0;
   virtual double getValue(const Var &var) const = 0;
   virtual double getObjective() const = 0;
+
+  virtual void write(llvm::StringRef filePath) const = 0;
 };
 
 enum MILPSolver {
@@ -410,9 +412,7 @@ public:
   }
 
   void optimize() override {
-    model->write("/tmp/model.lp");
     model->optimize();
-    model->write("/tmp/model.json");
 
     switch (model->get(GRB_IntAttr_Status)) {
     case GRB_OPTIMAL:
@@ -431,6 +431,10 @@ public:
     default:
       status = ERROR;
     }
+  }
+
+  void write(llvm::StringRef filePath) const override {
+    model->write(filePath.str());
   }
 
   /// Retrieve the value from the solved MILP
@@ -572,6 +576,10 @@ public:
 
     // Update solver with solution for getValue
     solver.setColSolution(model.bestSolution());
+  }
+
+  void write(llvm::StringRef filePath) const override {
+    solver.writeLp(filePath.str().c_str());
   }
 
   double getValue(const Var &var) const override {
