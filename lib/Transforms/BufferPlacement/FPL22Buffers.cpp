@@ -37,14 +37,14 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
-                            GRB_DoubleAttr_X) > 0;
-    bool forceBreakR = chVars.signalVars[SignalType::READY].bufPresent.get(
-                           GRB_DoubleAttr_X) > 0;
+    bool forceBreakDV =
+        model->getValue(chVars.signalVars[SignalType::DATA].bufPresent) > 0;
+    bool forceBreakR =
+        model->getValue(chVars.signalVars[SignalType::READY].bufPresent) > 0;
 
     PlacementResult result;
     // 1. If breaking DV & R:
@@ -87,7 +87,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    double tmpThroughput = model->getValue(cfVars.throughput);
 
     cfdfcTPResult[idx] = tmpThroughput;
   }
@@ -109,26 +109,27 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   unsigned minSlots =
       std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
-    model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
-    model.addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");
+    model->addLinearConstraint(chVars.bufPresent == 1, "custom_forceBuffers");
+    model->addLinearConstraint(chVars.bufNumSlots >= minSlots,
+                               "custom_minSlots");
   }
 
   // Set constraints based on minimum number of buffer slots
-  GRBVar &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
-  GRBVar &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
+  Var &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
+  Var &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
   if (props.minOpaque > 0) {
     // Force the MILP to place at least one opaque slot
-    model.addConstr(bufData == 1, "custom_forceData");
+    model->addLinearConstraint(bufData == 1, "custom_forceData");
     // If the MILP decides to also place a ready buffer, then we must reserve
     // an extra slot for it
-    model.addConstr(chVars.bufNumSlots >= props.minOpaque + bufReady,
-                    "custom_minData");
+    model->addLinearConstraint(chVars.bufNumSlots >= props.minOpaque + bufReady,
+                               "custom_minData");
   }
   if (props.minTrans > 0) {
     // If the MILP decides to also place a data buffer, then we must reserve
     // an extra slot for it
-    model.addConstr(chVars.bufNumSlots >= props.minTrans + bufData,
-                    "custom_minReady");
+    model->addLinearConstraint(chVars.bufNumSlots >= props.minTrans + bufData,
+                               "custom_minReady");
   }
 
   // Set constraints based on maximum number of buffer slots
@@ -137,16 +138,16 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
     if (maxSlots == 0) {
       // Forbid buffer placement on the channel entirely when no slots are
       // allowed
-      model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
-      model.addConstr(chVars.bufNumSlots == 0, "custom_maxSlots");
+      model->addLinearConstraint(chVars.bufPresent == 0, "custom_noBuffer");
+      model->addLinearConstraint(chVars.bufNumSlots == 0, "custom_maxSlots");
     } else {
       // Restrict the maximum number of slots allowed. If both types are allowed
       // but the MILP decides to only place one type, then the maximum allowed
       // number is the maximum number of slots we can place for that type
-      model.addConstr(chVars.bufNumSlots <=
-                          maxSlots - *props.maxOpaque * (1 - bufData) -
-                              *props.maxTrans * (1 - bufReady),
-                      "custom_maxSlots");
+      model->addLinearConstraint(
+          chVars.bufNumSlots <= maxSlots - *props.maxOpaque * (1 - bufData) -
+                                    *props.maxTrans * (1 - bufReady),
+          "custom_maxSlots");
     }
   }
 
@@ -154,11 +155,11 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   // slots on each signal
   if (props.maxOpaque && *props.maxOpaque == 0) {
     // Force the MILP to use transparent slots only
-    model.addConstr(bufData == 0, "custom_noData");
+    model->addLinearConstraint(bufData == 0, "custom_noData");
   }
   if (props.maxTrans && *props.maxTrans == 0) {
     // Force the MILP to use opaque slots only
-    model.addConstr(bufReady == 0, "custom_noReady");
+    model->addLinearConstraint(bufReady == 0, "custom_noReady");
   }
 }
 
@@ -285,35 +286,35 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
       return;
 
     // Find variables for arrival time at input/output pin
-    GRBVar &tPinIn = vars.channelVars[cons.input.channel]
-                         .signalVars[cons.input.signalType]
-                         .path.tOut;
-    GRBVar &tPinOut = vars.channelVars[cons.output.channel]
-                          .signalVars[cons.output.signalType]
-                          .path.tIn;
+    Var &tPinIn = vars.channelVars[cons.input.channel]
+                      .signalVars[cons.input.signalType]
+                      .path.tOut;
+    Var &tPinOut = vars.channelVars[cons.output.channel]
+                       .signalVars[cons.output.signalType]
+                       .path.tIn;
 
     // Arrival time at unit's output pin must be greater than arrival time at
     // unit's input pin plus the unit's internal delay on the path
     std::string consName =
         "path_mixed_" + unitName.str() + "_" + std::to_string(idx++);
-    model.addConstr(tPinIn + cons.internalDelay <= tPinOut, consName);
+    model->addLinearConstraint(tPinIn + cons.internalDelay <= tPinOut,
+                               consName);
   }
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod),
-      cfUnion(cfUnion) {
+    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod), cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
                                      Logger &logger, StringRef milpName)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, logger, milpName),
+    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod, logger, milpName),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
@@ -400,20 +401,19 @@ void CFDFCUnionBuffers::setup() {
   markReadyToOptimize();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod) {
+    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, Logger &logger,
                                      StringRef milpName)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, logger,
-                       milpName) {
+    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod, logger, milpName) {
   if (!unsatisfiable)
     setup();
 }
@@ -440,7 +440,7 @@ void OutOfCycleBuffers::setup() {
   bufGroups.push_back(readyGroup);
 
   // Create the expression for the MILP objective
-  GRBLinExpr objective;
+  LinExpr objective;
 
   // Create a CFDFC union from all CFDFCs in the function so that we can make
   // very fast queries of the kind: is this channel part of any CFDFC?
@@ -484,8 +484,8 @@ void OutOfCycleBuffers::setup() {
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &chVars = vars.channelVars[channel];
-    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
-    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    Var &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    Var &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     objective -= dataBuf;
     objective -= readyBuf;
     objective -= 0.1 * chVars.bufNumSlots;
@@ -504,7 +504,7 @@ void OutOfCycleBuffers::setup() {
   }
 
   // Set MILP objective and mark it ready to be optimized
-  model.setObjective(objective, GRB_MAXIMIZE);
+  model->setMaximizeObjective(objective);
   markReadyToOptimize();
 }
 

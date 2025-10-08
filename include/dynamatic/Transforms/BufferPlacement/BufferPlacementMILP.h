@@ -408,9 +408,6 @@ protected:
       // Store the channel occupancy into the CFDFC data structure.
       for (auto &[val, var] : cfVars.channelThroughputs) {
         auto occupancy = model->getValue(var);
-        if (!occupancy)
-          llvm::report_fatal_error(
-              "Failed to retrieve occupancy from variable!");
         assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
         cf->channelOccupancy[val] = occupancy;
       }
