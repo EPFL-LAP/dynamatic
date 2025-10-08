@@ -112,10 +112,7 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
   auto yVal = solver->getValue(y);
   auto obj = solver->getObjective();
 
-  EXPECT_TRUE(xVal.has_value());
-  EXPECT_TRUE(yVal.has_value());
-  EXPECT_TRUE(obj.has_value());
-  EXPECT_LE(xVal.value() + yVal.value(), 10 + 1e-6); // Constraint check
+  EXPECT_LE(xVal + yVal, 10 + 1e-6); // Constraint check
 }
 
 TEST_P(ParamSolverTest, SimpleMinLP) {
@@ -131,7 +128,7 @@ TEST_P(ParamSolverTest, SimpleMinLP) {
   auto xVal = solver->getValue(x);
   auto yVal = solver->getValue(y);
 
-  EXPECT_TRUE(xVal.value() * 2 + yVal.value() >= 5 - 1e-6);
+  EXPECT_TRUE(xVal * 2 + yVal >= 5 - 1e-6);
 }
 
 TEST_P(ParamSolverTest, SmallIntegerProgram) {
@@ -147,7 +144,7 @@ TEST_P(ParamSolverTest, SmallIntegerProgram) {
   auto xVal = solver->getValue(x);
   auto yVal = solver->getValue(y);
 
-  EXPECT_TRUE(xVal.value() + 2 * yVal.value() <= 6 + 1e-6);
+  EXPECT_TRUE(xVal + 2 * yVal <= 6 + 1e-6);
 }
 
 TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
@@ -163,9 +160,9 @@ TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
   solver->setMaximizeObjective(x);
   solver->optimize();
 
-  auto xVal = solver->getValue(x).value();
-  auto yVal = solver->getValue(y).value();
-  auto objVal = solver->getObjective().value();
+  auto xVal = solver->getValue(x);
+  auto yVal = solver->getValue(y);
+  auto objVal = solver->getObjective();
 
   // Solve with Gurobi for cross-check
   GRBEnv env(true);
@@ -197,19 +194,89 @@ TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
   std::cerr << "Before quadConstr!\n";
   auto quadConstr = 1.0 * x * x + 1.0 * y * y <= 1.0;
   std::cerr << "After quadConstr!\n";
-  solver->addQuadConstraint(quadConstr);
+  solver->addQuadConstraint(quadConstr, "quad constr");
 
   // Maximize x + y
   solver->setMaximizeObjective(1.0 * x + 1.0 * y);
   solver->optimize();
 
-  auto xVal = solver->getValue(x).value();
-  auto yVal = solver->getValue(y).value();
-  auto obj = solver->getObjective().value();
+  auto xVal = solver->getValue(x);
+  auto yVal = solver->getValue(y);
+  auto obj = solver->getObjective();
 
   EXPECT_LE(xVal * xVal + yVal * yVal, 1 + 1e-6);
   EXPECT_NEAR(obj, xVal + yVal, 1e-6);
 }
+
+TEST(ExpressionOperators, LinearExprPlusEquals) {
+  Var x("x", Var::REAL, 0, 10);
+  Var y("y", Var::REAL, 0, 10);
+
+  LinExpr expr1 = x + 2 * y;
+  LinExpr expr2 = y + 3;
+
+  expr1 += expr2; // Should add expr2 to expr1
+
+  EXPECT_DOUBLE_EQ(expr1.terms[x], 1.0); // x only in expr1
+  EXPECT_DOUBLE_EQ(expr1.terms[y], 3.0); // 2 + 1
+  EXPECT_DOUBLE_EQ(expr1.constant, 3.0); // 0 + 3
+}
+
+TEST(ExpressionOperators, LinearExprMinusEquals) {
+  Var x("x", Var::REAL, 0, 10);
+  Var y("y", Var::REAL, 0, 10);
+
+  LinExpr expr1 = 5 * x + 2 * y + 10;
+  LinExpr expr2 = x + y + 3;
+
+  expr1 -= expr2; // Should subtract expr2 from expr1
+
+  EXPECT_DOUBLE_EQ(expr1.terms[x], 4.0); // 5 - 1
+  EXPECT_DOUBLE_EQ(expr1.terms[y], 1.0); // 2 - 1
+  EXPECT_DOUBLE_EQ(expr1.constant, 7.0); // 10 - 3
+}
+
+// TEST(ExpressionOperators, QuadExprPlusEquals) {
+//   Var x("x", Var::REAL, 0, 10);
+//   Var y("y", Var::REAL, 0, 10);
+//
+//   LinExpr l1 = x + y;
+//   LinExpr l2 = x;
+//   QuadExpr q1 = l1 * l1; // (x+y)^2
+//   QuadExpr q2 = l2 * l2; // x^2
+//
+//   q1 += q2; // Add x^2 to q1
+//
+//   // Check that quadratic term x*x increased
+//   auto xxTerm = std::make_pair(x, x);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 2.0); // x^2 + x^2 = 2 x^2
+//
+//   // y*y term should remain 1
+//   auto yyTerm = std::make_pair(y, y);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0);
+//
+//   // x*y term should remain 2
+//   auto xyTerm = std::make_pair(x, y);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 2.0);
+// }
+//
+// TEST(ExpressionOperators, QuadExprMinusEquals) {
+//   Var x("x", Var::REAL);
+//   Var y("y", Var::REAL);
+//
+//   QuadExpr q1 = (x + y) * (x + y); // (x+y)^2
+//   QuadExpr q2 = x * x + 2 * x * y; // x^2 + 2xy
+//
+//   q1 -= q2; // Subtract q2 from q1
+//
+//   // Check quadratic terms
+//   auto xxTerm = std::make_pair(x, x);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 0.0); // 1 - 1
+//   auto yyTerm = std::make_pair(y, y);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0); // stays 1
+//   auto xyTerm = std::make_pair(x, y);
+//   EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 0.0); // 2 - 2
+// }
 
 // [END AI-generated test cases]
 
