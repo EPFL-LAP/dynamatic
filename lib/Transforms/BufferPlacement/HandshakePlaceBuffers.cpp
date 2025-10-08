@@ -176,18 +176,6 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
   log = new Logger(fp + "placement.log", ec);
 }
 
-HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
-  this->algorithm = algorithm.str();
-  this->frequencies = frequencies.str();
-  this->timingModels = timingModels.str();
-  this->firstCFDFC = firstCFDFC;
-  this->targetCP = targetCP;
-  this->timeout = timeout;
-  this->dumpLogs = dumpLogs;
-}
-
 void HandshakePlaceBuffersPass::runOnOperation() {
   // Buffer placement requires that all values are used exactly once
   mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
@@ -587,15 +575,22 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
-  // Create solver
 
-  auto solver = std::make_unique<CbcSolver>();
+  // Create solver
+  std::unique_ptr<CPSolver> solverInstance;
+
+  if ("gurobi" == solver)
+    solverInstance = std::make_unique<GurobiSolver>();
+  else if ("cbc" == solver)
+    solverInstance = std::make_unique<CbcSolver>();
+  else
+    llvm::report_fatal_error("Unimplemented solver type!");
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, std::move(solver), info, timingDB,
-        targetCP);
+        logger, "placement", placement, std::move(solverInstance), info,
+        timingDB, targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -613,28 +608,28 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, std::move(solver), info, timingDB,
-              targetCP, cfUnion)))
+              logger, milpName, placement, std::move(solverInstance), info,
+              timingDB, targetCP, cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, std::move(solver), info, timingDB,
-        targetCP);
+        logger, "out_of_cycle", placement, std::move(solverInstance), info,
+        timingDB, targetCP);
   }
   if (algorithm == CostAware) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, std::move(solver), info, timingDB,
-        targetCP);
+        logger, "placement", placement, std::move(solverInstance), info,
+        timingDB, targetCP);
   }
 
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, std::move(solver), info, timingDB,
-        targetCP, blifFiles, lutDelay, lutSize, acyclicType);
+        logger, "placement", placement, std::move(solverInstance), info,
+        timingDB, targetCP, blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");
