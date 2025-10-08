@@ -27,20 +27,17 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpga20;
 
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
+FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
+    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
+FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, Logger &logger,
                              StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName) {
+    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod, logger, milpName) {
   if (!unsatisfiable)
     setup();
 }
@@ -50,8 +47,13 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+
+    auto bufNumSlots = model->getValue(chVars.bufNumSlots);
+
+    if (!bufNumSlots)
+      llvm::report_fatal_error("Cannot retrieve the number of buffer slots!");
+
+    unsigned numSlotsToPlace = static_cast<unsigned>(bufNumSlots.value() + 0.5);
 
     // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
     // nothing.

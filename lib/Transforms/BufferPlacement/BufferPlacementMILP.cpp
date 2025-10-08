@@ -91,21 +91,20 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
   }
 }
 
-BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod)
-    : MILP<BufferPlacement>(env), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr) {
+    : MILP<BufferPlacement>(), timingDB(timingDB), targetPeriod(targetPeriod),
+      funcInfo(funcInfo), logger(nullptr) {
   initialize();
 }
 
-BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod, Logger &logger,
                                          StringRef milpName)
-    : MILP<BufferPlacement>(env, logger.getLogDir() +
-                                     llvm::sys::path::get_separator() +
-                                     milpName),
+    : MILP<BufferPlacement>(logger.getLogDir() +
+                            llvm::sys::path::get_separator() + milpName),
       timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),
       logger(&logger) {
   initialize();
@@ -119,17 +118,17 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
   // Create a Gurobi variable of the given name and type for the channel
-  auto createVar = [&](const llvm::Twine &name, char type) {
-    return model.addVar(0, GRB_INFINITY, 0.0, type, (name + suffix).str());
+  auto createVar = [&](const llvm::Twine &name, Var::VarType type) {
+    return model->addVariable((name + suffix).str(), type, 0, std::nullopt);
   };
 
   // Signal-specific variables
   for (SignalType sig : signals) {
     ChannelSignalVars &signalVars = chVars.signalVars[sig];
     StringRef name = getSignalName(sig);
-    signalVars.path.tIn = createVar(name + "PathIn", GRB_CONTINUOUS);
-    signalVars.path.tOut = createVar(name + "PathOut", GRB_CONTINUOUS);
-    signalVars.bufPresent = createVar(name + "BufPresent", GRB_BINARY);
+    signalVars.path.tIn = createVar(name + "PathIn", Var::REAL);
+    signalVars.path.tOut = createVar(name + "PathOut", Var::REAL);
+    signalVars.bufPresent = createVar(name + "BufPresent", Var::BOOLEAN);
   }
 
   // Variables for placement information
@@ -137,10 +136,6 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
   chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
   chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
-
-  // Update the model before returning so that these variables can be referenced
-  // safely during the rest of model creation
-  model.update();
 }
 
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
@@ -150,8 +145,8 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a Gurobi variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
-    return model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        (prefix + name).str());
+    return model->addVariable((prefix + name).str(), Var::REAL, 0,
+                              std::nullopt);
   };
 
   // Create a set of variables for each unit in the CFDFC
@@ -182,10 +177,6 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a variable for the CFDFC's throughput
   cfVars.throughput = createVar("throughput");
-
-  // Update the model before returning so that these variables can be referenced
-  // safely during the rest of model creation
-  model.update();
 }
 
 void BufferPlacementMILP::addChannelTimingConstraints(
@@ -196,50 +187,51 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   double bigCst = targetPeriod * 10;
 
   // Sum up conditional delays of buffers before the one that cuts the path
-  GRBLinExpr bufsBeforeDelay;
+  LinExpr bufsBeforeDelay;
   for (const BufferingGroup &group : before)
     bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
                        group.getCombinationalDelay(channel, signalType);
 
   // Sum up conditional delays of buffers after the one that cuts the path
-  GRBLinExpr bufsAfterDelay;
+  LinExpr bufsAfterDelay;
   for (const BufferingGroup &group : after)
     bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
                       group.getCombinationalDelay(channel, signalType);
 
   ChannelBufProps &props = channelProps[channel];
   ChannelSignalVars &signalVars = chVars.signalVars[signalType];
-  GRBVar &t1 = signalVars.path.tIn;
-  GRBVar &t2 = signalVars.path.tOut;
-  GRBVar &bufPresent = signalVars.bufPresent;
+  Var &t1 = signalVars.path.tIn;
+  Var &t2 = signalVars.path.tOut;
+  Var &bufPresent = signalVars.bufPresent;
   auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
 
   // Arrival time at channel's output must be lower than target clock period
-  model.addConstr(t2 <= targetPeriod, "path_period");
+  model->addLinearConstraint(t2 <= targetPeriod, "path_period");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
   // signals before its own, and inside its own buffer's input pin logic
   double preBufCstDelay = props.inDelay + inBufDelay;
-  model.addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
-                      targetPeriod,
-                  "path_bufferedChannelIn");
+  model->addLinearConstraint(
+      t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <= targetPeriod,
+      "path_bufferedChannelIn");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // channel's output must be greater than the propagation time through its own
   // buffer's output pin logic and all potential buffers cutting other signals
   // after its own
   double postBufCstDelay = outBufDelay + props.outDelay;
-  model.addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
-                  "path_bufferedChannelOut");
+  model->addLinearConstraint(bufPresent * postBufCstDelay + bufsAfterDelay <=
+                                 t2,
+                             "path_bufferedChannelOut");
 
   // If there are no buffers cutting the signal's path, arrival time at
   // channel's output must still propagate through entire channel and all
   // potential buffers cutting through other signals
-  GRBLinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
-  model.addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
-                  "path_unbufferedChannel");
+  LinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
+  model->addLinearConstraint(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
+                             "path_unbufferedChannel");
 }
 
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
@@ -269,11 +261,11 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       if (signalType == SignalType::READY)
         std::swap(in, out);
 
-      GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
-      GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
+      Var &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
+      Var &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
-      model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+      model->addLinearConstraint(tOutPort >= tInPort + delay, "path_combDelay");
     });
 
     return;

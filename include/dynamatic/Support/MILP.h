@@ -15,12 +15,16 @@
 #ifndef DYNAMATIC_SUPPORT_MILP_H
 #define DYNAMATIC_SUPPORT_MILP_H
 
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
+
+using namespace dynamatic::cp;
+
 namespace dynamatic {
 
 /// Returns a string describing the meaning of the passed Gurobi optimization
@@ -54,12 +58,8 @@ public:
   /// non-empty twine is provided, the `MILP::optimize` method will store the
   /// MILP model and its solution at `writeTo`_model.lp and
   /// `writeTo`_solution.json, respectively.
-  MILP(GRBEnv &env, const llvm::Twine &writeTo = "")
-      : model(GRBModel(env)), writeTo(writeTo.str()) {
-    model.set(GRB_IntParam::GRB_IntParam_Seed, 0);
-    model.set(GRB_IntParam_LogToConsole, 0);
-    model.set(GRB_IntParam_OutputFlag, 1);
-  };
+  MILP(const llvm::Twine &writeTo = "")
+      : model(std::make_unique<GurobiSolver>()), writeTo(writeTo.str()) {};
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP
   /// model and its solution are stored in plain text in its associated
@@ -73,20 +73,13 @@ public:
     }
 
     // Optimize the model, possibly logging the MILP model and its solution
-    if (!writeTo.empty()) {
-      model.write(writeTo + "_model.lp");
-      model.set(GRB_StringParam_LogFile, writeTo + "_runtime.log");
-      model.optimize();
-      model.write(writeTo + "_solution.json");
-    } else {
-      model.optimize();
-    }
+    model->optimize();
 
     // Check whether we found an optimal solution or reached the time limit
-    int stat = model.get(GRB_IntAttr_Status);
+    int stat = model->status;
     if (milpStatus)
       *milpStatus = stat;
-    if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
+    if (stat != CPSolver::OPTIMAL && stat != CPSolver::NONOPTIMAL) {
       state = State::FAILED_TO_OPTIMIZE;
       llvm::errs() << "Buffer placement MILP failed with status " << stat
                    << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
@@ -143,7 +136,7 @@ public:
 
 protected:
   /// Gurobi model holding the MILP's state.
-  GRBModel model;
+  std::unique_ptr<CPSolver> model;
 
   /// Fills in the argument with the desired results extract from the MILP's
   /// solution. Called by `MILP::getResult` after checking that the underlying

@@ -39,17 +39,16 @@ class FPL22BuffersBase : public BufferPlacementMILP {
 protected:
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
-  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
-                   const TimingDatabase &timingDB, double targetPeriod)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod){};
+  FPL22BuffersBase(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                   double targetPeriod)
+      : BufferPlacementMILP(funcInfo, timingDB, targetPeriod) {};
 
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
-  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
-                   const TimingDatabase &timingDB, double targetPeriod,
-                   Logger &logger, StringRef milpName)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                            milpName){};
+  FPL22BuffersBase(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                   double targetPeriod, Logger &logger, StringRef milpName)
+      : BufferPlacementMILP(funcInfo, timingDB, targetPeriod, logger,
+                            milpName) {};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
@@ -99,16 +98,15 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                    const TimingDatabase &timingDB, double targetPeriod,
-                    CFDFCUnion &cfUnion);
+  CFDFCUnionBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                    double targetPeriod, CFDFCUnion &cfUnion);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                    const TimingDatabase &timingDB, double targetPeriod,
-                    CFDFCUnion &cfUnion, Logger &logger, StringRef milpName);
+  CFDFCUnionBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                    double targetPeriod, CFDFCUnion &cfUnion, Logger &logger,
+                    StringRef milpName);
 
 private:
   /// The CFDFC union over which the MILP is described. Constraints are only
@@ -139,15 +137,15 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                    const TimingDatabase &timingDB, double targetPeriod);
+  OutOfCycleBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                    double targetPeriod);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                    const TimingDatabase &timingDB, double targetPeriod,
-                    Logger &logger, StringRef milpName = "out_of_cycle");
+  OutOfCycleBuffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                    double targetPeriod, Logger &logger,
+                    StringRef milpName = "out_of_cycle");
 
 private:
   /// Setups the entire MILP, creating all variables, constraints, and setting
