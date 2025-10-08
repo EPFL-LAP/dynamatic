@@ -18,6 +18,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/MILP.h"
@@ -42,19 +43,19 @@ namespace buffer {
 /// a channel's endpoints.
 struct TimeVars {
   /// Time at channel's input (i.e., at source unit's output port).
-  GRBVar tIn;
+  Var tIn;
   /// Time at channel's output (i.e., at destination unit's input port).
-  GRBVar tOut;
+  Var tOut;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
 /// appear in multiple CFDFCs and so may have multiple sets of these variables.
 struct UnitVars {
   /// Fluid retiming of tokens at unit's input (real).
-  GRBVar retIn;
+  Var retIn;
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
-  GRBVar retOut;
+  Var retOut;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -63,7 +64,7 @@ struct ChannelSignalVars {
   /// Arrival time of the signal at channel's endpoints.
   TimeVars path;
   /// Presence of a buffer on the signal.
-  GRBVar bufPresent;
+  Var bufPresent;
 };
 
 /// Holds all MILP variables associated to a channel.
@@ -72,13 +73,13 @@ struct ChannelVars {
   /// (real, real) and buffer presence (binary).
   std::map<SignalType, ChannelSignalVars> signalVars;
   /// Presence of any buffer on the channel (binary).
-  GRBVar bufPresent;
+  Var bufPresent;
   /// Number of buffer slots on the channel (integer).
-  GRBVar bufNumSlots;
+  Var bufNumSlots;
   /// Buffer latency on the data signal path (integer).
-  GRBVar dataLatency;
+  Var dataLatency;
   /// Usage of a shift register on the channel (binary).
-  GRBVar shiftReg;
+  Var shiftReg;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -88,9 +89,9 @@ struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
   llvm::MapVector<Operation *, UnitVars> unitVars;
   /// Channel throughput variables (real).
-  llvm::MapVector<Value, GRBVar> channelThroughputs;
+  llvm::MapVector<Value, Var> channelThroughputs;
   /// CFDFC throughput (real).
-  GRBVar throughput;
+  Var throughput;
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
@@ -124,15 +125,14 @@ public:
   /// adjusting for components' internal buffers given by the timing models. If
   /// some buffering properties become unsatisfiable following this step, the
   /// constructor sets the `unsatisfiable` flag to true.
-  BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
-                      const TimingDatabase &timingDB, double targetPeriod);
+  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                      double targetPeriod);
 
   /// Follows the same pre-processing step as the other constructor; in
   /// addition, dumps the MILP model and solution under the provided name in the
   /// logger's directory.
-  BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
-                      const TimingDatabase &timingDB, double targetPeriod,
-                      Logger &logger, StringRef milpName);
+  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                      double targetPeriod, Logger &logger, StringRef milpName);
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -309,8 +309,7 @@ protected:
   // either a buffer is placed on a DFG edge or the cut that containts that edge
   // is selected.
   void addCutSelectionConflicts(experimental::Node *root,
-                                experimental::Node *leaf,
-                                GRBVar &cutSelectionVar,
+                                experimental::Node *leaf, Var &cutSelectionVar,
                                 experimental::LogicNetwork *blifData,
                                 std::vector<experimental::Node *> &path);
 
@@ -399,13 +398,12 @@ protected:
   void populateCFDFCThroughputAndOccupancy() {
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
-      double cfThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      cf->throughput = cfThroughput;
 
+      cf->throughput = model->getValue(cfVars.throughput);
       // Store the unit occupancy into the CFDFC data structure.
       for (auto &[op, var] : cfVars.unitVars) {
         double occupancy =
-            var.retOut.get(GRB_DoubleAttr_X) - var.retIn.get(GRB_DoubleAttr_X);
+            model->getValue(var.retOut) - model->getValue(var.retIn);
         // Approximate occupancy to 0 if it is negative but bigger than
         // -MILP_EPSILON.
         if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
@@ -417,7 +415,7 @@ protected:
 
       // Store the channel occupancy into the CFDFC data structure.
       for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = var.get(GRB_DoubleAttr_X);
+        double occupancy = model->getValue(var);
         // Approximate occupancy to 0 if it is negative but bigger than
         // -MILP_EPSILON.
         if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {

@@ -8,6 +8,7 @@
 /// `dynamatic/unittests/Support/ConstraintProgramming/CPTest.cpp`
 #pragma once
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <map>
 #include <memory>
 #include <optional>
@@ -85,6 +86,15 @@ struct LinExpr {
 };
 
 inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
+  LinExpr newExpr = left;
+  for (auto &[var, coeff] : right.terms) {
+    newExpr.terms[var] += coeff;
+  }
+  newExpr.constant += right.constant;
+  return newExpr;
+}
+
+inline LinExpr operator+=(const LinExpr &left, const LinExpr &right) {
   LinExpr newExpr = left;
   for (auto &[var, coeff] : right.terms) {
     newExpr.terms[var] += coeff;
@@ -252,12 +262,13 @@ public:
   virtual Var addVariable(const std::string &name, Var::VarType type,
                           std::optional<double> lb,
                           std::optional<double> ub) = 0;
-  virtual void addLinearConstraint(const LinConstr &constraint) = 0;
+  virtual void addLinearConstraint(const LinConstr &constraint,
+                                   llvm::StringRef name) = 0;
   virtual void addQuadConstraint(const QuadConstr &constraint) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
-  virtual std::optional<double> getValue(const Var &var) const = 0;
-  virtual std::optional<double> getObjective() const = 0;
+  virtual double getValue(const Var &var) const = 0;
+  virtual double getObjective() const = 0;
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -307,16 +318,17 @@ public:
     return addVariable(var);
   }
 
-  void addLinearConstraint(const LinConstr &constraint) override {
+  void addLinearConstraint(const LinConstr &constraint,
+                           llvm::StringRef constrName) override {
     GRBLinExpr expr = 0;
     for (auto &[var, coeff] : constraint.expr.terms) {
       expr += coeff * variables[var];
     }
     expr += constraint.expr.constant;
     if (constraint.pred == LE)
-      model->addConstr(expr <= 0);
+      model->addConstr(expr <= 0, constrName.str());
     else if (constraint.pred == EQ)
-      model->addConstr(expr == 0);
+      model->addConstr(expr == 0, constrName.str());
     else
       llvm_unreachable("Unknown predicate!");
   }
@@ -380,15 +392,20 @@ public:
   ///
   /// Example:
   /// auto resultMyVar = solver.getValue(myVar);
-  std::optional<double> getValue(const Var &var) const override {
-    if (status != OPTIMAL && status != NONOPTIMAL)
-      return std::nullopt;
+  double getValue(const Var &var) const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::errs() << "Solution is not available while retrieving " << var.name
+                   << "!\n";
+      llvm::report_fatal_error("Cannot retrieve the value of variable!");
+    }
     return variables.at(var).get(GRB_DoubleAttr_X);
   }
 
-  std::optional<double> getObjective() const override {
-    if (status != OPTIMAL && status != NONOPTIMAL)
-      return std::nullopt;
+  double getObjective() const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::report_fatal_error("Cannot retrieve the objective because the "
+                               "solution is not available!");
+    }
     return model->get(GRB_DoubleAttr_ObjVal);
   }
 };
@@ -437,7 +454,8 @@ public:
     return addVariable(var);
   }
 
-  void addLinearConstraint(const LinConstr &constraint) override {
+  void addLinearConstraint(const LinConstr &constraint,
+                           llvm::StringRef constrName) override {
     int numCoeffs = constraint.expr.terms.size();
     std::vector<int> indices;
     std::vector<double> values;
@@ -458,7 +476,12 @@ public:
       llvm_unreachable("Unknown predicate!");
     }
 
-    solver.addRow(numCoeffs, indices.data(), values.data(), rowLower, rowUpper);
+    CoinPackedVector row;
+
+    // Add elements to the row vector
+    row.setVector(numCoeffs, indices.data(), values.data());
+
+    solver.addRow(row, rowLower, rowUpper, constrName.str());
   }
 
   void addQuadConstraint(const QuadConstr &constraint) override {
@@ -498,15 +521,20 @@ public:
     solver.setColSolution(model.bestSolution());
   }
 
-  std::optional<double> getValue(const Var &var) const override {
-    if (status != OPTIMAL && status != NONOPTIMAL)
-      return std::nullopt;
+  double getValue(const Var &var) const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::errs() << "Solution is not available while retrieving " << var.name
+                   << "!\n";
+      llvm::report_fatal_error("Cannot retrieve the value of variable!");
+    }
     return solver.getColSolution()[variables.at(var)];
   }
 
-  std::optional<double> getObjective() const override {
-    if (status != OPTIMAL && status != NONOPTIMAL)
-      return std::nullopt;
+  double getObjective() const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::report_fatal_error("Cannot retrieve the objective because the "
+                               "solution is not available!");
+    }
     return solver.getObjValue();
   }
 };

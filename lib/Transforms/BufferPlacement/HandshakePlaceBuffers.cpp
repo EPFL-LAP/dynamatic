@@ -588,16 +588,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
   // Create Gurobi environment
-  GRBEnv env = GRBEnv(true);
-  env.set(GRB_IntParam_OutputFlag, 0);
-  if (timeout > 0)
-    env.set(GRB_DoubleParam_TimeLimit, timeout);
-  env.start();
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, info, timingDB, targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -615,26 +610,25 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, env, info, timingDB, targetCP,
-              cfUnion)))
+              logger, milpName, placement, info, timingDB, targetCP, cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
+        logger, "out_of_cycle", placement, info, timingDB, targetCP);
   }
   if (algorithm == CostAware) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, info, timingDB, targetCP);
   }
 
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP,
-        blifFiles, lutDelay, lutSize, acyclicType);
+        logger, "placement", placement, info, timingDB, targetCP, blifFiles,
+        lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");
