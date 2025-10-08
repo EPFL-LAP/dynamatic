@@ -27,17 +27,20 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpga20;
 
-FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+FPGA20Buffers::FPGA20Buffers(std::unique_ptr<CPSolver> solver,
+                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod)
-    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod) {
+    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+FPGA20Buffers::FPGA20Buffers(std::unique_ptr<CPSolver> solver,
+                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, Logger &logger,
                              StringRef milpName)
-    : BufferPlacementMILP(funcInfo, timingDB, targetPeriod, logger, milpName) {
+    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod,
+                          logger, milpName) {
   if (!unsatisfiable)
     setup();
 }

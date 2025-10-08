@@ -302,19 +302,23 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   }
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver,
+                                     FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion)
-    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod), cfUnion(cfUnion) {
+    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod),
+      cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver,
+                                     FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
                                      Logger &logger, StringRef milpName)
-    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod, logger, milpName),
+    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod,
+                       logger, milpName),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
@@ -401,19 +405,22 @@ void CFDFCUnionBuffers::setup() {
   markReadyToOptimize();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(std::unique_ptr<CPSolver> solver,
+                                     FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod)
-    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod) {
+    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(std::unique_ptr<CPSolver> solver,
+                                     FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, Logger &logger,
                                      StringRef milpName)
-    : FPL22BuffersBase(funcInfo, timingDB, targetPeriod, logger, milpName) {
+    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod,
+                       logger, milpName) {
   if (!unsatisfiable)
     setup();
 }

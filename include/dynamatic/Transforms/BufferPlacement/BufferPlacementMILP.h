@@ -125,14 +125,15 @@ public:
   /// adjusting for components' internal buffers given by the timing models. If
   /// some buffering properties become unsatisfiable following this step, the
   /// constructor sets the `unsatisfiable` flag to true.
-  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod);
+  BufferPlacementMILP(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
+                      const TimingDatabase &timingDB, double targetPeriod);
 
   /// Follows the same pre-processing step as the other constructor; in
   /// addition, dumps the MILP model and solution under the provided name in the
   /// logger's directory.
-  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, Logger &logger, StringRef milpName);
+  BufferPlacementMILP(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
+                      const TimingDatabase &timingDB, double targetPeriod,
+                      Logger &logger, StringRef milpName);
 
 protected:
   /// Represents a list of signals that are buffered together by a single

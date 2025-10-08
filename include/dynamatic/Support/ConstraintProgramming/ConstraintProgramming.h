@@ -303,6 +303,13 @@ public:
   virtual double getObjective() const = 0;
 };
 
+enum MILPSolver {
+  COIN_OR_CBC,
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  GUROBI,
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+};
+
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 class GurobiSolver : public CPSolver {
 
@@ -456,7 +463,10 @@ class CbcSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  CbcSolver() = default;
+  CbcSolver() {
+    // Suppress the solver's output
+    solver.messageHandler()->setLogLevel(0);
+  }
 
   Var addVariable(const Var &var) override {
     if (names.count(var.name)) {
@@ -542,6 +552,10 @@ public:
 
   void optimize() override {
     CbcModel model(solver);
+    // Disable all output
+    // 0 = no output, 1 = minimal, higher = more verbose
+    model.setLogLevel(0);
+
     model.branchAndBound();
 
     int stat = model.status();
