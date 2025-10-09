@@ -558,12 +558,28 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
   return solveMILP<MILP>(placement, std::forward<Args>(args)...);
 }
 
+static std::unique_ptr<CPSolver>
+getSolverInstance(const std::string &solverName, unsigned timeout) {
+  // Instantiate the selected solver
+  if (solverName == "cbc")
+    return std::make_unique<CbcSolver>(timeout);
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  if (solverName == "gurobi")
+    return std::make_unique<GurobiSolver>(timeout);
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  llvm::errs() << "Solver type " << solverName << " is not supported!\n";
+  if (solverName == "gurobi") {
+    llvm::errs() << "Gurobi is not correctly configured! Please check out "
+                    "the Dynamatic documentation.\n";
+  }
+  llvm::report_fatal_error("Unsupported solver type!");
+}
+
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
 
   // Create solver
-  std::unique_ptr<CPSolver> solverInstance;
   if (dumpLogs) {
     mlir::raw_indented_ostream &os = *(*logger);
     os << "\n";
@@ -573,27 +589,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     os << "Selected MILP solver: " << solver << "\n\n";
   }
 
-  // Instantiate the selected solver
-  if (solver == "cbc")
-    solverInstance = std::make_unique<CbcSolver>(this->timeout);
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-  else if (solver == "gurobi")
-    solverInstance = std::make_unique<GurobiSolver>(this->timeout);
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-  else {
-    llvm::errs() << "Solver type " << solver << " is not supported!\n";
-    if (solver == "gurobi") {
-      llvm::errs() << "Gurobi is not correctly configured! Please check out "
-                      "the Dynamatic documentation.\n";
-    }
-    llvm::report_fatal_error("Unsupported solver type!");
-  }
-
   if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, std::move(solverInstance), info,
-        timingDB, targetCP);
+        logger, "placement", placement, getSolverInstance(solver, timeout),
+        info, timingDB, targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -611,28 +611,28 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, std::move(solverInstance), info,
-              timingDB, targetCP, cfUnion)))
+              logger, milpName, placement, getSolverInstance(solver, timeout),
+              info, timingDB, targetCP, cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, std::move(solverInstance), info,
-        timingDB, targetCP);
+        logger, "out_of_cycle", placement, getSolverInstance(solver, timeout),
+        info, timingDB, targetCP);
   }
   if (algorithm == CostAware) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, std::move(solverInstance), info,
-        timingDB, targetCP);
+        logger, "placement", placement, getSolverInstance(solver, timeout),
+        info, timingDB, targetCP);
   }
 
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, std::move(solverInstance), info,
-        timingDB, targetCP, blifFiles, lutDelay, lutSize, acyclicType);
+        logger, "placement", placement, getSolverInstance(solver, timeout),
+        info, timingDB, targetCP, blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");
