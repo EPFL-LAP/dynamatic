@@ -902,14 +902,29 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
 
   // No pair → no mux; return `start` condition (maybe inverted).
   if (pairs.empty()) {
+    // Root is a terminal: return constant value 1/0.
+    if (startIdx == trueSinkIdx)
+      return makeConst(true);
+    if (startIdx == falseSinkIdx)
+      return makeConst(false);
+
     bool dir = (nodes[startIdx].trueSucc == trueSinkIdx &&
                 nodes[startIdx].falseSucc == falseSinkIdx);
     bool inv = (nodes[startIdx].trueSucc == falseSinkIdx &&
                 nodes[startIdx].falseSucc == trueSinkIdx);
+
     if (!dir && !inv) {
       llvm::errs() << "BddToCircuit: start node doesn't map to sinks.\n";
+      llvm::errs() << "  Summary\n";
+      llvm::errs() << "    nodes.size = " << nodes.size() << "\n";
+      llvm::errs() << "    startIdx   = " << startIdx << "\n";
+      llvm::errs() << "    trueSinkIdx  = " << trueSinkIdx  << "\n";
+      llvm::errs() << "    falseSinkIdx = " << falseSinkIdx << "\n";
+      llvm::errs() << "    trueSucc  = " << nodes[startIdx].trueSucc << "\n";
+      llvm::errs() << "    falseSucc = " << nodes[startIdx].falseSucc << "\n";
       return nullptr;
     }
+
     Value sel = getSel(nodes[startIdx].var);
     if (!sel)
       return nullptr;
