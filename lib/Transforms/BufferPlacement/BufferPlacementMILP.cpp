@@ -24,9 +24,6 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -1138,5 +1135,3 @@ void BufferPlacementMILP::initialize() {
   auto ops = funcInfo.funcOp.getOps();
   largeCst = std::distance(ops.begin(), ops.end()) + 2;
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

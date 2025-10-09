@@ -26,9 +26,6 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
@@ -82,6 +79,5 @@ private:
 } // namespace fpga20
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_FPGA20BUFFERS_H

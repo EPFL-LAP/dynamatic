@@ -22,9 +22,6 @@
 #include <iterator>
 #include <optional>
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
@@ -514,5 +511,3 @@ void OutOfCycleBuffers::setup() {
   model->setMaximizeObjective(objective);
   markReadyToOptimize();
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

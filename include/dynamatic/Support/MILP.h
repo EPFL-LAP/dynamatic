@@ -20,9 +20,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace dynamatic::cp;
 
 namespace dynamatic {
@@ -195,6 +192,5 @@ LogicalResult solveMILP(MILPRes &milpResult, Args &&...args) {
 }
 
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_SUPPORT_MILP_H

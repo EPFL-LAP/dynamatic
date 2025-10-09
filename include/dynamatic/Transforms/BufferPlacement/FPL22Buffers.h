@@ -27,9 +27,6 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "llvm/ADT/MapVector.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace fpl22 {
@@ -160,6 +157,5 @@ private:
 } // namespace fpl22
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_FPL22BUFFERS_H

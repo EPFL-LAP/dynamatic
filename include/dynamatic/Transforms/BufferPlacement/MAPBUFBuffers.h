@@ -25,9 +25,6 @@
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace mapbuf {
@@ -92,6 +89,5 @@ private:
 } // namespace mapbuf
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_MAPBUFBUFFERS_H

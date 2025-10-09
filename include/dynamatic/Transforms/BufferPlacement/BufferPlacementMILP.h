@@ -34,8 +34,6 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
 namespace dynamatic {
 namespace buffer {
 
@@ -437,6 +435,5 @@ private:
 
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H

@@ -29,9 +29,6 @@
 #include <string>
 #include <unordered_map>
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
@@ -323,5 +320,3 @@ void MAPBUFBuffers::setup() {
   addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

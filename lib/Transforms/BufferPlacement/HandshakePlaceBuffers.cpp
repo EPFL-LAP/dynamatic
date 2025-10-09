@@ -45,11 +45,9 @@ using namespace dynamatic::experimental;
 
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     CostAware("costaware"), MAPBUF("mapbuf");
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace dynamatic {
 namespace buffer {
@@ -121,7 +119,6 @@ struct HandshakePlaceBuffersPass
   void runOnOperation() override;
 
 protected:
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   /// Called for all buffer placement strategies that not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeUsingMILP();
@@ -152,7 +149,6 @@ protected:
                                            TimingDatabase &timingDB,
                                            Logger *logger,
                                            BufferPlacement &placement);
-#endif
   /// Called for all buffer placement strategies that do not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeWithoutUsingMILP();
@@ -192,12 +188,10 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
   if (!allAlgorithms.contains(algorithm)) {
@@ -205,13 +199,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
                  << "', possible choices are:\n";
     for (auto &algo : allAlgorithms)
       llvm::errs() << "\t- " << algo.first << "\n";
-#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-    llvm::errs()
-        << "\tYou cannot use any of the MILP-based placement algorithms "
-           "because CMake did not detect a Gurobi installation on your "
-           "machine. Install Gurobi and rebuild to make these options "
-           "available.\n";
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
     return signalPassFailure();
   }
 
@@ -263,7 +250,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   markAnalysesPreserved<NameAnalysis>();
 }
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
@@ -579,12 +565,21 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   // Create solver
   std::unique_ptr<CPSolver> solverInstance;
 
-  if ("gurobi" == solver)
-    solverInstance = std::make_unique<GurobiSolver>();
-  else if ("cbc" == solver)
+  // Instantiate the selected solver
+  if ("cbc" == solver)
     solverInstance = std::make_unique<CbcSolver>();
-  else
-    llvm::report_fatal_error("Unimplemented solver type!");
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  else if ("gurobi" == solver)
+    solverInstance = std::make_unique<GurobiSolver>();
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  else {
+    llvm::errs() << "Solver type " << solver << " is not supported!\n";
+    if ("gurobi" == solver) {
+      llvm::errs() << "Gurobi is not correctly configured! Please check out "
+                      "the Dynamatic documentation.\n";
+    }
+    llvm::report_fatal_error("Unsupported solver type!");
+  }
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
@@ -634,7 +629,6 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
   llvm_unreachable("unknown algorithm");
 }
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // The only strategy at this point is to place buffers on the output channels
