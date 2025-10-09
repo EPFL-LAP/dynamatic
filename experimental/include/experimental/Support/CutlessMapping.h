@@ -14,12 +14,9 @@
 #ifndef EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 #define EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 
 #include "BlifReader.h"
-#include "gurobi_c++.h"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -79,5 +76,4 @@ void printCuts(NodeToCuts cuts, std::string &filename);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H

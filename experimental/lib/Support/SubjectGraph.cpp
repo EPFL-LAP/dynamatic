@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -986,4 +985,3 @@ LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   return mergedBlif;
 }
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

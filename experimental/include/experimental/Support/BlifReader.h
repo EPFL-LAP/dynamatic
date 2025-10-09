@@ -14,8 +14,6 @@
 #ifndef EXPERIMENTAL_SUPPORT_BLIF_READER_H
 #define EXPERIMENTAL_SUPPORT_BLIF_READER_H
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
 
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
@@ -290,5 +288,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H

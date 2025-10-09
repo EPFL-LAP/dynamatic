@@ -566,15 +566,15 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   std::unique_ptr<CPSolver> solverInstance;
 
   // Instantiate the selected solver
-  if ("cbc" == solver)
+  if (solver == "cbc")
     solverInstance = std::make_unique<CbcSolver>();
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-  else if ("gurobi" == solver)
+  else if (solver == "gurobi")
     solverInstance = std::make_unique<GurobiSolver>();
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   else {
     llvm::errs() << "Solver type " << solver << " is not supported!\n";
-    if ("gurobi" == solver) {
+    if (solver == "gurobi") {
       llvm::errs() << "Gurobi is not correctly configured! Please check out "
                       "the Dynamatic documentation.\n";
     }

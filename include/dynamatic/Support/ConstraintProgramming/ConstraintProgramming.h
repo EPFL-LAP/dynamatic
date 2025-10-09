@@ -280,8 +280,15 @@ inline QuadConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
 /// This is overloaded for the Gurobi solver and the Google's OR Tools API.
 class CPSolver {
 public:
+  enum Kind { GUROBI, CBC };
+
   enum Status { OPTIMAL, NONOPTIMAL, INFEASIBLE, UNBOUNDED, UNKNOWN, ERROR };
   Status status = UNKNOWN;
+
+  Kind solverKind;
+
+  CPSolver(Kind k) : solverKind(k) {}
+
   virtual ~CPSolver() = default;
   // Virtual class methods: they provide a unified interface for all available
   // solvers.
@@ -303,6 +310,13 @@ public:
   virtual double getObjective() const = 0;
 
   virtual void write(llvm::StringRef filePath) const = 0;
+
+  // LLVM Implementation of rtti functions like dyn_cast<>, isa<> needs these
+  // function
+  // [START LLVM RTTI prerequisites]
+  Kind getKind() const { return solverKind; }
+  static inline bool classof(CPSolver const *) { return true; }
+  // [END LLVM RTTI prerequisites]
 };
 
 enum MILPSolver {
@@ -323,7 +337,7 @@ class GurobiSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  GurobiSolver() {
+  GurobiSolver() : CPSolver(GUROBI) {
     env = std::make_unique<GRBEnv>(true);
     env->set(GRB_IntParam_OutputFlag, 0);
     env->start();
@@ -457,6 +471,11 @@ public:
     }
     return model->get(GRB_DoubleAttr_ObjVal);
   }
+
+  // [START LLVM RTTI prerequisites]
+  static bool classof(const CPSolver *b) { return b->getKind() == GUROBI; }
+  static bool classof(const GurobiSolver *b) { return true; }
+  // [END LLVM RTTI prerequisites]
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
@@ -467,7 +486,7 @@ class CbcSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  CbcSolver() {
+  CbcSolver() : CPSolver(CBC) {
     // Suppress the solver's output
     solver.messageHandler()->setLogLevel(0);
   }
@@ -598,6 +617,11 @@ public:
     }
     return solver.getObjValue();
   }
+
+  // [START LLVM RTTI prerequisites]
+  static bool classof(const CbcSolver *b) { return true; }
+  static bool classof(const CPSolver *b) { return b->getKind() == CBC; }
+  // [END LLVM RTTI prerequisites]
 };
 
 } // namespace cp

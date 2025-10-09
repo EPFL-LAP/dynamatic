@@ -111,7 +111,7 @@ BufferPlacementMILP::BufferPlacementMILP(std::unique_ptr<CPSolver> solver,
 }
 
 void BufferPlacementMILP::addChannelVars(Value channel,
-                                         ArrayRef<SignalType> signals) {
+                                         ArrayRef<SignalType> signalTypes) {
 
   // Default-initialize channel variables and retrieve a reference
   ChannelVars &chVars = vars.channelVars[channel];
@@ -123,7 +123,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   };
 
   // Signal-specific variables
-  for (SignalType sig : signals) {
+  for (SignalType sig : signalTypes) {
     ChannelSignalVars &signalVars = chVars.signalVars[sig];
     StringRef name = getSignalName(sig);
     signalVars.path.tIn = createVar(name + "PathIn", Var::REAL);
@@ -823,7 +823,19 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
 std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   std::vector<Value> channelsToBuffer;
 
-  std::unique_ptr<GurobiSolver> modelFeedback;
+  std::unique_ptr<CPSolver> modelFeedback;
+
+  if (isa<CbcSolver>(this->model)) {
+    modelFeedback = std::make_unique<CbcSolver>();
+  }
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  else if (isa<GurobiSolver>(this->model)) {
+    modelFeedback = std::make_unique<CbcSolver>();
+  }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  else {
+    llvm_unreachable("Aborting on unimplemented solver type!");
+  }
 
   // Maps operations to GRBVars that holds the topological order index of MLIR
   // Operations
