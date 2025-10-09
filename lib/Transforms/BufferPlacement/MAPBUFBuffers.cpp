@@ -174,8 +174,8 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   }
 
   // Set constraints based on minimum number of buffer slots
-  Var &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
-  Var &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
+  CPVar &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
   if (props.minOpaque > 0) {
     // Force the MILP to place at least one opaque slot
     model->addConstr(bufData == 1, "custom_forceData");
@@ -290,7 +290,7 @@ void MAPBUFBuffers::setup() {
     addDelayAndCutConflictConstraints(rootNode, cutVector, blifData, lutDelay);
     for (auto &cut : cutVector) {
       auto &leaves = cut.getLeaves();
-      Var &cutSelectionVar = cut.getCutSelectionVariable();
+      CPVar &cutSelectionVar = cut.getCutSelectionVariable();
       for (auto *leaf : leaves) {
         if ((leaves.size() == 1) && (*leaves.begin() == rootNode)) {
           continue;

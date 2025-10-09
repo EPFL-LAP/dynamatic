@@ -18,8 +18,8 @@ TEST_P(ParamSolverTest, basicMILPTest) {
   // [Using our API to solve the result]
   // auto solver = GurobiSolver();
   auto solver = GetParam()();
-  auto x = solver->addVar("x", Var::REAL, /* lb */ 0, std::nullopt);
-  auto y = solver->addVar("y", Var::REAL, /* lb */ 0, std::nullopt);
+  auto x = solver->addVar("x", CPVar::REAL, /* lb */ 0, std::nullopt);
+  auto y = solver->addVar("y", CPVar::REAL, /* lb */ 0, std::nullopt);
   solver->addConstr(x + 2 * y <= 14);
   solver->addConstr(3 * x - y >= 0);
   solver->addConstr(x - y <= 2);
@@ -59,11 +59,11 @@ TEST_P(ParamSolverTest, basicIntegerProgramTest) {
   // [Using our API to solve the result]
   // auto solver = GurobiSolver();
   auto solver = GetParam()();
-  auto x = solver->addVar("x", Var::INTEGER, /* lb */ 0,
+  auto x = solver->addVar("x", CPVar::INTEGER, /* lb */ 0,
                           /* infinity */ std::nullopt);
-  auto y = solver->addVar("y", Var::INTEGER, /* lb */ 0,
+  auto y = solver->addVar("y", CPVar::INTEGER, /* lb */ 0,
                           /* infinity */ std::nullopt);
-  auto z = solver->addVar("z", Var::INTEGER, /* lb */ 0,
+  auto z = solver->addVar("z", CPVar::INTEGER, /* lb */ 0,
                           /* infinity */ std::nullopt);
   solver->addConstr(2 * x + 7 * y + 3 * z <= 50);
   solver->addConstr(3 * x + 5 * y + 7 * z <= 45);
@@ -101,8 +101,8 @@ TEST_P(ParamSolverTest, basicIntegerProgramTest) {
 TEST_P(ParamSolverTest, SimpleMaxLP) {
   auto solver = GetParam()();
 
-  auto x = solver->addVar("x", Var::REAL, 0, std::nullopt);
-  auto y = solver->addVar("y", Var::REAL, 0, std::nullopt);
+  auto x = solver->addVar("x", CPVar::REAL, 0, std::nullopt);
+  auto y = solver->addVar("y", CPVar::REAL, 0, std::nullopt);
 
   solver->addConstr(x + y <= 10);
   solver->setMaximizeObjective(x + 2 * y);
@@ -118,8 +118,8 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
 TEST_P(ParamSolverTest, SimpleMinLP) {
   auto solver = GetParam()();
 
-  auto x = solver->addVar("x", Var::REAL, 1, std::nullopt);
-  auto y = solver->addVar("y", Var::REAL, 0, std::nullopt);
+  auto x = solver->addVar("x", CPVar::REAL, 1, std::nullopt);
+  auto y = solver->addVar("y", CPVar::REAL, 0, std::nullopt);
 
   solver->addConstr(2 * x + y >= 5);
   solver->setMaximizeObjective(-(x + y)); // Minimization via negation
@@ -134,8 +134,8 @@ TEST_P(ParamSolverTest, SimpleMinLP) {
 TEST_P(ParamSolverTest, SmallIntegerProgram) {
   auto solver = GetParam()();
 
-  auto x = solver->addVar("x", Var::INTEGER, 0, 5);
-  auto y = solver->addVar("y", Var::INTEGER, 0, 5);
+  auto x = solver->addVar("x", CPVar::INTEGER, 0, 5);
+  auto y = solver->addVar("y", CPVar::INTEGER, 0, 5);
 
   solver->addConstr(x + 2 * y <= 6);
   solver->setMaximizeObjective(x + y);
@@ -150,8 +150,8 @@ TEST_P(ParamSolverTest, SmallIntegerProgram) {
 TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
   auto solver = GetParam()();
 
-  auto x = solver->addVar("x", Var::REAL, 0, 10);
-  auto y = solver->addVar("y", Var::BOOLEAN, std::nullopt, std::nullopt);
+  auto x = solver->addVar("x", CPVar::REAL, 0, 10);
+  auto y = solver->addVar("y", CPVar::BOOLEAN, std::nullopt, std::nullopt);
 
   double bigConst = 1e6;
   // If y = 0 then x <= 3, else no restriction
@@ -186,8 +186,8 @@ TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
 TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
   auto solver = GetParam()();
 
-  auto x = solver->addVar("x", Var::REAL, 0, 1);
-  auto y = solver->addVar("y", Var::REAL, 0, 1);
+  auto x = solver->addVar("x", CPVar::REAL, 0, 1);
+  auto y = solver->addVar("y", CPVar::REAL, 0, 1);
 
   // Quadratic constraint: x^2 + y^2 <= 1
   //
@@ -209,8 +209,8 @@ TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
 }
 
 TEST(ExpressionOperators, LinearExprPlusEquals) {
-  Var x("x", Var::REAL, 0, 10);
-  Var y("y", Var::REAL, 0, 10);
+  CPVar x("x", CPVar::REAL, 0, 10);
+  CPVar y("y", CPVar::REAL, 0, 10);
 
   LinExpr expr1 = x + 2 * y;
   LinExpr expr2 = y + 3;
@@ -223,8 +223,8 @@ TEST(ExpressionOperators, LinearExprPlusEquals) {
 }
 
 TEST(ExpressionOperators, LinearExprMinusEquals) {
-  Var x("x", Var::REAL, 0, 10);
-  Var y("y", Var::REAL, 0, 10);
+  CPVar x("x", CPVar::REAL, 0, 10);
+  CPVar y("y", CPVar::REAL, 0, 10);
 
   LinExpr expr1 = 5 * x + 2 * y + 10;
   LinExpr expr2 = x + y + 3;

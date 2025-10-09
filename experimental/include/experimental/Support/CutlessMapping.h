@@ -47,7 +47,7 @@ public:
 
   // Returns the cut selection variable, which is a Gurobi variable used for
   // MapBuf formulation. This variable is unique for each cut.
-  Var &getCutSelectionVariable() { return cutSelection; }
+  CPVar &getCutSelectionVariable() { return cutSelection; }
 
   // Returns the root node of the cut.
   Node *getNode() { return root; }
@@ -57,7 +57,7 @@ public:
 
 private:
   int depth;               // Depth of the cut
-  Var cutSelection;        // Cut selection variable for MILP of MapBuf
+  CPVar cutSelection;      // Cut selection variable for MILP of MapBuf
   Node *root;              // Root node of the cut
   std::set<Node *> leaves; // Set of leaves in the cut
 };

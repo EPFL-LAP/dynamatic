@@ -105,7 +105,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
-  Var &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
 
   if (props.minOpaque > 0) {
     // Force the MILP to use opaque slots

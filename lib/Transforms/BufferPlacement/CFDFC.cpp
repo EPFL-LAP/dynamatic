@@ -37,11 +37,11 @@ namespace {
 /// Gurobi variable that corresponds to it.
 struct MILPVars {
   /// Mapping between each arch and Gurobi variable.
-  std::map<ArchBB *, Var> archs;
+  std::map<ArchBB *, CPVar> archs;
   /// Mapping between each basic block and Gurobi variable.
-  std::map<unsigned, Var> bbs;
+  std::map<unsigned, CPVar> bbs;
   /// Holds the maximum number of executions achievable.
-  Var numExecs;
+  CPVar numExecs;
 };
 } // namespace
 
@@ -56,18 +56,18 @@ static void initMILPVariables(std::unique_ptr<CPSolver> &model, ArchSet &archs,
   // Create a variable for each basic block
   for (unsigned bb : bbs)
     vars.bbs[bb] =
-        model->addVar("sBB_" + std::to_string(bb), Var::BOOLEAN, 0, 1);
+        model->addVar("sBB_" + std::to_string(bb), CPVar::BOOLEAN, 0, 1);
 
   // Create a variable for each arch
   for (ArchBB *arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
-    vars.archs[arch] = model->addVar(arcName, Var::BOOLEAN, 0, 1);
+    vars.archs[arch] = model->addVar(arcName, CPVar::BOOLEAN, 0, 1);
     maxTrans = std::max(maxTrans, arch->numTrans);
   }
 
   // Create a variable to hold the maximum number of CFDFC executions
-  vars.numExecs = model->addVar("varMaxExecs", Var::INTEGER, 0, maxTrans);
+  vars.numExecs = model->addVar("varMaxExecs", CPVar::INTEGER, 0, maxTrans);
 }
 
 /// Sets the MILP objective, which is to maximize the sum over all archs of
@@ -78,7 +78,7 @@ static void setObjective(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
 
     // vars.numExecs * var is not a linear term, we should linearize it
     auto numExecsTimesVar =
-        model->addVar("numExec*" + var.name, Var::INTEGER, 0, std::nullopt);
+        model->addVar("numExec*" + var.name, CPVar::INTEGER, 0, std::nullopt);
     constexpr double bigM = 1e4;
 
     // - If var == 0: 0 <= w <= 0
@@ -118,8 +118,8 @@ static void setEdgeConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars,
 
 /// Get all variables corresponding to "predecessor archs" i.e., archs from
 /// predecessor blocks to the given block.
-static SmallVector<Var> getPredArchVars(unsigned bb, MILPVars &vars) {
-  SmallVector<Var> predVars;
+static SmallVector<CPVar> getPredArchVars(unsigned bb, MILPVars &vars) {
+  SmallVector<CPVar> predVars;
   for (auto &[arch, var] : vars.archs)
     if (arch->dstBB == bb)
       predVars.push_back(var);
@@ -128,8 +128,8 @@ static SmallVector<Var> getPredArchVars(unsigned bb, MILPVars &vars) {
 
 /// Get all variables corresponding to "successor archs" i.e., archs from the
 /// given block to its successor blocks.
-static SmallVector<Var> getSuccArchvars(unsigned bb, MILPVars &vars) {
-  SmallVector<Var> succVars;
+static SmallVector<CPVar> getSuccArchvars(unsigned bb, MILPVars &vars) {
+  SmallVector<CPVar> succVars;
   for (auto &[arch, var] : vars.archs)
     if (arch->srcBB == bb)
       succVars.push_back(var);
@@ -145,13 +145,13 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   for (auto &[bb, varBB] : vars.bbs) {
     // Set constraint for predecessor archs
     LinExpr predArchsConstr;
-    for (Var &var : getPredArchVars(bb, vars))
+    for (CPVar &var : getPredArchVars(bb, vars))
       predArchsConstr += var;
     model->addConstr(predArchsConstr == varBB, "in" + std::to_string(bb));
 
     // Set constraint for successor archs
     LinExpr succArchsConstr;
-    for (Var &var : getSuccArchvars(bb, vars))
+    for (CPVar &var : getSuccArchvars(bb, vars))
       succArchsConstr += var;
     model->addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
   }

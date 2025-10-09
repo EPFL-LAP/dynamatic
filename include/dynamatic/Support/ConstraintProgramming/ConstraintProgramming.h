@@ -28,11 +28,11 @@ namespace cp {
 
 /// A single variable in constraint programming
 /// Example:
-/// auto x = Var("x", Var::INTEGER);
+/// auto x = CPVar("x", CPVar::INTEGER);
 ///
 /// For simplicity, the upper and lower bounds are not encoded here (just the
 /// data types).
-struct Var {
+struct CPVar {
   enum VarType { REAL, INTEGER, BOOLEAN };
   std::string name;
   VarType type;
@@ -41,20 +41,23 @@ struct Var {
   // Null value of upperBound would be +inf
   std::optional<double> upperBound;
   // Using Var as a key
-  bool operator<(const Var &other) const noexcept { return name < other.name; }
-  bool operator==(const Var &other) const noexcept {
+  bool operator<(const CPVar &other) const noexcept {
+    return name < other.name;
+  }
+  bool operator==(const CPVar &other) const noexcept {
     return name == other.name;
   }
 
-  Var() = default;
+  CPVar() = default;
 
   // Explicit constructor:
   // Var newVar = solver.addVariable("newVar", Var::INTEGER, std::nullopt,
   // std::nullopt);
   //
   // Explicit constructor avoids implicit cast from string to Var.
-  explicit Var(std::string name, VarType type, std::optional<double> lowerBound,
-               std::optional<double> upperBound)
+  explicit CPVar(std::string name, VarType type,
+                 std::optional<double> lowerBound,
+                 std::optional<double> upperBound)
       : name(std::move(name)), type(type), lowerBound(lowerBound),
         upperBound(upperBound) {}
 };
@@ -71,10 +74,10 @@ struct LinExpr {
   // The coefficients in the linear expression
   // For instance, for x + 2 * y + 1
   // We have (x, 1) and (y, 2)
-  std::map<Var, double> terms;
+  std::map<CPVar, double> terms;
   double constant = 0.0;
   LinExpr() = default;
-  LinExpr(const Var &v) { terms[v] = 1.0; }
+  LinExpr(const CPVar &v) { terms[v] = 1.0; }
   LinExpr(double value) { constant = value; }
 
   LinExpr operator-() const {
@@ -121,7 +124,7 @@ inline void operator-=(LinExpr &left, const LinExpr &right) {
 
 /// Overloading mul
 /// const * var
-inline LinExpr operator*(double c, const Var &v) {
+inline LinExpr operator*(double c, const CPVar &v) {
   LinExpr newExpr(v);
   newExpr.terms[v] *= c;
   newExpr.constant *= c;
@@ -130,7 +133,7 @@ inline LinExpr operator*(double c, const Var &v) {
 
 /// Overloading mul (commutativity of mul):
 /// var * const
-inline LinExpr operator*(const Var &v, double c) { return c * v; }
+inline LinExpr operator*(const CPVar &v, double c) { return c * v; }
 
 /// Overloading mul
 /// const * linexpr
@@ -147,7 +150,7 @@ inline LinExpr operator*(const LinExpr &expr, double c) { return c * expr; }
 
 struct QuadExpr {
   LinExpr linexpr;
-  std::map<std::pair<Var, Var>, double> quadTerms;
+  std::map<std::pair<CPVar, CPVar>, double> quadTerms;
   QuadExpr() = default;
   QuadExpr(double value) { linexpr = LinExpr(value); }
   QuadExpr(const LinExpr &expr) { linexpr = expr; }
@@ -305,10 +308,10 @@ public:
   virtual ~CPSolver() = default;
   // Virtual class methods: they provide a unified interface for all available
   // solvers.
-  virtual Var addVar(const Var &var) = 0;
+  virtual CPVar addVar(const CPVar &var) = 0;
   // Create var, add gurobi var, and then return the created variable
-  virtual Var addVar(const std::string &name, Var::VarType type,
-                     std::optional<double> lb, std::optional<double> ub) = 0;
+  virtual CPVar addVar(const std::string &name, CPVar::VarType type,
+                       std::optional<double> lb, std::optional<double> ub) = 0;
   virtual void addConstr(const LinConstr &constraint,
                          llvm::StringRef constrName) = 0;
   void addConstr(const LinConstr &constraint) { addConstr(constraint, ""); }
@@ -316,7 +319,7 @@ public:
                           llvm::StringRef constrName) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
-  virtual double getValue(const Var &var) const = 0;
+  virtual double getValue(const CPVar &var) const = 0;
   virtual double getObjective() const = 0;
 
   virtual void write(llvm::StringRef filePath) const = 0;
@@ -326,7 +329,7 @@ public:
 class GurobiSolver : public CPSolver {
 
   std::unique_ptr<GRBEnv> env;
-  std::map<Var, GRBVar> variables;
+  std::map<CPVar, GRBVar> variables;
   std::unique_ptr<GRBModel> model;
 
   // Track the added names: prevent adding variables with duplicated names
@@ -346,7 +349,7 @@ public:
     model = std::make_unique<GRBModel>(*env);
   }
 
-  Var addVar(const Var &var) override {
+  CPVar addVar(const CPVar &var) override {
     if (names.count(var.name)) {
       llvm::report_fatal_error("Adding variable with duplicated names is not "
                                "permitted! Aborting...");
@@ -355,13 +358,13 @@ public:
     double ub = var.upperBound.value_or(GRB_INFINITY);
     char type;
     switch (var.type) {
-    case Var::REAL:
+    case CPVar::REAL:
       type = GRB_CONTINUOUS;
       break;
-    case Var::INTEGER:
+    case CPVar::INTEGER:
       type = GRB_INTEGER;
       break;
-    case Var::BOOLEAN:
+    case CPVar::BOOLEAN:
       type = GRB_BINARY;
     }
     variables[var] = model->addVar(lb, ub, 0.0, type, var.name);
@@ -370,9 +373,9 @@ public:
   }
 
   // Create var, add gurobi var, and then return
-  Var addVar(const std::string &name, Var::VarType type,
-             std::optional<double> lb, std::optional<double> ub) override {
-    auto var = Var(name, type, lb, ub);
+  CPVar addVar(const std::string &name, CPVar::VarType type,
+               std::optional<double> lb, std::optional<double> ub) override {
+    auto var = CPVar(name, type, lb, ub);
     return addVar(var);
   }
 
@@ -455,7 +458,7 @@ public:
   ///
   /// Example:
   /// auto resultMyVar = solver.getValue(myVar);
-  double getValue(const Var &var) const override {
+  double getValue(const CPVar &var) const override {
     if (status != OPTIMAL && status != NONOPTIMAL) {
       llvm::errs() << "Solution is not available while retrieving " << var.name
                    << "!\n";
@@ -482,7 +485,7 @@ public:
 class CbcSolver : public CPSolver {
 
   OsiClpSolverInterface solver;
-  std::map<Var, int> variables; // map Var -> column index
+  std::map<CPVar, int> variables; // map Var -> column index
   std::set<std::string> names;
 
 public:
@@ -492,7 +495,7 @@ public:
     solver.messageHandler()->setLogLevel(0);
   }
 
-  Var addVar(const Var &var) override {
+  CPVar addVar(const CPVar &var) override {
     if (names.count(var.name)) {
       llvm::report_fatal_error("Adding variable with duplicated names is not "
                                "permitted! Aborting...");
@@ -508,9 +511,9 @@ public:
     variables[var] = colIndex;
 
     // Set variable type
-    if (var.type == Var::INTEGER)
+    if (var.type == CPVar::INTEGER)
       solver.setInteger(colIndex);
-    else if (var.type == Var::BOOLEAN) {
+    else if (var.type == CPVar::BOOLEAN) {
       solver.setInteger(colIndex);
       solver.setColUpper(colIndex, 1.0);
       solver.setColLower(colIndex, 0.0);
@@ -520,9 +523,9 @@ public:
     return var;
   }
 
-  Var addVar(const std::string &name, Var::VarType type,
-             std::optional<double> lb, std::optional<double> ub) override {
-    auto var = Var(name, type, lb, ub);
+  CPVar addVar(const std::string &name, CPVar::VarType type,
+               std::optional<double> lb, std::optional<double> ub) override {
+    auto var = CPVar(name, type, lb, ub);
     return addVar(var);
   }
 
@@ -605,7 +608,7 @@ public:
     solver.writeLp(filePath.str().c_str());
   }
 
-  double getValue(const Var &var) const override {
+  double getValue(const CPVar &var) const override {
     if (status != OPTIMAL && status != NONOPTIMAL) {
       llvm::errs() << "Solution is not available while retrieving " << var.name
                    << "!\n";

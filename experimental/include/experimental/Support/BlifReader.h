@@ -14,7 +14,6 @@
 #ifndef EXPERIMENTAL_SUPPORT_BLIF_READER_H
 #define EXPERIMENTAL_SUPPORT_BLIF_READER_H
 
-
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
@@ -33,9 +32,9 @@ namespace experimental {
 class LogicNetwork;
 
 struct MILPVarsSubjectGraph {
-  Var tIn;
-  Var tOut;
-  Var bufferVar;
+  CPVar tIn;
+  CPVar tOut;
+  CPVar bufferVar;
 };
 
 /// Represents a node in an And-Inverter Graph (AIG) circuit representation.

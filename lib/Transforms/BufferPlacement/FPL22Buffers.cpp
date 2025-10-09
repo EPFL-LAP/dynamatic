@@ -111,8 +111,8 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   }
 
   // Set constraints based on minimum number of buffer slots
-  Var &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
-  Var &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
+  CPVar &bufData = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
   if (props.minOpaque > 0) {
     // Force the MILP to place at least one opaque slot
     model->addConstr(bufData == 1, "custom_forceData");
@@ -282,12 +282,12 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
       return;
 
     // Find variables for arrival time at input/output pin
-    Var &tPinIn = vars.channelVars[cons.input.channel]
-                      .signalVars[cons.input.signalType]
-                      .path.tOut;
-    Var &tPinOut = vars.channelVars[cons.output.channel]
-                       .signalVars[cons.output.signalType]
-                       .path.tIn;
+    CPVar &tPinIn = vars.channelVars[cons.input.channel]
+                        .signalVars[cons.input.signalType]
+                        .path.tOut;
+    CPVar &tPinOut = vars.channelVars[cons.output.channel]
+                         .signalVars[cons.output.signalType]
+                         .path.tIn;
 
     // Arrival time at unit's output pin must be greater than arrival time at
     // unit's input pin plus the unit's internal delay on the path
@@ -486,8 +486,8 @@ void OutOfCycleBuffers::setup() {
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &chVars = vars.channelVars[channel];
-    Var &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
-    Var &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    CPVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    CPVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     objective -= dataBuf;
     objective -= readyBuf;
     objective -= 0.1 * chVars.bufNumSlots;

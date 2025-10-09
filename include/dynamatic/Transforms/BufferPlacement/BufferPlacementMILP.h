@@ -41,19 +41,19 @@ namespace buffer {
 /// a channel's endpoints.
 struct TimeVars {
   /// Time at channel's input (i.e., at source unit's output port).
-  Var tIn;
+  CPVar tIn;
   /// Time at channel's output (i.e., at destination unit's input port).
-  Var tOut;
+  CPVar tOut;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
 /// appear in multiple CFDFCs and so may have multiple sets of these variables.
 struct UnitVars {
   /// Fluid retiming of tokens at unit's input (real).
-  Var retIn;
+  CPVar retIn;
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
-  Var retOut;
+  CPVar retOut;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -62,7 +62,7 @@ struct ChannelSignalVars {
   /// Arrival time of the signal at channel's endpoints.
   TimeVars path;
   /// Presence of a buffer on the signal.
-  Var bufPresent;
+  CPVar bufPresent;
 };
 
 /// Holds all MILP variables associated to a channel.
@@ -71,13 +71,13 @@ struct ChannelVars {
   /// (real, real) and buffer presence (binary).
   std::map<SignalType, ChannelSignalVars> signalVars;
   /// Presence of any buffer on the channel (binary).
-  Var bufPresent;
+  CPVar bufPresent;
   /// Number of buffer slots on the channel (integer).
-  Var bufNumSlots;
+  CPVar bufNumSlots;
   /// Buffer latency on the data signal path (integer).
-  Var dataLatency;
+  CPVar dataLatency;
   /// Usage of a shift register on the channel (binary).
-  Var shiftReg;
+  CPVar shiftReg;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -87,9 +87,9 @@ struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
   llvm::MapVector<Operation *, UnitVars> unitVars;
   /// Channel throughput variables (real).
-  llvm::MapVector<Value, Var> channelThroughputs;
+  llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
-  Var throughput;
+  CPVar throughput;
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
@@ -308,7 +308,8 @@ protected:
   // either a buffer is placed on a DFG edge or the cut that containts that edge
   // is selected.
   void addCutSelectionConflicts(experimental::Node *root,
-                                experimental::Node *leaf, Var &cutSelectionVar,
+                                experimental::Node *leaf,
+                                CPVar &cutSelectionVar,
                                 experimental::LogicNetwork *blifData,
                                 std::vector<experimental::Node *> &path);
 

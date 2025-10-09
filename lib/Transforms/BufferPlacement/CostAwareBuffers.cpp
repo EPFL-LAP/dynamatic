@@ -97,7 +97,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
 void CostAwareBuffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
-  Var &dataLatency = chVars.dataLatency;
+  CPVar &dataLatency = chVars.dataLatency;
   for (mlir::Operation *user : channel.getUsers()) {
     if (isa<handshake::LoadOp>(user)) {
       props.minTrans = 0;
