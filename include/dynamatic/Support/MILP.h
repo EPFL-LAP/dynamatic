@@ -69,7 +69,11 @@ public:
       return failure();
     }
 
-    // Optimize the model, possibly logging the MILP model and its solution
+    // Optimize the model
+    if (!writeTo.empty()) {
+      // Logging the MILP model
+      model->write(writeTo + "_model.lp");
+    }
     model->optimize();
 
     // Check whether we found an optimal solution or reached the time limit

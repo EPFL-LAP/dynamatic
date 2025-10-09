@@ -363,7 +363,8 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               unsigned &numExecs,
                                               const std::string &logPath,
                                               int *milpStat) {
-  // Create Gurobi MILP model for CFDFC extraction, suppressing stdout
+  // Create an MILP model for CFDFC extraction (NOTE: since the problem is
+  // small, we could use CBC here).
   std::unique_ptr<CPSolver> model = std::make_unique<CbcSolver>();
 
   // Create all MILP variables we need
