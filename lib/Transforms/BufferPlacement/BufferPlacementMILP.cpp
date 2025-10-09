@@ -830,7 +830,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   }
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   else if (isa<GurobiSolver>(this->model)) {
-    modelFeedback = std::make_unique<CbcSolver>();
+    modelFeedback = std::make_unique<GurobiSolver>();
   }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   else {
@@ -960,8 +960,6 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
       double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
-
-      llvm::errs() << "Coefficient of CFDFC: " << coef << "\n";
       objective += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }

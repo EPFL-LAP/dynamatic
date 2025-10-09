@@ -280,14 +280,22 @@ inline QuadConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
 /// This is overloaded for the Gurobi solver and the Google's OR Tools API.
 class CPSolver {
 public:
-  enum Kind { GUROBI, CBC };
-
   enum Status { OPTIMAL, NONOPTIMAL, INFEASIBLE, UNBOUNDED, UNKNOWN, ERROR };
   Status status = UNKNOWN;
 
+  // LLVM Implementation of rtti functions like dyn_cast<>, isa<> needs these
+  // function
+  // [START LLVM RTTI prerequisites]
+  enum Kind { GUROBI, CBC };
   Kind solverKind;
+  Kind getKind() const { return solverKind; }
+  static inline bool classof(CPSolver const *) { return true; }
+  // [END LLVM RTTI prerequisites]
 
-  CPSolver(Kind k) : solverKind(k) {}
+  // Solver timeout in second.
+  // If timeout <= 0, then this option is ignored.
+  int timeout;
+  CPSolver(int t, Kind k) : solverKind(k), timeout(t) {}
 
   virtual ~CPSolver() = default;
   // Virtual class methods: they provide a unified interface for all available
@@ -310,13 +318,6 @@ public:
   virtual double getObjective() const = 0;
 
   virtual void write(llvm::StringRef filePath) const = 0;
-
-  // LLVM Implementation of rtti functions like dyn_cast<>, isa<> needs these
-  // function
-  // [START LLVM RTTI prerequisites]
-  Kind getKind() const { return solverKind; }
-  static inline bool classof(CPSolver const *) { return true; }
-  // [END LLVM RTTI prerequisites]
 };
 
 enum MILPSolver {
@@ -337,10 +338,16 @@ class GurobiSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  GurobiSolver() : CPSolver(GUROBI) {
+  GurobiSolver(int timeout = -1 /* default = no timeout*/)
+      : CPSolver(timeout, GUROBI) {
     env = std::make_unique<GRBEnv>(true);
     env->set(GRB_IntParam_OutputFlag, 0);
     env->start();
+
+    if (timeout > 0) {
+      env->set(GRB_DoubleParam_TimeLimit, timeout);
+    }
+
     model = std::make_unique<GRBModel>(*env);
   }
 
@@ -416,8 +423,6 @@ public:
   void setMaximizeObjective(const LinExpr &expr) override {
     GRBLinExpr obj = 0;
     for (auto &[name, coeff] : expr.terms) {
-      llvm::errs() << "Adding vairable " << name.name << " with coeff " << coeff
-                   << " to grb!\n";
       obj += coeff * variables[name];
     }
     obj += expr.constant;
@@ -486,7 +491,8 @@ class CbcSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  CbcSolver() : CPSolver(CBC) {
+  CbcSolver(int timeout = -1 /* default = no timeout */)
+      : CPSolver(timeout, CBC) {
     // Suppress the solver's output
     solver.messageHandler()->setLogLevel(0);
   }
@@ -578,6 +584,10 @@ public:
     // Disable all output
     // 0 = no output, 1 = minimal, higher = more verbose
     model.setLogLevel(0);
+
+    if (this->timeout > 0) {
+      model.setMaximumSeconds(timeout);
+    }
 
     model.branchAndBound();
 

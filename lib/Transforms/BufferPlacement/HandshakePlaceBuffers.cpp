@@ -564,13 +564,21 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
   // Create solver
   std::unique_ptr<CPSolver> solverInstance;
+  if (dumpLogs) {
+    mlir::raw_indented_ostream &os = *(*logger);
+    os << "\n";
+    os << "# =========================== #\n";
+    os << "# Solver for buffer placement #\n";
+    os << "# =========================== #\n\n";
+    os << "Selected MILP solver: " << solver << "\n\n";
+  }
 
   // Instantiate the selected solver
   if (solver == "cbc")
-    solverInstance = std::make_unique<CbcSolver>();
+    solverInstance = std::make_unique<CbcSolver>(this->timeout);
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   else if (solver == "gurobi")
-    solverInstance = std::make_unique<GurobiSolver>();
+    solverInstance = std::make_unique<GurobiSolver>(this->timeout);
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   else {
     llvm::errs() << "Solver type " << solver << " is not supported!\n";
