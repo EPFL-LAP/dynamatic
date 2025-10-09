@@ -119,7 +119,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
 
   // Create a Gurobi variable of the given name and type for the channel
   auto createVar = [&](const llvm::Twine &name, Var::VarType type) {
-    return model->addVariable((name + suffix).str(), type, 0, std::nullopt);
+    return model->addVar((name + suffix).str(), type, 0, std::nullopt);
   };
 
   // Signal-specific variables
@@ -145,8 +145,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a Gurobi variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
-    return model->addVariable((prefix + name).str(), Var::REAL, 0,
-                              std::nullopt);
+    return model->addVar((prefix + name).str(), Var::REAL, 0, std::nullopt);
   };
 
   // Create a set of variables for each unit in the CFDFC
@@ -206,32 +205,31 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
 
   // Arrival time at channel's output must be lower than target clock period
-  model->addLinearConstraint(t2 <= targetPeriod, "path_period");
+  model->addConstr(t2 <= targetPeriod, "path_period");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
   // signals before its own, and inside its own buffer's input pin logic
   double preBufCstDelay = props.inDelay + inBufDelay;
-  model->addLinearConstraint(
-      t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <= targetPeriod,
-      "path_bufferedChannelIn");
+  model->addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
+                       targetPeriod,
+                   "path_bufferedChannelIn");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // channel's output must be greater than the propagation time through its own
   // buffer's output pin logic and all potential buffers cutting other signals
   // after its own
   double postBufCstDelay = outBufDelay + props.outDelay;
-  model->addLinearConstraint(bufPresent * postBufCstDelay + bufsAfterDelay <=
-                                 t2,
-                             "path_bufferedChannelOut");
+  model->addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
+                   "path_bufferedChannelOut");
 
   // If there are no buffers cutting the signal's path, arrival time at
   // channel's output must still propagate through entire channel and all
   // potential buffers cutting through other signals
   LinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
-  model->addLinearConstraint(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
-                             "path_unbufferedChannel");
+  model->addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
+                   "path_unbufferedChannel");
 }
 
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
@@ -265,7 +263,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       Var &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
-      model->addLinearConstraint(tOutPort >= tInPort + delay, "path_combDelay");
+      model->addConstr(tOutPort >= tInPort + delay, "path_combDelay");
     });
 
     return;
@@ -288,8 +286,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     Var &tInPort = path.tOut;
     // Arrival time at unit's input port + input port delay must be less
     // than the target clock period
-    model->addLinearConstraint(tInPort + inPortDelay <= targetPeriod,
-                               "path_inDelay");
+    model->addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
   }
 
   // Output port constraints
@@ -305,7 +302,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
     Var &tOutPort = path.tIn;
     // Arrival time at unit's output port is equal to the output port delay
-    model->addLinearConstraint(tOutPort == outPortDelay, "path_outDelay");
+    model->addConstr(tOutPort == outPortDelay, "path_outDelay");
   }
 }
 
@@ -316,14 +313,13 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   Var &bufNumSlots = chVars.bufNumSlots;
 
   // If there is at least one slot, there must be a buffer
-  model->addLinearConstraint(bufNumSlots <= 100 * bufPresent,
-                             "buffer_presence");
+  model->addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
 
   for (auto &[sig, signalVars] : chVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
     // on the channel
-    model->addLinearConstraint(signalVars.bufPresent <= bufPresent,
-                               getSignalName(sig).str() + "_Presence");
+    model->addConstr(signalVars.bufPresent <= bufPresent,
+                     getSignalName(sig).str() + "_Presence");
   }
 }
 
@@ -337,21 +333,17 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
   Var &dataLatency = chVars.dataLatency;
 
   // There is a buffer breaking data & valid iff dataLatency > 0
-  model->addLinearConstraint(dataLatency <= 100 * dataBuf,
-                             "dataBuf_if_dataLatency");
-  model->addLinearConstraint(dataLatency <= 100 * validBuf,
-                             "validBuf_if_dataLatency");
-  model->addLinearConstraint(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
-  model->addLinearConstraint(dataLatency >= validBuf,
-                             "dataLatency_if_validBuf");
+  model->addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
+  model->addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
+  model->addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model->addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
 
   // The dataBuf and validBuf must be equal
   // This constraint is not necessary, but may assist presolve.
-  model->addLinearConstraint(LinExpr(dataBuf) == LinExpr(validBuf),
-                             "dataBuf_validBuf_equal");
+  model->addConstr(LinExpr(dataBuf) == LinExpr(validBuf),
+                   "dataBuf_validBuf_equal");
   // There must be enough slots for data and ready buffers.
-  model->addLinearConstraint(dataLatency + readyBuf <= bufNumSlots,
-                             "slot_sufficiency");
+  model->addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
 }
 
 void BufferPlacementMILP::addBufferingGroupConstraints(
@@ -372,16 +364,14 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
     StringRef refName = getSignalName(group.getRefSignal());
     for (SignalType sig : group.getOtherSignals()) {
       StringRef otherName = getSignalName(sig);
-      model->addLinearConstraint(LinExpr(groupBufPresent) ==
-                                     LinExpr(chVars.signalVars[sig].bufPresent),
-                                 "elastic_" + refName.str() + "_same_" +
-                                     otherName.str());
+      model->addConstr(LinExpr(groupBufPresent) ==
+                           LinExpr(chVars.signalVars[sig].bufPresent),
+                       "elastic_" + refName.str() + "_same_" + otherName.str());
     }
   }
 
   // There must be enough slots for all disjoint buffers
-  model->addLinearConstraint(disjointBufPresentSum <= bufNumSlots,
-                             "elastic_slots");
+  model->addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
@@ -421,8 +411,8 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
-    model->addLinearConstraint(chTokenOccupancy - backedge == retDst - retSrc,
-                               "throughput_channelRetiming");
+    model->addConstr(chTokenOccupancy - backedge == retDst - retSrc,
+                     "throughput_channelRetiming");
   }
 }
 
@@ -462,8 +452,7 @@ void BufferPlacementMILP::
     Var &chTokenOccupancy = cfVars.channelThroughputs[channel];
 
     // The channel's throughput cannot exceed the number of buffer slots.
-    model->addLinearConstraint(chTokenOccupancy <= bufNumSlots,
-                               "throughput_channel");
+    model->addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
@@ -484,8 +473,8 @@ void BufferPlacementMILP::
     // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
     //    otherwise, token occupancy >= 0 (enforced by the variable’s lower
     //    bound).
-    model->addLinearConstraint(
-        cfVars.throughput - chTokenOccupancy + dataBuf <= 1, "throughput_data");
+    model->addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
+                     "throughput_data");
     // In terms of the constraint on readyBuf:
     // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
     //    otherwise, bubble occupancy >= 0.
@@ -503,7 +492,7 @@ void BufferPlacementMILP::
     // constraint already enforces it):
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      model->addLinearConstraint(
+      model->addConstr(
           chTokenOccupancy + cfVars.throughput + readyBuf - bufNumSlots <= 1,
           "throughput_ready");
     }
@@ -555,9 +544,8 @@ void BufferPlacementMILP::
     Var &shiftReg = chVars.shiftReg;
 
     // Token occupancy >= data latency * CFDFC's throughput.
-    model->addQuadConstraint(dataLatency * throughput <=
-                                 QuadExpr(chTokenOccupancy),
-                             "throughput_tokens_lb");
+    model->addQConstr(dataLatency * throughput <= QuadExpr(chTokenOccupancy),
+                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
     std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
     // Shift registers have more bubbles if II is higher than 1 (i.e.,
@@ -569,17 +557,17 @@ void BufferPlacementMILP::
     //
     // Create an intermediate variable to represent the extra bubbles
     // of the SHIFT_REG_BREAK_DV buffer.
-    Var shiftRegExtraBubbles = model->addVariable(
-        shiftRegExtraBubblesName, Var::INTEGER, 0, std::nullopt);
+    Var shiftRegExtraBubbles =
+        model->addVar(shiftRegExtraBubblesName, Var::INTEGER, 0, std::nullopt);
 
     // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
     // number (dataLatency) minus the ceiling of the product of data latency and
     // CFDFC throughput.
     // We approximate the ceiling function numerically to keep the model linear.
-    model->addQuadConstraint(QuadExpr(shiftRegExtraBubbles) >=
-                                 QuadExpr(dataLatency) -
-                                     dataLatency * throughput - 0.99,
-                             shiftRegExtraBubblesName);
+    model->addQConstr(QuadExpr(shiftRegExtraBubbles) >=
+                          QuadExpr(dataLatency) - dataLatency * throughput -
+                              0.99,
+                      shiftRegExtraBubblesName);
 
     // Combine the following into a unified constraint:
     // 1. If readyBuf is used, bubble occupancy limits the CFDFC's throughput,
@@ -595,11 +583,10 @@ void BufferPlacementMILP::
     // As a result, we model bubble occupancy as 'readyBuf * throughput'. This
     // term can be linearized, but it is not necessary because this is a
     // quadratic constaint.
-    model->addQuadConstraint(QuadExpr(chTokenOccupancy) +
-                                     readyBuf * throughput +
-                                     shiftReg * shiftRegExtraBubbles <=
-                                 QuadExpr(bufNumSlots),
-                             "throughput_tokens_ub");
+    model->addQConstr(QuadExpr(chTokenOccupancy) + readyBuf * throughput +
+                              shiftReg * shiftRegExtraBubbles <=
+                          QuadExpr(bufNumSlots),
+                      "throughput_tokens_ub");
   }
 }
 
@@ -619,8 +606,8 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
 
     // The fluid retiming of tokens across the non-combinational unit must
     // be the same as its latency multiplied by the CFDFC's throughput
-    model->addLinearConstraint(cfVars.throughput * latency == retOut - retIn,
-                               "through_unitRetiming");
+    model->addConstr(cfVars.throughput * latency == retOut - retIn,
+                     "through_unitRetiming");
   }
 }
 
@@ -674,9 +661,8 @@ void BufferPlacementMILP::addBlackboxConstraints(
 
     // Delay propagation constraint for blackbox nodes. Delay propagates through
     // input edges to output edges, increasing by delay variable.
-    model->addLinearConstraint(inputPathOut + delay == outputPathIn,
-                               "blackbox_constraint_" +
-                                   std::to_string(bitwidth));
+    model->addConstr(inputPathOut + delay == outputPathIn,
+                     "blackbox_constraint_" + std::to_string(bitwidth));
   }
 }
 
@@ -688,7 +674,7 @@ void BufferPlacementMILP::addCutSelectionConstraints(
     auto &cut = cutVector[i];
     // Add cut selection variable to the Gurobi model
     Var &cutSelection = cut.getCutSelectionVariable();
-    cutSelection = model->addVariable(
+    cutSelection = model->addVar(
         (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)),
         Var::BOOLEAN, 0, std::nullopt);
     cutSelectionSum += cutSelection;
@@ -696,7 +682,7 @@ void BufferPlacementMILP::addCutSelectionConstraints(
   // Cut Selection Constraint. Only a single cut of a node can be selected.
   // This affects delay propagation, as delay will propagate through the chosen
   // cut.
-  model->addLinearConstraint(cutSelectionSum == 1, "cut_selection_constraint");
+  model->addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
 void BufferPlacementMILP::addCutSelectionConflicts(
@@ -710,9 +696,8 @@ void BufferPlacementMILP::addCutSelectionConflicts(
       // if it is cut by a buffer, as LUTs cannot cover multiple sequential
       // stages. This constraint ensures an edge is either covered by a LUT, or
       // a buffer is inserted on the edge.
-      model->addLinearConstraint(1 >= nodePath->gurobiVars->bufferVar +
-                                          cutSelectionVar,
-                                 "cut_selection_conflict");
+      model->addConstr(1 >= nodePath->gurobiVars->bufferVar + cutSelectionVar,
+                       "cut_selection_conflict");
     }
   }
 }
@@ -743,7 +728,7 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     } else {
       // Create the timing variable for Subject Graph Node. These Nodes need
       // only 1 timing variable, as no buffers can be placed between them.
-      nodeVarIn = model->addVariable(node->str(), Var::REAL, 0, std::nullopt);
+      nodeVarIn = model->addVar(node->str(), Var::REAL, 0, std::nullopt);
       nodeVarOut = nodeVarIn;
     }
   }
@@ -762,15 +747,15 @@ void BufferPlacementMILP::addClockPeriodConstraintsNodes(
       std::string nodeName = node->str();
 
       // Add clock period constraints
-      model->addLinearConstraint(nodeVarIn <= targetPeriod, "pathIn_period");
-      model->addLinearConstraint(nodeVarOut <= targetPeriod, "pathOut_period");
-      model->addLinearConstraint(
-          nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0, "buf_delay");
+      model->addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+      model->addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+      model->addConstr(nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0,
+                       "buf_delay");
     } else {
       // If the node is a Primary Input, the delay is 0.
-      model->addLinearConstraint(
-          nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
-          node->isPrimaryInput() ? "input_delay" : "clock_period_constraint");
+      model->addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
+                       node->isPrimaryInput() ? "input_delay"
+                                              : "clock_period_constraint");
     }
   }
 }
@@ -787,8 +772,8 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
     // If a node has single fanin, then it is not mapped to LUT. The
     // delay of the node is simply equal to the delay of the fanin.
     Var &faninVar = (*fanIns.begin())->gurobiVars->tOut;
-    model->addLinearConstraint(LinExpr(nodeVar) == LinExpr(faninVar),
-                               "single_fanin_delay");
+    model->addConstr(LinExpr(nodeVar) == LinExpr(faninVar),
+                     "single_fanin_delay");
     return;
   }
 
@@ -799,7 +784,7 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
                                              const char *name) {
       Var &leafVar = leaf->gurobiVars->tOut;
       // Add delay propagation constraint
-      model->addLinearConstraint(
+      model->addConstr(
           nodeVar + (1 - cutSelectionVar) * 100 >= leafVar + lutDelay, name);
     };
 
@@ -845,8 +830,8 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
     // Create a Gurobi variable for each operation, which will hold the order of
     // the Operation in the topological ordering
     StringRef uniqueName = getUniqueName(op);
-    Var operationVariable = modelFeedback->addVariable(
-        uniqueName.str(), Var::INTEGER, 0, std::nullopt);
+    Var operationVariable =
+        modelFeedback->addVar(uniqueName.str(), Var::INTEGER, 0, std::nullopt);
     opToGRB[op] = operationVariable;
   });
 
@@ -858,7 +843,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
     for (Operation *user : op->getUsers()) {
       Var currentOpVar = opToGRB[op];
       Var userOpVar = opToGRB[user];
-      Var edge = modelFeedback->addVariable(
+      Var edge = modelFeedback->addVar(
           (getUniqueName(op) + "_" + getUniqueName(user)).str(), Var::BOOLEAN,
           0, 1);
       edgeToOps[std::make_pair(op, user)] = edge;
@@ -867,8 +852,8 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
       // their predecessors. If such an order cannot be satisfied with the given
       // set of nodes, "edge" variable is set to 1, which means the edge needs
       // to be cut to have an acyclic graph.
-      modelFeedback->addLinearConstraint(
-          userOpVar - currentOpVar + 100 * edge >= 1, "operation_order");
+      modelFeedback->addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
+                               "operation_order");
     }
   });
 
@@ -914,11 +899,11 @@ void BufferPlacementMILP::cutGraphEdges(Value channel) {
   //
   Var &bufVar =
       vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
-  model->addLinearConstraint(bufVar == 1, "backedge_ready");
+  model->addConstr(bufVar == 1, "backedge_ready");
 
   Var &bufVarData =
       vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
-  model->addLinearConstraint(bufVarData == 1, "backedge_data");
+  model->addConstr(bufVarData == 1, "backedge_data");
   // Insert buffers in the Subject Graph
   experimental::BufferSubjectGraph::createAndInsertNewBuffer(
       producer, consumer, "one_slot_break_dvr");
@@ -1045,11 +1030,10 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
     // Linearization of dataLatency * shiftReg
     Var latencyMulShiftReg =
-        model->addVariable("latencyMulShiftReg", Var::INTEGER, 0, 100);
-    model->addLinearConstraint(latencyMulShiftReg <= dataLatency);
-    model->addLinearConstraint(latencyMulShiftReg <= 100 * shiftReg);
-    model->addLinearConstraint(latencyMulShiftReg >=
-                               dataLatency - (1 - shiftReg) * 100);
+        model->addVar("latencyMulShiftReg", Var::INTEGER, 0, 100);
+    model->addConstr(latencyMulShiftReg <= dataLatency);
+    model->addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model->addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
     objective -=
         maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
     objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;

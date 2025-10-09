@@ -169,9 +169,8 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   unsigned minSlots =
       std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
-    model->addLinearConstraint(chVars.bufPresent == 1, "custom_forceBuffers");
-    model->addLinearConstraint(chVars.bufNumSlots >= minSlots,
-                               "custom_minSlots");
+    model->addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
+    model->addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");
   }
 
   // Set constraints based on minimum number of buffer slots
@@ -179,17 +178,17 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   Var &bufReady = chVars.signalVars[SignalType::READY].bufPresent;
   if (props.minOpaque > 0) {
     // Force the MILP to place at least one opaque slot
-    model->addLinearConstraint(bufData == 1, "custom_forceData");
+    model->addConstr(bufData == 1, "custom_forceData");
     // If the MILP decides to also place a ready buffer, then we must reserve
     // an extra slot for it
-    model->addLinearConstraint(chVars.bufNumSlots >= props.minOpaque + bufReady,
-                               "custom_minData");
+    model->addConstr(chVars.bufNumSlots >= props.minOpaque + bufReady,
+                     "custom_minData");
   }
   if (props.minTrans > 0) {
     // If the MILP decides to also place a data buffer, then we must reserve
     // an extra slot for it
-    model->addLinearConstraint(chVars.bufNumSlots >= props.minTrans + bufData,
-                               "custom_minReady");
+    model->addConstr(chVars.bufNumSlots >= props.minTrans + bufData,
+                     "custom_minReady");
   }
 
   // Set constraints based on maximum number of buffer slots
@@ -198,16 +197,16 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
     if (maxSlots == 0) {
       // Forbid buffer placement on the channel entirely when no slots are
       // allowed
-      model->addLinearConstraint(chVars.bufPresent == 0, "custom_noBuffer");
-      model->addLinearConstraint(chVars.bufNumSlots == 0, "custom_maxSlots");
+      model->addConstr(chVars.bufPresent == 0, "custom_noBuffer");
+      model->addConstr(chVars.bufNumSlots == 0, "custom_maxSlots");
     } else {
       // Restrict the maximum number of slots allowed. If both types are allowed
       // but the MILP decides to only place one type, then the maximum allowed
       // number is the maximum number of slots we can place for that type
-      model->addLinearConstraint(
-          chVars.bufNumSlots <= maxSlots - *props.maxOpaque * (1 - bufData) -
-                                    *props.maxTrans * (1 - bufReady),
-          "custom_maxSlots");
+      model->addConstr(chVars.bufNumSlots <=
+                           maxSlots - *props.maxOpaque * (1 - bufData) -
+                               *props.maxTrans * (1 - bufReady),
+                       "custom_maxSlots");
     }
   }
 
@@ -215,11 +214,11 @@ void MAPBUFBuffers::addCustomChannelConstraints(Value channel) {
   // slots on each signal
   if (props.maxOpaque && *props.maxOpaque == 0) {
     // Force the MILP to use transparent slots only
-    model->addLinearConstraint(bufData == 0, "custom_noData");
+    model->addConstr(bufData == 0, "custom_noData");
   }
   if (props.maxTrans && *props.maxTrans == 0) {
     // Force the MILP to use opaque slots only
-    model->addLinearConstraint(bufReady == 0, "custom_noReady");
+    model->addConstr(bufReady == 0, "custom_noReady");
   }
 }
 

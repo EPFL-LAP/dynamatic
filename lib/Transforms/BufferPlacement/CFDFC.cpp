@@ -56,18 +56,18 @@ static void initMILPVariables(std::unique_ptr<CPSolver> &model, ArchSet &archs,
   // Create a variable for each basic block
   for (unsigned bb : bbs)
     vars.bbs[bb] =
-        model->addVariable("sBB_" + std::to_string(bb), Var::BOOLEAN, 0, 1);
+        model->addVar("sBB_" + std::to_string(bb), Var::BOOLEAN, 0, 1);
 
   // Create a variable for each arch
   for (ArchBB *arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
-    vars.archs[arch] = model->addVariable(arcName, Var::BOOLEAN, 0, 1);
+    vars.archs[arch] = model->addVar(arcName, Var::BOOLEAN, 0, 1);
     maxTrans = std::max(maxTrans, arch->numTrans);
   }
 
   // Create a variable to hold the maximum number of CFDFC executions
-  vars.numExecs = model->addVariable("varMaxExecs", Var::INTEGER, 0, maxTrans);
+  vars.numExecs = model->addVar("varMaxExecs", Var::INTEGER, 0, maxTrans);
 }
 
 /// Sets the MILP objective, which is to maximize the sum over all archs of
@@ -77,16 +77,15 @@ static void setObjective(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   for (auto &[_, var] : vars.archs) {
 
     // vars.numExecs * var is not a linear term, we should linearize it
-    auto numExecsTimesVar = model->addVariable("numExec*" + var.name,
-                                               Var::INTEGER, 0, std::nullopt);
+    auto numExecsTimesVar =
+        model->addVar("numExec*" + var.name, Var::INTEGER, 0, std::nullopt);
     constexpr double bigM = 1e4;
 
     // - If var == 0: 0 <= w <= 0
     // - If var == 1: numExecs <= w <= numExecs
-    model->addLinearConstraint(numExecsTimesVar <= vars.numExecs);
-    model->addLinearConstraint(numExecsTimesVar >=
-                               vars.numExecs - bigM * (1 - var));
-    model->addLinearConstraint(numExecsTimesVar <= bigM * var);
+    model->addConstr(numExecsTimesVar <= vars.numExecs);
+    model->addConstr(numExecsTimesVar >= vars.numExecs - bigM * (1 - var));
+    model->addConstr(numExecsTimesVar <= bigM * var);
     objExpr += numExecsTimesVar;
   }
   model->setMaximizeObjective(objExpr);
@@ -105,7 +104,7 @@ static void setEdgeConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars,
     // the maximum number of transitions
     std::string name = "arch_" + std::to_string(arch->srcBB) + "_" +
                        std::to_string(arch->dstBB);
-    model->addLinearConstraint(
+    model->addConstr(
         vars.numExecs <= var * arch->numTrans + (1 - var) * maxExecs, name);
 
     // Only select one backedge
@@ -114,7 +113,7 @@ static void setEdgeConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars,
   }
 
   // Finally, the backedge constraint
-  model->addLinearConstraint(backedgeConstraint == 1, "oneBackedge");
+  model->addConstr(backedgeConstraint == 1, "oneBackedge");
 }
 
 /// Get all variables corresponding to "predecessor archs" i.e., archs from
@@ -148,15 +147,13 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
     LinExpr predArchsConstr;
     for (Var &var : getPredArchVars(bb, vars))
       predArchsConstr += var;
-    model->addLinearConstraint(predArchsConstr == varBB,
-                               "in" + std::to_string(bb));
+    model->addConstr(predArchsConstr == varBB, "in" + std::to_string(bb));
 
     // Set constraint for successor archs
     LinExpr succArchsConstr;
     for (Var &var : getSuccArchvars(bb, vars))
       succArchsConstr += var;
-    model->addLinearConstraint(succArchsConstr == varBB,
-                               "out" + std::to_string(bb));
+    model->addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
   }
 };
 

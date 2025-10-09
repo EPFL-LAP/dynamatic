@@ -286,45 +286,40 @@ public:
   // LLVM Implementation of rtti functions like dyn_cast<>, isa<> needs these
   // function
   // [START LLVM RTTI prerequisites]
-  enum Kind { GUROBI, CBC };
-  Kind solverKind;
-  Kind getKind() const { return solverKind; }
+  enum SolverKind {
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+    GUROBI,
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    CBC,
+  };
+  SolverKind solverKind;
+  SolverKind getKind() const { return solverKind; }
   static inline bool classof(CPSolver const *) { return true; }
   // [END LLVM RTTI prerequisites]
 
   // Solver timeout in second.
   // If timeout <= 0, then this option is ignored.
   int timeout;
-  CPSolver(int t, Kind k) : solverKind(k), timeout(t) {}
+  CPSolver(int t, SolverKind k) : solverKind(k), timeout(t) {}
 
   virtual ~CPSolver() = default;
   // Virtual class methods: they provide a unified interface for all available
   // solvers.
-  virtual Var addVariable(const Var &var) = 0;
+  virtual Var addVar(const Var &var) = 0;
   // Create var, add gurobi var, and then return the created variable
-  virtual Var addVariable(const std::string &name, Var::VarType type,
-                          std::optional<double> lb,
-                          std::optional<double> ub) = 0;
-  virtual void addLinearConstraint(const LinConstr &constraint,
-                                   llvm::StringRef constrName) = 0;
-  void addLinearConstraint(const LinConstr &constraint) {
-    addLinearConstraint(constraint, "");
-  }
-  virtual void addQuadConstraint(const QuadConstr &constraint,
-                                 llvm::StringRef constrName) = 0;
+  virtual Var addVar(const std::string &name, Var::VarType type,
+                     std::optional<double> lb, std::optional<double> ub) = 0;
+  virtual void addConstr(const LinConstr &constraint,
+                         llvm::StringRef constrName) = 0;
+  void addConstr(const LinConstr &constraint) { addConstr(constraint, ""); }
+  virtual void addQConstr(const QuadConstr &constraint,
+                          llvm::StringRef constrName) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
   virtual double getValue(const Var &var) const = 0;
   virtual double getObjective() const = 0;
 
   virtual void write(llvm::StringRef filePath) const = 0;
-};
-
-enum MILPSolver {
-  COIN_OR_CBC,
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-  GUROBI,
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -351,7 +346,7 @@ public:
     model = std::make_unique<GRBModel>(*env);
   }
 
-  Var addVariable(const Var &var) override {
+  Var addVar(const Var &var) override {
     if (names.count(var.name)) {
       llvm::report_fatal_error("Adding variable with duplicated names is not "
                                "permitted! Aborting...");
@@ -375,14 +370,14 @@ public:
   }
 
   // Create var, add gurobi var, and then return
-  Var addVariable(const std::string &name, Var::VarType type,
-                  std::optional<double> lb, std::optional<double> ub) override {
+  Var addVar(const std::string &name, Var::VarType type,
+             std::optional<double> lb, std::optional<double> ub) override {
     auto var = Var(name, type, lb, ub);
-    return addVariable(var);
+    return addVar(var);
   }
 
-  void addLinearConstraint(const LinConstr &constraint,
-                           llvm::StringRef constrName) override {
+  void addConstr(const LinConstr &constraint,
+                 llvm::StringRef constrName) override {
     GRBLinExpr expr = 0;
     for (auto &[var, coeff] : constraint.expr.terms) {
       expr += coeff * variables[var];
@@ -396,8 +391,8 @@ public:
       llvm_unreachable("Unknown predicate!");
   }
 
-  void addQuadConstraint(const QuadConstr &constraint,
-                         llvm::StringRef constrName) override {
+  void addQConstr(const QuadConstr &constraint,
+                  llvm::StringRef constrName) override {
     GRBQuadExpr expr = 0;
 
     // Quadratic terms
@@ -497,7 +492,7 @@ public:
     solver.messageHandler()->setLogLevel(0);
   }
 
-  Var addVariable(const Var &var) override {
+  Var addVar(const Var &var) override {
     if (names.count(var.name)) {
       llvm::report_fatal_error("Adding variable with duplicated names is not "
                                "permitted! Aborting...");
@@ -525,14 +520,14 @@ public:
     return var;
   }
 
-  Var addVariable(const std::string &name, Var::VarType type,
-                  std::optional<double> lb, std::optional<double> ub) override {
+  Var addVar(const std::string &name, Var::VarType type,
+             std::optional<double> lb, std::optional<double> ub) override {
     auto var = Var(name, type, lb, ub);
-    return addVariable(var);
+    return addVar(var);
   }
 
-  void addLinearConstraint(const LinConstr &constraint,
-                           llvm::StringRef constrName) override {
+  void addConstr(const LinConstr &constraint,
+                 llvm::StringRef constrName) override {
     int numCoeffs = constraint.expr.terms.size();
     std::vector<int> indices;
     std::vector<double> values;
@@ -561,8 +556,7 @@ public:
     solver.addRow(row, rowLower, rowUpper, constrName.str());
   }
 
-  void addQuadConstraint(const QuadConstr &constraint,
-                         llvm::StringRef name) override {
+  void addQConstr(const QuadConstr &constraint, llvm::StringRef name) override {
     llvm::report_fatal_error(
         "Quadratic constraints is currently unavailable for CBC!");
   }

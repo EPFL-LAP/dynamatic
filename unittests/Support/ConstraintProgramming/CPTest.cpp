@@ -18,11 +18,11 @@ TEST_P(ParamSolverTest, basicMILPTest) {
   // [Using our API to solve the result]
   // auto solver = GurobiSolver();
   auto solver = GetParam()();
-  auto x = solver->addVariable("x", Var::REAL, /* lb */ 0, std::nullopt);
-  auto y = solver->addVariable("y", Var::REAL, /* lb */ 0, std::nullopt);
-  solver->addLinearConstraint(x + 2 * y <= 14);
-  solver->addLinearConstraint(3 * x - y >= 0);
-  solver->addLinearConstraint(x - y <= 2);
+  auto x = solver->addVar("x", Var::REAL, /* lb */ 0, std::nullopt);
+  auto y = solver->addVar("y", Var::REAL, /* lb */ 0, std::nullopt);
+  solver->addConstr(x + 2 * y <= 14);
+  solver->addConstr(3 * x - y >= 0);
+  solver->addConstr(x - y <= 2);
   solver->setMaximizeObjective(3 * x + 4 * y);
   solver->optimize();
 
@@ -59,15 +59,15 @@ TEST_P(ParamSolverTest, basicIntegerProgramTest) {
   // [Using our API to solve the result]
   // auto solver = GurobiSolver();
   auto solver = GetParam()();
-  auto x = solver->addVariable("x", Var::INTEGER, /* lb */ 0,
-                               /* infinity */ std::nullopt);
-  auto y = solver->addVariable("y", Var::INTEGER, /* lb */ 0,
-                               /* infinity */ std::nullopt);
-  auto z = solver->addVariable("z", Var::INTEGER, /* lb */ 0,
-                               /* infinity */ std::nullopt);
-  solver->addLinearConstraint(2 * x + 7 * y + 3 * z <= 50);
-  solver->addLinearConstraint(3 * x + 5 * y + 7 * z <= 45);
-  solver->addLinearConstraint(5 * x + 2 * y - 6 * z <= 37);
+  auto x = solver->addVar("x", Var::INTEGER, /* lb */ 0,
+                          /* infinity */ std::nullopt);
+  auto y = solver->addVar("y", Var::INTEGER, /* lb */ 0,
+                          /* infinity */ std::nullopt);
+  auto z = solver->addVar("z", Var::INTEGER, /* lb */ 0,
+                          /* infinity */ std::nullopt);
+  solver->addConstr(2 * x + 7 * y + 3 * z <= 50);
+  solver->addConstr(3 * x + 5 * y + 7 * z <= 45);
+  solver->addConstr(5 * x + 2 * y - 6 * z <= 37);
   solver->setMaximizeObjective(2 * x + 2 * y + 3 * z);
   solver->optimize();
 
@@ -101,10 +101,10 @@ TEST_P(ParamSolverTest, basicIntegerProgramTest) {
 TEST_P(ParamSolverTest, SimpleMaxLP) {
   auto solver = GetParam()();
 
-  auto x = solver->addVariable("x", Var::REAL, 0, std::nullopt);
-  auto y = solver->addVariable("y", Var::REAL, 0, std::nullopt);
+  auto x = solver->addVar("x", Var::REAL, 0, std::nullopt);
+  auto y = solver->addVar("y", Var::REAL, 0, std::nullopt);
 
-  solver->addLinearConstraint(x + y <= 10);
+  solver->addConstr(x + y <= 10);
   solver->setMaximizeObjective(x + 2 * y);
   solver->optimize();
 
@@ -118,10 +118,10 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
 TEST_P(ParamSolverTest, SimpleMinLP) {
   auto solver = GetParam()();
 
-  auto x = solver->addVariable("x", Var::REAL, 1, std::nullopt);
-  auto y = solver->addVariable("y", Var::REAL, 0, std::nullopt);
+  auto x = solver->addVar("x", Var::REAL, 1, std::nullopt);
+  auto y = solver->addVar("y", Var::REAL, 0, std::nullopt);
 
-  solver->addLinearConstraint(2 * x + y >= 5);
+  solver->addConstr(2 * x + y >= 5);
   solver->setMaximizeObjective(-(x + y)); // Minimization via negation
   solver->optimize();
 
@@ -134,10 +134,10 @@ TEST_P(ParamSolverTest, SimpleMinLP) {
 TEST_P(ParamSolverTest, SmallIntegerProgram) {
   auto solver = GetParam()();
 
-  auto x = solver->addVariable("x", Var::INTEGER, 0, 5);
-  auto y = solver->addVariable("y", Var::INTEGER, 0, 5);
+  auto x = solver->addVar("x", Var::INTEGER, 0, 5);
+  auto y = solver->addVar("y", Var::INTEGER, 0, 5);
 
-  solver->addLinearConstraint(x + 2 * y <= 6);
+  solver->addConstr(x + 2 * y <= 6);
   solver->setMaximizeObjective(x + y);
   solver->optimize();
 
@@ -150,12 +150,12 @@ TEST_P(ParamSolverTest, SmallIntegerProgram) {
 TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
   auto solver = GetParam()();
 
-  auto x = solver->addVariable("x", Var::REAL, 0, 10);
-  auto y = solver->addVariable("y", Var::BOOLEAN, std::nullopt, std::nullopt);
+  auto x = solver->addVar("x", Var::REAL, 0, 10);
+  auto y = solver->addVar("y", Var::BOOLEAN, std::nullopt, std::nullopt);
 
   double bigConst = 1e6;
   // If y = 0 then x <= 3, else no restriction
-  solver->addLinearConstraint(x - bigConst * y <= 3);
+  solver->addConstr(x - bigConst * y <= 3);
 
   solver->setMaximizeObjective(x);
   solver->optimize();
@@ -186,15 +186,15 @@ TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
 TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
   auto solver = GetParam()();
 
-  auto x = solver->addVariable("x", Var::REAL, 0, 1);
-  auto y = solver->addVariable("y", Var::REAL, 0, 1);
+  auto x = solver->addVar("x", Var::REAL, 0, 1);
+  auto y = solver->addVar("y", Var::REAL, 0, 1);
 
   // Quadratic constraint: x^2 + y^2 <= 1
   //
   std::cerr << "Before quadConstr!\n";
   auto quadConstr = 1.0 * x * x + 1.0 * y * y <= 1.0;
   std::cerr << "After quadConstr!\n";
-  solver->addQuadConstraint(quadConstr, "quad constr");
+  solver->addQConstr(quadConstr, "quad constr");
 
   // Maximize x + y
   solver->setMaximizeObjective(1.0 * x + 1.0 * y);
