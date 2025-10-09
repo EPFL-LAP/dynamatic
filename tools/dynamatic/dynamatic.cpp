@@ -668,6 +668,10 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
+    milpSolver = it->second;
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";

@@ -182,6 +182,7 @@ if [[ $USE_SHARING -ne 0 ]]; then
   echo_info "Set to apply credit-based sharing after buffer placement."
 fi
 
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
@@ -207,6 +208,8 @@ else
     --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
+
+  echo_info "Set to use \"$MILP_SOLVER\" to solve buffer placement MILP!"
 
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"

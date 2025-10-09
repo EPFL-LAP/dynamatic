@@ -487,7 +487,6 @@ class CbcSolver : public CPSolver {
   OsiClpSolverInterface solver;
   std::map<CPVar, int> variables; // map Var -> column index
   std::set<std::string> names;
-  CbcModel model;
 
 public:
   CbcSolver(int timeout = -1 /* default = no timeout */)
@@ -497,10 +496,6 @@ public:
     //
     solver.messageHandler()->setLogLevel(-1);
     solver.getModelPtr()->messageHandler()->setLogLevel(-1);
-    model = CbcModel(solver);
-    // Disable all output
-    // 0 = no output, 1 = minimal, higher = more verbose
-    model.setLogLevel(-1);
   }
 
   CPVar addVar(const CPVar &var) override {
@@ -585,6 +580,10 @@ public:
   }
 
   void optimize() override {
+    CbcModel model(solver);
+    // Disable all output
+    // 0 = no output, 1 = minimal, higher = more verbose
+    model.setLogLevel(-1);
 
     if (this->timeout > 0) {
       model.setMaximumSeconds(timeout);
@@ -609,6 +608,11 @@ public:
   }
 
   void write(llvm::StringRef filePath) const override {
+    // HACK: This implementation bypasses the log level and prints some warning
+    // messages to stdout; this pollutes the final mlir output.
+    //
+    // Therefore, this write command currently doesn't do anything.
+    //
     // solver.writeLp(filePath.str().c_str());
   }
 
