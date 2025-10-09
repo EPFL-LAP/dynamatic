@@ -133,7 +133,8 @@ protected:
 
   /// Places buffers in the function, according to the logic dictated by the
   /// algorithm the pass was instantiated with.
-  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB);
+  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB,
+                                     CFDFCAnalysis &cfdfcAnalysis);
 
   /// Identifies and extracts all existing CFDFCs in the function using
   /// estimated transition frequencies between its basic blocks. Fills the
@@ -141,7 +142,7 @@ protected:
   /// iteratively solving MILPs until the MILP solution indicates that no
   /// "executable cycle" remains in the circuit.
   virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
-                                  SmallVector<CFDFC> &cfdfcs);
+                                  std::vector<CFDFC> &cfdfcs);
 
   /// Computes an optimal buffer placement for a Handhsake function by solving
   /// a large MILP over the entire dataflow circuit represented by the
@@ -158,7 +159,8 @@ protected:
 
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
-  virtual void instantiateBuffers(BufferPlacement &placement);
+  virtual void instantiateBuffers(BufferPlacement &placement,
+                                  std::vector<CFDFC> &cfdfcs);
 };
 
 } // namespace buffer
@@ -300,17 +302,11 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
-  auto &perfAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-
-    perfAnalysis.results.insert(
-        std::make_pair(funcOp, BufferPlacementResult()));
-
-    funcToInfo.insert(std::make_pair(
-        funcOp, FuncInfo(funcOp, &perfAnalysis.results[funcOp])));
+    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
     FuncInfo &info = funcToInfo[funcOp];
 
     // Read the CSV containing arch information (number of transitions between
@@ -331,9 +327,12 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
+  auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
+
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
+    // Create an empty list of CFDFCs for funcOp
+    if (failed(placeBuffers(funcToInfo[funcOp], timingDB, cfdfcAnalysis)))
       return failure();
   }
 
@@ -429,9 +428,8 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
   os.flush();
 }
 
-LogicalResult
-HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
-                                        TimingDatabase &timingDB) {
+LogicalResult HandshakePlaceBuffersPass::placeBuffers(
+    FuncInfo &info, TimingDatabase &timingDB, CFDFCAnalysis &cfdfcAnalysis) {
   // Use a wrapper around a logger to benefit from RAII
   std::error_code ec;
   BufferLogger bufLogger(info.funcOp, dumpLogs, ec);
@@ -445,7 +443,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
 
   // Get CFDFCs from the function unless the functions has no archs (i.e.,
   // it has a single block) in which case there are no CFDFCs
-  SmallVector<CFDFC> cfdfcs;
+  std::vector<CFDFC> cfdfcs;
   if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
     return failure();
 
@@ -479,13 +477,14 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   if (failed(getBufferPlacement(info, timingDB, logger, placement)))
     return failure();
 
-  instantiateBuffers(placement);
+  instantiateBuffers(placement, cfdfcs);
+  cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
   return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    Logger *logger,
-                                                   SmallVector<CFDFC> &cfdfcs) {
+                                                   std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
   // Store all archs in a set. We use a pointer to each arch as the key type to
@@ -697,13 +696,95 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       result.numOneSlotR = props.minTrans;
       placement[channel] = result;
     }
-    instantiateBuffers(placement);
+
+    // Since we are not using MILP, we do not need to access to CFDFC to get the
+    // throughput information.
+    //
+    // We cannot pass the reference of a temporary object to std::vector<..>&,
+    // so we have to create this empty vector.
+    std::vector<CFDFC> dummy;
+    instantiateBuffers(placement, dummy);
   }
 
   return success();
 }
 
-void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
+/// Adding a new buffer op changes the CFDFC graph. This function updates the
+/// cfdfc that contain the channel.
+/// - bufOp: The buffer to be inserted into the CFDFC.
+/// - CFDFC: The CFDFC.
+/// - totalChannelLatency: The total number of sequential latency on DV path.
+/// - totalChanOccupancy: The total number of tokens to be distributed on the
+///   CFDFC.
+/// - remainingTknsToDistribute: The remaining tokens to be distributed on the
+///   channel.
+static void insertBufferOpAndOccupancyInCFDFC(
+    handshake::BufferOp bufOp, CFDFC &cfdfc, unsigned totalChannelLatency,
+    unsigned totalChannelOccupancy, double &remainingTknsToDistribute) {
+
+  // When we add a new buffer op, the value remains the same object (now
+  // used by a different user). Therefore, we just need to add the newly
+  // added operation and channel.
+  cfdfc.units.insert(bufOp.getOperation());
+  cfdfc.channels.insert(bufOp.getResult());
+
+  double tokensInBufOp;
+  // The MILP solution returns the token occupancy per each channel in the
+  // CFDFC.
+  //
+  // The tokens in the CFDFC might be smaller than the total number slots of the
+  // channel. Therefore, we need to calculate the number of tokens per different
+  // buffer slots.
+  if (totalChannelOccupancy < (double)totalChannelLatency) {
+    // Case "#tokens in the channel" < "Total latency of the channel":
+    // Distribute tokens among slots with latency (the tokens
+    // are not blocking each other, so they will only be stopped by the
+    // sequential buffer slot).
+    //
+    // Example:
+    // - Channel: producer -> T, DV, DV, DV -> receiver
+    // - Number of tokens: 2
+    // (remark: DV introduces a 1-cycle delay on data and valid, T does not
+    // introduce a delay on any path).
+    // In this case, the token must occupy the 3 DV slots but the T
+    // slots; each DV slot holds 2/3 tokens.
+    tokensInBufOp =
+        (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
+    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+  } else {
+    // Case "#tokens in the channel" => "Total latency of the channel":
+    // Assign one token to each bufer slot with latency, the rest is assigned
+    // bottom (from the receiver of the channel) -> up (to the producer
+    // of the channel).
+    //
+    // Example:
+    // - Channel: producer -> T, T, DV, DV, T -> receiver
+    // - Number of tokens: 3
+    //
+    // In this case, the token must occupy in the 2 DV slots and the last T
+    // slot.
+    tokensInBufOp =
+        // Assign to the slot with DV latency >= 1
+        bufOp.getLatencyDV() +
+        // Assign to the slots DV latency = 1. We insert buffers into the
+        // CFDFC starting from the channel that is the closest to the receiver,
+        // so this function does not need to take care of the order between the
+        // slots without DV latency.
+        fmin(bufOp.getNumSlots() - bufOp.getLatencyDV(),
+             remainingTknsToDistribute);
+
+    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+  }
+
+  // Sanity check: we should never assign more tokens to the buffer than its
+  // buffer slot.
+  assert(tokensInBufOp <= bufOp.getNumSlots() &&
+         "Should not assign tokens to a buffer more than its slots!");
+  remainingTknsToDistribute -= tokensInBufOp;
+}
+
+void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
+                                                   std::vector<CFDFC> &cfdfcs) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
@@ -713,12 +794,17 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
+
+    // We need to record the list of placed buffers. We will calculate their
+    // token occupancy in each CFDFC below.
+    SmallVector<handshake::BufferOp, 2> placedBuffers;
     auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, numSlots, bufferType);
+      placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -741,6 +827,41 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     placeBuffer(BufferType::FIFO_BREAK_NONE, placeRes.numFifoNone);
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
+    }
+
+    unsigned totalChannelLatency = 0;
+    for (auto bufOp : placedBuffers) {
+      totalChannelLatency += bufOp.getLatencyDV();
+    }
+
+    // Insert the buffers and their token occupancy into the CFDFCs that contain
+    // them.
+    for (auto &cfdfc : cfdfcs) {
+      // Skipping the CFDFCs that do not contain the channel.
+      if (!cfdfc.channels.contains(channel))
+        continue;
+
+      // How many tokens are distributed into the buffers placed on the channel?
+      // This variable is updated after every buffer placed.
+      double currNumTokensOfChannelInCFDFC = cfdfc.channelOccupancy.at(channel);
+      double totalChannelOccupancy = currNumTokensOfChannelInCFDFC;
+      for (auto &bufOp : llvm::reverse(placedBuffers)) {
+        // Insert the buffer ops into the CFDFC that contains the original
+        // channel, and assign the token occupancy (i.e.,
+        // numTokensOfChannelInCFDFC) to each buffer. We start from the end of
+        // the channel (e.g., the one closest to the receiver) to the beginning
+        // of the channel.
+        //
+        // reverse(placedBuffers): the first inserted buffer is the one closest
+        // to the sender.
+        insertBufferOpAndOccupancyInCFDFC(bufOp, cfdfc, totalChannelLatency,
+                                          totalChannelOccupancy,
+                                          currNumTokensOfChannelInCFDFC);
+      }
+
+      // Set the channel occupancy to zero (they are transferred to the buffer
+      // placed).
+      cfdfc.channelOccupancy[channel] = 0.0;
     }
   }
 }
