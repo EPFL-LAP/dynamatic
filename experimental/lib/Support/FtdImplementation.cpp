@@ -918,7 +918,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
       llvm::errs() << "  Summary\n";
       llvm::errs() << "    nodes.size = " << nodes.size() << "\n";
       llvm::errs() << "    startIdx   = " << startIdx << "\n";
-      llvm::errs() << "    trueSinkIdx  = " << trueSinkIdx  << "\n";
+      llvm::errs() << "    trueSinkIdx  = " << trueSinkIdx << "\n";
       llvm::errs() << "    falseSinkIdx = " << falseSinkIdx << "\n";
       llvm::errs() << "    trueSucc  = " << nodes[startIdx].trueSucc << "\n";
       llvm::errs() << "    falseSucc = " << nodes[startIdx].falseSucc << "\n";
