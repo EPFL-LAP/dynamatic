@@ -984,4 +984,3 @@ LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // Return the resulting LogicNetwork object
   return mergedBlif;
 }
-
