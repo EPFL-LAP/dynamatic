@@ -21,7 +21,7 @@ Most of our dependencies are provided as standard packages on most Linux distrib
 On `apt`-based Linux distributions:
 ```sh
 apt-get update
-apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev libboost-all-dev coinor-libcbc-dev
+apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev libboost-all-dev pkg-config coinor-cbc coinor-libcbc-dev
 ```
 Note that you may need super user privileges for any package installation. You can use **sudo** before entering the commands
 
