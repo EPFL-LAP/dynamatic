@@ -25,9 +25,6 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace costaware {
@@ -39,10 +36,10 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  CostAwareBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod);
 
-  CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  CostAwareBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod,
                    Logger &logger, StringRef milpName);
 
@@ -64,6 +61,5 @@ private:
 } // namespace costaware
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_COSTAWAREBUFFERS_H

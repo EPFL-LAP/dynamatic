@@ -258,6 +258,8 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
     "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
+    Option<"solver", "solver", "std::string", "\"gurobi\"",
+    "The MILP solver. Choices are: 'gurobi', 'cbc'">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,

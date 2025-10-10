@@ -14,9 +14,7 @@
 #ifndef EXPERIMENTAL_SUPPORT_BLIF_READER_H
 #define EXPERIMENTAL_SUPPORT_BLIF_READER_H
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
@@ -26,6 +24,7 @@
 #include <vector>
 
 using namespace mlir;
+using namespace dynamatic::cp;
 
 namespace dynamatic {
 namespace experimental {
@@ -33,9 +32,9 @@ namespace experimental {
 class LogicNetwork;
 
 struct MILPVarsSubjectGraph {
-  GRBVar tIn;
-  GRBVar tOut;
-  GRBVar bufferVar;
+  CPVar tIn;
+  CPVar tOut;
+  CPVar bufferVar;
 };
 
 /// Represents a node in an And-Inverter Graph (AIG) circuit representation.
@@ -288,5 +287,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H

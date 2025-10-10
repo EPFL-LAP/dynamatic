@@ -21,6 +21,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+
   )
 
 if (GUROBI_FOUND)
@@ -30,3 +31,12 @@ if (GUROBI_FOUND)
     ${GUROBI_LIBRARY}
   )
 endif()
+
+target_link_libraries(DynamaticBufferPlacement
+  PUBLIC
+  ${CBC_LIBRARIES}
+  ${CLPCORE_LIBRARIES}
+  ${OSI_LIBRARIES}
+)
+
+

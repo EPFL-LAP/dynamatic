@@ -27,9 +27,6 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "llvm/ADT/MapVector.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace fpl22 {
@@ -39,17 +36,18 @@ class FPL22BuffersBase : public BufferPlacementMILP {
 protected:
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
-  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
+  FPL22BuffersBase(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod){};
+      : BufferPlacementMILP(std::move(solver), funcInfo, timingDB,
+                            targetPeriod) {};
 
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
-  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
+  FPL22BuffersBase(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod,
                    Logger &logger, StringRef milpName)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                            milpName){};
+      : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod,
+                            logger, milpName) {};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
@@ -99,14 +97,14 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
                     CFDFCUnion &cfUnion);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
                     CFDFCUnion &cfUnion, Logger &logger, StringRef milpName);
 
@@ -139,13 +137,13 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  OutOfCycleBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+  OutOfCycleBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
                     Logger &logger, StringRef milpName = "out_of_cycle");
 
@@ -159,6 +157,5 @@ private:
 } // namespace fpl22
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_FPL22BUFFERS_H
