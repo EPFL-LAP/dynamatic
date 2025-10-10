@@ -746,6 +746,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::RAMOp>([&](handshake::RAMOp ramOp) {
+        MemRefType resType = ramOp.getResult().getType();
+        addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
+        addUnsigned("SIZE", resType.getNumElements());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";

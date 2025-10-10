@@ -19,8 +19,14 @@ USE_RIGIDIFICATION=${9}
 DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 
+LLVM=$DYNAMATIC_DIR/polygeist/llvm-project
+LLVM_BINS=$LLVM/build/bin
+export PATH=$PATH:$LLVM_BINS
+
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+LLVM_OPT="$LLVM_BINS/opt"
+LLVM_TO_STD_TRANSLATION_BIN="$DYNAMATIC_DIR/build/bin/translate-llvm-to-std"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -30,13 +36,16 @@ RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidificati
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
-F_AFFINE="$COMP_DIR/affine.mlir"
-F_AFFINE_MEM="$COMP_DIR/affine_mem.mlir"
-F_SCF="$COMP_DIR/scf.mlir"
+
+F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c" 
+
+F_CLANG="$COMP_DIR/clang.ll"
+F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
+F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
+
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
-F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
-F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_dyn_transformed_mem_dep_marked.mlir"
+F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -95,55 +104,122 @@ export_cfg() {
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
-# source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
-  -I "$DYNAMATIC_DIR/include" \
-  -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE"
-exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
+# ------------------------------------------------------------------------------
+# NOTE:
+# - ffp-contract will prevent clang from adding "fused add mul" into the IR
+# We need to check out the clang language extensions carefully for more
+# optimizations, e.g., loop unrolling:
+# https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
+# ------------------------------------------------------------------------------
+$LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
+  -I "$DYNAMATIC_DIR/include"  \
+  -Xclang \
+  -ffp-contract=off \
+  -o "$F_CLANG"
 
-# affine level -> pre-processing and memory analysis
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes \
-  --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-  --mark-memory-dependencies \
-  > "$F_AFFINE_MEM"
-exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
+exit_on_fail "Failed to compile to LLVM IR" \
+  "Compiled to LLVM IR"
 
-# affine level -> scf level
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
-  --flatten-memref-row-major --scf-simple-if-to-select \
-  --scf-rotate-for-loops \
-  > "$F_SCF"
-exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
+# ------------------------------------------------------------------------------
+# NOTE:
+# - When calling clang with "-ffp-contract=off", clang will bypass the
+# "-disable-O0-optnone" flag and still adds "optnone" to the IR. This is a hacky
+# way to ignore it
+# - Clang always adds "noinline" to the IR.
+# ------------------------------------------------------------------------------
+sed -i "s/optnone//g" "$F_CLANG"
+sed -i "s/noinline//g" "$F_CLANG"
 
-# scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
-exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
+# Strip information that we don't care (and mlir-translate also doesn't know how
+# to handle it).
+sed -i "s/^target datalayout = .*$//g" "$F_CLANG"
+sed -i "s/^target triple = .*$//g" "$F_CLANG"
 
-# cf transformations (standard)
-"$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
-    --control-flow-sink --loop-invariant-code-motion --canonicalize \
-    > "$F_CF_TRANSFORMED"
-exit_on_fail "Failed to apply standard transformations to cf" \
-  "Applied standard transformations to cf"
+# ------------------------------------------------------------------------------
+# NOTE:
+# Here is a brief summary of what each llvm pass does:
+# - inline: Inlines the function calls.
+# - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - lowerswitch: Convert switch case into branches.
+# - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
+# - loop-rotate: canonicalize loops to do-while loops
+# - consthoist: moving constants around
+# - simplifycfg: merge BBs
+#
+# NOTE: the optnone attribute sliently disables all the optimization in the
+# passes; Check out the complete list: https://llvm.org/docs/Passes.html
+# ------------------------------------------------------------------------------
+
+$LLVM_BINS/opt -S \
+ -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
+  "$F_CLANG" \
+  > "$F_CLANG_OPTIMIZED"
+exit_on_fail "Failed to apply optimization to LLVM IR" \
+  "Optimized LLVM IR"
+
+# ------------------------------------------------------------------------------
+# This pass uses polyhedral and alias analysis to determine the dependency
+# between memory operations.
+#
+# Example:
+# ======== histogram.ll =========
+#  %2 = load float, ptr %arrayidx4, align 4, !handshake.name !5
+#  ...
+#  store float %add, ptr %arrayidx6, align 4, !handshake.name !6 !dest.ops !7
+#  ...
+# !5 = !{!"load1"}
+# !6 = !{!"store!"}
+# !7 = !{!5, !"1"} ; this means that the store must happen before the load, with
+# a loop depth of 1
+# ===============================
+#
+# ------------------------------------------------------------------------------
+# NOTE:
+# - without "--polly-process-unprofitable", polly ignores certain small loops
+# - ArrayParititon pass currently breaks the SCoP analysis in Polly. Therefore,
+# we need to first attach analysis results to memory ops and then apply memory
+# bank partition.
+$LLVM_BINS/opt -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
+  -passes="mem-dep-analysis" \
+  -polly-process-unprofitable \
+  "$F_CLANG_OPTIMIZED" \
+  > "$F_CLANG_OPTIMIZED_DEPENDENCY"
+exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
+  "Applied memory dependency analysis to LLVM IR"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_OPTIMIZED_DEPENDENCY" \
+  -function-name "$KERNEL_NAME" \
+  -csource "$F_C_SOURCE" \
+  -dynamatic-path "$DYNAMATIC_DIR" \
+   -o "$F_CF"
+exit_on_fail "Failed to convert to std dialect" \
+  "Converted to std dialect"
 
 # cf transformations (dynamatic)
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
-    --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-    > "$F_CF_DYN_TRANSFORMED"
-  exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-    "Applied Dynamatic transformations to cf"
+# - drop-unlist-functions: Dropping the functions that are not needed in HLS
+# compilation
+$DYNAMATIC_OPT_BIN \
+  "$F_CF" \
+  --drop-unlisted-functions="function-names=$KERNEL_NAME" \
+  --func-set-arg-names="source=$F_C_SOURCE" \
+  --flatten-memref-row-major \
+  --canonicalize \
+  --push-constants \
+  --mark-memory-interfaces \
+  > "$F_CF_TRANSFORMED"
+exit_on_fail "Failed to apply CF transformations" \
+  "Applied CF transformations"
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
@@ -202,7 +278,7 @@ else
   exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling"
 
   # cf-level profiler
-  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
+  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
     --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
@@ -230,7 +306,7 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
-export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
+export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification

@@ -485,25 +485,4 @@ def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
   "mlir::LLVM::LLVMDialect"];
 }
 
-def LLVMMarkMemoryDependencies : Pass<"llvm-mark-memory-dependencies"> {
-  let summary = "Annotate the memory dependency data on LLVM dialect using the result from the memory analysis pass.";
-
-  let description = [{The mlir-translate only retains very few types of meta
-  data from the original LLVMIR. This pass assumes that the LLVM IR and MLIR
-  have identically ordered operations and converts the memory dependency
-  metadata nodes in the original IR into MLIR attributes. This pass is a
-  temporary solution: we should eliminate the middle step of converting to LLVM
-  dialect and directly convert from LLVM IR to CF, and implement the dependency
-  annotation logic there.}];
-
-  let options = [
-      Option<"llvmir", "llvmir", "std::string", "",
-            "Path to the LLVM IR file.">,
-    ];
-
-  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
-}
-
-
-
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
