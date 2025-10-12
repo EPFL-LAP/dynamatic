@@ -28,10 +28,14 @@ namespace cp {
 
 /// A single variable in constraint programming
 /// Example:
-/// auto x = CPVar("x", CPVar::INTEGER);
+/// A linear expression (not an equality/inequality)
+/// Examples:
 ///
-/// For simplicity, the upper and lower bounds are not encoded here (just the
-/// data types).
+/// Creating variables:
+/// 1. An integer variable without upper and lower bounds
+/// auto x = Var("x", Var::INTEGER);
+/// 2. An float variable without lower bound and has a upperbound of 1
+/// auto y = Var("y", Var::REAL, std::nullopt, 1);
 struct CPVar {
   enum VarType { REAL, INTEGER, BOOLEAN };
   std::string name;
@@ -44,9 +48,6 @@ struct CPVar {
   bool operator<(const CPVar &other) const noexcept {
     return name < other.name;
   }
-  bool operator==(const CPVar &other) const noexcept {
-    return name == other.name;
-  }
 
   CPVar() = default;
 
@@ -56,19 +57,20 @@ struct CPVar {
   //
   // Explicit constructor avoids implicit cast from string to Var.
   explicit CPVar(std::string name, VarType type,
-                 std::optional<double> lowerBound,
-                 std::optional<double> upperBound)
+                 std::optional<double> lowerBound = /* -inf */ std::nullopt,
+                 std::optional<double> upperBound = /* +inf */ std::nullopt)
       : name(std::move(name)), type(type), lowerBound(lowerBound),
         upperBound(upperBound) {}
 };
 
-/// A linear expression (not an equality/inequality)
-/// Example:
+/// An expression in constraint programming.
 ///
-/// auto x = Var("x", Var::INTEGER);
-/// auto y = Var("y", Var::INTEGER);
-/// Using operator overloading to construct an expression:
-/// auto expr = (x + 2 * y);
+/// Examples:
+/// 1. Using operator overloading to construct an expression:
+/// auto expr1 = (x + 2 * y);
+/// 2. Constructing constraints from 2 expressions
+/// auto expr2 = (3 * z);
+/// Constraint constr1 = (expr1 <= expr2);
 struct LinExpr {
 
   // The coefficients in the linear expression
@@ -91,8 +93,14 @@ struct LinExpr {
 };
 
 inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
+  // REMARK:
+  // this is a deep copy of "left"
   LinExpr newExpr = left;
   for (auto &[var, coeff] : right.terms) {
+    // REMARK:
+    // std::map makes this safe when var does not exist in "left" at the
+    // first place by calling the default constructor, i.e., setting terms[var]
+    // = 0.0.
     newExpr.terms[var] += coeff;
   }
   newExpr.constant += right.constant;
