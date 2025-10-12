@@ -46,7 +46,7 @@ int runIntegrationTest(IntegrationTestData &config) {
              << "set-src " << cSourcePath.string() << std::endl
              << "set-clock-period 5" << std::endl
              << "compile --buffer-algorithm fpga20 "
-             << (config.useSharing ? "--sharing" : "") << " --solver "
+             << (config.useSharing ? "--sharing" : "") << " --milp-solver "
              << config.milpSolver << std::endl
              << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
              << std::endl
