@@ -75,6 +75,11 @@ public:
       model->write(writeTo + "_model.lp");
     }
     model->optimize();
+    // Optimize the model
+    if (!writeTo.empty()) {
+      // Logging the MILP model
+      model->writeSol(writeTo + "_sol.log");
+    }
 
     // Check whether we found an optimal solution or reached the time limit
     int stat = model->status;

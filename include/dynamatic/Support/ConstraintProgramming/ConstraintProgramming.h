@@ -9,6 +9,8 @@
 #pragma once
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include <fstream>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -81,7 +83,6 @@ struct LinExpr {
   LinExpr() = default;
   LinExpr(const CPVar &v) { terms[v] = 1.0; }
   LinExpr(double value) { constant = value; }
-
   LinExpr operator-() const {
     LinExpr negated;
     for (auto &[var, coeff] : terms) {
@@ -100,7 +101,7 @@ inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
     // REMARK:
     // std::map makes this safe when var does not exist in "left" at the
     // first place by calling the default constructor, i.e., setting terms[var]
-    // = 0.0.
+    // = 0.0. This happens when "left" and "right" have different variables.
     newExpr.terms[var] += coeff;
   }
   newExpr.constant += right.constant;
@@ -218,6 +219,24 @@ inline QuadExpr operator-(const QuadExpr &lhs, const QuadExpr &rhs) {
   return e;
 }
 
+inline void operator+=(QuadExpr lhs, const QuadExpr &rhs) {
+  // Quadratic terms:
+  for (auto &[quadTerm, coeff] : rhs.quadTerms) {
+    lhs.quadTerms[quadTerm] += coeff;
+  }
+  // Linear and constant terms:
+  lhs.linexpr = lhs.linexpr + rhs.linexpr;
+}
+
+inline void operator-=(QuadExpr lhs, const QuadExpr &rhs) {
+  // Quadratic terms:
+  for (auto &[quadTerm, coeff] : rhs.quadTerms) {
+    lhs.quadTerms[quadTerm] -= coeff;
+  }
+  // Linear and constant terms:
+  lhs.linexpr = lhs.linexpr - rhs.linexpr;
+}
+
 enum Predicate {
   /* <= */ LE,
   /* == */ EQ
@@ -331,6 +350,8 @@ public:
   virtual double getObjective() const = 0;
 
   virtual void write(llvm::StringRef filePath) const = 0;
+
+  virtual void writeSol(llvm::StringRef filePath) const = 0;
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -460,6 +481,22 @@ public:
 
   void write(llvm::StringRef filePath) const override {
     model->write(filePath.str());
+  }
+
+  void writeSol(llvm::StringRef filePath) const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::report_fatal_error("Calling writeSol before the model was solved!");
+    }
+
+    std::ofstream myfile(filePath.str());
+    if (myfile.is_open()) {
+      for (auto &[var, _] : variables) {
+        myfile << var.name << " = " << getValue(var) << "\n";
+      }
+    } else {
+      llvm::errs() << "Unable to open file: " << filePath << "!\n";
+      llvm::report_fatal_error("Unable to open file!");
+    }
   }
 
   /// Retrieve the value from the solved MILP
@@ -622,6 +659,22 @@ public:
     // Therefore, this write command currently doesn't do anything.
     //
     // solver.writeLp(filePath.str().c_str());
+  }
+
+  void writeSol(llvm::StringRef filePath) const override {
+    if (status != OPTIMAL && status != NONOPTIMAL) {
+      llvm::report_fatal_error("Calling writeSol before the model was solved!");
+    }
+
+    std::ofstream solLogFile(filePath.str());
+    if (solLogFile.is_open()) {
+      for (auto &[var, _] : variables) {
+        solLogFile << var.name << " = " << getValue(var) << "\n";
+      }
+    } else {
+      llvm::errs() << "Unable to open file: " << filePath << "!\n";
+      llvm::report_fatal_error("Unable to open file!");
+    }
   }
 
   double getValue(const CPVar &var) const override {
