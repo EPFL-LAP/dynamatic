@@ -55,7 +55,13 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
 // Graph of the preceding module.
 void BaseSubjectGraph::connectInputNodesHelper(
     ChannelSignals &currentSignals,
-    BaseSubjectGraph *moduleBeforeSubjectGraph) {
+    unsigned int inputIndex) {
+
+  if (inputIndex >= inputSubjectGraphs.size()) {
+    return;
+  }
+
+  BaseSubjectGraph *moduleBeforeSubjectGraph = inputSubjectGraphs[inputIndex];
 
   auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
   Value channel = nullptr;
@@ -265,8 +271,8 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
 // are connected to the Subject Graph with index 1.
 void ArithSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(lhsNodes, inputSubjectGraphs[0]);
-  connectInputNodesHelper(rhsNodes, inputSubjectGraphs[1]);
+  connectInputNodesHelper(lhsNodes, 0);
+  connectInputNodesHelper(rhsNodes, 1);
 }
 
 // Arith modules only have resultNodes as output.
@@ -378,7 +384,7 @@ void ForkSubjectGraph::connectInputNodes() {
   // In the cases where fork modules are Block Arguments, they
   // do not have any input Operations.
   if (!inputSubjectGraphs.empty()) {
-    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+    connectInputNodesHelper(inputNodes, 0);
   }
 }
 
@@ -437,8 +443,8 @@ FloatingPointSubjectGraph::FloatingPointSubjectGraph(Operation *op)
 // lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
 // are connected to the Subject Graph with index 1.
 void FloatingPointSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(lhsNodes, inputSubjectGraphs[0]);
-  connectInputNodesHelper(rhsNodes, inputSubjectGraphs[1]);
+  connectInputNodesHelper(lhsNodes, 0);
+  connectInputNodesHelper(rhsNodes, 1);
 }
 
 // Arith modules only have resultNodes as output.
@@ -493,10 +499,10 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // indexNodes are connected to the first inputSubjectGraph, and rest are
 // connected to the inputSubjectGraphs in the order they are defined.
 void MuxSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(indexNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(indexNodes, 0);
 
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i + 1]);
+    connectInputNodesHelper(inputNodes[i], i+1);
   }
 }
 
@@ -563,7 +569,7 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
 // inputSubjectGraphs in the order that they are defined.
 void ControlMergeSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
+    connectInputNodesHelper(inputNodes[i], i);
   }
 }
 
@@ -598,9 +604,9 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
 // conditionNodes are connected to the first inputSubjectGraph, and
 // inputNodes are connected to the second inputSubjectGraph.
 void ConditionalBranchSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(conditionNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(conditionNodes, 0);
   if (inputSubjectGraphs.size() != 1) {
-    connectInputNodesHelper(inputNodes, inputSubjectGraphs[1]);
+    connectInputNodesHelper(inputNodes, 1);
   }
 }
 
@@ -648,7 +654,7 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
 // Load Module has only addrInSignals as input.
 void LoadSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(addrInSignals, 0);
 }
 
 // addrOutSignals are connected to the output module with channelIndex 0,
@@ -678,8 +684,8 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // addrInSignals and dataInSignals are connected to the first and
 // second inputSubjectGraphs respectively.
 void StoreSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
-  connectInputNodesHelper(dataInSignals, inputSubjectGraphs[1]);
+  connectInputNodesHelper(addrInSignals, 0);
+  connectInputNodesHelper(dataInSignals, 1);
 }
 
 // Store module has only addrOutSignals as output.
@@ -705,7 +711,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 
 // Constant module has only controlSignals as input.
 void ConstantSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(controlSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(controlSignals, 0);
 }
 
 // Constant module has only outputNodes as output.
@@ -736,7 +742,7 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 
 // These modules only have a single input, inputNodes.
 void ExtTruncSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, 0);
 }
 
 // These modules only have a single output, outputNodes.
@@ -768,9 +774,9 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // connected to the second inputSubjectGraph, and falseValue are connected to
 // the third inputSubjectGraph.
 void SelectSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(condition, inputSubjectGraphs[0]);
-  connectInputNodesHelper(trueValue, inputSubjectGraphs[1]);
-  connectInputNodesHelper(falseValue, inputSubjectGraphs[2]);
+  connectInputNodesHelper(condition, 0);
+  connectInputNodesHelper(trueValue, 1);
+  connectInputNodesHelper(falseValue, 2);
 }
 
 // Select module has only outputNodes as output.
@@ -795,7 +801,7 @@ SIFPSubjectGraph::SIFPSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
 // are connected to the Subject Graph with index 1.
 void SIFPSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, 0);
 }
 
 // Arith modules only have resultNodes as output.
@@ -848,7 +854,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // inputSubjectGraphs in the order that they are defined.
 void MergeSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
+    connectInputNodesHelper(inputNodes[i], i);
   }
 }
 
@@ -879,7 +885,7 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
 void BranchSinkSubjectGraph::connectInputNodes() {
   // Block arguments do not have any input operations.
   if (!inputSubjectGraphs.empty()) {
-    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+    connectInputNodesHelper(inputNodes, 0);
   }
 }
 
@@ -945,7 +951,7 @@ BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
 
 // Buffers only have inputNodes as input.
 void BufferSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, 0);
 }
 
 // Buffers only have outputNodes as output.
