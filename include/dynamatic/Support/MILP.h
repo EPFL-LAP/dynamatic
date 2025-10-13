@@ -53,8 +53,20 @@ public:
   /// non-empty twine is provided, the `MILP::optimize` method will store the
   /// MILP model and its solution at `writeTo`_model.lp and
   /// `writeTo`_solution.json, respectively.
-  MILP(std::unique_ptr<CPSolver> solver, const llvm::Twine &writeTo = "")
-      : model(std::move(solver)), writeTo(writeTo.str()) {};
+  MILP(CPSolver::SolverKind solverKind, int timeout,
+       const llvm::Twine &writeTo = "")
+      : writeTo(writeTo.str()) {
+    switch (solverKind) {
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+    case CPSolver::GUROBI:
+      model = std::make_unique<GurobiSolver>(timeout);
+      break;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    case CPSolver::CBC:
+      model = std::make_unique<CbcSolver>(timeout);
+      break;
+    }
+  };
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP
   /// model and its solution are stored in plain text in its associated

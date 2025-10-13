@@ -88,21 +88,21 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
   }
 }
 
-BufferPlacementMILP::BufferPlacementMILP(std::unique_ptr<CPSolver> solver,
-                                         FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
+                                         int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod)
-    : MILP<BufferPlacement>(std::move(solver)), timingDB(timingDB),
+    : MILP<BufferPlacement>(solverKind, timeout), timingDB(timingDB),
       targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr) {
   initialize();
 }
 
-BufferPlacementMILP::BufferPlacementMILP(std::unique_ptr<CPSolver> solver,
-                                         FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
+                                         int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod, Logger &logger,
                                          StringRef milpName)
-    : MILP<BufferPlacement>(std::move(solver),
+    : MILP<BufferPlacement>(solverKind, timeout,
                             logger.getLogDir() +
                                 llvm::sys::path::get_separator() + milpName),
       timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),

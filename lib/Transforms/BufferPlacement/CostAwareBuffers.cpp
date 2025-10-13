@@ -24,21 +24,22 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::costaware;
 
-CostAwareBuffers::CostAwareBuffers(std::unique_ptr<CPSolver> solver,
+CostAwareBuffers::CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
                                    FuncInfo &funcInfo,
                                    const TimingDatabase &timingDB,
                                    double targetPeriod)
-    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod) {
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
+                          targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-CostAwareBuffers::CostAwareBuffers(std::unique_ptr<CPSolver> solver,
+CostAwareBuffers::CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
                                    FuncInfo &funcInfo,
                                    const TimingDatabase &timingDB,
                                    double targetPeriod, Logger &logger,
                                    StringRef milpName)
-    : BufferPlacementMILP(std::move(solver), funcInfo, timingDB, targetPeriod,
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
                           logger, milpName) {
   if (!unsatisfiable)
     setup();

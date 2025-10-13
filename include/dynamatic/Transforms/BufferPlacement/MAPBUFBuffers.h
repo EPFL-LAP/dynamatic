@@ -42,18 +42,18 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  MAPBUFBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
-                const TimingDatabase &timingDB, double targetPeriod,
-                StringRef blifFiles, double lutDelay, int lutSize,
-                bool acyclicType);
+  MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                double targetPeriod, StringRef blifFiles, double lutDelay,
+                int lutSize, bool acyclicType);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  MAPBUFBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
-                const TimingDatabase &timingDB, double targetPeriod,
-                StringRef blifFiles, double lutDelay, int lutSize,
-                bool acyclicType, Logger &logger,
+  MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                double targetPeriod, StringRef blifFiles, double lutDelay,
+                int lutSize, bool acyclicType, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:

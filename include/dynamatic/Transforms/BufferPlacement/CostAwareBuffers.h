@@ -36,12 +36,13 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  CostAwareBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
-                   const TimingDatabase &timingDB, double targetPeriod);
+  CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
+                   FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                   double targetPeriod);
 
-  CostAwareBuffers(std::unique_ptr<CPSolver> solver, FuncInfo &funcInfo,
-                   const TimingDatabase &timingDB, double targetPeriod,
-                   Logger &logger, StringRef milpName);
+  CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
+                   FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                   double targetPeriod, Logger &logger, StringRef milpName);
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions.

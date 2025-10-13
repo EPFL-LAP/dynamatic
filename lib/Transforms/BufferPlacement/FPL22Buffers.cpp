@@ -297,22 +297,22 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   }
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver,
-                                     FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
+                                     int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion)
-    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod),
+    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
 }
 
-CFDFCUnionBuffers::CFDFCUnionBuffers(std::unique_ptr<CPSolver> solver,
-                                     FuncInfo &funcInfo,
+CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
+                                     int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
                                      Logger &logger, StringRef milpName)
-    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod,
+    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
                        logger, milpName),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
@@ -400,21 +400,21 @@ void CFDFCUnionBuffers::setup() {
   markReadyToOptimize();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(std::unique_ptr<CPSolver> solver,
-                                     FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
+                                     int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod)
-    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod) {
+    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-OutOfCycleBuffers::OutOfCycleBuffers(std::unique_ptr<CPSolver> solver,
-                                     FuncInfo &funcInfo,
+OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
+                                     int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, Logger &logger,
                                      StringRef milpName)
-    : FPL22BuffersBase(std::move(solver), funcInfo, timingDB, targetPeriod,
+    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
                        logger, milpName) {
   if (!unsatisfiable)
     setup();
