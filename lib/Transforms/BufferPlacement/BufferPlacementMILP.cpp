@@ -542,7 +542,7 @@ void BufferPlacementMILP::
     CPVar &shiftReg = chVars.shiftReg;
 
     // Token occupancy >= data latency * CFDFC's throughput.
-    model->addQConstr(dataLatency * throughput <= QuadExpr(chTokenOccupancy),
+    model->addQConstr(dataLatency * throughput <= chTokenOccupancy,
                       "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
     std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
@@ -562,9 +562,8 @@ void BufferPlacementMILP::
     // number (dataLatency) minus the ceiling of the product of data latency and
     // CFDFC throughput.
     // We approximate the ceiling function numerically to keep the model linear.
-    model->addQConstr(QuadExpr(shiftRegExtraBubbles) >=
-                          QuadExpr(dataLatency) - dataLatency * throughput -
-                              0.99,
+    model->addQConstr(shiftRegExtraBubbles >=
+                          dataLatency - dataLatency * throughput - 0.99,
                       shiftRegExtraBubblesName);
 
     // Combine the following into a unified constraint:
@@ -581,9 +580,9 @@ void BufferPlacementMILP::
     // As a result, we model bubble occupancy as 'readyBuf * throughput'. This
     // term can be linearized, but it is not necessary because this is a
     // quadratic constaint.
-    model->addQConstr(QuadExpr(chTokenOccupancy) + readyBuf * throughput +
+    model->addQConstr(chTokenOccupancy + readyBuf * throughput +
                               shiftReg * shiftRegExtraBubbles <=
-                          QuadExpr(bufNumSlots),
+                          bufNumSlots,
                       "throughput_tokens_ub");
   }
 }
