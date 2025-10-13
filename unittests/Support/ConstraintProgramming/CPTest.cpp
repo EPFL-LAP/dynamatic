@@ -208,7 +208,7 @@ TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
   EXPECT_NEAR(obj, xVal + yVal, 1e-6);
 }
 
-TEST(ExpressionOperators, LinearExprPlusEquals) {
+TEST(ExpressionOperators, LinExprPlusEquals) {
   CPVar x("x", CPVar::REAL, 0, 10);
   CPVar y("y", CPVar::REAL, 0, 10);
 
@@ -222,7 +222,7 @@ TEST(ExpressionOperators, LinearExprPlusEquals) {
   EXPECT_DOUBLE_EQ(expr1.constant, 3.0); // 0 + 3
 }
 
-TEST(ExpressionOperators, LinearExprMinusEquals) {
+TEST(ExpressionOperators, LinExprMinusEquals) {
   CPVar x("x", CPVar::REAL, 0, 10);
   CPVar y("y", CPVar::REAL, 0, 10);
 
@@ -237,8 +237,8 @@ TEST(ExpressionOperators, LinearExprMinusEquals) {
 }
 
 // TEST(ExpressionOperators, QuadExprPlusEquals) {
-//   Var x("x", Var::REAL, 0, 10);
-//   Var y("y", Var::REAL, 0, 10);
+//   CPVar x("x", CPVar::REAL, 0, 10);
+//   CPVar y("y", CPVar::REAL, 0, 10);
 //
 //   LinExpr l1 = x + y;
 //   LinExpr l2 = x;
@@ -261,8 +261,8 @@ TEST(ExpressionOperators, LinearExprMinusEquals) {
 // }
 //
 // TEST(ExpressionOperators, QuadExprMinusEquals) {
-//   Var x("x", Var::REAL);
-//   Var y("y", Var::REAL);
+//   CPVar x("x", CPVar::REAL);
+//   CPVar y("y", CPVar::REAL);
 //
 //   QuadExpr q1 = (x + y) * (x + y); // (x+y)^2
 //   QuadExpr q2 = x * x + 2 * x * y; // x^2 + 2xy
@@ -277,6 +277,94 @@ TEST(ExpressionOperators, LinearExprMinusEquals) {
 //   auto xyTerm = std::make_pair(x, y);
 //   EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 0.0); // 2 - 2
 // }
+
+// Helper for comparing two LinExpr
+static void expectExprEq(const LinExpr &lhs, const LinExpr &rhs) {
+  EXPECT_EQ(lhs.terms.size(), rhs.terms.size());
+  for (auto &[var, coeff] : lhs.terms) {
+    auto it = rhs.terms.find(var);
+    ASSERT_NE(it, rhs.terms.end());
+    EXPECT_DOUBLE_EQ(it->second, coeff);
+  }
+  EXPECT_DOUBLE_EQ(lhs.constant, rhs.constant);
+}
+
+//----------------------------------------------------------------------------//
+//  Tests for CPVar + double, double + CPVar, CPVar - double, double - CPVar
+//----------------------------------------------------------------------------//
+
+TEST(LinExprOpTest, VarPlusDouble) {
+  CPVar x("x", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = x + 5.0;
+  LinExpr expected;
+  expected.terms[x] = 1.0;
+  expected.constant = 5.0;
+  expectExprEq(expr, expected);
+}
+
+TEST(LinExprOpTest, DoublePlusVar) {
+  CPVar x("x", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = 5.0 + x;
+  LinExpr expected;
+  expected.terms[x] = 1.0;
+  expected.constant = 5.0;
+  expectExprEq(expr, expected);
+}
+
+TEST(LinExprOpTest, VarMinusDouble) {
+  CPVar x("x", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = x - 3.0;
+  LinExpr expected;
+  expected.terms[x] = 1.0;
+  expected.constant = -3.0;
+  expectExprEq(expr, expected);
+}
+
+TEST(LinExprOpTest, DoubleMinusVar) {
+  CPVar x("x", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = 7.0 - x;
+  LinExpr expected;
+  expected.terms[x] = -1.0;
+  expected.constant = 7.0;
+  expectExprEq(expr, expected);
+}
+
+//----------------------------------------------------------------------------//
+//  Tests for combinations like double * CPVar + double, etc.
+//----------------------------------------------------------------------------//
+
+TEST(LinExprOpTest, DoubleTimesVarPlusDouble) {
+  CPVar y("y", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = 2.5 * y + 1.5;
+  LinExpr expected;
+  expected.terms[y] = 2.5;
+  expected.constant = 1.5;
+  expectExprEq(expr, expected);
+}
+
+TEST(LinExprOpTest, VarTimesDoubleMinusDouble) {
+  CPVar y("y", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = y * 2.0 - 4.0;
+  LinExpr expected;
+  expected.terms[y] = 2.0;
+  expected.constant = -4.0;
+  expectExprEq(expr, expected);
+}
+
+//----------------------------------------------------------------------------//
+//  Tests for chained operations (associativity and correctness)
+//----------------------------------------------------------------------------//
+
+TEST(LinExprOpTest, ChainedAddSub) {
+  CPVar x("x", CPVar::REAL, std::nullopt, std::nullopt);
+  CPVar y("y", CPVar::REAL, std::nullopt, std::nullopt);
+  LinExpr expr = 2.0 + x - 3.0 + y + 1.0;
+  LinExpr expected;
+  expected.terms[x] = 1.0;
+  expected.terms[y] = 1.0;
+  expected.constant = 0.0; // (2 - 3 + 1) = 0
+  expectExprEq(expr, expected);
+}
 
 // [END AI-generated test cases]
 
