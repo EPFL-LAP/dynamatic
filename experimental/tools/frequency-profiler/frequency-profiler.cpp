@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Simulator.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -35,11 +36,6 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
-
-/// Simulates a std-level function on a specific set of inputs.
-mlir::LogicalResult simulate(func::FuncOp funcOp,
-                             ArrayRef<std::string> inputArgs,
-                             StdProfiler &prof);
 
 static cl::OptionCategory mainCategory("Application options");
 

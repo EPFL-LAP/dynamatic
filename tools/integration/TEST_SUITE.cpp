@@ -17,15 +17,21 @@
 class BasicFixture : public testing::TestWithParam<std::string> {};
 class MemoryFixture : public testing::TestWithParam<std::string> {};
 class SharingFixture : public testing::TestWithParam<std::string> {};
+class SharingUnitTestFixture : public testing::TestWithParam<std::string> {};
 class SpecFixture : public testing::TestWithParam<std::string> {};
 
 TEST_P(BasicFixture, basic) {
-  std::string name = GetParam();
-  int simTime = -1;
-
-  EXPECT_EQ(runIntegrationTest(name, simTime), 0);
-
-  RecordProperty("cycles", std::to_string(simTime));
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
 }
 
 //
@@ -44,27 +50,87 @@ TEST_P(BasicFixture, basic) {
 // }
 
 TEST_P(MemoryFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory";
-  std::string name = GetParam();
-  int simTime = -1;
-
-  EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
-
-  RecordProperty("cycles", std::to_string(simTime));
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
 }
 
-TEST_P(SharingFixture, basic) {
-  fs::path root = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing";
-  std::string name = GetParam();
-  int simTime = -1;
+/// This testing fixture runs the test with and without sharing. It checks
+/// whenever the sharing option is enabled, the pass can run without any
+/// interruption and does not penalize the latency.
+TEST_P(SharingUnitTestFixture, basic) {
+  IntegrationTestData configWithSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
+      .useVerilog = false,
+      .useSharing = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
 
-  EXPECT_EQ(runIntegrationTest(name, simTime, root), 0);
+  IntegrationTestData configWithoutSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
 
-  RecordProperty("cycles", std::to_string(simTime));
+  // Check if sharing brings under 5% latency increase
+  EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
+            true);
+
+  RecordProperty("cycles", std::to_string(configWithSharing.simTime));
+}
+
+/// This testing fixture runs the test with and without sharing. It checks
+/// whenever the sharing option is enabled, the pass can run without any
+/// interruption and does not penalize the latency.
+TEST_P(SharingFixture, sharing_NoCI) {
+  IntegrationTestData configWithSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
+      .useVerilog = false,
+      .useSharing = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
+
+  IntegrationTestData configWithoutSharing{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
+      .useVerilog = false,
+      .useSharing = false,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
+
+  // Check if sharing brings under 5% latency increase
+  EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
+            true);
+
+  RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
 TEST_P(SpecFixture, spec_NoCI) {
-  std::string name = GetParam();
+  const std::string &name = GetParam();
   int simTime = -1;
 
   EXPECT_EQ(runSpecIntegrationTest(name, simTime), true);
@@ -72,24 +138,75 @@ TEST_P(SpecFixture, spec_NoCI) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
+// clang-format off
 INSTANTIATE_TEST_SUITE_P(
     MiscBenchmarks, BasicFixture,
-    testing::Values("single_loop", "atax", "atax_float", "bicg", "bicg_float",
-                    "binary_search", "factorial", "fir", "float_basic",
-                    "gaussian", "gcd", "gemm", "gemm_float", "gemver",
-                    "gemver_float", "gesummv_float", "get_tanh", "gsum",
-                    "gsumif", "histogram", "if_loop_1", "if_loop_2",
-                    "if_loop_3", "if_loop_add", "if_loop_mul", "iir",
-                    "image_resize", "insertion_sort", "iterative_division",
-                    "iterative_sqrt", "jacobi_1d_imper", "kernel_2mm",
-                    "kernel_2mm_float", "kernel_3mm", "kernel_3mm_float", "kmp",
-                    "loop_array", "lu", "matching", "matching_2", "matrix",
-                    "matrix_power", "matvec", "mul_example", "mvt_float",
-                    "pivot", "polyn_mult", "simple_example_1", "sobel", "spmv",
-                    "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
-                    "test_stdint", "threshold", "triangular", "vector_rescale",
-                    "video_filter", "while_loop_1", "while_loop_3"),
-    [](const auto &info) { return info.param; });
+    testing::Values(
+      "single_loop",
+      "atax",
+      "atax_float",
+      "bicg",
+      "bicg_float",
+      "binary_search",
+      "factorial",
+      "fir",
+      "float_basic",
+      "gaussian",
+      "gcd",
+      "gemm",
+      "gemm_float",
+      "gemver",
+      "gemver_float",
+      "gesummv_float",
+      "get_tanh",
+      "gsum",
+      "gsumif",
+      "histogram",
+      "if_loop_1",
+      "if_loop_2",
+      "if_loop_3",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "image_resize",
+      "insertion_sort",
+      "iterative_division",
+      "iterative_sqrt",
+      "jacobi_1d_imper",
+      "kernel_2mm",
+      "kernel_2mm_float",
+      "kernel_3mm",
+      "kernel_3mm_float",
+      "kmp",
+      "loop_array",
+      "lu",
+      "matching",
+      "matching_2",
+      "matrix",
+      "matrix_power",
+      "matvec",
+      "mul_example",
+      "mvt_float",
+      "pivot",
+      "polyn_mult",
+      "simple_example_1",
+      "sobel",
+      "spmv",
+      "stencil_2d",
+      "sumi3_mem",
+      "symm_float",
+      "syr2k_float",
+      "test_stdint",
+      "threshold",
+      "triangular",
+      "vector_rescale",
+      "video_filter",
+      "while_loop_1",
+      "while_loop_3",
+      "test_loop_free"
+      ),
+      [](const auto &info) { return info.param; });
+// clang-format on
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
@@ -102,11 +219,30 @@ INSTANTIATE_TEST_SUITE_P(
                     "test_memory_18", "test_smallbound"),
     [](const auto &info) { return "memory_" + info.param; });
 
-INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
                          testing::Values("share_test_1", "share_test_2"),
                          [](const auto &info) {
                            return "sharing_" + info.param;
                          });
+
+// clang-format off
+INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
+    testing::Values(
+      "atax_float",
+      "bicg_float",
+      "gsum",
+      "gsumif",
+      "gemm_float",
+      "mvt_float",
+      "syr2k_float",
+      "kernel_3mm_float",
+      "kernel_2mm_float",
+      "gesummv_float"
+      ),
+    [](const auto &info) {
+    return "sharing_" + info.param;
+    });
+// clang-format on
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",

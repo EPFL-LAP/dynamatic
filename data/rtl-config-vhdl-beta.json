@@ -65,6 +65,10 @@
     }
   },
   {
+    "name": "handshake.ram",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ram -p data_width=$DATA_WIDTH addr_width=$ADDR_WIDTH size=$SIZE values=\"($INITIAL_VALUES)\""
+  },
+  {
     "name": "handshake.cmpi",
     "parameters": [
       {

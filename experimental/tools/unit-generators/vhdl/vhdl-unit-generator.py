@@ -171,5 +171,6 @@ if __name__ == "__main__":
     generators.add("handshake", "valid_merger")
     generators.add("handshake", "top_join")
     generators.add("handshake", "remsi")
+    generators.add("handshake", "ram")
 
     main(generators)

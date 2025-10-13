@@ -388,15 +388,44 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
-  /// Store the CFDFC extraction result into the reference stored in funcInfo.
-  /// This makes it possible for a later pass in the pass pipeline to retrieve
-  /// the graph and throughput and each CFDFC of the current function.
-  void populateCFDFCAnalysisResult() {
+  /// Constant representing the error threshold for floating-point numbers in
+  /// the MILP model. This is used to determine whether a variable's value is
+  /// close enough to zero to be considered zero.
+  static constexpr double MILP_EPSILON = 1e-6;
+
+  /// Store the buffer placement MILP solution. This makes it possible for a
+  /// later pass in the pass pipeline to retrieve the throughput and occupancy
+  /// of each CFDFC of the current function.
+  void populateCFDFCThroughputAndOccupancy() {
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
       double cfThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      this->funcInfo.result->cfdfcAndThroughputs.emplace_back(*cf,
-                                                              cfThroughput);
+      cf->throughput = cfThroughput;
+
+      // Store the unit occupancy into the CFDFC data structure.
+      for (auto &[op, var] : cfVars.unitVars) {
+        double occupancy =
+            var.retOut.get(GRB_DoubleAttr_X) - var.retIn.get(GRB_DoubleAttr_X);
+        // Approximate occupancy to 0 if it is negative but bigger than
+        // -MILP_EPSILON.
+        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+          occupancy = 0.0;
+        }
+        assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
+        cf->unitOccupancy[op] = occupancy;
+      }
+
+      // Store the channel occupancy into the CFDFC data structure.
+      for (auto &[val, var] : cfVars.channelThroughputs) {
+        double occupancy = var.get(GRB_DoubleAttr_X);
+        // Approximate occupancy to 0 if it is negative but bigger than
+        // -MILP_EPSILON.
+        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+          occupancy = 0.0;
+        }
+        assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
+        cf->channelOccupancy[val] = occupancy;
+      }
     }
   }
 

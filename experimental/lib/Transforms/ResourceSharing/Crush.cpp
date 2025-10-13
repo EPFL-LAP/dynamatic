@@ -97,7 +97,10 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
 
   SmallVector<CFDFC *> cfdfcPtrs;
 
-  for (auto &[cfdfc, _] : analysis.results[funcOp].cfdfcAndThroughputs) {
+  for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
+    // Note: here cfdfc must be a reference to the objects in the vector,
+    // otherwise the copy that "&cfdfc" points to will immediately goes out of
+    // scope after the loop.
     cfdfcPtrs.push_back(&cfdfc);
   }
 
@@ -107,18 +110,15 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
 
-  for (auto [id, cfAndThroughputs] :
-       llvm::enumerate(analysis.results[funcOp].cfdfcAndThroughputs)) {
-    cfIndices[&cfAndThroughputs.first] = id;
+  for (auto [cfdfcIdx, cfdfc] :
+       llvm::enumerate(analysis.mapFuncOpToCFDFCs[funcOp])) {
+    cfIndices[&cfdfc] = cfdfcIdx;
   }
 
-  for (auto [cfdfc, throughput] :
-       analysis.results[funcOp].cfdfcAndThroughputs) {
-    sharingInfo[funcOp].cfThroughput[cfIndices[&cfdfc]] = throughput;
-
+  for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
+    sharingInfo[funcOp].cfThroughput[cfIndices[&cfdfc]] = cfdfc.throughput;
     sharingInfo[funcOp].cfUnits[cfIndices[&cfdfc]] =
         std::set(cfdfc.units.begin(), cfdfc.units.end());
-
     // Track the channels of the CFC
     for (Value val : cfdfc.channels) {
       Channel *ch = new Channel(val);
@@ -128,7 +128,6 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
   // For each CFDFC Union, mark the most-frequently-executed CFC as performance
   // critical.
   for (CFDFCUnion &cfUnion : disjointUnions) {
-
     CFDFC **critCf =
         std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
                          [](CFDFC const *l, CFDFC const *r) {

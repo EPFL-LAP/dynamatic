@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Simulator.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -39,138 +40,6 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
-
-namespace {
-
-class StdExecuter {
-public:
-  StdExecuter(mlir::func::FuncOp &toplevel,
-              llvm::DenseMap<mlir::Value, Any> &valueMap,
-              llvm::DenseMap<mlir::Value, double> &timeMap,
-              std::vector<Any> &results, std::vector<double> &resultTimes,
-              std::vector<std::vector<Any>> &store,
-              std::vector<double> &storeTimes, StdProfiler &prof);
-
-  LogicalResult succeeded() const {
-    return successFlag ? success() : failure();
-  }
-
-private:
-  /// Operation execution visitors
-  LogicalResult execute(mlir::arith::ConstantOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::AddIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::LLVM::UndefOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::SelectOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::OrIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::ShLIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::ShRSIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::TruncIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::TruncFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::AndIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::XOrIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::AddFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::SIToFPOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::FPToSIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::CmpIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::CmpFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::SubIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::SubFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::MulIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::MulFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::DivSIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::DivUIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::DivFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::NegFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::RemFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::RemSIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::RemUIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::IndexCastOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::ExtSIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::ExtUIOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::arith::ExtFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::CosOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::ExpOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::Exp2Op, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::LogOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::Log2Op, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::Log10Op, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::SinOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::SqrtOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::math::AbsFOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(memref::LoadOp, std::vector<Any> &, std::vector<Any> &);
-  LogicalResult execute(memref::StoreOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(memref::AllocOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::cf::BranchOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(mlir::cf::CondBranchOp, std::vector<Any> &,
-                        std::vector<Any> &);
-  LogicalResult execute(func::ReturnOp, std::vector<Any> &, std::vector<Any> &);
-  LogicalResult execute(mlir::CallOpInterface, std::vector<Any> &,
-                        std::vector<Any> &);
-
-private:
-  /// Execution context variables.
-  llvm::DenseMap<mlir::Value, Any> &valueMap;
-  llvm::DenseMap<mlir::Value, double> &timeMap;
-  std::vector<Any> &results;
-  std::vector<double> &resultTimes;
-  std::vector<std::vector<Any>> &store;
-  std::vector<double> &storeTimes;
-  double time;
-
-  /// Profiler to gather statistics.
-  StdProfiler &prof;
-
-  /// Flag indicating whether execution was successful.
-  bool successFlag = true;
-
-  /// An iterator which walks over the instructions.
-  mlir::Block::iterator instIter;
-};
-
-} // namespace
 
 //===----------------------------------------------------------------------===//
 // Utility functions
@@ -373,6 +242,16 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  auto toShift = any_cast<APInt>(in[0]).getZExtValue();
+  auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+  auto shifted =
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+  out[0] = shifted;
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::OrIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = any_cast<APInt>(in[0]) | any_cast<APInt>(in[1]);
@@ -560,6 +439,13 @@ LogicalResult StdExecuter::execute(mlir::arith::SIToFPOp op,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::UIToFPOp op,
+                                   std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(APIntOps::RoundAPIntToFloat(any_cast<APInt>(in[0])));
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::FPToSIOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -624,6 +510,22 @@ LogicalResult StdExecuter::execute(mlir::math::AbsFOp op, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::MaxSIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.sgt(in1) ? in0 : in1;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::MaxUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.ugt(in1) ? in0 : in1;
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::memref::LoadOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -684,6 +586,22 @@ LogicalResult StdExecuter::execute(mlir::memref::AllocOp op,
   out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
   unsigned ptr = any_cast<unsigned>(out[0]);
   storeTimes[ptr] = time;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(memref::AllocaOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
+  unsigned ptr = any_cast<unsigned>(out[0]);
+  storeTimes[ptr] = time;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(memref::GetGlobalOp op, std::vector<Any> &,
+                                   std::vector<Any> &out) {
+  // This result is a unsigned type (i.e., the pointer to the memory allocated
+  // for gbl).
+  out[0] = valueMap[op.getResult()];
   return success();
 }
 
@@ -811,18 +729,58 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
     unsigned strat = ExecuteStrategy::Default;
     auto res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<arith::ConstantOp, arith::AddIOp, arith::AddFOp,
-                  arith::CmpIOp, arith::CmpFOp, arith::SubIOp, arith::SubFOp,
-                  arith::MulIOp, arith::MulFOp, arith::DivSIOp, arith::DivUIOp,
-                  arith::DivFOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
-                  arith::SIToFPOp, arith::FPToSIOp, arith::IndexCastOp,
-                  arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
-                  arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
-                  arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
-                  arith::NegFOp, math::SqrtOp, math::CosOp, math::ExpOp,
-                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
-                  math::SqrtOp, math::AbsFOp, memref::AllocOp, memref::LoadOp,
-                  memref::StoreOp>([&](auto op) {
+            .Case<
+                // clang-format off
+                LLVM::UndefOp,
+                arith::AddFOp,
+                arith::AddIOp,
+                arith::AndIOp,
+                arith::CmpFOp,
+                arith::CmpIOp,
+                arith::ConstantOp,
+                arith::DivFOp,
+                arith::DivSIOp,
+                arith::DivUIOp,
+                arith::ExtFOp,
+                arith::ExtSIOp,
+                arith::ExtUIOp,
+                arith::FPToSIOp,
+                arith::IndexCastOp,
+                arith::MulFOp,
+                arith::MulIOp,
+                arith::OrIOp,
+                arith::RemFOp,
+                arith::RemSIOp,
+                arith::RemUIOp,
+                arith::SIToFPOp,
+                arith::UIToFPOp,
+                arith::SelectOp,
+                arith::ShLIOp,
+                arith::ShRSIOp,
+                arith::ShRUIOp,
+                arith::SubFOp,
+                arith::SubIOp,
+                arith::TruncFOp,
+                arith::TruncIOp,
+                arith::XOrIOp,
+                arith::MaxUIOp,
+                arith::MaxSIOp,
+                math::SqrtOp,
+                math::CosOp,
+                math::ExpOp,
+                math::Exp2Op,
+                math::LogOp,
+                math::Log2Op,
+                math::Log10Op,
+                math::SqrtOp,
+                math::AbsFOp,
+                memref::AllocOp,
+                memref::AllocaOp,
+                memref::LoadOp,
+                memref::StoreOp,
+                memref::GetGlobalOp
+                // clang-format on
+                >([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })
@@ -862,10 +820,10 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
 
 LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
                        StdProfiler &prof) {
-  // The store associates each allocation in the program
-  // (represented by a int) with a vector of values which can be
-  // accessed by it.   Currently values are assumed to be an integer.
-  std::vector<std::vector<Any>> store;
+  // The "programStackMemory" associates each allocation in the program
+  // (represented by a int) with a vector of values which can be accessed by it.
+  // Currently values are assumed to be an integer.
+  std::vector<std::vector<Any>> programStackMemory;
   std::vector<double> storeTimes;
 
   // The valueMap associates each SSA statement in the program
@@ -900,16 +858,26 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
     if (type.isa<mlir::MemRefType>()) {
       // We require this memref type to be fully specified.
       auto memreftype = type.dyn_cast<mlir::MemRefType>();
-      std::vector<Any> nothing;
+
+      // emptyDims: the dynamic dimension type of alloca takes an array of
+      // dimensions. We cannot pass an temporary object "{}" to a reference type
+      // "std::vector<Any> &". So we construct an empty array here.
+      std::vector<Any> emptyDims;
       std::string x;
-      unsigned buffer = allocateMemRef(memreftype, nothing, store, storeTimes);
-      valueMap[blockArgs[i]] = buffer;
+
+      // "pointer" is a (pseudo) pointer to the beginning to the stack memory
+      // that is reserved using the alloca.
+      unsigned pointer =
+          allocateMemRef(memreftype, emptyDims, programStackMemory, storeTimes);
+      valueMap[blockArgs[i]] = pointer;
       timeMap[blockArgs[i]] = 0.0;
       std::stringstream arg(inputArgs[i]);
       int64_t j = 0;
       while (!arg.eof()) {
         getline(arg, x, ',');
-        store[buffer][j++] = readValueWithType(memreftype.getElementType(), x);
+        // Read the value into the stack memory indicated by the pointer.
+        programStackMemory[pointer][j++] =
+            readValueWithType(memreftype.getElementType(), x);
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
@@ -918,10 +886,57 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
     }
   }
 
+  // Allocate memory for each global variable. Here we need to use modOp.walk
+  // instead of funcOp.walk to find the globals, because GlobalOps are in the
+  // global scope and not accesible from within the funcOp.
+  //
+  // builtin.module {
+  //    memref.global ...
+  //    func.func {
+  //      ...
+  //    }
+  // }
+  auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
+  modOp.walk([&](memref::GlobalOp gblOp) {
+    auto memreftype = gblOp.getTypeAttr().getValue().dyn_cast<MemRefType>();
+    // emptyDims: the dynamic dimension type of alloca takes an array of
+    // dimensions. We cannot pass an temporary object "{}" to a reference type
+    // "std::vector<Any> &". So we construct an empty array here.
+    std::vector<Any> emptyDims;
+    std::string x;
+    unsigned pointer =
+        allocateMemRef(memreftype, emptyDims, programStackMemory, storeTimes);
+
+    StringRef symName = gblOp.getSymName();
+    // Register all the results of GetGlobal to buffer
+    funcOp.walk([&](memref::GetGlobalOp getGblOp) {
+      if (getGblOp.getNameAttr().getValue() == symName) {
+        valueMap[getGblOp.getResult()] = pointer;
+        timeMap[getGblOp.getResult()] = 0.0;
+      }
+    });
+
+    // If the GlobalOp has a dense initializer, use it the initialize the memory
+    // content:
+    mlir::Attribute initValueAttr = gblOp.getInitialValueAttr();
+    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+      mlir::Type elemType = denseAttr.getElementType();
+      if (elemType.isa<mlir::IntegerType>()) {
+        for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APInt>())) {
+          programStackMemory[pointer][id] = val;
+        }
+      } else if (elemType.isa<mlir::FloatType>()) {
+        for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APFloat>())) {
+          programStackMemory[pointer][id] = val;
+        }
+      }
+    }
+  });
+
   std::vector<Any> results(numOutputs);
   std::vector<double> resultTimes(numOutputs);
 
-  return StdExecuter(funcOp, valueMap, timeMap, results, resultTimes, store,
-                     storeTimes, prof)
+  return StdExecuter(funcOp, valueMap, timeMap, results, resultTimes,
+                     programStackMemory, storeTimes, prof)
       .succeeded();
 }

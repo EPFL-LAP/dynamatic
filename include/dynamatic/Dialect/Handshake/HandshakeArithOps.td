@@ -297,6 +297,14 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   let summary = "Unsigned integer division.";
 }
 
+def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi"> {
+  let summary = "Outputs the maximum between two input signed integers";
+}
+
+def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
+  let summary = "Outputs the maximum between two input unsigned integers";
+}
+
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
@@ -407,11 +415,15 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
 
-def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
+def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp"> {
   IsIntSizedChannel<32, "in">,
   IsFloatSizedChannel<32, "out">,
-  LatencyInterface
-]> {
+  let summary = "Converts a unsigned integer to float.";
+}
+
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+  IsIntSizedChannel<32, "in">,
+  IsFloatSizedChannel<32, "out">,
   let summary = "Converts a signed integer to float.";
 }
 
