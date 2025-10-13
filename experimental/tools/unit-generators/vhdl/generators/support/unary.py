@@ -43,7 +43,7 @@ def generate_unary(
     Returns:
         VHDL code as a string.
     """
-    if bitwidth is not None:
+    if bitwidth is None:
         if input_bitwidth is not None or output_bitwidth is not None:
             raise RuntimeError("If bitwidth is specified, input and output bitwidth must not be specified")
 
