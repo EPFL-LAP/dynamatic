@@ -142,6 +142,21 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
+class FloatingPointSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals lhsNodes;
+  ChannelSignals rhsNodes;
+  ChannelSignals resultNodes;
+
+  void processOutOfRuleNodes();
+
+public:
+  FloatingPointSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
 class ForkSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int size = 0;
@@ -280,6 +295,18 @@ public:
   SelectSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
+class SIFPSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
+
+public:
+  SIFPSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int) override;
 };
 
 class MergeSubjectGraph : public BaseSubjectGraph {

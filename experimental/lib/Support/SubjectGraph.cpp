@@ -388,6 +388,64 @@ ChannelSignals &ForkSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
   return outputNodes[channelIndex];
 }
 
+void FloatingPointSubjectGraph::processOutOfRuleNodes() {
+  // Data signal nodes of blackbox modules need to be set as Blackbox Outputs.
+  // Valid and Ready signals are not blackboxed, so they are not set.
+  auto setBlackboxBool = [&](Node *node) {
+    std::string nodeName = node->name;
+    if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                       nodeName.find("ready") == std::string::npos)) {
+      node->isBlackboxOutput = (true);
+    }
+  };
+
+  for (auto &node : blifData->getAllNodes()) {
+    std::string nodeName = node->name;
+    if (nodeName.find("result") != std::string::npos &&
+        (node->isInput || node->isOutput)) {
+      assignSignals(resultNodes, node, nodeName);
+      node->name = uniqueName + "_" + nodeName;
+      setBlackboxBool(node);
+    } else if (nodeName.find(".") != std::string::npos ||
+               nodeName.find("dataReg") !=
+                   std::string::npos) { // Nodes with "." and "dataReg"
+                                        // require unique naming to avoid
+                                        // naming conflicts
+      node->name = (uniqueName + "." + nodeName);
+    }
+  }
+}
+
+// FloatingPointSubjectGraph implementation
+FloatingPointSubjectGraph::FloatingPointSubjectGraph(Operation *op)
+    : BaseSubjectGraph(op) {
+  // Get datawidth of the operation
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+
+  loadBlifFile({dataWidth});
+  isBlackbox = true;
+
+  // "result" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {{"lhs", lhsNodes, false},
+                                           {"rhs", rhsNodes, false}};
+
+  processNodesWithRules(rules);
+}
+
+// lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
+// are connected to the Subject Graph with index 1.
+void FloatingPointSubjectGraph::connectInputNodes() {
+  connectInputNodesHelper(lhsNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(rhsNodes, inputSubjectGraphs[1]);
+}
+
+// Arith modules only have resultNodes as output.
+ChannelSignals &FloatingPointSubjectGraph::returnOutputNodes(unsigned int) {
+  return resultNodes;
+}
+
 void MuxSubjectGraph::processOutOfRuleNodes() {
   // Similar to the ForkSubjectGraph, the Mux module has
   // output nodes named as ins[0], ins[1], ..., ins[size-1]. This function
@@ -541,7 +599,9 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
 // inputNodes are connected to the second inputSubjectGraph.
 void ConditionalBranchSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(conditionNodes, inputSubjectGraphs[0]);
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[1]);
+  if (inputSubjectGraphs.size() != 1) {
+    connectInputNodesHelper(inputNodes, inputSubjectGraphs[1]);
+  }
 }
 
 // trueOut are at channelIndex 0, and falseOut are at channelIndex 1.
@@ -715,6 +775,31 @@ void SelectSubjectGraph::connectInputNodes() {
 
 // Select module has only outputNodes as output.
 ChannelSignals &SelectSubjectGraph::returnOutputNodes(unsigned int) {
+  return outputNodes;
+}
+
+// FloatingPointSubjectGraph implementation
+SIFPSubjectGraph::SIFPSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  // Get datawidth of the operation
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+
+  loadBlifFile({dataWidth});
+  isBlackbox = true;
+
+  std::vector<NodeProcessingRule> rules = {{"in", inputNodes, false},
+                                           {"out", outputNodes, true}};
+
+  processNodesWithRules(rules);
+}
+
+// lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
+// are connected to the Subject Graph with index 1.
+void SIFPSubjectGraph::connectInputNodes() {
+  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+}
+
+// Arith modules only have resultNodes as output.
+ChannelSignals &SIFPSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
@@ -899,6 +984,10 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
               handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
               handshake::MulIOp, handshake::DivSIOp, handshake::DivUIOp>(
             [&](auto) { subjectGraphs.push_back(new ArithSubjectGraph(op)); })
+        .Case<handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+              handshake::MulFOp, handshake::SubFOp>([&](auto) {
+          subjectGraphs.push_back(new FloatingPointSubjectGraph(op));
+        })
         .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
           subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
         })
@@ -932,6 +1021,8 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
         .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
           subjectGraphs.push_back(new SelectSubjectGraph(op));
         })
+        .Case<handshake::SIToFPOp, handshake::FPToSIOp>(
+            [&](auto) { subjectGraphs.push_back(new SIFPSubjectGraph(op)); })
         .Case<handshake::SourceOp>(
             [&](auto) { subjectGraphs.push_back(new SourceSubjectGraph(op)); })
         .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
