@@ -3,6 +3,7 @@ from generators.support.signal_manager import generate_arith_binary_signal_manag
 from generators.support.utils import ExtraSignals
 from generators.handshake.buffer import generate_valid_propagation_buffer
 
+
 def generate_arith_binary(
     name: str,
     handshake_op: str,
@@ -54,11 +55,11 @@ def generate_arith_binary(
     elif input_bitwidth is None or output_bitwidth is None:
         raise RuntimeError("If bitwidth is not specified, both input and output bitwidth must be specified")
 
-
     # generate inner function takes a name parameter
     # since the top level name is used for the signal manager wrapper
     #
     # the signal manager wrapper will make a new name for the inner unit
+
     def generate_inner(name): return _generate_arith_binary(
         name,
         handshake_op,
@@ -70,9 +71,9 @@ def generate_arith_binary(
         dependencies
     )
 
-
     # if no signal manager,
     # the unit uses the top level name
+
     def generate(): return generate_inner(name)
 
     if extra_signals:
@@ -86,6 +87,7 @@ def generate_arith_binary(
         )
     else:
         return generate()
+
 
 def _generate_arith_binary(
         name,

@@ -279,14 +279,14 @@ InterfaceMethod<[{
     }]>,
     
   // Return StringAttr instead of StringRef to ensure proper memory allocation.
-  // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+  // Using StringRef would result in the default value "0_0" becoming a dangling pointer.
   InterfaceMethod<[{
-      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
+      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0_0" if not set.
     }], "StringAttr", "getInternalDelay", (ins), [{
       Operation *op = $_op.getOperation();
       if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
         return attr;
-      return StringAttr::get(op->getContext(), "0.0");
+      return StringAttr::get(op->getContext(), "0_0");
     }]>
   ];
 }
