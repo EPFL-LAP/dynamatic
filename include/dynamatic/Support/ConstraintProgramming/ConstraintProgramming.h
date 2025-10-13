@@ -3,6 +3,7 @@
 /// - Users can use overloaded '+', '*', '-', '<', etc. to construct constraints
 /// and objectives.
 /// - It is designed to be solver agnostic.
+/// - The API is designed to look very similar to gurobi's API.
 ///
 /// For example usage of this API, please refer to
 /// `dynamatic/unittests/Support/ConstraintProgramming/CPTest.cpp`
@@ -324,32 +325,33 @@ enum Predicate {
 /// It has the form:
 /// [expr] [pred] 0
 /// For example:
-/// - x + 2 * y - z - 1 <= 1
+/// - x + 2 * y - z - 1 <= 0
 /// - x + 2 * y - z + 1 <= 0
 /// - x + 2 * y - z + 2 == 0
 /// The rhs is always 0
 
-struct QuadConstr {
-  // The expression
+// NOTE: this name is borrowed from gurobi (GRBTempConstr)
+struct TempConstr {
+  // The LHS expression. RHS is omitted because it is always set to zero.
   QuadExpr expr;
   Predicate pred;
 };
 
-inline QuadConstr operator<=(const QuadExpr &lhs, const QuadExpr &rhs) {
+inline TempConstr operator<=(const QuadExpr &lhs, const QuadExpr &rhs) {
   QuadExpr e = (lhs - rhs);
-  QuadConstr c;
+  TempConstr c;
   c.expr = e;
   c.pred = LE;
   return c;
 }
 
-inline QuadConstr operator>=(const QuadExpr &lhs, const QuadExpr &rhs) {
+inline TempConstr operator>=(const QuadExpr &lhs, const QuadExpr &rhs) {
   return (rhs <= lhs);
 }
 
-inline QuadConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
+inline TempConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
   QuadExpr e = (lhs - rhs);
-  QuadConstr c;
+  TempConstr c;
   c.expr = e;
   c.pred = EQ;
   return c;
@@ -390,10 +392,10 @@ public:
   // Create var, add gurobi var, and then return the created variable
   virtual CPVar addVar(const std::string &name, CPVar::VarType type,
                        std::optional<double> lb, std::optional<double> ub) = 0;
-  virtual void addConstr(const QuadConstr &constraint,
+  virtual void addConstr(const TempConstr &constraint,
                          llvm::StringRef constrName) = 0;
-  void addConstr(const QuadConstr &constraint) { addConstr(constraint, ""); }
-  virtual void addQConstr(const QuadConstr &constraint,
+  void addConstr(const TempConstr &constraint) { addConstr(constraint, ""); }
+  virtual void addQConstr(const TempConstr &constraint,
                           llvm::StringRef constrName) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
   virtual void optimize() = 0;
@@ -459,7 +461,7 @@ public:
     return addVar(var);
   }
 
-  void addConstr(const QuadConstr &constraint,
+  void addConstr(const TempConstr &constraint,
                  llvm::StringRef constrName) override {
     if (!constraint.expr.quadTerms.empty())
       llvm::report_fatal_error(
@@ -467,7 +469,7 @@ public:
     addQConstr(constraint, constrName);
   }
 
-  void addQConstr(const QuadConstr &constraint,
+  void addQConstr(const TempConstr &constraint,
                   llvm::StringRef constrName) override {
     GRBQuadExpr expr = 0;
 
@@ -621,7 +623,7 @@ public:
     return addVar(var);
   }
 
-  void addConstr(const QuadConstr &constraint,
+  void addConstr(const TempConstr &constraint,
                  llvm::StringRef constrName) override {
     if (!constraint.expr.quadTerms.empty()) {
       llvm::report_fatal_error(
@@ -658,7 +660,7 @@ public:
     solver.addRow(row, rowLower, rowUpper, constrName.str());
   }
 
-  void addQConstr(const QuadConstr &constraint, llvm::StringRef name) override {
+  void addQConstr(const TempConstr &constraint, llvm::StringRef name) override {
     llvm::report_fatal_error(
         "Quadratic constraints is currently unavailable for CBC!");
   }
