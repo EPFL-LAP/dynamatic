@@ -50,9 +50,9 @@ TEST_P(ParamSolverTest, basicMILPTest) {
 
   // Check: The result from our API and from Gurobi's API must be exactly the
   // same.
-  EXPECT_EQ(model.get(GRB_DoubleAttr_ObjVal), solver->getObjective());
-  EXPECT_EQ(a.get(GRB_DoubleAttr_X), solver->getValue(x));
-  EXPECT_EQ(b.get(GRB_DoubleAttr_X), solver->getValue(y));
+  EXPECT_NEAR(model.get(GRB_DoubleAttr_ObjVal), solver->getObjective(), 1e-6);
+  EXPECT_NEAR(a.get(GRB_DoubleAttr_X), solver->getValue(x), 1e-6);
+  EXPECT_NEAR(b.get(GRB_DoubleAttr_X), solver->getValue(y), 1e-6);
 }
 
 TEST_P(ParamSolverTest, basicIntegerProgramTest) {

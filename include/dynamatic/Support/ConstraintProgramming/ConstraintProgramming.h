@@ -91,6 +91,85 @@ struct LinExpr {
   }
 };
 
+inline LinExpr operator+(const CPVar &left, double right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = left;
+  // REMARK:
+  // std::map makes this safe when var does not exist in "right" at the
+  // first place by calling the default constructor, i.e., setting terms[right]
+  // = 0.0.
+  newExpr.constant = right;
+  return newExpr;
+}
+
+inline LinExpr operator+(double left, const CPVar &right) {
+  return (right + left);
+}
+
+inline LinExpr operator-(const CPVar &left, double right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = left;
+  // REMARK:
+  // std::map makes this safe when var does not exist in "right" at the
+  // first place by calling the default constructor, i.e., setting terms[right]
+  // = 0.0.
+  newExpr.constant = -right;
+  return newExpr;
+}
+
+inline LinExpr operator-(double left, const CPVar &right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = right;
+  newExpr.terms[right] = -1.0;
+  // REMARK:
+  // std::map makes this safe when var does not exist in "right" at the
+  // first place by calling the default constructor, i.e., setting terms[right]
+  // = 0.0.
+  newExpr.constant = left;
+  return newExpr;
+}
+
+inline LinExpr operator+(const CPVar &left, const CPVar &right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = left;
+  // REMARK:
+  // std::map makes this safe when var does not exist in "right" at the
+  // first place by calling the default constructor, i.e., setting terms[right]
+  // = 0.0.
+  newExpr.terms[right] += 1.0;
+  return newExpr;
+}
+
+inline LinExpr operator-(const CPVar &left, const CPVar &right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = left;
+  // REMARK:
+  // std::map makes this safe when var does not exist in "right" at the
+  // first place by calling the default constructor, i.e., setting terms[right]
+  // = 0.0.
+  newExpr.terms[right] -= 1.0;
+  return newExpr;
+}
+
+inline LinExpr operator+(const LinExpr &left, double right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  LinExpr newExpr = left;
+  newExpr.constant += right;
+  return newExpr;
+}
+
+inline LinExpr operator+(double left, const LinExpr &right) {
+  // REMARK:
+  // this is a deep copy of "left"
+  return (right + left);
+}
+
 inline LinExpr operator+(const LinExpr &left, const LinExpr &right) {
   // REMARK:
   // this is a deep copy of "left"
@@ -160,6 +239,7 @@ struct QuadExpr {
   std::map<std::pair<CPVar, CPVar>, double> quadTerms;
   QuadExpr() = default;
   QuadExpr(double value) { linexpr = LinExpr(value); }
+  QuadExpr(const CPVar &var) { linexpr = LinExpr(var); }
   QuadExpr(const LinExpr &expr) { linexpr = expr; }
 };
 
@@ -248,33 +328,6 @@ enum Predicate {
 /// - x + 2 * y - z + 1 <= 0
 /// - x + 2 * y - z + 2 == 0
 /// The rhs is always 0
-struct LinConstr {
-  // The expression
-  LinExpr expr;
-  Predicate pred;
-};
-
-inline LinConstr operator<=(const LinExpr &lhs, const LinExpr &rhs) {
-  LinConstr c;
-  c.expr = lhs - rhs;
-  c.pred = LE;
-  return c;
-}
-
-inline LinConstr operator>=(const LinExpr &lhs, const LinExpr &rhs) {
-  return (rhs <= lhs);
-}
-
-inline LinConstr operator==(const LinExpr &lhs, double rhs) {
-  LinConstr c;
-  c.expr = lhs - rhs;
-  c.pred = EQ;
-  return c;
-}
-
-inline LinConstr operator==(const LinExpr &lhs, const LinExpr &rhs) {
-  return (lhs - rhs == 0);
-}
 
 struct QuadConstr {
   // The expression
@@ -337,9 +390,9 @@ public:
   // Create var, add gurobi var, and then return the created variable
   virtual CPVar addVar(const std::string &name, CPVar::VarType type,
                        std::optional<double> lb, std::optional<double> ub) = 0;
-  virtual void addConstr(const LinConstr &constraint,
+  virtual void addConstr(const QuadConstr &constraint,
                          llvm::StringRef constrName) = 0;
-  void addConstr(const LinConstr &constraint) { addConstr(constraint, ""); }
+  void addConstr(const QuadConstr &constraint) { addConstr(constraint, ""); }
   virtual void addQConstr(const QuadConstr &constraint,
                           llvm::StringRef constrName) = 0;
   virtual void setMaximizeObjective(const LinExpr &expr) = 0;
@@ -406,19 +459,12 @@ public:
     return addVar(var);
   }
 
-  void addConstr(const LinConstr &constraint,
+  void addConstr(const QuadConstr &constraint,
                  llvm::StringRef constrName) override {
-    GRBLinExpr expr = 0;
-    for (auto &[var, coeff] : constraint.expr.terms) {
-      expr += coeff * variables[var];
-    }
-    expr += constraint.expr.constant;
-    if (constraint.pred == LE)
-      model->addConstr(expr <= 0, constrName.str());
-    else if (constraint.pred == EQ)
-      model->addConstr(expr == 0, constrName.str());
-    else
-      llvm_unreachable("Unknown predicate!");
+    if (!constraint.expr.quadTerms.empty())
+      llvm::report_fatal_error(
+          "Adding a linear constraint with quadratic terms!");
+    addQConstr(constraint, constrName);
   }
 
   void addQConstr(const QuadConstr &constraint,
@@ -575,13 +621,20 @@ public:
     return addVar(var);
   }
 
-  void addConstr(const LinConstr &constraint,
+  void addConstr(const QuadConstr &constraint,
                  llvm::StringRef constrName) override {
-    int numCoeffs = constraint.expr.terms.size();
+    if (!constraint.expr.quadTerms.empty()) {
+      llvm::report_fatal_error(
+          "Cbc solver does not support quadratic constraints! Aborting");
+    }
+
+    auto linearPart = constraint.expr.linexpr;
+
+    int numCoeffs = linearPart.terms.size();
     std::vector<int> indices;
     std::vector<double> values;
 
-    for (auto &[var, coeff] : constraint.expr.terms) {
+    for (auto &[var, coeff] : constraint.expr.linexpr.terms) {
       indices.push_back(variables.at(var));
       values.push_back(coeff);
     }
@@ -589,10 +642,10 @@ public:
     double rowLower, rowUpper;
     if (constraint.pred == LE) {
       rowLower = -1e20;
-      rowUpper = -constraint.expr.constant;
+      rowUpper = -linearPart.constant;
     } else if (constraint.pred == EQ) {
-      rowLower = -constraint.expr.constant;
-      rowUpper = -constraint.expr.constant;
+      rowLower = -linearPart.constant;
+      rowUpper = -linearPart.constant;
     } else {
       llvm_unreachable("Unknown predicate!");
     }
