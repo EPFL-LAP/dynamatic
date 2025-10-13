@@ -63,7 +63,7 @@ public:
   bool isLatchOutput = false;
   Value nodeMLIRValue; // MLIR Value associated with the node, if any
 
-  MILPVarsSubjectGraph *gurobiVars;
+  MILPVarsSubjectGraph *subjectGraphVars;
   std::set<Node *> fanins = {};
   std::set<Node *> fanouts = {};
   std::string function;
@@ -71,7 +71,7 @@ public:
 
   Node() = default;
   Node(const std::string &name, LogicNetwork *parent)
-      : gurobiVars(new MILPVarsSubjectGraph()), name(name) {}
+      : subjectGraphVars(new MILPVarsSubjectGraph()), name(name) {}
 
   // Adds a fanin node to the current node.
   void addFanin(Node *node) { fanins.insert(node); }
@@ -144,7 +144,7 @@ public:
   std::string str() const { return name; }
 
   ~Node() {
-    delete gurobiVars;
+    delete subjectGraphVars;
     fanins.clear();
     fanouts.clear();
   }

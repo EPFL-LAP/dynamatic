@@ -117,7 +117,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   ChannelVars &chVars = vars.channelVars[channel];
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
-  // Create a Gurobi variable of the given name and type for the channel
+  // Create a CPVar variable of the given name and type for the channel
   auto createVar = [&](const llvm::Twine &name, CPVar::VarType type) {
     return model->addVar((name + suffix).str(), type, 0, std::nullopt);
   };
@@ -143,7 +143,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
 
-  // Create a Gurobi variable of the given name (prefixed by the CFDFC index)
+  // Create a CPVar variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
     return model->addVar((prefix + name).str(), CPVar::REAL, 0, std::nullopt);
   };
@@ -340,8 +340,7 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
 
   // The dataBuf and validBuf must be equal
   // This constraint is not necessary, but may assist presolve.
-  model->addConstr(LinExpr(dataBuf) == LinExpr(validBuf),
-                   "dataBuf_validBuf_equal");
+  model->addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
   // There must be enough slots for data and ready buffers.
   model->addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
 }
@@ -364,8 +363,7 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
     StringRef refName = getSignalName(group.getRefSignal());
     for (SignalType sig : group.getOtherSignals()) {
       StringRef otherName = getSignalName(sig);
-      model->addConstr(LinExpr(groupBufPresent) ==
-                           LinExpr(chVars.signalVars[sig].bufPresent),
+      model->addConstr(groupBufPresent == chVars.signalVars[sig].bufPresent,
                        "elastic_" + refName.str() + "_same_" + otherName.str());
     }
   }
@@ -672,7 +670,7 @@ void BufferPlacementMILP::addCutSelectionConstraints(
   for (size_t i = 0; i < cutVector.size(); ++i) {
     // Loop over cuts of the node
     auto &cut = cutVector[i];
-    // Add cut selection variable to the Gurobi model
+    // Add cut selection variable to the CPVar model
     CPVar &cutSelection = cut.getCutSelectionVariable();
     cutSelection = model->addVar(
         (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)),
@@ -696,7 +694,8 @@ void BufferPlacementMILP::addCutSelectionConflicts(
       // if it is cut by a buffer, as LUTs cannot cover multiple sequential
       // stages. This constraint ensures an edge is either covered by a LUT, or
       // a buffer is inserted on the edge.
-      model->addConstr(1 >= nodePath->gurobiVars->bufferVar + cutSelectionVar,
+      model->addConstr(1 >= nodePath->subjectGraphVars->bufferVar +
+                                cutSelectionVar,
                        "cut_selection_conflict");
     }
   }
@@ -704,12 +703,12 @@ void BufferPlacementMILP::addCutSelectionConflicts(
 
 void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
-    // Gurobi variables of the node
-    CPVar &nodeVarIn = node->gurobiVars->tIn;
-    CPVar &nodeVarOut = node->gurobiVars->tOut;
-    CPVar &bufVarSignal = node->gurobiVars->bufferVar;
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
 
-    // If the AIG node is a channel, match the Gurobi variables of the AIG
+    // If the AIG node is a channel, match the CPVar variables of the AIG
     // node with channel variables
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
@@ -737,10 +736,10 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
 void BufferPlacementMILP::addClockPeriodConstraintsNodes(
     experimental::LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
-    // Gurobi variables of the node
-    CPVar &nodeVarIn = node->gurobiVars->tIn;
-    CPVar &nodeVarOut = node->gurobiVars->tOut;
-    CPVar &bufVarSignal = node->gurobiVars->bufferVar;
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
 
     // Add timing constraints for the node.
     if (Value nodeChannel = node->nodeMLIRValue) {
@@ -765,15 +764,14 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
     experimental::LogicNetwork *blifData, double lutDelay) {
   // Using cuts map to loop over subject graph edges, and adds delay
   // propagation constraints to the nodes that have cuts
-  CPVar &nodeVar = root->gurobiVars->tIn;
+  CPVar &nodeVar = root->subjectGraphVars->tIn;
   std::set<experimental::Node *> fanIns = root->fanins;
 
   if (fanIns.size() == 1) {
     // If a node has single fanin, then it is not mapped to LUT. The
     // delay of the node is simply equal to the delay of the fanin.
-    CPVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
-    model->addConstr(LinExpr(nodeVar) == LinExpr(faninVar),
-                     "single_fanin_delay");
+    CPVar &faninVar = (*fanIns.begin())->subjectGraphVars->tOut;
+    model->addConstr(nodeVar == faninVar, "single_fanin_delay");
     return;
   }
 
@@ -782,7 +780,7 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
     CPVar &cutSelectionVar = cut.getCutSelectionVariable();
     auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
                                              const char *name) {
-      CPVar &leafVar = leaf->gurobiVars->tOut;
+      CPVar &leafVar = leaf->subjectGraphVars->tOut;
       // Add delay propagation constraint
       model->addConstr(
           nodeVar + (1 - cutSelectionVar) * 100 >= leafVar + lutDelay, name);
@@ -827,7 +825,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   DenseMap<Operation *, CPVar> opToGRB;
 
   funcInfo.funcOp.walk([&](Operation *op) {
-    // Create a Gurobi variable for each operation, which will hold the order of
+    // Create a CPVar variable for each operation, which will hold the order of
     // the Operation in the topological ordering
     StringRef uniqueName = getUniqueName(op);
     CPVar operationVariable = modelFeedback->addVar(
@@ -869,7 +867,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   // Solve the model
   modelFeedback->optimize();
 
-  // Loop over Gurobi Variables (edgeVar) to see which Channels are chosen
+  // Loop over CPVar Variables (edgeVar) to see which Channels are chosen
   // to be cut with buffers.
   for (const auto &entry : edgeToOps) {
     auto ops = entry.first;
