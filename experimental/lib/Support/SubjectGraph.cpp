@@ -784,7 +784,7 @@ ChannelSignals &SelectSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
-// FloatingPointSubjectGraph implementation
+// SIFPSubjectGraph implementation
 SIFPSubjectGraph::SIFPSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Get datawidth of the operation
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
@@ -1027,7 +1027,8 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
         .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
           subjectGraphs.push_back(new SelectSubjectGraph(op));
         })
-        .Case<handshake::SIToFPOp, handshake::FPToSIOp>(
+        .Case<handshake::SIToFPOp, handshake::FPToSIOp, handshake::ExtFOp, 
+              handshake::TruncFOp>(
             [&](auto) { subjectGraphs.push_back(new SIFPSubjectGraph(op)); })
         .Case<handshake::SourceOp>(
             [&](auto) { subjectGraphs.push_back(new SourceSubjectGraph(op)); })
