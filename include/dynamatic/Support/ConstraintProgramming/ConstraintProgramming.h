@@ -466,7 +466,21 @@ public:
     if (!constraint.expr.quadTerms.empty())
       llvm::report_fatal_error(
           "Adding a linear constraint with quadratic terms!");
-    addQConstr(constraint, constrName);
+
+    GRBLinExpr expr = 0;
+    // Linear terms
+    for (auto &[name, coeff] : constraint.expr.linexpr.terms) {
+      expr += coeff * variables[name];
+    }
+
+    // Constant terms
+    expr += constraint.expr.linexpr.constant;
+    if (constraint.pred == LE)
+      model->addConstr(expr <= 0, constrName.str());
+    else if (constraint.pred == EQ)
+      model->addConstr(expr == 0, constrName.str());
+    else
+      llvm_unreachable("Unknown predicate!");
   }
 
   void addQConstr(const TempConstr &constraint,
