@@ -236,47 +236,47 @@ TEST(ExpressionOperators, LinExprMinusEquals) {
   EXPECT_DOUBLE_EQ(expr1.constant, 7.0); // 10 - 3
 }
 
-// TEST(ExpressionOperators, QuadExprPlusEquals) {
-//   CPVar x("x", CPVar::REAL, 0, 10);
-//   CPVar y("y", CPVar::REAL, 0, 10);
-//
-//   LinExpr l1 = x + y;
-//   LinExpr l2 = x;
-//   QuadExpr q1 = l1 * l1; // (x+y)^2
-//   QuadExpr q2 = l2 * l2; // x^2
-//
-//   q1 += q2; // Add x^2 to q1
-//
-//   // Check that quadratic term x*x increased
-//   auto xxTerm = std::make_pair(x, x);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 2.0); // x^2 + x^2 = 2 x^2
-//
-//   // y*y term should remain 1
-//   auto yyTerm = std::make_pair(y, y);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0);
-//
-//   // x*y term should remain 2
-//   auto xyTerm = std::make_pair(x, y);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 2.0);
-// }
-//
-// TEST(ExpressionOperators, QuadExprMinusEquals) {
-//   CPVar x("x", CPVar::REAL);
-//   CPVar y("y", CPVar::REAL);
-//
-//   QuadExpr q1 = (x + y) * (x + y); // (x+y)^2
-//   QuadExpr q2 = x * x + 2 * x * y; // x^2 + 2xy
-//
-//   q1 -= q2; // Subtract q2 from q1
-//
-//   // Check quadratic terms
-//   auto xxTerm = std::make_pair(x, x);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 0.0); // 1 - 1
-//   auto yyTerm = std::make_pair(y, y);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0); // stays 1
-//   auto xyTerm = std::make_pair(x, y);
-//   EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 0.0); // 2 - 2
-// }
+TEST(ExpressionOperators, QuadExprPlusEquals) {
+  CPVar x("x", CPVar::REAL, 0, 10);
+  CPVar y("y", CPVar::REAL, 0, 10);
+
+  LinExpr l1 = x + y;
+  LinExpr l2 = x;
+  QuadExpr q1 = l1 * l1; // (x+y)^2
+  QuadExpr q2 = l2 * l2; // x^2
+
+  q1 += q2; // Add x^2 to q1
+
+  // Check that quadratic term x*x increased
+  auto xxTerm = makeSortedPair(x, x);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 2.0); // x^2 + x^2 = 2 x^2
+
+  // y*y term should remain 1
+  auto yyTerm = makeSortedPair(y, y);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0);
+
+  // x*y term should remain 2
+  auto xyTerm = makeSortedPair(x, y);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 2.0);
+}
+
+TEST(ExpressionOperators, QuadExprMinusEquals) {
+  CPVar x("x", CPVar::REAL);
+  CPVar y("y", CPVar::REAL);
+
+  QuadExpr q1 = (x + y) * (x + y); // (x+y)^2
+  QuadExpr q2 = x * x + 2 * x * y; // x^2 + 2xy
+
+  q1 -= q2; // Subtract q2 from q1
+
+  // Check quadratic terms
+  auto xxTerm = makeSortedPair(x, x);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[xxTerm], 0.0); // 1 - 1
+  auto yyTerm = makeSortedPair(y, y);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[yyTerm], 1.0); // stays 1
+  auto xyTerm = makeSortedPair(x, y);
+  EXPECT_DOUBLE_EQ(q1.quadTerms[xyTerm], 0.0); // 2 - 2
+}
 
 // Helper for comparing two LinExpr
 static void expectExprEq(const LinExpr &lhs, const LinExpr &rhs) {

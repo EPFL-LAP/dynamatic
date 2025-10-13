@@ -235,6 +235,10 @@ inline LinExpr operator*(double c, const LinExpr &expr) {
 
 inline LinExpr operator*(const LinExpr &expr, double c) { return c * expr; }
 
+inline std::pair<CPVar, CPVar> makeSortedPair(const CPVar &a, const CPVar &b) {
+  return (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
+}
+
 struct QuadExpr {
   LinExpr linexpr;
   std::map<std::pair<CPVar, CPVar>, double> quadTerms;
@@ -249,7 +253,7 @@ inline QuadExpr operator*(const LinExpr &lhs, const LinExpr &rhs) {
   // Quadratic terms:
   for (auto &[lhsTerm, lhsCoeff] : lhs.terms) {
     for (auto &[rhsTerm, rhsCoeff] : rhs.terms) {
-      e.quadTerms[std::make_pair(lhsTerm, rhsTerm)] = lhsCoeff * rhsCoeff;
+      e.quadTerms[makeSortedPair(lhsTerm, rhsTerm)] += lhsCoeff * rhsCoeff;
     }
   }
   // Linear terms:
@@ -298,7 +302,7 @@ inline QuadExpr operator-(const QuadExpr &lhs, const QuadExpr &rhs) {
   return e;
 }
 
-inline void operator+=(QuadExpr lhs, const QuadExpr &rhs) {
+inline void operator+=(QuadExpr &lhs, const QuadExpr &rhs) {
   // Quadratic terms:
   for (auto &[quadTerm, coeff] : rhs.quadTerms) {
     lhs.quadTerms[quadTerm] += coeff;
@@ -307,7 +311,7 @@ inline void operator+=(QuadExpr lhs, const QuadExpr &rhs) {
   lhs.linexpr = lhs.linexpr + rhs.linexpr;
 }
 
-inline void operator-=(QuadExpr lhs, const QuadExpr &rhs) {
+inline void operator-=(QuadExpr &lhs, const QuadExpr &rhs) {
   // Quadratic terms:
   for (auto &[quadTerm, coeff] : rhs.quadTerms) {
     lhs.quadTerms[quadTerm] -= coeff;
