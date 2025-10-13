@@ -16,9 +16,12 @@
 
 class BasicFixture : public testing::TestWithParam<std::string> {};
 
-// Use CBC MILP solver to test a subset of BasicFixture (CBC is slower than
+// Use CBC MILP solver to test a subset of MiscBenchmarks (CBC is slower than
 // Gurobi)
 class CBCSolverFixture : public testing::TestWithParam<std::string> {};
+
+// Use FPL22 placement algorithm on a small subset of MiscBenchmarks
+class FPL22Fixture : public testing::TestWithParam<std::string> {};
 class MemoryFixture : public testing::TestWithParam<std::string> {};
 class SharingFixture : public testing::TestWithParam<std::string> {};
 class SharingUnitTestFixture : public testing::TestWithParam<std::string> {};
@@ -32,6 +35,7 @@ TEST_P(BasicFixture, basic) {
       .useVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -47,6 +51,23 @@ TEST_P(CBCSolverFixture, basic) {
       .useVerilog = false,
       .useSharing = false,
       .milpSolver = "cbc",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+}
+
+TEST_P(FPL22Fixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpl22",
       .simTime = -1
       // clang-format on
   };
@@ -77,6 +98,7 @@ TEST_P(MemoryFixture, basic) {
       .useVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -95,6 +117,7 @@ TEST_P(SharingUnitTestFixture, basic) {
       .useVerilog = false,
       .useSharing = true,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -107,6 +130,7 @@ TEST_P(SharingUnitTestFixture, basic) {
       .useVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -130,6 +154,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .useVerilog = false,
       .useSharing = true,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -142,6 +167,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .useVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -235,6 +261,19 @@ INSTANTIATE_TEST_SUITE_P(
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 INSTANTIATE_TEST_SUITE_P(
     Tiny, CBCSolverFixture,
+    testing::Values(
+      "fir",
+      "histogram",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "matvec"
+      ),
+      [](const auto &info) { return info.param; });
+
+// Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, FPL22Fixture,
     testing::Values(
       "fir",
       "histogram",
