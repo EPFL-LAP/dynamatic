@@ -3,7 +3,7 @@
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 
-using namespace dynamatic::cp;
+using namespace dynamatic;
 
 namespace {
 

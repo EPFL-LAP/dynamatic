@@ -20,8 +20,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace dynamatic::cp;
-
 namespace dynamatic {
 
 /// Returns a string describing the meaning of the passed Gurobi optimization

@@ -25,8 +25,6 @@
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace dynamatic {
-// Namespace for constraint programming
-namespace cp {
 
 /// A single variable in constraint programming
 /// Example:
@@ -700,5 +698,4 @@ public:
   // [END LLVM RTTI prerequisites]
 };
 
-} // namespace cp
 } // namespace dynamatic

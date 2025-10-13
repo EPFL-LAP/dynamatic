@@ -30,7 +30,6 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
-using namespace dynamatic::cp;
 
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the

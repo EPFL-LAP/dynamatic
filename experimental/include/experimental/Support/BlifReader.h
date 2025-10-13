@@ -24,7 +24,6 @@
 #include <vector>
 
 using namespace mlir;
-using namespace dynamatic::cp;
 
 namespace dynamatic {
 namespace experimental {
