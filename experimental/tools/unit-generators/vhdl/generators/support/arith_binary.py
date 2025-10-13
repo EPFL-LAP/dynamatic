@@ -78,12 +78,12 @@ def generate_arith_binary(
 
     if extra_signals:
         return generate_arith_binary_signal_manager(
-            name,
-            input_bitwidth,
-            output_bitwidth,
-            extra_signals,
-            generate_inner,
-            latency
+            name=name,
+            input_bitwidth=input_bitwidth,
+            output_bitwidth=output_bitwidth,
+            extra_signals=extra_signals,
+            generate_inner=generate_inner,
+            latency=latency
         )
     else:
         return generate()
