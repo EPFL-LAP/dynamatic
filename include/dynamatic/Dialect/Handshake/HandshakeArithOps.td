@@ -415,15 +415,17 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
 
-def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp"> {
+def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
   IsIntSizedChannel<32, "in">,
-  IsFloatSizedChannel<32, "out">,
+  IsFloatSizedChannel<32, "out">
+]> {
   let summary = "Converts a unsigned integer to float.";
 }
 
-def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp",[
   IsIntSizedChannel<32, "in">,
-  IsFloatSizedChannel<32, "out">,
+  IsFloatSizedChannel<32, "out">
+]> {
   let summary = "Converts a signed integer to float.";
 }
 
