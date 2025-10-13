@@ -43,7 +43,7 @@ def generate_unary(
     Returns:
         VHDL code as a string.
     """
-    if bitwidth is None:
+    if bitwidth is not None:
         if input_bitwidth is not None or output_bitwidth is not None:
             raise RuntimeError("If bitwidth is specified, input and output bitwidth must not be specified")
 
@@ -58,14 +58,14 @@ def generate_unary(
     #
     # the signal manager wrapper will make a new name for the inner unit
     def generate_inner(name): return _generate_unary(
-        name,
-        handshake_op,
-        input_bitwidth,
-        output_bitwidth,
-        signals,
-        body,
-        dependencies,
-        latency
+        name=name,
+        handshake_op=handshake_op,
+        input_bitwidth=input_bitwidth,
+        output_bitwidth=output_bitwidth,
+        signals=signals,
+        body=body,
+        dependencies=dependencies,
+        latency=latency
     )
 
     # if no signal manager,
@@ -74,12 +74,12 @@ def generate_unary(
 
     if extra_signals:
         return generate_unary_signal_manager(
-            name,
-            input_bitwidth,
-            output_bitwidth,
-            extra_signals,
-            generate_inner,
-            latency
+            name=name,
+            input_bitwidth=input_bitwidth,
+            output_bitwidth=output_bitwidth,
+            extra_signals=extra_signals,
+            generate_inner=generate_inner,
+            latency=latency
         )
     else:
         return generate()
