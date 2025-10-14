@@ -146,6 +146,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
         return names.size();
       }
       return 0;
+    }
     
     unsigned getNumOutputPorts(){
       if (auto names = getResNames()) {
@@ -153,7 +154,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       }
       return 0;
     }
-    
+
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
