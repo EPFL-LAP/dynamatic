@@ -34,14 +34,6 @@ namespace handshake {
 
 class FuncOp;
 
-/// Returns the name of an operand
-/// based on which interface the operation implements
-std::string getOperandName(Operation *op, size_t oprdIdx);
-
-/// Returns the name of a result
-/// based on which interface the operation implements
-std::string getResultName(Operation *op, size_t resIdx);
-
 class ControlType;
 
 namespace detail {

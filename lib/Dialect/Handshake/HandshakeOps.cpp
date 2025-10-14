@@ -2143,5 +2143,42 @@ std::string MemoryControllerOp::getResultName(unsigned idx) {
   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
 }
 
+//===----------------------------------------------------------------------===//
+// Operand and Result Names
+//===----------------------------------------------------------------------===//
+
+std::string getOperandName(Operation *op, size_t oprdIdx) {
+
+  if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+    return nameInterface.getOperandName(oprdIdx);
+  } else if (auto nameInterface =
+                 dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+    return nameInterface.getOperandName(oprdIdx);
+  } else if (auto nameInterface =
+                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
+    return nameInterface.getOperandName(oprdIdx);
+  }
+
+  op->emitError() << "must specify operand names, op: " << *op;
+  assert(0);
+}
+
+std::string getResultName(Operation *op, size_t resIdx) {
+
+  if (auto nameInterface =
+                 dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  } else if (auto nameInterface =
+                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  } else if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  } 
+
+  op->emitError() << "must specify result names, op: " << *op;
+  assert(0);
+}
+
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
