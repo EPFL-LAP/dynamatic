@@ -128,9 +128,6 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
 
-  handshake::PortNamer ownerNamer(ownerOp);
-  handshake::PortNamer userNamer(userOp);
-
   unsigned long operandIndex = userOp->getNumOperands();
   for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
     if (arg == res) {
@@ -144,9 +141,8 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
-  ownerChannel.channelName =
-      ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel.channelName = userNamer.getInputName(operandIndex).str();
+  ownerChannel.channelName = getOutputPortName(ownerOp, res.getResultNumber());
+  userChannel.channelName = getInputPortName(userOp, operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -184,18 +180,16 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
     : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
-  handshake::PortNamer namer1(op1);
 
   Operation *op2 = res2.getOwner();
   unsigned int j = res2.getResultNumber();
-  handshake::PortNamer namer2(op2);
 
   ownerChannel.operationName = getUniqueName(op1).str();
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = namer1.getOutputName(i).str();
-  targetChannel.channelName = namer2.getOutputName(j).str();
+  ownerChannel.channelName = getOutputPortName(op1, i);
+  targetChannel.channelName = getOutputPortName(op2, j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
