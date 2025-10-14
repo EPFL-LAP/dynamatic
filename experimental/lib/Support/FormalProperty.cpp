@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 #include "experimental/Support/FormalProperty.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "llvm/Support/JSON.h"
 #include <memory>
