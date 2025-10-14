@@ -143,26 +143,43 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
-def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description =
-      [{"Provides detailed names for the operands and results of an operation."}];
-
-  let methods = [
-    InterfaceMethod<
-        "Returns the name of a specific operand.",
-        "std::string", "getOperandName", (ins "unsigned" : $idx)>,
-    InterfaceMethod<
-      "Returns the name of a specific result.",
-      "std::string", "getResultName", (ins "unsigned" : $idx)
-    >
-  ];
-}
+//===----------------------------------------------------------------------===//
+// IO Naming Interfaces
+//===----------------------------------------------------------------------===//
+//
+// To generate the netlist, we need to know the names of
+// the operands (inputs) and results (output)
+// for each operation.
+//
+// These are already named inside of the Tablegen, 
+// but this does not generate any way to access the names as strings
+// only using the names to generate functions.
+//
+// There are 3 interfaces: simple, binary arith, custom
+// For an operation which uses the simple interface:
+// The operand names are 'ins_n', where n is the index of the operand
+// the result names are 'outs_n' where n is the idnex of the result
+//
+// If there is only 1 operand or 1 result, the name is 'ins' or 'outs',
+// respectively.
+//
+// To use binary arith, the operation must have 2 operands and 1 result
+// They will be named 'lhs', 'rhs', and 'result'.
+//
+// If the custom interface is used, the name uses a fully custom function
+// If the naming is easy to do, 
+// the function definition can be added to the operation declaration in tablegen
+//
+// If it is hard,
+// the function declaration can be added to the operation declaration in tablegen
+// and the definition can be written in HandshakeOps.cpp
+//
+//===----------------------------------------------------------------------===//
 
 def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Provides detailed names for the operands and results of an operation."}];
+      [{"Used by operations whose operands and results are named 'ins" and 'outs'."}];
 
   let methods = [
     InterfaceMethod<
@@ -186,10 +203,10 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
   ];
 }
 
-def ArithNamedIOInterface : OpInterface<"ArithNamedIOInterface"> {
+def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Provides detailed names for the operands and results of an operation."}];
+      [{"Used by operations whose operands are named 'lhs' and 'rhs', and result is named 'result'."}];
 
   let methods = [
     InterfaceMethod<
@@ -210,6 +227,27 @@ def ArithNamedIOInterface : OpInterface<"ArithNamedIOInterface"> {
       }]>
   ];
 }
+
+def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description =
+      [{"Used by operations with unique names for their operands and results. T"}];
+
+  let methods = [
+    InterfaceMethod<
+        "Returns the name of a specific operand.",
+        "std::string", "getOperandName", (ins "unsigned" : $idx)>,
+    InterfaceMethod<
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx)
+    >
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// Number of RTL Ports
+//===----------------------------------------------------------------------===//
+
 
 def InputRTLPortsAreOperandsInterface : OpInterface<"InputRTLPortsAreOperandsInterface"> {
   let cppNamespace = "::dynamatic::handshake";

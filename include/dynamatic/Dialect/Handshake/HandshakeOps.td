@@ -32,6 +32,9 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<ControlInterface>,
+         // To inherit from HandshakeOp,
+         // an operations connections must match its 
+         // RTL connections
          InputRTLPortsAreOperandsInterface,
          OutputRTLPortsAreResultsInterface
          ]> {
@@ -40,6 +43,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 // This is almost exactly like a standard FuncOp, except that it has some
 // extra verification conditions.  In particular, each Value must
 // only have a single use.  Also, it defines a Dominance-Free Scope
+
 def FuncOp : Op<Handshake_Dialect, "func", [
    IsolatedFromAbove,
    FunctionOpInterface,
@@ -47,7 +51,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   SimpleNamedIOInterface,
+  // A FuncOp has more RTL ports than MLIR operands/results
    CustomRTLInputPortsInterface,
    CustomRTLOutputPortsInterface
 ]> {
@@ -137,6 +141,11 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     //===------------------------------------------------------------------===//
     // CustomRTLInputPortsInterface Methods
     //===------------------------------------------------------------------===//
+    // The number of RTL ports of the FuncOp does not match
+    // its operands/results
+    //
+    // Instead it matches custom attributes:
+    //===------------------------------------------------------------------===//
 
     unsigned getNumInputPorts(){
       if (auto names = getArgNames()) {
@@ -153,6 +162,11 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     //===------------------------------------------------------------------===//
     // CustomRTLOutputPortsInterface Methods
+    //===------------------------------------------------------------------===//
+    // The number of RTL ports of the FuncOp does not match
+    // its operands/results
+    //
+    // Instead it matches custom attributes:
     //===------------------------------------------------------------------===//
 
       unsigned getNumOutputPorts(){
@@ -177,6 +191,7 @@ def InstanceOp : Handshake_Op<"instance", [
     CallOpInterface,
     HasClock,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    // the RTL ports of a FuncOp have simple names
     SimpleNamedIOInterface
 ]> {
   let summary = "module instantiate operation";
