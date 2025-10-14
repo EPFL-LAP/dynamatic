@@ -45,7 +45,7 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
                  dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   }
 
@@ -63,7 +63,7 @@ std::string getResultName(Operation *op, size_t resIdx) {
                  dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::ArithNamedIOInterface>(op)) {
+                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   }
 
