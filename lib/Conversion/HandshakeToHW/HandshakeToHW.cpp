@@ -184,7 +184,7 @@ struct MemLoweringState {
 
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
-  MemLoweringState() : ports(nullptr), {
+  MemLoweringState() : ports(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
@@ -1400,7 +1400,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    converter.addOutput(handshake::getOutputPortName(funcOp, idx),
+    converter.addOutput(handshake::getOutputPortName(memOp, idx),
                         lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
