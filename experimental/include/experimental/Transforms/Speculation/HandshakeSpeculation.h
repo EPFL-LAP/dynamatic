@@ -22,12 +22,7 @@ namespace dynamatic {
 namespace experimental {
 namespace speculation {
 
-std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSpeculation(const std::string &jsonPath = "",
-                           bool automatic = true);
-
 #define GEN_PASS_DECL_HANDSHAKESPECULATION
-#define GEN_PASS_DEF_HANDSHAKESPECULATION
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace speculation

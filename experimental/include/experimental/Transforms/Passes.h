@@ -26,6 +26,11 @@
 namespace dynamatic {
 namespace experimental {
 
+/// TableGen-generated header files assume all passes reside in the same
+/// namespace. However, in Dynamatic, some passes are defined in separate child
+/// namespaces, so we explicitly brings those into the current scope here.
+using namespace speculation;
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "experimental/Transforms/Passes.h.inc"

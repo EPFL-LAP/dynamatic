@@ -12,7 +12,6 @@
 
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -20,7 +19,6 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -38,16 +36,24 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
-namespace {
+namespace dynamatic {
+namespace experimental {
+namespace speculation {
+
+// Implement the base class and auto-generated create functions.
+// Must be called from the .cpp file to avoid multiple definitions
+#define GEN_PASS_DEF_HANDSHAKESPECULATION
+#include "experimental/Transforms/Passes.h.inc"
+
+} // namespace speculation
+} // namespace experimental
+} // namespace dynamatic
 
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(const std::string &jsonPath = "",
-                           bool automatic = true) {
-    this->jsonPath = jsonPath;
-    this->automatic = automatic;
-  }
+  using HandshakeSpeculationBase<
+      HandshakeSpeculationPass>::HandshakeSpeculationBase;
 
   void runDynamaticPass() override;
 
@@ -88,7 +94,6 @@ private:
   // their type requirements.
   LogicalResult addNonSpecOp();
 };
-} // namespace
 
 // The list item to trace the branches that need to be replicated
 struct BranchTracingItem {
@@ -875,10 +880,4 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::speculation::createHandshakeSpeculation(
-    const std::string &jsonPath, bool automatic) {
-  return std::make_unique<HandshakeSpeculationPass>(jsonPath, automatic);
 }

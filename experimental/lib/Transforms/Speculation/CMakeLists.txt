@@ -1,3 +1,5 @@
+include_directories(${DYNAMATIC_SOURCE_DIR}/experimental/include/experimental/Transforms/Speculation)
+
 add_dynamatic_library(DynamaticSpeculation
   SpeculationPlacement.cpp
   HandshakeSpeculation.cpp

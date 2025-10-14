@@ -42,7 +42,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       The pass needs to specify the position of the Speculation Units by 
       means of an input JSON file.
   }];
-  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the positions for speculative "
