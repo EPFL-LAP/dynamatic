@@ -240,7 +240,7 @@ def InstanceOp : Handshake_Op<"instance", [
              operands);
   }]>];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     FunctionType getModuleType();
 
     /// Get the argument operands to the called function.
@@ -296,7 +296,7 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let results = (outs HandshakeType:$result);
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     // can a data token bypass the buffer
     bool isBypassDV(){
       switch (getBufferType()) {
@@ -366,7 +366,7 @@ def InitOp : Handshake_Op<"init", [
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
                                            TIMING_ATTR_NAME = "TIMING";
   }];
@@ -519,7 +519,7 @@ def MuxOp : Handshake_Op<"mux", [
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operand 0 is named "index"
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     std::string getOperandName(unsigned idx) {
@@ -580,7 +580,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     std::string getOperandName(unsigned idx) {
       return detail::simpleOperandName(idx, getOperation()->getNumOperands());
@@ -660,7 +660,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
@@ -880,7 +880,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Returns the list of basic block IDs the MC is connected to.
     mlir::SmallVector<unsigned> getMCBlocks() {
       mlir::SmallVector<unsigned> blocks;
@@ -961,7 +961,7 @@ def LSQOp : Handshake_Op<"lsq", [
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Returns the list of sizes of all LSQ groups.
     mlir::SmallVector<unsigned> getLSQGroupSizes() {
       mlir::SmallVector<unsigned> sizes;
@@ -1125,7 +1125,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
@@ -1228,7 +1228,7 @@ def EndOp : Op<Handshake_Dialect, "end", [
 
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
-  let ExtraClassDeclaration = [{
+  let extraClassDeclaration = [{
     /// Output ports of EndOp are function results
     unsigned getNumOutputPorts();
 
@@ -1316,7 +1316,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       wideControlType, ctrlType});
   }]>];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
     std::string getOperandName(unsigned idx) {
@@ -1386,7 +1386,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
@@ -1440,7 +1440,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
@@ -1485,7 +1485,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
@@ -1533,7 +1533,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($trueResult) `,` type($falseResult)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "spec_tag_data" : "data";
@@ -1573,7 +1573,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return "dataIn";
@@ -1637,7 +1637,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
@@ -1808,7 +1808,7 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx){
       assert(idx < 1 && "index too high");
       return "ins";
@@ -1843,7 +1843,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
-  let ExtraClassDeclaration += [{
+  let extraClassDeclaration += [{
     std::string getOperandName(unsigned idx) {
     assert(idx < getOperation()->getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_ins" : "rhs_ins";
