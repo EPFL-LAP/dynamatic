@@ -409,6 +409,20 @@ public:
   virtual void write(llvm::StringRef filePath) const = 0;
 
   virtual void writeSol(llvm::StringRef filePath) const = 0;
+
+  std::string symbolizeStatus() {
+    if (status == OPTIMAL)
+      return "OPTIMAL";
+    if (status == NONOPTIMAL)
+      return "NONOPTIMAL";
+    if (status == INFEASIBLE)
+      return "INFEASIBLE";
+    if (status == UNBOUNDED)
+      return "UNBOUNDED";
+    if (status == UNKNOWN)
+      return "UNKNOWN";
+    return "ERROR";
+  }
 };
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
