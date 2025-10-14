@@ -257,14 +257,6 @@ def InputRTLPortsAreOperandsInterface : OpInterface<"InputRTLPortsAreOperandsInt
   let description =
     [{"The operands of this operation correspond directly to its input RTL ports."}];
   let methods = [
-    // InterfaceMethod<
-    //   "Returns the number of RTL ports.",
-    //   "unsigned", "getNumInputPorts", (ins),
-    //   "",
-    //   [{
-    //     ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-    //     return concreteOp->getNumOperands();
-    //   }]>,
     InterfaceMethod<
       "Returns the name of a specific input port.",
       "std::string", "getInputPortName", (ins "unsigned" : $idx),
@@ -283,9 +275,6 @@ def CustomRTLInputPortsInterface : OpInterface<"CustomRTLInputPortsInterface"> {
 
   let methods = [
     InterfaceMethod<
-      "Returns the number of RTL ports.",
-      "unsigned", "getNumInputPorts", (ins)>,
-    InterfaceMethod<
       "Returns the name of a specific input port.",
       "std::string", "getInputPortName", (ins "unsigned" : $idx)
     >
@@ -297,14 +286,6 @@ def OutputRTLPortsAreResultsInterface : OpInterface<"OutputRTLPortsAreResultsInt
   let description =
       [{"The results of this operation correspond directly to its output RTL ports."}];
   let methods = [
-    // InterfaceMethod<
-    //   "Returns the number of RTL ports.",
-    //   "unsigned", "getNumOutputPorts", (ins),
-    //   "",
-    //   [{
-    //     ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-    //     return concreteOp->getNumResults();
-    //   }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
       "std::string", "getOutputPortName", (ins "unsigned" : $idx),
@@ -322,9 +303,6 @@ def CustomRTLOutputPortsInterface : OpInterface<"CustomRTLOutputPortsInterface">
       [{"The output RTL ports of this operation do not correspond to its results"}];
 
   let methods = [
-    InterfaceMethod<
-        "Returns the number of output RTL ports.",
-        "unsigned", "getNumOutputPorts", (ins)>,
     InterfaceMethod<
       "Returns the name of a specific output port.",
       "std::string", "getOutputPortName", (ins "unsigned" : $idx)

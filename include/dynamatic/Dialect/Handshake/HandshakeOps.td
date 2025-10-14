@@ -179,7 +179,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     // Instead it matches custom attributes:
     //===------------------------------------------------------------------===//
 
-      unsigned getNumOutputPorts(){
+    unsigned getNumOutputPorts(){
       if (auto names = getResNames()) {
         return names.size();
       }
@@ -1245,9 +1245,6 @@ def EndOp : Op<Handshake_Dialect, "end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    /// Output ports of EndOp are function results
-    unsigned getNumOutputPorts();
-
     /// Output ports of EndOp are function results
     std::string getOutputPortName(unsigned idx);
   }];
