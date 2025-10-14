@@ -1141,7 +1141,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes())){
     StringAttr resName = funcOp.getResName(idx);
-    modBuilder.addOutput(resName, lowerType(res));
+    modBuilder.addOutput(resName.getValue(), lowerType(res));
   }
   
 
@@ -1153,7 +1153,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(argName, lowerType(type));
+      modBuilder.addInput(argName.getValue(), lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -1308,7 +1308,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(funcOp.getResName(idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1317,7 +1317,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(funcOp.getArgName(idx), lowerType(type));
+    modBuilder.addInput(funcOp.getArgName(idx).getValue(), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
