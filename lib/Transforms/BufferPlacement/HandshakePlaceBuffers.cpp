@@ -577,8 +577,9 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (solver == "gurobi") {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
     llvm::report_fatal_error("Gurobi not installed!");
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#else
     solverKind = CPSolver::GUROBI;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   } else if (solver == "cbc") {
     solverKind = CPSolver::CBC;
   } else {
