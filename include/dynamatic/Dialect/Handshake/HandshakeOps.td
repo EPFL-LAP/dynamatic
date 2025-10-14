@@ -40,11 +40,11 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          ]> {
   // Shared functions to include in child classes 
   string validateIO = [{
-    void validateOperandIdx(unsigned idx){
+    void validateOperandIdx(unsigned int idx){
       assert(idx < getOperation()->getNumOperands() && "index too high");
     }
 
-    void validateResultIdx(unsigned idx){
+    void validateResultIdx(unsigned int idx){
       assert(idx < getOperation()->getNumResults() && "index too high");
     }
   }];
@@ -523,11 +523,13 @@ def MuxOp : Handshake_Op<"mux", [
   let extraClassDeclaration = [{
     /// Operand 0 is named "index"
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
+    /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
       return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
     }
 
     /// Result 0 is named "outs"
+    /// simpleResultName handles validation
     std::string getResultName(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
@@ -581,8 +583,10 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
+    /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
       return detail::simpleOperandName(idx, getOperation()->getNumOperands());
     }
@@ -590,7 +594,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     /// Result 0 is named outs
     /// Result 1 is named index
     std::string getResultName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      validateResultIdx(idx);
       return idx == 0 ? "outs" : "index";
     }
   }];
@@ -1077,18 +1081,19 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
-  let extraClassDeclaration= [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataFromMem
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataOut
     std::string getResultName(unsigned idx) {
-      validateResultIdx(idx)
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
@@ -1126,19 +1131,19 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  // include validateIO functions
+  // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataToMem
     std::string getResultName(unsigned int idx) {
-      validateResultIdx(idx)
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
@@ -1318,11 +1323,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       wideControlType, ctrlType});
   }]>];
 
+  // include validateIO functions from handshake op
   let extraClassDeclaration = [{
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "trigger";
     }
 
@@ -1333,7 +1339,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     /// Result 4 is named ctrl_sc_commit
     /// Result 5 is named ctrl_sc_branch
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       switch (idx) {
       case 0:
         return "outs";
@@ -1388,17 +1394,18 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named outs
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1442,17 +1449,17 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named result
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1487,14 +1494,15 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1535,14 +1543,16 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($trueResult) `,` type($falseResult)
   }];
 
+
+  // include validateIO functions from handshake op
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      validateResultIdx(idx);
       return idx == 0 ? "trueOut" : "falseOut";
     }
   }];
@@ -1575,14 +1585,16 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
-  let extraClassDeclaration = [{
+
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return "dataIn";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "dataOut";
     }
   }];
@@ -1639,9 +1651,10 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
         return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
               std::to_string(idx % getNumSharedOperands());
@@ -1650,7 +1663,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       if (idx < getNumSharedOperations())
         return "op" + std::to_string(idx) + "out0";
       return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
@@ -1810,14 +1823,15 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO # [{
     std::string getOperandName(unsigned idx){
-      assert(idx < 1 && "index too high");
+      validateOperandIdx(idx);
       return "ins";
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < 1 && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1845,15 +1859,16 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
+  // include validateIO functions from handshake op
   let extraClassDeclaration = [{
     std::string getOperandName(unsigned idx) {
-    assert(idx < getOperation()->getNumOperands() && "index too high");
-    return (idx == 0) ? "lhs_ins" : "rhs_ins";
+      validateOperandIdx(idx);
+      return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
     std::string getResultName(unsigned idx) {
-    assert(idx < getOperation()->getNumOperands() && "index too high");
-    return (idx == 0) ? "lhs_outs" : "rhs_outs";
+      validateResultIdx(idx);
+      return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
   }];
 
