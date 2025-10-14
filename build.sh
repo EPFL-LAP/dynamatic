@@ -93,6 +93,12 @@ create_generator_symlink() {
     ln -f --symbolic ../../$src $dst
 }
 
+create_include_symlink() {
+    local src=$1
+    local dst="build/include/clang_headers"
+    echo "$dst -> $src"
+    ln -fT --symbolic "$src" "$dst"
+}
 
 # Determine whether cmake should be re-configured by looking for a
 # CMakeCache.txt file in the current working directory.
@@ -424,6 +430,11 @@ create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
 create_generator_symlink build/bin/exp-sharing-wrapper-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+
+# Create symbolic links to polygeist headers (standard c library for clang)
+create_include_symlink "$POLYGEIST_DIR"/llvm-project/clang/lib/Headers
+
+
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow
 fi
