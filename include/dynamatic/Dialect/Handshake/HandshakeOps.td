@@ -257,7 +257,6 @@ def InstanceOp : Handshake_Op<"instance", [
 def BufferOp : Handshake_Op<"buffer", [
   HasClock,
   SameOperandsAndResultType,
-  // The IOs of a BufferOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "buffer operation";
@@ -356,7 +355,6 @@ def InitOp : Handshake_Op<"init", [
 def NDWireOp : Handshake_Op<"ndwire", [
   HasClock,
   SameOperandsAndResultType,
-  // The IOs of a NDWire have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "non-deterministic wire operation";
@@ -377,7 +375,6 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     Pure,
     HasClock,
     SameOperandsAndResultType,
-    // The IOs of a ForkOp have simple names
     SimpleNamedIOInterface
 ]> {
   let arguments = (ins HandshakeType:$operand);
@@ -435,7 +432,6 @@ def MergeOp : Handshake_Op<"merge", [
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  // The IOs of a MergeOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "merge operation";
@@ -582,7 +578,6 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 def BranchOp : Handshake_Op<"br", [
   Pure,
   SameOperandsAndResultType,
-  // The IOs of a BranchOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "branch operation";
@@ -663,7 +658,6 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 }
 
 def SinkOp : Handshake_Op<"sink", [
-  // The IOs of a SinkOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "sink operation";
@@ -686,7 +680,6 @@ def SinkOp : Handshake_Op<"sink", [
 
 def SourceOp : Handshake_Op<"source", [
   Pure,
-  // The IOs of a SourceOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "source operation";
@@ -717,7 +710,6 @@ def SourceOp : Handshake_Op<"source", [
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  // The IOs of a JoinOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "join operation";
@@ -741,7 +733,6 @@ def JoinOp : Handshake_Op<"join", [
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
   SameOperandsAndResultType,
-  // The IOs of a BlockerOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "blocker operation";
@@ -764,7 +755,6 @@ def BlockerOp : Handshake_Op<"blocker", [
 def NotOp : Handshake_Op<"not", [
   Pure,
   SameOperandsAndResultType,
-  // The IOs of a NotOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "Logical negation";
@@ -1796,7 +1786,6 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  // The IOs of a ReadyRemoverOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = [{
