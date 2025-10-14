@@ -38,7 +38,8 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          InputRTLPortsAreOperandsInterface,
          OutputRTLPortsAreResultsInterface
          ]> {
-  let extraClassDeclaration = [{
+  // Shared functions to include in child classes 
+  let validateIO = [{
     void validateOperandIdx(unsigned idx){
       assert(idx < getOperation()->getNumOperands() && "index too high");
     }
@@ -1125,7 +1126,8 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions
+  let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
@@ -1139,7 +1141,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
       validateResultIdx(idx)
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
-  }] # extraClassDeclaration;
+  }];
 }
 
 //===----------------------------------------------------------------------===//
