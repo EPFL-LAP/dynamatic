@@ -211,6 +211,7 @@ def SpecV1PostAdaptor : DynamaticPass<"handshake-spec-v1-post-adaptor"> {
   let description = [{
   }];
   let options = [
+    Option<"disablePasserAtExits", "disable-passer-at-exits", "bool", "false", "">,
   ];
 }
 
