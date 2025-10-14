@@ -1140,7 +1140,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(funcOp.getResName(idx);.getValue(), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
   
   
 
