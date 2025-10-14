@@ -9,7 +9,7 @@ module {
     %2 = memref.load %arg0[%1] {handshake.name = "load0"} : memref<1000xi32>
     %3 = memref.load %arg1[%1] {handshake.name = "load1"} : memref<1000xi32>
     %4 = arith.muli %2, %3 {handshake.name = "muli0"} : i32
-    memref.store %4, %arg2[%1] {handshake.deps = #handshake<deps[<"store0" (0)>]>, handshake.name = "store0"} : memref<1000xi32>
+    memref.store %4, %arg2[%1] {handshake.deps = #handshake<deps[["store0", 0]]>, handshake.name = "store0"} : memref<1000xi32>
     %5 = arith.cmpi slt, %4, %c1000_i32 {handshake.name = "cmpi0"} : i32
     %6 = arith.addi %0, %c1_i32 {handshake.name = "addi0"} : i32
     cf.cond_br %5, ^bb1(%6 : i32), ^bb3 {handshake.name = "cond_br0"}

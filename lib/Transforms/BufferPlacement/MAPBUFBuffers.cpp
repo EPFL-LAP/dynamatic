@@ -128,7 +128,7 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 
-  populateCFDFCAnalysisResult();
+  populateCFDFCThroughputAndOccupancy();
 }
 
 // Check if the path from leaf to root has already been computed, if so then

@@ -284,6 +284,18 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   let summary = "Unsigned integer division.";
 }
 
+def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi", [
+  SimpleNamedIOInterface
+]> {
+  let summary = "Outputs the maximum between two input signed integers";
+}
+
+def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui", [
+  SimpleNamedIOInterface
+]> {
+  let summary = "Outputs the maximum between two input unsigned integers";
+}
+
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi", [
   SimpleNamedIOInterface
 ]> {
@@ -423,6 +435,12 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [
   ArithNamedIOInterface
 ]> {
   let summary = "Bitwise exclusive union.";
+}
+
+def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
+  SimpleNamedIOInterface
+]> {
+  let summary = "Converts a unsigned integer to float.";
 }
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [

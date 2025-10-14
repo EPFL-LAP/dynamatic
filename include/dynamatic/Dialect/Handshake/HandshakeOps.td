@@ -22,6 +22,7 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
 include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
@@ -1066,6 +1067,55 @@ def StoreOp : Handshake_MemPortOp<"store", [
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Memory hierarchy
+//===----------------------------------------------------------------------===//
+
+def RAMOp : Handshake_Op<"ram", []>  {
+  let arguments = (ins ElementsAttr:$initialValue);
+
+  let description = [{
+    A placeholder operation for an RAM or ROM instantiated inside the handshake
+    function. It holds the shape and the type of the stored elements and also
+    has an "ElementsAttr" attribute that stores the initial (reset) content of
+    the memory.
+
+    This operation is converted from get_global ops or alloca ops in the
+    built-in memref dialect (see "CfToHandshake" pass).
+
+    Assumptions:
+    - Currently, if the global op does not have an initial value, we initialize
+      the RAM content with all zeros (and 0.0 if the elements are FPs).
+
+    Limitations:
+    - Currently this RAMOp always gets mapped into a RAM with 1 read port and 1
+      write port. 
+
+    TODO: 
+    - Enum attribute to indicate the architecture of the memory op.
+    - ROM support.
+    - Multiple (at most 2) reads and writes within the same clock cycle.
+    - Map ROM to BRAM or wide MUX.
+
+    Example: MLIR format
+
+    ```mlir
+    %1 = handshake.ram() {handshake.name = "ram0", initialValue = ...} : () -> memref<100xi32>
+    ```
+
+    Example: Using handshake.RAMOp in the C++ API.
+    ```c++
+    // Building a new RAMOp
+    builder.create<handshake::RAMOp>(type, elementAttr);
+
+    // Access its initialValue
+    std::optional<ElementsAttr> initialValue = ramOp.getInitialValue();
+    ```
+  }];
+
+  let results = (outs AnyStaticShapeMemRef:$result);
 }
 
 //===----------------------------------------------------------------------===//

@@ -97,7 +97,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 
-  populateCFDFCAnalysisResult();
+  populateCFDFCThroughputAndOccupancy();
 }
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
@@ -174,7 +174,7 @@ struct Pin {
 
   /// Simple member-by-member constructor.
   Pin(Value channel, SignalType signalType)
-      : channel(channel), signalType(signalType){};
+      : channel(channel), signalType(signalType) {};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -189,7 +189,7 @@ struct MixedDomainConstraint {
 
   /// Simple member-by-member constructor.
   MixedDomainConstraint(Pin input, Pin output, double internalDelay)
-      : input(input), output(output), internalDelay(internalDelay){};
+      : input(input), output(output), internalDelay(internalDelay) {};
 };
 
 } // namespace

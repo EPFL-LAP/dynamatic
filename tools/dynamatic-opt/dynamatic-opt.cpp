@@ -23,7 +23,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
-#include "tutorials/CreatingPasses/InitAllPasses.h"
+#include "tutorials/InitAllPasses.h"
 
 #ifdef DYNAMATIC_ENABLE_XLS
 #include "experimental/xls/InitAllDialects.h"
