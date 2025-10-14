@@ -1584,7 +1584,7 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(handshake::getResultsName(op, idx), lowerType(type));
+    converter.addOutput(handshake::getResultName(op, idx), lowerType(type));
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
