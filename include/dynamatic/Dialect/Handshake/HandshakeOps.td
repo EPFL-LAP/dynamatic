@@ -665,7 +665,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 
   // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO [{
+  let extraClassDeclaration = validateIO # [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
