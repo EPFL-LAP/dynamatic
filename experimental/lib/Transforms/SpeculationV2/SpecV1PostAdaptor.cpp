@@ -57,6 +57,12 @@ void SpecV1PostAdaptorPass::runDynamaticPass() {
       continue;
     if (branch->hasAttr("specv1_cond_br"))
       continue;
+    if (disablePasserAtExits &&
+        (!isInsideLoop(branch.getTrueResult(), loopBBs) ||
+         !isInsideLoop(branch.getFalseResult(), loopBBs))) {
+      // Do not insert passers at exits
+      continue;
+    }
 
     builder.setInsertionPoint(branch);
     Value inverted = nullptr;

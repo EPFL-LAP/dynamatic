@@ -395,7 +395,7 @@ def main():
     with open(handshake_post_spec_adapted, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
-            f"--handshake-spec-v1-post-adaptor",
+            f"--handshake-spec-v1-post-adaptor={'disable-passer-at-exits' if args.loop_bottom_passer_disabled else ''}",
             "--handshake-materialize",
         ],
             stdout=f,
