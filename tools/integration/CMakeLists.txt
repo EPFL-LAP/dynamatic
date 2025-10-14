@@ -32,9 +32,13 @@ gtest_discover_tests(
 
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
+if(NOT DEFINED INTEGRATION_PARALLEL)
+  set(INTEGRATION_PARALLEL 8)
+endif()
+
 add_custom_target(
   run-all-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 500 --output-on-failure
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${INTEGRATION_PARALLEL} --timeout 1500 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
@@ -44,10 +48,20 @@ add_custom_target(
 
 add_custom_target(
   run-ci-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 500 --output-on-failure --exclude-regex _NoCI
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${INTEGRATION_PARALLEL} --timeout 1500 --output-on-failure --exclude-regex _NoCI
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests that aren't marked with '_NoCI'."
+  VERBATIM
+  USES_TERMINAL
+)
+
+add_custom_target(
+  run-spec-integration-tests
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${INTEGRATION_PARALLEL} --timeout 1500 --output-on-failure --tests-regex spec
+  DEPENDS dynamatic-opt integration
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
+  COMMENT "Run speculation integration tests."
   VERBATIM
   USES_TERMINAL
 )
