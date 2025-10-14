@@ -53,9 +53,8 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
 
 // Helper function to connect PIs of the Subject Graph with POs of the Subject
 // Graph of the preceding module.
-void BaseSubjectGraph::connectInputNodesHelper(
-    ChannelSignals &currentSignals,
-    unsigned int inputIndex) {
+void BaseSubjectGraph::connectInputNodesHelper(ChannelSignals &currentSignals,
+                                               unsigned int inputIndex) {
 
   if (inputIndex >= inputSubjectGraphs.size()) {
     return;
@@ -502,7 +501,7 @@ void MuxSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(indexNodes, 0);
 
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], i+1);
+    connectInputNodesHelper(inputNodes[i], i + 1);
   }
 }
 
@@ -1027,7 +1026,7 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
         .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
           subjectGraphs.push_back(new SelectSubjectGraph(op));
         })
-        .Case<handshake::SIToFPOp, handshake::FPToSIOp, handshake::ExtFOp, 
+        .Case<handshake::SIToFPOp, handshake::FPToSIOp, handshake::ExtFOp,
               handshake::TruncFOp>(
             [&](auto) { subjectGraphs.push_back(new SIFPSubjectGraph(op)); })
         .Case<handshake::SourceOp>(
