@@ -148,7 +148,9 @@ std::string formatElement(const T &element) {
     // A char can be directly printed as a integer (i.e., its ASCII code)
     oss << int(element);
   } else {
-    static_assert(always_false<T>, "Unsupported type!");
+    // HACK: The C23 type _BitInt cannot be captured using any of the types
+    // above. So we simply cast it to "long long" in this case:
+    oss << static_cast<long long>(element);
   }
   return oss.str();
 }
@@ -264,12 +266,20 @@ void scalarPrinter<double>(const double &arg, OS &os) {
      << *((const unsigned int *)(&arg)) << std::endl;
 }
 
+/// Specialization of the scalar printer for int.
+template <>
+void scalarPrinter<int>(const int &arg, OS &os) {
+  // Print the char as a 8-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
+     << std::endl;
+}
+
 /// Writes the argument's as an 8-digits hexadecimal number padded with zeros
 /// directly to stdout.
 template <typename T>
 static void scalarPrinter(const T &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
-     << std::endl;
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
+     << static_cast<unsigned long long>(arg) << std::endl;
 }
 
 /// Writes the array's content in row-major-order; one element per line,
