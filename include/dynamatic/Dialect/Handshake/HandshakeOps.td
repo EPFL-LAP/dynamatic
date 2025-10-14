@@ -1480,6 +1480,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
+  // The IOs of a SpecSaveCommitOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecCommitOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1505,11 +1508,15 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
+    /// Result 0 is named result
     std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
@@ -1524,6 +1531,9 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
+  // The IOs of a SpeculatingBranchOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpeculatingBranchOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "speculating branch operation";
@@ -1555,11 +1565,15 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    /// Operand 0 is named spec_tag_data
+    /// Operand 1 is named data
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
+    /// Result 0 is named trueOut
+    /// Result 1 is named falseOut
     std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return idx == 0 ? "trueOut" : "falseOut";
@@ -1572,6 +1586,9 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
+  // The IOs of a NonSpecOp have custom names,
+  // defined here in the Tablegen
+  // as part of the NonSpecOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Adds a non-speculative spec bit.";
@@ -1597,11 +1614,13 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    /// Operand 0 is named dataIn
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return "dataIn";
     }
 
+    /// Result 0 is named dataOut
     std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "dataOut";
@@ -1615,6 +1634,9 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   SameOperandsAndResultType,
+  // The IOs of a SharingWrapperOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SharingWrapperOp declaration
   CustomNamedIOInterface,
 ]> {
 
@@ -1662,6 +1684,8 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    /// The first set of operands are named op_<i>_in_<j>
+    /// The last operand is named fromSharedUnitOut0
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
@@ -1671,6 +1695,8 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
       return "fromSharedUnitOut0";
     }
 
+    /// The first set of results are named op_<i>_out_0
+    /// The last set of results are named toSharedUnitIn_<j>
     std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       if (idx < getNumSharedOperations())
@@ -1815,7 +1841,8 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  CustomNamedIOInterface
+  // The IOs of a ReadyRemoverOp have simple names
+  SimpleNamedIOInterface
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1832,24 +1859,14 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
-    std::string getOperandName(unsigned idx){
-      validateOperandIdx(idx);
-      return "ins";
-    }
-
-    std::string getResultName(unsigned idx) {
-      validateResultIdx(idx);
-      return "outs";
-    }
-  }];
-
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
   AllTypesMatch<["lhsIn", "lhs"]>,
   AllTypesMatch<["rhsIn", "rhs"]>,
+  // The IOs of a ValidMergerOp have custom names,
+  // defined here in the Tablegen
+  // as part of the ValidMergerOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = [{
@@ -1870,11 +1887,15 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    /// Operand 0 is named lhs_ins
+    /// Operand 1 is named rhs_ins
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
+    /// Result 0 is named lhs_outs
+    /// Result 1 is named rhs_outs
     std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "lhs_outs" : "rhs_outs";
