@@ -1324,7 +1324,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }]>];
 
   // include validateIO functions from handshake op
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = validateIO # [{
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
     std::string getOperandName(unsigned idx) {
