@@ -1860,7 +1860,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 
   // include validateIO functions from handshake op
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = validateIO # [{
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "lhs_ins" : "rhs_ins";
