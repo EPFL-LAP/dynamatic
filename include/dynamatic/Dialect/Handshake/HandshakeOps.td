@@ -1195,10 +1195,13 @@ def EndOp : Op<Handshake_Dialect, "end", [
   SimpleNamedIOInterface,
   // The RTL input ports correspond to the IR
   InputRTLPortsAreOperandsInterface,
-  // The RTL output ports do not
-  // As they are actually based on the function results
-  // And so are defined here in the tablegen
-  // as part of the EndOp declaration
+  // The RTL output ports do not correspond to the IR
+  // As they are actually the function results
+  // Although they could normally be in the class declaration
+  // The header file is organized alphabetically
+  // with EndOp before FuncOp
+  // and so the the RTL output port functions are defined in
+  // HandshakeOps.cpp
   CustomRTLOutputPortsInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
@@ -1216,24 +1219,11 @@ def EndOp : Op<Handshake_Dialect, "end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    // unsigned getNumOutputPorts();
-
-    // std::string getOutputPortName(unsigned idx);
+    /// Output ports of EndOp are function results
+    unsigned getNumOutputPorts();
 
     /// Output ports of EndOp are function results
-    unsigned EndOp::getNumOutputPorts(){
-      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
-      assert(funcOp && "end must be child of handshake function");
-      return funcOp.getNumOutputPorts();
-    }
-
-    /// Output ports of EndOp are function results
-    std::string EndOp::getOutputPortName(unsigned idx){
-      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
-      assert(funcOp && "end must be child of handshake function");
-      return funcOp.getOutputPortName(idx);
-    }
-
+    std::string getOutputPortName(unsigned idx);
   }];
 
   let assemblyFormat = [{
