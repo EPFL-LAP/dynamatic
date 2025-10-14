@@ -141,30 +141,30 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return "handshake";
     }
 
-    unsigned getNumInputPorts(){
-      if (auto names = getArgNames()) {
-        return names.size();
-      }
-      return 0;
-    }
+    // unsigned getNumInputPorts(){
+    //   if (auto names = getArgNames()) {
+    //     return names.size();
+    //   }
+    //   return 0;
+    // }
     
-    unsigned getNumOutputPorts(){
-      if (auto names = getResNames()) {
-        return names.size();
-      }
-      return 0;
-    }
+    // unsigned getNumOutputPorts(){
+    //   if (auto names = ) {
+    //     return names.size();
+    //   }
+    //   return 0;
+    // }
 
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
-      assert(idx < getNumInputPorts() && "index too high");
+      assert(idx < getArgNames().size() && "index too high");
       return getResName(idx).str();
     }
 
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getNumOutputPorts() && "index too high");
+      assert(idx < getResNames().size() && "index too high");
       return getResName(idx).str();
     }
   }];
