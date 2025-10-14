@@ -20,7 +20,7 @@
 
 namespace dynamatic {
 
-using handshake;
+using namespace handshake;
 
 std::optional<FormalProperty::TYPE>
 FormalProperty::typeFromStr(const std::string &s) {
