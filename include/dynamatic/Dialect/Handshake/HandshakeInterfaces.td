@@ -148,7 +148,7 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 //===----------------------------------------------------------------------===//
 //
 // To generate the netlist, we need to know the names of
-// the operands (inputs) and results (output)
+// the operands (inputs) and results (outputs)
 // for each operation.
 //
 // These are already named inside of the Tablegen, 
@@ -231,12 +231,12 @@ def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
 def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Used by operations with unique names for their operands and results. T"}];
+      [{"Used by operations with unique names for their operands and results."}];
 
   let methods = [
     InterfaceMethod<
-        "Returns the name of a specific operand.",
-        "std::string", "getOperandName", (ins "unsigned" : $idx)>,
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx)>,
     InterfaceMethod<
       "Returns the name of a specific result.",
       "std::string", "getResultName", (ins "unsigned" : $idx)
@@ -247,30 +247,33 @@ def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
 //===----------------------------------------------------------------------===//
 // Number of RTL Ports
 //===----------------------------------------------------------------------===//
-
+// Operations may have more ports than operands and results
+// For example, the EndOp and FuncOp both have
+// the function results as additional ports
+//===----------------------------------------------------------------------===//
 
 def InputRTLPortsAreOperandsInterface : OpInterface<"InputRTLPortsAreOperandsInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"The operands of this operation correspond directly to its input RTL ports."}];
+    [{"The operands of this operation correspond directly to its input RTL ports."}];
   let methods = [
-      InterfaceMethod<
-        "Returns the number of RTL ports.",
-        "unsigned", "getNumInputPorts", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return concreteOp->getNumOperands();
-        }]>,
-      InterfaceMethod<
-        "Returns the name of a specific input port.",
-        "std::string", "getInputPortName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return getOperandName(concreteOp, idx);
-        }]>
-    ];
+    InterfaceMethod<
+      "Returns the number of RTL ports.",
+      "unsigned", "getNumInputPorts", (ins),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp->getNumOperands();
+      }]>,
+    InterfaceMethod<
+      "Returns the name of a specific input port.",
+      "std::string", "getInputPortName", (ins "unsigned" : $idx),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return getOperandName(concreteOp, idx);
+      }]>
+  ];
 }
 
 def CustomRTLInputPortsInterface : OpInterface<"CustomRTLInputPortsInterface"> {
@@ -280,8 +283,8 @@ def CustomRTLInputPortsInterface : OpInterface<"CustomRTLInputPortsInterface"> {
 
   let methods = [
     InterfaceMethod<
-        "Returns the number of RTL ports.",
-        "unsigned", "getNumInputPorts", (ins)>,
+      "Returns the number of RTL ports.",
+      "unsigned", "getNumInputPorts", (ins)>,
     InterfaceMethod<
       "Returns the name of a specific input port.",
       "std::string", "getInputPortName", (ins "unsigned" : $idx)
@@ -294,23 +297,23 @@ def OutputRTLPortsAreResultsInterface : OpInterface<"OutputRTLPortsAreResultsInt
   let description =
       [{"The results of this operation correspond directly to its output RTL ports."}];
   let methods = [
-      InterfaceMethod<
-        "Returns the number of RTL ports.",
-        "unsigned", "getNumOutputPorts", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return concreteOp->getNumResults();
-        }]>,
-      InterfaceMethod<
-        "Returns the name of a specific result.",
-        "std::string", "getOutputPortName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          return getResultName(concreteOp, idx);
-        }]>
-    ];
+    InterfaceMethod<
+      "Returns the number of RTL ports.",
+      "unsigned", "getNumOutputPorts", (ins),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp->getNumResults();
+      }]>,
+    InterfaceMethod<
+      "Returns the name of a specific result.",
+      "std::string", "getOutputPortName", (ins "unsigned" : $idx),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return getResultName(concreteOp, idx);
+      }]>
+  ];
 }
 
 def CustomRTLOutputPortsInterface : OpInterface<"CustomRTLOutputPortsInterface"> {
@@ -328,6 +331,9 @@ def CustomRTLOutputPortsInterface : OpInterface<"CustomRTLOutputPortsInterface">
     >
   ];
 }
+
+//===----------------------------------------------------------------------===//
+
 
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";

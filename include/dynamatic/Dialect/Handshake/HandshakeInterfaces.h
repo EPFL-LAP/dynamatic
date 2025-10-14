@@ -34,34 +34,20 @@ namespace handshake {
 
 class FuncOp;
 
+/// Returns the name of an operand
+/// based on which interface the operation implements
 std::string getOperandName(Operation *op, size_t oprdIdx);
 
+
+/// Returns the name of a result
+/// based on which interface the operation implements
 std::string getResultName(Operation *op, size_t resIdx);
 
-/// Provides an opaque interface for generating the port names of an operation;
-/// handshake operations generate names by the `handshake::NamedIOInterface`;
-/// other operations, such as arithmetic ones, are assigned default names.
-class PortNamer {
-public:
-  /// Does nothing; no port name will be generated.
-  PortNamer() = default;
+unsigned getNumInputPorts(Operation *op);
+std::string getInputPortName(Operation *op, size_t portIdx);
 
-  /// Derives port names for the operation on object creation.
-  PortNamer(Operation *op);
-
-  /// Returs the port name of the input at the specified index.
-  StringRef getInputName(unsigned idx) const { return inputs[idx]; }
-
-  /// Returs the port name of the output at the specified index.
-  StringRef getOutputName(unsigned idx) const { return outputs[idx]; }
-
-private:
-
-  /// List of input port names.
-  SmallVector<std::string> inputs;
-  /// List of output port names.
-  SmallVector<std::string> outputs;
-};
+unsigned getNumOutputPorts(Operation *op);
+std::string getOutputPortName(Operation *op, size_t portIdx);
 
 class ControlType;
 

@@ -54,7 +54,6 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 // This is almost exactly like a standard FuncOp, except that it has some
 // extra verification conditions.  In particular, each Value must
 // only have a single use.  Also, it defines a Dominance-Free Scope
-
 def FuncOp : Op<Handshake_Dialect, "func", [
    IsolatedFromAbove,
    FunctionOpInterface,
@@ -201,7 +200,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 def InstanceOp : Handshake_Op<"instance", [
     CallOpInterface,
     HasClock,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
   let summary = "module instantiate operation";
   let description = [{
@@ -665,21 +664,22 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
 
-  let extraClassDeclaration = [{
+  // include validateIO functions from handshake op
+  let extraClassDeclaration = validateIO [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
     /// Operand 0 is named condition
     /// Operand 1 is named data
     std::string getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      validateOperandIdx(idx);
       return idx == 0 ? "condition" : "data";
     }
 
     /// Operand 0 is named trueOut
     /// Operand 1 is named falseOut
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return idx == trueIndex ? "trueOut" : "falseOut";
     }
   }];
@@ -898,8 +898,13 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// accesses that are connected to the memory controller. 
     dynamatic::MCPorts getPorts();
 
+
+    //-------------------------------------------
+    // Custom IO Naming:
+
     std::string getOperandName(unsigned idx);
     std::string getResultName(unsigned idx);
+    //-------------------------------------------
   }];
 }
 
@@ -998,8 +1003,12 @@ def LSQOp : Handshake_Op<"lsq", [
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
 
+    //-------------------------------------------
+    // Custom IO Naming:
+
     std::string getOperandName(unsigned idx);
     std::string getResultName(unsigned idx);
+    //-------------------------------------------
   }];
 }
 

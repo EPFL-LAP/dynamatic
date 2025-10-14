@@ -35,8 +35,6 @@ namespace handshake {
 // Operand and Result Names
 //===----------------------------------------------------------------------===//
 
-/// Returns the name of an operand which is either provided by the
-/// handshake::NamedIOInterface interface  or, failing that, is its index.
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
   if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
@@ -53,19 +51,17 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
   assert(0);
 }
 
-/// Returns the name of a result which is either provided by the
-/// handshake::NamedIOInterface interface or, failing that, is its index.
 std::string getResultName(Operation *op, size_t resIdx) {
 
-  if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
-    return nameInterface.getResultName(resIdx);
-  } else if (auto nameInterface =
+  if (auto nameInterface =
                  dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface =
                  dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
-  }
+  } else if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+    return nameInterface.getResultName(resIdx);
+  } 
 
   op->emitError() << "must specify result names, op: " << *op;
   assert(0);
@@ -127,21 +123,6 @@ std::string getOutputPortName(Operation *op, size_t portIdx) {
 } // namespace handshake
 } // namespace dynamatic
 
-//===----------------------------------------------------------------------===//
-// Operand and Result Names to Port Names
-//===----------------------------------------------------------------------===//
-
-PortNamer::PortNamer(Operation *op) {
-  assert(op && "cannot generate port names for null operation");
-
-  for (size_t idx = 0, e = getNumInputPorts(op); idx < e; ++idx){
-    inputs.push_back(getInputPortName(op, idx));
-  }
-
-  for (size_t idx = 0, e = getNumOutputPorts(op); idx < e; ++idx){
-    outputs.push_back(getOutputPortName(op, idx));
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // MemoryOpInterface
