@@ -20,8 +20,6 @@
 
 namespace dynamatic {
 
-using namespace handshake;
-
 std::optional<FormalProperty::TYPE>
 FormalProperty::typeFromStr(const std::string &s) {
 
@@ -143,8 +141,8 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
-  ownerChannel.channelName = getResultName(ownerOp, res.getResultNumber());
-  userChannel.channelName = getOperandName(userOp, operandIndex);
+  ownerChannel.channelName = handshake::getResultName(ownerOp, res.getResultNumber());
+  userChannel.channelName = handshake::getOperandName(userOp, operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -190,8 +188,8 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = getResultName(op1, i);
-  targetChannel.channelName = getResultName(op2, j);
+  ownerChannel.channelName = handshake::getResultName(op1, i);
+  targetChannel.channelName = handshake::getResultName(op2, j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
