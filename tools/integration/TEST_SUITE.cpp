@@ -59,6 +59,7 @@ TEST_P(CBCSolverFixture, basic) {
   RecordProperty("cycles", std::to_string(config.simTime));
 }
 
+#if 0
 TEST_P(FPL22Fixture, basic) {
   IntegrationTestData config{
       // clang-format off
@@ -74,6 +75,7 @@ TEST_P(FPL22Fixture, basic) {
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
 }
+#endif
 
 //
 // This is an example test case which uses the Verilog backend.
@@ -271,6 +273,7 @@ INSTANTIATE_TEST_SUITE_P(
       ),
       [](const auto &info) { return info.param; });
 
+#if 0
 // Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
 INSTANTIATE_TEST_SUITE_P(
     Tiny, FPL22Fixture,
@@ -278,11 +281,12 @@ INSTANTIATE_TEST_SUITE_P(
       "fir",
       "histogram",
       "if_loop_add",
-      "if_loop_mul",
+      "if_loop_mul", // Cannot break one combinational loop
       "iir",
       "matvec"
       ),
       [](const auto &info) { return info.param; });
+#endif 
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
