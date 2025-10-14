@@ -1228,7 +1228,8 @@ def EndOp : Op<Handshake_Dialect, "end", [
   // with EndOp before FuncOp
   // and so the the RTL output port functions are defined in
   // HandshakeOps.cpp
-  CustomRTLOutputPortsInterface
+  // CustomRTLOutputPortsInterface
+  OutputRTLPortsAreResultsInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -1244,10 +1245,10 @@ def EndOp : Op<Handshake_Dialect, "end", [
 
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
-  let extraClassDeclaration = [{
-    /// Output ports of EndOp are function results
-    std::string getOutputPortName(unsigned idx);
-  }];
+  // let extraClassDeclaration = [{
+  //   /// Output ports of EndOp are function results
+  //   std::string getOutputPortName(unsigned idx);
+  // }];
 
   let assemblyFormat = [{
     attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
