@@ -143,8 +143,8 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
-  ownerChannel.channelName = getOutputPortName(ownerOp, res.getResultNumber());
-  userChannel.channelName = getInputPortName(userOp, operandIndex);
+  ownerChannel.channelName = getResultName(ownerOp, res.getResultNumber());
+  userChannel.channelName = getOperandName(userOp, operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -190,8 +190,8 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = getOutputPortName(op1, i);
-  targetChannel.channelName = getOutputPortName(op2, j);
+  ownerChannel.channelName = getResultName(op1, i);
+  targetChannel.channelName = getResultName(op2, j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
