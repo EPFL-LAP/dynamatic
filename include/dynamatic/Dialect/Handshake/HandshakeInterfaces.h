@@ -42,15 +42,6 @@ std::string getOperandName(Operation *op, size_t oprdIdx);
 /// based on which interface the operation implements
 std::string getResultName(Operation *op, size_t resIdx);
 
-/// Returns the name of a input RTL port
-/// based on which interface the operation implements
-std::string getInputPortName(Operation *op, size_t portIdx);
-
-/// Returns the name of an output RTL port
-/// based on which interface the operation implements
-std::string getOutputPortName(Operation *op, size_t portIdx);
-
-
 class ControlType;
 
 namespace detail {

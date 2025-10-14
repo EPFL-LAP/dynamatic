@@ -1139,9 +1139,10 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
   ModuleBuilder modBuilder(funcOp.getContext());
 
   // Add all function outputs to the module
-  for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(handshake::getOutputPortName(funcOp, idx), lowerType(res));
-
+  for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes())){
+    StringAttr resName = funcOp.getResName(idx);
+    modBuilder.addOutput(resName, lowerType(res));
+  }
   
 
   // Add all function inputs to the module, expanding memory references into a
@@ -1152,7 +1153,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(handshake::getInputPortName(funcOp, idx), lowerType(type));
+      modBuilder.addInput(argName, lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -1307,7 +1308,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(handshake::getOutputPortName(funcOp, idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1316,7 +1317,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(handshake::getInputPortName(funcOp, idx), lowerType(type));
+    modBuilder.addInput(funcOp.getArgName(idx), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
@@ -1393,15 +1394,15 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     converter.addInput(removePortNamePrefix(port), arg);
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
     if (!isa<mlir::MemRefType>(oprd.getType()))
-      converter.addInput(handshake::getInputPortName(memOp, idx), oprd);
+      converter.addInput(handshake::getOperandName(memOp, idx), oprd);
   }
   converter.addClkAndRst(parentModOp);
 
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    converter.addOutput(handshake::getOutputPortName(memOp, idx),
-                        lowerType(res.getType()));
+      converter.addOutput(handshake::getResultName(memOp, idx),
+                        lowerType(res.getType()));;
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
   for (const hw::ModulePort &outputPort : outputModPorts)
@@ -1522,12 +1523,12 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   // type.
   for (auto [i, oprd] : llvm::enumerate(operands)) {
     if (!isa<MemRefType>(oprd.getType()))
-      memInterfaceConverter.addInput(handshake::getInputPortName(memOp, i), oprd);
+      memInterfaceConverter.addInput(handshake::getOperandName(memOp, i), oprd);
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    memInterfaceConverter.addOutput(handshake::getOutputPortName(memOp, idx),
+    memInterfaceConverter.addOutput(handshake::getResultName(memOp, idx),
                                     lowerType(res.getType()));
   }
 
@@ -1578,12 +1579,12 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
 
   // Add all operation operands to the inputs
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
-    converter.addInput(handshake::getInputPortName(op, idx), oprd);
+    converter.addInput(handshake::getOperandName(op, idx), oprd);
   converter.addClkAndRst(((Operation *)op)->getParentOfType<hw::HWModuleOp>());
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(handshake::getOutputPortName(op, idx), lowerType(type));
+    converter.addOutput(handshake::getResultsName(op, idx), lowerType(type));
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();

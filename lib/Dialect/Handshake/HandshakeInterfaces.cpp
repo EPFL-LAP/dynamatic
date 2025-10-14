@@ -67,32 +67,6 @@ std::string getResultName(Operation *op, size_t resIdx) {
   assert(0);
 }
 
-std::string getInputPortName(Operation *op, size_t portIdx) {
-  if(auto operandPortsInterface = 
-              dyn_cast<handshake::InputRTLPortsAreOperandsInterface>(op)){
-    return operandPortsInterface.getInputPortName(portIdx);
-  } else if (auto customPortsInterface = 
-              dyn_cast<handshake::CustomRTLInputPortsInterface>(op)){
-    return customPortsInterface.getInputPortName(portIdx);
-  }
-
-  op->emitError("All operations must specify input ports");
-  assert(0);
-}
-
-std::string getOutputPortName(Operation *op, size_t portIdx) {
-  if(auto resultsPortsInterface = 
-              dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
-    return resultsPortsInterface.getOutputPortName(portIdx);
-  } else if (auto customPortsInterface = 
-              dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
-    return customPortsInterface.getOutputPortName(portIdx);
-  }
-
-  op->emitError("All operations must specify output ports");
-  assert(0);
-}
-
 
 } // namespace handshake
 } // namespace dynamatic

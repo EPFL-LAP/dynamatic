@@ -1549,12 +1549,6 @@ LogicalResult EndOp::verify() {
   return success();
 }
 
-// std::string EndOp::getOutputPortName(unsigned idx){
-//   handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
-//   assert(funcOp && "end must be child of handshake function");
-//   return funcOp.getOutputPortName(idx);
-// }
-
 
 //===----------------------------------------------------------------------===//
 // BundleOp

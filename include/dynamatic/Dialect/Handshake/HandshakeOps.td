@@ -32,12 +32,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<ControlInterface>,
-         // To inherit from HandshakeOp,
-         // an operations connections must match its 
-         // RTL connections
-         InputRTLPortsAreOperandsInterface,
-         OutputRTLPortsAreResultsInterface
-         ]> {
+]> {
   // Shared functions to include in child classes 
   string validateIO = [{
     void validateOperandIdx(unsigned int idx){
@@ -61,9 +56,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   // A FuncOp has more RTL ports than MLIR operands/results
-   CustomRTLInputPortsInterface,
-   CustomRTLOutputPortsInterface
+   CustomNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -148,14 +141,14 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return "handshake";
     }
 
-    //===------------------------------------------------------------------===//
-    // CustomRTLInputPortsInterface Methods
-    //===------------------------------------------------------------------===//
-    // The number of RTL ports of the FuncOp does not match
-    // its operands/results
-    //
-    // Instead it matches custom attributes:
-    //===------------------------------------------------------------------===//
+    // //===------------------------------------------------------------------===//
+    // // CustomRTLInputPortsInterface Methods
+    // //===------------------------------------------------------------------===//
+    // // The number of RTL ports of the FuncOp does not match
+    // // its operands/results
+    // //
+    // // Instead it matches custom attributes:
+    // //===------------------------------------------------------------------===//
 
     unsigned getNumInputPorts(){
       if (auto names = getArgNames()) {
@@ -164,20 +157,20 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return 0;
     }
 
-    std::string getInputPortName(unsigned idx){
-      assert(idx < getNumInputPorts() && "index too high");
-      return getArgName(idx).str();
-    }
+    // std::string getInputPortName(unsigned idx){
+    //   assert(idx < getNumInputPorts() && "index too high");
+    //   return getArgName(idx).str();
+    // }
 
 
-    //===------------------------------------------------------------------===//
-    // CustomRTLOutputPortsInterface Methods
-    //===------------------------------------------------------------------===//
-    // The number of RTL ports of the FuncOp does not match
-    // its operands/results
-    //
-    // Instead it matches custom attributes:
-    //===------------------------------------------------------------------===//
+    // //===------------------------------------------------------------------===//
+    // // CustomRTLOutputPortsInterface Methods
+    // //===------------------------------------------------------------------===//
+    // // The number of RTL ports of the FuncOp does not match
+    // // its operands/results
+    // //
+    // // Instead it matches custom attributes:
+    // //===------------------------------------------------------------------===//
 
     unsigned getNumOutputPorts(){
       if (auto names = getResNames()) {
@@ -186,9 +179,23 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return 0;
     }
 
-    std::string getOutputPortName(unsigned idx){
-      assert(idx < getNumOutputPorts() && "index too high");
+    // std::string getOutputPortName(unsigned idx){
+    //   assert(idx < getNumOutputPorts() && "index too high");
+    //   return getResName(idx).str();
+    // }
+
+    /// Operands 0 to N are named "ins_0" to "ins_<N>"
+    /// simpleOperandName handles validation
+    std::string getOperandName(unsigned idx) {
+      assert(idx < getNumInputPorts() && "index too high");
       return getResName(idx).str();
+    }
+
+    /// Result 0 is named outs
+    /// Result 1 is named index
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return idx == 0 ? "outs" : "index";
     }
   }];
 
@@ -1211,25 +1218,10 @@ def RAMOp : Handshake_Op<"ram", []>  {
 // Terminator
 //===----------------------------------------------------------------------===//
 
-// Not a handshake op, as its RTL ports do not correspond to
-// its operands and results
-def EndOp : Op<Handshake_Dialect, "end", [
+def EndOp : Handshake_Op<"end", [
   Terminator,
-  HasParent<"handshake::FuncOp">,
-  DeclareOpInterfaceMethods<ControlInterface>,
-  // The IOs of a EndOp have simple names
-  SimpleNamedIOInterface,
-  // The RTL input ports correspond to the IR
-  InputRTLPortsAreOperandsInterface,
-  // The RTL output ports do not correspond to the IR
-  // As they are actually the function results
-  // Although they could normally be in the class declaration
-  // The header file is organized alphabetically
-  // with EndOp before FuncOp
-  // and so the the RTL output port functions are defined in
-  // HandshakeOps.cpp
-  // CustomRTLOutputPortsInterface
-  OutputRTLPortsAreResultsInterface
+  // The IOs of an EndOp have simple names
+  SimpleNamedIOInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -1244,11 +1236,6 @@ def EndOp : Op<Handshake_Dialect, "end", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$inputs);
-
-  // let extraClassDeclaration = [{
-  //   /// Output ports of EndOp are function results
-  //   std::string getOutputPortName(unsigned idx);
-  // }];
 
   let assemblyFormat = [{
     attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
