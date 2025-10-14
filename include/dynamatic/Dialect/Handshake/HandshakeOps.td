@@ -141,49 +141,19 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return "handshake";
     }
 
-    // //===------------------------------------------------------------------===//
-    // // CustomRTLInputPortsInterface Methods
-    // //===------------------------------------------------------------------===//
-    // // The number of RTL ports of the FuncOp does not match
-    // // its operands/results
-    // //
-    // // Instead it matches custom attributes:
-    // //===------------------------------------------------------------------===//
-
     unsigned getNumInputPorts(){
       if (auto names = getArgNames()) {
         return names.size();
       }
       return 0;
-    }
-
-    // std::string getInputPortName(unsigned idx){
-    //   assert(idx < getNumInputPorts() && "index too high");
-    //   return getArgName(idx).str();
-    // }
-
-
-    // //===------------------------------------------------------------------===//
-    // // CustomRTLOutputPortsInterface Methods
-    // //===------------------------------------------------------------------===//
-    // // The number of RTL ports of the FuncOp does not match
-    // // its operands/results
-    // //
-    // // Instead it matches custom attributes:
-    // //===------------------------------------------------------------------===//
-
+    
     unsigned getNumOutputPorts(){
       if (auto names = getResNames()) {
         return names.size();
       }
       return 0;
     }
-
-    // std::string getOutputPortName(unsigned idx){
-    //   assert(idx < getNumOutputPorts() && "index too high");
-    //   return getResName(idx).str();
-    // }
-
+    
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
@@ -191,11 +161,10 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return getResName(idx).str();
     }
 
-    /// Result 0 is named outs
-    /// Result 1 is named index
+
     std::string getResultName(unsigned idx) {
-      validateResultIdx(idx);
-      return idx == 0 ? "outs" : "index";
+      assert(idx < getNumOutputPorts() && "index too high");
+      return getResName(idx).str();
     }
   }];
 
