@@ -1,0 +1,29 @@
+#include "handshake_mux_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_constant_0.smv"
+#include "handshake_source_0.smv"
+
+
+MODULE mux_to_and_lhs (A_in, A_in_valid, B_in, B_in_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := mux.outs;
+DEFINE C_out_valid := mux.outs_valid;
+DEFINE mux_outs_ready := C_out_ready;
+DEFINE a_fork_ins := A_in;
+DEFINE a_fork_ins_valid := A_in_valid;
+DEFINE A_in_ready := a_fork.ins_ready;
+DEFINE passer1_data := B_in;
+DEFINE passer1_data_valid := B_in_valid;
+DEFINE B_in_ready := passer1.data_ready;
+
+
+VAR source : handshake_source_0(constant.ctrl_ready);
+VAR constant : handshake_constant_0(source.outs_valid, mux.ins_0_ready);
+VAR a_fork : handshake_fork_0(a_fork_ins, a_fork_ins_valid, passer1.ctrl_ready, mux.index_ready);
+VAR passer1 : handshake_passer_0(passer1_data, passer1_data_valid, a_fork.outs_0, a_fork.outs_0_valid, mux.ins_1_ready);
+VAR mux : handshake_mux_0(a_fork.outs_1, a_fork.outs_1_valid, constant.outs, passer1.result, constant.outs_valid, passer1.result_valid, mux_outs_ready);
+
+-- properties

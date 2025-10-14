@@ -1,6 +1,6 @@
 #include "handshake_mux_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
 
 
 MODULE sup_gamma_mux2_mini_lhs_wrapper (cond, cond_valid, dataT, dataT_valid, dataF, dataF_valid, res_ready)

@@ -1,0 +1,21 @@
+#include "handshake_andi_0.smv"
+
+
+MODULE mux_to_and_rhs (A_in, A_in_valid, B_in, B_in_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := andi1.result;
+DEFINE C_out_valid := andi1.result_valid;
+DEFINE andi1_result_ready := C_out_ready;
+DEFINE andi1_lhs := A_in;
+DEFINE andi1_lhs_valid := A_in_valid;
+DEFINE A_in_ready := andi1.lhs_ready;
+DEFINE andi1_rhs := B_in;
+DEFINE andi1_rhs_valid := B_in_valid;
+DEFINE B_in_ready := andi1.rhs_ready;
+
+
+VAR andi1 : handshake_andi_0(andi1_lhs, andi1_lhs_valid, andi1_rhs, andi1_rhs_valid, andi1_result_ready);
+
+-- properties

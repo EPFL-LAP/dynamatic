@@ -1,6 +1,6 @@
 #include "handshake_andi_0.smv"
-#include "handshake_fork_0.smv"
 #include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
 
 
 MODULE sup_and_lhs_wrapper (A_in, A_in_valid, B_in, B_in_valid, Cond, Cond_valid, C_out_ready)

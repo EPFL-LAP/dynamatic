@@ -1,0 +1,21 @@
+#include "handshake_andi_0.smv"
+
+
+MODULE mux_to_and_rhs_wrapper (A_in, A_in_valid, B_in, B_in_valid, C_out_ready)
+
+
+-- input and output
+DEFINE C_out := mux_to_and_rhs_wrapped.C_out;
+DEFINE C_out_valid := mux_to_and_rhs_wrapped.C_out_valid;
+DEFINE mux_to_and_rhs_wrapped_C_out_ready := C_out_ready;
+DEFINE mux_to_and_rhs_wrapped_A_in := A_in;
+DEFINE mux_to_and_rhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := mux_to_and_rhs_wrapped.A_in_ready;
+DEFINE mux_to_and_rhs_wrapped_B_in := B_in;
+DEFINE mux_to_and_rhs_wrapped_B_in_valid := B_in_valid;
+DEFINE B_in_ready := mux_to_and_rhs_wrapped.B_in_ready;
+
+
+VAR mux_to_and_rhs_wrapped : mux_to_and_rhs(mux_to_and_rhs_wrapped_A_in, mux_to_and_rhs_wrapped_A_in_valid, mux_to_and_rhs_wrapped_B_in, mux_to_and_rhs_wrapped_B_in_valid, mux_to_and_rhs_wrapped_C_out_ready);
+
+-- properties

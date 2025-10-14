@@ -9,8 +9,8 @@ module {
     %in_fork_Cond2.outs_0, %in_fork_Cond2.outs_1 = hw.instance "in_fork_Cond2" @handshake_lazy_fork_0(ins: %Cond2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     %lhs_in_buf_Cond2.outs = hw.instance "lhs_in_buf_Cond2" @handshake_buffer_0(ins: %in_fork_Cond2.outs_0: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %rhs_in_buf_Cond2.outs = hw.instance "rhs_in_buf_Cond2" @handshake_buffer_0(ins: %in_fork_Cond2.outs_1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
-    %out_nds_B_out.result = hw.instance "out_nds_B_out" @handshake_ndsource_0(clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.control<>)
-    %out_lf_B_out.outs_0, %out_lf_B_out.outs_1 = hw.instance "out_lf_B_out" @handshake_lazy_fork_1(ins: %out_nds_B_out.result: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.control<>, outs_1: !handshake.control<>)
+    %out_src_B_out.outs = hw.instance "out_src_B_out" @handshake_source_0(clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
+    %out_lf_B_out.outs_0, %out_lf_B_out.outs_1 = hw.instance "out_lf_B_out" @handshake_lazy_fork_1(ins: %out_src_B_out.outs: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.control<>, outs_1: !handshake.control<>)
     %out_buf_lhs_nds_B_out.outs = hw.instance "out_buf_lhs_nds_B_out" @handshake_buffer_1(ins: %out_lf_B_out.outs_0: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
     %out_buf_rhs_nds_B_out.outs = hw.instance "out_buf_rhs_nds_B_out" @handshake_buffer_1(ins: %out_lf_B_out.outs_1: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.control<>)
     %lhs_out_bl_B_out.outs = hw.instance "lhs_out_bl_B_out" @handshake_blocker_0(ins: %lhs_passer3.result: !handshake.channel<i1>, ctrl: %out_buf_lhs_nds_B_out.outs: !handshake.control<>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
@@ -26,7 +26,7 @@ module {
   }
   hw.module.extern @handshake_lazy_fork_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.channel<i1>, out outs_1 : !handshake.channel<i1>) attributes {hw.name = "handshake.lazy_fork", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
   hw.module.extern @handshake_buffer_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.buffer", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", DATA_TYPE = !handshake.channel<i1>, DEBUG_COUNTER = true, NUM_SLOTS = 1 : ui32}}
-  hw.module.extern @handshake_ndsource_0(in %clk : i1, in %rst : i1, out result : !handshake.control<>) attributes {hw.name = "handshake.ndsource", hw.parameters = {}}
+  hw.module.extern @handshake_source_0(in %clk : i1, in %rst : i1, out outs : !handshake.control<>) attributes {hw.name = "handshake.source", hw.parameters = {}}
   hw.module.extern @handshake_lazy_fork_1(in %ins : !handshake.control<>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.control<>, out outs_1 : !handshake.control<>) attributes {hw.name = "handshake.lazy_fork", hw.parameters = {DATA_TYPE = !handshake.control<>, SIZE = 2 : ui32}}
   hw.module.extern @handshake_buffer_1(in %ins : !handshake.control<>, in %clk : i1, in %rst : i1, out outs : !handshake.control<>) attributes {hw.name = "handshake.buffer", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", DATA_TYPE = !handshake.control<>, DEBUG_COUNTER = false, NUM_SLOTS = 1 : ui32}}
   hw.module.extern @handshake_blocker_0(in %ins : !handshake.channel<i1>, in %ctrl : !handshake.control<>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.blocker", hw.parameters = {SIZE = 2 : ui32}}

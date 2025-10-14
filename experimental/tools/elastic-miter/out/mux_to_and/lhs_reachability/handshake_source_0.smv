@@ -1,0 +1,9 @@
+-- handshake_source_0 : source([])
+
+
+MODULE handshake_source_0(outs_ready)
+
+  -- output
+  DEFINE
+  outs_valid  := TRUE;
+

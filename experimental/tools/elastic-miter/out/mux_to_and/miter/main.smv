@@ -1,0 +1,39 @@
+#include "elastic_miter_mux_to_and_lhs_mux_to_and_rhs.smv"
+
+
+MODULE bool_input(nReady0, max_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_A_in : bool_input(elastic_miter_mux_to_and_lhs_mux_to_and_rhs.A_in_ready, 1);
+  VAR seq_generator_B_in : bool_input(elastic_miter_mux_to_and_lhs_mux_to_and_rhs.B_in_ready, 1);
+
+  VAR elastic_miter_mux_to_and_lhs_mux_to_and_rhs : elastic_miter_mux_to_and_lhs_mux_to_and_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_B_in.outs, seq_generator_B_in.outs_valid, sink_EQ_C_out.ins_ready);
+
+  VAR sink_EQ_C_out : sink_main(elastic_miter_mux_to_and_lhs_mux_to_and_rhs.EQ_C_out_valid);
+
+INVARSPEC (elastic_miter_mux_to_and_lhs_mux_to_and_rhs.EQ_C_out_valid -> elastic_miter_mux_to_and_lhs_mux_to_and_rhs.EQ_C_out);
+CTLSPEC AF (AG ((elastic_miter_mux_to_and_lhs_mux_to_and_rhs.lhs_in_buf_A_in.debug_counter.counter = elastic_miter_mux_to_and_lhs_mux_to_and_rhs.rhs_in_buf_A_in.debug_counter.counter) & (elastic_miter_mux_to_and_lhs_mux_to_and_rhs.lhs_in_buf_B_in.debug_counter.counter = elastic_miter_mux_to_and_lhs_mux_to_and_rhs.rhs_in_buf_B_in.debug_counter.counter) & (!elastic_miter_mux_to_and_lhs_mux_to_and_rhs.lhs_out_bl_C_out.outs_valid) & (!elastic_miter_mux_to_and_lhs_mux_to_and_rhs.rhs_out_bl_C_out.outs_valid)));
+
+INVAR  seq_generator_A_in.exact_tokens = seq_generator_B_in.exact_tokens ;

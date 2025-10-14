@@ -37,4 +37,3 @@ MODULE main
 INVARSPEC (elastic_miter_sup_and_lhs_sup_and_rhs.EQ_C_out_valid -> elastic_miter_sup_and_lhs_sup_and_rhs.EQ_C_out);
 CTLSPEC AF (AG ((elastic_miter_sup_and_lhs_sup_and_rhs.lhs_in_buf_A_in.debug_counter.counter = elastic_miter_sup_and_lhs_sup_and_rhs.rhs_in_buf_A_in.debug_counter.counter) & (elastic_miter_sup_and_lhs_sup_and_rhs.lhs_in_buf_B_in.debug_counter.counter = elastic_miter_sup_and_lhs_sup_and_rhs.rhs_in_buf_B_in.debug_counter.counter) & (elastic_miter_sup_and_lhs_sup_and_rhs.lhs_in_buf_Cond.debug_counter.counter = elastic_miter_sup_and_lhs_sup_and_rhs.rhs_in_buf_Cond.debug_counter.counter) & (!elastic_miter_sup_and_lhs_sup_and_rhs.lhs_out_bl_C_out.outs_valid) & (!elastic_miter_sup_and_lhs_sup_and_rhs.rhs_out_bl_C_out.outs_valid)));
 
-INVAR  seq_generator_A_in.exact_tokens = seq_generator_B_in.exact_tokens ;

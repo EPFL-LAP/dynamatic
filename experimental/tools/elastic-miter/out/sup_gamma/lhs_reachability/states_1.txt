@@ -734,4 +734,4 @@ reachable states: 48 (2^5.58496) out of 1.07374e+09 (2^30)
   sup_gamma_lhs.c2_fork.inner_fork.inner_reg_block_2.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.10 seconds, total: 0.10 seconds
+elapse: 0.09 seconds, total: 0.09 seconds

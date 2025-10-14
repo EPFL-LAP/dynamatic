@@ -1,13 +1,13 @@
-#include "handshake_ndsource_0.smv"
+#include "handshake_andi_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_source_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_fork_0.smv"
 #include "handshake_lazy_fork_1.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_lazy_fork_0.smv"
-#include "handshake_buffer_1.smv"
-#include "handshake_andi_0.smv"
-#include "handshake_blocker_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_buffer_0.smv"
 
 
 MODULE elastic_miter_unify_sup_lhs_unify_sup_rhs (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, EQ_B_out_ready)
@@ -37,8 +37,8 @@ VAR rhs_in_buf_Cond1 : handshake_buffer_0(in_fork_Cond1.outs_1, in_fork_Cond1.ou
 VAR in_fork_Cond2 : handshake_lazy_fork_0(in_fork_Cond2_ins, in_fork_Cond2_ins_valid, lhs_in_buf_Cond2.ins_ready, rhs_in_buf_Cond2.ins_ready);
 VAR lhs_in_buf_Cond2 : handshake_buffer_0(in_fork_Cond2.outs_0, in_fork_Cond2.outs_0_valid, lhs_fork_cond2.ins_ready);
 VAR rhs_in_buf_Cond2 : handshake_buffer_0(in_fork_Cond2.outs_1, in_fork_Cond2.outs_1_valid, rhs_andi.rhs_ready);
-VAR out_nds_B_out : handshake_ndsource_0(out_lf_B_out.ins_ready);
-VAR out_lf_B_out : handshake_lazy_fork_1(out_nds_B_out.result_valid, out_buf_lhs_nds_B_out.ins_ready, out_buf_rhs_nds_B_out.ins_ready);
+VAR out_src_B_out : handshake_source_0(out_lf_B_out.ins_ready);
+VAR out_lf_B_out : handshake_lazy_fork_1(out_src_B_out.outs_valid, out_buf_lhs_nds_B_out.ins_ready, out_buf_rhs_nds_B_out.ins_ready);
 VAR out_buf_lhs_nds_B_out : handshake_buffer_1(out_lf_B_out.outs_0_valid, lhs_out_bl_B_out.ctrl_ready);
 VAR out_buf_rhs_nds_B_out : handshake_buffer_1(out_lf_B_out.outs_1_valid, rhs_out_bl_B_out.ctrl_ready);
 VAR lhs_out_bl_B_out : handshake_blocker_0(lhs_passer3.result, lhs_passer3.result_valid, out_buf_lhs_nds_B_out.outs_valid, out_eq_B_out.lhs_ready);

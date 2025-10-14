@@ -230,4 +230,4 @@ reachable states: 24 (2^4.58496) out of 1.04858e+06 (2^20)
   sup_gamma_mux2_mini_lhs.cond_fork.inner_fork.inner_reg_block_1.reg_value = TRUE
   -------------------------
 ######################################################################
-elapse: 0.03 seconds, total: 0.03 seconds
+elapse: 0.02 seconds, total: 0.02 seconds
