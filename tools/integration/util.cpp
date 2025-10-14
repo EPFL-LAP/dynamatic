@@ -161,7 +161,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
 
   fs::path handshakeBuffered = compOutDir / "handshakeBuffered.mlir";
   std::string timingModel =
-      (fs::path(DYNAMATIC_ROOT) / "data" / "components-flopoco.json").string();
+      (fs::path(DYNAMATIC_ROOT) / "data" / "components.json").string();
   if (!runSubprocess(
           {DYNAMATIC_OPT_BIN, handshakeTransformed.string(),
            "--handshake-set-buffering-properties=version=fpga20",
