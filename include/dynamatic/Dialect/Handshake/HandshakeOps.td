@@ -38,6 +38,16 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          InputRTLPortsAreOperandsInterface,
          OutputRTLPortsAreResultsInterface
          ]> {
+  let extraClassDeclaration = [{
+    void validateOperandIdx(unsigned idx){
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+    }
+
+    void validateResultIdx(unsigned idx){
+      assert(idx < getOperation()->getNumResults() && "index too high");
+    }
+  }];
+
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -657,14 +667,14 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     /// Operand 0 is named condition
     /// Operand 1 is named data
     std::string getOperandName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "condition" : "data";
     }
 
     /// Operand 0 is named trueOut
     /// Operand 1 is named falseOut
     std::string getResultName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      validateResultIdx(idx);
       return idx == trueIndex ? "trueOut" : "falseOut";
     }
   }];
@@ -1070,14 +1080,14 @@ def LoadOp : Handshake_MemPortOp<"load", [
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataFromMem
     std::string getOperandName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataOut
     std::string getResultName(unsigned idx) {
-      assert(idx < 2 && "index too high");
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
@@ -1119,14 +1129,14 @@ def StoreOp : Handshake_MemPortOp<"store", [
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
-      assert(idx < 2 && "index too high");
+      assert(idx < getOperation()->getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataToMem
     std::string getResultName(unsigned int idx) {
-      assert(idx < 2 && "index too high");
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
@@ -1252,6 +1262,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCIsMisspec">,
   IsIntSizedChannel<1, "SCIsMisspec">,
+  // The IOs of the SpeculatorOp have custom names
+  // defined here in the Tablegen
+  // as part of the SpeculatorOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -1304,13 +1317,21 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }]>];
 
   let extraClassDeclaration = [{
+    /// Operand 0 is named ins
+    /// Operand 1 is named trigger
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "trigger";
     }
 
+    /// Result 0 is named outs
+    /// Result 1 is named ctrl_save
+    /// Result 2 is named ctrl_commit
+    /// Result 3 is named ctrl_sc_save
+    /// Result 4 is named ctrl_sc_commit
+    /// Result 5 is named ctrl_sc_branch
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       switch (idx) {
       case 0:
         return "outs";
@@ -1336,6 +1357,9 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
+  // The IOs of a SpecSaveOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecSaveOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
@@ -1363,13 +1387,16 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   }];
 
   let extraClassDeclaration = [{
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
+    /// Result 0 is named outs
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1382,6 +1409,9 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
+  // The IOs of a SpecCommitOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecCommitOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
@@ -1411,13 +1441,16 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   }];
 
   let extraClassDeclaration = [{
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
       return idx == 0 ? "ins" : "ctrl";
     }
 
+    /// Result 0 is named result
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1459,7 +1492,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "outs";
     }
   }];
@@ -1547,7 +1580,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       return "dataOut";
     }
   }];
@@ -1615,7 +1648,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     }
 
     std::string getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      validateResultIdx(idx);
       if (idx < getNumSharedOperations())
         return "op" + std::to_string(idx) + "out0";
       return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
