@@ -51,7 +51,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-  // A FuncOp has more RTL ports than MLIR operands/results
+   // A FuncOp has more RTL ports than MLIR operands/results
    CustomRTLInputPortsInterface,
    CustomRTLOutputPortsInterface
 ]> {
@@ -191,8 +191,6 @@ def InstanceOp : Handshake_Op<"instance", [
     CallOpInterface,
     HasClock,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-    // the RTL ports of a FuncOp have simple names
-    SimpleNamedIOInterface
 ]> {
   let summary = "module instantiate operation";
   let description = [{
@@ -272,6 +270,7 @@ def InstanceOp : Handshake_Op<"instance", [
 def BufferOp : Handshake_Op<"buffer", [
   HasClock,
   SameOperandsAndResultType,
+  // The IOs of a BufferOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "buffer operation";
@@ -345,6 +344,7 @@ def BufferOp : Handshake_Op<"buffer", [
 def InitOp : Handshake_Op<"init", [
   HasClock,
   SameOperandsAndResultType,
+  // The IOs of an InitOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "init operation";
@@ -369,6 +369,7 @@ def InitOp : Handshake_Op<"init", [
 def NDWireOp : Handshake_Op<"ndwire", [
   HasClock,
   SameOperandsAndResultType,
+  // The IOs of a NDWire have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "non-deterministic wire operation";
@@ -389,6 +390,7 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     Pure,
     HasClock,
     SameOperandsAndResultType,
+    // The IOs of a ForkOp have simple names
     SimpleNamedIOInterface
 ]> {
   let arguments = (ins HandshakeType:$operand);
@@ -446,6 +448,7 @@ def MergeOp : Handshake_Op<"merge", [
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  // The IOs of a MergeOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "merge operation";
@@ -477,6 +480,9 @@ def MuxOp : Handshake_Op<"mux", [
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  // The IOs of a MuxOp have custom names,
+  // defined here in the Tablegen
+  // as part of the MuxOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "mux operation";
@@ -504,10 +510,13 @@ def MuxOp : Handshake_Op<"mux", [
   let results = (outs HandshakeType:$result);
 
   let extraClassDeclaration = [{
+    /// Operand 0 is named "index"
+    /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     std::string getOperandName(unsigned idx) {
       return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
     }
 
+    /// Result 0 is named "outs"
     std::string getResultName(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
@@ -526,6 +535,9 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  // The IOs of a CMergeOP have custom names,
+  // defined here in the Tablegen
+  // as part of the CMergeOP declaration
   CustomNamedIOInterface
 ]> {
   let summary = "control merge operation";
@@ -559,10 +571,13 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   }]>];
 
   let extraClassDeclaration = [{
+    /// Operands 0 to N are named "ins_0" to "ins_<N>"
     std::string getOperandName(unsigned idx) {
       return detail::simpleOperandName(idx, getOperation()->getNumOperands());
     }
 
+    /// Result 0 is named outs
+    /// Result 1 is named index
     std::string getResultName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return idx == 0 ? "outs" : "index";
@@ -576,6 +591,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 def BranchOp : Handshake_Op<"br", [
   Pure,
   SameOperandsAndResultType,
+  // The IOs of a BranchOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "branch operation";
@@ -605,6 +621,9 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  // The IOs of a ConditionalBranch have custom names,
+  // defined here in the Tablegen
+  // as part of the ConditionalBranch declaration
   CustomNamedIOInterface
 ]> {
   let summary = "conditional branch operation";
@@ -635,11 +654,15 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
+    /// Operand 0 is named condition
+    /// Operand 1 is named data
     std::string getOperandName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return idx == 0 ? "condition" : "data";
     }
 
+    /// Operand 0 is named trueOut
+    /// Operand 1 is named falseOut
     std::string getResultName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return idx == trueIndex ? "trueOut" : "falseOut";
@@ -648,6 +671,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 }
 
 def SinkOp : Handshake_Op<"sink", [
+  // The IOs of a SinkOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "sink operation";
@@ -670,8 +694,9 @@ def SinkOp : Handshake_Op<"sink", [
 
 def SourceOp : Handshake_Op<"source", [
   Pure,
+  // The IOs of a SourceOp have simple names
   SimpleNamedIOInterface
-  ]> {
+]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
@@ -700,6 +725,7 @@ def SourceOp : Handshake_Op<"source", [
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  // The IOs of a JoinOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "join operation";
@@ -723,6 +749,7 @@ def JoinOp : Handshake_Op<"join", [
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
   SameOperandsAndResultType,
+  // The IOs of a BlockerOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "blocker operation";
@@ -745,6 +772,7 @@ def BlockerOp : Handshake_Op<"blocker", [
 def NotOp : Handshake_Op<"not", [
   Pure,
   SameOperandsAndResultType,
+  // The IOs of a NotOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "Logical negation";
@@ -776,6 +804,9 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   IsSimpleHandshakeVariadic<"inputs">,
   IsSimpleHandshakeVariadic<"outputs">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
+  // The IOs of a MemoryControllerOp have custom names,
+  // As they are complex, they are declared here,
+  // but defined in HandshakeOps.cpp
   CustomNamedIOInterface
 ]> {
   let summary = "memory controller (dynamatic)";
@@ -859,6 +890,9 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
 def LSQOp : Handshake_Op<"lsq", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
+  // The IOs of a MemoryControllerOp have custom names,
+  // As they are complex, they are declared here,
+  // but defined in HandshakeOps.cpp
   CustomNamedIOInterface
 ]> {
   let summary = "load-store queue  (dynamatic)";
@@ -992,6 +1026,9 @@ def LoadOp : Handshake_MemPortOp<"load", [
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
   IsSimpleHandshake<"data">,
+  // The IOs of a LoadOp have custom names,
+  // defined here in the Tablegen
+  // as part of the LoadOp declaration
   CustomNamedIOInterface
 ], [
   // TODO: Please add comments on why this builder is necessary
@@ -1030,11 +1067,15 @@ def LoadOp : Handshake_MemPortOp<"load", [
   }];
 
   let extraClassDeclaration= [{
+    /// Operand 0 is named addrIn
+    /// Operand 1 is named dataFromMem
     std::string getOperandName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
+    /// Result 0 is named addrOut
+    /// Result 1 is named dataOut
     std::string getResultName(unsigned idx) {
       assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
@@ -1047,6 +1088,9 @@ def StoreOp : Handshake_MemPortOp<"store", [
   // In StoreOp, addressResult and dataResult are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
   IsSimpleHandshake<"dataResult">,
+  // The IOs of a StoreOp have custom names,
+  // defined here in the Tablegen
+  // as part of the StoreOp declaration
   CustomNamedIOInterface
 ], []> {
   let summary = "store operation for memory controller (MC)";
@@ -1072,11 +1116,15 @@ def StoreOp : Handshake_MemPortOp<"store", [
   }];
 
   let extraClassDeclaration = [{
+    /// Operand 0 is named addrIn
+    /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
       assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
+    /// Result 0 is named addrOut
+    /// Result 1 is named dataToMem
     std::string getResultName(unsigned int idx) {
       assert(idx < 2 && "index too high");
       return (idx == 0) ? "addrOut" : "dataToMem";
@@ -1143,8 +1191,14 @@ def EndOp : Op<Handshake_Dialect, "end", [
   Terminator,
   HasParent<"handshake::FuncOp">,
   DeclareOpInterfaceMethods<ControlInterface>,
+  // The IOs of a EndOp have simple names
   SimpleNamedIOInterface,
+  // The RTL input ports correspond to the IR
   InputRTLPortsAreOperandsInterface,
+  // The RTL output ports do not
+  // As they are actually based on the function results
+  // And so are defined here in the tablegen
+  // as part of the EndOp declaration
   CustomRTLOutputPortsInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
@@ -1162,9 +1216,24 @@ def EndOp : Op<Handshake_Dialect, "end", [
   let arguments = (ins Variadic<HandshakeType>:$inputs);
 
   let extraClassDeclaration = [{
-    unsigned getNumOutputPorts();
+    // unsigned getNumOutputPorts();
 
-    std::string getOutputPortName(unsigned idx);
+    // std::string getOutputPortName(unsigned idx);
+
+    /// Output ports of EndOp are function results
+    unsigned EndOp::getNumOutputPorts(){
+      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+      assert(funcOp && "end must be child of handshake function");
+      return funcOp.getNumOutputPorts();
+    }
+
+    /// Output ports of EndOp are function results
+    std::string EndOp::getOutputPortName(unsigned idx){
+      handshake::FuncOp funcOp = (*this)->getParentOfType<handshake::FuncOp>();
+      assert(funcOp && "end must be child of handshake function");
+      return funcOp.getOutputPortName(idx);
+    }
+
   }];
 
   let assemblyFormat = [{
