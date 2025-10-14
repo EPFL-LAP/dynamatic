@@ -244,6 +244,8 @@ def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
