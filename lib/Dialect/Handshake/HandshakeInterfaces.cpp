@@ -67,18 +67,18 @@ std::string getResultName(Operation *op, size_t resIdx) {
   assert(0);
 }
 
-unsigned getNumInputPorts(Operation *op) {
-  if(auto operandPortsInterface = 
-              dyn_cast<handshake::InputRTLPortsAreOperandsInterface>(op)){
-    return operandPortsInterface.getNumInputPorts();
-  } else if (auto customPortsInterface = 
-              dyn_cast<handshake::CustomRTLInputPortsInterface>(op)){
-    return customPortsInterface.getNumInputPorts();
-  }
+// unsigned getNumInputPorts(Operation *op) {
+//   if(auto operandPortsInterface = 
+//               dyn_cast<handshake::InputRTLPortsAreOperandsInterface>(op)){
+//     return operandPortsInterface.getNumInputPorts();
+//   } else if (auto customPortsInterface = 
+//               dyn_cast<handshake::CustomRTLInputPortsInterface>(op)){
+//     return customPortsInterface.getNumInputPorts();
+//   }
 
-  op->emitError("All operations must specify input ports");
-  assert(0);
-}
+//   op->emitError("All operations must specify input ports");
+//   assert(0);
+// }
 
 std::string getInputPortName(Operation *op, size_t portIdx) {
   if(auto operandPortsInterface = 
@@ -93,18 +93,18 @@ std::string getInputPortName(Operation *op, size_t portIdx) {
   assert(0);
 }
 
-unsigned getNumOutputPorts(Operation *op) {
-  if(auto resultsPortsInterface = 
-              dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
-    return resultsPortsInterface.getNumOutputPorts();
-  } else if (auto customPortsInterface = 
-              dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
-    return customPortsInterface.getNumOutputPorts();
-  }
+// unsigned getNumOutputPorts(Operation *op) {
+//   if(auto resultsPortsInterface = 
+//               dyn_cast<handshake::OutputRTLPortsAreResultsInterface>(op)){
+//     return resultsPortsInterface.getNumOutputPorts();
+//   } else if (auto customPortsInterface = 
+//               dyn_cast<handshake::CustomRTLOutputPortsInterface>(op)){
+//     return customPortsInterface.getNumOutputPorts();
+//   }
 
-  op->emitError("All operations must specify output ports");
-  assert(0);
-}
+//   op->emitError("All operations must specify output ports");
+//   assert(0);
+// }
 
 std::string getOutputPortName(Operation *op, size_t portIdx) {
   if(auto resultsPortsInterface = 
