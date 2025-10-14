@@ -1139,10 +1139,9 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
   ModuleBuilder modBuilder(funcOp.getContext());
 
   // Add all function outputs to the module
-  for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes())){
-    StringAttr resName = funcOp.getResName(idx);
-    modBuilder.addOutput(resName.getValue(), lowerType(res));
-  }
+  for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
+    modBuilder.addOutput(funcOp.getResName(idx);.getValue(), lowerType(res));
+  
   
 
   // Add all function inputs to the module, expanding memory references into a
