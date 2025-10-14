@@ -39,7 +39,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          OutputRTLPortsAreResultsInterface
          ]> {
   // Shared functions to include in child classes 
-  let validateIO = [{
+  string validateIO = [{
     void validateOperandIdx(unsigned idx){
       assert(idx < getOperation()->getNumOperands() && "index too high");
     }
