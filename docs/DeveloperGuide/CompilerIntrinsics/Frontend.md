@@ -4,16 +4,16 @@ This document describes Dynamatic's C frontend (under `tools/translate-llvm-to-s
 
 Sections:
 
-1. [Design](#design): The principle of the C frontend, and how to interact with it.
-2. [LLVM to MLIR translation](#llvm-to-mlir-translation)
-3. [Memory dependency analysis](#memory-dependency-analysis)
+1. [Design](#design): The role of a C frontend.
+2. [LLVM to MLIR translation](#llvm-to-mlir-translation): The conversion mechanism between LLVM IR and MLIR standard dialect.
+3. [Memory dependency analysis](#memory-dependency-analysis): The memory dependency analysis for minimizing LSQ usage.
 
 ## Design 
 
 ### What Does a C Frontend Do?
 
 Dynamatic's C frontend has three main objectives:
-- Converting (a well-defined subset of) C to the standard MLIR dialects (see below).
+- Converting C code to the standard MLIR dialects (see below).
 - Performing generic IR optimizations.
 - Performing memory analysis (which load depends on which store?).
 
@@ -23,15 +23,14 @@ The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dial
 - Math dialect for advanced floating-point math operations.
 - MemRef for representing arrays and memory accesses.
 
-### Reused Components from the LLVM project
+### Reused Components from the LLVM Project
 
 Since Dynamatic depends on the `llvm-project`, it can reuse many components:
 - `clang` can translate the input C code to LLVM IR.
 - `opt` provides a variety of transformations (e.g., cfg optimization, code motion, strength reduction, etc) and analyses (e.g., pointer alias analysis).
 - `polly` provides polyhedral analysis (we use this to analyze the index accessing pattern).
 
-#### Notable Optimizations that We Need from the LLVM Project
-
+Notable optimizations that we need from the LLVM project:
 - `mem2reg`: Suppresses allocas (allocate memory on the heap) into regs.
 - `instcombine`: Local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of GEPs.
 - `loop-rotate`: transform loops to do-while loops as much as possible.
@@ -49,7 +48,7 @@ Since Dynamatic depends on the `llvm-project`, it can reuse many components:
 > 
 We decided not to use this approach because the LLVM IR-to-LLVM dialect translation does not preserve custom LLVM metadata. This would drop the memory analysis annotation (marked as llvm metadata nodes).
 
-## LLVM to MLIR translation
+## LLVM to MLIR Translation
 
 The translation between LLVM IR and the standard dialects (especially the subset that is supported in Dynamatic) is mostly straightforward. 
 
@@ -65,7 +64,7 @@ The translation between LLVM IR and the standard dialects (especially the subset
 
 Since LLVM discards the argument types of the array arguments, `translate-llvm-to-std` analyzes the AST of the original input C code to recover the dimension(s) and the types.
 
-### LLVM to Std Translation Algorithm
+### LLVM to Standard MLIR Dialect Translation Algorithm
 
 During translation, Dynamatic maintains the following mapping between the LLVM
 IR and MLIR:
@@ -92,6 +91,6 @@ For each LLVM function, Dynamatic performs the following translation:
 > The `instCombine` pass must be applied before the conversion to eliminate a
 > chain of GEPs.
 
-## Memory dependency analysis
+## Memory Dependency Analysis
 
 TODO
