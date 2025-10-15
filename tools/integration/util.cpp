@@ -18,8 +18,8 @@
 
 using json = nlohmann::json;
 
-bool runSubprocess(const std::vector<std::string> &args,
-                   const fs::path &outputPath) {
+static bool runSubprocess(const std::vector<std::string> &args,
+                          const fs::path &outputPath) {
   std::ostringstream command;
   command << args[0];
   for (size_t i = 1; i < args.size(); ++i) {
@@ -30,15 +30,12 @@ bool runSubprocess(const std::vector<std::string> &args,
   return std::system(command.str().c_str()) == 0;
 };
 
-int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath,
-                       bool useVerilog) {
-  fs::path path =
-      customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
-      name / (name + ".c");
+int runIntegrationTest(IntegrationTestData &config) {
+  fs::path cSourcePath =
+      config.benchmarkPath / config.name / (config.name + ".c");
 
-  std::cout << "[INFO] Running " << name << std::endl;
-  std::string tmpFilename = "tmp_" + name + ".dyn";
+  std::cout << "[INFO] Running " << config.name << std::endl;
+  std::string tmpFilename = "tmp_" + config.name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
     std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
@@ -46,10 +43,17 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   }
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
-             << "set-src " << path.string() << std::endl
-             << "set-clock-period 5" << std::endl
-             << "compile --buffer-algorithm fpga20" << std::endl
-             << "write-hdl --hdl " << (useVerilog ? "verilog" : "vhdl")
+             << "set-src " << cSourcePath.string() << std::endl
+             << "set-clock-period 5" << std::endl;
+
+  // clang-format off
+  scriptFile << "compile"
+             << " --buffer-algorithm " << config.bufferAlgorithm
+             << (config.useSharing ? " --sharing" : "")
+             << " --milp-solver " << config.milpSolver << std::endl;
+  // clang-format on
+
+  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
              << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
@@ -57,8 +61,10 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   scriptFile.close();
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
-  fs::path dynamaticOutPath = path.parent_path() / "out" / "dynamatic_out.txt";
-  fs::path dynamaticErrPath = path.parent_path() / "out" / "dynamatic_err.txt";
+  fs::path dynamaticOutPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
   if (!fs::exists(dynamaticOutPath.parent_path())) {
     fs::create_directories(dynamaticOutPath.parent_path());
   }
@@ -72,8 +78,11 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
 
   int status = system(cmd.c_str());
   if (status == 0) {
-    fs::path logFilePath = path.parent_path() / "out" / "sim" / "report.txt";
-    outSimTime = getSimulationTime(logFilePath);
+    fs::path logFilePath =
+        cSourcePath.parent_path() / "out" / "sim" / "report.txt";
+    config.simTime = getSimulationTime(logFilePath);
+    std::cout << "[INFO] Benchmark " << config.name
+              << " latency: " << config.simTime << " cycles" << std::endl;
   }
 
   return status;
