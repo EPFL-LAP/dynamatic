@@ -586,6 +586,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
+        addBoolean("DEBUG_COUNTER", bufferOp.getDebugCounter());
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
