@@ -57,6 +57,7 @@ The translation between LLVM IR and the standard dialects (especially the subset
 > Key differences between LLVM IR and MLIR:
 > - LLVM uses void ptrs for array inputs (both for fixed-size arrays `int arr[10][20]` and arrays with unbounded length `int * arr`). While in standard dialect, we use memref types `memref<10 * 20 * i32>` for referencing an array.
 > - LLVM does not represent constants as operations, while in MILR, constants must be "materialized" as explicit constant operations.
+> - LLVM has explicit SSA Phi nodes. MLIR replaces the Phis by block arguments.
 > - The MemRef dialect does not have a special GEP operation for the array index calculation (e.g., `a[0][1]`); instead, it has a high-level syntax like `%result = memref.load [%memrefValue] %dim0, %dim1`. Therefore, GEPs are replaced by a direct connection between indices to the loads/stores. 
 > - In LLVM, global values can be referenced by GEPs, but in MLIR memref dialect, global values can only be referenced via `get_global` op via the `sym_name` symbol attached to the global op.
 
@@ -75,14 +76,17 @@ IR and MLIR:
 
 Dynamatic performs these translation steps for the LLVM module:
 
-- Create a corresponding `arith::ConstantOp` for each constant input of each `llvm::Instruction *` in LLVM IR.
 - Create an MLIR function for each LLVM function.
 
 For each LLVM function, Dynamatic performs the following translation:
 
-- Create an MLIR block for every basic block in LLVM. Remember the BB mappings. For every block argument in LLVM, it creates the corresponding block argument in MLIR (for each array function argument, the original C code is used to recover the correct memref type). Remember the value mappings.
-- Create a memref global operation for each global variable in LLVM.
-- Create an operation in LLVM for each MLIR operation (*with exception*).
+1. **Constant materialization**. Create a corresponding `arith::ConstantOp` for each constant input of each `llvm::Instruction *` in LLVM IR.
+2. **Block conversion**. Create an MLIR block for every basic block in LLVM. Remember the BB mappings. For every Phi output in LLVM, it creates the corresponding block argument in MLIR (for each array function argument, the original C code is used to recover the correct memref type). Remember the value mappings.
+3. **Global conversion**. Create a memref global operation for each global variable in LLVM.
+4. **Instruction translation**. Create an operation in LLVM for each MLIR operation (exception: GEP are removed and the indices are directly connected to the loads and stores) from the input values (retrieved from the value mapping).
+
+> [!NOTE]
+> The syntax of the GEP instruction in LLVM is often simplified/shortened. This requires a sophisticated conversion rule for GEP. Check out the LLVM documentation on [caveats of GEP syntax](https://llvm.org/docs/GetElementPtr.html) for more details.
 
 > [!IMPORTANT]
 > The `instCombine` pass must be applied before the conversion to eliminate a
