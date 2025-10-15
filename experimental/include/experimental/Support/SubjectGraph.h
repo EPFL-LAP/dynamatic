@@ -62,7 +62,7 @@ protected:
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
-                               BaseSubjectGraph *moduleBeforeSubjectGraph);
+                               unsigned int inputIndex);
 
   // Function to assign signals to the ChannelSignals struct based on the
   // rules provided. It processes the nodes in the BLIF file and assigns them
@@ -137,6 +137,21 @@ private:
 
 public:
   ArithSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
+class FloatingPointSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals lhsNodes;
+  ChannelSignals rhsNodes;
+  ChannelSignals resultNodes;
+
+  void processOutOfRuleNodes();
+
+public:
+  FloatingPointSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
@@ -279,6 +294,18 @@ public:
   SelectSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
+class SIFPSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
+
+public:
+  SIFPSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int) override;
 };
 
 class MergeSubjectGraph : public BaseSubjectGraph {
