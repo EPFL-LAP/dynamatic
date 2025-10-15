@@ -1,6 +1,6 @@
 # C Frontend
 
-This document describes Dynamatic's C frontend.
+This document describes Dynamatic's C frontend (under `tools/translate-llvm-to-std`).
 
 Sections:
 
@@ -28,7 +28,7 @@ The output of Dynamatic's C frontend is an MLIR IR built written in standard MLI
 Since Dynamatic depends on the `llvm-project`, it can reuse many components:
 - `clang` can translate the input C code to LLVM IR.
 - `opt` provides a variety of transformations (e.g., cfg optimization, code motion, strength reduction, etc) and analyses (e.g., pointer alias analysis).
-- `polly` provides polyhedral analysis (we use this to analysis the index accessing pattern).
+- `polly` provides polyhedral analysis (we use this to analyze the index accessing pattern).
 
 ### Components in Dynamatic: 
 
