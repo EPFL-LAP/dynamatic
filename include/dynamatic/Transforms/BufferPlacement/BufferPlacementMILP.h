@@ -18,6 +18,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/MILP.h"
@@ -33,8 +34,6 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
 namespace dynamatic {
 namespace buffer {
 
@@ -42,19 +41,19 @@ namespace buffer {
 /// a channel's endpoints.
 struct TimeVars {
   /// Time at channel's input (i.e., at source unit's output port).
-  GRBVar tIn;
+  CPVar tIn;
   /// Time at channel's output (i.e., at destination unit's input port).
-  GRBVar tOut;
+  CPVar tOut;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
 /// appear in multiple CFDFCs and so may have multiple sets of these variables.
 struct UnitVars {
   /// Fluid retiming of tokens at unit's input (real).
-  GRBVar retIn;
+  CPVar retIn;
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
-  GRBVar retOut;
+  CPVar retOut;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -63,7 +62,7 @@ struct ChannelSignalVars {
   /// Arrival time of the signal at channel's endpoints.
   TimeVars path;
   /// Presence of a buffer on the signal.
-  GRBVar bufPresent;
+  CPVar bufPresent;
 };
 
 /// Holds all MILP variables associated to a channel.
@@ -72,13 +71,13 @@ struct ChannelVars {
   /// (real, real) and buffer presence (binary).
   std::map<SignalType, ChannelSignalVars> signalVars;
   /// Presence of any buffer on the channel (binary).
-  GRBVar bufPresent;
+  CPVar bufPresent;
   /// Number of buffer slots on the channel (integer).
-  GRBVar bufNumSlots;
+  CPVar bufNumSlots;
   /// Buffer latency on the data signal path (integer).
-  GRBVar dataLatency;
+  CPVar dataLatency;
   /// Usage of a shift register on the channel (binary).
-  GRBVar shiftReg;
+  CPVar shiftReg;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -88,9 +87,9 @@ struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
   llvm::MapVector<Operation *, UnitVars> unitVars;
   /// Channel throughput variables (real).
-  llvm::MapVector<Value, GRBVar> channelThroughputs;
+  llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
-  GRBVar throughput;
+  CPVar throughput;
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
@@ -124,15 +123,16 @@ public:
   /// adjusting for components' internal buffers given by the timing models. If
   /// some buffering properties become unsatisfiable following this step, the
   /// constructor sets the `unsatisfiable` flag to true.
-  BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
-                      const TimingDatabase &timingDB, double targetPeriod);
+  BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
+                      FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                      double targetPeriod);
 
   /// Follows the same pre-processing step as the other constructor; in
   /// addition, dumps the MILP model and solution under the provided name in the
   /// logger's directory.
-  BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
-                      const TimingDatabase &timingDB, double targetPeriod,
-                      Logger &logger, StringRef milpName);
+  BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
+                      FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                      double targetPeriod, Logger &logger, StringRef milpName);
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -310,7 +310,7 @@ protected:
   // is selected.
   void addCutSelectionConflicts(experimental::Node *root,
                                 experimental::Node *leaf,
-                                GRBVar &cutSelectionVar,
+                                CPVar &cutSelectionVar,
                                 experimental::LogicNetwork *blifData,
                                 std::vector<experimental::Node *> &path);
 
@@ -388,26 +388,40 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
+  /// Constant representing the error threshold for floating-point numbers in
+  /// the MILP model. This is used to determine whether a variable's value is
+  /// close enough to zero to be considered zero.
+  static constexpr double MILP_EPSILON = 1e-6;
+
   /// Store the buffer placement MILP solution. This makes it possible for a
   /// later pass in the pass pipeline to retrieve the throughput and occupancy
   /// of each CFDFC of the current function.
   void populateCFDFCThroughputAndOccupancy() {
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
-      double cfThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      cf->throughput = cfThroughput;
 
+      cf->throughput = model->getValue(cfVars.throughput);
       // Store the unit occupancy into the CFDFC data structure.
       for (auto &[op, var] : cfVars.unitVars) {
         double occupancy =
-            var.retOut.get(GRB_DoubleAttr_X) - var.retIn.get(GRB_DoubleAttr_X);
+            model->getValue(var.retOut) - model->getValue(var.retIn);
+        // Approximate occupancy to 0 if it is negative but bigger than
+        // -MILP_EPSILON.
+        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+          occupancy = 0.0;
+        }
         assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
         cf->unitOccupancy[op] = occupancy;
       }
 
       // Store the channel occupancy into the CFDFC data structure.
       for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = var.get(GRB_DoubleAttr_X);
+        double occupancy = model->getValue(var);
+        // Approximate occupancy to 0 if it is negative but bigger than
+        // -MILP_EPSILON.
+        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+          occupancy = 0.0;
+        }
         assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
         cf->channelOccupancy[val] = occupancy;
       }
@@ -423,6 +437,5 @@ private:
 
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H

@@ -44,10 +44,16 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl
-             << "set-clock-period 5" << std::endl
-             << "compile --buffer-algorithm fpga20 "
-             << (config.useSharing ? "--sharing" : "") << std::endl
-             << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
+             << "set-clock-period 5" << std::endl;
+
+  // clang-format off
+  scriptFile << "compile"
+             << " --buffer-algorithm " << config.bufferAlgorithm
+             << (config.useSharing ? " --sharing" : "")
+             << " --milp-solver " << config.milpSolver << std::endl;
+  // clang-format on
+
+  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
              << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
