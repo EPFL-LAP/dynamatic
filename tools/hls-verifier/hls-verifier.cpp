@@ -72,7 +72,7 @@ void generateModelsimScripts(const VerificationContext &ctx) {
     os << "eval vsim tb\n";
   }
   os << "log -r *\n";
-  os << "run -all\n";
+  os << "run 10000ns -all \n";
   os << "exit\n";
 }
 

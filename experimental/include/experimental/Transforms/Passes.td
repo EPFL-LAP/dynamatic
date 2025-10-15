@@ -52,6 +52,17 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
+def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
+  let summary = "Post-buffering speculation pass";
+  let description = [{
+    Speculation integration requires some steps to be performed after the
+    buffer placement pass:
+    - Finalize speculative units
+  }];
+  let options = [
+  ];
+}
+
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of

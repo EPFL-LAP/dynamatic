@@ -1127,6 +1127,24 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os.unindent();
     os << "\n";
   }
+
+  os << "\n# =================== #\n";
+  os << "# Unit Retimings #\n";
+  os << "# =================== #\n\n";
+
+  // Log retimings of all units in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Unit retimings of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (auto &[op, unitVars] : cfVars.unitVars) {
+      os << getUniqueName(op)
+         << ": (in: " << unitVars.retIn.get(GRB_DoubleAttr_X)
+         << ", out: " << unitVars.retOut.get(GRB_DoubleAttr_X) << ")\n";
+    }
+    os.unindent();
+    os << "\n";
+  }
 }
 
 void BufferPlacementMILP::initialize() {
