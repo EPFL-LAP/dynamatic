@@ -5,8 +5,8 @@ This document describes Dynamatic's C frontend (under `tools/translate-llvm-to-s
 Sections:
 
 1. [Design](#design): The principle of the C frontend, and how to interact with it.
-2. [LLVM to MLIR translation](#LLVM to MLIR translation)
-3. [Memory dependency analysis](#Memory dependency analysis)
+2. [LLVM to MLIR translation](#llvm-to-mlir-translation)
+3. [Memory dependency analysis](#memory-dependency-analysis)
 
 ## Design 
 
