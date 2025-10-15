@@ -1,0 +1,105 @@
+
+def generate_select(name, parameters):
+    bitwidth = parameters["bitwidth"]
+    return _generate_select(name, bitwidth)
+
+
+def _generate_select(name, bitwidth):
+
+    antitoken_module_name = name + "_antitokens"
+
+    antitokens = f"""
+// Module of {antitoken_module_name} - Antitoken generation logic for handshake select
+module {antitoken_module_name} (
+  // inputs
+  input  clk,
+  input  reset,
+  input  pvalid1,
+  input  pvalid0,
+  input  generate_at1,
+  input  generate_at0,
+  // outputs
+  output  kill1,
+  output  kill0,
+  output  stop_valid
+);
+
+  wire reg_in0;
+  wire reg_in1;
+  reg reg_out0 = 1'b0;
+  reg reg_out1 = 1'b0;
+
+  always @(posedge clk) begin
+    if (reset) begin
+      reg_out0 <= 1'b0;
+      reg_out1 <= 1'b0;
+    end else begin
+      reg_out0 <= reg_in0;
+      reg_out1 <= reg_in1;
+    end
+  end
+
+  assign reg_in0 = !pvalid0 & (generate_at0 | reg_out0);
+  assign reg_in1 = !pvalid1 & (generate_at1 | reg_out1);
+
+  assign stop_valid = reg_out0 | reg_out1;
+
+  assign kill0 = generate_at0 | reg_out0;
+  assign kill1 = generate_at1 | reg_out1;
+
+endmodule
+"""
+
+    selector = f"""
+// Module of select
+module {name}(
+  // inputs
+  input  clk,
+  input  rst,
+  input  condition,
+  input  condition_valid,
+  input  [{bitwidth}-1 : 0] trueValue,
+  input  trueValue_valid,
+  input  [{bitwidth}-1 : 0] falseValue,
+  input  falseValue_valid,
+  input  result_ready,
+  // outputs
+  output  [{bitwidth}-1 : 0] result,
+  output  result_valid,
+  output  condition_ready,
+  output  trueValue_ready,
+  output  falseValue_ready
+);
+
+  wire ee, validInternal, kill0, kill1, antitokenStop, g0, g1;
+
+  // condition and one input
+  assign ee = condition_valid & ( ( !condition & falseValue_valid) | (condition & trueValue_valid) );
+  // propagate ee if not stopped antitoken
+  assign validInternal = ee & !antitokenStop;
+
+  assign g0 = !trueValue_valid & validInternal & result_ready;
+  assign g1 = !falseValue_valid & validInternal & result_ready;
+
+  assign result_valid = validInternal;
+  assign trueValue_ready = (validInternal & result_ready) | kill0; // normal join or antitoken
+  assign falseValue_ready = (validInternal & result_ready) | kill1; // normal join or antitoken
+  assign condition_ready = (validInternal & result_ready); // normal join
+
+  assign result = condition ? trueValue : falseValue;
+
+  {antitoken_module_name} antitokens (
+    .clk(clk),
+    .reset(rst),
+    .pvalid0(trueValue_valid),
+    .pvalid1(falseValue_valid),
+    .generate_at0(g0),
+    .generate_at1(g1),
+    .kill0(kill0),
+    .kill1(kill1),
+    .stop_valid(antitokenStop)
+  );
+
+endmodule
+"""
+    return antitokens + selector

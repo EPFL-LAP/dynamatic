@@ -1,0 +1,38 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[INFO] Compiled cf to handshake
+[INFO] Applied transformations to handshake
+[INFO] Running simple buffer placement (on-merges).
+[INFO] Placed simple buffers
+[INFO] Canonicalized handshake
+[INFO] Created minimal DOT
+[INFO] Converted minimal DOT to PNG
+[INFO] Created minimal_CFG DOT
+[INFO] Converted minimal_CFG DOT to PNG
+[INFO] Lowered to HW
+[INFO] Compilation succeeded
+[INFO] Exported RTL (verilog)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-dynamatic-path /home/iaganz/devian/dynamatic
+dynamatic> set-src /home/iaganz/devian/dynamatic/integration-test/minimal/minimal.c
+dynamatic> compile
+dynamatic> write-hdl --hdl verilog
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!

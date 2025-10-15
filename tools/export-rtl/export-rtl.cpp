@@ -79,11 +79,13 @@ static cl::opt<std::string> propertyFilename("property-database", cl::Optional,
                                              cl::cat(mainCategory));
 
 static cl::opt<HDL>
-    hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
-        cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
-                   clEnumValN(HDL::VERILOG, "verilog", "Verilog"),
-                   clEnumValN(HDL::SMV, "smv", "SMV")),
-        cl::cat(mainCategory));
+  hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
+    cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
+           clEnumValN(HDL::VHDL, "vhdl-beta", "VHDL Beta"),
+           clEnumValN(HDL::VERILOG, "verilog", "Verilog"),
+           clEnumValN(HDL::VERILOG, "verilog-beta", "Verilog Beta"),
+           clEnumValN(HDL::SMV, "smv", "SMV")),
+    cl::cat(mainCategory));
 
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
