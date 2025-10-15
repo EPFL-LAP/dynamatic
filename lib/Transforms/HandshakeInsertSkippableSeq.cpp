@@ -1055,8 +1055,22 @@ SkipConditionForPair createSkipConditionsForAllPairs(
             // SmallVector<Value> extraDelayedAddresses =
             //     std::get<1>(bothDelayedAddresses);
 
+            rewriter.setInsertionPoint(predecessorOpPointer);
+            Value prevResult = predecessorOpDoneSignal;
+            for (unsigned i = 0; i < N; i++) {
+              handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
+                  predecessorOpPointer->getLoc(), prevResult);
+              inheritBB(predecessorOpPointer, initOp);
+              prevResult = initOp.getResult();
+            }
+
+            rewriter.setInsertionPoint(predecessorOpPointer);
+            handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
+                predecessorOpPointer->getLoc(), predecessorOpAddr, prevResult);
+            inheritBB(predecessorOpPointer, gateOp);
+
             SmallVector<Value> delayedAddresses =
-                getNDelayedValues(predecessorOpAddr, predecessorOpPointer, N,
+                getNDelayedValues(gateOp.getResult(), predecessorOpPointer, N,
                                   addressDelayGenerator, rewriter);
 
             StringRef successorOpName = dependency.getDstAccess();
@@ -1073,20 +1087,20 @@ SkipConditionForPair createSkipConditionsForAllPairs(
 
             // paolo join
 
-            rewriter.setInsertionPoint(predecessorOpPointer);
-            Value prevResult = predecessorOpDoneSignal;
-            for (unsigned i = 0; i < N - 1; i++) {
-              handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
-                  predecessorOpPointer->getLoc(), prevResult);
-              inheritBB(predecessorOpPointer, initOp);
-              prevResult = initOp.getResult();
-            }
+            // rewriter.setInsertionPoint(predecessorOpPointer);
+            // Value prevResult = predecessorOpDoneSignal;
+            // for (unsigned i = 0; i < N - 1; i++) {
+            //   handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
+            //       predecessorOpPointer->getLoc(), prevResult);
+            //   inheritBB(predecessorOpPointer, initOp);
+            //   prevResult = initOp.getResult();
+            // }
 
-            rewriter.setInsertionPoint(predecessorOpPointer);
-            handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
-                predecessorOpPointer->getLoc(), delayedAddresses.back(),
-                prevResult);
-            inheritBB(predecessorOpPointer, gateOp);
+            // rewriter.setInsertionPoint(predecessorOpPointer);
+            // handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
+            //     predecessorOpPointer->getLoc(), delayedAddresses.back(),
+            //     prevResult);
+            // inheritBB(predecessorOpPointer, gateOp);
 
             SmallVector<Value> skipConditions = createSkipConditionForPair(
                 predecessorOpDoneSignal, predecessorOpPointer,
