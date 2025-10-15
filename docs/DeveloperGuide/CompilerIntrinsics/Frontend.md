@@ -46,7 +46,7 @@ Notable optimizations that we need from the LLVM project:
 > [!NOTE]
 > **Design choice**. Notably, MLIR internally has a translation tool for converting LLVM IR to the LLVM dialect. So one alternative is to build an MLIR dialect translation pass to convert the LLVM dialect to the standard dialect.
 > 
-We decided not to use this approach because the LLVM IR-to-LLVM dialect translation does not preserve custom LLVM metadata. This would drop the memory analysis annotation (marked as llvm metadata nodes).
+> We decided **not to use this approach** because the LLVM IR-to-LLVM dialect translation does not preserve custom LLVM metadata. This would drop the memory analysis annotation (marked as llvm metadata nodes).
 
 ## LLVM to MLIR Translation
 
