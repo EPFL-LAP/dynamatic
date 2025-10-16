@@ -36,6 +36,7 @@
   
 - [Compiler Intrinsics]()
   - [Backend](DeveloperGuide/CompilerIntrinsics/Backend.md)
+  - [BetaBackend](DeveloperGuide/CompilerIntrinsics/Backend.md)
   - [Extra Signals Type Verification](DeveloperGuide/CompilerIntrinsics/ExtraSignalsTypeVerification.md)
   - [MLIR Op Instantiation C Level](DeveloperGuide/CompilerIntrinsics/MLIROpInstantiationCLevel.md)
   - [MLIR Primer](DeveloperGuide/CompilerIntrinsics/MLIRPrimer.md)
