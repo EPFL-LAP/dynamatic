@@ -700,7 +700,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
       hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', "
+                   << "', possible options are 'vhdl', 'vhdl-beta',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }

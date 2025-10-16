@@ -850,7 +850,7 @@
     "module-name": "logic_not"
   },
   {
-    "name": "handshake.ready_remover",
+    "name": "handshake.rigidifier",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ready_remover -p bitwidth=$BITWIDTH"
   },
   {

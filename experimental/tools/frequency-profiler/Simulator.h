@@ -79,6 +79,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::DivFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::NegFOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemFOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemSIOp, std::vector<Any> &,
