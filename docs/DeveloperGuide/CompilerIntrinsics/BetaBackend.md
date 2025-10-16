@@ -143,7 +143,7 @@ Speculation. taint tracking, and tagged tokens for multi-threading, require wrap
 For arithmetic units which have IP cores, the beta backend does not handle the IP cores themselves: these are generated offline, and imported into the synthesis or simulation library unconditonally.
 
 
-However, the beta backend, does generate the following wrapper, which is mostly IP agnostic:
+However, the beta backend does generate the following wrapper, which is mostly IP agnostic:
 
 <img alt="IP core wrapper" src="./Figures/BetaBackend/ip_wrapper.png" width="300" />
 
