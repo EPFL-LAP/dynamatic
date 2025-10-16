@@ -112,6 +112,12 @@ struct Gate {
   /// Block whose terminator is used to drive the condition of the gate.
   Block *conditionBlock;
 
+  /// Condition of the gate.
+  boolean::BoolExpression *condition;
+
+  /// list of condition cofactors
+  std::vector<std::string> cofactorList;
+
   /// Block in which the gate is placed
   Block *gateBlock;
 
@@ -128,9 +134,12 @@ struct Gate {
 
   /// Initialize the values of the gate.
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
-       Block *c = nullptr, bool muGen = false)
+       Block *c = nullptr,
+       boolean::BoolExpression *cond = boolean::BoolExpression::boolZero(),
+       std::vector<std::string> cof = {}, bool muGen = false)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
-        gateBlock(v.getParentBlock()), muGenerated(muGen), index(i) {}
+        condition(cond), cofactorList(cof), gateBlock(v.getParentBlock()),
+        muGenerated(muGen), index(i) {}
 
   /// Print the information about the gate.
   void print();
@@ -216,7 +225,8 @@ private:
   void printAllGates();
 
   /// Mark as mu all the phi gates which correspond to loop variables.
-  void convertPhiToMu(Region &region);
+  void convertPhiToMu(Region &region,
+                      const experimental::ftd::BlockIndexing &bi);
 
   /// Convert some phi gates to trees of gamma gates.
   void convertPhiToGamma(Region &region,
