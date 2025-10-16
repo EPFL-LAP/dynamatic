@@ -66,58 +66,6 @@ struct HandshakeInsertSkippableSeqPass
 };
 } // namespace
 
-class FTDBoolExpressions {
-  BoolExpression *supp, *regen, *prodCons;
-  bool needsShanon;
-
-public:
-  FTDBoolExpressions(){};
-
-  FTDBoolExpressions(BoolExpression *supp, BoolExpression *regen,
-                     BoolExpression *prodCons, bool needsShanon) {
-    this->supp = supp;
-    this->regen = regen;
-    this->prodCons = prodCons;
-    this->needsShanon = needsShanon;
-  }
-
-  BoolExpression *getSupp() { return supp; }
-
-  BoolExpression *getRegen() { return regen; }
-
-  BoolExpression *getProdcons() { return prodCons; }
-
-  bool DoesNeedShanon() { return needsShanon; }
-
-  void SetNeedsShanon(bool needsShanon) { this->needsShanon = needsShanon; }
-
-  SmallVector<BoolExpression *> getAsVector() {
-    return {supp, regen, prodCons};
-  }
-};
-
-using FTDBoolExpForPair =
-    DenseMap<StringRef, DenseMap<StringRef, FTDBoolExpressions>>;
-
-class FTDConditionValues {
-  Value supp, regen, prodCons;
-
-public:
-  FTDConditionValues(SmallVector<Value> values) {
-    supp = values[0];
-    regen = values[1];
-    prodCons = values[2];
-  }
-
-  Value getSupp() { return supp; }
-
-  Value getRegen() { return regen; }
-
-  Value getProdCons() { return prodCons; }
-
-  SmallVector<Value> getAsVector() { return {supp, regen, prodCons}; }
-};
-
 class FuncOpInformation {
 
 private:
@@ -308,133 +256,6 @@ void updateRegenConditionForLoop(Block *predecessorBlock, Block *successorBlock,
   }
 }
 
-/// This function calculates the FTD conditions for a pair of memory accesses.
-FTDBoolExpressions calculateFTDConditions(Block *predecessorBlock,
-                                          Block *successorBlock,
-                                          std::string kernelName,
-                                          FuncOpInformation &funcOpInformation,
-                                          ConversionPatternRewriter &rewriter) {
-
-  BlockControlDepsMap cdAnalysis = funcOpInformation.getCdAnalysis();
-  Block *startBlock = funcOpInformation.getStartBlock();
-  BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
-
-  DenseSet<Block *> predControlDeps =
-      cdAnalysis[predecessorBlock].forwardControlDeps;
-
-  DenseSet<Block *> succControlDeps =
-      cdAnalysis[successorBlock].forwardControlDeps;
-
-  // Get rid of common entries in the two sets
-  // eliminateCommonBlocks(predControlDeps, succControlDeps);
-
-  BoolExpression *fProd1 = enumeratePaths(startBlock, predecessorBlock,
-                                          blockIndexing, predControlDeps);
-  BoolExpression *fCons1 = enumeratePaths(startBlock, successorBlock,
-                                          blockIndexing, succControlDeps);
-
-  BoolExpression *fProdAndCons = BoolExpression::boolAnd(fProd1, fCons1);
-
-  BoolExpression *fProd2 = enumeratePaths(startBlock, predecessorBlock,
-                                          blockIndexing, predControlDeps);
-  BoolExpression *fCons2 = enumeratePaths(startBlock, successorBlock,
-                                          blockIndexing, succControlDeps);
-
-  BoolExpression *fSuppress =
-      BoolExpression::boolAnd(fProd2, fCons2->boolNegate());
-
-  BoolExpression *fProd3 = enumeratePaths(startBlock, predecessorBlock,
-                                          blockIndexing, predControlDeps);
-  BoolExpression *fCons3 = enumeratePaths(startBlock, successorBlock,
-                                          blockIndexing, succControlDeps);
-
-  BoolExpression *fRegen =
-      BoolExpression::boolAnd(fProd3->boolNegate(), fCons3);
-
-  BoolExpression *ajib = enumeratePaths(predecessorBlock, successorBlock,
-                                        blockIndexing, succControlDeps);
-
-  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
-  bool producingGtUsing =
-      loopInfo.getLoopFor(predecessorBlock) &&
-      !loopInfo.getLoopFor(predecessorBlock)->contains(successorBlock);
-
-  if (producingGtUsing) {
-    handleConditionForLoop(predecessorBlock, successorBlock, fSuppress,
-                           funcOpInformation, rewriter);
-  }
-
-  bool usingGtProducing =
-      loopInfo.getLoopFor(successorBlock) &&
-      !loopInfo.getLoopFor(successorBlock)->contains(predecessorBlock);
-  if (usingGtProducing) {
-    updateRegenConditionForLoop(predecessorBlock, successorBlock, fRegen,
-                                funcOpInformation, rewriter);
-  }
-
-  outFile << "----------------------------------------------\n";
-  outFile << "Prod: " << fProd1->toString() << "\n";
-  outFile << "Cons: " << fCons1->toString() << "\n";
-  outFile << "Supp: " << fSuppress->toString() << "\n";
-  outFile << "Reg:  " << fRegen->toString() << "\n";
-  outFile << "Ajib: " << ajib->toString() << "\n";
-  outFile << "Pred Block: " << getBBNumberFromOp(&predecessorBlock->front())
-          << "\n";
-  outFile << "Succ Block: " << getBBNumberFromOp(&successorBlock->front())
-          << "\n";
-  outFile << "----------------------------------------------\n";
-  outFile.flush();
-
-  // llvm::errs() << "Supp: " << fSuppress->toString() << "\n";
-  // llvm::errs() << "Reg:  " << fRegen->toString() << "\n";
-  // llvm::errs() << "Prod: " << fProd1->toString() << "\n";
-  // llvm::errs() << "Cons: " << fCons1->toString() << "\n";
-
-  return FTDBoolExpressions(fSuppress, fRegen, fProdAndCons,
-                            doesNeedShanon(predecessorBlock, successorBlock,
-                                           predControlDeps, succControlDeps));
-}
-
-/// This function calculates the FTD conditions for all pairs of memory
-/// accesses that depend on each other. It uses the `calculateFTDConditions`
-/// function to do so.
-FTDBoolExpForPair calculateFtdConditionsForEachPair(
-    DenseMap<StringRef, Operation *> &memAccesses, std::string kernelName,
-    FuncOpInformation &funcOpInformation, ConversionPatternRewriter &rewriter) {
-
-  FTDBoolExpForPair ftdConditionsForEachPair;
-
-  for (auto [predecessorOpName, predecessorOpPointer] : memAccesses) {
-    if (auto deps =
-            getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
-
-      for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive())
-          continue;
-
-        StringRef successorOpName = dependency.getDstAccess();
-        Operation *successorOpPointer = memAccesses[successorOpName];
-
-        Block *predecessorBlock = getBlockFromOp(
-            predecessorOpPointer, funcOpInformation.getBlockIndexing());
-        Block *successorBlock = getBlockFromOp(
-            successorOpPointer, funcOpInformation.getBlockIndexing());
-
-        // llvm::errs() << "------------\n";
-        // llvm::errs() << getBBNumberFromOp(predecessorOpPointer) << "\n";
-        // llvm::errs() << getBBNumberFromOp(successorOpPointer) << "\n";
-
-        FTDBoolExpressions boolConditions =
-            calculateFTDConditions(predecessorBlock, successorBlock, kernelName,
-                                   funcOpInformation, rewriter);
-        ftdConditionsForEachPair[predecessorOpName][successorOpName] =
-            boolConditions;
-      }
-    }
-  }
-  return ftdConditionsForEachPair;
-}
-
 /// This function distributes the start signal to all blocks in the CFG.
 Value distributStartSignalToDstBlock(Value lastStartCopy, Block *block,
                                      Block *dstBlock, bool firstExec,
@@ -573,74 +394,6 @@ bool isInitialConsWithoutProdInSameBB(Operation *prod, Operation *cons) {
   // llvm::errs() << getBBNumberFromOp(prod) << getBBNumberFromOp(cons)
   //              << "((((\n";
   return cons->isBeforeInBlock(prod);
-}
-
-// Value constructConditionNormally(BDD *bdd) {
-
-//   boolVariabletoCircuit();
-
-//   Value node = boolExpressionToCircuit(rewriter, bdd->boolVariable, block,
-//   bi);
-
-//   Value falseValue =
-//   constructConditionNormally(bdd->successors.value().first); Value
-//   TrueValue = constructConditionNormally(bdd->successors.value().second);
-// }
-
-/// This function creates the circuit for a specific FTD condition.
-Value constructCircuitForCondition(BoolExpression *fBool,
-                                   BlockIndexing blockIndexing, Block *block,
-                                   Operation *opPointer,
-                                   ConversionPatternRewriter &rewriter) {
-  fBool = fBool->boolMinimize();
-
-  if (fBool->type == experimental::boolean::ExpressionType::One) {
-    handshake::SourceOp sourceOpConstOp =
-        rewriter.create<handshake::SourceOp>(opPointer->getLoc());
-
-    inheritBB(opPointer, sourceOpConstOp);
-
-    handshake::ConstantOp falseConstOp = rewriter.create<handshake::ConstantOp>(
-        opPointer->getLoc(), rewriter.getBoolAttr(true), sourceOpConstOp);
-    inheritBB(opPointer, falseConstOp);
-    return falseConstOp.getResult();
-  }
-  if (fBool->type != experimental::boolean::ExpressionType::Zero) {
-
-    std::set<std::string> blocks = fBool->getVariables();
-
-    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-    BDD *bdd = buildBDD(fBool, cofactorList);
-    Value condValue = bddToCircuit(rewriter, bdd, block, blockIndexing);
-    return condValue;
-  }
-
-  handshake::SourceOp sourceOpConstOp =
-      rewriter.create<handshake::SourceOp>(opPointer->getLoc());
-  inheritBB(opPointer, sourceOpConstOp);
-
-  handshake::ConstantOp falseConstOp = rewriter.create<handshake::ConstantOp>(
-      opPointer->getLoc(), rewriter.getBoolAttr(false), sourceOpConstOp);
-  inheritBB(opPointer, falseConstOp);
-  return falseConstOp.getResult();
-}
-
-/// This function creates all of the FTD conditions for a pair of memory
-/// accesses.
-FTDConditionValues constructCircuitForAllConditions(
-    FTDBoolExpressions ftdBoolExpressions, BlockIndexing blockIndexing,
-    Operation *opPointer, ConversionPatternRewriter &rewriter) {
-
-  Block *block = getBlockFromOp(opPointer, blockIndexing);
-
-  SmallVector<Value> results;
-  for (BoolExpression *ftdCond : ftdBoolExpressions.getAsVector()) {
-    Value value = constructCircuitForCondition(ftdCond, blockIndexing, block,
-                                               opPointer, rewriter);
-
-    results.push_back(value);
-  }
-  return FTDConditionValues(results);
 }
 
 /// This function creates the regeneration block for the given main values
@@ -853,80 +606,11 @@ SmallVector<Value> insertSuppressBlock(
 SmallVector<Value> createSkipConditionForPair(
     Value predecessorOpDoneSignal, Operation *predecessorOpPointer,
     Operation *successorOpPointer, SmallVector<Value> delayedAddresses,
-    FTDBoolExpressions ftdConditions, BlockIndexing blockIndexing, unsigned N,
+    BlockIndexing blockIndexing, unsigned N,
     DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMapForPhiNetwork,
     ConversionPatternRewriter &rewriter) {
 
   SmallVector<Operation *> skipConditionGeneratorOps;
-
-  // FTDConditionValues ftdValues = constructCircuitForAllConditions(
-  //     ftdConditions, blockIndexing, predecessorOpPointer, rewriter);
-
-  // unsigned effective_N = N;
-  // if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
-  //                                      successorOpPointer)) {
-  //   effective_N = N + 1;
-  // }
-  // paolo join
-  // rewriter.setInsertionPoint(predecessorOpPointer);
-  // Value prevResult = predecessorOpDoneSignal;
-  // for (unsigned i = 0; i < N; i++) {
-  //   handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
-  //       predecessorOpPointer->getLoc(), prevResult);
-  //   inheritBB(predecessorOpPointer, initOp);
-  //   skipConditionGeneratorOps.push_back(initOp);
-  //   prevResult = initOp.getResult();
-  // }
-
-  // Value mergedWithExtra = prevResult;
-  // if (ftdConditions.getRegen()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   mergedWithExtra = addExtraSourceToDoneForRegen(
-  //       prevResult, ftdValues.getRegen(), predecessorOpPointer,
-  //       skipConditionGeneratorOps, rewriter);
-  // }
-
-  // Value suppressedWithSupp = mergedWithExtra;
-  // if (ftdConditions.getSupp()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   handshake::ConditionalBranchOp conditionalBranchOp =
-  //       rewriter.create<handshake::ConditionalBranchOp>(
-  //           successorOpPointer->getLoc(), ftdValues.getSupp(),
-  //           mergedWithExtra);
-  //   inheritBB(successorOpPointer, conditionalBranchOp);
-  //   skipConditionGeneratorOps.push_back(conditionalBranchOp);
-  //   suppressedWithSupp = conditionalBranchOp.getFalseResult();
-  // }
-
-  // Value gatedSuccessorOpaddr = gateChannelValue(
-  //     successorOpPointer->getOperand(0), prevResult, successorOpPointer,
-  //     dependenciesMapForPhiNetwork, skipConditionGeneratorOps, rewriter);
-
-  // SmallVector<Value> delayedAddressesAfterSuppress = delayedAddresses;
-  // if (ftdConditions.getSupp()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   SmallVector<Operation *> suppressOpList;
-  //   delayedAddressesAfterSuppress = insertSuppressBlock(
-  //       delayedAddresses, predecessorOpDoneSignal, ftdValues.getSupp(),
-  //       ftdValues.getRegen(), predecessorOpPointer, successorOpPointer, N,
-  //       suppressOpList, rewriter);
-  //   addDrawingAttrToList(suppressOpList, "Suppress_Block_Cond");
-  // }
-
-  // SmallVector<Value> delayedAddressesAfterRegen =
-  // delayedAddressesAfterSuppress; if
-  // (ftdConditions.getRegen()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   llvm::errs() << "ey khoda\n";
-  //   SmallVector<Operation *> regenOpList;
-  //   bool initialConsWithoutProd = isInitialConsWithoutProdInSameBB(
-  //       predecessorOpPointer, successorOpPointer);
-  //   delayedAddressesAfterRegen = insertRegenBlock(
-  //       delayedAddressesAfterSuppress, ftdValues.getRegen(),
-  //       initialConsWithoutProd, predecessorOpPointer, regenOpList, rewriter);
-  //   llvm::errs() << "----" << regenOpList.size() << "\n";
-  //   addDrawingAttrToList(regenOpList, "Regen_Block_Cond");
-  // }
 
   SmallVector<Value> skipConditions;
   rewriter.setInsertionPoint(successorOpPointer);
@@ -989,9 +673,8 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
 /// generator are created specifically for each pair in
 /// `createSkipConditionForPair`.
 SkipConditionForPair createSkipConditionsForAllPairs(
-    MemAccesses &memAccesses, FTDBoolExpForPair &ftdConditionsForEachPair,
-    FuncOpInformation &funcOpInformation, std::vector<unsigned> Nvector,
-    ConversionPatternRewriter &rewriter) {
+    MemAccesses &memAccesses, FuncOpInformation &funcOpInformation,
+    std::vector<unsigned> Nvector, ConversionPatternRewriter &rewriter) {
 
   SkipConditionForPair skipConditionForEachPair;
   DenseMap<OpOperand *, SmallVector<Value>> dependenciesMapForPhiNetwork;
@@ -1075,8 +758,6 @@ SkipConditionForPair createSkipConditionsForAllPairs(
 
             StringRef successorOpName = dependency.getDstAccess();
             Operation *successorOpPointer = memAccesses[successorOpName];
-            FTDBoolExpressions ftdConditions =
-                ftdConditionsForEachPair[predecessorOpName][successorOpName];
 
             // If the first successor does not have a producer, we need to
             // use the extra delayed addresses.
@@ -1104,8 +785,8 @@ SkipConditionForPair createSkipConditionsForAllPairs(
 
             SmallVector<Value> skipConditions = createSkipConditionForPair(
                 predecessorOpDoneSignal, predecessorOpPointer,
-                successorOpPointer, effectiveDelayedAddresses, ftdConditions,
-                blockIndexing, N, dependenciesMapForPhiNetwork, rewriter);
+                successorOpPointer, effectiveDelayedAddresses, blockIndexing, N,
+                dependenciesMapForPhiNetwork, rewriter);
             skipConditionForEachPair[predecessorOpName][successorOpName] =
                 skipConditions;
             handledSuccessors.push_back(successorOpName);
@@ -1203,47 +884,11 @@ Value joinValues(SmallVector<Value> valuesToJoin, Operation *BBOp,
 Value createWaitingSignalForPair(
     Value predecessorOpDoneSignal, SmallVector<Value> delayedDoneSignals,
     SmallVector<Value> conds, Operation *predecessorOp, Operation *successorOp,
-    Value startSignal, FTDBoolExpressions ftdConditions,
-    BlockIndexing blockIndexing, unsigned N,
+    Value startSignal, BlockIndexing blockIndexing, unsigned N,
     DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMapForPhiNetwork,
     ConversionPatternRewriter &rewriter) {
 
   SmallVector<Operation *> conditionalSequentializerOps;
-
-  // FTDConditionValues ftdValues = constructCircuitForAllConditions(
-  //     ftdConditions, blockIndexing, predecessorOp, rewriter);
-
-  // SmallVector<Value> delayedDoneSignalsAfterSuppress = delayedDoneSignals;
-  // if (ftdConditions.getSupp()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   llvm::errs() << "[SKIP][INFO] Inserting Suppression\n";
-  //   SmallVector<Operation *> suppressOpList;
-  //   delayedDoneSignalsAfterSuppress = insertSuppressBlock(
-  //       delayedDoneSignals, predecessorOpDoneSignal, ftdValues.getSupp(),
-  //       ftdValues.getRegen(), predecessorOp, successorOp, N, suppressOpList,
-  //       rewriter);
-  //   addDrawingAttrToList(suppressOpList, "Suppress_Block_Done");
-
-  // } else {
-  //   llvm::errs() << "[SKIP][INFO] Skipping Suppression\n";
-  // }
-
-  // SmallVector<Value> delayedDoneSignalsAfterRegen =
-  //     delayedDoneSignalsAfterSuppress;
-
-  // if (ftdConditions.getRegen()->boolMinimize()->type !=
-  //     experimental::boolean::ExpressionType::Zero) {
-  //   llvm::errs() << "[SKIP][INFO] Inserting Regen\n";
-  //   SmallVector<Operation *> regenOpList;
-  //   bool initialConsWithoutProd =
-  //       isInitialConsWithoutProdInSameBB(predecessorOp, successorOp);
-  //   delayedDoneSignalsAfterRegen = insertRegenBlock(
-  //       delayedDoneSignalsAfterSuppress, ftdValues.getRegen(),
-  //       initialConsWithoutProd, predecessorOp, regenOpList, rewriter);
-  //   addDrawingAttrToList(regenOpList, "Regen_Block_Done");
-  // } else {
-  //   llvm::errs() << "[SKIP][INFO] Skipping Regen\n";
-  // }
 
   if (N == 0)
     return delayedDoneSignals[0];
@@ -1285,8 +930,7 @@ MemDependenceAttr getInactivatedDependency(MemDependenceAttr dependency) {
 WaitingSignalForSucc createWaitingSignals(
     MemAccesses &memAccesses, SkipConditionForPair &skipConditionForEachPair,
     MLIRContext *ctx, FuncOpInformation &funcOpInformation,
-    FTDBoolExpForPair &ftdConditionsForEachPair, std::vector<unsigned> NVector,
-    ConversionPatternRewriter &rewriter) {
+    std::vector<unsigned> NVector, ConversionPatternRewriter &rewriter) {
 
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
   BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
@@ -1355,9 +999,6 @@ WaitingSignalForSucc createWaitingSignals(
         SmallVector<Value> conds =
             skipConditionForEachPair[predecessorOpName][successorName];
 
-        FTDBoolExpressions ftdConditions =
-            ftdConditionsForEachPair[predecessorOpName][successorName];
-
         SmallVector<Value> effectiveDelayedDoneSignals = delayedDoneSignals;
         // if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
         //                                      successorOpPointer))
@@ -1366,8 +1007,7 @@ WaitingSignalForSucc createWaitingSignals(
         Value waitingSignal = createWaitingSignalForPair(
             predecessorOpDoneSignal, effectiveDelayedDoneSignals, conds,
             predecessorOpPointer, successorOpPointer, startSignal,
-            ftdConditions, blockIndexing, N, dependenciesMapForPhiNetwork,
-            rewriter);
+            blockIndexing, N, dependenciesMapForPhiNetwork, rewriter);
         waitingSignalsForEachSuccessor[successorName].push_back(waitingSignal);
         isWaitingSignalForSuccDirect[successorName].push_back(N == 0);
 
@@ -1453,23 +1093,18 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
   MemAccesses memAccesses;
   SkipConditionForPair skipConditionForEachPair;
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
-  FTDBoolExpForPair ftdConditionsForEachPair;
   std::vector<Operation *> consumerOpListForFTD;
 
   initializeStartCopies(funcOpInformation);
 
   memAccesses = findMemAccessesInFunc(funcOp);
 
-  // ftdConditionsForEachPair = calculateFtdConditionsForEachPair(
-  //     memAccesses, kernelName, funcOpInformation, rewriter);
+  skipConditionForEachPair = createSkipConditionsForAllPairs(
+      memAccesses, funcOpInformation, NVector, rewriter);
 
-  skipConditionForEachPair =
-      createSkipConditionsForAllPairs(memAccesses, ftdConditionsForEachPair,
-                                      funcOpInformation, NVector, rewriter);
-
-  waitingSignalsForEachSuccessor = createWaitingSignals(
-      memAccesses, skipConditionForEachPair, ctx, funcOpInformation,
-      ftdConditionsForEachPair, NVector, rewriter);
+  waitingSignalsForEachSuccessor =
+      createWaitingSignals(memAccesses, skipConditionForEachPair, ctx,
+                           funcOpInformation, NVector, rewriter);
 
   gateAllSuccessorAccesses(memAccesses, waitingSignalsForEachSuccessor,
                            funcOpInformation, rewriter);
