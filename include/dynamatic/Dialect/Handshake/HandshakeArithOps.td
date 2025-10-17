@@ -287,7 +287,7 @@ def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
 }
 
 def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIOInterface,
   IsIntSizedChannel<32, "lhs">,
   IsIntSizedChannel<32, "rhs">,
   IsIntSizedChannel<32, "result">,
