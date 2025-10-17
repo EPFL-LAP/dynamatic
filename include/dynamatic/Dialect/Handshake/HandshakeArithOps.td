@@ -63,8 +63,7 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
     AllTypesMatch<["lhs", "rhs"]>,
     AllExtraSignalsMatch<["lhs", "rhs", "result"]>,
     IsIntSizedChannel<1, "result">,
-    DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
-    CustomNamedIOInterface
+    DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
   ]> {
   let results = (outs ChannelType:$result);
 
@@ -219,8 +218,11 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   AllExtraSignalsMatch<["ctrl", "result"]>,
-  CustomNamedIOInterface,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  // The IOs of a Handshake_ConstantOp have custom names,
+  // defined here in the Tablegen
+  // as part of the Handshake_ConstantOp declaration
+  CustomNamedIOInterface
 ]> {
   let summary = "constant operation";
   let description = [{
@@ -242,11 +244,18 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 
 
   let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    // Operand 0 is named ctrl
     std::string getOperandName(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "ctrl";
     }
 
+    // Result 0 is named outs
+    // detail::simpleResultName handles idx validation
     std::string getResultName(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
@@ -385,6 +394,9 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   AllTypesMatch<["trueValue", "falseValue", "result"]>,
   AllExtraSignalsMatch<["condition", "trueValue", "falseValue", "result"]>,
   IsIntSizedChannel<1, "condition">,
+  // The IOs of a Handshake_SelectOp have custom names,
+  // defined here in the Tablegen
+  // as part of the Handshake_SelectOp declaration
   CustomNamedIOInterface
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
@@ -394,6 +406,13 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    // Operand 0 is named condition
+    // Operand 1 is named trueValue
+    // Operand 2 is named falseValue
     std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       if (idx == 0)
@@ -401,6 +420,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
       return (idx == 1) ? "trueValue" : "falseValue";
     }
 
+    // Result 0 is named result
     std::string getResultName(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "result";

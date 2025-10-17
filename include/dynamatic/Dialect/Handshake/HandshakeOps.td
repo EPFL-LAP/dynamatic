@@ -35,6 +35,10 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 ]> {
   // Shared functions to include in child classes 
   string validateIO = [{
+    //===------------------------------------------------------------------===//
+    // Helper Methods for CustomNamedIOInterface
+    //===------------------------------------------------------------------===//
+
     void validateOperandIdx(unsigned int idx){
       assert(idx < getOperation()->getNumOperands() && "index too high");
     }
@@ -56,6 +60,9 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
+   // The IOs of a FuncOp have custom names,
+   // defined here in the Tablegen
+   // as part of the FuncOp declaration
    CustomNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
@@ -141,28 +148,17 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return "handshake";
     }
 
-    // unsigned getNumInputPorts(){
-    //   if (auto names = getArgNames()) {
-    //     return names.size();
-    //   }
-    //   return 0;
-    // }
-    
-    // unsigned getNumOutputPorts(){
-    //   if (auto names = ) {
-    //     return names.size();
-    //   }
-    //   return 0;
-    // }
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
 
-    /// Operands 0 to N are named "ins_0" to "ins_<N>"
-    /// simpleOperandName handles validation
+    /// Function operand names are function argument names
     std::string getOperandName(unsigned idx) {
       assert(idx < getArgNames().size() && "index too high");
       return getResName(idx).str();
     }
 
-
+    /// Function result names are function result names
     std::string getResultName(unsigned idx) {
       assert(idx < getResNames().size() && "index too high");
       return getResName(idx).str();
@@ -493,6 +489,10 @@ def MuxOp : Handshake_Op<"mux", [
   let results = (outs HandshakeType:$result);
 
   let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named "index"
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     /// simpleOperandName handles validation
@@ -557,6 +557,10 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
@@ -638,6 +642,10 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
@@ -866,12 +874,12 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     dynamatic::MCPorts getPorts();
 
 
-    //-------------------------------------------
-    // Custom IO Naming:
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
 
     std::string getOperandName(unsigned idx);
     std::string getResultName(unsigned idx);
-    //-------------------------------------------
   }];
 }
 
@@ -970,12 +978,12 @@ def LSQOp : Handshake_Op<"lsq", [
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
 
-    //-------------------------------------------
-    // Custom IO Naming:
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
 
     std::string getOperandName(unsigned idx);
     std::string getResultName(unsigned idx);
-    //-------------------------------------------
   }];
 }
 
@@ -1059,6 +1067,10 @@ def LoadOp : Handshake_MemPortOp<"load", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataFromMem
     std::string getOperandName(unsigned idx) {
@@ -1109,6 +1121,10 @@ def StoreOp : Handshake_MemPortOp<"store", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
     std::string getOperandName(unsigned int idx) {
@@ -1279,6 +1295,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
     std::string getOperandName(unsigned idx) {
@@ -1350,6 +1370,10 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
@@ -1404,6 +1428,10 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   }];
 
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
     std::string getOperandName(unsigned idx) {
@@ -1453,6 +1481,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
@@ -1510,6 +1541,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named spec_tag_data
     /// Operand 1 is named data
     std::string getOperandName(unsigned idx) {
@@ -1559,6 +1594,10 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named dataIn
     std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
@@ -1629,6 +1668,10 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// The first set of operands are named op_<i>_in_<j>
     /// The last operand is named fromSharedUnitOut0
     std::string getOperandName(unsigned idx) {
@@ -1831,6 +1874,10 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
 
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     /// Operand 0 is named lhs_ins
     /// Operand 1 is named rhs_ins
     std::string getOperandName(unsigned idx) {
