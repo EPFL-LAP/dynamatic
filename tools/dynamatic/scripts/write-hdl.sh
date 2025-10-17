@@ -34,6 +34,9 @@ elif [ "$HDL" == "verilog" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
 elif [ "$HDL" == "smv" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-smv.json"
+elif [ "$HDL" == "verilog-beta" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog-beta.json"
+  HDL="verilog"
 fi
 
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
