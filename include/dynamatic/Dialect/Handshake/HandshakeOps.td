@@ -189,7 +189,7 @@ def InstanceOp : Handshake_Op<"instance", [
     and returns a control output as its last result.
 
     Example:
-    
+
     ```mlir
     %2:2 = handshake.instance @my_add(%0, %1, %ctrl) : (f32, f32, !handshake.control) -> (f32, !handshake.control)
     ```
@@ -262,10 +262,10 @@ def BufferOp : Handshake_Op<"buffer", [
   let summary = "buffer operation";
   let description = [{
     Represents an arbitrary buffer whose properties (e.g., type, latency, and number of
-    slots) are dictated by HW parameters. 
+    slots) are dictated by HW parameters.
   }];
-  
-  let arguments = (ins HandshakeType:$operand, 
+
+  let arguments = (ins HandshakeType:$operand,
                         Handshake_BufferTypeAttr:$bufferType,
                         ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
                         );
@@ -304,7 +304,7 @@ def BufferOp : Handshake_Op<"buffer", [
     }
   }];
 
-  
+
   let builders = [
     OpBuilder<(
       ins
@@ -338,7 +338,7 @@ def InitOp : Handshake_Op<"init", [
     A single-slot buffer which contains a token in its reset state.
     Similar to a buffer, its timing behavior is configurable.
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
@@ -361,7 +361,7 @@ def NDWireOp : Handshake_Op<"ndwire", [
   let description = [{
     Represents a wire that non-determinastically stalls the propagation of a signal.
   }];
-  
+
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
@@ -449,7 +449,7 @@ def MergeOp : Handshake_Op<"merge", [
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
-  
+
   let assemblyFormat = [{
     $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
   }];
@@ -862,7 +862,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     }
 
     /// Returns a convenient data-structure to go over the controls and memory
-    /// accesses that are connected to the memory controller. 
+    /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
 
 
@@ -895,13 +895,13 @@ def LSQOp : Handshake_Op<"lsq", [
       clearly program-orderable, and stored in the LSQ's inputs in that order.
       Additionally, two groups connected to the same LSQ cannot share the same
       control signal, which are determined by the program location of the first
-      memory access of each group). 
+      memory access of each group).
     - Control signals are not fed through a constant and are instead data-less
       signals simply indicating that a new group has started.
     - To ensure proper identification of groups when analyzing the operation's
       operands, the `groupSizes` attribute contains the numberf of load/store
-      ports in each LSQ group, in operand order.  
-    
+      ports in each LSQ group, in operand order.
+
     In the absence of an MC on the same memory region, the LSQ talks directly to
     the external memory and its first memory input will be the Handhsake
     function's memref argument that it interfaces in the circuit. In the
@@ -949,8 +949,8 @@ def LSQOp : Handshake_Op<"lsq", [
 
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the LSQ.
-    dynamatic::LSQPorts getPorts();
-    
+    dynamatic::LSQPorts getPorts(); 
+
     /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
       return !isa<mlir::MemRefType>(getInputs().front().getType());
@@ -1231,12 +1231,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
     The speculator produces speculative tokens when real data has
-    not yet arrived. The speculator is also responsible for deciding 
+    not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
     It needs to send control tokens to save units and commit units
     ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while 
+    signals are needed. $SCSaveCtrl is connected directly, while
     $SCCommitCtrl replicates the branches that $dataOut
     follows and might not reach a save-commit. $SCIsMisspec is needed
     in the replicated branches to discard the latter signal.
@@ -1254,9 +1254,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        ControlType:$trigger,
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
-                      ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
+                      ChannelType:$saveCtrl, ChannelType:$commitCtrl,
                       ChannelType:$SCSaveCtrl,
-                      ChannelType:$SCCommitCtrl, 
+                      ChannelType:$SCCommitCtrl,
                       ChannelType:$SCIsMisspec);
 
   let assemblyFormat = [{
@@ -1326,13 +1326,13 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
-    Save units are used to mark the beginning of the speculation region. 
-    Whenever a speculative token can interact with a non-speculative token, 
+    Save units are used to mark the beginning of the speculation region.
+    Whenever a speculative token can interact with a non-speculative token,
     the non-speculative token needs to be saved. In case of correct speculation
     or no speculation, the saved token can be dropped.
 
-    On the other hand, if the speculation was incorrect, the saved tokens 
-    need to be reinserted into the circuit to repeat the previously 
+    On the other hand, if the speculation was incorrect, the saved tokens
+    need to be reinserted into the circuit to repeat the previously
     miscalculated computations.
 
     Example:
@@ -1379,14 +1379,14 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
-    Commit units are used to mark the end of the speculation region. 
-    Commit units are used to stall speculative tokens until they receive 
-    the decision from the speculator. In case the speculation is correct, 
-    the speculative tokens are converted into non-speculative tokens and 
-    passed on to the rest of the circuit. 
-    Otherwise, the speculative tokens are discarded. 
+    Commit units are used to mark the end of the speculation region.
+    Commit units are used to stall speculative tokens until they receive
+    the decision from the speculator. In case the speculation is correct,
+    the speculative tokens are converted into non-speculative tokens and
+    passed on to the rest of the circuit.
+    Otherwise, the speculative tokens are discarded.
 
-    Any non-speculative token can pass through the commit units 
+    Any non-speculative token can pass through the commit units
     without any stall.
 
     Example:
@@ -1436,7 +1436,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     To increase loop parallelism, the save-commit unit will let both
     speculative and non-speculative tokens pass as well as save
     a copy of them.
- 
+
     Example:
 
     ```mlir
@@ -1485,10 +1485,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let description = [{
     The speculating branch operation represents a conditional
     branch that decides the condition based on if a token Value is
-    speculative or not. 
+    speculative or not.
 
     The $tagFromOperand field is the condition. Depending on wether the data
-    is speculative or not, $dataOperand will be send to $trueResult or 
+    is speculative or not, $dataOperand will be send to $trueResult or
     $falseResult. The speculative tag is a fictious attribute.
 
     Example:
@@ -1582,7 +1582,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   // The IOs of a SharingWrapperOp have custom names,
   // defined here in the Tablegen
   // as part of the SharingWrapperOp declaration
-  CustomNamedIOInterface,
+  CustomNamedIOInterface
 ]> {
 
   let summary = "sharing wrapper operation";
@@ -1792,7 +1792,7 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     Rigidifies a channel to simplify the handshake logic.
   }];
   let description = [{
-    Rigidifies a channel by setting the output valid signal to 1 and input ready
+    Rigidifies a channel by setting the output ready signal to 1 and input ready
     signal to a open. This allows the simplification of redundant handshake logic.
   }];
 
@@ -1823,7 +1823,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 
   let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
-  let results = (outs HandshakeType:$lhs, HandshakeType:$rhs);
+  let results = (outs HandshakeType:$lhsOut, HandshakeType:$rhsOut);
 
   let assemblyFormat = [{
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))

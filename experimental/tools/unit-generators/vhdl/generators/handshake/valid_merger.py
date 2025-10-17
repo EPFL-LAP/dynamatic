@@ -1,65 +1,39 @@
+from generators.support.utils import data
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.generation import generate_default_mappings
+
 
 def generate_valid_merger(name, params):
-    left_bitwidth = params["left_bitwidth"]
-    right_bitwidth = params["right_bitwidth"]
+    lhs_bitwidth = params["left_bitwidth"]
+    rhs_bitwidth = params["right_bitwidth"]
 
-    if left_bitwidth > 0 and right_bitwidth > 0:
-        return _generate_valid_merger(name, left_bitwidth, right_bitwidth)
-    elif left_bitwidth > 0:
-        return _generate_valid_merger_right_dataless(name, left_bitwidth)
-    elif right_bitwidth > 0:
-        return _generate_valid_merger_left_dataless(name, right_bitwidth)
+    lhs_extra_signals = params.get("lhs_extra_signals", None)
+    rhs_extra_signals = params.get("rhs_extra_signals", None)
+
+    def generate_inner(name): return _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth)
+    def generate(): return generate_inner(name)
+
+    if lhs_extra_signals or rhs_extra_signals:
+        return _generate_valid_merger_signal_manager(
+            name,
+            lhs_bitwidth,
+            rhs_bitwidth,
+            generate_inner,
+            lhs_extra_signals,
+            rhs_extra_signals
+        )
     else:
-        return _generate_valid_merger_dataless(name)
+        return generate()
 
 
-def _generate_valid_merger(name, left_bitwidth, right_bitwidth):
+def _generate_valid_merger(name, lhs_bitwidth, rhs_bitwidth):
+    possible_lhs_ins = f"lhs_ins          : in std_logic_vector({lhs_bitwidth} - 1 downto 0);"
+    possible_rhs_ins = f"rhs_ins          : in std_logic_vector({rhs_bitwidth} - 1 downto 0);"
+    possible_lhs_outs = f"lhs_outs         : out std_logic_vector({lhs_bitwidth} - 1 downto 0);"
+    possible_rhs_outs = f"rhs_outs         : out std_logic_vector({rhs_bitwidth} - 1 downto 0);"
 
-    entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of valid_merger
-entity {name} is
-  port (
-    -- inputs
-    clk              : in std_logic;
-    rst              : in std_logic;
-    lhs_ins          : in std_logic_vector({left_bitwidth} - 1 downto 0);
-    lhs_ins_valid    : in std_logic;
-    lhs_outs_ready   : in std_logic;
-    rhs_ins          : in std_logic_vector({right_bitwidth} - 1 downto 0);
-    rhs_ins_valid    : in std_logic;
-    rhs_outs_ready   : in std_logic;
-    -- outputs
-    lhs_outs         : out std_logic_vector({left_bitwidth} - 1 downto 0);
-    lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic;
-    rhs_outs         : out std_logic_vector({right_bitwidth} - 1 downto 0);
-    rhs_outs_valid   : out std_logic;
-    rhs_ins_ready    : out std_logic
-  );
-end entity;
-"""
-
-    architecture = f"""
--- Architecture of valid_merger
-architecture arch of {name} is
-begin
-  lhs_outs <= lhs_ins;
-  rhs_outs <= rhs_ins;
-  lhs_outs_valid <= lhs_ins_valid;
-  rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_outs_ready;
-  rhs_ins_ready <= rhs_outs_ready;
-end architecture;
-"""
-
-    return entity + architecture
-
-
-def _generate_valid_merger_right_dataless(name, left_bitwidth):
+    possible_lhs_assignment = "lhs_outs <= lhs_ins;"
+    possible_rhs_assignment = "rhs_outs <= rhs_ins;"
 
     entity = f"""
 library ieee;
@@ -72,113 +46,109 @@ entity {name} is
     -- inputs
     clk              : in std_logic;
     rst              : in std_logic;
-    lhs_ins          : in std_logic_vector({left_bitwidth} - 1 downto 0);
+    {data(possible_lhs_ins, lhs_bitwidth)}
     lhs_ins_valid    : in std_logic;
     lhs_outs_ready   : in std_logic;
+    {data(possible_rhs_ins, rhs_bitwidth)}
     rhs_ins_valid    : in std_logic;
     rhs_outs_ready   : in std_logic;
     -- outputs
-    lhs_outs         : out std_logic_vector({left_bitwidth} - 1 downto 0);
+    {data(possible_lhs_outs, lhs_bitwidth)}
     lhs_outs_valid   : out std_logic;
     lhs_ins_ready    : out std_logic;
+    {data(possible_rhs_outs, rhs_bitwidth)}
     rhs_outs_valid   : out std_logic;
     rhs_ins_ready    : out std_logic
   );
 end entity;
 """
-
     architecture = f"""
 -- Architecture of valid_merger
 architecture arch of {name} is
 begin
-  lhs_outs <= lhs_ins;
+  {data(possible_lhs_assignment, lhs_bitwidth)}
   lhs_outs_valid <= lhs_ins_valid;
-  rhs_outs_valid <= lhs_ins_valid; -- merge happens here
   lhs_ins_ready <= lhs_outs_ready;
+
+  {data(possible_rhs_assignment, rhs_bitwidth)}
+  rhs_outs_valid <= lhs_ins_valid; -- merge happens here
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
-
     return entity + architecture
 
 
-def _generate_valid_merger_left_dataless(name, right_bitwidth):
+def _generate_valid_merger_signal_manager(name,
+                                          lhs_bitwidth,
+                                          rhs_bitwidth,
+                                          generate_inner,
+                                          lhs_extra_signals,
+                                          rhs_extra_signals):
+    inner_name = f"{name}_inner"
+    inner = generate_inner(inner_name)
 
-    entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+    in_channels = [
+        {
+            "name": "lhs_in",
+            "bitwidth": lhs_bitwidth,
+            "extra_signals": lhs_extra_signals
+        },
+        {
+            "name": "rhs_in",
+            "bitwidth": rhs_bitwidth,
+            "extra_signals": rhs_extra_signals
+        }
+    ]
 
--- Entity of valid_merger
-entity {name} is
-  port (
-    -- inputs
-    clk              : in std_logic;
-    rst              : in std_logic;
-    lhs_ins_valid    : in std_logic;
-    lhs_outs_ready   : in std_logic;
-    rhs_ins          : in std_logic_vector({right_bitwidth} - 1 downto 0);
-    rhs_ins_valid    : in std_logic;
-    rhs_outs_ready   : in std_logic;
-    -- outputs
-    lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic;
-    rhs_outs         : out std_logic_vector({right_bitwidth} - 1 downto 0);
-    rhs_outs_valid   : out std_logic;
-    rhs_ins_ready    : out std_logic
+    out_channels = [
+        {
+            "name": "lhs_out",
+            "bitwidth": lhs_bitwidth,
+            "extra_signals": lhs_extra_signals
+        },
+        {
+            "name": "rhs_out",
+            "bitwidth": rhs_bitwidth,
+            "extra_signals": rhs_extra_signals
+        }
+    ]
+
+    entity = generate_entity(
+        name,
+        in_channels,
+        out_channels
+    )
+
+    extra_signal_assignments = []
+    # directly pass extra signals through the valid merger
+    # regardless of how they're normally forwarded
+    for extra_signal_name in lhs_extra_signals:
+        extra_signal_assignments.append(
+            f"lhs_out_{extra_signal_name} <= lhs_in_{extra_signal_name};"
+        )
+
+    for extra_signal_name in rhs_extra_signals:
+        extra_signal_assignments.append(
+            f"rhs_out_{extra_signal_name} <= rhs_in_{extra_signal_name};"
+        )
+
+    # Map channels to inner component
+    mappings = generate_default_mappings(in_channels + out_channels)
+
+    architecture = f"""
+-- Architecture of signal manager (valid merger)
+architecture arch of {name} is
+begin
+-- Forward extra signals to output channels
+{"\n  ".join(extra_signal_assignments)}
+
+inner : entity work.{inner_name}(arch)
+  port map(
+    clk => clk,
+    rst => rst,
+    {mappings}
   );
-end entity;
-"""
-
-    architecture = f"""
--- Architecture of valid_merger
-architecture arch of {name} is
-begin
-  rhs_outs <= rhs_ins;
-  lhs_outs_valid <= lhs_ins_valid;
-  rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_outs_ready;
-  rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
 
-    return entity + architecture
-
-
-def _generate_valid_merger_dataless(name):
-    entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of valid_merger
-entity {name} is
-  port (
-    -- inputs
-    clk              : in std_logic;
-    rst              : in std_logic;
-    lhs_ins_valid    : in std_logic;
-    lhs_outs_ready   : in std_logic;
-    rhs_ins_valid    : in std_logic;
-    rhs_outs_ready   : in std_logic;
-    -- outputs
-    lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic;
-    rhs_outs_valid   : out std_logic;
-    rhs_ins_ready    : out std_logic
-  );
-end entity;
-"""
-
-    architecture = f"""
--- Architecture of valid_merger
-architecture arch of {name} is
-begin
-  lhs_outs_valid <= lhs_ins_valid;
-  rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_outs_ready;
-  rhs_ins_ready <= rhs_outs_ready;
-end architecture;
-"""
-
-    return entity + architecture
+    return inner + entity + architecture
