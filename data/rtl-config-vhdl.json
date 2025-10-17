@@ -109,7 +109,7 @@
     ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "vivado_ip_wrappers"
+      "vivado_hls_wrappers"
     ]
   },
   {
@@ -122,7 +122,7 @@
     ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t remsi -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "vivado_ip_wrappers"
+      "vivado_hls_wrappers"
     ]
   },
   {
@@ -135,7 +135,7 @@
     ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "vivado_ip_wrappers"
+      "vivado_hls_wrappers"
     ]
   },
   {
@@ -523,6 +523,12 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/vivado_ip_wrappers.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/vivado_hls_wrappers.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/vitis_hls_wrappers.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
