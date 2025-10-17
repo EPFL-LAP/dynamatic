@@ -9,6 +9,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -55,16 +56,11 @@ static handshake::ConditionalBranchOp findControlBranch(FuncOp funcOp,
     if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
       continue;
 
-    llvm::errs() << "Candidate: ";
-    condBrOp->dump();
-
     for (Value result : condBrOp->getResults()) {
       for (Operation *user : result.getUsers()) {
 
         if (isBackedge(result, user))
           return condBrOp;
-        llvm::errs() << "Rejecting user: ";
-        user->dump();
       }
     }
   }
@@ -72,36 +68,10 @@ static handshake::ConditionalBranchOp findControlBranch(FuncOp funcOp,
   return nullptr;
 }
 
-void HandshakeSpecPostBufferPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-
-  // Support only one funcOp
-  assert(std::distance(modOp.getOps<FuncOp>().begin(),
-                       modOp.getOps<FuncOp>().end()) == 1 &&
-         "Expected a single FuncOp in the module");
-
-  FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
-
-  SpecPreBufferOp1 specOp1 = *funcOp.getOps<SpecPreBufferOp1>().begin();
-  SpecPreBufferOp2 specOp2 = *funcOp.getOps<SpecPreBufferOp2>().begin();
-
-  unsigned specBB = getLogicBB(specOp1).value();
-
-  OpBuilder builder(&getContext());
-  builder.setInsertionPoint(specOp1);
-
-  SpeculatorOp speculator = builder.create<SpeculatorOp>(
-      specOp1.getLoc(), specOp1.getDataOut().getType(), specOp2.getDataIn(),
-      specOp1.getTrigger(), specOp1.getFifoDepth());
-  setBB(speculator, specBB);
-
-  // speculator.setConstant(constant);
-  // speculator.setDefaultValue(defaultValue);
-
-  specOp1.getDataOut().replaceAllUsesWith(speculator.getDataOut());
-  specOp2.getSaveCtrl().replaceAllUsesWith(speculator.getSaveCtrl());
-  specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());
-  specOp2.getSCIsMisspec().replaceAllUsesWith(speculator.getSCIsMisspec());
+static FailureOr<Value> constructSaveCommitControl(SpeculatorOp speculator) {
+  OpBuilder builder(speculator.getContext());
+  builder.setInsertionPoint(speculator);
+  unsigned specBB = getLogicBB(speculator).value();
 
   // Construct Save Commit Control
   auto branchDiscardCondNonMisspec = cast<ConditionalBranchOp>(
@@ -119,11 +89,12 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   SmallVector<Value, 2> mergeOperands;
   mergeOperands.push_back(speculator.getSCSaveCtrl());
 
-  ConditionalBranchOp controlBranch = findControlBranch(funcOp, specBB);
+  ConditionalBranchOp controlBranch =
+      findControlBranch(speculator->getParentOfType<FuncOp>(), specBB);
   if (controlBranch == nullptr) {
-    specOp1->emitError() << "Could not find backedge within speculation bb: "
-                         << specBB << ".\n";
-    return signalPassFailure();
+    speculator->emitError()
+        << "Could not find backedge within speculation bb: " << specBB << ".\n";
+    return failure();
   }
 
   // Helper function to check if a value leads to a Backedge
@@ -150,48 +121,114 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
     controlBranch->emitError()
         << "Could not find the backedge in the Control Branch " << specBB
         << "\n";
-    return signalPassFailure();
+    return failure();
   }
 
   // All the inputs to the merge operation are ready
   auto mergeOp = builder.create<handshake::MergeOp>(branchReplicated.getLoc(),
                                                     mergeOperands);
+  mergeOp->setAttr("specv1_sc_merge", builder.getUnitAttr());
   setBB(mergeOp, specBB);
 
-  specOp1.getSCSaveCtrl().replaceAllUsesWith(mergeOp.getResult());
+  return mergeOp.getResult();
+}
 
-  specOp1->erase();
-  specOp2->erase();
+static LogicalResult placeAdditionalBuffers(SpeculatorOp speculator) {
+  FuncOp funcOp = speculator->getParentOfType<FuncOp>();
+  OpBuilder builder(funcOp.getContext());
 
   for (auto commitOp : funcOp.getOps<SpecCommitOp>()) {
     builder.setInsertionPoint(commitOp);
-    // To maintain high throughput: commit op *sometimes* joins a control with
-    // data from the iteration i-1. We need a 1-slot buffer to hold the control
-    // signal
+    // To maintain high throughput: commit op *sometimes* joins a control from
+    // the iteration `i` with data from the iteration `i-1`. We need a 1-slot
+    // buffer to hold the control signal
     auto bufOp1 =
         builder.create<BufferOp>(builder.getUnknownLoc(), commitOp.getCtrl(), 1,
                                  BufferType::FIFO_BREAK_NONE);
     inheritBB(commitOp, bufOp1);
     bufOp1.getOperand().replaceAllUsesExcept(bufOp1.getResult(), bufOp1);
-
-    // To avoid deadlock: On misspeculation, kill follows resend. When "resend"
-    // is sent, misspeculated data doesn't join with "kill" signal. The stall of
-    // this data possibly leads to a deadlock ("resend" is never accepted by a
-    // save-commit). Therefore, we need a 1-slot buffer to store the token
-    auto bufOp2 =
-        builder.create<BufferOp>(builder.getUnknownLoc(), commitOp.getDataIn(),
-                                 1, BufferType::FIFO_BREAK_NONE);
-    inheritBB(commitOp, bufOp2);
-    bufOp2.getOperand().replaceAllUsesExcept(bufOp2.getResult(), bufOp2);
   }
 
-  for (auto specBranchOp : funcOp.getOps<SpeculatingBranchOp>()) {
-    Value specResult = specBranchOp.getTrueResult();
-    builder.setInsertionPointAfterValue(specResult);
-    // Create a buffer to hold the delayed operand
-    auto bufOp = builder.create<BufferOp>(builder.getUnknownLoc(), specResult,
-                                          1, BufferType::FIFO_BREAK_NONE);
-    inheritBBFromValue(specResult, bufOp);
-    specResult.replaceAllUsesExcept(bufOp.getResult(), bufOp);
+  // To avoid deadlock: on misspeculation, `kill` is only sent after `resend` is
+  // accepted. Buffering algorithm ignores `resend`, and insufficient buffering
+  // may cause deadlock. We buffer dataOut and commitCtrl of speculator and the
+  // merged save-commit control for a `resend` iteration.
+
+  auto bufDataOut =
+      builder.create<BufferOp>(builder.getUnknownLoc(), speculator.getDataOut(),
+                               1, BufferType::FIFO_BREAK_NONE);
+  inheritBB(speculator, bufDataOut);
+  speculator.getDataOut().replaceAllUsesExcept(bufDataOut.getResult(),
+                                               bufDataOut);
+
+  auto bufCommitCtrl = builder.create<BufferOp>(builder.getUnknownLoc(),
+                                                speculator.getCommitCtrl(), 1,
+                                                BufferType::FIFO_BREAK_NONE);
+  inheritBB(speculator, bufCommitCtrl);
+  speculator.getCommitCtrl().replaceAllUsesExcept(bufCommitCtrl.getResult(),
+                                                  bufCommitCtrl);
+
+  MergeOp merge;
+  bool mergeFound = false;
+  for (auto candidate : funcOp.getOps<MergeOp>()) {
+    if (candidate->hasAttr("specv1_sc_merge")) {
+      merge = candidate;
+      mergeFound = true;
+      break;
+    }
   }
+  if (!mergeFound) {
+    funcOp.emitError("specv1_sc_merge not found");
+    return failure();
+  }
+  auto bufSCControl =
+      builder.create<BufferOp>(builder.getUnknownLoc(), merge.getResult(), 1,
+                               BufferType::FIFO_BREAK_NONE);
+  inheritBB(speculator, bufSCControl);
+  merge.getResult().replaceAllUsesExcept(bufSCControl.getResult(),
+                                         bufSCControl);
+
+  return success();
+}
+
+void HandshakeSpecPostBufferPass::runDynamaticPass() {
+  ModuleOp modOp = getOperation();
+
+  // Support only one funcOp
+  assert(std::distance(modOp.getOps<FuncOp>().begin(),
+                       modOp.getOps<FuncOp>().end()) == 1 &&
+         "Expected a single FuncOp in the module");
+
+  FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
+
+  SpecPreBufferOp1 specOp1 = *funcOp.getOps<SpecPreBufferOp1>().begin();
+  SpecPreBufferOp2 specOp2 = *funcOp.getOps<SpecPreBufferOp2>().begin();
+
+  unsigned specBB = getLogicBB(specOp1).value();
+
+  OpBuilder builder(&getContext());
+  builder.setInsertionPoint(specOp1);
+
+  // Build the (post-buffer) SpeculatorOp
+  SpeculatorOp speculator = builder.create<SpeculatorOp>(
+      specOp1.getLoc(), specOp1.getDataOut().getType(), specOp2.getDataIn(),
+      specOp1.getTrigger(), specOp1.getFifoDepth());
+  setBB(speculator, specBB);
+
+  specOp1.getDataOut().replaceAllUsesWith(speculator.getDataOut());
+  specOp2.getSaveCtrl().replaceAllUsesWith(speculator.getSaveCtrl());
+  specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());
+  specOp2.getSCIsMisspec().replaceAllUsesWith(speculator.getSCIsMisspec());
+
+  auto scControl = constructSaveCommitControl(speculator);
+  if (failed(scControl))
+    return signalPassFailure();
+
+  specOp1.getSCSaveCtrl().replaceAllUsesWith(scControl.value());
+
+  specOp1->erase();
+  specOp2->erase();
+
+  if (failed(placeAdditionalBuffers(speculator)))
+    return signalPassFailure();
 }

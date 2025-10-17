@@ -446,12 +446,13 @@ FailureOr<Value> HandshakeSpeculationPass::generateSaveCommitCtrl() {
   auto conditionOperand = controlBranch.getConditionOperand();
   // trueResultType and falseResultType are tentative and will be updated in the
   // addSpecTag algorithm later.
+  // Operands are temporary. Will be updated at the end of the pass.
   auto branchDiscardCondNonSpec =
       builder.create<handshake::SpeculatingBranchOp>(
           controlBranch.getLoc(),
           /*trueResultType=*/conditionOperand.getType(),
           /*falseResultType=*/conditionOperand.getType(),
-          /*specTag=*/conditionOperand, conditionOperand);
+          /*specTag=*/specOp1.getDataOut(), conditionOperand);
   inheritBB(specOp1, branchDiscardCondNonSpec);
   branchDiscardCondNonSpec->setAttr("specv1_branchDiscardCondNonSpec",
                                     builder.getUnitAttr());
@@ -846,7 +847,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(addNonSpecOp()))
     return signalPassFailure();
 
-  // quick fix
+  // Quick fix: branchDiscardCondNonspec's operands must be the loop condition
+  // The real loop condition only turns out after the placement of speculative
+  // units (Speculator or save-commit unit may produce this)
   handshake::FuncOp funcOp = specOp1->getParentOfType<handshake::FuncOp>();
   for (auto branch : funcOp.getOps<handshake::SpeculatingBranchOp>()) {
     if (branch->getAttr("specv1_branchDiscardCondNonSpec")) {
