@@ -1964,7 +1964,6 @@ LogicalResult TruncIOp::verify() {
   return success();
 }
 
-
 //===----------------------------------------------------------------------===//
 // Memory Controller GetOperandName and GetResultName Utilities
 //===----------------------------------------------------------------------===//
