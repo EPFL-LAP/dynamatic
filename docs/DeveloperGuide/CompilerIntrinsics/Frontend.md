@@ -15,7 +15,7 @@ This section gives a high-level overview of Dynamatic's C frontend.
 ### What Does a C Frontend Do?
 
 Dynamatic's C frontend converts C code to the standard MLIR dialects, performs generic IR optimizations, and performs memory analysis (which load depends on which store?). Dynamatic employs the following conversion flow:
-1. Convert C to LLVM IR. We use clang (with no optimization `clang -O0 ...`) for this step. We do not apply any optimization here to ensure predictability across different clang version (different clang versions perform a different set of optimizations).
+1. Convert C to LLVM IR. We use clang (with no optimization `clang -O0 ...`) for this step. We do not apply any optimization here to ensure predictability across different clang version (different clang versions perform a different set of optimizations, and some transformations are unnecessary for us).
 2. Apply various IR optimizations. We use LLVM IR transformations such as mem2reg, instcombine, and so on. Here, we have control over exactly the set of passes we run to ensure predictability.
 3. Annotate memory analysis to know the dependencies between the loads and stores. This step relies on the polyhedral analysis from Polly and alias analysis from LLVM. LLVM/Polly's memory dependency analysis cannot be directly imported into Dynamatic's toolchain. We implement a memory dependency analysis tool to generate them.
 4. Convert LLVM IR to MLIR standard dialects. As of Oct. 2025, there is no working implementation in the LLVM project that can translate LLVM IR to MLIR. Therefore, Dynamatic utilizes a conversion tool for translating the LLVM IR directly to MLIR standard dialects.
@@ -27,12 +27,12 @@ The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dial
 - MemRef for representing arrays and memory accesses.
 
 Notable optimizations that we need from the LLVM project:
-- `mem2reg`: Suppresses allocas (allocate memory on the heap) into regs.
-- `instcombine`: Local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of GEPs.
-- `loop-rotate`: transform loops to do-while loops as much as possible.
+- `mem2reg`: Suppressing allocas (allocate memory on the heap) into regs.
+- `instcombine`: Performing local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of GEPs.
+- `loop-rotate`: Transforming loops to do-while loops as much as possible.
 - `simplifycfg`, `loopsimplify`: reducing the number of BBs (fewer branches).
 - `consthoist`: Moving constants around.
-- `licm`: Applies loop-invariant code motion to make the loops simplier.
+- `licm`: Applying loop-invariant code motion to make the loops simplier.
 
 > [!NOTE]
 > **Design choice**. These LLVM IR transformations and analyses are crucial to the quality of Dynamatic-produced circuits, and porting them to MLIR requires significant effort. Therefore, we switched from Polygeist to an LLVM IR-based frontend.
@@ -50,11 +50,11 @@ The translation between LLVM IR and the standard dialects (especially the subset
 
 > [!NOTE]
 > Key differences between LLVM IR and MLIR:
-> - LLVM uses void ptrs for array inputs (both for fixed-size arrays `int arr[10][20]` and arrays with unbounded length `int * arr`). While in standard dialect, we use memref types `memref<10 * 20 * i32>` for referencing an array.
+> - LLVM uses void ptrs for array inputs (both for fixed-size arrays `int arr[10][20]` and arrays with unbounded length `int * arr`). While in standard dialect, we use MemRef types `memref<10 * 20 * i32>` for referencing an array.
 > - LLVM does not represent constants as operations, while in MILR, constants must be "materialized" as explicit constant operations.
 > - LLVM has explicit SSA Phi nodes. MLIR replaces the Phis by block arguments.
 > - The MemRef dialect does not have a special GEP operation for the array index calculation (e.g., `a[0][1]`); instead, it has a high-level syntax like `%result = memref.load [%memrefValue] %dim0, %dim1`. Therefore, GEPs are replaced by a direct connection between indices to the loads/stores. 
-> - In LLVM, global values can be referenced by GEPs, but in MLIR memref dialect, global values can only be referenced via `get_global` op via the `sym_name` symbol attached to the global op.
+> - In LLVM, global values can be referenced by GEPs, but in MLIR MemRef dialect, global values can only be referenced via `get_global` op via the `sym_name` symbol attached to the global op.
 
 ### Type Conversion for Function Arguments
 
@@ -69,16 +69,16 @@ IR and MLIR:
 - **Get element pointer**: `llvm::Value *` (the gep instruction in LLVM) to `SmallVector<mlir::Value>` (the indices in MLIR). This mapping keeps track of the index operands of loads/stores in MLIR.
 - **Global values**: `llvm::Value *` to `memref::GlobalOp`. This mapping is needed in addition to the normal value mappings because MLIR does not reference the global ops via `mlir::Value`.
 
-Dynamatic performs these translation steps for the LLVM module:
+Dynamatic performs the following translation for the LLVM module:
 
 - Create an MLIR function for each LLVM function.
 
 For each LLVM function, Dynamatic performs the following translation:
 
 1. **Constant materialization**. Create a corresponding `arith::ConstantOp` for each constant input of each `llvm::Instruction *` in LLVM IR.
-2. **Block conversion**. Create an MLIR block for every basic block in LLVM. Remember the BB mappings. For every Phi output in LLVM, it creates the corresponding block argument in MLIR (for each array function argument, the original C code is used to recover the correct memref type). Remember the value mappings.
-3. **Global conversion**. Create a memref global operation for each global variable in LLVM.
-4. **Instruction translation**. Create an operation in LLVM for each MLIR operation (exception: GEP are removed and the indices are directly connected to the loads and stores) from the input values (retrieved from the value mapping).
+2. **Block conversion**. Create an MLIR block for every basic block in LLVM. Remember the BB mappings (see the list above). For every Phi output in LLVM, it creates the corresponding block argument in MLIR (for each array function argument, the original C code is used to recover the correct MemRef type). Remember the value mappings (see the list above).
+3. **Global conversion**. Create a MemRef global operation for each global variable in LLVM.
+4. **Instruction translation**. Create an operation in MLIR for each LLVM operation from the input values (retrieved from the value mapping). Exception: GEP are removed and the indices are directly connected to the loads and stores.
 
 > [!NOTE]
 > The syntax of the GEP instruction in LLVM is often simplified/shortened. This requires a sophisticated conversion rule for GEP. Check out the LLVM documentation on [caveats of GEP syntax](https://llvm.org/docs/GetElementPtr.html) for more details.
