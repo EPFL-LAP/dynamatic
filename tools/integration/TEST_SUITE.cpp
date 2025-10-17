@@ -129,7 +129,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
-TEST_P(SpecFixture, spec_NoCI) {
+TEST_P(SpecFixture, spec) {
   const std::string &name = GetParam();
   int simTime = -1;
 
