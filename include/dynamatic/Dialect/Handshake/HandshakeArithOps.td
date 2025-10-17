@@ -308,13 +308,13 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
 }
 
 def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi", [
-  SimpleNamedIOInterface
+  BinaryArithNamedIOInterface
 ]> {
   let summary = "Outputs the maximum between two input signed integers";
 }
 
 def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui", [
-  SimpleNamedIOInterface
+  BinaryArithNamedIOInterface
 ]> {
   let summary = "Outputs the maximum between two input unsigned integers";
 }
