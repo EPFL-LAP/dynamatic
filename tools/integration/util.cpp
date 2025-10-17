@@ -104,7 +104,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
                                   "dynamatic" / "scripts" / "simulate.sh";
 
   const std::string RTL_CONFIG =
-      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
+      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl.json";
 
   fs::path cFilePath =
       fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");

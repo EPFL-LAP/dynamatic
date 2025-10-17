@@ -81,7 +81,7 @@ The second set of if statements analyzes the `HWModuleExternOp` dictionary to be
 
 ### Step 3: JSON Files for Parameter Passing
 
-A [json file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/rtl-config-vhdl-beta.json) controls how information passes from the C++ MLIR-based flow to the python text printing logic. 
+A [json file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/rtl-config-vhdl.json) controls how information passes from the C++ MLIR-based flow to the python text printing logic. 
 
 As discussed in the [backend documentation](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/DeveloperGuide/CompilerIntrinsics/Backend.md), the JSON file is relatively powerful. The beta backend uses very few of its features, as it is not quite powerful enough, but this means the syntax can be complex.
 

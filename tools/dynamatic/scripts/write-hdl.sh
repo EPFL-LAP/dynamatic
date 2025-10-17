@@ -27,9 +27,6 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 RTL_CONFIG=""
 if [ "$HDL" == "vhdl" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
-elif [ "$HDL" == "vhdl-beta" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-beta.json"
-  HDL="vhdl"
 elif [ "$HDL" == "verilog" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
 elif [ "$HDL" == "smv" ]; then
