@@ -29,6 +29,8 @@ struct IntegrationTestData {
   fs::path benchmarkPath;
   bool useVerilog;
   bool useSharing;
+  std::string milpSolver = "gurobi";
+  std::string bufferAlgorithm = "fpga20";
 
   // Results
   int simTime;
