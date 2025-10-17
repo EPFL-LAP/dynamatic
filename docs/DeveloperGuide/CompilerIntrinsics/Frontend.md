@@ -4,9 +4,9 @@ This document describes Dynamatic's C frontend (under `tools/translate-llvm-to-s
 
 Sections and overview:
 
-1. [Design](#design): This section gives a high-level overview of Dynamatic's C frontend. We describe (1) what are the input (LLVM IR) and output (MLIR standard dialects) of the C frontend, (2) what translation steps are in the upstream LLVM project, and (3) what are developed inside Dynamatic.
+1. [Design](#design): This section gives a high-level overview of Dynamatic's C frontend. We describe what are the input (LLVM IR) and output (MLIR standard dialects) of the C frontend and major translation steps.
 2. [LLVM to MLIR translation](#llvm-to-mlir-translation): This section describes the translation algorithm between LLVM IR and MLIR standard dialects.
-3. [Memory dependency analysis](#memory-dependency-analysis): The memory dependency analysis for minimizing LSQ usage.
+3. [Memory dependency analysis](#memory-dependency-analysis): This section describes the memory dependency analysis pass for minimizing LSQ usage.
 
 ## Design 
 
@@ -14,23 +14,17 @@ This section gives a high-level overview of Dynamatic's C frontend.
 
 ### What Does a C Frontend Do?
 
-Dynamatic's C frontend has three main objectives:
-- Converting C code to the standard MLIR dialects (see below).
-- Performing generic IR optimizations.
-- Performing memory analysis (which load depends on which store?).
+Dynamatic's C frontend converts C code to the standard MLIR dialects, performs generic IR optimizations, and performing memory analysis (which load depends on which store?). Dynamatic employs the following conversion flow:
+1. Convert C to LLVM IR. We use clang (with no optimization `clang -O0 ...`) for this step. We do not apply any optimization here to ensure predictability and readability across different clang version.
+2. Apply various IR optimizations. We use LLVM IR transformations such as mem2reg, instcombine, and so on. 
+3. Annotate memory analysis to know the dependencies between the loads and stores. This step relies on the polyhedral analysis from Polly and alias analysis from LLVM. LLVM/Polly's memory dependency analysis cannot be directly imported into Dynamatic's toolchain. We implement a memory dependency analysis tool to generate them.
+4. Convert LLVM IR to MLIR standard dialects. As of Oct. 2025, there is no working implementation in the LLVM project that can translate LLVM IR to MLIR. Therefore, Dynamatic utilizes a conversion tool for translating the LLVM IR directly to MLIR standard dialects.
 
-The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dialect, namely:
+The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dialects, namely:
 - ControlFlow dialect for representing control flow operations.
 - Arith dialect for representing basic math operations.
 - Math dialect for advanced floating-point math operations.
 - MemRef for representing arrays and memory accesses.
-
-### Reused Components from the LLVM Project
-
-Since Dynamatic depends on the `llvm-project`, it can reuse many components:
-- `clang` can translate the input C code to LLVM IR.
-- `opt` provides a variety of transformations (e.g., cfg optimization, code motion, strength reduction, etc) and analyses (e.g., pointer alias analysis).
-- `polly` provides polyhedral analysis (we use this to analyze the index accessing pattern).
 
 Notable optimizations that we need from the LLVM project:
 - `mem2reg`: Suppresses allocas (allocate memory on the heap) into regs.
@@ -40,13 +34,11 @@ Notable optimizations that we need from the LLVM project:
 - `consthoist`: Moving constants around.
 - `licm`: Applies loop-invariant code motion to make the loops simplier.
 
-### Components in Dynamatic: 
-
-- **LLVM IR to MLIR Standard Dialects**. As of Oct. 2025, there is no working implementation in the LLVM project that can translate LLVM IR to MLIR. Therefore, Dynamatic utilizes a conversion tool for translating the LLVM IR directly to MLIR standard dialects.
-- **Memory dependency annotation**. LLVM/Polly's memory dependency analysis cannot be directly imported into Dynamatic's toolchain. We implement a memory dependency analysis tool to generate them.
+> [!NOTE]
+> **Design choice**. These LLVM IR transformations and analyses are crucial to the quality of Dynamatic-produced circuits, and porting them to MLIR requires significant effort. Therefore, we switched from Polygeist to an LLVM IR-based frontend.
 
 > [!NOTE]
-> **Design choice**. Notably, MLIR internally has a translation tool for converting LLVM IR to the LLVM dialect. So one alternative is to build an MLIR dialect translation pass to convert the LLVM dialect to the standard dialect.
+> **Design choice**. MLIR internally has a translation tool for converting LLVM IR to the LLVM dialect. So one alternative is to build an MLIR dialect translation pass to convert the LLVM dialect to the standard dialect.
 > 
 > We decided **not to use this approach** because the LLVM IR-to-LLVM dialect translation does not preserve custom LLVM metadata. This would drop the memory analysis annotation (marked as llvm metadata nodes).
 
