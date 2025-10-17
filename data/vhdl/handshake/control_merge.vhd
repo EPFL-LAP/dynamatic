@@ -48,5 +48,9 @@ begin
     );
 
   index <= index_internal;
+
+  assert false
+  report "control_merge implementation with data signal has a bug. Use beta backend instead"
+  severity failure;
   outs  <= ins(to_integer(unsigned(index_internal)));
 end architecture;
