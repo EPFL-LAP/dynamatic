@@ -326,7 +326,6 @@ def BufferOp : Handshake_Op<"buffer", [
 def InitOp : Handshake_Op<"init", [
   HasClock,
   SameOperandsAndResultType,
-  // The IOs of an InitOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "init operation";
@@ -1196,7 +1195,6 @@ def RAMOp : Handshake_Op<"ram", []>  {
 
 def EndOp : Handshake_Op<"end", [
   Terminator,
-  // The IOs of an EndOp have simple names
   SimpleNamedIOInterface
 ]> {
   let summary = "function endpoint (dynamatic)";
