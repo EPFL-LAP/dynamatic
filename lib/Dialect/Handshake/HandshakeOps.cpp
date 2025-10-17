@@ -545,7 +545,6 @@ void FuncOp::print(OpAsmPrinter &p) {
       getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
-
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
                                       getDataOperand());
@@ -1549,7 +1548,6 @@ LogicalResult EndOp::verify() {
   return success();
 }
 
-
 //===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
@@ -2150,7 +2148,6 @@ namespace handshake {
 // Operand and Result Names
 //===----------------------------------------------------------------------===//
 
-
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
   if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
@@ -2169,15 +2166,15 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
 
 std::string getResultName(Operation *op, size_t resIdx) {
 
-  if (auto nameInterface =
-                 dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+  if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface =
                  dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
-  } else if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+  } else if (auto nameInterface =
+                 dyn_cast<handshake::CustomNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
-  } 
+  }
 
   op->emitError() << "must specify result names, op: " << *op;
   assert(0);

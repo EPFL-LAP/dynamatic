@@ -1141,8 +1141,6 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
     modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
-  
-  
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
@@ -1400,8 +1398,8 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-      converter.addOutput(handshake::getResultName(memOp, idx),
-                        lowerType(res.getType()));;
+    converter.addOutput(handshake::getResultName(memOp, idx),
+                        lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
   for (const hw::ModulePort &outputPort : outputModPorts)

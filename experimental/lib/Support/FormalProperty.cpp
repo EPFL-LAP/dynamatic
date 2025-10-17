@@ -141,7 +141,8 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
-  ownerChannel.channelName = handshake::getResultName(ownerOp, res.getResultNumber());
+  ownerChannel.channelName =
+      handshake::getResultName(ownerOp, res.getResultNumber());
   userChannel.channelName = handshake::getOperandName(userOp, operandIndex);
 }
 
