@@ -32,7 +32,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
 
-#include "ImportLLVMModule.h"
+#include "TranslateLLVMToStd.h"
 #include "mlir/Support/FileUtilities.h"
 
 using namespace llvm;
@@ -102,9 +102,9 @@ int main(int argc, char **argv) {
   FuncNameToCFuncArgsMap nameToArgTypesMap =
       inferArgTypes(csource, dynamaticPath + "/include");
 
-  ImportLLVMModule importer(llvmModule.get(), module, builder,
-                            nameToArgTypesMap, &context, funcName);
-  importer.translateModule();
+  TranslateLLVMToStd importer(llvmModule.get(), module, builder,
+                              nameToArgTypesMap, &context, funcName);
+  importer.translateLLVMModule();
 
   if (failed(module.verify())) {
     return 1;

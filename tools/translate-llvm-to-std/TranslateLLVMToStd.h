@@ -29,17 +29,17 @@ using namespace mlir;
 using MemRefAndIndices =
     std::pair<mlir::Value /* memref */, SmallVector<mlir::Value> /* Indices */>;
 
-class ImportLLVMModule {
+class TranslateLLVMToStd {
 public:
-  ImportLLVMModule(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
-                   OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
-                   MLIRContext *ctx, StringRef funcName)
+  TranslateLLVMToStd(llvm::Module *llvmModule, mlir::ModuleOp mlirModule,
+                     OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
+                     MLIRContext *ctx, StringRef funcName)
       : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
         builder(builder), ctx(ctx), argMap(argMap) {};
 
   /// Calling this method will translate the funcName to mlirModule. TODO: maybe
   /// we could return a newly created "OwnOpReference<ModuleOp>" instead?
-  void translateModule();
+  void translateLLVMModule();
 
 private:
   /// FIXME: This module importer only converts for one given function (name).

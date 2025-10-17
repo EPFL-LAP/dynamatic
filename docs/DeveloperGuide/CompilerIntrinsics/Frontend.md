@@ -2,13 +2,15 @@
 
 This document describes Dynamatic's C frontend (under `tools/translate-llvm-to-std`).
 
-Sections:
+Sections and overview:
 
-1. [Design](#design): The role of a C frontend.
-2. [LLVM to MLIR translation](#llvm-to-mlir-translation): The conversion mechanism between LLVM IR and MLIR standard dialect.
+1. [Design](#design): This section gives a high-level overview of Dynamatic's C frontend. We describe (1) what are the input (LLVM IR) and output (MLIR standard dialects) of the C frontend, (2) what translation steps are in the upstream LLVM project, and (3) what are developed inside Dynamatic.
+2. [LLVM to MLIR translation](#llvm-to-mlir-translation): This section describes the translation algorithm between LLVM IR and MLIR standard dialects.
 3. [Memory dependency analysis](#memory-dependency-analysis): The memory dependency analysis for minimizing LSQ usage.
 
 ## Design 
+
+This section gives a high-level overview of Dynamatic's C frontend.
 
 ### What Does a C Frontend Do?
 
@@ -50,7 +52,9 @@ Notable optimizations that we need from the LLVM project:
 
 ## LLVM to MLIR Translation
 
-The translation between LLVM IR and the standard dialects (especially the subset that is supported in Dynamatic) is mostly straightforward. 
+This section describes the conversion mechanism between LLVM IR and MLIR standard dialects
+
+The translation between LLVM IR and the standard dialects (especially the subset that is supported in Dynamatic) is mostly straightforward. However, there are a few important caveats:
 
 > [!NOTE]
 > Key differences between LLVM IR and MLIR:

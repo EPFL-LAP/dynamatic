@@ -3,8 +3,8 @@ set(LLVM_LINK_COMPONENTS
 )
 
 add_llvm_tool(translate-llvm-to-std
-  translate-llvm-to-std.cpp
-  ImportLLVMModule.cpp
+  main.cpp
+  TranslateLLVMToStd.cpp
   InferArgTypes.cpp
 )
 

@@ -1,4 +1,4 @@
-#include "ImportLLVMModule.h"
+#include "TranslateLLVMToStd.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -144,7 +144,7 @@ void convertInitializerToDenseElemAttrRecursive(
   }
 }
 
-void ImportLLVMModule::translateModule() {
+void TranslateLLVMToStd::translateLLVMModule() {
   translateGlobalVars();
 
   for (auto &f : llvmModule->functions()) {
@@ -158,7 +158,7 @@ void ImportLLVMModule::translateModule() {
   }
 }
 
-void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
+void TranslateLLVMToStd::translateFunction(llvm::Function *llvmFunc) {
 
   SmallVector<mlir::Type> argTypes =
       getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
@@ -193,7 +193,7 @@ void ImportLLVMModule::translateFunction(llvm::Function *llvmFunc) {
   }
 }
 
-void ImportLLVMModule::translateGlobalVars() {
+void TranslateLLVMToStd::translateGlobalVars() {
   builder.setInsertionPointToEnd(mlirModule.getBody());
   for (auto &constant : llvmModule->global_values()) {
 
@@ -240,7 +240,7 @@ void ImportLLVMModule::translateGlobalVars() {
   }
 }
 
-void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
+void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   Location loc = UnknownLoc::get(ctx);
   if (auto *binaryOp = dyn_cast<llvm::BinaryOperator>(inst)) {
     translateBinaryInst(binaryOp);
@@ -290,8 +290,8 @@ void ImportLLVMModule::translateInstruction(llvm::Instruction *inst) {
 }
 
 SmallVector<mlir::Value>
-ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currBB,
-                                              BasicBlock *nextBB) {
+TranslateLLVMToStd::getBranchOperandsForCFGEdge(BasicBlock *currBB,
+                                                BasicBlock *nextBB) {
   SmallVector<mlir::Value> operands;
   for (PHINode &phi : nextBB->phis()) {
     mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
@@ -300,8 +300,8 @@ ImportLLVMModule::getBranchOperandsForCFGEdge(BasicBlock *currBB,
   return operands;
 }
 
-void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
-                                                       func::FuncOp funcOp) {
+void TranslateLLVMToStd::initializeBlocksAndBlockMapping(
+    llvm::Function *llvmFunc, func::FuncOp funcOp) {
   // Convert the entry block (specially handled, because its arguments are also
   // the function arguments). NOTE: "funcOp.addEntryBlock()" automatically adds
   // the block arguments of the first block according to the predefined function
@@ -334,7 +334,7 @@ void ImportLLVMModule::initializeBlocksAndBlockMapping(llvm::Function *llvmFunc,
   }
 }
 
-void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
+void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
   for (auto &block : *llvmFunc) {
     for (auto &inst : block) {
       for (unsigned i = 0; i < inst.getNumOperands(); ++i) {
@@ -375,7 +375,7 @@ void ImportLLVMModule::createConstants(llvm::Function *llvmFunc) {
   }
 }
 
-void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
+void TranslateLLVMToStd::createGetGlobals(llvm::Function *llvmFunc) {
   for (auto &block : *llvmFunc) {
     for (auto &inst : block) {
       for (unsigned i = 0; i < inst.getNumOperands(); ++i) {
@@ -399,7 +399,7 @@ void ImportLLVMModule::createGetGlobals(llvm::Function *llvmFunc) {
   }
 }
 
-void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
+void TranslateLLVMToStd::translateBinaryInst(llvm::BinaryOperator *inst) {
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   mlir::Type resType = getMLIRType(inst->getType(), ctx);
@@ -431,7 +431,7 @@ void ImportLLVMModule::translateBinaryInst(llvm::BinaryOperator *inst) {
   }
 }
 
-void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
+void TranslateLLVMToStd::translateCastInst(llvm::CastInst *inst) {
   mlir::Value arg = valueMap[inst->getOperand(0)];
   mlir::Type resType = getMLIRType(inst->getType(), ctx);
 
@@ -455,7 +455,7 @@ void ImportLLVMModule::translateCastInst(llvm::CastInst *inst) {
   }
 }
 
-void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
+void TranslateLLVMToStd::translateICmpInst(llvm::ICmpInst *inst) {
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpIPredicate predicate;
@@ -481,7 +481,7 @@ void ImportLLVMModule::translateICmpInst(llvm::ICmpInst *inst) {
   valueMap[inst] = op->getResult(0);
 }
 
-void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
+void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
   mlir::Value lhs = valueMap[inst->getOperand(0)];
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpFPredicate predicate;
@@ -512,7 +512,7 @@ void ImportLLVMModule::translateFCmpInst(llvm::FCmpInst *inst) {
   valueMap[inst] = op->getResult(0);
 }
 
-void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
+void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // NOTE: this function does not create any corresponding op in the CF MLIR but
   // only computes the indices for the LOAD/STORE ops that the gepInst drives.
 
@@ -582,7 +582,7 @@ void ImportLLVMModule::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
       MemRefAndIndices(baseAddress, indexOperands);
 }
 
-void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
+void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
   BasicBlock *currLLVMBB = inst->getParent();
   Location loc = UnknownLoc::get(ctx);
   if (inst->isUnconditional()) {
@@ -621,7 +621,7 @@ void ImportLLVMModule::translateBranchInst(llvm::BranchInst *inst) {
   }
 }
 
-void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
+void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
   mlir::Value memref;
@@ -655,7 +655,7 @@ void ImportLLVMModule::translateLoadInst(llvm::LoadInst *loadInst) {
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
-void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
+void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = storeInst->getPointerOperand();
 
@@ -693,7 +693,7 @@ void ImportLLVMModule::translateStoreInst(llvm::StoreInst *storeInst) {
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
-void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
+void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   Location loc = UnknownLoc::get(ctx);
 
   SmallVector<int64_t> shape;
@@ -710,7 +710,7 @@ void ImportLLVMModule::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   valueMap[allocaInst] = allocaOp->getResult(0);
 }
 
-void ImportLLVMModule::translateCallInst(llvm::CallInst *callInst) {
+void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
   assert(calledFunc);
