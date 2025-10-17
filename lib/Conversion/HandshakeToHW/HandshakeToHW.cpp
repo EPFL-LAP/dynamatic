@@ -219,7 +219,6 @@ struct InternalMemLoweringState {
   handshake::MemoryOpInterface memInterface;
   FuncMemoryPorts ports;
 
-
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
   InternalMemLoweringState()
