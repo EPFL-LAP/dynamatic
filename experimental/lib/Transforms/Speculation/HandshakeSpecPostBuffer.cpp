@@ -216,7 +216,6 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   setBB(speculator, specBB);
 
   specOp1.getDataOut().replaceAllUsesWith(speculator.getDataOut());
-  specOp2.getSaveCtrl().replaceAllUsesWith(speculator.getSaveCtrl());
   specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());
   specOp2.getSCIsMisspec().replaceAllUsesWith(speculator.getSCIsMisspec());
 

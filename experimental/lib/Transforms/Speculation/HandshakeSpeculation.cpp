@@ -813,9 +813,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     llvm::errs() << "Error: Placement of save units is not supported.\n";
     return signalPassFailure();
   }
-  // Place Save operations
-  // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
-  //   return signalPassFailure();
 
   if (!placements.getPlacements<SpecSaveCommitOp>().empty()) {
     // Generate Place SaveCommit operations and the SaveCommit control path

@@ -1171,8 +1171,6 @@ def SpecPreBufferOp1 : Handshake_Op<"spec_prebuffer1", [
 
 def SpecPreBufferOp2 : Handshake_Op<"spec_prebuffer2", [
   HasValidSpecTag<"dataIn">,
-  IsSimpleHandshake<"saveCtrl">,
-  IsIntSizedChannel<1, "saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
   IsSimpleHandshake<"SCIsMisspec">,
@@ -1184,12 +1182,11 @@ def SpecPreBufferOp2 : Handshake_Op<"spec_prebuffer2", [
 
   let arguments = (ins ChannelType:$dataIn,
                        UI32Attr:$fifoDepth);
-  let results = (outs ChannelType:$saveCtrl, ChannelType:$commitCtrl,
+  let results = (outs ChannelType:$commitCtrl,
                       ChannelType:$SCIsMisspec);
 
   let assemblyFormat = [{
-    $dataIn attr-dict `:` type($dataIn) `,`
-    type($saveCtrl) `,` type($commitCtrl) `,`
+    $dataIn attr-dict `:` type($dataIn) `,` type($commitCtrl) `,`
     type($SCIsMisspec)
   }];
 
