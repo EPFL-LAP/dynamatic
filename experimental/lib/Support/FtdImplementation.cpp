@@ -791,7 +791,7 @@ static void insertDirectSuppression(
     // for (auto &x : condControlDeps)
     //   locConsControlDeps.insert(x);
   }
-
+  llvm::errs() << "fCons-no-mux  = " << fCons->toString() << "\n";
   if (accountMuxCondition) {
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     BoolExpression *selectOperandCondition =
@@ -808,11 +808,15 @@ static void insertDirectSuppression(
     // producer is not control dependent from the block which produces the
     // condition of the mux
     if (!bi.isLess(muxConditionBlock, producerBlock)) {
-      if (consumer->getOperand(1) == connection)
+      if (consumer->getOperand(1) == connection) {
+        llvm::errs() << "MuxCondN  = " << (selectOperandCondition->boolNegate())->toString() << "\n";
         fCons = BoolExpression::boolAnd(fCons,
-                                        selectOperandCondition->boolNegate());
-      else
+                                        selectOperandCondition);
+      }
+      else {
+        llvm::errs() << "MuxCond  = " << selectOperandCondition->toString() << "\n";
         fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
+      }
     }
   }
 
