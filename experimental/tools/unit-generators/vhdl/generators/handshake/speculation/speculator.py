@@ -713,8 +713,8 @@ begin
       else
         -- if only filling but not emptying
         if (TailEn = '1') and (HeadEn = '0') then
-          -- if new tail index will reach head index
-          if ((Tail +2) mod {fifo_depth} = Head) then
+          -- if new tail index will reach head index - 1 (ring buffer full)
+          if ((Tail + 2) mod {fifo_depth} = Head) then
             Full  <= '1';
           end if;
         elsif (TailEn = '0') and (HeadEn = '1') then
