@@ -5,5 +5,5 @@ The result matched that of Haoran's thesis.
 |                                        | No Speculation   | Speculation       |
 |----------------------------------------|------------------|-------------------|
 | II of the inner loop (Haoran’s thesis) | 6                | 1                 |
-| II of the inner loop                   | 6                | 1                 |
-| Cycles (Test Bench)                    | 2423 (End: 2421) | 437 (End: 433)    |
+| II of the inner loop                   | 5                | 1                 |
+| Cycles (Test Bench)                    | 2018 | 428    |
