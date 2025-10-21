@@ -131,6 +131,14 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.maxsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/maxsi.v",
+    "dependencies": ["join"]
+  },
+  {
     "name": "handshake.mulf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
@@ -730,6 +738,27 @@
     "io-signals": {
       "data": "_bits"
     }
+  },
+  {
+    "name": "handshake.ram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "INITIAL_VALUES", "type": "string" }
+    ],
+    "generator": "\"python3\" \"$DYNAMATIC/tools/backend/ram-generator/ram_generator.py\" --module-name \"$MODULE_NAME\" --hdl verilog --output \"$OUTPUT_DIR/$MODULE_NAME.v\" --data-width $DATA_WIDTH --addr-width $ADDR_WIDTH --size $SIZE --values $INITIAL_VALUES",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.ram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SIZE", "type": "unsigned", "lb": 1 }
+    ],
+    "generator": "\"python3\" \"$DYNAMATIC/tools/backend/ram-generator/ram_generator.py\" --module-name \"$MODULE_NAME\" --hdl verilog --output \"$OUTPUT_DIR/$MODULE_NAME.v\" --data-width $DATA_WIDTH --addr-width $ADDR_WIDTH --size $SIZE",
+    "hdl": "verilog"
   },
   {
     "name": "handshake.join",

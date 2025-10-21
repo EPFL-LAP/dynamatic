@@ -21,6 +21,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -48,6 +49,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <utility>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -105,7 +107,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -210,6 +212,31 @@ struct MemLoweringState {
   void connectWithCircuit(ModuleBuilder &modBuilder);
 };
 
+/// \brief: utility struct that holds useful information for converting memory
+/// interfaces (i.e., mem_controller and lsqs) that are connected to an ramOp
+/// (i.e., instantiated as interal BRAMs).
+struct InternalMemLoweringState {
+  /// The placeholder operation for memory instance
+  handshake::RAMOp ramOp;
+  handshake::MemoryOpInterface memInterface;
+  FuncMemoryPorts ports;
+
+  handshake::PortNamer portNames;
+
+  /// Needed because we use the class as a value type in a map, which needs to
+  /// be default-constructible.
+  InternalMemLoweringState()
+      : ramOp(nullptr), memInterface(nullptr), ports(nullptr),
+        portNames(nullptr) {
+    llvm_unreachable("object should never be default-constructed");
+  }
+
+  InternalMemLoweringState(handshake::RAMOp ramOp,
+                           handshake::MemoryOpInterface memInterface)
+      : ramOp(ramOp), memInterface(memInterface),
+        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+};
+
 /// Summarizes information to convert a Handshake function into a
 /// `hw::HWModuleOp`.
 struct ModuleLoweringState {
@@ -218,6 +245,11 @@ struct ModuleLoweringState {
   llvm::MapVector<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
   /// Number of distinct memories in the function's arguments.
   unsigned numMemories = 0;
+
+  /// Memory interfaces connected to the internal BRAMs (represented using an
+  /// ramOp).
+  llvm::MapVector<handshake::MemoryOpInterface, InternalMemLoweringState>
+      internalMemInterfaces;
 
   /// Default constructor required because we use the class as a map's value,
   /// which must be default constructible.
@@ -315,7 +347,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -339,6 +371,8 @@ public:
   /// Same role as the construction which takes an opaque operation but
   /// specialized for memory interfaces, passed through their port information.
   ModuleDiscriminator(FuncMemoryPorts &ports);
+
+  ModuleDiscriminator(handshake::RAMOp *op, FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
   /// with different parameter values will never receive the same name.
@@ -646,14 +680,35 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("VALUE", bitValue);
         addUnsigned("DATA_WIDTH", bitwidth);
       })
-      .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::DivFOp, handshake::RemSIOp, handshake::DivSIOp,
-            handshake::DivUIOp, handshake::MaximumFOp, handshake::MinimumFOp,
-            handshake::MulFOp, handshake::MulIOp, handshake::NegFOp,
-            handshake::NotOp, handshake::OrIOp, handshake::ShLIOp,
-            handshake::ShRSIOp, handshake::ShRUIOp, handshake::SubFOp,
-            handshake::SubIOp, handshake::XOrIOp, handshake::SIToFPOp,
-            handshake::FPToSIOp, handshake::AbsFOp>([&](auto) {
+      .Case<
+          // clang-format off
+          handshake::AddFOp,
+          handshake::AddIOp,
+          handshake::AndIOp,
+          handshake::DivFOp,
+          handshake::RemSIOp,
+          handshake::DivSIOp,
+          handshake::DivUIOp,
+          handshake::MaximumFOp,
+          handshake::MinimumFOp,
+          handshake::MulFOp,
+          handshake::MulIOp,
+          handshake::NegFOp,
+          handshake::NotOp,
+          handshake::OrIOp,
+          handshake::ShLIOp,
+          handshake::ShRSIOp,
+          handshake::ShRUIOp,
+          handshake::SubFOp,
+          handshake::SubIOp,
+          handshake::XOrIOp,
+          handshake::SIToFPOp,
+          handshake::UIToFPOp,
+          handshake::FPToSIOp,
+          handshake::AbsFOp,
+          handshake::MaxSIOp
+          // clang-format on
+          >([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -697,16 +752,24 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         unsupported = true;
       });
 
-  if (auto internalDelayInterface =
-          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
-    auto delayAttr = internalDelayInterface.getInternalDelay();
-    addParam("INTERNAL_DELAY", delayAttr);
-  }
-
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     auto impl = fpuImplInterface.getFPUImpl();
     addString("FPU_IMPL", stringifyEnum(impl));
+
+    auto delayAttr = fpuImplInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto latencyInterface =
+          llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
+    auto latency = latencyInterface.getLatency();
+    if (failed(latency)) {
+      op->emitError() << "Missing required latency value on operation";
+      unsupported = true;
+      return;
+    }
+    addUnsigned("LATENCY", latency.value());
   }
 }
 
@@ -718,6 +781,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // There can be at most one of those, and it is a load/store port
         unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+
         Type dataType = IntegerType::get(ctx, ports.dataWidth);
         Type addrType = IntegerType::get(ctx, ports.addrWidth);
 
@@ -796,6 +860,38 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
       });
 }
 
+// This discriminator is needed and it lives outside of the general one
+// ModuleDiscriminator(Operation *op), because we need FuncMemoryPorts to know
+// exactly how many bits that the previous stage decided to use to represent
+// the data and address.
+ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
+                                         FuncMemoryPorts &ports) {
+
+  MemRefType resType = op->getResult().getType();
+  init(op->getOperation());
+  addUnsigned("DATA_WIDTH", ports.dataWidth);
+  addUnsigned("ADDR_WIDTH", ports.addrWidth);
+  addUnsigned("SIZE", resType.getNumElements());
+
+  if (auto initialValueAttr = op->getInitialValueAttr()) {
+    Type elemType = initialValueAttr.getElementType();
+    std::vector<std::string> strValues;
+    strValues.reserve(initialValueAttr.getNumElements());
+    if (isa<IntegerType>(elemType)) {
+      for (auto val : initialValueAttr.getValues<int32_t>()) {
+        strValues.push_back(std::to_string(val));
+      }
+    } else if (isa<Float32Type>(elemType)) {
+      for (auto val : initialValueAttr.getValues<float>()) {
+        strValues.push_back(std::to_string(val));
+      }
+    } else {
+      assert(false && "Unsupported constant type!");
+    }
+    addString("INITIAL_VALUES", llvm::join(strValues, " "));
+  }
+}
+
 void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
   assert(!unsupported && "operation unsupported");
 
@@ -820,7 +916,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -927,6 +1023,32 @@ public:
     // memory interface
     ValueRange toModOutput = instOp->getResults().drop_front(numResults);
     for (auto [backedge, res] : llvm::zip_equal(state.backedges, toModOutput))
+      backedge.setValue(res);
+    return instOp;
+  }
+
+  hw::InstanceOp
+  convertToInstance(InternalMemLoweringState &state,
+                    ConversionPatternRewriter &rewriter,
+                    SmallVector<Backedge> &memInterfaceToBRAMChannels) {
+    handshake::MemoryOpInterface memOp = state.memInterface;
+    ModuleDiscriminator discriminator(state.ports);
+    StringRef name = getUniqueName(memOp);
+    Location loc = memOp.getLoc();
+    hw::InstanceOp instOp = createInstance(discriminator, name, loc, rewriter);
+    if (!instOp)
+      return nullptr;
+
+    assert(instOp->getNumResults() - memOp->getNumResults() ==
+           memInterfaceToBRAMChannels.size());
+    size_t numResults = memOp->getNumResults();
+    rewriter.replaceOp(memOp, instOp->getResults().take_front(numResults));
+
+    // Resolve backedges in the module's terminator that are coming from the
+    // memory interface
+    ValueRange toModOutput = instOp->getResults().drop_front(numResults);
+    for (auto [backedge, res] :
+         llvm::zip_equal(memInterfaceToBRAMChannels, toModOutput))
       backedge.setValue(res);
     return instOp;
   }
@@ -1125,6 +1247,16 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   ModuleLoweringState state(funcOp);
   hw::ModulePortInfo modInfo = getFuncPortInfo(funcOp, state);
 
+  // Register all the memory interfaces that are connect to an ramOp
+  for (auto ramOp : funcOp.getOps<handshake::RAMOp>()) {
+    for (auto *userOp : ramOp.getResult().getUsers()) {
+      if (auto memInterface = dyn_cast<MemoryOpInterface>(userOp)) {
+        InternalMemLoweringState memLoweringState(ramOp, memInterface);
+        state.internalMemInterfaces.insert({memInterface, memLoweringState});
+      }
+    }
+  }
+
   // Create non-external HW module to replace the function with
   rewriter.setInsertionPoint(funcOp);
   auto modOp = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), name, modInfo);
@@ -1239,6 +1371,18 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   hw::HWModuleOp parentModOp = memOp->getParentOfType<hw::HWModuleOp>();
   ModuleLoweringState &modState = lowerState.modState[parentModOp];
+
+  if (!modState.memInterfaces.contains(memOp)) {
+    // The memory interface is not in the set of memInterfaces, this means:
+    // - The memory interface is connected to an internal array (assert below).
+    // - The IR is malformed.
+
+    assert(modState.internalMemInterfaces.contains(memOp) &&
+           "The memory interface op is not registered as an internal one nor "
+           "external one!");
+    return failure();
+  }
+
   MemLoweringState &memState = modState.memInterfaces[memOp];
   HWMemConverter converter(getContext());
 
@@ -1277,6 +1421,144 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
 
   hw::InstanceOp instOp = converter.convertToInstance(memState, rewriter);
   return instOp ? success() : failure();
+}
+
+namespace {
+
+class ConvertMemInterfaceForInternalArray
+    : public OpInterfaceConversionPattern<handshake::MemoryOpInterface> {
+public:
+  ConvertMemInterfaceForInternalArray(ChannelTypeConverter &typeConverter,
+                                      MLIRContext *ctx,
+                                      LoweringState &lowerState)
+      : OpInterfaceConversionPattern<handshake::MemoryOpInterface>(
+            typeConverter, ctx),
+        lowerState(lowerState) {}
+
+  LogicalResult
+  matchAndRewrite(handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override;
+
+private:
+  /// Shared lowering state.
+  LoweringState &lowerState;
+};
+
+} // namespace
+
+// Steps:
+// 1. Materialize the ramOp as a RAM module (here we assume that it is
+// instantiated as a dual-port, single cycle latency BRAM).
+// 2. Replace the memory interface op.
+// 3. Erase the old memory interface op and the ramOp.
+LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
+    handshake::MemoryOpInterface memOp, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) const {
+
+  hw::HWModuleOp parentModOp = memOp->getParentOfType<hw::HWModuleOp>();
+  ModuleLoweringState &modState = lowerState.modState[parentModOp];
+
+  if (!modState.internalMemInterfaces.contains(memOp)) {
+    // The memory interface is not in the set of memInterfaces, this means:
+    // - The memory interface is connected to an internal array (assert below).
+    // - The IR is malformed.
+    assert(modState.memInterfaces.contains(memOp) &&
+           "The memory interface op is not registered as an internal one nor "
+           "external one!");
+    return failure();
+  }
+
+  InternalMemLoweringState &memState = modState.internalMemInterfaces[memOp];
+
+  // Converter of the interface (LSQ/MC)
+  HWMemConverter memInterfaceConverter(getContext());
+
+  MLIRContext *ctx = memOp.getContext();
+
+  auto addrType = IntegerType::get(ctx, memState.ports.addrWidth);
+  auto dataType = IntegerType::get(ctx, memState.ports.dataWidth);
+  Type i1Type = IntegerType::get(ctx, 1);
+
+  SmallVector<Backedge> memInterfaceToBRAMChannels;
+
+  // We need this because at the time when we build the BRAM, the input
+  // signals to it are not (fully) available yet.
+  BackedgeBuilder edgeBuilder(rewriter, memOp->getLoc());
+
+  if (memOp.isMasterInterface()) {
+    // Materialize the ramOp as a hardware BRAM module:
+    // NOTE: This is only needed if the memory interface is not an LSQ -> MC
+    HWBuilder bramBuilder(getContext());
+
+    // Signals of a dual port RAM with the direction:
+    // - [circuit -> mem] loadEn (1-bit)
+    auto loadEn = edgeBuilder.get(i1Type);
+    bramBuilder.addInput("loadEn", loadEn);
+    // - [circuit -> mem] loadAddr (address width)
+    auto loadAddr = edgeBuilder.get(addrType);
+    bramBuilder.addInput("loadAddr", loadAddr);
+    // - [circuit -> mem] storeEn (1-bit)
+    auto storeEn = edgeBuilder.get(i1Type);
+    bramBuilder.addInput("storeEn", storeEn);
+    // - [circuit -> mem] storeAddr (address width)
+    auto storeAddr = edgeBuilder.get(addrType);
+    bramBuilder.addInput("storeAddr", storeAddr);
+    // - [circuit -> mem] storeData (data width)
+    auto storeData = edgeBuilder.get(dataType);
+    bramBuilder.addInput("storeData", storeData);
+    // We need to create backedges for all the signals above.
+    // - [mem -> circuit] loadData (data width)
+    bramBuilder.addOutput("loadData", dataType);
+    // This signal feeds the memory op interface.
+    bramBuilder.addClkAndRst(parentModOp);
+
+    // These backedges are passed to the convertToInstance to resolve the
+    // missing drivers
+    memInterfaceToBRAMChannels = {loadEn, loadAddr, storeEn, storeAddr,
+                                  storeData};
+
+    // Query the parameters of ramOp (used to generate external module op).
+    ModuleDiscriminator bramDiscriminator(&memState.ramOp, memState.ports);
+
+    auto bramInstanceOp = bramBuilder.createInstance(
+        bramDiscriminator, getUniqueName(memState.ramOp), memOp->getLoc(),
+        rewriter);
+
+    // Create new input connections that are not present in the handshake op (in
+    // this case, only the load data). NOTE: not needed if we have LSQ -> MC
+    memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
+  }
+
+  // Add the ports from handshake op (here we use the port namer to name the
+  // ports that are directly converted from handshake op), except for the memref
+  // type.
+  for (auto [i, oprd] : llvm::enumerate(operands)) {
+    if (!isa<MemRefType>(oprd.getType()))
+      memInterfaceConverter.addInput(memState.portNames.getInputName(i), oprd);
+  }
+  memInterfaceConverter.addClkAndRst(parentModOp);
+
+  for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
+    memInterfaceConverter.addOutput(memState.portNames.getOutputName(idx),
+                                    lowerType(res.getType()));
+  }
+
+  if (memOp.isMasterInterface()) {
+    // Create new output connections that are not present in the handshake IR
+    // (in this case, the loadEn, loadAddr, storeEn, storeAddr, storeData).
+    // memInterfaceConverter.addOutput("loadEn");
+    memInterfaceConverter.addOutput("loadEn", i1Type);
+    memInterfaceConverter.addOutput("loadAddr", addrType);
+    memInterfaceConverter.addOutput("storeEn", i1Type);
+    memInterfaceConverter.addOutput("storeAddr", addrType);
+    memInterfaceConverter.addOutput("storeData", dataType);
+  }
+
+  memInterfaceConverter.convertToInstance(memState, rewriter,
+                                          memInterfaceToBRAMChannels);
+
+  rewriter.eraseOp(memState.ramOp);
+  return success();
 }
 
 namespace {
@@ -1510,7 +1792,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1812,67 +2095,74 @@ public:
 
     // Create pattern set
     RewritePatternSet patterns(ctx);
-    patterns.insert<ConvertFunc, ConvertMemInterface>(typeConverter, ctx,
-                                                      lowerState);
-    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
-                    ConvertToHWInstance<handshake::NDWireOp>,
-                    ConvertToHWInstance<handshake::ConditionalBranchOp>,
-                    ConvertToHWInstance<handshake::BranchOp>,
-                    ConvertToHWInstance<handshake::MergeOp>,
-                    ConvertToHWInstance<handshake::ControlMergeOp>,
-                    ConvertToHWInstance<handshake::MuxOp>,
-                    ConvertToHWInstance<handshake::JoinOp>,
-                    ConvertToHWInstance<handshake::BlockerOp>,
-                    ConvertToHWInstance<handshake::SourceOp>,
-                    ConvertToHWInstance<handshake::ConstantOp>,
-                    ConvertToHWInstance<handshake::SinkOp>,
-                    ConvertToHWInstance<handshake::ForkOp>,
-                    ConvertToHWInstance<handshake::LazyForkOp>,
-                    ConvertToHWInstance<handshake::LoadOp>,
-                    ConvertToHWInstance<handshake::StoreOp>,
-                    ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
-                    ConvertToHWInstance<handshake::ValidMergerOp>,
-                    ConvertToHWInstance<handshake::SharingWrapperOp>,
+    patterns.insert<ConvertFunc, ConvertMemInterface,
+                    ConvertMemInterfaceForInternalArray>(typeConverter, ctx,
+                                                         lowerState);
+    patterns.insert<
+        // clang-format off
+        ConvertInstance,
+        ConvertToHWInstance<handshake::BufferOp>,
+        ConvertToHWInstance<handshake::NDWireOp>,
+        ConvertToHWInstance<handshake::ConditionalBranchOp>,
+        ConvertToHWInstance<handshake::BranchOp>,
+        ConvertToHWInstance<handshake::MergeOp>,
+        ConvertToHWInstance<handshake::ControlMergeOp>,
+        ConvertToHWInstance<handshake::MuxOp>,
+        ConvertToHWInstance<handshake::JoinOp>,
+        ConvertToHWInstance<handshake::BlockerOp>,
+        ConvertToHWInstance<handshake::SourceOp>,
+        ConvertToHWInstance<handshake::ConstantOp>,
+        ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::ForkOp>,
+        ConvertToHWInstance<handshake::LazyForkOp>,
+        ConvertToHWInstance<handshake::LoadOp>,
+        ConvertToHWInstance<handshake::StoreOp>,
+        ConvertToHWInstance<handshake::NotOp>,
+        ConvertToHWInstance<handshake::ReadyRemoverOp>,
+        ConvertToHWInstance<handshake::ValidMergerOp>,
+        ConvertToHWInstance<handshake::SharingWrapperOp>,
 
-                    // Arith operations
-                    ConvertToHWInstance<handshake::AddFOp>,
-                    ConvertToHWInstance<handshake::AddIOp>,
-                    ConvertToHWInstance<handshake::AndIOp>,
-                    ConvertToHWInstance<handshake::CmpFOp>,
-                    ConvertToHWInstance<handshake::CmpIOp>,
-                    ConvertToHWInstance<handshake::DivFOp>,
-                    ConvertToHWInstance<handshake::DivSIOp>,
-                    ConvertToHWInstance<handshake::DivUIOp>,
-                    ConvertToHWInstance<handshake::RemSIOp>,
-                    ConvertToHWInstance<handshake::ExtSIOp>,
-                    ConvertToHWInstance<handshake::ExtUIOp>,
-                    ConvertToHWInstance<handshake::MulFOp>,
-                    ConvertToHWInstance<handshake::MulIOp>,
-                    ConvertToHWInstance<handshake::NegFOp>,
-                    ConvertToHWInstance<handshake::OrIOp>,
-                    ConvertToHWInstance<handshake::SelectOp>,
-                    ConvertToHWInstance<handshake::ShLIOp>,
-                    ConvertToHWInstance<handshake::ShRSIOp>,
-                    ConvertToHWInstance<handshake::ShRUIOp>,
-                    ConvertToHWInstance<handshake::SubFOp>,
-                    ConvertToHWInstance<handshake::SubIOp>,
-                    ConvertToHWInstance<handshake::TruncIOp>,
-                    ConvertToHWInstance<handshake::TruncFOp>,
-                    ConvertToHWInstance<handshake::XOrIOp>,
-                    ConvertToHWInstance<handshake::SIToFPOp>,
-                    ConvertToHWInstance<handshake::FPToSIOp>,
-                    ConvertToHWInstance<handshake::ExtFOp>,
-                    ConvertToHWInstance<handshake::AbsFOp>,
+        // Arith operations
+        ConvertToHWInstance<handshake::AddFOp>,
+        ConvertToHWInstance<handshake::AddIOp>,
+        ConvertToHWInstance<handshake::AndIOp>,
+        ConvertToHWInstance<handshake::CmpFOp>,
+        ConvertToHWInstance<handshake::CmpIOp>,
+        ConvertToHWInstance<handshake::DivFOp>,
+        ConvertToHWInstance<handshake::DivSIOp>,
+        ConvertToHWInstance<handshake::DivUIOp>,
+        ConvertToHWInstance<handshake::RemSIOp>,
+        ConvertToHWInstance<handshake::ExtSIOp>,
+        ConvertToHWInstance<handshake::ExtUIOp>,
+        ConvertToHWInstance<handshake::MulFOp>,
+        ConvertToHWInstance<handshake::MulIOp>,
+        ConvertToHWInstance<handshake::NegFOp>,
+        ConvertToHWInstance<handshake::OrIOp>,
+        ConvertToHWInstance<handshake::SelectOp>,
+        ConvertToHWInstance<handshake::ShLIOp>,
+        ConvertToHWInstance<handshake::ShRSIOp>,
+        ConvertToHWInstance<handshake::ShRUIOp>,
+        ConvertToHWInstance<handshake::SubFOp>,
+        ConvertToHWInstance<handshake::SubIOp>,
+        ConvertToHWInstance<handshake::TruncIOp>,
+        ConvertToHWInstance<handshake::TruncFOp>,
+        ConvertToHWInstance<handshake::XOrIOp>,
+        ConvertToHWInstance<handshake::SIToFPOp>,
+        ConvertToHWInstance<handshake::UIToFPOp>,
+        ConvertToHWInstance<handshake::FPToSIOp>,
+        ConvertToHWInstance<handshake::ExtFOp>,
+        ConvertToHWInstance<handshake::AbsFOp>,
+        ConvertToHWInstance<handshake::MaxSIOp>,
 
-                    // Speculative operations
-                    ConvertToHWInstance<handshake::SpecCommitOp>,
-                    ConvertToHWInstance<handshake::SpecSaveOp>,
-                    ConvertToHWInstance<handshake::SpecSaveCommitOp>,
-                    ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-                    ConvertToHWInstance<handshake::NonSpecOp>>(
-        typeConverter, funcOp->getContext());
+        // Speculative operations
+        ConvertToHWInstance<handshake::SpecCommitOp>,
+        ConvertToHWInstance<handshake::SpecSaveOp>,
+        ConvertToHWInstance<handshake::SpecSaveCommitOp>,
+        ConvertToHWInstance<handshake::SpeculatorOp>,
+        ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+        ConvertToHWInstance<handshake::NonSpecOp>
+        // clang-format on
+        >(typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
     ConversionTarget target(*ctx);

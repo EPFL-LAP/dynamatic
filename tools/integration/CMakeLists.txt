@@ -1,16 +1,3 @@
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  DOWNLOAD_EXTRACT_TIMESTAMP true
-  URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
-FetchContent_MakeAvailable(json)
-
 add_executable(
   integration
   TEST_SUITE.cpp
@@ -32,9 +19,15 @@ gtest_discover_tests(
 
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
+# Default: Execute 8 integration tests in parallel
+# Can be overridden with -DPARALLEL_FACTOR=<n> at configure time
+# e.g. by running 'cmake -DPARALLEL_FACTOR=<n> -B build'
+# before 'ninja -C build <target>'
+set(PARALLEL_FACTOR 8 CACHE STRING "Parallelism for integration test targets")
+
 add_custom_target(
   run-all-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${PARALLEL_FACTOR} --timeout 1500 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
@@ -44,10 +37,20 @@ add_custom_target(
 
 add_custom_target(
   run-ci-integration-tests
-  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure --exclude-regex _NoCI
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${PARALLEL_FACTOR} --timeout 1500 --output-on-failure --exclude-regex _NoCI
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests that aren't marked with '_NoCI'."
+  VERBATIM
+  USES_TERMINAL
+)
+
+add_custom_target(
+  run-spec-integration-tests
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${PARALLEL_FACTOR} --timeout 1500 --output-on-failure --tests-regex spec
+  DEPENDS dynamatic-opt integration
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
+  COMMENT "Run speculation integration tests."
   VERBATIM
   USES_TERMINAL
 )

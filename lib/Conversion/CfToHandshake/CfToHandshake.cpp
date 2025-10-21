@@ -27,6 +27,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -543,6 +544,13 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
     Value index = *iMerge.indexEdge;
 
     for (Value &operand : operands) {
+      if (!isa<handshake::ChannelType, handshake::ControlType>(
+              operand.getType())) {
+        llvm_unreachable(
+            "Attempting to construct merge on a non-handshake operand. You "
+            "might have accidentally maximized the SSA of a placeholder op "
+            "like LSQ, MemoryController, or RAMOp.");
+      }
       assert(operand.getType()
                      .cast<handshake::ExtraSignalsTypeInterface>()
                      .getNumExtraSignals() == 0 &&
@@ -687,12 +695,12 @@ void LowerFuncToHandshake::addBranchOps(
   }
 }
 
-LowerFuncToHandshake::MemAccesses::MemAccesses(BlockArgument memStart)
+LowerFuncToHandshake::MemAccesses::MemAccesses(Value memStart)
     : memStart(memStart) {}
 
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    const DenseMap<Value, unsigned> &memrefIndices,
+    const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
     BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
   // Count the number of memory regions in the function, and derive the starting
@@ -710,9 +718,52 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
       if (!isValidMemrefType(arg.getLoc(), memrefTy))
         return failure();
       unsigned memStartIdx = memStartOffset + (memIdx++);
+      // Every memory controller needs a start signal to indicate that the BRAM
+      // can safely accept new memory requests. For internally allocated
+      // memories (which will be converted to BRAMs or MUXes) we use the
+      // function's control signal as the memory start signal.
+      //
+      // NOTE: Each external memory bank (passed in the function argument)
+      // has a separate block argument as the memory controller's start signal
+      // - arg: function argument of memref type that will be managed by a
+      // memory controller
+      // - {funcArgs[...]}: the external start signals.
+      //
+      // @Jiahui17: Should we use the first block control instead for the memory
+      // start signals? Or at least make it optional..
       memInfo.insert({arg, {funcArgs[memStartIdx]}});
     }
   }
+
+  // Record each alloca/get_global operation to memInfo
+  Block *firstBlock = &funcOp.getBlocks().front();
+  auto firstBBControl = getBlockControl(firstBlock);
+  funcOp.walk([&](memref::AllocaOp op) {
+    // Every memory controller needs a start signal to indicate that the BRAM
+    // can safely accept new memory requests. For internally allocated
+    // memories (which will be converted to BRAMs or MUXes) we use the
+    // function's control signal as the memory start signal.
+    //
+    // NOTE: Each external memory bank (passed in the function argument)
+    // has a separate block argument as the memory controller's start signal
+    Value memref = op->getResult(0);
+    memInfo.insert({/* will be managed by a mem_controller */ memref,
+                    /* mem_controller's start signal */ {firstBBControl}});
+  });
+
+  funcOp.walk([&](memref::GetGlobalOp op) {
+    Value memref = op->getResult(0);
+    // Every memory controller needs a start signal to indicate that the BRAM
+    // can safely accept new memory requests. For internally allocated memories
+    // (which will be converted to BRAMs or MUXes) we use the function's control
+    // signal as the memory start signal.
+    //
+    // NOTE: Each external memory bank (passed in the function argument)
+    // has a separate block argument as the memory controller's start signal
+    memInfo.insert({/* will be managed by a mem_controller */ memref,
+                    /* MemoryAccesses = */ {
+                        /* mem_controller's start signal */ firstBBControl}});
+  });
 
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
@@ -788,12 +839,38 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
     // Associate the new operation with the memory region it references and
     // the memory interface it should connect to
-    auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
-    assert(accessesIt != memInfo.end() && "unknown memref");
-    if (memAttr.connectsToMC())
-      accessesIt->second.mcPorts[block].push_back(portOp);
-    else
-      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    //
+    // NOTE: Why do we need to do this weird conversion (
+    // memInfo.find(funcArgs[memrefIndices.at(memref)]);) here:
+    // - "memref" points to the original argument in the CF function.
+    // - "memInfo" points to the new arguments in the handshake function.
+    // - We need to do this convoluted mapping ("arg in the
+    // original CF func" -> "position in the argument" -> "arg in the
+    // handshake func.".
+    if (/* Case: MemRef is a function argument */ memrefToFuncArgIndex.count(
+        memref)) {
+      auto handshakeMemRef = funcArgs[memrefToFuncArgIndex.at(memref)];
+      // Get the start signal
+      auto *accessIt = memInfo.find(handshakeMemRef);
+      assert(accessIt != memInfo.end() && "unknown memref");
+
+      // This reference holds the set of memory ports and the start signals
+      auto &memoryAccessInfo = accessIt->second;
+      if (memAttr.connectsToMC())
+        memoryAccessInfo.mcPorts[block].push_back(portOp);
+      else
+        memoryAccessInfo.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    } else /* Case: MemRef is produced by Alloca or GetGlobal */ {
+      auto *accessIt = memInfo.find(memref);
+      assert(accessIt != memInfo.end() && "unknown memref");
+
+      // This reference holds the set of memory ports and the start signals
+      auto &memoryAccessInfo = accessIt->second;
+      if (memAttr.connectsToMC())
+        memoryAccessInfo.mcPorts[block].push_back(portOp);
+      else
+        memoryAccessInfo.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
+    }
   }
 
   return success();
@@ -1411,6 +1488,103 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
   return success();
 }
 
+struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
+  using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
+
+  // Construct a dense element attribute with everything zeroes.
+  DenseElementsAttr getZeroAttr(ShapedType type) const {
+    auto elemType = type.getElementType();
+    if (auto intTy = dyn_cast<IntegerType>(elemType)) {
+      return DenseElementsAttr::get(type, APInt(intTy.getWidth(), 0));
+    }
+    if (auto floatTy = dyn_cast<FloatType>(type)) {
+      if (floatTy.isF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEhalf(), /*negative=*/false));
+      if (floatTy.isBF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::BFloat(), /*negative=*/false));
+      if (floatTy.isF32())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEsingle(), /*negative=*/false));
+      if (floatTy.isF64())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEdouble(), /*negative=*/false));
+      llvm::report_fatal_error("Unhandled float element type!");
+    }
+    llvm::report_fatal_error("Unknown base element type!");
+  }
+
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // HACK: By default, we initialize the memory with all zeros. According to
+    // the C standard, this only happens for arrays.
+    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                  getZeroAttr(op.getType()));
+    return success();
+  }
+};
+
+struct GetGlobalOpConversion
+    : public DynOpConversionPattern<memref::GetGlobalOp> {
+  using DynOpConversionPattern<memref::GetGlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // clang-format off
+    // Example:
+    //  memref.global "external" constant @internal_array : memref<...> = dense<...>
+    //  ....
+    //  %4 = memref.get_global @internal_array : memref<...>
+    //
+    // In this case, we remove the global constant and rewrite the addressof
+    // node into a RAMOp (and we put an attribute to describe its constant
+    // value).
+    // clang-format on
+    SymbolTableCollection symbolTableCollection;
+
+    auto symNameOfGetGlobal = op.getNameAttr();
+
+    GlobalOp global;
+    auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
+    moduleOp.walk([&global, symNameOfGetGlobal](memref::GlobalOp gbl) {
+      if (gbl.getSymName() == symNameOfGetGlobal.getValue()) {
+        global = gbl;
+      }
+    });
+
+    if (!global) {
+      // No corresponding Global (maybe emit pass failure is better)
+      return failure();
+    }
+
+    /// The initial value doesn't have any type constraints. Therefore we need
+    /// to check if it is stored as dense elements.
+    mlir::Attribute initValueAttr = global.getInitialValueAttr();
+    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+      rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                    denseAttr);
+    } else {
+      llvm::report_fatal_error(
+          "The initial value must be denoted in DenseElementsAttr.");
+    }
+    return success();
+  }
+};
+
+// TODO: Here we simply erase all the global variables and attach the initial
+// values to the RAMOps inside the handshake function.
+struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
+  using DynOpConversionPattern<memref::GlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===-----------------------------------------------------------------------==//
 // Pass driver
 //===-----------------------------------------------------------------------==//
@@ -1443,41 +1617,51 @@ struct CfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
-                 ConvertUndefinedValues,
-                 ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-                 ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-                 OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-                 OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-                 OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-                 OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-                 OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-                 OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
-                 OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-                 OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-                 OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-                 OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-                 OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-                 OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-                 OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-                 OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-                 OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-                 OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-                 OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-                 OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-                 OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-                 OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-                 OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
-        getAnalysis<NameAnalysis>(), converter, ctx);
+    patterns.add<
+        // clang-format off
+        LowerFuncToHandshake,
+        ConvertConstants,
+        AllocaOpConversion,
+        ConvertCalls,
+        ConvertUndefinedValues,
+        GetGlobalOpConversion,
+        GlobalOpConversion,
+        ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+        OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+        OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+        OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+        OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+        OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+        OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+        OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+        OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+        OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+        OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+        OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+        OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
+        OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+        OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+        OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+        OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+        OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+        OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+        OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+        OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+        OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+        OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+        OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+        OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+        OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+        OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+        OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
+        OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+        OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>
+        // clang-format on
+        >(getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
