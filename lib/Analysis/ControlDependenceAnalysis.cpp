@@ -240,8 +240,7 @@ void dynamatic::ControlDependenceAnalysis::printAllBlocksDeps() const {
   DEBUG_WITH_TYPE(
       "CONTROL_DEPENDENCY_ANALYSIS",
       llvm::dbgs() << "\n*********************************\n\n";
-      for (auto &elem
-           : blocksControlDeps) {
+      for (auto &elem : blocksControlDeps) {
         Block *block = elem.first;
         block->printAsOperand(llvm::dbgs());
         llvm::dbgs() << " is control dependent on: ";
