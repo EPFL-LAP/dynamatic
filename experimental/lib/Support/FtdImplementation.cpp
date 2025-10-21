@@ -1145,7 +1145,12 @@ static void insertDirectSuppression(
     llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
     for (auto &p : tmp)
       cofactorList.push_back(p.second);
-
+    
+    llvm::errs() << "[CofactorList] ";
+    for (const auto &s : cofactorList)
+      llvm::errs() << s << " ";
+    llvm::errs() << "\n";
+    
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
