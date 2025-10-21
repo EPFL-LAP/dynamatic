@@ -656,18 +656,29 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
 }
 
 struct LocalCFG {
+  // The MLIR region representing the local subgraph.
   Region *region = nullptr;
+  // Mapping: block in local graph -> original block.
   DenseMap<Block *, Block *> origMap;
+  // The producer block in the local CFG.
   Block *newProd = nullptr;
+  // The consumer block in the local CFG.
   Block *newCons = nullptr;
+  // A replicated block used when the producer is revisited (for loops).
   Block *secondVisitBB = nullptr;
+  // A unique sink (exit) block to which all terminal paths lead.
   Block *sinkBB = nullptr;
+  // Topological order of the reconstructed region.
   SmallVector<Block *, 8> topoOrder;
+  // Temporary parent operation that owns the region.
   Operation *containerOp = nullptr;
 
   ~LocalCFG() = default;
 };
 
+/// Build a local control-flow subgraph (LocalCFG) between a producer and
+/// consumer. The subgraph is reconstructed as a region with unique entry
+/// (producer) and exit (sink).
 static std::unique_ptr<LocalCFG>
 buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons) {
   auto L = std::make_unique<LocalCFG>();
@@ -911,15 +922,15 @@ static void insertDirectSuppression(
   if (fProd->type == experimental::boolean::ExpressionType::Zero)
     return;
   if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumer) ||
-        llvm::isa_and_nonnull<handshake::LSQOp>(consumer) ||
-        llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumer) ||
-        llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumer) ||
-        llvm::isa_and_nonnull<cf::CondBranchOp>(consumer) ||
-        llvm::isa_and_nonnull<cf::BranchOp>(consumer) ||
-        (llvm::isa<memref::LoadOp>(consumer) &&
-         !llvm::isa<handshake::LoadOp>(consumer)) ||
-        (llvm::isa<memref::StoreOp>(consumer) &&
-         !llvm::isa<handshake::StoreOp>(consumer)))
+      llvm::isa_and_nonnull<handshake::LSQOp>(consumer) ||
+      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumer) ||
+      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumer) ||
+      llvm::isa_and_nonnull<cf::CondBranchOp>(consumer) ||
+      llvm::isa_and_nonnull<cf::BranchOp>(consumer) ||
+      (llvm::isa<memref::LoadOp>(consumer) &&
+       !llvm::isa<handshake::LoadOp>(consumer)) ||
+      (llvm::isa<memref::StoreOp>(consumer) &&
+       !llvm::isa<handshake::StoreOp>(consumer)))
     return;
   auto L = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
   ControlDependenceAnalysis locCDA(*L->region);
