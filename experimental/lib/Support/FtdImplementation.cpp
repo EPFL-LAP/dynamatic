@@ -910,7 +910,17 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
   if (fProd->type == experimental::boolean::ExpressionType::Zero)
     return;
-
+  if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumer) ||
+        llvm::isa_and_nonnull<handshake::LSQOp>(consumer) ||
+        llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumer) ||
+        llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumer) ||
+        llvm::isa_and_nonnull<cf::CondBranchOp>(consumer) ||
+        llvm::isa_and_nonnull<cf::BranchOp>(consumer) ||
+        (llvm::isa<memref::LoadOp>(consumer) &&
+         !llvm::isa<handshake::LoadOp>(consumer)) ||
+        (llvm::isa<memref::StoreOp>(consumer) &&
+         !llvm::isa<handshake::StoreOp>(consumer)))
+    return;
   auto L = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
   ControlDependenceAnalysis locCDA(*L->region);
   DenseSet<Block *> locConsControlDepsTmp =
