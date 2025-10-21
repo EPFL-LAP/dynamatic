@@ -1237,11 +1237,10 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
       return;
+    // Handle the suppression in all the other cases (including the operand being
+    // a function argument)
+    insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
   }
-
-  // Handle the suppression in all the other cases (including the operand being
-  // a function argument)
-  insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }
 
 void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
