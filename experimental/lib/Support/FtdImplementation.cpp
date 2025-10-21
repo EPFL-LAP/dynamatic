@@ -655,6 +655,167 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   return muxOp.getResult();
 }
 
+struct LocalCFG {
+  Region *region = nullptr;
+  DenseMap<Block *, Block *> origMap;
+  Block *newProd = nullptr;
+  Block *newCons = nullptr;
+  Block *secondVisitBB = nullptr;
+  Block *sinkBB = nullptr;
+  SmallVector<Block *, 8> topoOrder;
+  Operation *containerOp = nullptr;
+
+  ~LocalCFG() = default;
+};
+
+static std::unique_ptr<LocalCFG>
+buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons) {
+  auto L = std::make_unique<LocalCFG>();
+  Location loc = builder.getUnknownLoc();
+
+  // Create a temporary container for the region.
+  // MLIR regions must be attached to an operation.
+  // A dummy function is created to keep the local CFG syntactically valid.
+  OpBuilder::InsertionGuard guard(builder);
+  auto funcType = builder.getFunctionType({}, {});
+  auto dummyFunc =
+      builder.create<func::FuncOp>(loc, "__ftd_local_cfg__", funcType);
+  Region &R = dummyFunc.getBody();
+  L->region = &R;
+  L->containerOp = dummyFunc;
+
+  // Initialize entry and sink blocks.
+  // The entry represents the producer.
+  // The sink is a unified exit block for all terminal paths.
+  Block *entry = new Block();
+  L->region->push_back(entry);
+  L->newProd = entry;
+  L->origMap[entry] = origProd;
+
+  L->sinkBB = new Block();
+  L->region->push_back(L->sinkBB);
+  L->origMap[L->sinkBB] = nullptr;
+
+  // Build the reachable subgraph using DFS.
+  // Each original block is cloned once.
+  // Edges returning to the producer are redirected to a "secondVisit" node.
+  DenseMap<Block *, Block *> cloned;
+  DenseSet<Block *> visited;
+  cloned[origProd] = entry;
+
+  std::function<void(Block *)> dfs = [&](Block *orig) {
+    Block *clone = cloned[orig];
+    visited.insert(orig);
+
+    auto *term = orig->getTerminator();
+    SmallVector<Block *, 2> succs;
+    if (term)
+      for (auto it = term->successor_begin(), e = term->successor_end();
+           it != e; ++it)
+        succs.push_back(*it);
+
+    SmallVector<Block *, 2> newSuccs;
+
+    // No successors, or the block is the consumer (different from the producer)
+    // In such cases, connect the block directly to the sink.
+    if (succs.empty() || (orig == origCons && orig != origProd)) {
+      builder.setInsertionPointToEnd(clone);
+      builder.create<cf::BranchOp>(loc, L->sinkBB);
+      return;
+    }
+
+    for (Block *v : succs) {
+      // Successor revisits the producer
+      // Redirect this edge to a single secondVisitBB, which will later branch
+      // to the sink.
+      if (v == origProd) {
+        if (!L->secondVisitBB) {
+          L->secondVisitBB = new Block();
+          L->region->push_back(L->secondVisitBB);
+          L->origMap[L->secondVisitBB] = nullptr;
+        }
+        newSuccs.push_back(L->secondVisitBB);
+        continue;
+      }
+
+      // Regular successor
+      // Clone it if not already cloned.
+      Block *newSucc = nullptr;
+      if (!cloned.count(v)) {
+        newSucc = new Block();
+        L->region->push_back(newSucc);
+        cloned[v] = newSucc;
+        L->origMap[newSucc] = v;
+      } else {
+        newSucc = cloned[v];
+      }
+
+      newSuccs.push_back(newSucc);
+
+      if (!visited.contains(v))
+        dfs(v);
+    }
+
+    // Create a terminator in the cloned block that reflects its control-flow
+    // structure.
+    builder.setInsertionPointToEnd(clone);
+    if (newSuccs.size() == 1) {
+      builder.create<cf::BranchOp>(loc, newSuccs[0]);
+    } else if (newSuccs.size() == 2) {
+      // Use a dummy constant as a condition for a two-way branch.
+      Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
+      builder.create<cf::CondBranchOp>(loc, cond, newSuccs[0], newSuccs[1]);
+    } else {
+      // For nodes with more than two successors, connect to the sink by
+      // default.
+      builder.create<cf::BranchOp>(loc, L->sinkBB);
+    }
+  };
+
+  dfs(origProd);
+
+  // Connect the secondVisitBB (if any) to the sink.
+  if (L->secondVisitBB) {
+    builder.setInsertionPointToEnd(L->secondVisitBB);
+    builder.create<cf::BranchOp>(loc, L->sinkBB);
+  }
+
+  // Add a return terminator to the sink block.
+  // This ensures the region has a valid exit.
+  builder.setInsertionPointToEnd(L->sinkBB);
+  builder.create<func::ReturnOp>(loc);
+
+  // Identify the cloned consumer block in the new CFG.
+  if (origCons == origProd)
+    L->newCons = L->secondVisitBB;
+  else if (cloned.count(origCons))
+    L->newCons = cloned[origCons];
+  else
+    L->newCons = L->newProd;
+
+  // Compute topological order of the local CFG.
+  // A post-order DFS ensures successors are visited before predecessors,
+  // which is required for deterministic Boolean or BDD analysis.
+  visited.clear();
+  SmallVector<Block *> order;
+  std::function<void(Block *)> topo = [&](Block *u) {
+    if (!u || visited.contains(u))
+      return;
+    visited.insert(u);
+    if (auto *term = u->getTerminator())
+      for (auto it = term->successor_begin(), e = term->successor_end();
+           it != e; ++it)
+        topo(*it);
+    order.push_back(u);
+  };
+
+  topo(entry);
+  std::reverse(order.begin(), order.end());
+  L->topoOrder = std::move(order);
+
+  return L;
+}
+
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static void insertDirectSuppression(
@@ -666,6 +827,15 @@ static void insertDirectSuppression(
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
+
+  std::string funcName = funcOp.getName().str();
+  std::string dir = "/home/yuaqin/dynamatic-scripts/TempOutputs/";
+  std::string cfgFile = dir + funcName + "_localcfg.txt";
+  std::string logFile = dir + funcName + "_debuglog.txt";
+  std::error_code EC_log;
+  llvm::raw_fd_ostream log(logFile, EC_log,
+                           static_cast<llvm::sys::fs::OpenFlags>(0x0004));
+  llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
 
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
   // gate and the producer is one of its data inputs
@@ -681,18 +851,18 @@ static void insertDirectSuppression(
   // Get the control dependencies from the consumer
   DenseSet<Block *> consControlDeps =
       cdAnalysis[consumer->getBlock()].forwardControlDeps;
-  
-  llvm::errs() << "[FTD] Producer block: ";
+
+  out << "[FTD] Producer block: ";
   if (producerBlock)
-    producerBlock->printAsOperand(llvm::errs());
+    producerBlock->printAsOperand(out);
   else
-    llvm::errs() << "(null)";
-  llvm::errs() << ", Consumer block: ";
+    out << "(null)";
+  out << ", Consumer block: ";
   if (consumerBlock)
-    consumerBlock->printAsOperand(llvm::errs());
+    consumerBlock->printAsOperand(out);
   else
-    llvm::errs() << "(null)";
-  llvm::errs() << "\n";
+    out << "(null)";
+  out << "\n";
   // Debug: dump consumer block control deps
   {
     Block *consumerBlock = consumer->getBlock();
@@ -701,18 +871,18 @@ static void insertDirectSuppression(
 
     auto printBlockSet = [&](llvm::StringRef label,
                              const DenseSet<Block *> &S) {
-      llvm::errs() << label << " = { ";
+      out << label << " = { ";
       bool first = true;
       for (Block *b : S) {
         if (!first)
-          llvm::errs() << ", ";
+          out << ", ";
         if (b)
-          b->printAsOperand(llvm::errs());
+          b->printAsOperand(out);
         else
-          llvm::errs() << "<null>";
+          out << "<null>";
         first = false;
       }
-      llvm::errs() << " }\n";
+      out << " }\n";
     };
     printBlockSet("[FTD] prod forwardControlDeps",
                   prodEntry.forwardControlDeps);
@@ -735,30 +905,118 @@ static void insertDirectSuppression(
 
   // Get rid of common entries in the two sets
   eliminateCommonBlocks(prodControlDeps, consControlDeps);
-
-  DenseSet<Block *> locConsControlDeps =
-      getLocalConsDependence(producerBlock, consumerBlock);
   // Compute the activation function of producer and consumer
   BoolExpression *fProd =
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
+  if (fProd->type == experimental::boolean::ExpressionType::Zero)
+    return;
+
+  auto L = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
+  ControlDependenceAnalysis locCDA(*L->region);
+  DenseSet<Block *> locConsControlDepsTmp =
+      *locCDA.getBlockForwardControlDeps(L->newCons);
+
+  DenseSet<Block *> locConsControlDeps;
+  for (Block *nb : locConsControlDepsTmp) {
+    Block *orig = L->origMap.lookup(nb);
+    if (orig)
+      locConsControlDeps.insert(orig);
+  }
+
   BoolExpression *fCons =
       enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps);
+
+  // Debug: append all LocalCFGs to one txt file (no console output)
+  {
+    std::error_code EC;
+    llvm::raw_fd_ostream file(cfgFile, EC,
+                              static_cast<llvm::sys::fs::OpenFlags>(0x0004));
+
+    if (!EC) {
+      file << "=============================================================\n";
+      file << "Function: " << funcOp.getName() << "\n";
+      file << "Producer: ";
+      if (producerBlock)
+        producerBlock->printAsOperand(file);
+      else
+        file << "<null>";
+      file << "\nConsumer: ";
+      if (consumerBlock)
+        consumerBlock->printAsOperand(file);
+      else
+        file << "<null>";
+      file << "\n";
+
+      file << "newProd: ";
+      if (L->newProd)
+        L->newProd->printAsOperand(file);
+      else
+        file << "<null>";
+      file << "\nnewCons: ";
+      if (L->newCons)
+        L->newCons->printAsOperand(file);
+      else
+        file << "<null>";
+      file << "\n";
+
+      file << "\nBlocks (origMap):\n";
+      for (Block &b : L->region->getBlocks()) {
+        file << "  new=";
+        b.printAsOperand(file);
+        Block *orig = L->origMap.lookup(&b);
+        file << " -> orig=";
+        if (orig)
+          orig->printAsOperand(file);
+        else
+          file << "<null>";
+        file << "\n";
+      }
+
+      file << "\nEdges:\n";
+      for (Block &b : L->region->getBlocks()) {
+        file << "  ";
+        b.printAsOperand(file);
+        file << " -> { ";
+        if (auto *term = b.getTerminator()) {
+          bool first = true;
+          for (auto it = term->successor_begin(), e = term->successor_end();
+               it != e; ++it) {
+            if (!first)
+              file << ", ";
+            (*it)->printAsOperand(file);
+            first = false;
+          }
+        }
+        file << " }\n";
+      }
+
+      file << "\nTopoOrder:\n  ";
+      for (Block *b : L->topoOrder) {
+        if (b)
+          b->printAsOperand(file);
+        else
+          file << "<null>";
+        file << ' ';
+      }
+      file << "\n\n";
+    }
+  }
 
   {
     auto printBlockSet = [&](llvm::StringRef label,
                              const DenseSet<Block *> &S) {
-      llvm::errs() << label << " = { ";
+      out << label << " = { ";
       bool first = true;
       for (Block *b : S) {
         if (!first)
-          llvm::errs() << ", ";
+          out << ", ";
         if (b)
-          b->printAsOperand(llvm::errs());
+          b->printAsOperand(out);
         else
-          llvm::errs() << "<null>";
+          out << "<null>";
         first = false;
       }
-      llvm::errs() << " }\n";
+      out << " }\n";
     };
 
     printBlockSet("[FTD] locConsControlDeps", locConsControlDeps);
@@ -771,103 +1029,83 @@ static void insertDirectSuppression(
         cdAnalysis[muxConditionBlock].forwardControlDeps;
     {
       auto printBlockSet = [&](llvm::StringRef label,
-                              const DenseSet<Block *> &S) {
-        llvm::errs() << label << " = { ";
+                               const DenseSet<Block *> &S) {
+        out << label << " = { ";
         bool first = true;
         for (Block *b : S) {
           if (!first)
-            llvm::errs() << ", ";
+            out << ", ";
           if (b)
-            b->printAsOperand(llvm::errs());
+            b->printAsOperand(out);
           else
-            llvm::errs() << "<null>";
+            out << "<null>";
           first = false;
         }
-        llvm::errs() << " }\n";
+        out << " }\n";
       };
 
       printBlockSet("[FTD] muxControlDeps", condControlDeps);
     }
-    // for (auto &x : condControlDeps)
-    //   locConsControlDeps.insert(x);
   }
-  llvm::errs() << "fCons-no-mux  = " << fCons->toString() << "\n";
+  out << "fCons-no-mux  = " << fCons->toString() << "\n";
   if (accountMuxCondition) {
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     BoolExpression *selectOperandCondition =
         BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
 
-    llvm::errs() << "[MUX] Mux Condition Block: ";
+    out << "[MUX] Mux Condition Block: ";
     if (muxConditionBlock)
-      muxConditionBlock->printAsOperand(llvm::errs());
+      muxConditionBlock->printAsOperand(out);
     else
-      llvm::errs() << "(null)";
-    llvm::errs() << "\n";
+      out << "(null)";
+    out << "\n";
 
-    // The condition must be taken into account for `fCons` only if the
-    // producer is not control dependent from the block which produces the
-    // condition of the mux
     if (!bi.isLess(muxConditionBlock, producerBlock)) {
       if (consumer->getOperand(1) == connection) {
-        llvm::errs() << "MuxCondN  = " << (selectOperandCondition->boolNegate())->toString() << "\n";
-        fCons = BoolExpression::boolAnd(fCons,
-                                        selectOperandCondition);
-      }
-      else {
-        llvm::errs() << "MuxCond  = " << selectOperandCondition->toString() << "\n";
+        out << "MuxCondN  = "
+            << (selectOperandCondition->boolNegate())->toString() << "\n";
+        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
+      } else {
+        out << "MuxCond  = " << selectOperandCondition->toString() << "\n";
         fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
       }
     }
   }
 
-  if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::LSQOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumer) ||
-      llvm::isa_and_nonnull<cf::CondBranchOp>(consumer) ||
-      llvm::isa_and_nonnull<cf::BranchOp>(consumer) ||
-      (llvm::isa<memref::LoadOp>(consumer) &&
-       !llvm::isa<handshake::LoadOp>(consumer)) ||
-      (llvm::isa<memref::StoreOp>(consumer) &&
-       !llvm::isa<handshake::StoreOp>(consumer)))
-    return;
-
-  /// f_supp = f_prod and not f_cons
-  llvm::errs() << "fProd  = " << fProd->toString() << "\n";
-  llvm::errs() << "fCons  = " << fCons->toString() << "\n";
-  if (fProd->type == experimental::boolean::ExpressionType::Zero)
-    return;
+  // f_supp = f_prod and not f_cons
+  out << "fProd  = " << fProd->toString() << "\n";
+  out << "fCons  = " << fCons->toString() << "\n";
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
-  llvm::errs() << "fSupmin  = " << fSup->toString() << "\n";
+  out << "fSupmin  = " << fSup->toString() << "\n";
   if (fProd->type == experimental::boolean::ExpressionType::Zero) {
-    llvm::errs() << "[FTD] fProd == 0 detected\n";
-    llvm::errs() << "  producer block: ";
+    out << "[FTD] fProd == 0 detected\n";
+    out << "  producer block: ";
     if (producerBlock)
-      producerBlock->printAsOperand(llvm::errs());
+      producerBlock->printAsOperand(out);
     else
-      llvm::errs() << "<null>";
-    llvm::errs() << "\n";
+      out << "<null>";
+    out << "\n";
 
-    llvm::errs() << "  consumer block: ";
+    out << "  consumer block: ";
     if (consumerBlock)
-      consumerBlock->printAsOperand(llvm::errs());
+      consumerBlock->printAsOperand(out);
     else
-      llvm::errs() << "<null>";
-    llvm::errs() << "\n";
+      out << "<null>";
+    out << "\n";
 
-    llvm::errs() << "  producer (connection): ";
+    out << "  producer (connection): ";
     if (Operation *def = connection.getDefiningOp()) {
-      llvm::errs() << def->getName() << " @ ";
-      def->getLoc().print(llvm::errs());
+      out << def->getName() << " @ ";
+      def->getLoc().print(out);
     } else {
-      llvm::errs() << "<block argument>";
+      out << "<block argument>";
     }
-    llvm::errs() << "\n";
+    out << "\n";
 
-    llvm::errs() << "  consumer: " << consumer->getName() << " @ ";
-    consumer->getLoc().print(llvm::errs());
-    llvm::errs() << "\n";
+    out << "  consumer: " << consumer->getName() << " @ ";
+    consumer->getLoc().print(out);
+    out << "\n";
   }
 
   // If the activation function is not zero, then a suppress block is to be
@@ -875,7 +1113,23 @@ static void insertDirectSuppression(
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
     std::set<std::string> blocks = fSup->getVariables();
 
-    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
+    DenseMap<Block *, unsigned> rank;
+    unsigned i = 0;
+    for (Block *b : L->topoOrder)
+      if (auto *ob = L->origMap.lookup(b))
+        rank[ob] = i++;
+
+    std::vector<std::string> cofactorList;
+    cofactorList.reserve(blocks.size());
+    std::vector<std::pair<unsigned, std::string>> tmp;
+    for (auto &var : blocks)
+      if (auto blkOpt = bi.getBlockFromCondition(var))
+        if (rank.count(*blkOpt))
+          tmp.emplace_back(rank[*blkOpt], var);
+    llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
+    for (auto &p : tmp)
+      cofactorList.push_back(p.second);
+
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
@@ -896,6 +1150,7 @@ static void insertDirectSuppression(
       use.set(branchOp.getFalseResult());
     }
   }
+  rewriter.eraseOp(L->containerOp);
 }
 
 void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,

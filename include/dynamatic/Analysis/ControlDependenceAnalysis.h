@@ -76,13 +76,6 @@ private:
   void addDepsOfDeps(Region &region);
 };
 
-/// Build a local CDG on the subgraph rooted at `prod` with a single sink node
-/// Sk. Paths stop when reaching: a real end, the second visit to `prod`, or
-/// `cons`. If `prod == cons`, the very first hit at the start does not stop.
-/// The function returns the set of all control-ancestors of `cons` in this
-/// local CDG.
-DenseSet<Block *> getLocalConsDependence(Block *prod, Block *cons);
-
 } // namespace dynamatic
 
 #endif // DYNAMATIC_ANALYSIS_CONTROLDEPENDENCEANALYSIS_H

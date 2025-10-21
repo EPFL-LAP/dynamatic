@@ -159,14 +159,23 @@ void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
 
 void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(Region &region) {
 
-  // For each block, consider each of its dependencies (`oneDep`) and move each
-  // of its dependencies into block's
-  for (Block &block : region.getBlocks()) {
-    BlockControlDeps blockControlDeps = blocksControlDeps[&block];
-    for (auto &oneDep : blockControlDeps.allControlDeps) {
-      DenseSet<Block *> &oneDepDeps = blocksControlDeps[oneDep].allControlDeps;
-      for (auto &oneDepDep : oneDepDeps)
-        blocksControlDeps[&block].allControlDeps.insert(oneDepDep);
+  bool changed = true;
+  while (changed) {
+    changed = false;
+
+    // For each block, consider each of its dependencies and move each
+    // of its dependencies into block's
+    for (Block &block : region.getBlocks()) {
+      DenseSet<Block *> &blockDeps = blocksControlDeps[&block].allControlDeps;
+      SmallVector<Block *, 4> currentDeps(blockDeps.begin(), blockDeps.end());
+
+      for (Block *oneDep : currentDeps) {
+        DenseSet<Block *> &oneDepDeps = blocksControlDeps[oneDep].allControlDeps;
+        for (Block *oneDepDep : oneDepDeps) {
+          if (blockDeps.insert(oneDepDep).second)
+            changed = true; // Found a new dependency
+        }
+      }
     }
   }
 }
@@ -224,239 +233,6 @@ dynamatic::ControlDependenceAnalysis::getBlockForwardControlDeps(
 ControlDependenceAnalysis::BlockControlDepsMap
 dynamatic::ControlDependenceAnalysis::getAllBlockDeps() const {
   return blocksControlDeps;
-}
-
-DenseSet<Block *> dynamatic::getLocalConsDependence(Block *prod, Block *cons) {
-  if (!prod || !cons)
-    return DenseSet<Block *>{};
-  Region *reg = prod->getParent();
-  if (!reg || reg != cons->getParent())
-    return DenseSet<Block *>{};
-
-  // 1) Build the local subgraph G' with a single sink node Sk
-  struct NodeInfo {
-    SmallVector<Block *, 4> succs; // Successors in G' (excluding Sk)
-    bool toSink = false;           // Whether this node has an edge to Sk
-  };
-
-  DenseMap<Block *, NodeInfo> G; // Only contains blocks in the local subgraph
-  Block *SINK = nullptr; // Use nullptr to represent Sk (the unique exit)
-
-  enum class Mark : int { kUnseen = 0, kSeen, kDone };
-  DenseMap<Block *, Mark> mark;
-
-  // Construction rules:
-  //  1) Keep all edges u -> cons. The block `cons` itself is not expanded,
-  //     but must always have an outgoing edge cons -> Sk.
-  //  2) For any successor s == prod:
-  //       - If prod == cons, connect u -> cons (and cons will later connect to
-  //       Sk).
-  //       - If prod != cons, connect u -> Sk (this represents the second visit
-  //       to prod).
-  //  3) For any block with no successors or successors outside the current
-  //  region,
-  //     connect that block -> Sk.
-  //  4) If prod == cons and b == cons at the starting point (isStart == true),
-  //     do NOT stop; expand successors once normally.
-  std::function<void(Block *, bool)> build = [&](Block *b, bool isStart) {
-    (void)G[b]; // Ensure the node exists in the map
-
-    // Case: current block is `cons`
-    // Always add an edge cons -> Sk
-    if (b == cons) {
-      G[b].toSink = true; // cons -> Sk always exists
-      // At the starting node (prod == cons, first visit): keep exploring
-      if (!(isStart && prod == cons)) {
-        // For non-start or when prod != cons, stop expanding at cons
-        mark[b] = Mark::kDone;
-        return;
-      }
-      // Otherwise continue expanding successors normally
-    }
-
-    if (mark[b] == Mark::kDone)
-      return;
-    if (mark[b] == Mark::kSeen && !isStart)
-      return;
-    mark[b] = Mark::kSeen;
-
-    auto succRange = b->getSuccessors();
-    if (succRange.empty()) {
-      // True end block: connect to Sk
-      G[b].toSink = true;
-      mark[b] = Mark::kDone;
-      return;
-    }
-
-    for (Block *s : succRange) {
-      // Out-of-region successors are treated as -> Sk
-      if (!s || s->getParent() != reg) {
-        G[b].toSink = true;
-        continue;
-      }
-
-      // Successor is `prod`
-      if (s == prod) {
-        if (prod == cons) {
-          // Second visit to prod is treated as reaching cons.
-          // First connect to cons, then cons -> Sk will terminate the path.
-          (void)G[cons];
-          G[b].succs.push_back(cons);
-        } else {
-          // prod != cons: second visit to prod terminates directly -> Sk
-          G[b].toSink = true;
-        }
-        continue;
-      }
-
-      // Successor is `cons`: keep the edge but do not expand cons
-      if (s == cons) {
-        (void)G[cons];
-        G[b].succs.push_back(cons);
-        continue; // Do not recursively expand cons
-      }
-
-      // Normal edge b -> s
-      G[b].succs.push_back(s);
-      build(s, /*isStart=*/false);
-    }
-
-    mark[b] = Mark::kDone;
-  };
-
-  build(prod, /*isStart=*/true);
-
-  // If cons is unreachable in the local subgraph, return an empty set
-  if (!G.contains(cons))
-    return DenseSet<Block *>{};
-
-  // Expand all "toSink" edges into explicit -> Sk edges
-  SmallVector<Block *, 32> nodes;
-  nodes.reserve(G.size() + 1);
-  for (auto &kv : G)
-    nodes.push_back(kv.first);
-  nodes.push_back(SINK);
-
-  DenseMap<Block *, SmallVector<Block *, 4>> succP, predP;
-  for (Block *n : nodes) {
-    succP[n];
-    predP[n];
-  }
-  for (auto &kv : G) {
-    Block *u = kv.first;
-    for (Block *v : kv.second.succs) {
-      succP[u].push_back(v);
-      predP[v].push_back(u);
-    }
-    if (kv.second.toSink) {
-      succP[u].push_back(SINK);
-      predP[SINK].push_back(u);
-    }
-  }
-
-  // 2) Compute post-dominance sets with respect to Sk
-  DenseMap<Block *, DenseSet<Block *>> postdom;
-  for (Block *n : nodes) {
-    if (n == SINK) {
-      postdom[n].insert(SINK);
-    } else {
-      for (Block *m : nodes)
-        postdom[n].insert(m);
-    }
-  }
-
-  bool changed = true;
-  while (changed) {
-    changed = false;
-    for (Block *n : nodes) {
-      if (n == SINK)
-        continue;
-
-      // inter = intersection of postdom(s) for all successors s of n
-      DenseSet<Block *> inter;
-      bool first = true;
-      for (Block *s : succP[n]) {
-        if (first) {
-          inter = postdom[s];
-          first = false;
-        } else {
-          DenseSet<Block *> tmp;
-          for (Block *x : inter)
-            if (postdom[s].contains(x))
-              tmp.insert(x);
-          inter.swap(tmp);
-        }
-      }
-
-      DenseSet<Block *> newSet = inter;
-      newSet.insert(n);
-
-      // Check for changes
-      if (newSet.size() != postdom[n].size()) {
-        postdom[n].swap(newSet);
-        changed = true;
-        continue;
-      }
-      for (Block *x : newSet) {
-        if (!postdom[n].contains(x)) {
-          postdom[n].swap(newSet);
-          changed = true;
-          break;
-        }
-      }
-    }
-  }
-
-  auto postDominates = [&](Block *x, Block *y) -> bool {
-    auto it = postdom.find(y);
-    return it != postdom.end() && it->second.contains(x);
-  };
-
-  // 3) Query CDG direct predecessors (without explicitly building CDG)
-  // Ferrante–Ottenstein–Warren criterion:
-  //   ∃ Y->Z such that X ∈ postdom(Z) and X ∉ postdom(Y)
-  //   -> add edge Y -> X in CDG
-  auto predsInCDG = [&](Block *X, DenseSet<Block *> &out) {
-    for (Block *Y : nodes) {
-      if (Y == SINK)
-        continue;
-      if (postDominates(X, Y))
-        continue;
-      for (Block *Z : succP[Y]) {
-        if (postDominates(X, Z)) {
-          out.insert(Y);
-          break;
-        }
-      }
-    }
-  };
-
-  // 4) Reverse closure: collect all control ancestors of `cons`
-  DenseSet<Block *> upstream, frontier;
-  SmallVector<Block *, 16> stack;
-
-  // Direct control predecessors of cons
-  predsInCDG(cons, frontier);
-  for (Block *p : frontier) {
-    upstream.insert(p);
-    stack.push_back(p);
-  }
-
-  // BFS/DFS over CDG to get transitive closure (all upstream control points)
-  while (!stack.empty()) {
-    Block *x = stack.back();
-    stack.pop_back();
-    DenseSet<Block *> parents;
-    predsInCDG(x, parents);
-    for (Block *p : parents) {
-      if (!upstream.contains(p)) {
-        upstream.insert(p);
-        stack.push_back(p);
-      }
-    }
-  }
-
-  return upstream;
 }
 
 void dynamatic::ControlDependenceAnalysis::printAllBlocksDeps() const {
