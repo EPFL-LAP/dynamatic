@@ -22,6 +22,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/MemoryDependency.h"
+#include "llvm/Analysis/ValueTracking.h"
 
 using namespace llvm;
 using namespace polly;
@@ -228,7 +229,9 @@ class ScopAnalysisInfo {
 
     auto inDimsToBeChecked = currentMap.dim(isl::dim::in);
 
-    assert(!inDimsToBeChecked.is_error());
+    if (inDimsToBeChecked.is_error())
+      llvm::report_fatal_error(
+          "Fail to extraction the input dim of currentMap!");
 
     unsigned inDimValue = static_cast<unsigned>(inDimsToBeChecked);
 
@@ -248,7 +251,8 @@ class ScopAnalysisInfo {
 
     auto nInsToBeChecked = map.dim(isl::dim::in);
 
-    assert(!nInsToBeChecked.is_error());
+    if (nInsToBeChecked.is_error())
+      llvm::report_fatal_error("Cannot extract the input dim of map!");
 
     unsigned nIns = static_cast<unsigned>(nInsToBeChecked);
 
@@ -273,7 +277,8 @@ class ScopAnalysisInfo {
 
     auto nInsToBeChecked = map.dim(isl::dim::in);
 
-    assert(!nInsToBeChecked.is_error());
+    if (nInsToBeChecked.is_error())
+      llvm::report_fatal_error("Cannot extract input dimension of map!");
 
     int nIns = static_cast<unsigned>(nInsToBeChecked) / 2;
     isl::map constrMap = map;
@@ -371,7 +376,8 @@ public:
 
         auto outDim = currentMap.dim(isl::dim::out);
 
-        assert(!outDim.is_error());
+        if (outDim.is_error())
+          llvm::report_fatal_error("Failed to extract output dimension");
 
         domain = domain.add_dims(isl::dim::out, static_cast<unsigned>(outDim));
 
@@ -577,26 +583,16 @@ bool equalBase(Instruction *a, Instruction *b) {
 
 namespace {
 
-/// Metadata for loops
-struct LoopMetaData {
-
-  Loop *loop;
-  LoopMetaData() = default;
-  ~LoopMetaData() = default;
-
-  std::set<LoadInst *> readInstructions;
-  std::set<StoreInst *> writeInstructions;
-
-  // NOTE: An instruction should not be present in multiple Scops (?), so a
-  // single set is a good container for it.
-  std::map<Instruction *, int> instToScop;
-
-  bool sameScop(Instruction *a, Instruction *b) {
-    if (instToScop.count(a) == 0)
+struct FunctionInfo {
+  std::map<Instruction *, int> instToScopId;
+  std::vector<Instruction *> loadInsts;
+  std::vector<Instruction *> storeInsts;
+  bool sameScop(Instruction *a, Instruction *b) const {
+    if (instToScopId.count(a) == 0)
       return false;
-    if (instToScop.count(b) == 0)
+    if (instToScopId.count(b) == 0)
       return false;
-    return (instToScop[a] == instToScop[b]);
+    return (instToScopId.at(a) == instToScopId.at(b));
   }
 };
 
@@ -620,7 +616,8 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
 
   /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
   /// or WAW conflict.
-  std::vector<InstPairType> getDependencyPairs(struct LoopMetaData &loopInfo);
+  std::vector<InstPairType>
+  getDependencyPairs(const FunctionInfo &functionInfo);
   std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
 };
 
@@ -701,44 +698,13 @@ void MemDepAnalysisPass::processScop(Scop &scop,
   scopMeta.push_back(meta);
 }
 
-void MemDepAnalysisPass::processLoop(Loop *l,
-                                     std::vector<LoopMetaData> &loopMetaInfos) {
-
-  loopMetaInfos.emplace_back();
-  auto &loopMetaData = loopMetaInfos.back();
-
-  loopMetaData.loop = l;
-
-  for (auto *bb : l->getBlocks()) {
-    int scopId = indexAnalysis.getScopID(bb);
-    bool isInScop = indexAnalysis.isInScop(bb);
-
-    for (auto &inst : *bb) {
-      if (!inst.mayReadOrWriteMemory())
-        continue;
-      if (isa<CallInst>(&inst))
-        continue;
-
-      // NOTE: In legacy dynamatic here uses mayReadFromMemory and
-      // mayWriteToMemory, which I think is quite redundant for our need
-      if (auto *loadInst = dyn_cast<llvm::LoadInst>(&inst))
-        loopMetaData.readInstructions.emplace(loadInst);
-      if (auto *storeInst = dyn_cast<llvm::StoreInst>(&inst))
-        loopMetaData.writeInstructions.emplace(storeInst);
-
-      if (isInScop)
-        loopMetaData.instToScop[&inst] = scopId;
-    }
-  }
-}
-
 std::vector<InstPairType>
-MemDepAnalysisPass::getDependencyPairs(LoopMetaData &loopInfo) {
+MemDepAnalysisPass::getDependencyPairs(const FunctionInfo &functionInfo) {
   std::vector<InstPairType> depPairList;
-
-  for (auto *storeInst : loopInfo.writeInstructions) {
+  for (auto *storeInst : functionInfo.storeInsts) {
     // Find RAW dependencies
-    for (auto *loadInst : loopInfo.readInstructions) {
+    for (auto *loadInst : functionInfo.loadInsts) {
+
       InstPairType rawPair = std::make_pair(storeInst, loadInst);
 
       // NOTE: In dynamatic we assume that memory with different base addresses
@@ -748,7 +714,7 @@ MemDepAnalysisPass::getDependencyPairs(LoopMetaData &loopInfo) {
         continue;
 
       // Instructions are in the same scop: use the result from IndexAnalysis
-      if (loopInfo.sameScop(loadInst, storeInst)) {
+      if (functionInfo.sameScop(loadInst, storeInst)) {
         if (indexAnalysis.instRAWlist.count(rawPair) > 0)
           depPairList.push_back(rawPair);
         continue;
@@ -764,7 +730,7 @@ MemDepAnalysisPass::getDependencyPairs(LoopMetaData &loopInfo) {
       }
     }
     // Find WAW dependencies
-    for (auto *secondStoreInst : loopInfo.writeInstructions) {
+    for (auto *secondStoreInst : functionInfo.storeInsts) {
       if (secondStoreInst == storeInst)
         continue;
 
@@ -778,7 +744,7 @@ MemDepAnalysisPass::getDependencyPairs(LoopMetaData &loopInfo) {
       auto pairRev = InstPairType(storeInst, secondStoreInst);
 
       // Instructions are in the same scop: use the result from IndexAnalysis
-      if (loopInfo.sameScop(storeInst, secondStoreInst)) {
+      if (functionInfo.sameScop(storeInst, secondStoreInst)) {
         if (indexAnalysis.instWAWlist.count(pair) > 0)
           depPairList.push_back(pair);
         else if (indexAnalysis.instWAWlist.count(pairRev) > 0)
@@ -808,10 +774,6 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
 
   auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
 
-  auto &loopAnalysis = fam.getResult<LoopAnalysis>(f);
-
-  std::vector<LoopMetaData> loopMetaInfos;
-
   std::vector<ScopAnalysisInfo> scopMetaInfos;
 
   aliasAnalysis = &fam.getResult<AAManager>(f);
@@ -825,34 +787,43 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
       processScop(*s, scopMetaInfos);
   }
 
-  // Process loops according to AA
-  for (Loop *loop : loopAnalysis) {
-    // Currently, we shall analyze only top-level loops. TODO: Properly handle
-    // multi-level loops.
-    //
-    // @Jiahui17: I don't see why processLoop doesn't work for depth > 1.
-    if (loop->getLoopDepth() > 1)
-      continue;
+  FunctionInfo functionInfo;
 
-    processLoop(loop, loopMetaInfos);
+  for (auto &bb : f) {
+    int scopId = indexAnalysis.getScopID(&bb);
+    bool isInScop = indexAnalysis.isInScop(&bb);
+    for (auto &inst : bb) {
+      if (!inst.mayReadOrWriteMemory())
+        continue;
+      if (isa<CallInst>(&inst)) {
+        llvm::errs() << "Warning - Applying memory analysis on a function with "
+                        "a call instruction!\n";
+        continue;
+      }
+
+      // NOTE: In legacy dynamatic here uses mayReadFromMemory and
+      // mayWriteToMemory, which I think is quite redundant for our need
+      if (isa<llvm::LoadInst>(&inst))
+        functionInfo.loadInsts.emplace_back(&inst);
+      if (isa<llvm::StoreInst>(&inst))
+        functionInfo.storeInsts.emplace_back(&inst);
+      if (isInScop)
+        functionInfo.instToScopId[&inst] = scopId;
+    }
   }
 
   auto nameMapping = nameAllLoadStores(f);
 
   std::map<Instruction *, LLVMMemDependency> deps;
-  for (auto &meta : loopMetaInfos) {
-    for (auto &[src, dst] : getDependencyPairs(meta)) {
-      assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
-      if (deps.count(src) == 0) {
-        LLVMMemDependency newDep;
-        newDep.name = nameMapping[src];
-        newDep.destAndDepth.emplace_back(nameMapping[dst],
-                                         meta.loop->getLoopDepth());
-        deps[src] = newDep;
-      } else {
-        deps[src].destAndDepth.emplace_back(nameMapping[dst],
-                                            meta.loop->getLoopDepth());
-      }
+  for (auto &[src, dst] : getDependencyPairs(functionInfo)) {
+    assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
+    if (deps.count(src) == 0) {
+      LLVMMemDependency newDep;
+      newDep.name = nameMapping[src];
+      newDep.destAndDepth.emplace_back(nameMapping[dst], 1);
+      deps[src] = newDep;
+    } else {
+      deps[src].destAndDepth.emplace_back(nameMapping[dst], 1);
     }
   }
 
