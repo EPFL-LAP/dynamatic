@@ -10,13 +10,15 @@ Sections and overview:
 
 ## Design 
 
-This section gives a high-level overview of Dynamatic's C frontend.
+This section gives a high-level overview of Dynamatic's C frontend. 
+
+<img alt="The block diagram of Dynamatic's C frontend" src="./Figures/frontend_block_diagram.png" width="700" />
 
 ### What Does a C Frontend Do?
 
 Dynamatic's C frontend converts C code to the standard MLIR dialects, performs generic IR optimizations, and performs memory analysis (which load depends on which store?). Dynamatic employs the following conversion flow:
 1. Convert C to LLVM IR. We use clang (with no optimization `clang -O0 ...`) for this step. We do not apply any optimization here to ensure predictability across different clang version (different clang versions perform a different set of optimizations, and some transformations are unnecessary for us).
-2. Apply various IR optimizations. We use LLVM IR transformations such as mem2reg, instcombine, and so on. Here, we have control over exactly the set of passes we run to ensure predictability.
+2. Apply various IR optimizations. We use LLVM IR transformations such as mem2reg, instcombine, and so on. Here, we have control over exactly the set of passes we run to ensure predictability. See below for the set of notable optimizations that we run on the LLVM IR.
 3. Annotate memory analysis to know the dependencies between the loads and stores. This step relies on the polyhedral analysis from Polly and alias analysis from LLVM. LLVM/Polly's memory dependency analysis cannot be directly imported into Dynamatic's toolchain. We implement a memory dependency analysis tool to generate them.
 4. Convert LLVM IR to MLIR standard dialects. As of Oct. 2025, there is no working implementation in the LLVM project that can translate LLVM IR to MLIR. Therefore, Dynamatic utilizes a conversion tool for translating the LLVM IR directly to MLIR standard dialects.
 
@@ -28,7 +30,7 @@ The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dial
 
 Notable optimizations that we need from the LLVM project:
 - `mem2reg`: Suppressing allocas (allocate memory on the heap) into regs.
-- `instcombine`: Performing local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of GEPs.
+- `instcombine`: Performing local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of `getelementptr` instructions (GEPs).
 - `loop-rotate`: Transforming loops to do-while loops as much as possible.
 - `simplifycfg`, `loopsimplify`: reducing the number of BBs (fewer branches).
 - `consthoist`: Moving constants around.
