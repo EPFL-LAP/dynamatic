@@ -921,25 +921,15 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
   if (fProd->type == experimental::boolean::ExpressionType::Zero)
     return;
-  if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::LSQOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumer) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumer) ||
-      llvm::isa_and_nonnull<cf::CondBranchOp>(consumer) ||
-      llvm::isa_and_nonnull<cf::BranchOp>(consumer) ||
-      (llvm::isa<memref::LoadOp>(consumer) &&
-       !llvm::isa<handshake::LoadOp>(consumer)) ||
-      (llvm::isa<memref::StoreOp>(consumer) &&
-       !llvm::isa<handshake::StoreOp>(consumer)))
-    return;
-  auto L = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
-  ControlDependenceAnalysis locCDA(*L->region);
-  DenseSet<Block *> locConsControlDepsTmp =
-      *locCDA.getBlockForwardControlDeps(L->newCons);
 
+  auto locGraph = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
+  ControlDependenceAnalysis locCDA(*locGraph->region);
+  DenseSet<Block *> locConsControlDepsTmp =
+      locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+  
   DenseSet<Block *> locConsControlDeps;
   for (Block *nb : locConsControlDepsTmp) {
-    Block *orig = L->origMap.lookup(nb);
+    Block *orig = locGraph->origMap.lookup(nb);
     if (orig)
       locConsControlDeps.insert(orig);
   }
@@ -969,22 +959,26 @@ static void insertDirectSuppression(
       file << "\n";
 
       file << "newProd: ";
-      if (L->newProd)
-        L->newProd->printAsOperand(file);
+      if (locGraph->newProd)
+        locGraph->newProd->printAsOperand(file);
       else
         file << "<null>";
       file << "\nnewCons: ";
-      if (L->newCons)
-        L->newCons->printAsOperand(file);
+      if (locGraph->newCons)
+        locGraph->newCons->printAsOperand(file);
       else
         file << "<null>";
       file << "\n";
 
+      file << "regionFront = ";
+      locGraph->region->front().printAsOperand(file);
+      file << "\n";
+
       file << "\nBlocks (origMap):\n";
-      for (Block &b : L->region->getBlocks()) {
+      for (Block &b : locGraph->region->getBlocks()) {
         file << "  new=";
         b.printAsOperand(file);
-        Block *orig = L->origMap.lookup(&b);
+        Block *orig = locGraph->origMap.lookup(&b);
         file << " -> orig=";
         if (orig)
           orig->printAsOperand(file);
@@ -994,7 +988,7 @@ static void insertDirectSuppression(
       }
 
       file << "\nEdges:\n";
-      for (Block &b : L->region->getBlocks()) {
+      for (Block &b : locGraph->region->getBlocks()) {
         file << "  ";
         b.printAsOperand(file);
         file << " -> { ";
@@ -1012,7 +1006,7 @@ static void insertDirectSuppression(
       }
 
       file << "\nTopoOrder:\n  ";
-      for (Block *b : L->topoOrder) {
+      for (Block *b : locGraph->topoOrder) {
         if (b)
           b->printAsOperand(file);
         else
@@ -1040,6 +1034,7 @@ static void insertDirectSuppression(
       out << " }\n";
     };
 
+    printBlockSet("[FTD] locConsControlDepsTmp", locConsControlDepsTmp);
     printBlockSet("[FTD] locConsControlDeps", locConsControlDeps);
   }
 
@@ -1136,8 +1131,8 @@ static void insertDirectSuppression(
 
     DenseMap<Block *, unsigned> rank;
     unsigned i = 0;
-    for (Block *b : L->topoOrder)
-      if (auto *ob = L->origMap.lookup(b))
+    for (Block *b : locGraph->topoOrder)
+      if (auto *ob = locGraph->origMap.lookup(b))
         rank[ob] = i++;
 
     std::vector<std::string> cofactorList;
@@ -1171,7 +1166,7 @@ static void insertDirectSuppression(
       use.set(branchOp.getFalseResult());
     }
   }
-  rewriter.eraseOp(L->containerOp);
+  rewriter.eraseOp(locGraph->containerOp);
 }
 
 void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
