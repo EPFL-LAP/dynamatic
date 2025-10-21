@@ -12,7 +12,7 @@ Sections and overview:
 
 This section gives a high-level overview of Dynamatic's C frontend. 
 
-<img alt="The block diagram of Dynamatic's C frontend" src="./Figures/frontend_block_diagram.png" width="700" />
+<img alt="The block diagram of Dynamatic's C frontend" src="./Figures/frontend_block_diagram.png" width="350" />
 
 ### What Does a C Frontend Do?
 
