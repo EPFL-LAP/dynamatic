@@ -341,7 +341,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
-      dstNodeName = dstPortName = handshake::getResultName(dstOp, dstIdx);
+      dstNodeName = dstPortName = handshake::getResultName(parentOp, dstIdx);
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();

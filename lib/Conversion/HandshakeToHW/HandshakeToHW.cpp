@@ -1402,7 +1402,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
         converter.addInput(handshakeOp.getOperandName(idx), oprd);
       } else{
         memOp->emitError() << "must implement HandshakeBaseInterface, op: " << *memOp;
-        llvm::reportFatalInternalError("Missing HandshakeBaseInterface")
+        llvm::reportFatalError("Missing HandshakeBaseInterface");
       }
       converter.addInput(handshake::getOperandName(memOp, idx), oprd);
   }
