@@ -268,7 +268,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getOperandName", (ins "unsigned" : $idx),
       "",
       [{
-        auto *op = const_cast<mlir::Operation *>($_op);
+        auto *op = const_cast<mlir::Operation *>($_op.getOperation());
 
         if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
           return nameInterface.getOperandNameImpl(idx);
@@ -288,8 +288,8 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getResultName", (ins "unsigned" : $idx),
       "",
       [{
-        auto *op = const_cast<mlir::Operation *>($_op);
-
+        auto *op = const_cast<mlir::Operation *>($_op.getOperation());
+        
         if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
           return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
