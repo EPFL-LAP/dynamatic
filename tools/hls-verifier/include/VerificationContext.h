@@ -27,6 +27,8 @@ static const std::string INPUT_VECTORS_DIR = "INPUT_VECTORS";
 static const std::string C_SOURCE_DIR = "C_SRC";
 static const std::string C_OUT_DIR = "C_OUT";
 static const std::string VSIM_SCRIPT_FILE = "simulation.do";
+static const std::string GHDL_SCRIPT_FILE = "ghdl_simulation.sh";
+static const std::string XSIM_SCRIPT_FILE = "xsim_project.prj";
 static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 
 struct VerificationContext {
@@ -57,6 +59,8 @@ struct VerificationContext {
   }
 
   std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }
+  std::string getGhdlShFilePath() const {return GHDL_SCRIPT_FILE; }
+  std::string getXsimPrjFilePath() const {return XSIM_SCRIPT_FILE; }
 
   std::string getCOutDir() const { return simPath + SEP + C_OUT_DIR; }
 

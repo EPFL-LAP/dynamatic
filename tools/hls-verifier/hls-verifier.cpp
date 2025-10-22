@@ -13,6 +13,7 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "Utilities.h"
+#include "Simulators.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -39,41 +40,6 @@ using namespace dynamatic;
 
 static const char SEP = std::filesystem::path::preferred_separator;
 
-static const string LOG_TAG = "HLS_VERIFIER";
-
-void generateModelsimScripts(const VerificationContext &ctx) {
-  vector<string> filelistVhdl =
-      getListOfFilesInDirectory(ctx.getHdlSrcDir(), ".vhd");
-  vector<string> filelistVerilog =
-      getListOfFilesInDirectory(ctx.getHdlSrcDir(), ".v");
-
-  std::error_code ec;
-  llvm::raw_fd_ostream os(ctx.getModelsimDoFilePath(), ec);
-  // os << "vdel -all" << endl;
-  os << "vlib work\n";
-  os << "vmap work work\n";
-  os << "project new . simulation work modelsim.ini 0\n";
-  os << "project open simulation\n";
-
-  // We use the same VHDL TB for simulating both the VHDL and Verilog designs in
-  // ModelSim.
-  for (auto &it : filelistVhdl)
-    os << "project addfile " << it << "\n";
-
-  for (auto &it : filelistVerilog)
-    os << "project addfile " << it << "\n";
-
-  os << "project calculateorder\n";
-  os << "project compileall\n";
-  if (ctx.useVivadoFPU()) {
-    os << "eval vsim tb work.glbl\n";
-  } else {
-    os << "eval vsim tb\n";
-  }
-  os << "log -r *\n";
-  os << "run -all\n";
-  os << "exit\n";
-}
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
@@ -148,12 +114,6 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   return mlir::success();
 }
 
-// Executing ModelSim
-void executeVhdlTestbench(const VerificationContext &ctx) {
-  std::string command = "vsim -c -do " + ctx.getModelsimDoFilePath();
-  logInf(LOG_TAG, "Executing modelsim: [" + command + "]");
-  executeCommand(command);
-}
 
 int main(int argc, char **argv) {
 
@@ -175,6 +135,11 @@ int main(int argc, char **argv) {
       "vivado-fpu",
       cl::desc("Use Vivado FPU for floating-point operations (default: false)"),
       cl::value_desc("vivado-fpu"), cl::init(false));
+
+  cl::opt<std::string> simulatorType(
+      "simulator",
+      cl::desc("Simulator of choice (options: xsim, verilator, ghdl, vsim)"),
+      cl::value_desc("Simulator of choice"), cl::init("ghdl"));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -215,15 +180,26 @@ int main(int argc, char **argv) {
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
+  
+  std::unique_ptr<Simulator> simulator;
+  
+  if(simulatorType == "ghdl"){
+    simulator = std::make_unique<GHDLSimulator>(&ctx);
+  } else if (simulatorType == "vsim"){
+    simulator = std::make_unique<VSimSimulator>(&ctx);
+  } else if (simulatorType == "xsim"){
+    simulator = std::make_unique<XSimSimulator>(&ctx);
+  } else {
+    logErr(LOG_TAG, "Wrong Simulator (use vsim, xsim, ghdl, verilator)");
+    return 1;
+  }
 
-  // Need to first copy the supplementary files to the VHDL source before
-  // generating the scripts (it looks at the existing files to generate the
-  // scripts).
-  generateModelsimScripts(ctx);
 
-  // Run modelsim to simulate the testbench and write the outputs to the
+  simulator->generateScripts();
+
+  // Run the simulator to simulate the testbench and write the outputs to the
   // VHDL_OUT
-  executeVhdlTestbench(ctx);
+  simulator->execSimulation();
 
   if (succeeded(compareCAndVhdlOutputs(ctx))) {
     logInf(LOG_TAG, "C and VHDL outputs match");
