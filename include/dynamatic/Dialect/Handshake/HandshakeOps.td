@@ -61,6 +61,9 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
+   // This is only used by export-dot, please remove
+   // if export-dot is ever depreciated
+   CustomNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -143,6 +146,18 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     static ::llvm::StringRef getDefaultDialect() {
       return "handshake";
+    }
+
+    //===------------------------------------------------------------------===//
+    // CustomNamedIOInterface Methods (used only by export-dot)
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandNameImple(unsigned idx){
+      return getArgName(idx);
+    }
+
+    std::string getResultNameImpl(unsigned idx){
+      return getResName(idx);
     }
   }];
 
