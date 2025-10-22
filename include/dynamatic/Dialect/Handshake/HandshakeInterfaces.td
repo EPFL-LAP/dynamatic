@@ -245,64 +245,64 @@ def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   ];
 }
 
-// //===----------------------------------------------------------------------===//
-// // Handshake Base Interface
-// //===----------------------------------------------------------------------===//
-// //
-// // The MLIR Operation inheritance hierarchy does not allow a shared base 
-// // class to place shared functionality into.
-// //
-// // Instead we use this interface, present on every handshake operation
-// // to implement any functionality present on every handshake op
-// //
-// //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// Handshake Base Interface
+//===----------------------------------------------------------------------===//
+//
+// The MLIR Operation inheritance hierarchy does not allow a shared base 
+// class to place shared functionality into.
+//
+// Instead we use this interface, present on every handshake operation,
+// to implement shared functionality
+//
+//===----------------------------------------------------------------------===//
 
-// def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
-//   let cppNamespace = "::dynamatic::handshake";
-//   let description =
-//       [{"Base interface for shared functionality of all handshake operations."}];
+def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description =
+      [{"Base interface for shared functionality of all handshake operations."}];
 
-//   let methods = [
-//     InterfaceMethod<
-//       "Returns the name of a specific operand.",
-//       "std::string", "getOperandName", (ins "unsigned" : $idx),
-//       "",
-//       [{
-//         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+  let methods = [
+    InterfaceMethod<
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx),
+      "",
+      [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-//         if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
-//           return nameInterface.getOperandName(idx);
-//         } else if (auto nameInterface =
-//                       dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
-//           return nameInterface.getOperandName(idx);
-//         } else if (auto nameInterface =
-//                       dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
-//           return nameInterface.getOperandName(idx);
-//         }
+        if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
+          return nameInterface.getOperandName(idx);
+        } else if (auto nameInterface =
+                      dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
+          return nameInterface.getOperandName(idx);
+        } else if (auto nameInterface =
+                      dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
+          return nameInterface.getOperandName(idx);
+        }
 
-//         $_op->emitError() << "must specify operand names, op: " << *$_op;
-//         assert(0);
-//       }]>,
-//     InterfaceMethod<
-//       "Returns the name of a specific result.",
-//       "std::string", "getResultName", (ins "unsigned" : $idx),
-//       "",
-//       [{
-//         if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
-//           return nameInterface.getResultName(idx);
-//         } else if (auto nameInterface =
-//                       dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
-//           return nameInterface.getResultName(idx);
-//         } else if (auto nameInterface =
-//                       dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
-//           return nameInterface.getResultName(idx);
-//         }
+        $_op->emitError() << "must specify operand names, op: " << *$_op;
+        assert(0);
+      }]>,
+    InterfaceMethod<
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx),
+      "",
+      [{
+        if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
+          return nameInterface.getResultName(idx);
+        } else if (auto nameInterface =
+                      dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
+          return nameInterface.getResultName(idx);
+        } else if (auto nameInterface =
+                      dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
+          return nameInterface.getResultName(idx);
+        }
 
-//         $_op->emitError() << "must specify result names, op: " << *$_op;
-//         assert(0);
-//       }]>
-//   ];
-// }
+        $_op->emitError() << "must specify result names, op: " << *$_op;
+        assert(0);
+      }]>
+  ];
+}
 
 
 //===----------------------------------------------------------------------===//
