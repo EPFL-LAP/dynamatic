@@ -41,11 +41,13 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     //===------------------------------------------------------------------===//
 
     void validateOperandIdx(unsigned idx){
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+      if (idx >= getOperation()->getNumOperands())
+        llvm::report_fatal_error("operand index too high");
     }
 
     void validateResultIdx(unsigned idx){
-      assert(idx < getOperation()->getNumResults() && "index too high");
+      if (idx >= getOperation()->getNumResults())
+        llvm::report_fatal_error("result index too high");
     }
   }];
 
@@ -61,8 +63,9 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   // This is only used by export-dot, please remove
-   // if export-dot is ever depreciated
+  // The IOs of a FuncOp have custom names,
+  // defined here in the Tablegen
+  // as part of the FuncOp declaration
    CustomNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
@@ -114,12 +117,18 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     /// Returns the argument name at the given index.
     StringAttr getArgName(unsigned idx) {
-      return getArgNames()[idx].cast<StringAttr>();
+      auto names = getArgNames();
+      if (idx >= names.size())
+        llvm::report_fatal_error("argument index too high");
+      return names[idx].cast<StringAttr>();
     }
 
     /// Returns the result name at the given index.
     StringAttr getResName(unsigned idx) {
-      return getResNames()[idx].cast<StringAttr>();
+      auto names = getResNames();
+      if (idx >= names.size())
+        llvm::report_fatal_error("result index too high");
+      return names[idx].cast<StringAttr>();
     }
 
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
@@ -149,7 +158,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     }
 
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods (used only by export-dot)
+    // CustomNamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     std::string getOperandNameImpl(unsigned idx){
