@@ -178,7 +178,7 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail";
+  let cppNamespace = "::dynamatic::handshake::detail::io";
   let description =
       [{"Used by operations whose operands and results are named 'ins" and 'outs'."}];
 
@@ -205,7 +205,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
 }
 
 def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail";
+  let cppNamespace = "::dynamatic::handshake::detail::io";
   let description =
       [{"Used by operations whose operands are named 'lhs' and 'rhs', and result is named 'result'."}];
 
@@ -230,7 +230,7 @@ def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
 }
 
 def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail";
+  let cppNamespace = "::dynamatic::handshake::detail::io";
   let description =
       [{"Used by operations with unique names for their operands and results."}];
 
