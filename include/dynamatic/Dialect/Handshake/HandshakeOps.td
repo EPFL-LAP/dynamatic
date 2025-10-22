@@ -153,11 +153,11 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     //===------------------------------------------------------------------===//
 
     std::string getOperandNameImpl(unsigned idx){
-      return getArgName(idx);
+      return getArgNames()[idx];
     }
 
     std::string getResultNameImpl(unsigned idx){
-      return getResName(idx);
+      return getResNames()[idx];
     }
   }];
 
