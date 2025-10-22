@@ -141,9 +141,11 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
+  auto handshakeOwnerOp = handshake::getHandshakeBase(ownerOp)
   ownerChannel.channelName =
-      handshake::getResultName(ownerOp, res.getResultNumber());
-  userChannel.channelName = handshake::getOperandName(userOp, operandIndex);
+      handshakeOwnerOp.getResultName(res.getResultNumber());
+  auto handshakeUserOp = handshake::getHandshakeBase(userOp);
+  userChannel.channelName = handshakeUserOp.getOperandName(operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -189,8 +191,10 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = handshake::getResultName(op1, i);
-  targetChannel.channelName = handshake::getResultName(op2, j);
+  auto handshakeOp1 = handshake::getHandshakeBase(op1);
+  auto handshakeOp2 = handshake::getHandshakeBase(op2);
+  ownerChannel.channelName = handshakeOp1.getResultName(i);
+  targetChannel.channelName = handshakeOp2.getResultName(j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
