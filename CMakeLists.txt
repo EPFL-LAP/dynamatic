@@ -30,6 +30,7 @@ endif ()
 
 include(FindPackageHandleStandardArgs)
 find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
+find_package(Boost REQUIRED COMPONENTS)
 
 # Build Dynamatic with ccache if the package is present
 set(DYNAMATIC_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")

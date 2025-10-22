@@ -416,10 +416,20 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
 }
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
-  IsIntSizedChannel<32, "in">,
   IsFloatSizedChannel<32, "out">,
   LatencyInterface
 ]> {
+  // NOTE:
+  // - This operation always translates an unsigned integer of any size into an
+  // IEEE single-precision FP number.
+  // - We do not enforce an i32 constraint on the input. As LLVM always uses
+  // the minimum number of bits to represent an integer constant. For example,
+  // consider the code
+  // ```c++
+  // L[i][i] = 1; // L[][] is an float array
+  // ```
+  // This code will be compiled to the following MLIR:
+  // 3 = arith.uitofp %2 {handshake.name = "uitofp0"} : i1 to f32
   let summary = "Converts a unsigned integer to float.";
 }
 
