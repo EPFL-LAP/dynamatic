@@ -59,8 +59,8 @@ struct VerificationContext {
   }
 
   std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }
-  std::string getGhdlShFilePath() const {return GHDL_SCRIPT_FILE; }
-  std::string getXsimPrjFilePath() const {return XSIM_SCRIPT_FILE; }
+  std::string getGhdlShFilePath() const { return GHDL_SCRIPT_FILE; }
+  std::string getXsimPrjFilePath() const { return XSIM_SCRIPT_FILE; }
 
   std::string getCOutDir() const { return simPath + SEP + C_OUT_DIR; }
 
