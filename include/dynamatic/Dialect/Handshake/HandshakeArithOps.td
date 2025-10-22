@@ -249,14 +249,14 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     //===------------------------------------------------------------------===//
 
     // Operand 0 is named ctrl
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "ctrl";
     }
 
     // Result 0 is named outs
     // detail::simpleResultName handles idx validation
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
   }];
@@ -407,7 +407,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
     // Operand 0 is named condition
     // Operand 1 is named trueValue
     // Operand 2 is named falseValue
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       if (idx == 0)
         return "condition";
@@ -415,7 +415,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
     }
 
     // Result 0 is named result
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "result";
     }

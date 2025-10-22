@@ -40,11 +40,11 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     // Helper Methods for CustomNamedIOInterface
     //===------------------------------------------------------------------===//
 
-    void validateOperandIdx(unsigned int idx){
+    void validateOperandIdx(unsigned idx){
       assert(idx < getOperation()->getNumOperands() && "index too high");
     }
 
-    void validateResultIdx(unsigned int idx){
+    void validateResultIdx(unsigned idx){
       assert(idx < getOperation()->getNumResults() && "index too high");
     }
   }];
@@ -476,13 +476,13 @@ def MuxOp : Handshake_Op<"mux", [
     /// Operand 0 is named "index"
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     /// simpleOperandName handles validation
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
     }
 
     /// Result 0 is named "outs"
     /// simpleResultName handles validation
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
   }];
@@ -543,13 +543,13 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       return detail::simpleOperandName(idx, getOperation()->getNumOperands());
     }
 
     /// Result 0 is named outs
     /// Result 1 is named index
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return idx == 0 ? "outs" : "index";
     }
@@ -631,14 +631,14 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
     /// Operand 0 is named condition
     /// Operand 1 is named data
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "condition" : "data";
     }
 
     /// Operand 0 is named trueOut
     /// Operand 1 is named falseOut
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return idx == trueIndex ? "trueOut" : "falseOut";
     }
@@ -858,8 +858,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     // CustomNamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
-    std::string getOperandName(unsigned idx);
-    std::string getResultName(unsigned idx);
+    std::string getOperandNameImpl(unsigned idx);
+    std::string getResultNameImpl(unsigned idx);
   }];
 }
 
@@ -962,8 +962,8 @@ def LSQOp : Handshake_Op<"lsq", [
     // CustomNamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
-    std::string getOperandName(unsigned idx);
-    std::string getResultName(unsigned idx);
+    std::string getOperandNameImpl(unsigned idx);
+    std::string getResultNameImpl(unsigned idx);
   }];
 }
 
@@ -1053,14 +1053,14 @@ def LoadOp : Handshake_MemPortOp<"load", [
 
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataFromMem
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataOut
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataOut";
     }
@@ -1107,14 +1107,14 @@ def StoreOp : Handshake_MemPortOp<"store", [
 
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
-    std::string getOperandName(unsigned int idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataToMem
-    std::string getResultName(unsigned int idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
@@ -1280,7 +1280,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "trigger";
     }
@@ -1291,7 +1291,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     /// Result 3 is named ctrl_sc_save
     /// Result 4 is named ctrl_sc_commit
     /// Result 5 is named ctrl_sc_branch
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       switch (idx) {
       case 0:
@@ -1355,13 +1355,13 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named outs
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
@@ -1413,13 +1413,13 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named result
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
@@ -1466,13 +1466,13 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named result
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
@@ -1526,14 +1526,14 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 
     /// Operand 0 is named spec_tag_data
     /// Operand 1 is named data
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
     /// Result 0 is named trueOut
     /// Result 1 is named falseOut
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return idx == 0 ? "trueOut" : "falseOut";
     }
@@ -1578,13 +1578,13 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named dataIn
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return "dataIn";
     }
 
     /// Result 0 is named dataOut
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return "dataOut";
     }
@@ -1653,7 +1653,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
     /// The first set of operands are named op_<i>_in_<j>
     /// The last operand is named fromSharedUnitOut0
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
         return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
@@ -1664,7 +1664,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
     /// The first set of results are named op_<i>_out_0
     /// The last set of results are named toSharedUnitIn_<j>
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       if (idx < getNumSharedOperations())
         return "op" + std::to_string(idx) + "out0";
@@ -1859,14 +1859,14 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
 
     /// Operand 0 is named lhs_ins
     /// Operand 1 is named rhs_ins
-    std::string getOperandName(unsigned idx) {
+    std::string getOperandNameImpl(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
     /// Result 0 is named lhs_outs
     /// Result 1 is named rhs_outs
-    std::string getResultName(unsigned idx) {
+    std::string getResultNameImpl(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }

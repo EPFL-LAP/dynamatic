@@ -185,7 +185,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
   let methods = [
     InterfaceMethod<
       "Returns the name of a specific operand.",
-      "std::string", "getOperandName", (ins "unsigned" : $idx),
+      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx),
       "",
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
@@ -194,7 +194,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
       }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
-      "std::string", "getResultName", (ins "unsigned" : $idx),
+      "std::string", "getResultNameImpl", (ins "unsigned" : $idx),
       "",
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
@@ -212,7 +212,7 @@ def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
   let methods = [
     InterfaceMethod<
       "Returns the name of a specific operand.",
-      "std::string", "getOperandName", (ins "unsigned" : $idx),
+      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx),
       "",
       [{
         assert(idx < 2 && "index too high");
@@ -220,7 +220,7 @@ def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
       }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
-      "std::string", "getResultName", (ins "unsigned" : $idx),
+      "std::string", "getResultNameImpl", (ins "unsigned" : $idx),
       "",
       [{
         assert(idx < 1 && "index too high");
@@ -237,10 +237,10 @@ def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
   let methods = [
     InterfaceMethod<
       "Returns the name of a specific operand.",
-      "std::string", "getOperandName", (ins "unsigned" : $idx)>,
+      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx)>,
     InterfaceMethod<
       "Returns the name of a specific result.",
-      "std::string", "getResultName", (ins "unsigned" : $idx)
+      "std::string", "getResultNameImpl", (ins "unsigned" : $idx)
     >
   ];
 }
