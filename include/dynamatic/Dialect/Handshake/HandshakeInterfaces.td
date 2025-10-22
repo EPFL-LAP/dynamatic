@@ -271,13 +271,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
         if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
-          return nameInterface.getOperandName(idx);
+          return nameInterface.getOperandNameImpl(idx);
         } else if (auto nameInterface =
                       dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
-          return nameInterface.getOperandName(idx);
+          return nameInterface.getOperandNameImpl(idx);
         } else if (auto nameInterface =
                       dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
-          return nameInterface.getOperandName(idx);
+          return nameInterface.getOperandNameImpl(idx);
         }
 
         $_op->emitError() << "must specify operand names, op: " << *$_op;
@@ -289,13 +289,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "",
       [{
         if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
-          return nameInterface.getResultName(idx);
+          return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
                       dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
-          return nameInterface.getResultName(idx);
+          return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
                       dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
-          return nameInterface.getResultName(idx);
+          return nameInterface.getResultNameImpl(idx);
         }
 
         $_op->emitError() << "must specify result names, op: " << *$_op;
