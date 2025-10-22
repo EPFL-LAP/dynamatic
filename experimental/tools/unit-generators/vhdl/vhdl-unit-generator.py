@@ -123,6 +123,7 @@ if __name__ == "__main__":
     generators.add("handshake", "shrsi")
     generators.add("handshake", "shrui")
     generators.add("handshake", "blocker")
+    generators.add("handshake", "uitofp")
     generators.add("handshake", "sitofp")
     generators.add("handshake", "fptosi")
     generators.add("handshake", "ready_remover")
