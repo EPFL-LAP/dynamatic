@@ -3,6 +3,7 @@ from generators.support.unary import generate_unary
 
 def generate_uitofp(name, params):
     latency = params["latency"]
+    input_bitwidth = params["bitwidth"]
 
     signals = f"""
   signal converted : std_logic_vector(32 - 1 downto 0);
@@ -42,7 +43,7 @@ def generate_uitofp(name, params):
     return generate_unary(
         name=name,
         handshake_op="uitofp",
-        input_bitwidth=params.get("bitwidth", 32),
+        input_bitwidth=input_bitwidth,
         output_bitwidth=32,
         signals=signals,
         body=body,
