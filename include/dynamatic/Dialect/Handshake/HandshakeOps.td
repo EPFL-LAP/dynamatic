@@ -1827,8 +1827,8 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
-  AllTypesMatch<["lhsIn", "lhs"]>,
-  AllTypesMatch<["rhsIn", "rhs"]>,
+  AllTypesMatch<["lhsIn", "lhsOut"]>,
+  AllTypesMatch<["rhsIn", "rhsOut"]>,
   // The IOs of a ValidMergerOp have custom names,
   // defined here in the Tablegen
   // as part of the ValidMergerOp declaration
