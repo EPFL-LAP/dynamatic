@@ -2141,37 +2141,6 @@ handshake::HandshakeBaseInterface getHandshakeBase(Operation *op) {
   llvm::report_fatal_error("Missing HandshakeBaseInterface");
 }
 
-std::string getOperandName(Operation *op, size_t oprdIdx) {
-  if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
-    return nameInterface.getOperandNameImpl(oprdIdx);
-  } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
-    return nameInterface.getOperandNameImpl(oprdIdx);
-  } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
-    return nameInterface.getOperandNameImpl(oprdIdx);
-  }
-
-  op->emitError() << "must specify operand names, op: " << *op;
-  assert(0);
-}
-
-std::string getResultName(Operation *op, size_t resIdx) {
-
-  if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
-    return nameInterface.getResultNameImpl(resIdx);
-  } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
-    return nameInterface.getResultNameImpl(resIdx);
-  } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
-    return nameInterface.getResultNameImpl(resIdx);
-  }
-
-  op->emitError() << "must specify result names, op: " << *op;
-  assert(0);
-}
-
 } // end namespace handshake
 } // end namespace dynamatic
 
