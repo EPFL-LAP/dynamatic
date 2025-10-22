@@ -2134,13 +2134,13 @@ namespace handshake {
 
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
-  if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+  if (auto nameInterface = dyn_cast<handshake::detail::CustomNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::SimpleNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   }
 
