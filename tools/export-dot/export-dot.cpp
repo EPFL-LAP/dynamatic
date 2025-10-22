@@ -328,7 +328,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       Operation *srcOp = res.getDefiningOp();
       srcNodeName = getUniqueName(srcOp).str();
       srcIdx = res.getResultNumber();
-      srcPortName = handshake::getResultName(srcIdx);
+      srcPortName = handshake::getResultName(srcOp, srcIdx);
     } else {
       Operation *parentOp = val.getParentBlock()->getParentOp();
       srcIdx = cast<BlockArgument>(val).getArgNumber();
@@ -341,7 +341,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
-      dstNodeName = dstPortName = handshake::getResultName(dstIdx);
+      dstNodeName = dstPortName = handshake::getResultName(dstOp, dstIdx);
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
