@@ -288,13 +288,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getResultName", (ins "unsigned" : $idx),
       "",
       [{
-        if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::SimpleNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::BinaryArithNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::CustomNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         }
 
