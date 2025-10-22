@@ -250,16 +250,14 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   }
 
   // First associate names to all function arguments
-  handshake::PortNamer argNameGen(funcOp);
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-    ports.insert({argNameGen.getInputName(idx), arg});
+    ports.insert({funcOp.getArgName(idx), arg});
 
   // Then associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
-    handshake::PortNamer resNameGen(&op);
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       std::string signalName =
-          getUniqueName(&op).str() + "_" + resNameGen.getOutputName(idx).str();
+          getUniqueName(&op).str() + "_" + funcOp.getResultName(idx).str();
       ports.insert({signalName, res});
     }
   }
