@@ -345,7 +345,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
-      dstPortName = handshake::getOperandName(dstOp, dstIdx)
+      dstPortName = handshake::getOperandName(dstOp, dstIdx);
     }
 
     DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
@@ -387,7 +387,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   // Create nodes for all function results
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    StringRef resName = funcOp.getResultName(idx);
+    StringRef resName = funcOp.getResName(idx);
     DOTGraph::Node *node = builder.addNode(resName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;

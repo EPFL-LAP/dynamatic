@@ -257,7 +257,7 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       std::string signalName =
-          getUniqueName(&op).str() + "_" + funcOp.getResultName(idx).str();
+          getUniqueName(&op).str() + "_" + funcOp.getResName(idx).str();
       ports.insert({signalName, res});
     }
   }
