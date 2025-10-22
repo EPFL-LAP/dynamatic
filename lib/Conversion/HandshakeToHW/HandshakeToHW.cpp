@@ -1407,7 +1407,9 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    converter.addOutput(handshake::getResultName(memOp, idx),
+    auto handshakeOp = handshake::getHandshakeBase(memOp);
+
+    converter.addOutput(handshakeOp.getResultName(idx),
                         lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
@@ -1524,17 +1526,17 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
   }
 
-  // Add the ports from handshake op (here we use the port namer to name the
-  // ports that are directly converted from handshake op), except for the memref
-  // type.
+  // Add the ports from handshake op 
   for (auto [i, oprd] : llvm::enumerate(operands)) {
     if (!isa<MemRefType>(oprd.getType()))
-      memInterfaceConverter.addInput(handshake::getOperandName(memOp, i), oprd);
+      auto handshakeOp = handshake::getHandshakeBase(memOp);
+      memInterfaceConverter.addInput(handshakeOp.getOperandName(i), oprd);
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    memInterfaceConverter.addOutput(handshake::getResultName(memOp, idx),
+    auto handshakeOp = handshake::getHandshakeBase(memOp);
+    memInterfaceConverter.addOutput(handshakeOp.getResultName(idx),
                                     lowerType(res.getType()));
   }
 
@@ -1584,14 +1586,18 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
   HWConverter converter(this->getContext());
 
   // Add all operation operands to the inputs
-  for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
-    converter.addInput(handshake::getOperandName(op, idx), oprd);
+  for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands())){
+    auto handshakeOp = handshake::getHandshakeBase(op);
+    converter.addInput(handshakeOp.getOperandName(idx), oprd);
+  }
   converter.addClkAndRst(((Operation *)op)->getParentOfType<hw::HWModuleOp>());
 
   // Add all operation results to the outputs
-  for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(handshake::getResultName(op, idx), lowerType(type));
+  for (auto [idx, type] : llvm::enumerate(op->getResultTypes())){
+    auto handshakeOp = handshake::getHandshakeBase(op);
 
+    converter.addOutput(handshakeOp.getResultName(idx), lowerType(type));
+  }
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
 }
