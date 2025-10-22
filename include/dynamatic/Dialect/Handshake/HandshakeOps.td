@@ -63,6 +63,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
+   HandshakeBaseInterface,
   // The IOs of a FuncOp have custom names,
   // defined here in the Tablegen
   // as part of the FuncOp declaration
