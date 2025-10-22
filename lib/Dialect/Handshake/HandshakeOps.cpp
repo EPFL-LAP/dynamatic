@@ -2134,13 +2134,13 @@ namespace handshake {
 
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
-  if (auto nameInterface = dyn_cast<handshake::detail::CustomNamedIOInterface>(op)) {
+  if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::SimpleNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::detail::BinaryArithNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getOperandName(oprdIdx);
   }
 
@@ -2150,13 +2150,13 @@ std::string getOperandName(Operation *op, size_t oprdIdx) {
 
 std::string getResultName(Operation *op, size_t resIdx) {
 
-  if (auto nameInterface = dyn_cast<handshake::SimpleNamedIOInterface>(op)) {
+  if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::BinaryArithNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   } else if (auto nameInterface =
-                 dyn_cast<handshake::CustomNamedIOInterface>(op)) {
+                 dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
     return nameInterface.getResultName(resIdx);
   }
 

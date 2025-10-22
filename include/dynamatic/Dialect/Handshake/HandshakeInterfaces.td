@@ -270,13 +270,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        if (auto nameInterface = dyn_cast<handshake::detail::CustomNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::SimpleNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         }
 
@@ -288,13 +288,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getResultName", (ins "unsigned" : $idx),
       "",
       [{
-        if (auto nameInterface = dyn_cast<handshake::detail::SimpleNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::CustomNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
           return nameInterface.getResultName(idx);
         }
 
