@@ -31,6 +31,7 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
+         HandshakeBaseInterface,
          DeclareOpInterfaceMethods<ControlInterface>,
 ]> {
   // Shared functions to include in child classes 
@@ -60,10 +61,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   // The IOs of a FuncOp have custom names,
-   // defined here in the Tablegen
-   // as part of the FuncOp declaration
-   CustomNamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -146,22 +143,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     static ::llvm::StringRef getDefaultDialect() {
       return "handshake";
-    }
-
-    //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
-    //===------------------------------------------------------------------===//
-
-    /// Function operand names are function argument names
-    std::string getOperandName(unsigned idx) {
-      assert(idx < getArgNames().size() && "index too high");
-      return getResName(idx).str();
-    }
-
-    /// Function result names are function result names
-    std::string getResultName(unsigned idx) {
-      assert(idx < getResNames().size() && "index too high");
-      return getResName(idx).str();
     }
   }];
 

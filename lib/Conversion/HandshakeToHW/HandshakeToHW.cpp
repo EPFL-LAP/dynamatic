@@ -1398,6 +1398,12 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     converter.addInput(removePortNamePrefix(port), arg);
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
     if (!isa<mlir::MemRefType>(oprd.getType()))
+      if(auto handshakeOp = llvm::dyn_cast<handshake::HandshakeBaseInterface>(memOp)){
+        converter.addInput(handshakeOp.getOperandName(idx), oprd);
+      } else{
+        memOp->emitError() << "must implement HandshakeBaseInterface, op: " << *memOp;
+        llvm::reportFatalInternalError("Missing HandshakeBaseInterface")
+      }
       converter.addInput(handshake::getOperandName(memOp, idx), oprd);
   }
   converter.addClkAndRst(parentModOp);
