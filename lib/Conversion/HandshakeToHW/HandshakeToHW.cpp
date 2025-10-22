@@ -1397,9 +1397,10 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
-    if (!isa<mlir::MemRefType>(oprd.getType()))
+    if (!isa<mlir::MemRefType>(oprd.getType())){
       auto handshakeOp = handshake::getHandshakeBase(memOp);
       converter.addInput(handshakeOp.getOperandName(idx), oprd);
+    }
   }
   converter.addClkAndRst(parentModOp);
 
