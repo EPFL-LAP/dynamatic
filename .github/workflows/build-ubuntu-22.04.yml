@@ -18,5 +18,9 @@ jobs:
 
     steps:
       - name: Build Dynamatic
+        # Github runner always overrides HOME to "/github/home/"
+        # Here we need to make sure that we only write to writable locations
         run: |
-          cd /home/dynamatic/dynamatic && ./build.sh -f --release
+          export CCACHE_DIR=/home/dynamatic/dynamatic/.ccache
+          cd /home/dynamatic/dynamatic
+          ./build.sh -f --release
