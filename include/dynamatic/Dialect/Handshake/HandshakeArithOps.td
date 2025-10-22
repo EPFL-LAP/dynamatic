@@ -467,7 +467,7 @@ def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci", [
 }
 
 def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
-  SimpleNamedIOInterface
+  SimpleNamedIOInterface,
   IsFloatSizedChannel<64, "in">,
   IsFloatSizedChannel<32, "out">
 ]>{
@@ -483,14 +483,14 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [
 }
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
-  SimpleNamedIOInterface
+  SimpleNamedIOInterface,
   IsFloatSizedChannel<32, "out">
 ]> {
   let summary = "Converts a unsigned integer to float.";
 }
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
-  SimpleNamedIOInterface
+  SimpleNamedIOInterface,
   IsIntSizedChannel<32, "in">,
   IsFloatSizedChannel<32, "out">
 ]> {
@@ -498,7 +498,7 @@ def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
 }
 
 def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
-  SimpleNamedIOInterface
+  SimpleNamedIOInterface,
   IsFloatSizedChannel<32, "in">,
   IsIntSizedChannel<32, "out">,
   LatencyInterface
@@ -507,7 +507,7 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
 }
 
 def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
-  SimpleNamedIOInterface
+  SimpleNamedIOInterface,
   IsFloatSizedChannel<32, "in">,
   IsFloatSizedChannel<64, "out">
 ]>{
