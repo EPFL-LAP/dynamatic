@@ -349,7 +349,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
       auto handshakeOp = getHandshakeBase(dstOp);
-      dstPortName = handshakeOp.getOperandName(dstOp, dstIdx);
+      dstPortName = handshakeOp.getOperandName(dstIdx);
     }
 
     DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
