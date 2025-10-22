@@ -276,13 +276,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
   DOTGraph::Subgraph *root = &builder.getRoot();
 
-  // Collect port names for all operations and the top-level function
-  using PortNames = mlir::DenseMap<Operation *, handshake::PortNamer>;
-  PortNames portNames;
-  portNames.try_emplace(funcOp, funcOp);
-  for (Operation &op : funcOp.getOps())
-    portNames.try_emplace(&op, &op);
-
   auto addNode = [&](Operation *op,
                      DOTGraph::Subgraph &subgraph) -> LogicalResult {
     // The node's DOT "mlir_op" attribute
@@ -335,11 +328,11 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       Operation *srcOp = res.getDefiningOp();
       srcNodeName = getUniqueName(srcOp).str();
       srcIdx = res.getResultNumber();
-      srcPortName = portNames.at(srcOp).getOutputName(srcIdx);
+      srcPortName = handshake::getResultName(srcIdx);
     } else {
       Operation *parentOp = val.getParentBlock()->getParentOp();
       srcIdx = cast<BlockArgument>(val).getArgNumber();
-      srcNodeName = srcPortName = portNames.at(parentOp).getInputName(srcIdx);
+      srcNodeName = srcPortName = handshake::getOperandName(parentOp, srcIdx);
     }
 
     // Determine the edge's destination
@@ -348,11 +341,11 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
-      dstNodeName = dstPortName = portNames.at(parentOp).getOutputName(dstIdx);
+      dstNodeName = dstPortName = handshake::getResultName(dstIdx);
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
-      dstPortName = portNames.at(dstOp).getInputName(dstIdx);
+      dstPortName = handshake::getOperandName(dstOp, dstIdx)
     }
 
     DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
@@ -377,7 +370,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       continue;
 
     // Create a node for the argument
-    StringRef argName = portNames.at(funcOp).getInputName(idx);
+    StringRef argName = funcOp.getArgName(idx);
     DOTGraph::Node *node = builder.addNode(argName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
@@ -394,7 +387,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   // Create nodes for all function results
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    StringRef resName = portNames.at(funcOp).getOutputName(idx);
+    StringRef resName = funcOp.getResultName(idx);
     DOTGraph::Node *node = builder.addNode(resName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
