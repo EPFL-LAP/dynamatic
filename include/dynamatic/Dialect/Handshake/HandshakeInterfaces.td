@@ -288,6 +288,8 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getResultName", (ins "unsigned" : $idx),
       "",
       [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+
         if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(concreteOp)) {
           return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
