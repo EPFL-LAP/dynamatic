@@ -44,7 +44,7 @@ jobs:
           git remote remove origin 2>/dev/null || true
           git remote add origin "$GIT_REPO"
           # Fetch the PR branch
-          git fetch origin $GIT_REF
+          git fetch origin "$GIT_REF"
           # Checkout and reset to the PR branch
           git checkout -B pr-branch FETCH_HEAD
           echo "Test Dynamatic build on commit: $GIT_REF repo: $GIT_REPO"
