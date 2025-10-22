@@ -18,9 +18,24 @@ jobs:
 
     steps:
       - name: Build Dynamatic
+        # NOTE: here we cannot use "actions/checkout@v4", because it always
+        # operate on the mounted volume instead of the pre-built Dynamatic
+        # directory in the container.
+        env:
+          PR_REF: ${{ github.event.pull_request.head.ref }}
+          PR_REPO: ${{ github.event.pull_request.head.repo.clone_url }}
         # Github runner always overrides HOME to "/github/home/"
         # Here we need to make sure that we only write to writable locations
         run: |
           export CCACHE_DIR=/home/dynamatic/dynamatic/.ccache
           cd /home/dynamatic/dynamatic
+          # Replaces the origin the repo of the PR (it might be a fork)
+          git remote remove origin 2>/dev/null || true
+          git remote add origin $PR_REPO
+          # Fetch the PR branch
+          git fetch origin $PR_REF
+          # Checkout and reset to the PR branch
+          git checkout -B pr-branch FETCH_HEAD
+          # Update submodules if needed
+          git submodule update --init --recursive
           ./build.sh -f --release
