@@ -31,7 +31,9 @@ RUN \
 
 # [START Create a user called "dynamatic"]
 # Add a user
-RUN useradd -m dynamatic
+RUN groupadd --gid 1000 dynamatic && \
+  useradd --uid 1000 --gid dynamatic --shell /bin/bash --create-home dynamatic
+
 USER dynamatic
 ARG workdir="/home/dynamatic"
 WORKDIR $workdir

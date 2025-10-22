@@ -1,0 +1,22 @@
+name: Build on Ubuntu 22.04
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: jiahui17/dynamatic:latest
+
+    steps:
+      - name: Build Dynamatic
+        run: |
+          cd /home/dynamatic/dynamatic && ./build.sh -f --release
