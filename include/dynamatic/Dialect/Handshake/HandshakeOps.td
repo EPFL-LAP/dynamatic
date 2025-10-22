@@ -31,7 +31,6 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         HandshakeBaseInterface,
          DeclareOpInterfaceMethods<ControlInterface>,
 ]> {
   // Shared functions to include in child classes 
