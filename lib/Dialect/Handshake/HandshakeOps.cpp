@@ -2063,7 +2063,7 @@ std::string LSQOp::getOperandName(unsigned idx) {
   return "ldDataFromMC";
 }
 
-std::string LSQOp::getResultName(unsigned idx) {
+std::string LSQOp::getResultNameImpl(unsigned idx) {
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
@@ -2107,7 +2107,7 @@ std::string MemoryControllerOp::getOperandName(unsigned idx) {
   return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
 }
 
-std::string MemoryControllerOp::getResultName(unsigned idx) {
+std::string MemoryControllerOp::getResultNameImpl(unsigned idx) {
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
