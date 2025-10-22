@@ -334,7 +334,7 @@ def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui", [
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIOInterface,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
   IsFloatSizedChannel<32, "result">,
@@ -345,7 +345,7 @@ def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIOInterface,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
   IsFloatSizedChannel<32, "result">,
@@ -484,7 +484,6 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
   SimpleNamedIOInterface
-  IsIntSizedChannel<32, "in">,
   IsFloatSizedChannel<32, "out">
 ]> {
   let summary = "Converts a unsigned integer to float.";
