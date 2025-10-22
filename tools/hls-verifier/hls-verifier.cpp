@@ -12,8 +12,8 @@
 
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
-#include "Utilities.h"
 #include "Simulators.h"
+#include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -39,7 +39,6 @@ using namespace mlir;
 using namespace dynamatic;
 
 static const char SEP = std::filesystem::path::preferred_separator;
-
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
@@ -114,7 +113,6 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   return mlir::success();
 }
 
-
 int main(int argc, char **argv) {
 
   cl::opt<std::string> simPathName(
@@ -180,20 +178,19 @@ int main(int argc, char **argv) {
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
-  
+
   std::unique_ptr<Simulator> simulator;
-  
-  if(simulatorType == "ghdl"){
+
+  if (simulatorType == "ghdl") {
     simulator = std::make_unique<GHDLSimulator>(&ctx);
-  } else if (simulatorType == "vsim"){
+  } else if (simulatorType == "vsim") {
     simulator = std::make_unique<VSimSimulator>(&ctx);
-  } else if (simulatorType == "xsim"){
+  } else if (simulatorType == "xsim") {
     simulator = std::make_unique<XSimSimulator>(&ctx);
   } else {
     logErr(LOG_TAG, "Wrong Simulator (use vsim, xsim, ghdl, verilator)");
     return 1;
   }
-
 
   simulator->generateScripts();
 

@@ -96,7 +96,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -131,7 +131,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -196,7 +196,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -204,7 +204,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -319,12 +319,13 @@ public:
 
   Simulate(FrontendState &state)
       : Command("simulate",
-                "Simulates the VHDL produced during HDL writing using a simulator of choice "
+                "Simulates the VHDL produced during HDL writing using a "
+                "simulator of choice "
                 "and the hls-verifier tool",
                 state) {
-        addOption({SIMULATOR, "The simulator to use for verification, options are "
-                              "'ghdl' (default option: GHDL), 'vsim' (ModelSim), "
-                              "'xsim' (Vivado), 'verilator' (Verilator)"});
+    addOption({SIMULATOR, "The simulator to use for verification, options are "
+                          "'ghdl' (default option: GHDL), 'vsim' (ModelSim), "
+                          "'xsim' (Vivado), 'verilator' (Verilator)"});
   }
   CommandResult execute(CommandArguments &args) override;
 };
@@ -702,7 +703,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string simulator  = "ghdl";  
+  std::string simulator = "ghdl";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
 
   if (auto it = args.options.find(SIMULATOR); it != args.options.end()) {
@@ -722,7 +723,8 @@ CommandResult Simulate::execute(CommandArguments &args) {
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
-                 state.fpUnitsGenerator == "vivado" ? "true" : "false", simulator);
+                 state.fpUnitsGenerator == "vivado" ? "true" : "false",
+                 simulator);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
