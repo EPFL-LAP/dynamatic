@@ -281,7 +281,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
         }
 
         op->emitError() << "must specify operand names, op: " << *op;
-        assert(0);
+        llvm::raise_fatal_error("All operation must specify IO names");
       }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
@@ -289,7 +289,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "",
       [{
         auto *op = const_cast<mlir::Operation *>($_op.getOperation());
-        
+
         if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
           return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
@@ -301,7 +301,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
         }
 
         op->emitError() << "must specify result names, op: " << *op;
-        assert(0);
+        llvm::raise_fatal_error("All operation must specify IO names");
       }]>
   ];
 }
