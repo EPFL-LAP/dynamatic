@@ -2044,7 +2044,7 @@ static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   return "";
 }
 
-std::string LSQOp::getOperandName(unsigned idx) {
+std::string LSQOp::getOperandNameImpl(unsigned idx) {
 
   assert(idx < getOperation()->getNumOperands() && "index too high");
 
@@ -2085,7 +2085,7 @@ std::string LSQOp::getResultNameImpl(unsigned idx) {
   return "stDataToMC";
 }
 
-std::string MemoryControllerOp::getOperandName(unsigned idx) {
+std::string MemoryControllerOp::getOperandNameImpl(unsigned idx) {
   assert(idx < getOperation()->getNumOperands() && "index too high");
 
   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
