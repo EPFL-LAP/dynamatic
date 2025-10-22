@@ -270,17 +270,17 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(concreteOp)) {
           return nameInterface.getOperandNameImpl(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(concreteOp)) {
           return nameInterface.getOperandNameImpl(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(concreteOp)) {
           return nameInterface.getOperandNameImpl(idx);
         }
 
-        $_op->emitError() << "must specify operand names, op: " << *$_op;
+        concreteOp->emitError() << "must specify operand names, op: " << *concreteOp;
         assert(0);
       }]>,
     InterfaceMethod<
@@ -288,17 +288,17 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       "std::string", "getResultName", (ins "unsigned" : $idx),
       "",
       [{
-        if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(concreteOp)) {
           return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(concreteOp)) {
           return nameInterface.getResultNameImpl(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::CustomNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::io::CustomNamedIOInterface>(concreteOp)) {
           return nameInterface.getResultNameImpl(idx);
         }
 
-        $_op->emitError() << "must specify result names, op: " << *$_op;
+        concreteOp->emitError() << "must specify result names, op: " << *concreteOp;
         assert(0);
       }]>
   ];
