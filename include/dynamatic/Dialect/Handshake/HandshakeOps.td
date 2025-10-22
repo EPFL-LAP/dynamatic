@@ -152,7 +152,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     // CustomNamedIOInterface Methods (used only by export-dot)
     //===------------------------------------------------------------------===//
 
-    std::string getOperandNameImple(unsigned idx){
+    std::string getOperandNameImpl(unsigned idx){
       return getArgName(idx);
     }
 
