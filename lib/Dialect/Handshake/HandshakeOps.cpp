@@ -2132,6 +2132,14 @@ namespace handshake {
 // Operand and Result Names
 //===----------------------------------------------------------------------===//
 
+handshake::HandshakeBaseInterface getHandshakeBase(Operation * op){
+  if(auto handshakeBase = llvm::dyn_cast<handshake::HandshakeBaseInterface>(op)){
+    return handshakeBase;
+  }
+  op->emitError() << "must implement HandshakeBaseInterface, op: " << *op;
+  llvm::report_fatal_error("Missing HandshakeBaseInterface");
+}
+
 std::string getOperandName(Operation *op, size_t oprdIdx) {
 
   if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
