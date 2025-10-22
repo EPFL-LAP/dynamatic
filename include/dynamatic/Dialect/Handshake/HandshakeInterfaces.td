@@ -281,7 +281,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
         }
 
         op->emitError() << "must specify operand names, op: " << *op;
-        llvm::raise_fatal_error("All operation must specify IO names");
+        llvm::report_fatal_error("All operation must specify IO names");
       }]>,
     InterfaceMethod<
       "Returns the name of a specific result.",
@@ -301,7 +301,7 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
         }
 
         op->emitError() << "must specify result names, op: " << *op;
-        llvm::raise_fatal_error("All operation must specify IO names");
+        llvm::report_fatal_error("All operation must specify IO names");
       }]>
   ];
 }
