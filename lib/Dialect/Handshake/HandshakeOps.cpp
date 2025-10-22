@@ -2133,7 +2133,7 @@ namespace handshake {
 //===----------------------------------------------------------------------===//
 
 handshake::HandshakeBaseInterface getHandshakeBase(Operation *op) {
-  if(auto handshakeBase =
+  if (auto handshakeBase =
           llvm::dyn_cast<handshake::HandshakeBaseInterface>(op)) {
     return handshakeBase;
   }
