@@ -1397,7 +1397,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
-    if (!isa<mlir::MemRefType>(oprd.getType())){
+    if (!isa<mlir::MemRefType>(oprd.getType())) {
       auto handshakeOp = handshake::getHandshakeBase(memOp);
       converter.addInput(handshakeOp.getOperandName(idx), oprd);
     }
@@ -1526,11 +1526,12 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
   }
 
-  // Add the ports from handshake op 
+  // Add the ports from handshake op
   for (auto [i, oprd] : llvm::enumerate(operands)) {
-    if (!isa<MemRefType>(oprd.getType()))
+    if (!isa<MemRefType>(oprd.getType())){
       auto handshakeOp = handshake::getHandshakeBase(memOp);
       memInterfaceConverter.addInput(handshakeOp.getOperandName(i), oprd);
+    }
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 

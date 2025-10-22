@@ -50,7 +50,7 @@ std::string getOperandName(Operation *op, size_t oprdIdx);
 /// based on which interface the operation implements
 std::string getResultName(Operation *op, size_t resIdx);
 
-HandshakeBaseInterface getHandshakeBase(Operation * op);
+HandshakeBaseInterface getHandshakeBase(Operation *op);
 
 } // end namespace handshake
 } // end namespace dynamatic
