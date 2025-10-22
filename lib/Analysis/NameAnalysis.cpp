@@ -129,7 +129,7 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   std::string userName, oprName;
   Operation *userOp = oprd.getOwner();
   userName = getName(userOp);
-  auto handshakeOp = getHandshakeBase(userOp)
+  auto handshakeOp = getHandshakeBase(userOp);
   oprName = handshakeOp.getOperandName(oprd.getOperandNumber());
   return defName + "_" + resName + "_" + oprName + "_" + userName;
 }
