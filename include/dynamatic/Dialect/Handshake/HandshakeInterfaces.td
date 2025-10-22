@@ -178,7 +178,7 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
+  let cppNamespace = "::dynamatic::handshake::detail";
   let description =
       [{"Used by operations whose operands and results are named 'ins" and 'outs'."}];
 
@@ -205,7 +205,7 @@ def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
 }
 
 def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
+  let cppNamespace = "::dynamatic::handshake::detail";
   let description =
       [{"Used by operations whose operands are named 'lhs' and 'rhs', and result is named 'result'."}];
 
@@ -230,7 +230,7 @@ def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
 }
 
 def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
+  let cppNamespace = "::dynamatic::handshake::detail";
   let description =
       [{"Used by operations with unique names for their operands and results."}];
 
@@ -270,13 +270,13 @@ def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
       [{
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        if (auto nameInterface = dyn_cast<handshake::CustomNamedIOInterface>($_op)) {
+        if (auto nameInterface = dyn_cast<handshake::detail::CustomNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::SimpleNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::SimpleNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         } else if (auto nameInterface =
-                      dyn_cast<handshake::BinaryArithNamedIOInterface>($_op)) {
+                      dyn_cast<handshake::detail::BinaryArithNamedIOInterface>($_op)) {
           return nameInterface.getOperandName(idx);
         }
 
