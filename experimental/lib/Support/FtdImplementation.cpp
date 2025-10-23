@@ -77,7 +77,6 @@ static Block *returnMuxConditionBlock(Value muxCondition) {
       muxConditionBlock = userBlock;
       break;
     }
-    // TODO: extend for multi-loop exit
   }
   if (!muxConditionBlock)
     muxConditionBlock = muxCondition.getParentBlock();
@@ -268,9 +267,6 @@ static BoolExpression *enumeratePaths(Block *start, Block *end,
 
 /// Get a boolean expression representing the exit condition of the current
 /// loop block.
-namespace dynamatic {
-namespace experimental {
-namespace boolean {
 static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
                                                  CFGLoopInfo &li,
                                                  const ftd::BlockIndexing &bi) {
@@ -291,9 +287,6 @@ static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
 
   return blockCond;
 }
-} // namespace boolean
-} // namespace experimental
-} // namespace dynamatic
 
 /// Run the Cytron algorithm to determine, give a set of values, in which blocks
 /// should we add a merge in order for those values to be merged
@@ -580,10 +573,9 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   // Use the BlockIndexing to access the block corresponding to such condition
   // and access its terminator to determine the condition.
   auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
-  if (!conditionOpt.has_value()) {
-    llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
+  if (!conditionOpt.has_value())
     return nullptr;
-  }
+
   auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
 
   // Add a not if the condition is negated.
@@ -677,6 +669,10 @@ getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
     cofactorList->push_back(bi.getBlockCondition(exitBlock));
     fLoopExit = fLoopExit->boolMinimize();
   }
+
+  // Sort the cofactors alphabetically
+  std::sort(cofactorList->begin(), cofactorList->end());
+
   return fLoopExit;
 }
 
@@ -746,12 +742,8 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
       BDD *bdd = buildBDD(exitCondition, cofactorList);
       conditionValue =
           bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
-    } else{
-      //BDD *bdd = buildBDD(exitCondition, cofactorList);
-      //conditionValue =
-      //    bddToCircuit(rewriter, bdd, loop->getHeader(), bi, true);
+    } else
       conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
-    }
 
     // Create the false constant to feed `init`
     auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
@@ -817,6 +809,43 @@ static bool isWhileLoop(CFGLoop *loop) {
 
 using PairOperandConsumer = std::pair<Value, Operation *>;
 
+// Find the closest loop exit between a producer inside the loop and a consumer
+// outside the loop.
+static Block *findClosestLoopExit(Operation *consumer, Value connection,
+                                  const ftd::BlockIndexing &bi,
+                                  SmallVector<Block *> exitBlocks) {
+  // Find all the paths from the producer to the consumer using DFS
+  std::vector<std::vector<Block *>> allPaths =
+      findAllPaths(connection.getParentBlock(), consumer->getBlock(), bi);
+
+  Block *closestExit = nullptr;
+  unsigned minDistance = std::numeric_limits<unsigned>::max();
+
+  // For every path from producer to consumer , check if it passes through any
+  // of the loop’s exit blocks.
+  for (const auto &path : allPaths) {
+    bool foundInThisPath = false;
+    for (unsigned i = 0; i < path.size() && !foundInThisPath; ++i) {
+      Block *pathBlock = path[i];
+      for (Block *exitBlock : exitBlocks) {
+        if (pathBlock == exitBlock) {
+          // Update the closest exit if this one is nearer to the producer
+          if (i < minDistance) {
+            minDistance = i;
+            closestExit = exitBlock;
+          }
+          foundInThisPath = true;
+          break;
+        }
+      }
+    }
+  }
+
+  assert(closestExit &&
+         "No loop exit found in any path between producer and consumer.");
+  return closestExit;
+}
+
 /// Insert a branch to the correct position, taking into account whether it
 /// should work to suppress the over-production of tokens or self-regeneration
 static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
@@ -827,96 +856,35 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
   handshake::ConditionalBranchOp branchOp;
 
-
   // Do not add the branch in case of a while loop with backward edge
-    if (btlt == BackwardRelationship && isWhileLoop(loop))
-      return connection;
+  if (btlt == BackwardRelationship && isWhileLoop(loop))
+    return connection;
 
-    Block *loopExit;
+  std::vector<std::string> cofactorList;
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+  BoolExpression *fLoopExit = getLoopExitCondition(loop, &cofactorList, li, bi);
+  // Choose the closest loop exit to the producer and place the suppression
+  // there
+  Block *loopExit = findClosestLoopExit(consumer, connection, bi, exitBlocks);
 
-    std::vector<std::string> cofactorList;
-    SmallVector<Block *> exitBlocks;
-    loop->getExitingBlocks(exitBlocks);
+  // Apply a BDD expansion to the loop exit expression and the list of
+  // cofactors
+  BDD *bdd = buildBDD(fLoopExit, cofactorList);
 
-    //previosly first exit was chosen to add the suppression, we should now choose the right exit to add
-    // loopExit = exitBlocks.front();
-    // Current Idea choose the earliest exit among all paths.
-    // Find all the paths from the producer to the consumer, using a DFS
-    std::vector<std::vector<Block *>> allPaths = findAllPaths(connection.getParentBlock(), consumer->getBlock(), bi);
+  // Convert the boolean expression obtained through BDD to a circuit
+  Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
 
+  Operation *loopTerminator = loopExit->getTerminator();
+  assert(isa<cf::CondBranchOp>(loopTerminator) &&
+         "Terminator condition of a loop exit must be a conditional "
+         "branch.");
 
-    //////////////////////////////////////////////////
-    Block *closestExit = nullptr;
-    unsigned minDistance = std::numeric_limits<unsigned>::max();
+  rewriter.setInsertionPointToStart(loopExit);
 
-    // For every path from producer to consumer
-    for (const auto &path : allPaths) {
-      bool foundInThisPath = false;
-      for (unsigned i = 0; i < path.size() && !foundInThisPath; ++i) {
-        Block *pathBlock = path[i];
-        for (Block *exitBlock : exitBlocks) {
-          if (pathBlock == exitBlock) {
-            // If this exit is closer to the producer than any previous one
-            if (i < minDistance) {
-              minDistance = i;
-              closestExit = exitBlock;
-            }
-            foundInThisPath = true;
-            break;
-          }
-        }
-      }
-    }
-
-    assert(closestExit && "No loop exit found in any path between producer and consumer.");
-    loopExit = closestExit;
-    // llvm::errs() << "Closest loop exit found in BB"
-    //              << bi.getIndexFromBlock(loopExit) << "\n";
-    //////////////////////////////////////////////////
-
-    ///// print
-    //  llvm::errs()<< "allPaths size is "<< allPaths.size()<<"\n";
-    // for (auto path : allPaths){
-    //   llvm::errs()<< "path ";
-    //   for (auto block : path){
-    //     llvm::errs()<< bi.getIndexFromBlock(block) <<" , ";
-    //   }   
-    //   llvm::errs()<< "\n";
-    // }
-    // //loopExit = connection.getParentBlock();//choose producer blk
-    // llvm::errs() << "\nfinished with "<< bi.getIndexFromBlock(loopExit) <<"\n";
-
-    BoolExpression *fLoopExit = BoolExpression::boolZero();
-
-    // Get the list of all the cofactors related to possible exit conditions
-    for (Block *exitBlock : exitBlocks) {
-      BoolExpression *blockCond =
-          getBlockLoopExitCondition(exitBlock, loop, li, bi);
-      fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-      cofactorList.push_back(bi.getBlockCondition(exitBlock));
-    }
-
-    // Sort the cofactors alphabetically
-    std::sort(cofactorList.begin(), cofactorList.end());
-
-    // Apply a BDD expansion to the loop exit expression and the list of
-    // cofactors
-    BDD *bdd = buildBDD(fLoopExit, cofactorList);
-
-    // Convert the boolean expression obtained through BDD to a circuit -> Q: where should we add the things we need to generate the condition
-    Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
-
-    Operation *loopTerminator = loopExit->getTerminator();
-    assert(isa<cf::CondBranchOp>(loopTerminator) &&
-           "Terminator condition of a loop exit must be a conditional "
-           "branch.");
-
-    rewriter.setInsertionPointToStart(loopExit);
-
-    branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        loopExit->getOperations().front().getLoc(),
-        ftd::getListTypes(connection.getType()), branchCond, connection);
-  //}
+  branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+      loopExit->getOperations().front().getLoc(),
+      ftd::getListTypes(connection.getType()), branchCond, connection);
 
   Value newConnection = btlt == MoreProducerThanConsumers
                             ? branchOp.getTrueResult()
@@ -981,16 +949,6 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
   BoolExpression *fCons =
       enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
-
-    // if (accountMuxCondition){
-    //   llvm::errs() << "prodControlDeps: ";
-    //   for (auto *block : prodControlDeps)
-    //     llvm::errs() << bi.getIndexFromBlock(block) << ", ";
-    //   llvm::errs() << "\t consControlDeps: ";
-    //   for (auto *block : consControlDeps)
-    //     llvm::errs() << bi.getIndexFromBlock(block) << ", ";
-    //   llvm::errs()<<"\nproducer " << bi.getIndexFromBlock(producerBlock) <<" , fprod= " << fProd->toString()
-    //   << "\nconsumer " << bi.getIndexFromBlock(consumerBlock)<<" , fcons=" <<fCons->toString() << "\n";}
 
   if (accountMuxCondition) {
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
@@ -1058,19 +1016,9 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     return;
 
   // Do not take into account conditional branch
-  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) ){
-    llvm::errs()<< "/////////////////////////////////////////////////////////////////////////////////////////////\n branch operation:";
-    consumerOp->print(llvm::errs());
-    llvm::errs()<< "\noperand: ";
-    operand.print(llvm::errs());
-    llvm::errs()<< "\noperand0: ";
-    consumerOp->getOperand(0).print(llvm::errs());
-    if(consumerOp->getOperand(0) != operand){
-      llvm::errs() <<"\nnot condition\n/////////////////////////////////////////////////////////////////////////////////////////////\n";
-      return;
-    }
-    llvm::errs() <<"\nwas condition\n/////////////////////////////////////////////////////////////////////////////////////////////\n";
-  }
+  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
+      consumerOp->getOperand(0) != operand)
+    return;
 
   // The consumer block is the block which contains the consumer
   Block *consumerBlock = consumerOp->getBlock();
@@ -1309,14 +1257,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // Convert the boolean expression obtained through BDD to a circuit
         conditionValue =
             bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
-      } else{
+      } else
         conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
-        //BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
-        // Convert the boolean expression obtained through BDD to a circuit
-        //conditionValue =
-          //  bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
-      
-      }
 
       // If the function is MU, then we create a merge
       // and use its result as condition

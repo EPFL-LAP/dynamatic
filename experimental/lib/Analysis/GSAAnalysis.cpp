@@ -566,6 +566,8 @@ getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
     cofactorList->push_back(bi.getBlockCondition(exitBlock));
     fLoopExit = fLoopExit->boolMinimize();
   }
+  // Sort the cofactors alphabetically
+  std::sort(cofactorList->begin(), cofactorList->end());
   return fLoopExit;
 }
 
@@ -630,6 +632,8 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
       if (loopInputs.size() == 1)
         operandLoop = loopInputs[0];
       else {
+        // The new Phi gate has a flag muGenerated so later in the convert phi
+        // to gamma it effects the place that gaama is added
         Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
                                  ++uniqueGateIndex, nullptr,
                                  BoolExpression::boolZero(), {}, true);
