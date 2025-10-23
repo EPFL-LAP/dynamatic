@@ -96,7 +96,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -131,7 +131,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -196,7 +196,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -204,7 +204,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -268,6 +268,7 @@ public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
+  static constexpr llvm::StringLiteral MILP_SOLVER = "milp-solver";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
@@ -285,6 +286,11 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addOption({MILP_SOLVER,
+               "The MILP solvers to use. Values are 'gurobi' (Dynamatic "
+               "needs to be built with Gurobi support) and 'cbc'. The default "
+               "option is gurobi and it will fall back to cbc if gurobi is not "
+               "available."});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -635,6 +641,13 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  std::string milpSolver = "gurobi";
+#else
+  std::string milpSolver = "cbc";
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
@@ -655,14 +668,19 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
+    milpSolver = it->second;
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, disableLSQ,
+                 fastTokenDelivery, milpSolver);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -682,7 +700,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
       hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', "
+                   << "', possible options are 'vhdl', 'vhdl-beta',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
