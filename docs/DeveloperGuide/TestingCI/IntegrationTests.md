@@ -115,6 +115,7 @@ TEST_P(BasicTests, basic) {
   EXPECT_EQ(exitCode, 0);
 }
 ```
+Note that in this case, we don't specify the test suite name, as in the first example (where we had `SumTests`), but instead we use the fixture (`BasicTests`).
 
 Finally, we must specify the concrete parameters that will be used to run the parameterized test. We use the macro `INSTANTIATE_TEST_SUITE_P(instantiationName, fixtureName, params)` for this purpose. As its name suggests, it serves to make an instance of the test suite with the given parameters; think of making an instance of a class in C++ with some parameters in the constructor. Since the parameter list contains all benchmarks, we appropriately name the instantiation `AllBenchmarks`.
 ```c++
