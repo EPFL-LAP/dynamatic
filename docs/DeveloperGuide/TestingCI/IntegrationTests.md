@@ -57,7 +57,7 @@ TEST(SumTests, positive_numbers) {
   EXPECT_EQ(received, expected);
 }
 ```
-`TEST` is a macro used for defining a test case. The parameters are the test suite name (`SumTests`) and the test case name (`positive_numbers`). A test suite can have multiple test cases. The code inside the test is run by GoogleTest like a function. `EXPECT_EQ` is a macro assertion which ensures that the two arguments are equal. If not, the test will fail.
+`TEST` is a macro used for defining a test case. The parameters are the test suite name (`SumTests`) and the test case name (`positive_numbers`). A test suite can have multiple test cases. The code inside the test is run by GoogleTest like a function. `EXPECT_EQ` is a macro assertion which checks if its two arguments (i.e. the expected and actual result) are equal. If not, the test will fail.
 
 Now, let's demonstrate how this would look like in the case of Dynamatic. We have a helper function defined in `util.cpp` that abstracts away the details of calling Dynamatic. It runs the basic flow described in the introduction and returns an exit code (0 if success).
 ```c++
