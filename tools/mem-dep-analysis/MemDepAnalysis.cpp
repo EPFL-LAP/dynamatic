@@ -516,6 +516,8 @@ struct IndexAnalysis {
   std::map<Instruction *, Value *> instToBase;
 };
 
+namespace {
+
 void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
   rq.push_back(&r);
   for (const auto &e : r)
@@ -581,30 +583,29 @@ bool equalBase(Instruction *a, Instruction *b) {
   return findBase(a) == findBase(b);
 }
 
-namespace {
-
-/// This struct holds all the needed information for extracting the dependencies
-/// between loops and stores.
-/// - `instToScopId` maps the load and store instructions to different scops.
-/// More precise analysis can be done if loads and stores are in the same scop.
-/// - `loadInsts`, `storeInsts`: set of memory accesses.
-struct PartitionMemoryAccessesByScopHelper {
-  std::map<Instruction *, int> instToScopId;
-  std::vector<Instruction *> loadInsts;
-  std::vector<Instruction *> storeInsts;
-  bool sameScop(Instruction *a, Instruction *b) const {
-    if (instToScopId.count(a) == 0)
-      return false;
-    if (instToScopId.count(b) == 0)
-      return false;
-    return (instToScopId.at(a) == instToScopId.at(b));
-  }
-};
-
 /// \brief: an LLVM pass that combines polyhedral and alias analysis to compute
 /// a set of dependency edges from the LLVM IR. It further uses dataflow
 /// analysis to eliminate dependency edges enforced by the dataflow.
 struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
+
+  /// This struct holds all the needed information for extracting the
+  /// dependencies between loops and stores.
+  /// - `instToScopId` maps the load and store instructions to different scops.
+  /// More precise analysis can be done if loads and stores are in the same
+  /// scop.
+  /// - `loadInsts`, `storeInsts`: set of memory accesses.
+  struct PartitionMemoryAccessesByScopHelper {
+    std::map<Instruction *, int> instToScopId;
+    std::vector<Instruction *> loadInsts;
+    std::vector<Instruction *> storeInsts;
+    bool sameScop(Instruction *a, Instruction *b) const {
+      if (instToScopId.count(a) == 0)
+        return false;
+      if (instToScopId.count(b) == 0)
+        return false;
+      return (instToScopId.at(a) == instToScopId.at(b));
+    }
+  };
 
   IndexAnalysis indexAnalysis;
   AAManager::Result *aliasAnalysis;
