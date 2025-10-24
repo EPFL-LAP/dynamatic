@@ -27,7 +27,7 @@ Dynamatic uses GoogleTest as the testing framework for writing integration tests
 $ cd build/tools/integration
 $ ctest --parallel 8 --output-on-failure 
 ```
-To simplify this, a custom target is defined in `tools/integration/CMakeLists.txt`, so that the tests can easily be run using ninja:
+To simplify this, a custom target is defined in `tools/integration/CMakeLists.txt`, so that the tests can easily be run using ninja with a single command (and no need to `cd` back and forth):
 ```
 $ ninja -C build run-all-integration-tests
 ```
