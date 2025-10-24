@@ -4,7 +4,7 @@ This document describes the GitHub Actions workflow used for the purposes of CI 
 
 ## Basics
 
-Workflows are defined using YAML files, placed in the `.github/workflows/` directory. A workflow consists of one or more jobs, and each job consists of one or more steps. Each step corresponds to running one or more shell commands. A step may install a dependency, run a build script, or do any other required task.
+Workflows are defined using YAML files, placed in the `.github/workflows/` directory. You can find an example in [GitHub's Getting Started guide](https://docs.github.com/en/actions/get-started/quickstart). For more details, refer to the [workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax). A workflow consists of one or more jobs, and each job consists of one or more steps. Each step corresponds to running one or more shell commands. A step may install a dependency, run a build script, or do any other required task.
 
 Workflows are triggered (i.e. run), when certain changes on the repository occur. For example, a workflow can run whenever a pull request into main is opened/marked ready for review, or when a push is made into a specified branch, and so on. A comprehensive list of such trigger events is available [in the official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
 
