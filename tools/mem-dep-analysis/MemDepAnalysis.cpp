@@ -806,7 +806,7 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
     int scopId = indexAnalysis.getScopID(&bb);
     // NOTE: If the BB is not in the scop, then we use alias analysis to check
     // if they ever collide.
-    if (not indexAnalysis.isInScop(&bb))
+    if (!indexAnalysis.isInScop(&bb))
       continue;
     for (auto &inst : bb) {
       if (!inst.mayReadOrWriteMemory())
@@ -822,20 +822,42 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
 
   auto nameMapping = nameAllLoadStores(llvmFunction);
 
-  std::map<Instruction *, LLVMMemDependency> deps;
+  // NOTE: LLVMMemDependency:
+  // A helper data structure that holds memory dependencies.
+  // It can dump the dependencies to many llvm meta data nodes (used in LLVM IR)
+  // or to an memory dependency attribute used in the handshake dialect.
+  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
   for (auto &[src, dst] : getDependencyPairs(llvmFunction, sameScopHelper)) {
     assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
-    if (deps.count(src) == 0) {
+    // In LLVM IR, one memory instruction might produce data that is needed by
+    // many successor instructions. E.g.,
+    //
+    // store %location, %data; name = "store1"
+    // %read_data1 = load %location; name = "load1"
+    // %read_data2 = load %location; name = "load2"
+    //
+    // Here, we have two RAW dependencies: dep1 = (store1, load1) and dep2 =
+    // (store1, load2). In LLVM IR, we annotate both of them on store1 as a list
+    // of dependencies [dep1, dep2].
+    //
+    // For each pair of memory dependencies:
+    // - dep: store -> load;
+    // - dep: store -> store;
+    if (instToDepsMap.count(src) == 0) {
+      // This branch creates the list [dep1] if the predecessor instruction
+      // hasn't been visited yet
       LLVMMemDependency newDep;
       newDep.name = nameMapping[src];
       newDep.destAndDepth.emplace_back(nameMapping[dst], 1);
-      deps[src] = newDep;
+      instToDepsMap[src] = newDep;
     } else {
-      deps[src].destAndDepth.emplace_back(nameMapping[dst], 1);
+      // Otherwise, populate the existing list [dep1, dep2, ...] with the new
+      // dep.
+      instToDepsMap[src].destAndDepth.emplace_back(nameMapping[dst], 1);
     }
   }
 
-  for (auto [src, dests] : deps) {
+  for (auto [src, dests] : instToDepsMap) {
     dests.toLLVMMetaDataNode(ctx, src);
   }
 
