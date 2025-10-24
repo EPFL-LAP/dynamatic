@@ -354,8 +354,8 @@ public:
     // clang-format on
 
     auto *bb = scop.begin()->getBasicBlock();
-    auto *l = loopInfo->getLoopFor(bb);
-    scopMinDepth = loopInfo->getLoopDepth(bb) - scop.getRelativeLoopDepth(l);
+    auto *loop = loopInfo->getLoopFor(bb);
+    scopMinDepth = loopInfo->getLoopDepth(bb) - scop.getRelativeLoopDepth(loop);
     assert(scopMinDepth > 0);
   }
 
@@ -518,10 +518,11 @@ struct IndexAnalysis {
 
 namespace {
 
-void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
-  rq.push_back(&r);
-  for (const auto &e : r)
-    getAllRegions(*e, rq);
+void getAllRegions(llvm::Region &region,
+                   std::deque<llvm::Region *> &regionQueue) {
+  regionQueue.push_back(&region);
+  for (const auto &e : region)
+    getAllRegions(*e, regionQueue);
 }
 
 bool hasMemoryReadOrWrite(ScopStmt &stmt) {
@@ -687,8 +688,8 @@ void MemDepAnalysisPass::processScop(Scop &scop,
 
   meta.computeIntersections();
 
-  for (auto [i, v] : meta.getInstsToBase()) {
-    indexAnalysis.instToBase[i] = v;
+  for (auto [inst, baseAddr] : meta.getInstsToBase()) {
+    indexAnalysis.instToBase[inst] = baseAddr;
   }
 
   for (auto pair : meta.getIntersectionList()) {
@@ -771,31 +772,31 @@ std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
   return depPairList;
 }
 
-PreservedAnalyses MemDepAnalysisPass::run(Function &f,
+PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
                                           FunctionAnalysisManager &fam) {
 
-  llvm::LLVMContext &ctx = f.getContext();
+  llvm::LLVMContext &ctx = llvmFunction.getContext();
 
-  auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
+  auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(llvmFunction);
 
-  auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
+  auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(llvmFunction);
 
   std::vector<ScopAnalysisInfo> scopMetaInfos;
 
-  aliasAnalysis = &fam.getResult<AAManager>(f);
+  aliasAnalysis = &fam.getResult<AAManager>(llvmFunction);
 
-  std::deque<Region *> rq;
-  getAllRegions(*regionInfoAnalysis.getTopLevelRegion(), rq);
+  std::deque<Region *> regionQueue;
+  getAllRegions(*regionInfoAnalysis.getTopLevelRegion(), regionQueue);
 
-  Scop *s;
-  for (Region *r : rq) {
-    if ((s = scopInfoAnalysis.getScop(r)))
-      processScop(*s, scopMetaInfos);
+  Scop *scop;
+  for (Region *region : regionQueue) {
+    if ((scop = scopInfoAnalysis.getScop(region)))
+      processScop(*scop, scopMetaInfos);
   }
 
   PartitionMemoryAccessesByScopHelper functionInfo;
 
-  for (auto &bb : f) {
+  for (auto &bb : llvmFunction) {
     int scopId = indexAnalysis.getScopID(&bb);
     bool isInScop = indexAnalysis.isInScop(&bb);
     for (auto &inst : bb) {
@@ -818,7 +819,7 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
     }
   }
 
-  auto nameMapping = nameAllLoadStores(f);
+  auto nameMapping = nameAllLoadStores(llvmFunction);
 
   std::map<Instruction *, LLVMMemDependency> deps;
   for (auto &[src, dst] : getDependencyPairs(functionInfo)) {
