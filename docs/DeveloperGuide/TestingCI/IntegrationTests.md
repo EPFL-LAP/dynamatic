@@ -243,7 +243,7 @@ Add the corresponding folder and .c kernel inside of it, and then add its name t
 
 *Example use case: You want the same set of benchmarks to be run with some different parameters, e.g. with Verilog instead of VHDL or with FPL'22 instead of FPGA'20 buffering.*
 
-Add a new macro invocation:
+Add a new macro invocation in `TEST_SUITE.cpp`:
 ```c++
 TEST_P(ExistingFixtureName, newTestCaseName) {
   // code
@@ -269,7 +269,7 @@ First we define the fixture at the top of `TEST_SUITE.cpp`:
 ```c++
 class NewFixture : public testing::TestWithParam<std::string> {};
 ```
-Then we create some test cases for it as stated earlier. Finally, we instantiate it at the bottom of the same file:
+Then we create some test cases for it as stated earlier. Finally, we instantiate it, again in `TEST_SUITE.cpp`:
 ```c++
 INSTANTIATE_TEST_SUITE_P(SomeBenchmarks, NewFixture, testing::Values(...));
 ```
