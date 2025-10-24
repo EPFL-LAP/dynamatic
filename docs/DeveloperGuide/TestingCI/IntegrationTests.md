@@ -106,7 +106,7 @@ class BasicTests : public testing::TestWithParam<std::string> {};
 
 In general, a fixture is a set of tests that are run with the same data configuration. In our case, the data configuration consists of the list of benchmarks. So, all test cases in the same fixture will be run with the same benchmarks.
 
-Then, we create a parameterized test with the given fixture using the `TEST_P` macro. As specified in the fixture, the test takes a parameter of type `std::string`. The parameter's value can be retrieved using `GetParam()`.
+Then, we create a parameterized test with the given fixture. The difference is that this time, we have to use a different macro, `TEST_P` (P as in "parameterized"). It will create a parameterized test case for a given fixture. As specified in the fixture, the test takes a parameter of type `std::string`. The parameter's value can be retrieved using `GetParam()`.
 ```c++
 TEST_P(BasicTests, basic) {
   std::string name = GetParam();
