@@ -1,11 +1,9 @@
-#include "polly/DependenceInfo.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -14,7 +12,6 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
-#include <stdexcept>
 #include <stdlib.h>
 #include <utility>
 
@@ -589,16 +586,11 @@ bool equalBase(Instruction *a, Instruction *b) {
 /// analysis to eliminate dependency edges enforced by the dataflow.
 struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
 
-  /// This struct holds all the needed information for extracting the
-  /// dependencies between loops and stores.
-  /// - `instToScopId` maps the load and store instructions to different scops.
-  /// More precise analysis can be done if loads and stores are in the same
-  /// scop.
-  /// - `loadInsts`, `storeInsts`: set of memory accesses.
-  struct PartitionMemoryAccessesByScopHelper {
+  // This struct keeps track for every memory instruction:
+  // - Is it in any scop (i.e., it is in `instToScopId`)?
+  // - Are two instructions in the same scop?
+  struct SameScopHelper {
     std::map<Instruction *, int> instToScopId;
-    std::vector<Instruction *> loadInsts;
-    std::vector<Instruction *> storeInsts;
     bool sameScop(Instruction *a, Instruction *b) const {
       if (instToScopId.count(a) == 0)
         return false;
@@ -619,12 +611,13 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
   /// \brief: Loops through the loops in the IR and collect the loads and
   /// stores.
   void processLoop(Loop *l, std::vector<struct LoopMetaData> &loopMetaInfos);
-  PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
+  PreservedAnalyses run(Function &llvmFunction, FunctionAnalysisManager &fam);
 
   /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
   /// or WAW conflict.
   std::vector<InstPairType>
-  getDependencyPairs(const PartitionMemoryAccessesByScopHelper &functionInfo);
+  getDependencyPairs(Function &llvmFunction,
+                     const SameScopHelper &sameScopHelper);
   std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
 };
 
@@ -705,12 +698,25 @@ void MemDepAnalysisPass::processScop(Scop &scop,
   scopMeta.push_back(meta);
 }
 
-std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
-    const PartitionMemoryAccessesByScopHelper &functionInfo) {
+// Helper function: Get all instructions of a certain type "T"
+template <typename T>
+std::vector<Instruction *> getAllInsts(Function *llvmFunction) {
+  std::vector<Instruction *> insts;
+  for (BasicBlock &bb : *llvmFunction) {
+    for (Instruction &inst : bb)
+      if (isa<T>(inst))
+        insts.push_back(&inst);
+  }
+  return insts;
+}
+
+std::vector<InstPairType>
+MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
+                                       const SameScopHelper &sameScopHelper) {
   std::vector<InstPairType> depPairList;
-  for (auto *storeInst : functionInfo.storeInsts) {
+  for (auto *storeInst : getAllInsts<StoreInst>(&llvmFunction)) {
     // Find RAW dependencies
-    for (auto *loadInst : functionInfo.loadInsts) {
+    for (auto *loadInst : getAllInsts<LoadInst>(&llvmFunction)) {
 
       InstPairType rawPair = std::make_pair(storeInst, loadInst);
 
@@ -721,7 +727,7 @@ std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
         continue;
 
       // Instructions are in the same scop: use the result from IndexAnalysis
-      if (functionInfo.sameScop(loadInst, storeInst)) {
+      if (sameScopHelper.sameScop(loadInst, storeInst)) {
         if (indexAnalysis.instRAWlist.count(rawPair) > 0)
           depPairList.push_back(rawPair);
         continue;
@@ -737,7 +743,7 @@ std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
       }
     }
     // Find WAW dependencies
-    for (auto *secondStoreInst : functionInfo.storeInsts) {
+    for (auto *secondStoreInst : getAllInsts<StoreInst>(&llvmFunction)) {
       if (secondStoreInst == storeInst)
         continue;
 
@@ -751,7 +757,7 @@ std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
       auto pairRev = InstPairType(storeInst, secondStoreInst);
 
       // Instructions are in the same scop: use the result from IndexAnalysis
-      if (functionInfo.sameScop(storeInst, secondStoreInst)) {
+      if (sameScopHelper.sameScop(storeInst, secondStoreInst)) {
         if (indexAnalysis.instWAWlist.count(pair) > 0)
           depPairList.push_back(pair);
         else if (indexAnalysis.instWAWlist.count(pairRev) > 0)
@@ -794,11 +800,14 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
       processScop(*scop, scopMetaInfos);
   }
 
-  PartitionMemoryAccessesByScopHelper functionInfo;
+  SameScopHelper sameScopHelper;
 
   for (auto &bb : llvmFunction) {
     int scopId = indexAnalysis.getScopID(&bb);
-    bool isInScop = indexAnalysis.isInScop(&bb);
+    // NOTE: If the BB is not in the scop, then we use alias analysis to check
+    // if they ever collide.
+    if (not indexAnalysis.isInScop(&bb))
+      continue;
     for (auto &inst : bb) {
       if (!inst.mayReadOrWriteMemory())
         continue;
@@ -807,22 +816,14 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
                         "a call instruction!\n";
         continue;
       }
-
-      // NOTE: In legacy dynamatic here uses mayReadFromMemory and
-      // mayWriteToMemory, which I think is quite redundant for our need
-      if (isa<llvm::LoadInst>(&inst))
-        functionInfo.loadInsts.emplace_back(&inst);
-      if (isa<llvm::StoreInst>(&inst))
-        functionInfo.storeInsts.emplace_back(&inst);
-      if (isInScop)
-        functionInfo.instToScopId[&inst] = scopId;
+      sameScopHelper.instToScopId[&inst] = scopId;
     }
   }
 
   auto nameMapping = nameAllLoadStores(llvmFunction);
 
   std::map<Instruction *, LLVMMemDependency> deps;
-  for (auto &[src, dst] : getDependencyPairs(functionInfo)) {
+  for (auto &[src, dst] : getDependencyPairs(llvmFunction, sameScopHelper)) {
     assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
     if (deps.count(src) == 0) {
       LLVMMemDependency newDep;
