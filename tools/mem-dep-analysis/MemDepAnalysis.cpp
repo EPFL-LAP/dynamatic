@@ -583,7 +583,12 @@ bool equalBase(Instruction *a, Instruction *b) {
 
 namespace {
 
-struct FunctionInfo {
+/// This struct holds all the needed information for extracting the dependencies
+/// between loops and stores.
+/// - `instToScopId` maps the load and store instructions to different scops.
+/// More precise analysis can be done if loads and stores are in the same scop.
+/// - `loadInsts`, `storeInsts`: set of memory accesses.
+struct PartitionMemoryAccessesByScopHelper {
   std::map<Instruction *, int> instToScopId;
   std::vector<Instruction *> loadInsts;
   std::vector<Instruction *> storeInsts;
@@ -617,7 +622,7 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
   /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
   /// or WAW conflict.
   std::vector<InstPairType>
-  getDependencyPairs(const FunctionInfo &functionInfo);
+  getDependencyPairs(const PartitionMemoryAccessesByScopHelper &functionInfo);
   std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
 };
 
@@ -698,8 +703,8 @@ void MemDepAnalysisPass::processScop(Scop &scop,
   scopMeta.push_back(meta);
 }
 
-std::vector<InstPairType>
-MemDepAnalysisPass::getDependencyPairs(const FunctionInfo &functionInfo) {
+std::vector<InstPairType> MemDepAnalysisPass::getDependencyPairs(
+    const PartitionMemoryAccessesByScopHelper &functionInfo) {
   std::vector<InstPairType> depPairList;
   for (auto *storeInst : functionInfo.storeInsts) {
     // Find RAW dependencies
@@ -787,7 +792,7 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
       processScop(*s, scopMetaInfos);
   }
 
-  FunctionInfo functionInfo;
+  PartitionMemoryAccessesByScopHelper functionInfo;
 
   for (auto &bb : f) {
     int scopId = indexAnalysis.getScopID(&bb);
