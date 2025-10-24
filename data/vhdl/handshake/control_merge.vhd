@@ -28,25 +28,8 @@ entity control_merge is
 end entity;
 
 architecture arch of control_merge is
-  signal index_internal : std_logic_vector(INDEX_TYPE - 1 downto 0);
 begin
-  control : entity work.control_merge_dataless
-    generic map(
-      SIZE        => SIZE,
-      INDEX_TYPE  => INDEX_TYPE
-    )
-    port map(
-      clk         => clk,
-      rst         => rst,
-      ins_valid   => ins_valid,
-      ins_ready   => ins_ready,
-      outs_valid  => outs_valid,
-      outs_ready  => outs_ready,
-      index       => index_internal,
-      index_valid => index_valid,
-      index_ready => index_ready
-    );
-
-  index <= index_internal;
-  outs  <= ins(to_integer(unsigned(index_internal)));
+  assert false
+  report "control_merge implementation with data signal has a bug. Use beta backend instead"
+  severity failure;
 end architecture;
