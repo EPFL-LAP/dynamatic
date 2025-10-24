@@ -1,22 +1,22 @@
 # GSA Analysis
 ## Introduction
-In Static Single Assignment (SSA) form, every variable is assigned exactly once, and ϕ (phi) functions are introduced to merge values coming from different control flow paths. While SSA is powerful, it does not explicitly encode the control-flow decisions that determine which value is actually chosen at runtime.
+In Static Single Assignment (SSA) form, every variable is assigned exactly once, and ϕ (phi) functions are introduced to merge values coming from different control flow paths. While SSA is powerful, it does not explicitly encode the control flow decisions that determine which value is actually chosen at runtime.
 
-**Gated Single Assignment (GSA)** was introduced as an extension of SSA to make these control-flow decisions explicit. Instead of a single generic ϕ merge, GSA introduces specialized gates:
-- The **μ (mu) gate** appears at loop headers. It chooses between an initial value coming from outside the loop and a value produced inside the loop. The decision is driven by the loop’s condition: if the loop is starting, the initial value is used; if the loop is iterating, the loop value is used.
-- The **γ (gamma) gate** replaces a ϕ at control-flow merges. It selects between a true value and a false value depending on a condition signal (like at the end of an if–else). In hardware, this becomes a multiplexer.
+**Gated Single Assignment (GSA)** was introduced as an extension of SSA to make these control flow decisions explicit. Instead of a single generic ϕ merge, GSA introduces specialized gates:
+- The **μ (mu) gate** appears at loop headers. It chooses between an initial value coming from outside the loop and a value produced inside the loop. The decision is driven by the loop’s condition: if the loop is starting, the initial value is used; if the loop is iterating, the loop value is used. In hardware, it is translated into a multiplexer, and its condition is driven through an INIT.
+- The **γ (gamma) gate** appears at the confluence point of an if–else structure. It selects between a true value and a false value depending on a condition signal. In hardware, this maps to a multiplexer controlled by the block’s branching condition.
 
-For Dynamatic’s **Fast Token Delivery (FTD)** algorithm, having the program represented in GSA form is required. The MLIR cf dialect already provides ϕ-gates in SSA form, but these must be translated into their GSA equivalents. During this translation, every block argument(pottential ϕ) in the control-flow is rewritten as either a μ or a γ gate.
+For Dynamatic’s **Fast Token Delivery (FTD)** algorithm, having the program represented in GSA form is required. The MLIR cf dialect already provides ϕ-gates in SSA form, but these must be translated into their GSA equivalents. During this translation, every block argument (i.e., potential ϕ) in the control flow is rewritten as either a μ or a γ gate.
 
 ### Example
-Consider the following control-flow graph and its corresponding `cf_dyn_transformed.mlir` code.
+Consider the following control flow graph and its corresponding `cf_dyn_transformed.mlir` code.
 - bb1 and bb3 both receive arguments from multiple predecessors. Implicit ϕ-gates are therefore placed in these blocks.
 
 - The first argument of bb1 (%0) chooses between the initial value %c0 from bb0 and the loop-carried value %8 from bb3. This corresponds to a μ function.
 
 - The second argument of bb1 (%1) is also updated inside the loop, so it too becomes a μ function.
 
-- The argument of bb3 (%7) comes from two mutually exclusive control-flow paths (bb1 or bb2). This corresponds to a γ function.
+- The argument of bb3 (%7) comes from two mutually exclusive control flow paths (bb1 or bb2). This corresponds to a γ function.
 
 ![if_loop_add_CFG](./Figures/if_loop_add_CFG.png)
 
@@ -94,7 +94,11 @@ For each block in the region:
       If `operands` is not empty (the ϕ has at least one input):
         → create the ϕ gate and associate it with the block.
 ```
-After all ϕ gates are created, the final step is to connect the missing inputs recorded in phisToConnect. 
+After all ϕ gates are created (i.e., all block arguments have been explored), we are guaranteed that every ϕ producing inputs for a missing ϕ has now been generated.
+
+At this stage, all missing ϕs have been recorded, and their corresponding source ϕs exist.Therefore, the final step is to reconnect these missing ϕs to their proper sources.
+
+The definition of a “missing ϕ” is explained next.
 
 ### What is a “missing phi”?
 The input of a ϕ gate can itself be another ϕ. This happens when the input comes from a block argument of another block (excluding bb0). In this case, the ϕ input cannot be connected immediately. Instead, it is marked as missing and the necessary information is stored. After all ϕ gates are extracted, these missing inputs are revisited and the connections are reconstructed.
@@ -121,7 +125,7 @@ These two helper functions avoid recording duplicate inputs for a ϕ.
 
   If these conditions hold, we treat them as the same missing ϕ input. As with values, we don’t add a new entry; instead, we **update the sender list** of the existing one to include the current predecessor.
 
-In both cases, the key idea is: a duplicate input means the same logical operand is reachable through multiple control-flow edges, so we reuse the operand and just record the extra senders.
+In both cases, the key idea is: a duplicate input means the same logical operand is reachable through multiple control flow edges, so we reuse the operand and just record the extra senders.
 
 ## Convert ϕ Gates into μ Gates
 
@@ -168,6 +172,8 @@ Therefore, the condition of a μ gate is defined as the **negation of the loop e
 #### Note:
 The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
 
+This OR-ing occurs between operations that produce different token counts; therefore, it is implemented in the **FTDConversion** pass using **Shannon’s expansion**.
+
 ## Convert ϕ Gates into γ Gates
 
 All remaining ϕ gates (i.e., those not turned into μ gates) must be converted into γ gates.
@@ -175,7 +181,7 @@ However, a single γ gate is only a **two-input multiplexer**, while a ϕ can ha
 To handle this, we build a tree of γ gates, each driven by a simple condition.
 The following steps describe the process.
 
-### Input Ordering
+### Step 1. Input Ordering
 The inputs of a ϕ are sorted based on the dominance relationship between their originating basic blocks.
 
 - If block Bi dominates block Bj, then the input from Bi is placed before Bj.
@@ -185,7 +191,8 @@ The inputs of a ϕ are sorted based on the dominance relationship between their 
 ### Step 2. Find Common Dominator
 
 Find **the nearest common dominator** among all input blocks of the ϕ.
-This block acts as the root for path exploration.
+
+This block will be used as the root for path exploration in the next step.
 
 ### Step 3. Path Identification
 
@@ -193,11 +200,11 @@ For each input operand:
 
 - Find all paths from the common dominator to the ϕ’s block that **pass through the operand’s block** but **avoid later operand blocks**.
 
-- Paths are explored using a modified DFS that:
+- Paths are explored using a modified DFS function that:
 
   - finds all possible paths between two blocks,
 
-  - avoids certain “blocked” nodes,
+  - avoids certain blocks,
 
   - and allows a block to be revisited only if it is both the start and end (for loop cases).
 
@@ -229,7 +236,7 @@ The process works as follows:
 
 **1. Pick a cofactor (condition):**
 
-The function starts from the queue of cofactors (Boolean conditions associated with blocks). Since they are ordered by block index, the first cofactor we take is guaranteed to be common to all input expressions (because the blocks associated with it dominate the others). This ensures that splitting on this cofactor applies consistently across all inputs.
+The function starts from the queue of cofactors (i.e., the Boolean conditions collected and sorted in the previous step). Since they are ordered by block index, the first cofactor we take is guaranteed to be common to all input expressions (because the blocks associated with it dominate the others). This ensures that splitting on this cofactor applies consistently across all inputs.
 
 **2. Split expressions by condition:**
 
@@ -245,11 +252,13 @@ For each input expression (operand + condition):
 
 Now we decide what should feed the true and false inputs of the γ gate being built:
 
-- If a side has **more than one expression**, this means multiple operands could be selected under that branch of the condition. To resolve this, we recursively call `expandGammaTree` on that subset. The resulting γ gate from the recursion becomes the input of the current γ.
+- For each condition outcome (`conditionsTrueExpressions` or `conditionsFalseExpressions`), check how many expressions it contains.
 
-- If a side has `exactly one expression`, its operand is directly assigned as the input of the current γ.
+- If it contains **more than one expression**, this means multiple operands could be selected under that branch of the condition. To resolve this, we recursively call `expandGammaTree` on that subset. The resulting γ gate from the recursion becomes the input of the current γ.
 
-- If a side has `no expressions`, it means this branch of the condition is never taken. In that case, an empty (null) input is created.
+- If it contains `exactly one expression`, its operand is directly assigned as the input of the current γ.
+
+- If it contains `no expressions`, that outcome of the condition is never taken, and an empty input is created.
 
 **4. Create the γ gate:**
 
@@ -259,7 +268,7 @@ A new γ is generated:
 
 - Its condition is the cofactor currently being expanded.
 
-- Internally, its output is temporarily set to the original ϕ’s result (only the root γ of the tree will preserve this).
+- Internally, its output is temporarily set to the original ϕ’s result. If the γ is not the root, this output will later become a “true” or “false” input of another γ, and the connection is updated when that parent γ is created.
 
 **5. Placement rule:**
 
