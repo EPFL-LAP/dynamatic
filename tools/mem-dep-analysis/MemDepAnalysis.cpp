@@ -843,7 +843,6 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &f,
 } // end anonymous namespace
 
 // Register the pass for opt-style loading
-// Important note: you need to enable shared libarary in LLVM to load pass
 // plugin:
 // https://stackoverflow.com/questions/51474188/using-shared-object-so-by-command-opt-in-llvm
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
