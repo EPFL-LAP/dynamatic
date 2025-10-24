@@ -5,7 +5,7 @@ and [CMake's ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html). Fo
 
 ## Introduction
 
-In order to avoid confusion, we introduce the following terminology.
+This is an introduction to the technical aspect of the implementation of integration tests in Dynamatic. In order to avoid confusion, we introduce the following terminology.
 
 A **benchmark** is a piece of .c code, commonly called a *kernel*, which is written in order to be compiled by Dynamatic into a HDL representation of a dataflow circuit. Benchmarks are located in the `integration-test` folder. We also say that benchmarks are *testing resources*, since they are files used for testing Dynamatic and verifying its correct behaviour".
 
@@ -38,7 +38,6 @@ All code related to integration testing is located in `tools/integration`.
 - `util.cpp` and `util.h` contain helper functions for running integration tests. 
 - `TEST_SUITE.cpp` contains the actual tests. For more details, [see below](#googletest-basics).
 - `generate_perf_report.py` is a script which reads the results of testing and generates a performance (in terms of cycle count) report in .md format.
-- `run_integration.py`, `run_spec_integration.py` and `ignored_tests.txt` are leftovers from the old testing setup which didn't rely on GoogleTest. Even though they are unused, they are left here as reference if any problems arise with the current setup. `run_integration.py` was used to run all benchmarks with the basic flow, except the ones listed in `ignored_tests.txt`. `run_spec_integration.py` was used to run benchmarks with a custom flow which used the speculation feature. It was replaced with the new setup because GoogleTest is a standard framework that people might be familiar with already, is very well documented and writing different tests with it is simpler than extending a custom script.
 
 ## GoogleTest basics
 
