@@ -446,11 +446,11 @@ public:
     // Always use the same random seed to make the solution deterministic.
     env->set(GRB_IntParam::GRB_IntParam_Seed, 0);
 
-    env->start();
-
     if (timeout > 0) {
       env->set(GRB_DoubleParam_TimeLimit, timeout);
     }
+
+    env->start();
 
     model = std::make_unique<GRBModel>(*env);
   }
