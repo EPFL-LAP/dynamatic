@@ -82,27 +82,4 @@ def HandshakeToHW
   let constructor = "dynamatic::createHandshakeToHWPass()";
 }
   
-//===----------------------------------------------------------------------===//
-// LLVMToControlFlow
-//===----------------------------------------------------------------------===//
-
-def LLVMToControlFlow : Pass<"convert-llvm-to-cf"> {
-  let summary = "Converts LLVM to ControlFlow dialect";
-  let description = [{ }];
-
-  let options =
-    [
-      Option<"source", "source", "std::string", "",
-            "Path to source C file from which the IR was generated.">,
-      Option<"dynamatic_path", "dynamatic-path", "std::string", "",
-            "Path to the dynamatic directory. This is needed to include Dynamatic-specific headers.">,
-    ];
-
-  let dependentDialects = [
-  "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
-  "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
-  "mlir::index::IndexDialect"];
-
-}
-
 #endif // DYNAMATIC_CONVERSION_PASSES_TD
