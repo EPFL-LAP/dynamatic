@@ -621,8 +621,6 @@ public:
   CbcSolver(int timeout = -1 /* default = no timeout */)
       : CPSolver(timeout, CBC) {
     // Suppress the solver's output
-    //
-    //
     solver.messageHandler()->setLogLevel(-1);
     solver.getModelPtr()->messageHandler()->setLogLevel(-1);
   }
@@ -724,6 +722,8 @@ public:
     if (this->timeout > 0) {
       model.setMaximumSeconds(timeout);
     }
+
+    model.setRandomSeed(0);
 
     model.branchAndBound();
 
