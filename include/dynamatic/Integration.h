@@ -156,9 +156,19 @@ std::string formatElement(const T &element) {
     // A char can be directly printed as a integer (i.e., its ASCII code)
     oss << int(element);
   } else if constexpr (__is_integral(T) && !std::is_same_v<T, bool>) {
-    // Fallback case for the other integral types (e.g., _BitInt(N) introduced
-    // in C23). In this case, we simply cast it to "long long"
+    // NOTE: __is_integral() is a type trait in the clang extension.
+    // (https://clang.llvm.org/docs/LanguageExtensions.html#type-trait-primitives)
+    //
+    // NOTE: This is a fallback case for the other integral types (e.g.,
+    // _BitInt(N) introduced in C23). In this case, we simply cast it to "long
+    // long"
+    //
     // TODO: maybe check if "long long" actually fits the value?
+    //
+    // TODO: the clang website says that __is_integral() should not be used by
+    // the user code as they are subject to change. For safety reason, maybe we
+    // could add some unittests to make sure that __is_integral(_BitInt(N) var)
+    // always evaluates to `true` (and also for other gcc/clang type traits)?
     oss << static_cast<long long>(element);
   } else {
     static_assert(always_false<T>, "Unsupported type!");
