@@ -134,7 +134,7 @@ unsupported types may work on local variables without any compilation errors.
 > [!NOTE]  
 > Arrays of supported data types are also supported as function parameters
 
-| data type                     | Supported |
+| Data type                     | Supported |
 |-------------------------------|-----------|
 | unsigned                      | ✓         |
 | int32_t / int16_t / int8_t    | ✓         |
