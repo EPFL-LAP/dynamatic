@@ -157,12 +157,39 @@ $LLVM_BINS/opt -S \
 
 # Clean up the index calculation logic inserted by the array-partition pass
 $LLVM_BINS/opt -S \
-  -passes="instcombine,sroa" \
+  -passes="sroa,instcombine,simplifycfg" \
   $OUT/clang_array_partitioned.ll \
   > $OUT/clang_array_partitioned_cleaned.ll
 
+# TODO: AVOID THIS HACK!
+# Module cleanup (cleans global variables that are not used). 
+# This allows lowering to .mlir
+# for some reason, the llvm passes decide to do this sometimes: 
+# they have a packed array [32x [21 x i32]] 
+# and write it as [21 x i32]...<{ [10 x i32], [11 x i32] }>,...[21 x i32] . 
+# And this makes the translate-llvm-to-std fail. I suppose this is done to better pack the bits.
+awk '
+  function countc(s,c,  n,i){n=0; for(i=1;i<=length(s);i++) if(substr(s,i,1)==c) n++; return n}
+  BEGIN{del=0; depth=0}
+  {
+    if(!del){
+      # start when we see a global definition with "constant" and a packed struct marker "<{"
+      if ($0 ~ /^@[^ ]+ = .* constant .*<\{/){
+        del=1
+        depth = countc($0,"<") - countc($0,">")   # account for both the type and initializer on this line
+        next
+      }
+      print
+    } else {
+      depth += countc($0,"<") - countc($0,">")
+      if (depth <= 0){ del=0; next }              # drop the closing line too
+    }
+  }
+' "$OUT/clang_array_partitioned_cleaned.ll" > "$OUT/clang_array_partitioned_module_cleaned.ll"
+
+
 $DYNAMATIC_BINS/translate-llvm-to-std \
-  "$OUT/clang_array_partitioned_cleaned.ll" \
+  "$OUT/clang_array_partitioned_module_cleaned.ll" \
   -function-name "$FUNC_NAME" \
   -csource "$F_SRC" \
   -dynamatic-path "$DYNAMATIC_PATH" \
