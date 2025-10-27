@@ -148,7 +148,7 @@ These types are most crucial when dealing with function parameters. Some of the 
 
 > [!NOTE]
 > The `_BitInt(N)` is a bit-percise integer type introduced in C23. We can use
-> it to represent integer with arbitrary width, e.g., a 18-bit integer.
+> it to represent integers with arbitrary width, e.g., a 18-bit integer.
 >
 > Example:
 > 
