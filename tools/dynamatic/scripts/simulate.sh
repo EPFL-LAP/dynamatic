@@ -81,7 +81,7 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
 
 # Simulate and verify design
-echo_info "Launching simulation"
+echo_info "Launching simulation ($SIMULATOR_NAME)"
 cd "$HLS_VERIFY_DIR"
 if [ "$VIVADO_FPU" = "true" ]; then
   "$HLS_VERIFIER_BIN" \

@@ -10,8 +10,9 @@
 #ifndef HLS_VERIFIER_SIMULATORS_H
 #define HLS_VERIFIER_SIMULATORS_H
 
+#include "HlsLogging.h"
 #include "VerificationContext.h"
-#include <iostream>
+#include "dynamatic/Support/System.h"
 
 static const string LOG_TAG = "HLS_VERIFIER";
 
@@ -27,6 +28,7 @@ class Simulator {
 protected:
   VerificationContext *ctx;
   virtual std::string setSimulationCommand() const = 0;
+  virtual void execSimCommand() const = 0;
 
 public:
   std::string simulationCommand;
@@ -40,7 +42,7 @@ public:
   void execSimulation() {
     std::string command = setSimulationCommand();
     logInf(LOG_TAG, "Executing Simulator: [" + command + "]");
-    executeCommand(command);
+    execSimCommand();
   };
 };
 
@@ -52,9 +54,19 @@ public:
   std::string setSimulationCommand() const override {
     // command to run the XSIM simulation, -prj uses the project file specified
     // in ctx,
-    std::string command = "vitis-2024.2 xelab -prj " +
-                          ctx->getXsimPrjFilePath() + " work.tb -s tb -R";
+    std::string command = "xelab "
+                          "-prj " +
+                          ctx->getXsimPrjFilePath() +
+                          " work.tb "
+                          "-s "
+                          "tb "
+                          "-R";
     return command;
+  }
+
+  void execSimCommand() const override {
+    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "-s", "tb",
+         "-R");
   }
 
   void generateScripts() const override {
@@ -80,25 +92,48 @@ public:
   GHDLSimulator(VerificationContext *context) : Simulator(context) {}
 
   std::string setSimulationCommand() const override {
-    // command to run the XSIM simulation, -prj uses the project file specified
-    // in ctx,
     std::string command = "bash " + ctx->getGhdlShFilePath();
     return command;
   }
 
+  void execSimCommand() const override {
+    exec("bash", ctx->getGhdlShFilePath());
+  }
+
   void generateScripts() const override {
+    // [START Example of generated script]
+    // # Imports all design files into the GHDL library. Uses the VHDL-2008
+    // # standard and allows the use of synopsys non-standard packages
+    // ghdl -i --std=08 -fsynopsys
+    // /data/dynamatic/integration-test/fir/out/sim/HDL_SRC/addi.vhd
+    // ...
+    // ghdl -i --std=08 -fsynopsys
+    // data/dynamatic/integration-test/fir/out/sim/HDL_SRC/oebh.vhd
+    //
+    // # Compiles the design in the correct compilation order, and relaxes "
+    // # some rules to only cause warnings instead of errors
+    // ghdl -m --std=08 -fsynopsys -frelaxed tb
+    //
+    // # Runs the Simulation with top-level unit tb
+    // ghdl -r --std==08 -fsynopsys tb
+    //
+    // # Exits the script
+    // exit 0
+    // [End Example of generated script]
+
     vector<string> filelistVhdl =
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".vhd");
 
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getGhdlShFilePath(), ec);
 
-    // Flag explenation:
+    // [Start Flag explanation]
     //  --std=08 : use the VHDL-2008 standard for compilation
     //  -fsynopsys : allow the use of synopsys non-standard packages
     //  (e.g.std_logic_arith, std_logic_signed, etc.). These packages would
     //  otherwise produce an error. -frelaxed : generates warining instead of
     //  errors
+    // [End Flag explanation]
 
     // We only import VHDL files (.vhd and .vhdl) because GHDL does not work
     // with Verilog files (.v)
@@ -106,17 +141,16 @@ public:
           "VHDL-2008 standard and allows the use of synopsys non-standard "
           "packages\n";
     for (auto &it : filelistVhdl)
-      os << "/home/dschober/ghdl/bin/ghdl -i --std=08 -fsynopsys " << it
-         << "\n";
+      os << "ghdl -i --std=08 -fsynopsys " << it << "\n";
 
     // -m compiles a design in the correct compilation order
     os << "# Compiles the design in the correct compilation order, and relaxes "
           "some rules to only cause warnings instead of errors\n";
-    os << "/home/dschober/ghdl/bin/ghdl -m --std=08 -fsynopsys -frelaxed tb\n";
+    os << "ghdl -m --std=08 -fsynopsys -frelaxed tb\n";
 
     // -r runs the simulation
     os << "# Runs the Simulation with top-level unit tb\n";
-    os << "/home/dschober/ghdl/bin/ghdl -r --std=08 -fsynopsys tb\n";
+    os << "ghdl -r --std=08 -fsynopsys tb\n";
 
     os << "# Exits the script\n";
     os << "exit 0";
@@ -129,10 +163,15 @@ public:
   VSimSimulator(VerificationContext *context) : Simulator(context) {}
 
   std::string setSimulationCommand() const override {
-    // command to run the XSIM simulation, -prj uses the project file specified
-    // in ctx,
-    std::string command = "vsim -c -do " + ctx->getModelsimDoFilePath();
+    std::string command = "vsim "
+                          "-c "
+                          "-do " +
+                          ctx->getModelsimDoFilePath();
     return command;
+  }
+
+  void execSimCommand() const override {
+    exec("vsim", "-c", "-do", ctx->getModelsimDoFilePath());
   }
 
   void generateScripts() const override {

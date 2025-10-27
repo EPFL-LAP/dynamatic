@@ -703,17 +703,14 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string simulator = "ghdl";
+  std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
 
   if (auto it = args.options.find(SIMULATOR); it != args.options.end()) {
-    if (it->second == "vsim") {
-      simulator = "vsim";
-    } else if (it->second == "xsim") {
-      simulator = "xsim";
-    } else if (it->second == "verilator") {
-      simulator = "verilator";
-    } else if (it->second != "ghdl") {
+    if (it->second == "vsim" || it->second == "xsim" || it->second == "ghdl" ||
+        it->second == "verilator") {
+      simulator = it->second;
+    } else {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
                       "'xsim', and 'vsim' and 'verilator'.\n";
