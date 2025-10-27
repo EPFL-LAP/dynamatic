@@ -439,12 +439,18 @@ public:
   GurobiSolver(int timeout = -1 /* default = no timeout*/)
       : CPSolver(timeout, GUROBI) {
     env = std::make_unique<GRBEnv>(true);
+
+    // Suppress outputs to stdout (clashes with the MLIR output file).
     env->set(GRB_IntParam_OutputFlag, 0);
-    env->start();
+
+    // Always use the same random seed to make the solution deterministic.
+    env->set(GRB_IntParam::GRB_IntParam_Seed, 0);
 
     if (timeout > 0) {
       env->set(GRB_DoubleParam_TimeLimit, timeout);
     }
+
+    env->start();
 
     model = std::make_unique<GRBModel>(*env);
   }
@@ -615,8 +621,6 @@ public:
   CbcSolver(int timeout = -1 /* default = no timeout */)
       : CPSolver(timeout, CBC) {
     // Suppress the solver's output
-    //
-    //
     solver.messageHandler()->setLogLevel(-1);
     solver.getModelPtr()->messageHandler()->setLogLevel(-1);
   }
@@ -718,6 +722,8 @@ public:
     if (this->timeout > 0) {
       model.setMaximumSeconds(timeout);
     }
+
+    model.setRandomSeed(0);
 
     model.branchAndBound();
 
