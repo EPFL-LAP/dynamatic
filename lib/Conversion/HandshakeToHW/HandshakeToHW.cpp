@@ -751,6 +751,18 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
         addUnsigned("SIZE", resType.getNumElements());
       })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr =
+            initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+        if (paramsAttr) {
+          auto initTokenAttr =
+              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+          int initialValue =
+              (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else
+          addUnsigned("INITIAL_VALUE", 0);
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -2115,6 +2127,7 @@ public:
         ConvertToHWInstance<handshake::MuxOp>,
         ConvertToHWInstance<handshake::JoinOp>,
         ConvertToHWInstance<handshake::BlockerOp>,
+        ConvertToHWInstance<handshake::InitOp>,
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,

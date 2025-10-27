@@ -28,6 +28,8 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 
+bool useInit = true;
+
 /// Different types of loop suppression.
 enum BranchToLoopType {
 
@@ -750,15 +752,28 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                                           cstAttr, startValue);
     constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
+    Operation *initOp;
+    if (useInit)
+      initOp = rewriter.create<handshake::InitOp>(consumerOp->getLoc(),
+                                                  conditionValue);
+    else {
+      SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
+      initOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+                                                   mergeOperands);
+    }
+
+    initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
     // Create the `init` operation
-    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+    // SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
+    // auto initMergeOp =
+    // rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+    //                                                        mergeOperands);
+    // initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
-    auto selectSignal = initMergeOp.getResult();
+    auto selectSignal = initOp->getResult(0);
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
@@ -1269,28 +1284,53 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // The inputs of the merge are the condition value and a `false`
         // constant driven by the start value of the function. This will
         // created later on, so we use a dummy value.
-        SmallVector<Value> mergeOperands;
-        mergeOperands.push_back(conditionValue);
-        mergeOperands.push_back(conditionValue);
+        // SmallVector<Value> mergeOperands;
+        // mergeOperands.push_back(conditionValue);
+        // mergeOperands.push_back(conditionValue);
 
-        auto initMergeOp =
-            rewriter.create<handshake::MergeOp>(loc, mergeOperands);
+        // auto initMergeOp =
+        //     rewriter.create<handshake::MergeOp>(loc, mergeOperands);
 
-        initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        Operation *initOp;
+        if (useInit)
+          initOp = rewriter.create<handshake::InitOp>(loc, conditionValue);
+        else {
+          // The inputs of the merge are the condition value and a `false`
+          // constant driven by the start value of the function. This will
+          // created later on, so we use a dummy value.
+          SmallVector<Value> mergeOperands;
+          mergeOperands.push_back(conditionValue);
+          mergeOperands.push_back(conditionValue);
+
+          initOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
+
+          // Add the activation constant driven by the backedge value, which
+          // will
+          // be then updated with the real start value, once available
+          auto cstType = rewriter.getIntegerType(1);
+          auto cstAttr = IntegerAttr::get(cstType, 0);
+          rewriter.setInsertionPointToStart(initOp->getBlock());
+          auto constOp = rewriter.create<handshake::ConstantOp>(
+              initOp->getLoc(), cstAttr, startValue);
+          constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+          initOp->setOperand(0, constOp.getResult());
+        }
+
+        initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
         // Replace the new condition value
-        conditionValue = initMergeOp->getResult(0);
+        conditionValue = initOp->getResult(0);
         conditionValue.setType(channelifyType(conditionValue.getType()));
 
         // Add the activation constant driven by the backedge value, which will
         // be then updated with the real start value, once available
-        auto cstType = rewriter.getIntegerType(1);
-        auto cstAttr = IntegerAttr::get(cstType, 0);
-        rewriter.setInsertionPointToStart(initMergeOp->getBlock());
-        auto constOp = rewriter.create<handshake::ConstantOp>(
-            initMergeOp->getLoc(), cstAttr, startValue);
-        constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-        initMergeOp->setOperand(0, constOp.getResult());
+        // auto cstType = rewriter.getIntegerType(1);
+        // auto cstAttr = IntegerAttr::get(cstType, 0);
+        // rewriter.setInsertionPointToStart(initMergeOp->getBlock());
+        // auto constOp = rewriter.create<handshake::ConstantOp>(
+        //     initMergeOp->getLoc(), cstAttr, startValue);
+        // constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        // initMergeOp->setOperand(0, constOp.getResult());
       }
 
       // When a single input gamma is encountered, a mux is inserted as a

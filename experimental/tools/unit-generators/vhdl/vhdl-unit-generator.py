@@ -132,5 +132,10 @@ if __name__ == "__main__":
     generators.add("handshake", "remsi")
     generators.add("handshake", "ram")
     generators.add("handshake", "sharing_wrapper")
+    generators.add("handshake", "init")
+
+    # print("HELLO AYA\n")
+    # print(generators._data)
+    # print("BYE AYA\n")
 
     main(generators)

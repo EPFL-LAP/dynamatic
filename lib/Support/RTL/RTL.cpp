@@ -319,7 +319,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.non_spec") {
+      handshakeOp == "handshake.non_spec" || handshakeOp == "handshake.init") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (handshakeOp == "handshake.cond_br" ||
@@ -444,7 +444,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       // the first input has extra signals
       handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
-      handshakeOp == "handshake.speculating_branch") {
+      handshakeOp == "handshake.speculating_branch" ||
+      handshakeOp == "handshake.init") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
   } else if (handshakeOp == "handshake.source" ||
