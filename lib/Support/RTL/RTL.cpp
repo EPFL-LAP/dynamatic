@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -305,12 +306,14 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.merge" || handshakeOp == "handshake.muli" ||
       handshakeOp == "handshake.sink" || handshakeOp == "handshake.subi" ||
       handshakeOp == "handshake.shli" || handshakeOp == "handshake.blocker" ||
-      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.uitofp" || handshakeOp == "handshake.sitofp" ||
+      handshakeOp == "handshake.fptosi" ||
       handshakeOp == "handshake.rigidifier" || handshakeOp == "handshake.ori" ||
       handshakeOp == "handshake.shrsi" || handshakeOp == "handshake.xori" ||
       handshakeOp == "handshake.negf" || handshakeOp == "handshake.divsi" ||
       handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.shrui" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
       // the first input has data bitwidth
       handshakeOp == "handshake.speculator" ||
       handshakeOp == "handshake.spec_commit" ||
@@ -389,6 +392,16 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              handshakeOp == "handshake.minimumf" ||
              handshakeOp == "handshake.join") {
     // Skip
+  } else if (handshakeOp == "handshake.ram") {
+    // NOTE: this port order is currently hardcoded in HandshakeToHW.cpp
+    // Input 0: loadEn
+    // Input 1: loadAddr
+    // Input 2: storeEn
+    // Input 3: storeAddr
+    // Input 4: storeData
+    // Output 0: loadData
+    serializedParams["ADDR_WIDTH"] = getBitwidthString(modType.getInputType(1));
+    serializedParams["DATA_WIDTH"] = getBitwidthString(modType.getInputType(4));
   } else {
     modOp->emitError("Failed to get bitwidth of operation");
     return failure();
@@ -417,8 +430,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.speculator" ||
       handshakeOp == "handshake.trunci" || handshakeOp == "handshake.mux" ||
       handshakeOp == "handshake.control_merge" ||
-      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.sitofp" ||
-      handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
       handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
       handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
       handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
@@ -427,6 +440,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
       handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
       handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
       // the first input has extra signals
       handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
@@ -439,7 +453,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
         serializeExtraSignals(modType.getOutputType(0));
   } else if (handshakeOp == "handshake.mem_controller" ||
              handshakeOp == "mem_to_bram" || handshakeOp == "handshake.lsq" ||
-             handshakeOp == "handshake.sharing_wrapper") {
+             handshakeOp == "handshake.sharing_wrapper" ||
+             handshakeOp == "handshake.ram") {
     // Skip
   } else {
     modOp.emitError("Failed to get extra signals of operation");
