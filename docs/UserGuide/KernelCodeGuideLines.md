@@ -132,18 +132,32 @@ These types are most crucial when dealing with function parameters. Some of the 
 > [!NOTE]  
 > Arrays of supported data types are also supported as function parameters
 
-| buffer algorithm/data type | Supported
-|---|---|
-|unsigned | ✓ |
-|int32_t / int16_t / int8_t|✓|
-|uint32_t / uint16_t / uint8_t|✓|
-|char / unsigned char | ✓|
-|short|✓|
-|float|✓|
-|double|✓|
-|long/long long/long double | x|
-|uint64_t / int64_t | x |
-__int128|x|
+| buffer algorithm/data type    | Supported |
+|-------------------------------|-----------|
+| unsigned                      | ✓         |
+| int32_t / int16_t / int8_t    | ✓         |
+| uint32_t / uint16_t / uint8_t | ✓         |
+| char / unsigned char          | ✓         |
+| short                         | ✓         |
+| float                         | ✓         |
+| double                        | ✓         |
+| _BitInt(N)                    | ✓         |
+| long/long long/long double    | x         |
+| uint64_t / int64_t            | x         |
+| __int128                      | x         |
+
+> [!NOTE]
+> The `_BitInt(N)` is a bit-percise integer type introduced in C23. We can use
+> it to represent arbitrary precisions, e.g., a 18-bit integer.
+>
+> Example:
+> 
+> ```c
+> _BitInt(7) foo = 3;
+> signed _BitInt(19) bar = -17;
+> ```
+> 
+> Dynamatic support this datatype in both synthesis and C-to-RTL co-simulation.
 
 ### Supported Operations
 - Arithmetic operations: `+`, `-`, `*`, `/`, `++`, `--`.  

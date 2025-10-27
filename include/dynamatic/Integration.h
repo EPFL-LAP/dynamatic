@@ -156,6 +156,18 @@ std::string formatElement(const T &element) {
     // A char can be directly printed as a integer (i.e., its ASCII code)
     oss << int(element);
   } else if constexpr (__is_integral(T) && !std::is_same_v<T, bool>) {
+    // This is for the bit-precise integer type "_BitInt(N)" introduced in C23
+    // standard. We can use it to represent integer with arbitrary precisions
+    // e.g., a 18-bit integer.
+    //
+    // Example:
+    //
+    // _BitInt(7) foo = 3;
+    // signed _BitInt(19) bar = -16;
+    //
+    // Please checkout also the detailed documentation.
+    // https://en.cppreference.com/w/c/language/arithmetic_types.html
+    //
     // NOTE: __is_integral() is a type trait in the clang extension.
     // (https://clang.llvm.org/docs/LanguageExtensions.html#type-trait-primitives)
     //
