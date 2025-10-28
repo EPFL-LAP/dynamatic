@@ -321,12 +321,18 @@ public:
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral SIMULATOR = "simulator";
+
   Simulate(FrontendState &state)
       : Command("simulate",
-                "Simulates the VHDL produced during HDL writing using Modelsim "
+                "Simulates the VHDL produced during HDL writing using a "
+                "simulator of choice "
                 "and the hls-verifier tool",
-                state) {}
-
+                state) {
+    addOption({SIMULATOR, "The simulator to use for verification, options are "
+                          "'ghdl' (default option: GHDL), 'vsim' (ModelSim), "
+                          "'xsim' (Vivado), 'verilator' (Verilator)"});
+  }
   CommandResult execute(CommandArguments &args) override;
 };
 
@@ -715,10 +721,25 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
+
+  if (auto it = args.options.find(SIMULATOR); it != args.options.end()) {
+    if (it->second == "vsim" || it->second == "xsim" || it->second == "ghdl" ||
+        it->second == "verilator") {
+      simulator = it->second;
+    } else {
+      llvm::errs() << "Unknow Simulator '" << it->second
+                   << "', possible options are 'ghdl', "
+                      "'xsim', and 'vsim'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
-                 state.fpUnitsGenerator == "vivado" ? "true" : "false");
+                 state.fpUnitsGenerator == "vivado" ? "true" : "false",
+                 simulator);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {

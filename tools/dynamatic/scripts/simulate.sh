@@ -13,6 +13,7 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 VIVADO_PATH=$5
 VIVADO_FPU=$6
+SIMULATOR_NAME=$7
 
 # Generated directories/files
 SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
@@ -80,13 +81,14 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
 
 # Simulate and verify design
-echo_info "Launching Modelsim simulation"
+echo_info "Launching simulation ($SIMULATOR_NAME)"
 cd "$HLS_VERIFY_DIR"
 if [ "$VIVADO_FPU" = "true" ]; then
   "$HLS_VERIFIER_BIN" \
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  --simulator="$SIMULATOR_NAME" \
   --vivado-fpu \
   > "../report.txt" 2>&1
 else
@@ -94,6 +96,7 @@ else
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  --simulator="$SIMULATOR_NAME" \
   > "../report.txt" 2>&1
 fi
 exit_on_fail "Simulation failed" "Simulation succeeded"
