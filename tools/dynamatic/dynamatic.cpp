@@ -713,7 +713,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
     } else {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
-                      "'xsim', and 'vsim' and 'verilator'.\n";
+                      "'xsim', and 'vsim'.\n";
       return CommandResult::FAIL;
     }
   }

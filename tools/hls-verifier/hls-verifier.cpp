@@ -40,6 +40,8 @@ using namespace dynamatic;
 
 static const char SEP = std::filesystem::path::preferred_separator;
 
+static const string LOG_TAG = "HLS_VERIFIER";
+
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   // mlir::raw_indented_ostream &os = ctx.testbenchStream;
@@ -135,8 +137,7 @@ int main(int argc, char **argv) {
       cl::value_desc("vivado-fpu"), cl::init(false));
 
   cl::opt<std::string> simulatorType(
-      "simulator",
-      cl::desc("Simulator of choice (options: xsim, verilator, ghdl, vsim)"),
+      "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
       cl::value_desc("Simulator of choice"), cl::init("ghdl"));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
@@ -192,7 +193,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  simulator->generateScripts();
+  if (failed(simulator->generateScripts())) {
+    logInf(LOG_TAG, "Failed to generate Simulation Script");
+  }
 
   // Run the simulator to simulate the testbench and write the outputs to the
   // VHDL_OUT
