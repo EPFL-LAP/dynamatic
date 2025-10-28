@@ -1,0 +1,96 @@
+name: Build and Test Dynamatic on Ubuntu 22.04
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: jiahui17/dynamatic:latest
+
+    steps:
+      - name: build-push
+        if: github.event_name == 'push'
+        env:
+          GIT_REF: ${{ github.ref_name }}
+          GIT_REPO: https://github.com/${{ github.repository }}.git
+          # Github runner always overrides HOME to "/github/home/". Here we need
+          # to make sure that we only write to writable locations
+          CCACHE_DIR: /home/dynamatic/dynamatic/.ccache
+        run: |
+          echo "Push branch is $GIT_REF"
+          cd /home/dynamatic/dynamatic
+          # Fetch the PR branch
+          git fetch origin "$GIT_REF"
+          # Checkout and reset to the PR branch
+          git checkout -B pr-branch FETCH_HEAD
+          # Update submodules if needed
+          git submodule update --init --recursive
+          ./build.sh -f --release
+
+      - name: build-pr
+        if: github.event_name == 'pull_request'
+        # NOTE: here we cannot use "actions/checkout@v4", because it always
+        # operate on the mounted volume instead of the pre-built Dynamatic
+        # directory in the container.
+        env:
+          GIT_REF: ${{ github.event.pull_request.head.ref }}
+          GIT_REPO: ${{ github.event.pull_request.head.repo.clone_url }}
+          # Github runner always overrides HOME to "/github/home/". Here we need
+          # to make sure that we only write to writable locations
+          CCACHE_DIR: /home/dynamatic/dynamatic/.ccache
+        run: |
+          echo "PR branch is $GIT_REF with git url $GIT_REPO"
+          cd /home/dynamatic/dynamatic
+          # Replaces the origin the repo of the PR (it might be a fork)
+          echo "Checking branch $GIT_REF, from repo $GIT_REPO"
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "$GIT_REPO"
+          # Fetch the PR branch
+          git fetch origin "$GIT_REF"
+          # Checkout and reset to the PR branch
+          git checkout -B pr-branch FETCH_HEAD
+          # Update submodules if needed
+          git submodule update --init --recursive
+          ./build.sh -f --release
+
+      - name: check-dynamatic
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja check-dynamatic
+
+      - name: check-dynamatic-experimental
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja check-dynamatic-experimental
+
+      - name: integration-test
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja run-ci-integration-tests
+
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with: 
+          name: integration-report
+          path: |
+            /data/dynamatic/dynamatic/integration-test/*/out*/comp
+            /data/dynamatic/dynamatic/integration-test/*/out*/sim/report.txt
+            /data/dynamatic/dynamatic/integration-test/*/out/dynamatic_out.txt
+            /data/dynamatic/dynamatic/integration-test/*/out/dynamatic_err.txt
+
