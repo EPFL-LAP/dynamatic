@@ -66,16 +66,16 @@ jobs:
         if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
         run: |
           cd /home/dynamatic/dynamatic/build
-          ninja -C build check-dynamatic
+          ninja check-dynamatic
 
       - name: check-dynamatic-experimental
         if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
         run: |
           cd /home/dynamatic/dynamatic/build
-          ninja -C build check-dynamatic-experimental
+          ninja check-dynamatic-experimental
 
       - name: integration-test
         if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
         run: |
           cd /home/dynamatic/dynamatic/build
-          ninja -C build run-ci-integration-tests
+          ninja run-ci-integration-tests
