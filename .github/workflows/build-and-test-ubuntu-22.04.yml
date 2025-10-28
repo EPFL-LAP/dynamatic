@@ -1,4 +1,4 @@
-name: Build on Ubuntu 22.04
+name: Build and Test Dynamatic on Ubuntu 22.04
 
 on:
   # Make sure that settings are set to require permission
@@ -9,6 +9,10 @@ on:
 
   push:
     branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -79,3 +83,14 @@ jobs:
         run: |
           cd /home/dynamatic/dynamatic/build
           ninja run-ci-integration-tests
+
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with: 
+          name: integration-report
+          path: |
+            /data/dynamatic/dynamatic/integration-test/*/out*/comp
+            /data/dynamatic/dynamatic/integration-test/*/out*/sim/report.txt
+            /data/dynamatic/dynamatic/integration-test/*/out/dynamatic_out.txt
+            /data/dynamatic/dynamatic/integration-test/*/out/dynamatic_err.txt
+
