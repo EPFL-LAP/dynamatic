@@ -146,6 +146,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
+# - licm: moving the code outside the loops as much as possible
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
