@@ -149,10 +149,14 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
+#
+# NOTE: There is a detailed overview of what passes are ran by `opt -O3`
+# https://llvm.org/devmtg/2023-05/slides/Tutorial-May10/01-Popov-AWhirlwindTour-oftheLLVMOptimizer.pdf
+# (Slide 26)
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
- -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
+  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
