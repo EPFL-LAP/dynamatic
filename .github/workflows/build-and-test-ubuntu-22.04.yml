@@ -17,7 +17,7 @@ jobs:
       image: jiahui17/dynamatic:latest
 
     steps:
-      - name: Build Dynamatic (push)
+      - name: build-push
         if: github.event_name == 'push'
         env:
           GIT_REF: ${{ github.ref_name }}
@@ -36,7 +36,7 @@ jobs:
           git submodule update --init --recursive
           ./build.sh -f --release
 
-      - name: Build Dynamatic (PR)
+      - name: build-pr
         if: github.event_name == 'pull_request'
         # NOTE: here we cannot use "actions/checkout@v4", because it always
         # operate on the mounted volume instead of the pre-built Dynamatic
@@ -61,3 +61,21 @@ jobs:
           # Update submodules if needed
           git submodule update --init --recursive
           ./build.sh -f --release
+
+      - name: check-dynamatic
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja -C build check-dynamatic
+
+      - name: check-dynamatic-experimental
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja -C build check-dynamatic-experimental
+
+      - name: integration-test
+        if: steps.build-pr.outputs.exit_code == 0 || steps.build-push.outputs.exit_code == 0
+        run: |
+          cd /home/dynamatic/dynamatic/build
+          ninja -C build run-ci-integration-tests
