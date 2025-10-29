@@ -330,7 +330,7 @@ public:
                 "and the hls-verifier tool",
                 state) {
     addOption({SIMULATOR, "The simulator to use for verification, options are "
-                          "'ghdl' (default option: GHDL), 'vsim' (ModelSim), "
+                          "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
                           "'xsim' (Vivado), 'verilator' (Verilator)"});
   }
   CommandResult execute(CommandArguments &args) override;
