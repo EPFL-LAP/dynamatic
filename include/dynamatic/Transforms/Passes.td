@@ -142,7 +142,9 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
     [Option<"NStr", "NStr", "std::string", "\"3\"",
             "Number of comparators">,
     Option<"kernelName", "kernelName", "std::string", "\"histogram\"",
-            "Name">];
+            "Name">,
+    Option<"compDir", "compDir", "std::string", "\"./integration-test/historam/out/comp\"",
+    "compile directory path">];
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
@@ -193,6 +195,9 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     LSQ never happen on the same cycle.   
   }];
   let constructor = "dynamatic::createHandshakeMaterialize()";
+  let options =
+    [Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",
+            "Size of the fifo in the output of each fork">];
 }
 
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
@@ -277,7 +282,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', 'cp'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,

@@ -301,6 +301,7 @@ public:
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
+  static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -315,6 +316,9 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addOption(
+        {FORK_FIFO_SIZE,
+         "Adds buffers with the specified size to the output of every fork"});
     addMultiOption({
         SKIPPABLE_SEQ_N,
         "Number of Comparators in SkippableSeq",
@@ -685,11 +689,12 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string skippableSeqNListString = "none";
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string forkFifoSize = "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
         it->second == "fpl22" || it->second == "costaware" ||
-        it->second == "mapbuf") {
+        it->second == "mapbuf" || it->second == "cpbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
@@ -698,9 +703,15 @@ CommandResult Compile::execute(CommandArguments &args) {
              "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
              "(throughput- and timing-driven buffering), or 'costaware' "
              "(throughput- and area-driven buffering), or 'mapbuf' "
-             "(simultaneous technology mapping and buffer placement).";
+             "(simultaneous technology mapping and buffer placement), or "
+             "'cpbuf' (only buffering for critical path).";
       return CommandResult::FAIL;
     }
+  }
+
+  if (auto it = args.options.find(FORK_FIFO_SIZE); it != args.options.end()) {
+    int val = std::stoi(std::string(it->second));
+    forkFifoSize = std::to_string(val);
   }
 
   if (auto it = args.multiOptions.find(SKIPPABLE_SEQ_N);
@@ -722,7 +733,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, skippableSeqNListString);
+                 fastTokenDelivery, forkFifoSize, skippableSeqNListString);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

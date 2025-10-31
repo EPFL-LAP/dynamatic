@@ -5,7 +5,7 @@ set-src PATH_TO_C_FILE
 set-clock-period CLOCK_PERIOD   
 
 # Compile
-compile --skippable-seq-n SKIPPABLE_SEQ_N --buffer-algorithm fpga20
+compile --skippable-seq-n SKIPPABLE_SEQ_N --buffer-algorithm cpbuf --fork-fifo-size FORK_FIFO_SIZE
 
 # Generate the VHDL design corresponding to the source code
 write-hdl

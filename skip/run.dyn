@@ -1,0 +1,13 @@
+set-src integration-test/histogram/histogram.c
+
+#set-src integration-test/matrix_power/matrix_power.c
+
+
+set-clock-period 10
+compile --skippable-seq-n 2 --buffer-algorithm cpbuf --fork-fifo-size 6
+#compile --buffer-algorithm fpga20
+
+write-hdl
+simulate
+
+exit

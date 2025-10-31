@@ -18,7 +18,6 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
@@ -50,15 +49,12 @@ using BlockIndexing = ftd::BlockIndexing;
 
 namespace {
 
-std::ofstream outFile;
 DenseMap<Operation *, std::vector<int>> consumerOpAndOperandIndexForFTD;
 IsWaitingSignalForSuccDirect isWaitingSignalForSuccDirect;
 
 struct HandshakeInsertSkippableSeqPass
     : public dynamatic::impl::HandshakeInsertSkippableSeqBase<
           HandshakeInsertSkippableSeqPass> {
-
-  // HandshakeInsertSkippableSeqPass(const std::string NStr) {};
 
   void runDynamaticPass() override;
 
@@ -199,63 +195,6 @@ Block *getBlockFromOp(Operation *op, BlockIndexing blockIndexing) {
   }
 }
 
-bool doesNeedShanon(Block *first, Block *second, DenseSet<Block *> firstDeps,
-                    DenseSet<Block *> secondDeps) {
-  return firstDeps.contains(second) || secondDeps.contains(first);
-}
-
-void handleConditionForLoop(Block *predecessorBlock, Block *successorBlock,
-                            BoolExpression *&fSuppress,
-                            FuncOpInformation &funcOpInformation,
-                            ConversionPatternRewriter &rewriter) {
-  BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
-  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
-
-  for (CFGLoop *loop = loopInfo.getLoopFor(predecessorBlock); loop;
-       loop = loop->getParentLoop()) {
-
-    if (!loop->contains(successorBlock)) {
-      if (Block *loopExit = loop->getExitingBlock(); loopExit) {
-        auto *exitCondition =
-            getBlockLoopExitCondition(loopExit, loop, loopInfo, blockIndexing);
-
-        fSuppress =
-            BoolExpression::boolOr(fSuppress, exitCondition->boolNegate());
-
-        llvm::errs() << "Added loop exit condition for suppress signal: "
-                     << exitCondition->toString() << "to "
-                     << fSuppress->toString() << "\n";
-      }
-    }
-  }
-}
-
-void updateRegenConditionForLoop(Block *predecessorBlock, Block *successorBlock,
-                                 BoolExpression *&fRegen,
-                                 FuncOpInformation &funcOpInformation,
-                                 ConversionPatternRewriter &rewriter) {
-  BlockIndexing blockIndexing = funcOpInformation.getBlockIndexing();
-  mlir::CFGLoopInfo &loopInfo = funcOpInformation.getLoopInfo();
-
-  for (CFGLoop *loop = loopInfo.getLoopFor(successorBlock); loop;
-       loop = loop->getParentLoop()) {
-
-    if (!loop->contains(predecessorBlock)) {
-      if (Block *loopExit = loop->getExitingBlock(); loopExit) {
-        auto *exitCondition =
-
-            getBlockLoopExitCondition(loopExit, loop, loopInfo, blockIndexing);
-
-        fRegen = BoolExpression::boolOr(fRegen, exitCondition->boolNegate());
-
-        llvm::errs() << "Added loop exit condition for suppress signal: "
-                     << exitCondition->toString() << "to " << fRegen->toString()
-                     << "\n";
-      }
-    }
-  }
-}
-
 /// This function distributes the start signal to all blocks in the CFG.
 Value distributStartSignalToDstBlock(Value lastStartCopy, Block *block,
                                      Block *dstBlock, bool firstExec,
@@ -338,100 +277,6 @@ SmallVector<Value> getNDelayedValues(Value initialVal, Operation *BBOp,
   }
 
   return delayedVals;
-}
-
-Value addExtraSourceToDoneForRegen(Value doneSignal, Value regenCond,
-                                   Operation *BBOp,
-                                   SmallVector<Operation *> &opList,
-                                   ConversionPatternRewriter &rewriter) {
-
-  handshake::SourceOp sourceOp =
-      rewriter.create<handshake::SourceOp>(BBOp->getLoc());
-  inheritBB(BBOp, sourceOp);
-  opList.push_back(sourceOp);
-
-  handshake::ConditionalBranchOp conditionalBranchOp =
-      rewriter.create<handshake::ConditionalBranchOp>(BBOp->getLoc(), regenCond,
-                                                      sourceOp.getResult());
-  inheritBB(BBOp, conditionalBranchOp);
-  opList.push_back(conditionalBranchOp);
-
-  // buffer for deadlock
-  handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-      BBOp->getLoc(), conditionalBranchOp.getTrueResult(), 5,
-      BufferType::FIFO_BREAK_NONE);
-  inheritBB(BBOp, bufferOp);
-  opList.push_back(bufferOp);
-
-  handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(
-      BBOp->getLoc(), ValueRange{
-                          doneSignal,
-                          bufferOp.getResult(),
-                      });
-  inheritBB(BBOp, mergeOp);
-  opList.push_back(mergeOp);
-
-  return mergeOp.getResult();
-}
-
-/// This function checks if the two operations are in the same basic block.
-bool AreOpsinSameBB(Operation *first, Operation *second) {
-  int firstBBNum = getBBNumberFromOp(first);
-  int secondBBNum = getBBNumberFromOp(second);
-  return firstBBNum == secondBBNum;
-}
-
-/// This function checks if the consumer operation is before the producer
-bool isInitialConsWithoutProdInSameBB(Operation *prod, Operation *cons) {
-  mlir::DominanceInfo domInfo;
-  if (!AreOpsinSameBB(prod, cons)) {
-    // llvm::errs() << getBBNumberFromOp(prod) << getBBNumberFromOp(cons)
-    //              << "))))\n";
-    llvm::errs() << domInfo.dominates(cons, prod) << "))))\n";
-    return domInfo.dominates(cons, prod);
-  }
-
-  // llvm::errs() << getBBNumberFromOp(prod) << getBBNumberFromOp(cons)
-  //              << "((((\n";
-  return cons->isBeforeInBlock(prod);
-}
-
-/// This function creates the regeneration block for the given main values
-SmallVector<Value> insertRegenBlock(SmallVector<Value> mainValues,
-                                    Value regenCond,
-                                    bool initialConsWithoutProd,
-                                    Operation *BBOp,
-                                    SmallVector<Operation *> &opList,
-                                    ConversionPatternRewriter &rewriter) {
-
-  if (initialConsWithoutProd) {
-    regenCond = rewriter.create<handshake::InitOp>(BBOp->getLoc(), regenCond);
-  }
-  SmallVector<Value> results;
-  for (Value mainValue : mainValues) {
-    // The second operand will change later
-    SmallVector<Value, 2> muxOpValues = {mainValue, mainValue};
-    handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(
-        BBOp->getLoc(), mainValue.getType(), regenCond, muxOpValues);
-    inheritBB(BBOp, muxOp);
-    opList.push_back(muxOp);
-
-    handshake::InitOp initOp =
-        rewriter.create<handshake::InitOp>(BBOp->getLoc(), muxOp.getResult());
-    inheritBB(BBOp, initOp);
-    opList.push_back(initOp);
-
-    handshake::ConditionalBranchOp conditionalBranchOp =
-        rewriter.create<handshake::ConditionalBranchOp>(
-            BBOp->getLoc(), regenCond, initOp.getResult());
-    inheritBB(BBOp, conditionalBranchOp);
-    opList.push_back(conditionalBranchOp);
-
-    muxOp.setOperand(2, conditionalBranchOp.getTrueResult());
-    results.push_back(muxOp.getResult());
-  }
-
-  return results;
 }
 
 /// This function gates the channel value by the control value.
@@ -521,85 +366,6 @@ void addDrawingAttrToList(ArrayRef<Operation *> operations, StringRef attr) {
     auto drawAttr = handshake::DrawingAttr::get(op->getContext(), attr);
     op->setAttr("drawing", drawAttr);
   }
-}
-
-/// This function creates the suppression block for the given main values.
-SmallVector<Value> insertSuppressBlock(
-    SmallVector<Value> mainValues, Value predecessorOpDoneSignal,
-    Value suppressCond, Value regenCond, Operation *predecessorOpPointer,
-    Operation *succcessorOpPointer, unsigned N,
-    SmallVector<Operation *> &opList, ConversionPatternRewriter &rewriter) {
-
-  unsigned effective_N_for_suppress = N - 1;
-  if (isInitialConsWithoutProdInSameBB(predecessorOpPointer,
-                                       succcessorOpPointer)) {
-    effective_N_for_suppress = N;
-  }
-
-  Value prevResult = predecessorOpDoneSignal;
-  for (unsigned i = 0; i < effective_N_for_suppress; i++) {
-    handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
-        predecessorOpPointer->getLoc(), prevResult);
-    inheritBB(predecessorOpPointer, initOp);
-    opList.push_back(initOp);
-    prevResult = initOp.getResult();
-  }
-
-  Value mergedWithExtra = prevResult;
-  if (regenCond) {
-    mergedWithExtra = addExtraSourceToDoneForRegen(
-        prevResult, regenCond, predecessorOpPointer, opList, rewriter);
-  }
-
-  DenseMap<OpOperand *, SmallVector<Value>> dependenciesMapForPhiNetwork;
-  Value gatedSuppressCond =
-      gateChannelValue(suppressCond, mergedWithExtra, predecessorOpPointer,
-                       dependenciesMapForPhiNetwork, opList, rewriter);
-
-  handshake::ConditionalBranchOp conditionalBranchOpForGated =
-      rewriter.create<handshake::ConditionalBranchOp>(
-          predecessorOpPointer->getLoc(), suppressCond, gatedSuppressCond);
-  inheritBB(predecessorOpPointer, conditionalBranchOpForGated);
-  opList.push_back(conditionalBranchOpForGated);
-
-  handshake::ConditionalBranchOp conditionalBranchOpForNormal =
-      rewriter.create<handshake::ConditionalBranchOp>(
-          predecessorOpPointer->getLoc(), suppressCond, suppressCond);
-  inheritBB(predecessorOpPointer, conditionalBranchOpForNormal);
-  opList.push_back(conditionalBranchOpForNormal);
-
-  SmallVector<Value, 2> muxOpValues = {
-      conditionalBranchOpForNormal.getFalseResult(),
-      conditionalBranchOpForGated.getTrueResult()};
-  handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(
-      predecessorOpPointer->getLoc(), suppressCond.getType(), suppressCond,
-      muxOpValues);
-  inheritBB(predecessorOpPointer, muxOp);
-  opList.push_back(muxOp);
-
-  SmallVector<Value> conds;
-
-  unsigned effective_N = N;
-  if (N == 0)
-    effective_N = 1;
-
-  // for (unsigned i = 0; i < effective_N; i++) {
-  //   /// ManualBuff
-  //   handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-  //       predecessorOpPointer->getLoc(), muxOp.getResult(), 3,
-  //       BufferType::FIFO_BREAK_NONE);
-  //   inheritBB(predecessorOpPointer, bufferOp);
-  //   conds.push_back(bufferOp.getResult());
-  // }
-
-  for (unsigned i = 0; i < effective_N; i++)
-    conds.push_back(muxOp.getResult());
-
-  DenseMap<OpOperand *, SmallVector<Value>> emptyMap;
-  auto result = insertBranches(mainValues, conds, predecessorOpPointer,
-                               emptyMap, opList, rewriter);
-
-  return result;
 }
 
 /// This function creates the skip condition for a pair of memory accesses.
@@ -1086,8 +852,6 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
   ConversionPatternRewriter rewriter(ctx);
   FuncOpInformation funcOpInformation(funcOp);
 
-  outFile.open("./skip/" + kernelName + ".txt");
-
   std::vector<unsigned> NVector = getNVector(NStr);
 
   MemAccesses memAccesses;
@@ -1122,7 +886,8 @@ void writeDepGraphToDotFile(const std::string &filename) {
   }
   file << "}\n";
   file.close();
-  llvm::errs() << "Dependency graph written to " << filename << "\n";
+  llvm::errs() << "[SKIP][INFO] Dependency graph written to " << filename
+               << "\n";
 }
 
 void runFTDOnSpecificConsumerOps(
@@ -1132,8 +897,6 @@ void runFTDOnSpecificConsumerOps(
   std::vector<std::vector<Operation *>> allNewUnits;
   for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
     for (auto index : indices) {
-      // llvm::errs() << "Running FTD on consumer op: " << *consumerOp
-      //              << " - operand index: " << index << "\n";
       std::vector<Operation *> newUnits =
           ftdFunc(rewriter, funcOp, consumerOp, consumerOp->getOperand(index));
       allNewUnits.push_back(newUnits);
@@ -1179,24 +942,11 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
     experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
-    // open a file to dump funcOp
-    llvm::errs() << "Dumping funcOp after inserting skippable seq:\n";
-
-    std::error_code EC;
-    llvm::raw_fd_ostream file("funcOp_after_inserting_skippable_seq.mlir", EC);
-    funcOp.print(file);
-    file.close();
-    // funcOp.print(llvm::errs());
     if (failed(cfg::flattenFunction(funcOp)))
       signalPassFailure();
   }
 
-  std::string extra = "";
-  if (kernelName.find("memory") != std::string::npos)
-    extra = "memory/";
-
-  std::string path = "./integration-test/" + extra + kernelName + "/out/comp/" +
-                     kernelName + "_DEP_G.dot";
+  std::string path = compDir + "/" + kernelName + "_DEP_G.dot";
 
   writeDepGraphToDotFile(path);
   llvm::errs() << "done! \n";
@@ -1204,6 +954,7 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeInsertSkippableSeq(const std::string &NStr,
-                                             const std::string &kernelName) {
+                                             const std::string &kernelName,
+                                             const std::string &compDir) {
   return std::make_unique<HandshakeInsertSkippableSeqPass>();
 }

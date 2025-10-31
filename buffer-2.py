@@ -13,7 +13,7 @@ def shell(*args, **kwargs):
 
 
 def generate_initial_design(dynamatic_path, kernel_name, additional_dir, n, cp):
-    script = f"set-src {dynamatic_path}/integration-test/{additional_dir}/{kernel_name}/{kernel_name}.c; set-clock-period {cp}; compile --skippable-seq-n {n} --buffer-algorithm fpga20; exit"
+    script = f"set-src {dynamatic_path}/integration-test/{additional_dir}/{kernel_name}/{kernel_name}.c; set-clock-period {cp}; compile --skippable-seq-n {n} 1 --buffer-algorithm fpga20; exit"
 
     shell(dynamatic_path / "bin" / "dynamatic", input=str.encode(script))
 
@@ -58,7 +58,7 @@ def list_transp_buffers(dynamatic_path, kernel_name, additional_dir) -> list:
             )
 
             # Only remove transparent buffers for throughput.
-            if m and int(m.group(3)) == 10:
+            if m and int(m.group(3)) == 4:
                 transp_buffers.append(m.group(4))
     return transp_buffers
 

@@ -17,6 +17,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Johnson.h"
+#include "dynamatic/Transforms/BufferPlacement/Reconvergence.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -183,7 +184,6 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
         uniqueName != "mux0") {
       latency = -0.0;
-      llvm::errs() << "Here\n";
     }
     if (latency == 0.0)
       unitVars.retOut = unitVars.retIn;
@@ -272,7 +272,6 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
       uniqueName != "mux0") {
     latency = -0.0;
-    llvm::errs() << "Here\n";
   }
 
   if (latency == 0.0) {
@@ -471,6 +470,27 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 }
 
 void BufferPlacementMILP::addBackedgeConstraints() {
+  CircuitGraph circuitGraph(funcInfo.funcOp);
+  ReconvergentPathList reconvergentPathList =
+      findReconvergentPaths(circuitGraph);
+
+  llvm::errs() << "&&&&&&&&&&&&&&&&\n";
+  for (auto path : reconvergentPathList) {
+
+    if (path.path1.size() > 1 || path.path2.size() > 1) {
+      for (auto op : path.path1)
+        llvm::errs() << getUniqueName(op) << " - ";
+
+      llvm::errs() << "\n";
+
+      for (auto op : path.path2)
+        llvm::errs() << getUniqueName(op) << " - ";
+      llvm::errs() << "-----\n";
+    }
+  }
+
+  return;
+
   GraphForJohnson graph(funcInfo.funcOp);
   ChannelCycleList channelCycles = graph.findAllChannelCycles();
 
@@ -723,7 +743,6 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
     if (uniqueName.starts_with("mux") && uniqueName != "mux1" &&
         uniqueName != "mux0") {
       latency = -0.0;
-      llvm::errs() << "Here\n";
     }
 
     if (latency == 0.0)

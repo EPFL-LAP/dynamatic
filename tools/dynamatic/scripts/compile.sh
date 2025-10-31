@@ -19,8 +19,9 @@ FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
 DISABLE_LSQ=${11}
 FAST_TOKEN_DELIVERY=${12}
+FORK_FIFO_SIZE=${13}
 
-for i in {1..12}; do shift; done
+for i in {1..13}; do shift; done
 
 SKIPPABLE_ACTTIVE=0
 SKIPPABLE_SEQ_N=()
@@ -187,7 +188,7 @@ fi
 if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
       --handshake-inactivate-enforced-deps \
-      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME" \
+      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
       --handshake-replace-memory-interfaces \
       --handshake-combine-steering-logic \
    > "$F_HANDSHAKE_ROUZBEH"
@@ -199,7 +200,7 @@ if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-minimize-cst-width \
     --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
+    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
@@ -209,7 +210,7 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-inactivate-enforced-deps --handshake-replace-memory-interfaces \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
+    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"

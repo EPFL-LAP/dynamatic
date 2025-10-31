@@ -4,8 +4,10 @@ add_dynamatic_library(DynamaticBufferPlacement
   CFDFC.cpp
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
+  CPBuffers.cpp
   CostAwareBuffers.cpp
   Johnson.cpp
+  Reconvergence.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
   MAPBUFBuffers.cpp

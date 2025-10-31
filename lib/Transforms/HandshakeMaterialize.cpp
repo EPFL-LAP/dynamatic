@@ -377,7 +377,7 @@ struct HandshakeMaterializePass
       }
     }
 
-    llvm::errs() << " goh " << mine << " | " << general << "\n";
+    // llvm::errs() << " goh " << mine << " | " << general << "\n";
 
     // Then, greedily optimize forks
     mlir::GreedyRewriteConfig config;
@@ -397,6 +397,8 @@ struct HandshakeMaterializePass
 
     int num = 0;
     int allResults = 0;
+    int forkFifoSizeInt = std::stoi(forkFifoSize);
+
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       // llvm::errs() << "ghabl shoro ----------------\n";
       // funcOp.print(llvm::errs());
@@ -439,14 +441,16 @@ struct HandshakeMaterializePass
                 continue;
               }
 
-              builder.setInsertionPointAfter(user);
-              handshake::BufferOp bufferOp =
-                  builder.create<handshake::BufferOp>(
-                      res.getLoc(), res, 4,
-                      handshake::BufferType::FIFO_BREAK_NONE);
-              inheritBB(user, bufferOp);
+              if (forkFifoSizeInt != 0) {
+                builder.setInsertionPointAfter(user);
+                handshake::BufferOp bufferOp =
+                    builder.create<handshake::BufferOp>(
+                        res.getLoc(), res, forkFifoSizeInt,
+                        handshake::BufferType::FIFO_BREAK_NONE);
+                inheritBB(user, bufferOp);
 
-              replaceFirstUse(user, res, bufferOp.getResult());
+                replaceFirstUse(user, res, bufferOp.getResult());
+              }
 
               if (user->hasAttr("drawing"))
                 num++;
@@ -459,7 +463,6 @@ struct HandshakeMaterializePass
       // funcOp.print(llvm::errs());
       // llvm::errs() << "bad tamoom----------------\n";
     }
-    llvm::errs() << "bah " << num << "ah " << allResults << "\n";
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
   }
@@ -467,6 +470,6 @@ struct HandshakeMaterializePass
 } // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMaterialize() {
+dynamatic::createHandshakeMaterialize(const std::string &forkFifoSize) {
   return std::make_unique<HandshakeMaterializePass>();
 }

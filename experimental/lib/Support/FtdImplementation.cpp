@@ -355,14 +355,11 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // Check that all the values have the same type, then collet them according to
   // their input blocks
   for (auto &val : vals) {
-    llvm::errs() << "val " << val << "\n";
     if (val.getType() != valueType) {
       llvm::errs() << "All values must have the same type\n";
       return failure();
     }
     auto *bb = val.getParentBlock();
-    llvm::errs() << "bb num "
-                 << bb->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
     valuesPerBlock[bb].push_back(val);
   }
 
@@ -371,7 +368,6 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // the input sets there is more than one value per blocks
   for (auto &[bb, vals] : valuesPerBlock) {
 
-    llvm::errs() << vals[0] << "\n";
     std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
       if (!a.getDefiningOp())
         return false;
@@ -379,19 +375,12 @@ LogicalResult experimental::ftd::createPhiNetwork(
         return true;
       return domInfo.dominates(b.getDefiningOp(), a.getDefiningOp());
     });
-    llvm::errs() << "inserting for "
-                 << bb->getOperations().front().getAttr(BB_ATTR_NAME)
-                 << " ---- \n " << vals[0] << "\n ---- \n";
     inputBlocks.insert({bb, vals[0]});
   }
 
   // In which block a new phi is necessary
   DenseSet<Block *> blocksToAddPhi =
       runCrytonAlgorithm(funcRegion, inputBlocks);
-
-  for (auto a : blocksToAddPhi)
-    llvm::errs() << " needs "
-                 << a->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
 
   // A backedge is created for each block in `blocksToAddPhi`, and it will
   // contain the value used as placeholder for the phi
@@ -401,13 +390,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
     resultPerPhi.insert({bb, mergeResult});
   }
 
-  llvm::errs() << "444\n";
-
   // For each phi, we need one input for every predecessor of the block
   for (auto &bb : blocksToAddPhi) {
-
-    llvm::errs() << " iterating "
-                 << bb->getOperations().front().getAttr(BB_ATTR_NAME) << "\n";
 
     // Avoid to cover a predecessor twice
     llvm::DenseSet<Block *> coveredPred;
@@ -418,28 +402,16 @@ LogicalResult experimental::ftd::createPhiNetwork(
         continue;
       coveredPred.insert(pred);
 
-      llvm::errs() << "pred "
-                   << pred->getOperations().front().getAttr(BB_ATTR_NAME)
-                   << "\n";
-
       // If the predecessor does not contains a definition of the value, we move
       // to its immediate dominator, until we have found a definition.
       Block *predecessorOrDominator = nullptr;
       Value valueToUse = nullptr;
 
       do {
-        llvm::errs() << "lanat pred "
-                     << pred->getOperations().front().getAttr(BB_ATTR_NAME)
-                     << "\n";
         predecessorOrDominator =
             !predecessorOrDominator
                 ? pred
                 : getImmediateDominator(funcRegion, predecessorOrDominator);
-
-        llvm::errs() << "lanat pred "
-                     << predecessorOrDominator->getOperations().front().getAttr(
-                            BB_ATTR_NAME)
-                     << "\n";
 
         if (inputBlocks.contains(predecessorOrDominator))
           valueToUse = inputBlocks[predecessorOrDominator];
@@ -452,8 +424,6 @@ LogicalResult experimental::ftd::createPhiNetwork(
     }
   }
 
-  llvm::errs() << "555\n";
-
   // Create the merge and then replace the values
   DenseMap<Block *, handshake::MergeOp> newMergePerPhi;
 
@@ -464,8 +434,6 @@ LogicalResult experimental::ftd::createPhiNetwork(
     mergeOp->setAttr(NEW_PHI, rewriter.getUnitAttr());
     newMergePerPhi.insert({bb, mergeOp});
   }
-
-  llvm::errs() << "666\n";
 
   for (auto *bb : blocksToAddPhi)
     resultPerPhi.find(bb)->getSecond().setValue(newMergePerPhi[bb].getResult());
@@ -496,8 +464,6 @@ LogicalResult experimental::ftd::createPhiNetwork(
     inputPerBlock[&bb] = foundValue;
   }
 
-  llvm::errs() << "777\n";
-
   for (auto &op : toSubstitue)
     op->set(inputPerBlock[op->getOwner()->getBlock()]);
 
@@ -513,7 +479,6 @@ LogicalResult ftd::createPhiNetworkDeps(
   // For each pair of operand and its dependencies
   for (auto &[operand, dependencies] : dependenciesMap) {
 
-    llvm::errs() << "Processing operand " << " - " << dependencies[0] << "\n";
     Operation *operandOwner = operand->getOwner();
 
     Value startSignal = (Value)funcRegion.getArguments().back();
@@ -528,12 +493,9 @@ LogicalResult ftd::createPhiNetworkDeps(
           rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), startSignal);
       // constOp->moveBefore(operandOwner);
       setBB(constOp, 0);
-      llvm::errs() << "in const " << constOp << "\n";
 
       startValue = constOp.getResult();
     }
-
-    llvm::errs() << "start value " << startValue << "\n";
 
     /// Lambda to run the SSA analysis over the pair of values {dep, startValue}
     /// and properly connect the operand `op` to the correct value in the
@@ -546,14 +508,12 @@ LogicalResult ftd::createPhiNetworkDeps(
       // sense) then the consumer is directly connected to the producer without
       // further mechanism.
 
-      llvm::errs() << "aval \n";
       if (dep.getParentBlock() == operandOwner->getBlock() &&
           domInfo.properlyDominates(depOwner, operandOwner)) {
         op->set(dep);
         return success();
       }
 
-      llvm::errs() << "dovom \n";
       // Otherwise, we run the SSA insertion
       SmallVector<mlir::OpOperand *> operandsToChange = {op};
       SmallVector<Value> inputValues = {startValue, dep};
@@ -575,7 +535,6 @@ LogicalResult ftd::createPhiNetworkDeps(
 
     // If the operand has one dependency only, there is no need for a join.
     if (dependencies.size() == 1) {
-      llvm::errs() << "tabe  \n";
       if (failed(connect(operand, dependencies[0])))
         return failure();
       continue;
@@ -711,7 +670,6 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 
-  llvm::errs() << "vaghan \n";
   return newUnits;
 }
 
@@ -1014,10 +972,6 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   // because it is the last function in the FTD flow so we do not need to run
   // any further delivery after this function is done
   std::vector<Operation *> newUnits;
-
-  llvm::errs() << "\n\n\nEntering addSuppOperandConsumer:\n";
-  consumerOp->print(llvm::errs());
-  llvm::errs() << "\n\n\n";
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
