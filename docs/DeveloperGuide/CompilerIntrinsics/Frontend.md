@@ -34,7 +34,7 @@ Notable optimizations that we need from the LLVM project:
 - `loop-rotate`: Transforming loops to do-while loops as much as possible.
 - `simplifycfg`, `loopsimplify`: reducing the number of BBs (fewer branches).
 - `consthoist`: Moving constants around.
-- `licm`: Applying loop-invariant code motion to make the loops simplier.
+- `licm`: Applying loop-invariant code motion to move the code outside the loop (which makes the loops simpler).
 
 > [!NOTE]
 > **Design choice**. These LLVM IR transformations and analyses are crucial to the quality of Dynamatic-produced circuits, and porting them to MLIR requires significant effort. Therefore, we switched from Polygeist to an LLVM IR-based frontend.
@@ -86,7 +86,7 @@ For each LLVM function, Dynamatic performs the following translation:
 > The syntax of the GEP instruction in LLVM is often simplified/shortened. This requires a sophisticated conversion rule for GEP. Check out the LLVM documentation on [caveats of GEP syntax](https://llvm.org/docs/GetElementPtr.html) for more details.
 
 > [!IMPORTANT]
-> The `instCombine` pass must be applied before the conversion to eliminate a
+> The `instcombine` pass must be applied before the conversion to eliminate a
 > chain of GEPs.
 
 ## Memory Dependency Analysis

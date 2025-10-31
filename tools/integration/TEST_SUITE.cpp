@@ -256,7 +256,8 @@ INSTANTIATE_TEST_SUITE_P(
       "video_filter",
       "while_loop_1",
       "while_loop_3",
-      "test_loop_free"
+      "test_loop_free",
+      "test_bitint"
       ),
       [](const auto &info) { return info.param; });
 
@@ -310,7 +311,9 @@ INSTANTIATE_TEST_SUITE_P(
       "test_memory_16",
       "test_memory_17",
       "test_memory_18",
-      "test_smallbound"
+      "test_smallbound",
+      "test_internal_array",
+      "test_constant_array"
     ),
     [](const auto &info) { return "memory_" + info.param; });
 
