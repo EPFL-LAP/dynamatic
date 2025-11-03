@@ -19,6 +19,7 @@ USE_RIGIDIFICATION=${9}
 DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
+STRAIGHT_TO_QUEUE=${13}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -45,6 +46,7 @@ F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
+F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -165,14 +167,40 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
+
+  echo_info "Using FPGA'23 for LSQ connection"
+
+  # FPT19 should run before straight to the queue, so that no useless components are instantiated.
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage \
+    --handshake-replace-memory-interfaces \
+    --handshake-straight-to-queue \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_SQ"
+  exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
+
+  F_HANDSHAKE=$F_HANDSHAKE_SQ
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+
+else
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+fi
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
