@@ -271,9 +271,6 @@ struct ChannelToEndConnector {
 
 // A helper construct for connecting the start signal to the inputs of the
 // handshake kernel
-// HACK: the control only signals are handled in the following ways:
-// - Input: they are driven by valid = constant 1, their ready signals are
-// ignored
 struct StartToControlConnector {
   handshake::ControlType type;
   std::string argName;
@@ -284,10 +281,23 @@ struct StartToControlConnector {
 
   void declareSignals(mlir::raw_indented_ostream &os) {}
 
-  // We just connect the control input channel to a constant source.
   void connectToDuv(Instance &duvInst) {
-    duvInst.connect(argName + "_valid", "\'1\'")
-        .connect(argName + "_ready", "open");
+    // Driving the control-only interface signals:
+    if (argName == "start") {
+      // Function start: it is driven by the TB start signal (to ensure that
+      // the function is strictly executed only once).
+      //
+      // [HACK] We hardcode the name "start" for the function start signal.
+      duvInst.connect(argName + "_valid", "tb_start_valid")
+          .connect(argName + "_ready", "tb_start_ready");
+    } else {
+      // Memory arguments: they are driven by valid = "constant_1", their
+      // ready signals are ignored.
+      //
+      // [TODO] Should this handshake also happen only once per TB transaction?
+      duvInst.connect(argName + "_valid", "\'1\'")
+          .connect(argName + "_ready", "open");
+    }
   }
 };
 
