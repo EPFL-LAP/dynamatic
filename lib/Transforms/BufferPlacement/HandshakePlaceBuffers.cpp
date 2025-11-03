@@ -292,8 +292,11 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
-    if (failed(checkFuncInvariants(info)))
-      return failure();
+    // AYA: TODO: Should figure out how to calculate probabilities using this
+    // readCSV!
+
+    // if (failed(checkFuncInvariants(info)))
+    //   return failure();
   }
 
   // Read the operations' timing models from disk
@@ -302,6 +305,9 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     return failure();
 
   auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
+
+  // AYA: I plan to leave the above untouched and the idea is to still take it
+  // inside the "placeBuffers" function but not use it internally
 
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
@@ -425,18 +431,20 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
   // it has a single block) in which case there are no CFDFCs
   std::vector<CFDFC> cfdfcs;
 
+  // AYA: The following commented code is new and I do not care about it...
   // If the CFG does not have any backedges (e.g., it only has one or many
   // if-else blocks), then we don't need to size buffers for performance
   // reasons.
-  bool cfgHasBackedge =
-      std::any_of(info.archs.begin(), info.archs.end(),
-                  [](ArchBB arch) { return arch.isBackEdge; });
+  // bool cfgHasBackedge =
+  //     std::any_of(info.archs.begin(), info.archs.end(),
+  //                 [](ArchBB arch) { return arch.isBackEdge; });
 
-  assert((not info.archs.empty() or not cfgHasBackedge) &&
-         "Sanity check failed: no BB edges -> CFG does not have any backedges");
+  // assert((not info.archs.empty() or not cfgHasBackedge) &&
+  //        "Sanity check failed: no BB edges -> CFG does not have any
+  //        backedges");
 
-  if (cfgHasBackedge && failed(getCFDFCs(info, logger, cfdfcs)))
-    return failure();
+  // if (cfgHasBackedge && failed(getCFDFCs(info, logger, cfdfcs)))
+  //   return failure();
 
   // All extracted CFDFCs must be optimized
   for (CFDFC &cf : cfdfcs)
@@ -462,6 +470,8 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
 
   if (dumpLogs)
     logFuncInfo(info, *logger);
+
+  // AYA: TODO: Try to comment out all of the above...
 
   // Solve the MILP to obtain a buffer placement
   BufferPlacement placement;

@@ -102,6 +102,15 @@ struct MILPVars {
   llvm::MapVector<Value, ChannelVars> channelVars;
 };
 
+struct AyaChannelVars {
+  CPVar throughput;
+};
+
+struct AyaMILPVars {
+  /// Channel throughput variables (real).
+  llvm::MapVector<Value, AyaChannelVars> ayaChannelThroughputs;
+};
+
 /// Abstract class holding the basic logic for the smart buffer placement pass,
 /// which expresses the buffer placement problem in dataflow circuits as an MILP
 /// (mixed-integer linear program) whose solution indicates the location and
@@ -186,7 +195,7 @@ protected:
   /// Contains all variables used throughout the MILP. Variables can be added to
   /// it with the `BufferPlacementMILP::addChannelVars` and
   /// `BufferPlacementMILP::addCFDFCVars` methods.
-  MILPVars vars;
+  AyaMILPVars vars;
 
   /// Whether the MILP was determined to be unsatisfiable during construction.
   bool unsatisfiable = false;
@@ -397,35 +406,35 @@ protected:
   /// later pass in the pass pipeline to retrieve the throughput and occupancy
   /// of each CFDFC of the current function.
   void populateCFDFCThroughputAndOccupancy() {
-    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-      auto [cf, cfVars] = cfdfcWithVars;
+    // for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    //   auto [cf, cfVars] = cfdfcWithVars;
 
-      cf->throughput = model->getValue(cfVars.throughput);
-      // Store the unit occupancy into the CFDFC data structure.
-      for (auto &[op, var] : cfVars.unitVars) {
-        double occupancy =
-            model->getValue(var.retOut) - model->getValue(var.retIn);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
-        cf->unitOccupancy[op] = occupancy;
-      }
+    //   cf->throughput = model->getValue(cfVars.throughput);
+    //   // Store the unit occupancy into the CFDFC data structure.
+    //   for (auto &[op, var] : cfVars.unitVars) {
+    //     double occupancy =
+    //         model->getValue(var.retOut) - model->getValue(var.retIn);
+    //     // Approximate occupancy to 0 if it is negative but bigger than
+    //     // -MILP_EPSILON.
+    //     if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+    //       occupancy = 0.0;
+    //     }
+    //     assert(occupancy >= 0.0 && "Unit occupancy must not be
+    //     non-negative!"); cf->unitOccupancy[op] = occupancy;
+    //   }
 
-      // Store the channel occupancy into the CFDFC data structure.
-      for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = model->getValue(var);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
-        cf->channelOccupancy[val] = occupancy;
-      }
-    }
+    //   // Store the channel occupancy into the CFDFC data structure.
+    //   for (auto &[val, var] : cfVars.channelThroughputs) {
+    //     double occupancy = model->getValue(var);
+    //     // Approximate occupancy to 0 if it is negative but bigger than
+    //     // -MILP_EPSILON.
+    //     if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+    //       occupancy = 0.0;
+    //     }
+    //     assert(occupancy >= 0.0 && "Channel occupancy must be
+    //     non-negative!"); cf->channelOccupancy[val] = occupancy;
+    //   }
+    // }
   }
 
 private:
