@@ -106,6 +106,8 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   const std::string RTL_CONFIG =
       fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
 
+  const std::string SIMULATOR_NAME = "vsim"; // modelsim
+
   fs::path cFilePath =
       fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
 
@@ -261,7 +263,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   std::cout << "Simulator launching\n";
   if (std::system((SIMULATE_SH + " " + DYNAMATIC_ROOT + " " +
                    cFileDir.string() + " " + outDir.string() + " " + name +
-                   " \"\" " + "false")
+                   " \"\" " + "false" + " " + SIMULATOR_NAME)
                       .c_str()) != 0) {
     std::cerr << "Failed to simulate\n";
     return false;
