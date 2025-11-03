@@ -200,9 +200,17 @@ class LSQ:
             ctrlEndReady = Logic(ctx, 'ctrlEndReady', 'w')
             temp_gen_mem = Logic(ctx, 'TEMP_GEN_MEM', 'w')
 
+            #! The memory completion signal cannot be set to 1 when any group is allocating:
+            no_curr_ga = "(not (" + " or ".join(group_init_valid_i.getNameRead(i)
+                                                for i in range(group_init_valid_i.length)) + "))"
+
             #! Define the needed logic
             arch += "\t-- Define the intermediate logic\n"
-            arch += f"\tTEMP_GEN_MEM <= {ctrlEnd_valid.getNameRead()} and stq_empty and ldq_empty;\n"
+            arch += "\t-- LSQ can return iff all the following conditions are true:\n"
+            arch += "\t-- 1. No more upcoming BBs containing memory accesses.\n"
+            arch += "\t-- 2. Both store and load queues are empty.\n"
+            arch += "\t-- 3. No GA in the same cycle.\n"
+            arch += f"\tTEMP_GEN_MEM <= {ctrlEnd_valid.getNameRead()} and stq_empty and ldq_empty and {no_curr_ga};\n"
 
             arch += "\t-- Define logic for the new interfaces needed by dynamatic\n"
             arch += "\tprocess (clk) is\n\tbegin\n"
