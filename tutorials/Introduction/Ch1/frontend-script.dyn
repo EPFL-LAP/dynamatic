@@ -1,13 +1,20 @@
 # Set the source file to run
-set-src             tutorials/Introduction/Ch1/loop_multiply.c
+set-src             integration-test/fir/fir.c
+
+set-clock-period 10  
 
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
 # strategy which does not require an MILP solver.
-compile             
+#compile   --fast-token-delivery --straight-to-queue
 
 # Generate the VHDL design corresponding to the source code
+#write-hdl --hdl vhdl-beta   # Urgent! DO not forget this if you want to use the INIT!!
+
+compile
+
 write-hdl
+
 
 # Simulate and verify using Modelsim
 simulate
