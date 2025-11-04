@@ -518,8 +518,11 @@ class LSQ:
             ga_ls_order
         )
 
-        # WARNING: This logic needs more testing
-        # Do not instantiate dispatching logic when there are zero load ports.
+        # When the condition "lsq_submodules.ptq_dispatcher_lda != None" is not true:
+        # The dispatcher module will be set to None when there are zero load ports.
+        # In this case, do not instantiate dispatching logic when there are zero load ports.
+        # - WARNING: This logic needs more testing
+        # - TODO: Also remove the load queue when there are zero load ports.
         if lsq_submodules.ptq_dispatcher_lda != None:
             # Load Address Port Dispatcher
             arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
@@ -528,8 +531,11 @@ class LSQ:
                 ldq_alloc, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
             )
 
-        # WARNING: This logic needs more testing
-        # Do not instantiate dispatching logic when there are zero load ports.
+        # When the condition "lsq_submodules.qtp_dispatcher_ldd != None" is not true:
+        # The dispatcher module will be set to None when there are zero load ports.
+        # In this case, do not instantiate dispatching logic when there are zero load ports.
+        # - WARNING: This logic needs more testing
+        # - TODO: Also remove the load queue when there are zero load ports.
         if lsq_submodules.qtp_dispatcher_ldd != None:
             # Load Data Port Dispatcher
             arch += lsq_submodules.qtp_dispatcher_ldd.instantiate(

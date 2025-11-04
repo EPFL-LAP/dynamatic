@@ -22,8 +22,11 @@ def codeGen(path_rtl, configs):
     ga.generate(path_rtl)
     lsq_submodules.group_allocator = ga
 
-    # WARNING: This logic needs more testing
+    # When the condition "if configs.numLdPorts > 0:" is not true:
     # Do not generating dispatching modules when there are zero load ports.
+    #
+    # - WARNING: This logic needs more testing
+    # - TODO: Also remove the load queue when there are zero load ports.
     if configs.numLdPorts > 0:
         # Load Address Port Dispatcher
         ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
