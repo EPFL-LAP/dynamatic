@@ -1,4 +1,4 @@
-//===- BDD.cpp - BDD Decomposition for Bool Expressions -----*----- C++ -*-===//
+//===- BDD.cpp - BDD construction and analysis ------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,20 +6,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the functions for performing a BDD decomposition on
-// boolean logic expression, following a specific order of variables.
+// This file implements construction of a Binary Decision Diagram (BDD) from a
+// BoolExpression and basic analysis utilities.
 //
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 
-#include <iterator>
+#include <algorithm>
+#include <functional>
+#include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace dynamatic::experimental::boolean;
 using namespace llvm;
+using namespace mlir;
 
 void dynamatic::experimental::boolean::restrict(BoolExpression *exp,
                                                 const std::string &var,
@@ -52,33 +59,233 @@ void dynamatic::experimental::boolean::restrict(BoolExpression *exp,
   }
 }
 
-BDD *dynamatic::experimental::boolean::buildBDD(
-    BoolExpression *exp, std::vector<std::string> variableList) {
-  if (exp->type == ExpressionType::Variable ||
-      exp->type == ExpressionType::Zero || exp->type == ExpressionType::One)
-    return new BDD(exp);
+BDD::BDD() {
+  nodes.clear();
+  order.clear();
+  rootIndex = zeroIndex = oneIndex = 0;
+}
 
-  // Get the next variable to expand
-  const std::string &var = variableList[0];
+LogicalResult
+BDD::buildROBDDFromExpression(BoolExpression *expr,
+                              const std::vector<std::string> &varOrder) {
+  nodes.clear();
+  order.clear();
+  rootIndex = zeroIndex = oneIndex = 0;
 
-  // Get a boolean expression in which `var` is substituted with false
-  BoolExpression *restrictedNegative = exp->deepCopy();
-  restrict(restrictedNegative, var, false);
-  restrictedNegative = restrictedNegative->boolMinimize();
+  if (!expr) {
+    llvm::errs() << "BDD: null expression\n";
+    return failure();
+  }
 
-  // Get a boolean expression in which `var` is substituted with true
-  BoolExpression *restrictedPositive = exp->deepCopy();
-  restrict(restrictedPositive, var, true);
-  restrictedPositive = restrictedPositive->boolMinimize();
+  // Minimize the whole expression once before starting.
+  BoolExpression *rootExpr = expr->boolMinimize();
 
-  // Get a list of the next variables to expand
-  std::vector<std::string> subList(std::next(variableList.begin()),
-                                   variableList.end());
+  // If the expression itself is constant, build only two terminals.
+  if (rootExpr->type == ExpressionType::Zero ||
+      rootExpr->type == ExpressionType::One) {
+    nodes.resize(2);
+    zeroIndex = 0;
+    oneIndex = 1;
+    nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
+    nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
+    rootIndex = (rootExpr->type == ExpressionType::One) ? oneIndex : zeroIndex;
+    return success();
+  }
 
-  // Recursively build the left and right sub-trees
-  BDD *negativeInput = buildBDD(restrictedNegative, subList);
-  BDD *positiveInput = buildBDD(restrictedPositive, subList);
-  auto *condition = new SingleCond(ExpressionType::Variable, var);
+  // Keep only variables that still appear after minimization and respect
+  // the order provided by the user.
+  {
+    std::set<std::string> present = rootExpr->getVariables();
+    for (const auto &v : varOrder)
+      if (present.find(v) != present.end())
+        order.push_back(v);
+  }
 
-  return new BDD(negativeInput, positiveInput, condition);
+  // Pre-allocate all internal nodes; initially connect them to the terminals.
+  const unsigned n = (unsigned)order.size();
+  nodes.resize(n + 2);
+  zeroIndex = n;
+  oneIndex = n + 1;
+  for (unsigned i = 0; i < n; ++i)
+    nodes[i] = BDDNode{order[i], zeroIndex, oneIndex, {}};
+  nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
+  nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
+
+  // Root is always the first internal node (smallest variable index).
+  rootIndex = 0;
+
+  // Recursively expand edges from the root; mark each expanded node to
+  // avoid rebuilding the same subgraph.
+  std::vector<char> expanded(nodes.size(), 0);
+  expandFrom(rootIndex, rootExpr, expanded);
+
+  // After the BDD is fully built, clean up each node's predecessor list:
+  // sort in ascending order and remove any duplicates.
+  for (auto &nd : nodes) {
+    auto &ps = nd.preds;
+    std::sort(ps.begin(), ps.end());
+    ps.erase(std::unique(ps.begin(), ps.end()), ps.end());
+  }
+
+  return success();
+}
+
+void BDD::expandFrom(unsigned idx, BoolExpression *residual,
+                     std::vector<char> &expanded) {
+  if (idx >= order.size() || expanded[idx])
+    return;
+
+  const std::string &var = order[idx];
+
+  // Perform Shannon expansion for the current variable.
+  BoolExpression *f0 = residual->deepCopy();
+  restrict(f0, var, false);
+  f0 = f0->boolMinimize();
+  BoolExpression *f1 = residual->deepCopy();
+  restrict(f1, var, true);
+  f1 = f1->boolMinimize();
+
+  // Decide the next node index for each branch.
+  auto decideNext = [&](BoolExpression *f, unsigned &succ) {
+    if (!f) {
+      succ = zeroIndex;
+      return;
+    }
+    if (f->type == ExpressionType::Zero) {
+      succ = zeroIndex;
+      return;
+    }
+    if (f->type == ExpressionType::One) {
+      succ = oneIndex;
+      return;
+    }
+
+    // Find the earliest variable in the current order that appears in f.
+    auto vars = f->getVariables();
+    size_t vpos = order.size();
+    for (size_t i = 0; i < order.size(); ++i)
+      if (vars.find(order[i]) != vars.end()) {
+        vpos = i;
+        break;
+      }
+
+    succ = static_cast<unsigned>(vpos);
+  };
+
+  unsigned fSucc = zeroIndex, tSucc = oneIndex;
+  decideNext(f0, fSucc);
+  decideNext(f1, tSucc);
+
+  // Connect edges for the current node.
+  nodes[idx].falseSucc = fSucc;
+  nodes[idx].trueSucc = tSucc;
+
+  // While expanding the BDD, record the current node `idx`
+  // as a predecessor of each of its false/true successors.
+  nodes[fSucc].preds.push_back(idx);
+  nodes[tSucc].preds.push_back(idx);
+
+  expanded[idx] = 1;
+
+  // Recurse only on unexplored internal successors.
+  if (fSucc < zeroIndex && !expanded[fSucc])
+    expandFrom(fSucc, f0, expanded);
+  if (tSucc < zeroIndex && !expanded[tSucc])
+    expandFrom(tSucc, f1, expanded);
+}
+
+std::vector<unsigned> BDD::collectSubgraph(unsigned root, unsigned t1,
+                                                   unsigned t0) const {
+  std::vector<char> vis(nodes.size(), 0);
+  std::vector<unsigned> st{root};
+  std::vector<unsigned> subgraph;
+
+  while (!st.empty()) {
+    unsigned u = st.back();
+    st.pop_back();
+    if (u >= nodes.size() || vis[u])
+      continue;
+    vis[u] = 1;
+    subgraph.push_back(u);
+
+    // Stop expansion at the designated local sinks.
+    if (u == t1 || u == t0)
+      continue;
+
+    // Abort if we accidentally reach the global terminals.
+    if (u == zeroIndex || u == oneIndex) {
+      llvm::errs() << "Illegal subgraph: reached global terminal\n";
+      std::abort();
+    }
+
+    const auto &nd = nodes[u];
+    st.push_back(nd.falseSucc);
+    st.push_back(nd.trueSucc);
+  }
+
+  // Ensure both sinks appear in the final list.
+  if (std::find(subgraph.begin(), subgraph.end(), t1) == subgraph.end())
+    subgraph.push_back(t1);
+  if (std::find(subgraph.begin(), subgraph.end(), t0) == subgraph.end())
+    subgraph.push_back(t0);
+
+  std::sort(subgraph.begin(), subgraph.end());
+  return subgraph;
+}
+
+bool BDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
+                            unsigned b) const {
+  std::vector<char> vis(nodes.size(), 0);
+  std::vector<unsigned> st{root};
+
+  auto push = [&](unsigned v) {
+    if (v == a || v == b)
+      return; // skip banned nodes
+    if (v < nodes.size() && !vis[v])
+      st.push_back(v);
+  };
+
+  while (!st.empty()) {
+    unsigned u = st.back();
+    st.pop_back();
+    if (u >= nodes.size() || vis[u] || u == a || u == b)
+      continue;
+    vis[u] = 1;
+
+    // Reaching either sink means not covering all paths.
+    if (u == t1 || u == t0)
+      return false;
+
+    const auto &nd = nodes[u];
+    push(nd.falseSucc);
+    push(nd.trueSucc);
+  }
+  // Neither sink reachable -> covering all paths.
+  return true;
+}
+
+std::vector<std::pair<unsigned, unsigned>>
+BDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
+  // Collect and validate the subgraph (sorted, includes root/t1/t0).
+  std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
+  std::vector<std::pair<unsigned, unsigned>> coverPairs;
+
+  // Scan all pairs in ascending order.
+  for (size_t i = 1; i < cand.size() - 2; ++i) {
+    for (size_t j = i + 1; j < cand.size(); ++j) {
+      if (pairCoverAllPaths(root, t1, t0, cand[i], cand[j])) {
+        coverPairs.emplace_back(cand[i], cand[j]);
+      }
+    }
+  }
+
+  // Sort lexicographically by (first, second).
+  std::sort(coverPairs.begin(), coverPairs.end(),
+            [](const auto &a, const auto &b) {
+              if (a.first != b.first)
+                return a.first < b.first;
+              return a.second < b.second;
+            });
+
+  return coverPairs;
 }
