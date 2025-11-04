@@ -17,7 +17,6 @@
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/BooleanLogic/ReadOnceBDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -693,62 +692,6 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   return condition;
 }
 
-/// Get a circuit out a boolean expression, depending on the different kinds
-/// of expressions you might have.
-static Value boolExpressionToCircuit(PatternRewriter &rewriter,
-                                     BoolExpression *expr, Block *block,
-                                     const ftd::BlockIndexing &bi) {
-
-  // Variable case
-  if (expr->type == ExpressionType::Variable)
-    return boolVariableToCircuit(rewriter, expr, block, bi);
-
-  // Constant case (either 0 or 1)
-  rewriter.setInsertionPointToStart(block);
-  auto sourceOp = rewriter.create<handshake::SourceOp>(
-      block->getOperations().front().getLoc());
-  Value cnstTrigger = sourceOp.getResult();
-
-  auto intType = rewriter.getIntegerType(1);
-  auto cstAttr = rewriter.getIntegerAttr(
-      intType, (expr->type == ExpressionType::One ? 1 : 0));
-
-  auto constOp = rewriter.create<handshake::ConstantOp>(
-      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
-
-  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return constOp.getResult();
-}
-
-/// Convert a `BDD` object as obtained from the bdd expansion to a
-/// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi) {
-  if (!bdd->successors.has_value())
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  rewriter.setInsertionPointToStart(block);
-
-  // Get the two operands by recursively calling `bddToCircuit` (it possibly
-  // creates other muxes in a hierarchical way)
-  SmallVector<Value> muxOperands;
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().first, block, bi));
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().second, block, bi));
-  Value muxCond =
-      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxOperands[0].getType(),
-      muxCond, muxOperands);
-  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return muxOp.getResult();
-}
-
 // Returns true if loop is a while loop, detected by the loop header being
 // also a loop exit and not a loop latch
 static bool isWhileLoop(CFGLoop *loop) {
@@ -785,7 +728,7 @@ static bool isWhileLoop(CFGLoop *loop) {
 ///      the recursion’s sinks are the next vertex-cut pair or the subgraph's
 ///      sinks.
 static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
-                          const ftd::BlockIndexing &bi, const ReadOnceBDD &bdd,
+                          const ftd::BlockIndexing &bi, const BDD &bdd,
                           unsigned startIdx, unsigned trueSinkIdx,
                           unsigned falseSinkIdx) {
 
@@ -1032,9 +975,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
 /// Convert the entire read-once BDD into a circuit by invoking buildMuxTree
 /// on the BDD root with terminal nodes {one, zero}. The result is a MUX tree
 /// in which each variable appears exactly once.
-static Value ReadOnceBDDToCircuit(PatternRewriter &rewriter, Block *block,
-                                  const ftd::BlockIndexing &bi,
-                                  const ReadOnceBDD &bdd) {
+static Value BDDToCircuit(PatternRewriter &rewriter, Block *block,
+                          const ftd::BlockIndexing &bi, const BDD &bdd) {
   return buildMuxTree(rewriter, block, bi, bdd, bdd.root(), bdd.one(),
                       bdd.zero());
 }
@@ -1099,21 +1041,14 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
     // Sort the cofactors alphabetically
     std::sort(cofactorList.begin(), cofactorList.end());
 
-    // // Apply a BDD expansion to the loop exit expression and the list of
-    // // cofactors
-    // BDD *bdd = buildBDD(fLoopExit, cofactorList);
-
-    // // Convert the boolean expression obtained through BDD to a circuit
-    // Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
-
-    // Build read-once BDD on the loop-exit condition and lower to mux chain
-    ReadOnceBDD ro;
-    if (failed(ro.buildFromExpression(fLoopExit, cofactorList))) {
-      llvm::errs() << "ReadOnceBDD: buildFromExpression failed in "
+    // Build BDD on the loop-exit condition and lower to mux chain
+    BDD robdd;
+    if (failed(robdd.buildFromExpression(fLoopExit, cofactorList))) {
+      llvm::errs() << "BDD: buildFromExpression failed in "
                       "addSuppressionInLoop.\n";
       std::abort();
     }
-    Value branchCond = ReadOnceBDDToCircuit(rewriter, loopExit, bi, ro);
+    Value branchCond = BDDToCircuit(rewriter, loopExit, bi, robdd);
 
     Operation *loopTerminator = loopExit->getTerminator();
     assert(isa<cf::CondBranchOp>(loopTerminator) &&
@@ -1218,18 +1153,16 @@ static void insertDirectSuppression(
     std::set<std::string> blocks = fSup->getVariables();
 
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-    // BDD *bdd = buildBDD(fSup, cofactorList);
-    // Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
-    // Build read-once BDD and lower to mux tree
-    ReadOnceBDD ro;
-    if (failed(ro.buildFromExpression(fSup, cofactorList))) {
-      llvm::errs() << "ReadOnceBDD: buildFromExpression failed in "
+    // Build BDD and lower to mux tree
+    BDD robdd;
+    if (failed(robdd.buildFromExpression(fSup, cofactorList))) {
+      llvm::errs() << "BDD: buildFromExpression failed in "
                       "insertDirectSuppression.\n";
       std::abort();
     }
     Value branchCond =
-        ReadOnceBDDToCircuit(rewriter, consumer->getBlock(), bi, ro);
+        BDDToCircuit(rewriter, consumer->getBlock(), bi, robdd);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
