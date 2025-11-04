@@ -15,6 +15,13 @@
 #include <gtest/gtest.h>
 
 class BasicFixture : public testing::TestWithParam<std::string> {};
+
+// Use CBC MILP solver to test a subset of MiscBenchmarks (CBC is slower than
+// Gurobi)
+class CBCSolverFixture : public testing::TestWithParam<std::string> {};
+
+// Use FPL22 placement algorithm on a small subset of MiscBenchmarks
+class FPL22Fixture : public testing::TestWithParam<std::string> {};
 class MemoryFixture : public testing::TestWithParam<std::string> {};
 class SharingFixture : public testing::TestWithParam<std::string> {};
 class SharingUnitTestFixture : public testing::TestWithParam<std::string> {};
@@ -27,12 +34,48 @@ TEST_P(BasicFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .useVerilog = false,
       .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
 }
+
+TEST_P(CBCSolverFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .milpSolver = "cbc",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+}
+
+#if 0
+TEST_P(FPL22Fixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpl22",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+}
+#endif
 
 //
 // This is an example test case which uses the Verilog backend.
@@ -56,6 +99,8 @@ TEST_P(MemoryFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
       .useVerilog = false,
       .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -73,6 +118,8 @@ TEST_P(SharingUnitTestFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
       .useVerilog = false,
       .useSharing = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -84,6 +131,8 @@ TEST_P(SharingUnitTestFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
       .useVerilog = false,
       .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -106,6 +155,8 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
       .useVerilog = false,
       .useSharing = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -117,6 +168,8 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
       .useVerilog = false,
       .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1
       // clang-format on
   };
@@ -129,7 +182,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
 }
 
-TEST_P(SpecFixture, spec_NoCI) {
+TEST_P(SpecFixture, spec) {
   const std::string &name = GetParam();
   int simTime = -1;
 
@@ -206,26 +259,69 @@ INSTANTIATE_TEST_SUITE_P(
       "test_loop_free"
       ),
       [](const auto &info) { return info.param; });
-// clang-format on
+
+// Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, CBCSolverFixture,
+    testing::Values(
+      "fir",
+      "histogram",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "matvec"
+      ),
+      [](const auto &info) { return info.param; });
+
+#if 0
+// Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, FPL22Fixture,
+    testing::Values(
+      "fir",
+      "histogram",
+      "if_loop_add",
+      "if_loop_mul", // Cannot break one combinational loop
+      "iir",
+      "matvec"
+      ),
+      [](const auto &info) { return info.param; });
+#endif 
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
-    testing::Values("test_flatten_array", "test_memory_1", "test_memory_2",
-                    "test_memory_3", "test_memory_4", "test_memory_5",
-                    "test_memory_6", "test_memory_7", "test_memory_8",
-                    "test_memory_9", "test_memory_10", "test_memory_11",
-                    "test_memory_12", "test_memory_13", "test_memory_14",
-                    "test_memory_15", "test_memory_16", "test_memory_17",
-                    "test_memory_18", "test_smallbound"),
+    testing::Values(
+      "test_flatten_array",
+      "test_memory_1",
+      "test_memory_2",
+      "test_memory_3",
+      "test_memory_4",
+      "test_memory_5",
+      "test_memory_6",
+      "test_memory_7",
+      "test_memory_8",
+      "test_memory_9",
+      "test_memory_10",
+      "test_memory_11",
+      "test_memory_12",
+      "test_memory_13",
+      "test_memory_14",
+      "test_memory_15",
+      "test_memory_16",
+      "test_memory_17",
+      "test_memory_18",
+      "test_smallbound"
+    ),
     [](const auto &info) { return "memory_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
-                         testing::Values("share_test_1", "share_test_2"),
-                         [](const auto &info) {
-                           return "sharing_" + info.param;
-                         });
+    testing::Values(
+      "share_test_1",
+      "share_test_2"),
+      [](const auto &info) {
+        return "sharing_" + info.param;
+      });
 
-// clang-format off
 INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
     testing::Values(
       "atax_float",
@@ -242,10 +338,17 @@ INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
     [](const auto &info) {
     return "sharing_" + info.param;
     });
-// clang-format on
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
-                         testing::Values("single_loop", "fixed", "if_convert",
-                                         "loop_path", "nested_loop", "sparse",
-                                         "subdiag", "subdiag_fast"),
-                         [](const auto &info) { return "spec_" + info.param; });
+    testing::Values(
+      "single_loop",
+      "fixed",
+      "if_convert",
+      "loop_path",
+      "nested_loop",
+      "sparse",
+      "subdiag",
+      "subdiag_fast"
+      ),
+    [](const auto &info) { return "spec_" + info.param; });
+// clang-format on

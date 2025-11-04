@@ -24,9 +24,6 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -91,56 +88,54 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
   }
 }
 
-BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
+                                         int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod)
-    : MILP<BufferPlacement>(env), timingDB(timingDB),
+    : MILP<BufferPlacement>(solverKind, timeout), timingDB(timingDB),
       targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr) {
   initialize();
 }
 
-BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
+                                         int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod, Logger &logger,
                                          StringRef milpName)
-    : MILP<BufferPlacement>(env, logger.getLogDir() +
-                                     llvm::sys::path::get_separator() +
-                                     milpName),
+    : MILP<BufferPlacement>(solverKind, timeout,
+                            logger.getLogDir() +
+                                llvm::sys::path::get_separator() + milpName),
       timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),
       logger(&logger) {
   initialize();
 }
 
 void BufferPlacementMILP::addChannelVars(Value channel,
-                                         ArrayRef<SignalType> signals) {
+                                         ArrayRef<SignalType> signalTypes) {
 
   // Default-initialize channel variables and retrieve a reference
   ChannelVars &chVars = vars.channelVars[channel];
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
-  // Create a Gurobi variable of the given name and type for the channel
-  auto createVar = [&](const llvm::Twine &name, char type) {
-    return model.addVar(0, GRB_INFINITY, 0.0, type, (name + suffix).str());
+  // Create a CPVar variable of the given name and type for the channel
+  auto createVar = [&](const llvm::Twine &name, CPVar::VarType type) {
+    return model->addVar((name + suffix).str(), type, 0, std::nullopt);
   };
 
   // Signal-specific variables
-  for (SignalType sig : signals) {
+  for (SignalType sig : signalTypes) {
     ChannelSignalVars &signalVars = chVars.signalVars[sig];
     StringRef name = getSignalName(sig);
-    signalVars.path.tIn = createVar(name + "PathIn", GRB_CONTINUOUS);
-    signalVars.path.tOut = createVar(name + "PathOut", GRB_CONTINUOUS);
-    signalVars.bufPresent = createVar(name + "BufPresent", GRB_BINARY);
+    signalVars.path.tIn = createVar(name + "PathIn", CPVar::REAL);
+    signalVars.path.tOut = createVar(name + "PathOut", CPVar::REAL);
+    signalVars.bufPresent = createVar(name + "BufPresent", CPVar::BOOLEAN);
   }
 
   // Variables for placement information
-  chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
-  chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
-  chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
-  chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
-
-  // Update the model before returning so that these variables can be referenced
-  // safely during the rest of model creation
-  model.update();
+  chVars.bufPresent = createVar("bufPresent", CPVar::BOOLEAN);
+  chVars.bufNumSlots = createVar("bufNumSlots", CPVar::INTEGER);
+  chVars.dataLatency = createVar("dataLatency", CPVar::INTEGER);
+  chVars.shiftReg = createVar("shiftReg", CPVar::BOOLEAN);
 }
 
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
@@ -148,10 +143,9 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
 
-  // Create a Gurobi variable of the given name (prefixed by the CFDFC index)
+  // Create a CPVar variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
-    return model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        (prefix + name).str());
+    return model->addVar((prefix + name).str(), CPVar::REAL, 0, std::nullopt);
   };
 
   // Create a set of variables for each unit in the CFDFC
@@ -182,10 +176,6 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a variable for the CFDFC's throughput
   cfVars.throughput = createVar("throughput");
-
-  // Update the model before returning so that these variables can be referenced
-  // safely during the rest of model creation
-  model.update();
 }
 
 void BufferPlacementMILP::addChannelTimingConstraints(
@@ -196,50 +186,50 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   double bigCst = targetPeriod * 10;
 
   // Sum up conditional delays of buffers before the one that cuts the path
-  GRBLinExpr bufsBeforeDelay;
+  LinExpr bufsBeforeDelay;
   for (const BufferingGroup &group : before)
     bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
                        group.getCombinationalDelay(channel, signalType);
 
   // Sum up conditional delays of buffers after the one that cuts the path
-  GRBLinExpr bufsAfterDelay;
+  LinExpr bufsAfterDelay;
   for (const BufferingGroup &group : after)
     bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
                       group.getCombinationalDelay(channel, signalType);
 
   ChannelBufProps &props = channelProps[channel];
   ChannelSignalVars &signalVars = chVars.signalVars[signalType];
-  GRBVar &t1 = signalVars.path.tIn;
-  GRBVar &t2 = signalVars.path.tOut;
-  GRBVar &bufPresent = signalVars.bufPresent;
+  CPVar &t1 = signalVars.path.tIn;
+  CPVar &t2 = signalVars.path.tOut;
+  CPVar &bufPresent = signalVars.bufPresent;
   auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
 
   // Arrival time at channel's output must be lower than target clock period
-  model.addConstr(t2 <= targetPeriod, "path_period");
+  model->addConstr(t2 <= targetPeriod, "path_period");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
   // signals before its own, and inside its own buffer's input pin logic
   double preBufCstDelay = props.inDelay + inBufDelay;
-  model.addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
-                      targetPeriod,
-                  "path_bufferedChannelIn");
+  model->addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
+                       targetPeriod,
+                   "path_bufferedChannelIn");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // channel's output must be greater than the propagation time through its own
   // buffer's output pin logic and all potential buffers cutting other signals
   // after its own
   double postBufCstDelay = outBufDelay + props.outDelay;
-  model.addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
-                  "path_bufferedChannelOut");
+  model->addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
+                   "path_bufferedChannelOut");
 
   // If there are no buffers cutting the signal's path, arrival time at
   // channel's output must still propagate through entire channel and all
   // potential buffers cutting through other signals
-  GRBLinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
-  model.addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
-                  "path_unbufferedChannel");
+  LinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
+  model->addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
+                   "path_unbufferedChannel");
 }
 
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
@@ -269,11 +259,11 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       if (signalType == SignalType::READY)
         std::swap(in, out);
 
-      GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
-      GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
+      CPVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
+      CPVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
-      model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+      model->addConstr(tOutPort >= tInPort + delay, "path_combDelay");
     });
 
     return;
@@ -293,10 +283,10 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       inPortDelay = 0.0;
 
     TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
-    GRBVar &tInPort = path.tOut;
+    CPVar &tInPort = path.tOut;
     // Arrival time at unit's input port + input port delay must be less
     // than the target clock period
-    model.addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
+    model->addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
   }
 
   // Output port constraints
@@ -310,63 +300,62 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       outPortDelay = 0.0;
 
     TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
-    GRBVar &tOutPort = path.tIn;
+    CPVar &tOutPort = path.tIn;
     // Arrival time at unit's output port is equal to the output port delay
-    model.addConstr(tOutPort == outPortDelay, "path_outDelay");
+    model->addConstr(tOutPort == outPortDelay, "path_outDelay");
   }
 }
 
 void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufPresent = chVars.bufPresent;
-  GRBVar &bufNumSlots = chVars.bufNumSlots;
+  CPVar &bufPresent = chVars.bufPresent;
+  CPVar &bufNumSlots = chVars.bufNumSlots;
 
   // If there is at least one slot, there must be a buffer
-  model.addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
+  model->addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
 
   for (auto &[sig, signalVars] : chVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
     // on the channel
-    model.addConstr(signalVars.bufPresent <= bufPresent,
-                    getSignalName(sig).str() + "_Presence");
+    model->addConstr(signalVars.bufPresent <= bufPresent,
+                     getSignalName(sig).str() + "_Presence");
   }
 }
 
 void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufNumSlots = chVars.bufNumSlots;
-  GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
-  GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
-  GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-  GRBVar &dataLatency = chVars.dataLatency;
+  CPVar &bufNumSlots = chVars.bufNumSlots;
+  CPVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
+  CPVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+  CPVar &dataLatency = chVars.dataLatency;
 
   // There is a buffer breaking data & valid iff dataLatency > 0
-  model.addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
-  model.addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
-  model.addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
-  model.addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
+  model->addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
+  model->addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
+  model->addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model->addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
 
   // The dataBuf and validBuf must be equal
   // This constraint is not necessary, but may assist presolve.
-  model.addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
+  model->addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
   // There must be enough slots for data and ready buffers.
-  model.addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
+  model->addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
 }
 
 void BufferPlacementMILP::addBufferingGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufNumSlots = chVars.bufNumSlots;
+  CPVar &bufNumSlots = chVars.bufNumSlots;
 
   // Compute the sum of the binary buffer presence over all signals that have
   // different buffers
-  GRBLinExpr disjointBufPresentSum;
+  LinExpr disjointBufPresentSum;
   for (const BufferingGroup &group : bufGroups) {
-    GRBVar &groupBufPresent =
-        chVars.signalVars[group.getRefSignal()].bufPresent;
+    CPVar &groupBufPresent = chVars.signalVars[group.getRefSignal()].bufPresent;
     disjointBufPresentSum += groupBufPresent;
 
     // For each group, the binary buffer presence variable of different signals
@@ -374,13 +363,13 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
     StringRef refName = getSignalName(group.getRefSignal());
     for (SignalType sig : group.getOtherSignals()) {
       StringRef otherName = getSignalName(sig);
-      model.addConstr(groupBufPresent == chVars.signalVars[sig].bufPresent,
-                      "elastic_" + refName.str() + "_same_" + otherName.str());
+      model->addConstr(groupBufPresent == chVars.signalVars[sig].bufPresent,
+                       "elastic_" + refName.str() + "_same_" + otherName.str());
     }
   }
 
   // There must be enough slots for all disjoint buffers
-  model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
+  model->addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
@@ -397,9 +386,10 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     /// stores that are connected to the LSQ and those that are not.
     /// In the new implementation, we use the MemInterfaceAttr to determine
     /// whether the StoreOp is connected to the LSQ or not.
-    if (isa<handshake::StoreOp>(dstOp) &&
-        getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()) {
-      continue;
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(dstOp)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (isa<handshake::LSQOp>(memOp))
+        continue;
     }
 
     /// TODO: The legacy implementation does not add any constraints here for
@@ -412,16 +402,16 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
         continue;
 
     // Retrieve the MILP variables we need
-    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
-    GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
-    GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+    CPVar &retSrc = cfVars.unitVars[srcOp].retOut;
+    CPVar &retDst = cfVars.unitVars[dstOp].retIn;
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
-    model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
-                    "throughput_channelRetiming");
+    model->addConstr(chTokenOccupancy - backedge == retDst - retSrc,
+                     "throughput_channelRetiming");
   }
 }
 
@@ -456,12 +446,12 @@ void BufferPlacementMILP::
     assert(dataFound && "missing data signal variables on channel variables");
 
     // Retrieve the MILP variables we need
-    GRBVar &dataBuf = dataVars->second.bufPresent;
-    GRBVar &bufNumSlots = chVars.bufNumSlots;
-    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+    CPVar &dataBuf = dataVars->second.bufPresent;
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
 
     // The channel's throughput cannot exceed the number of buffer slots.
-    model.addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
+    model->addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
@@ -482,8 +472,8 @@ void BufferPlacementMILP::
     // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
     //    otherwise, token occupancy >= 0 (enforced by the variable’s lower
     //    bound).
-    model.addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
-                    "throughput_data");
+    model->addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
+                     "throughput_data");
     // In terms of the constraint on readyBuf:
     // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
     //    otherwise, bubble occupancy >= 0.
@@ -501,7 +491,7 @@ void BufferPlacementMILP::
     // constraint already enforces it):
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      model.addConstr(
+      model->addConstr(
           chTokenOccupancy + cfVars.throughput + readyBuf - bufNumSlots <= 1,
           "throughput_ready");
     }
@@ -545,16 +535,16 @@ void BufferPlacementMILP::
     assert(readyFound && "missing ready signal variables on channel variables");
 
     // Retrieve the MILP variables we need
-    GRBVar &bufNumSlots = chVars.bufNumSlots;
-    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
-    GRBVar &throughput = cfVars.throughput;
-    GRBVar &dataLatency = chVars.dataLatency;
-    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-    GRBVar &shiftReg = chVars.shiftReg;
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+    CPVar &throughput = cfVars.throughput;
+    CPVar &dataLatency = chVars.dataLatency;
+    CPVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    CPVar &shiftReg = chVars.shiftReg;
 
     // Token occupancy >= data latency * CFDFC's throughput.
-    model.addQConstr(dataLatency * throughput <= chTokenOccupancy,
-                     "throughput_tokens_lb");
+    model->addQConstr(dataLatency * throughput <= chTokenOccupancy,
+                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
     std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
     // Shift registers have more bubbles if II is higher than 1 (i.e.,
@@ -566,16 +556,16 @@ void BufferPlacementMILP::
     //
     // Create an intermediate variable to represent the extra bubbles
     // of the SHIFT_REG_BREAK_DV buffer.
-    GRBVar shiftRegExtraBubbles = model.addVar(
-        0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegExtraBubblesName);
+    CPVar shiftRegExtraBubbles = model->addVar(shiftRegExtraBubblesName,
+                                               CPVar::INTEGER, 0, std::nullopt);
 
     // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
     // number (dataLatency) minus the ceiling of the product of data latency and
     // CFDFC throughput.
     // We approximate the ceiling function numerically to keep the model linear.
-    model.addQConstr(shiftRegExtraBubbles >=
-                         dataLatency - dataLatency * throughput - 0.99,
-                     shiftRegExtraBubblesName);
+    model->addQConstr(shiftRegExtraBubbles >=
+                          dataLatency - dataLatency * throughput - 0.99,
+                      shiftRegExtraBubblesName);
 
     // Combine the following into a unified constraint:
     // 1. If readyBuf is used, bubble occupancy limits the CFDFC's throughput,
@@ -591,10 +581,10 @@ void BufferPlacementMILP::
     // As a result, we model bubble occupancy as 'readyBuf * throughput'. This
     // term can be linearized, but it is not necessary because this is a
     // quadratic constaint.
-    model.addQConstr(chTokenOccupancy + readyBuf * throughput +
-                             shiftReg * shiftRegExtraBubbles <=
-                         bufNumSlots,
-                     "throughput_tokens_ub");
+    model->addQConstr(chTokenOccupancy + readyBuf * throughput +
+                              shiftReg * shiftRegExtraBubbles <=
+                          bufNumSlots,
+                      "throughput_tokens_ub");
   }
 }
 
@@ -609,13 +599,13 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
 
     // Retrieve the MILP variables corresponding to the unit's fluid retiming
     UnitVars &unitVars = cfVars.unitVars[unit];
-    GRBVar &retIn = unitVars.retIn;
-    GRBVar &retOut = unitVars.retOut;
+    CPVar &retIn = unitVars.retIn;
+    CPVar &retOut = unitVars.retOut;
 
     // The fluid retiming of tokens across the non-combinational unit must
     // be the same as its latency multiplied by the CFDFC's throughput
-    model.addConstr(cfVars.throughput * latency == retOut - retIn,
-                    "through_unitRetiming");
+    model->addConstr(cfVars.throughput * latency == retOut - retIn,
+                     "through_unitRetiming");
   }
 }
 
@@ -659,44 +649,42 @@ void BufferPlacementMILP::addBlackboxConstraints(
 
     // Path In variable of the channel that comes after blackbox module (output
     // of blackbox)
-    GRBVar &outputPathIn =
+    CPVar &outputPathIn =
         vars.channelVars[channel].signalVars[SignalType::DATA].path.tIn;
 
     // Path Out variable of the channel that comes before blackbox module (input
     // of blackbox)
-    GRBVar &inputPathOut =
+    CPVar &inputPathOut =
         vars.channelVars[inputChannel].signalVars[SignalType::DATA].path.tOut;
 
     // Delay propagation constraint for blackbox nodes. Delay propagates through
     // input edges to output edges, increasing by delay variable.
-    model.addConstr(inputPathOut + delay == outputPathIn,
-                    "blackbox_constraint_" + std::to_string(bitwidth));
+    model->addConstr(inputPathOut + delay == outputPathIn,
+                     "blackbox_constraint_" + std::to_string(bitwidth));
   }
-  model.update();
 }
 
 void BufferPlacementMILP::addCutSelectionConstraints(
     std::vector<experimental::Cut> &cutVector) {
-  GRBLinExpr cutSelectionSum = 0;
+  LinExpr cutSelectionSum = 0;
   for (size_t i = 0; i < cutVector.size(); ++i) {
     // Loop over cuts of the node
     auto &cut = cutVector[i];
-    // Add cut selection variable to the Gurobi model
-    GRBVar &cutSelection = cut.getCutSelectionVariable();
-    cutSelection = model.addVar(
-        0, GRB_INFINITY, 0, GRB_BINARY,
-        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)));
+    // Add cut selection variable to the CPVar model
+    CPVar &cutSelection = cut.getCutSelectionVariable();
+    cutSelection = model->addVar(
+        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)),
+        CPVar::BOOLEAN, 0, std::nullopt);
     cutSelectionSum += cutSelection;
   }
-  model.update();
   // Cut Selection Constraint. Only a single cut of a node can be selected.
   // This affects delay propagation, as delay will propagate through the chosen
   // cut.
-  model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
+  model->addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
 void BufferPlacementMILP::addCutSelectionConflicts(
-    experimental::Node *root, experimental::Node *leaf, GRBVar &cutSelectionVar,
+    experimental::Node *root, experimental::Node *leaf, CPVar &cutSelectionVar,
     experimental::LogicNetwork *blifData,
     std::vector<experimental::Node *> &path) {
   // Loop over edges in the path from the leaf to the root.
@@ -706,20 +694,21 @@ void BufferPlacementMILP::addCutSelectionConflicts(
       // if it is cut by a buffer, as LUTs cannot cover multiple sequential
       // stages. This constraint ensures an edge is either covered by a LUT, or
       // a buffer is inserted on the edge.
-      model.addConstr(1 >= nodePath->gurobiVars->bufferVar + cutSelectionVar,
-                      "cut_selection_conflict");
+      model->addConstr(1 >= nodePath->subjectGraphVars->bufferVar +
+                                cutSelectionVar,
+                       "cut_selection_conflict");
     }
   }
 }
 
 void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
-    // Gurobi variables of the node
-    GRBVar &nodeVarIn = node->gurobiVars->tIn;
-    GRBVar &nodeVarOut = node->gurobiVars->tOut;
-    GRBVar &bufVarSignal = node->gurobiVars->bufferVar;
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
 
-    // If the AIG node is a channel, match the Gurobi variables of the AIG
+    // If the AIG node is a channel, match the CPVar variables of the AIG
     // node with channel variables
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
@@ -738,8 +727,7 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     } else {
       // Create the timing variable for Subject Graph Node. These Nodes need
       // only 1 timing variable, as no buffers can be placed between them.
-      nodeVarIn =
-          model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
+      nodeVarIn = model->addVar(node->str(), CPVar::REAL, 0, std::nullopt);
       nodeVarOut = nodeVarIn;
     }
   }
@@ -748,28 +736,27 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
 void BufferPlacementMILP::addClockPeriodConstraintsNodes(
     experimental::LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
-    // Gurobi variables of the node
-    GRBVar &nodeVarIn = node->gurobiVars->tIn;
-    GRBVar &nodeVarOut = node->gurobiVars->tOut;
-    GRBVar &bufVarSignal = node->gurobiVars->bufferVar;
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
 
     // Add timing constraints for the node.
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
 
       // Add clock period constraints
-      model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
-      model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
-      model.addConstr(nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0,
-                      "buf_delay");
+      model->addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+      model->addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+      model->addConstr(nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0,
+                       "buf_delay");
     } else {
       // If the node is a Primary Input, the delay is 0.
-      model.addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
-                      node->isPrimaryInput() ? "input_delay"
-                                             : "clock_period_constraint");
+      model->addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
+                       node->isPrimaryInput() ? "input_delay"
+                                              : "clock_period_constraint");
     }
   }
-  model.update();
 }
 
 void BufferPlacementMILP::addDelayAndCutConflictConstraints(
@@ -777,25 +764,25 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
     experimental::LogicNetwork *blifData, double lutDelay) {
   // Using cuts map to loop over subject graph edges, and adds delay
   // propagation constraints to the nodes that have cuts
-  GRBVar &nodeVar = root->gurobiVars->tIn;
+  CPVar &nodeVar = root->subjectGraphVars->tIn;
   std::set<experimental::Node *> fanIns = root->fanins;
 
   if (fanIns.size() == 1) {
     // If a node has single fanin, then it is not mapped to LUT. The
     // delay of the node is simply equal to the delay of the fanin.
-    GRBVar &faninVar = (*fanIns.begin())->gurobiVars->tOut;
-    model.addConstr(nodeVar == faninVar, "single_fanin_delay");
+    CPVar &faninVar = (*fanIns.begin())->subjectGraphVars->tOut;
+    model->addConstr(nodeVar == faninVar, "single_fanin_delay");
     return;
   }
 
   for (auto &cut : cutVector) {
     // Loop over the cuts of the subject graph edge
-    GRBVar &cutSelectionVar = cut.getCutSelectionVariable();
+    CPVar &cutSelectionVar = cut.getCutSelectionVariable();
     auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
                                              const char *name) {
-      GRBVar &leafVar = leaf->gurobiVars->tOut;
+      CPVar &leafVar = leaf->subjectGraphVars->tOut;
       // Add delay propagation constraint
-      model.addConstr(
+      model->addConstr(
           nodeVar + (1 - cutSelectionVar) * 100 >= leafVar + lutDelay, name);
     };
 
@@ -819,65 +806,68 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
 std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
   std::vector<Value> channelsToBuffer;
 
-  // Create a new Gurobi Model
-  GRBEnv envFeedback = GRBEnv(true);
-  envFeedback.set(GRB_IntParam_OutputFlag, 0);
-  envFeedback.start();
-  GRBModel modelFeedback = GRBModel(envFeedback);
+  std::unique_ptr<CPSolver> modelFeedback;
+
+  if (isa<CbcSolver>(this->model)) {
+    modelFeedback = std::make_unique<CbcSolver>();
+  }
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  else if (isa<GurobiSolver>(this->model)) {
+    modelFeedback = std::make_unique<GurobiSolver>();
+  }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  else {
+    llvm_unreachable("Aborting on unimplemented solver type!");
+  }
 
   // Maps operations to GRBVars that holds the topological order index of MLIR
   // Operations
-  DenseMap<Operation *, GRBVar> opToGRB;
+  DenseMap<Operation *, CPVar> opToGRB;
 
   funcInfo.funcOp.walk([&](Operation *op) {
-    // Create a Gurobi variable for each operation, which will hold the order of
+    // Create a CPVar variable for each operation, which will hold the order of
     // the Operation in the topological ordering
     StringRef uniqueName = getUniqueName(op);
-    GRBVar operationVariable = modelFeedback.addVar(
-        0, GRB_INFINITY, 0.0, GRB_INTEGER, uniqueName.str());
+    CPVar operationVariable = modelFeedback->addVar(
+        uniqueName.str(), CPVar::INTEGER, 0, std::nullopt);
     opToGRB[op] = operationVariable;
   });
 
-  modelFeedback.update();
-
-  DenseMap<std::pair<Operation *, Operation *>, GRBVar> edgeToOps;
+  DenseMap<std::pair<Operation *, Operation *>, CPVar> edgeToOps;
 
   funcInfo.funcOp.walk([&](Operation *op) {
     // Add the constraint that forces topological ordering among adjacent
     // operations
     for (Operation *user : op->getUsers()) {
-      GRBVar currentOpVar = opToGRB[op];
-      GRBVar userOpVar = opToGRB[user];
-      GRBVar edge = modelFeedback.addVar(
-          0, 1, 0.0, GRB_BINARY,
-          (getUniqueName(op) + "_" + getUniqueName(user)).str());
+      CPVar currentOpVar = opToGRB[op];
+      CPVar userOpVar = opToGRB[user];
+      CPVar edge = modelFeedback->addVar(
+          (getUniqueName(op) + "_" + getUniqueName(user)).str(), CPVar::BOOLEAN,
+          0, 1);
       edgeToOps[std::make_pair(op, user)] = edge;
-      modelFeedback.update();
       // This constraint enforces topological order, by forcing successor
       // operations to have a bigger larger index in the topological order than
       // their predecessors. If such an order cannot be satisfied with the given
       // set of nodes, "edge" variable is set to 1, which means the edge needs
       // to be cut to have an acyclic graph.
-      modelFeedback.addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
-                              "operation_order");
+      modelFeedback->addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
+                               "operation_order");
     }
   });
 
-  modelFeedback.update();
-
   // Minimize the number of edges that needs to be removed
-  GRBLinExpr obj = 0;
+  LinExpr obj = 0;
   for (const auto &entry : edgeToOps) {
     obj += entry.second;
   }
 
-  modelFeedback.setObjective(obj, GRB_MINIMIZE);
-  modelFeedback.update();
+  // Minimizing: maximizing the minus
+  modelFeedback->setMaximizeObjective(-obj);
 
   // Solve the model
-  modelFeedback.optimize();
+  modelFeedback->optimize();
 
-  // Loop over Gurobi Variables (edgeVar) to see which Channels are chosen
+  // Loop over CPVar Variables (edgeVar) to see which Channels are chosen
   // to be cut with buffers.
   for (const auto &entry : edgeToOps) {
     auto ops = entry.first;
@@ -885,7 +875,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
     auto *inputOp = ops.first;
     auto *outputOp = ops.second;
 
-    if (edgeVar.get(GRB_DoubleAttr_X) > 0) {
+    if (modelFeedback->getValue(edgeVar) > 0) {
       for (Value channel : outputOp->getOperands()) {
         // no buffers on MCs because they form self loops
         if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
@@ -905,13 +895,13 @@ void BufferPlacementMILP::cutGraphEdges(Value channel) {
   Operation *producer = channel.getDefiningOp();
   Operation *consumer = *channel.getUsers().begin();
   //
-  GRBVar &bufVar =
+  CPVar &bufVar =
       vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
-  model.addConstr(bufVar == 1, "backedge_ready");
+  model->addConstr(bufVar == 1, "backedge_ready");
 
-  GRBVar &bufVarData =
+  CPVar &bufVarData =
       vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
-  model.addConstr(bufVarData == 1, "backedge_data");
+  model->addConstr(bufVarData == 1, "backedge_data");
   // Insert buffers in the Subject Graph
   experimental::BufferSubjectGraph::createAndInsertNewBuffer(
       producer, consumer, "one_slot_break_dvr");
@@ -944,7 +934,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   }
 
   // Create the expression for the MILP objective
-  GRBLinExpr objective;
+  LinExpr objective;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -974,7 +964,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   }
 
   // Finally, set the MILP objective
-  model.setObjective(objective, GRB_MAXIMIZE);
+  model->setMaximizeObjective(objective);
 }
 
 void BufferPlacementMILP::addBufferAreaAwareObjective(
@@ -987,7 +977,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   }
 
   // Create the expression for the MILP objective
-  GRBLinExpr objective = 0;
+  LinExpr objective = 0;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -1027,28 +1017,28 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   double shiftRegSlotPenaltyMul = 1e-7;
   for (Value channel : channels) {
     ChannelVars &chVars = vars.channelVars[channel];
-    GRBVar &bufPresent = chVars.bufPresent;
-    GRBVar &bufNumSlots = chVars.bufNumSlots;
-    GRBVar &dataLatency = chVars.dataLatency;
-    GRBVar &shiftReg = chVars.shiftReg;
+    CPVar &bufPresent = chVars.bufPresent;
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &dataLatency = chVars.dataLatency;
+    CPVar &shiftReg = chVars.shiftReg;
     objective -= maxCoefCFDFC * bufPenaltyMul * bufPresent;
     objective -=
         maxCoefCFDFC * largeSlotPenaltyMul * (bufNumSlots - dataLatency);
     objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
 
     // Linearization of dataLatency * shiftReg
-    GRBVar latencyMulShiftReg =
-        model.addVar(0, 100, 0.0, GRB_INTEGER, "latencyMulShiftReg");
-    model.addConstr(latencyMulShiftReg <= dataLatency);
-    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
-    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    CPVar latencyMulShiftReg =
+        model->addVar("latencyMulShiftReg", CPVar::INTEGER, 0, 100);
+    model->addConstr(latencyMulShiftReg <= dataLatency);
+    model->addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model->addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
     objective -=
         maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
     objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
   }
 
   // Finally, set the MILP objective
-  model.setObjective(objective, GRB_MAXIMIZE);
+  model->setMaximizeObjective(objective);
 }
 
 void BufferPlacementMILP::forEachIOPair(
@@ -1072,12 +1062,12 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   os << "# ========================== #\n\n";
 
   for (auto &[value, chVars] : vars.channelVars) {
-    if (chVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
+    if (model->getValue(chVars.bufPresent) == 0)
       continue;
 
     // Extract number and type of slots
     unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
 
     PlacementResult result = placement[value];
     ChannelBufProps &props = channelProps[value];
@@ -1107,7 +1097,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   // Log global CFDFC throuhgputs
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    double throughput = model->getValue(cfVars.throughput);
     os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
   }
 
@@ -1120,9 +1110,9 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
     os.indent();
-    for (auto [val, channelTh] : cfVars.channelThroughputs) {
+    for (auto &[val, channelTh] : cfVars.channelThroughputs) {
       os << getUniqueName(*val.getUses().begin()) << ": "
-         << channelTh.get(GRB_DoubleAttr_X) << "\n";
+         << model->getValue(channelTh) << "\n";
     }
     os.unindent();
     os << "\n";
@@ -1137,5 +1127,3 @@ void BufferPlacementMILP::initialize() {
   auto ops = funcInfo.funcOp.getOps();
   largeCst = std::distance(ops.begin(), ops.end()) + 2;
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

@@ -44,10 +44,16 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl
-             << "set-clock-period 5" << std::endl
-             << "compile --buffer-algorithm fpga20 "
-             << (config.useSharing ? "--sharing" : "") << std::endl
-             << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
+             << "set-clock-period 5" << std::endl;
+
+  // clang-format off
+  scriptFile << "compile"
+             << " --buffer-algorithm " << config.bufferAlgorithm
+             << (config.useSharing ? " --sharing" : "")
+             << " --milp-solver " << config.milpSolver << std::endl;
+  // clang-format on
+
+  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
              << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
@@ -99,6 +105,8 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
 
   const std::string RTL_CONFIG =
       fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
+
+  const std::string SIMULATOR_NAME = "vsim"; // modelsim
 
   fs::path cFilePath =
       fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
@@ -161,7 +169,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
 
   fs::path handshakeBuffered = compOutDir / "handshakeBuffered.mlir";
   std::string timingModel =
-      (fs::path(DYNAMATIC_ROOT) / "data" / "components-flopoco.json").string();
+      (fs::path(DYNAMATIC_ROOT) / "data" / "components.json").string();
   if (!runSubprocess(
           {DYNAMATIC_OPT_BIN, handshakeTransformed.string(),
            "--handshake-set-buffering-properties=version=fpga20",
@@ -255,7 +263,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   std::cout << "Simulator launching\n";
   if (std::system((SIMULATE_SH + " " + DYNAMATIC_ROOT + " " +
                    cFileDir.string() + " " + outDir.string() + " " + name +
-                   " \"\" " + "false")
+                   " \"\" " + "false" + " " + SIMULATOR_NAME)
                       .c_str()) != 0) {
     std::cerr << "Failed to simulate\n";
     return false;

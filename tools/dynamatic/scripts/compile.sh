@@ -18,6 +18,7 @@ FPUNITS_GEN=$8
 USE_RIGIDIFICATION=${9}
 DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
+MILP_SOLVER=${12}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -181,6 +182,7 @@ if [[ $USE_SHARING -ne 0 ]]; then
   echo_info "Set to apply credit-based sharing after buffer placement."
 fi
 
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
@@ -188,7 +190,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
@@ -207,13 +209,15 @@ else
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
+  echo_info "Set to use \"$MILP_SOLVER\" to solve buffer placement MILP!"
+
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
