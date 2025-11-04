@@ -25,6 +25,8 @@
 #include "llvm/Support/JSON.h"
 #include <map>
 #include <string>
+#include "mlir/IR/Types.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
 namespace dynamatic {
 
@@ -53,6 +55,42 @@ replaceRegexes(StringRef input,
 /// performed.
 std::string substituteParams(StringRef input,
                              const ParameterMappings &parameters);
+
+
+/// Returns the bitwidth of the type as string. If the type is a control type 0.
+inline std::string getBitwidthString(mlir::Type type) {
+  return std::to_string(dynamatic::handshake::getHandshakeTypeBitWidth(type));
+}
+
+/// Serialize all extra signals present to string.
+inline std::string serializeExtraSignals(const mlir::Type &type) {
+  assert(type.isa<dynamatic::handshake::ExtraSignalsTypeInterface>() &&
+         "type should be ChannelType or ControlType");
+
+  dynamatic::handshake::ExtraSignalsTypeInterface extraSignalsType =
+      type.cast<dynamatic::handshake::ExtraSignalsTypeInterface>();
+
+  std::string extraSignalsValue;
+  llvm::raw_string_ostream extraSignals(extraSignalsValue);
+
+  extraSignals << "{";
+  bool first = true;
+  for (const dynamatic::handshake::ExtraSignal &extraSignal :
+       extraSignalsType.getExtraSignals()) {
+    if (!first)
+      extraSignals << ", ";
+    first = false;
+
+    extraSignals << "\"" << extraSignal.name << "\": ";
+    extraSignals << extraSignal.getBitWidth();
+  }
+  extraSignals << "}";
+
+  return std::string("'") + extraSignals.str() + std::string("'");
+}
+
+/// Compute serialized parameters from a handshake operation
+dynamatic::ParameterMappings computeSerializedParameters(llvm::StringRef handshakeOp, hw::ModuleType modType);
 
 class RTLMatch;
 class RTLParameter;
@@ -293,15 +331,7 @@ public:
   /// Temporary function. These parameters should be added to hw.parameters
   /// (generation_params in the future)
   LogicalResult registerParameters(hw::HWModuleExternOp &modOp);
-
-  LogicalResult registerBitwidthParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType);
-
-  LogicalResult registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
-                                              llvm::StringRef modName,
-                                              hw::ModuleType &modType);
-
+  
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
   /// output directory while generated components are produced by the

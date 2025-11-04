@@ -24,6 +24,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
@@ -98,6 +99,133 @@ static Type lowerType(Type type) {
       })
       .Default([](auto type) { return nullptr; });
 }
+
+// Compute serialized textual parameters (moved from RTL.cpp).
+dynamatic::ParameterMappings dynamatic::computeSerializedParameters(
+    llvm::StringRef handshakeOp, hw::ModuleType modType) {
+  ParameterMappings pm;
+
+  // Bitwidth
+  if (
+      // default
+      handshakeOp == "handshake.addi" || handshakeOp == "handshake.andi" ||
+      handshakeOp == "handshake.buffer" || handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.fork" || handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.merge" || handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.sink" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.shli" || handshakeOp == "handshake.blocker" ||
+      handshakeOp == "handshake.uitofp" || handshakeOp == "handshake.sitofp" ||
+      handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.rigidifier" || handshakeOp == "handshake.ori" ||
+      handshakeOp == "handshake.shrsi" || handshakeOp == "handshake.xori" ||
+      handshakeOp == "handshake.negf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.shrui" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
+      // the first input has data bitwidth
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.spec_commit" ||
+      handshakeOp == "handshake.spec_save_commit" ||
+      handshakeOp == "handshake.sharing_wrapper" ||
+      handshakeOp == "handshake.non_spec") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.cond_br" ||
+             handshakeOp == "handshake.select") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.constant") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (handshakeOp == "handshake.control_merge") {
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["INDEX_BITWIDTH"] = getBitwidthString(modType.getOutputType(1));
+  } else if (handshakeOp == "handshake.extsi" ||
+             handshakeOp == "handshake.trunci" ||
+             handshakeOp == "handshake.extui") {
+    pm["INPUT_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["OUTPUT_BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (handshakeOp == "handshake.load") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getOutputType(1));
+  } else if (handshakeOp == "handshake.mux") {
+    pm["INDEX_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.store") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.speculating_branch") {
+    pm["SPEC_TAG_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.mem_controller" ||
+             handshakeOp == "handshake.lsq") {
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
+  } else if (handshakeOp == "mem_to_bram") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(4));
+  } else if (handshakeOp == "handshake.addf" ||
+             handshakeOp == "handshake.cmpf" ||
+             handshakeOp == "handshake.mulf" ||
+             handshakeOp == "handshake.subf" ||
+             handshakeOp == "handshake.divf") {
+    int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
+    pm["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
+  } else if (handshakeOp == "handshake.valid_merger") {
+    pm["LEFT_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["RIGHT_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "mem_controller" ||
+             handshakeOp == "handshake.truncf" ||
+             handshakeOp == "handshake.extf" ||
+             handshakeOp == "handshake.maximumf" ||
+             handshakeOp == "handshake.minimumf" ||
+             handshakeOp == "handshake.join") {
+    // nothing
+  } else if (handshakeOp == "handshake.ram") {
+    pm["ADDR_WIDTH"] = getBitwidthString(modType.getInputType(1));
+    pm["DATA_WIDTH"] = getBitwidthString(modType.getInputType(4));
+  }
+
+  // Extra signals
+  if (
+      // default
+      handshakeOp == "handshake.addf" || handshakeOp == "handshake.addi" ||
+      handshakeOp == "handshake.andi" || handshakeOp == "handshake.buffer" ||
+      handshakeOp == "handshake.cmpf" || handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.cond_br" ||
+      handshakeOp == "handshake.constant" || handshakeOp == "handshake.extsi" ||
+      handshakeOp == "handshake.fork" || handshakeOp == "handshake.merge" ||
+      handshakeOp == "handshake.mulf" || handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.select" || handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.subf" || handshakeOp == "handshake.extui" ||
+      handshakeOp == "handshake.shli" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.spec_save_commit" ||
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.trunci" || handshakeOp == "handshake.mux" ||
+      handshakeOp == "handshake.control_merge" ||
+      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
+      handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.truncf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
+      handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
+      // the first input has extra signals
+      handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
+      handshakeOp == "handshake.spec_commit" ||
+      handshakeOp == "handshake.speculating_branch") {
+    pm["EXTRA_SIGNALS"] = serializeExtraSignals(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "handshake.non_spec") {
+    pm["EXTRA_SIGNALS"] = serializeExtraSignals(modType.getOutputType(0));
+  }
+
+  return pm;
+}
+
 
 namespace {
 
@@ -1109,6 +1237,23 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
     extModOp = builder.create<hw::HWModuleExternOp>(loc, modNameAttr,
                                                     modBuilder.getPortInfo());
     discriminator.setParameters(extModOp);
+
+    // Compute serialized textual parameters and put them to the external module so export-rtl can read them.
+    MLIRContext *ctx = extModOp.getContext();
+    StringRef rtlName = extModOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
+    auto serialized = dynamatic::computeSerializedParameters(rtlName,
+                                                            extModOp.getModuleType());
+    std::vector<NamedAttribute> serialAttrs;
+    for (auto it = serialized.begin(); it != serialized.end(); ++it) {
+      StringRef key = it->first();
+      const std::string &val = it->second;
+      serialAttrs.emplace_back(StringAttr::get(ctx, key),
+                               StringAttr::get(ctx, val));
+    }
+    if (!serialAttrs.empty()){
+      extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"), DictionaryAttr::get(ctx, serialAttrs));
+    }
+    
     builder.restoreInsertionPoint(instInsertPoint);
   }
 
@@ -1905,6 +2050,17 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
                           IntegerAttr::get(i32, memState.ports.addrWidth));
   extModOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                     DictionaryAttr::get(ctx, parameters));
+  // Compute and add serialized parameters so the RTL exporter can read them
+  {
+    ParameterMappings pm = dynamatic::computeSerializedParameters(HW_NAME, extModOp.getModuleType());
+    std::vector<NamedAttribute> serializedAttrs;
+    for (auto it = pm.begin(); it != pm.end(); ++it) {
+      StringRef key = it->getKey();
+      std::string &val = it->getValue();
+      serializedAttrs.emplace_back(StringAttr::get(ctx, key), StringAttr::get(ctx, val));
+    }
+    extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"), DictionaryAttr::get(ctx, serializedAttrs));
+  }
   return extModOp;
 }
 
