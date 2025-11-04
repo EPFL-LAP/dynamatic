@@ -205,7 +205,7 @@ class LSQ:
                                                 for i in range(group_init_valid_i.length)) + "))"
 
             #! Define the needed logic
-            arch += "\t-- Define the intermediate logic\n"
+            arch += "\t-- This signal indicates that all mem. ops are completed and func. can return.\n"
             arch += "\t-- LSQ can return iff all the following conditions are true:\n"
             arch += "\t-- 1. No more upcoming BBs containing memory accesses.\n"
             arch += "\t-- 2. Both store and load queues are empty.\n"
