@@ -30,6 +30,7 @@ endif ()
 
 include(FindPackageHandleStandardArgs)
 find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
+find_package(Boost REQUIRED COMPONENTS)
 
 # Build Dynamatic with ccache if the package is present
 set(DYNAMATIC_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")
@@ -143,6 +144,24 @@ endfunction()
 find_package(GUROBI)
 if (GUROBI_FOUND)
   include_directories(${GUROBI_INCLUDE_DIRS})
+
+  # [START Check if the gurobi license is correctly set]
+  execute_process(
+      COMMAND gurobi_cl --license
+      OUTPUT_VARIABLE GRB_LICENSE_VERSION
+      RESULT_VARIABLE GRB_LICENSE_RESULT
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+
+  if(GRB_LICENSE_RESULT EQUAL 0)
+      message(STATUS "gurobi_cl found and the license is correctly set.")
+  else()
+      message(FATAL_ERROR "gurobi_cl not found or the license is not correctly
+      set. Please check out
+      https://github.com/EPFL-LAP/dynamatic/blob/main/docs/UserGuide/AdvancedBuild.md#1-gurobi")
+  endif()
+  # [END Check if the gurobi license is correctly set]
+
 else()
   message(WARNING "Gurobi wasn't found, the buffer placement algorithms \
                    that requires solving MILPs will not be built with the \
