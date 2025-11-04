@@ -421,111 +421,43 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
 // clang-format on
 
 // Verilog tests: CI safe
-INSTANTIATE_TEST_SUITE_P(
-    VerilogSharingTestsCI, VerilogSharingFixture,
-    testing::Values(
-      "share_test_1",
-      "share_test_2"
-    ),
-    [](const auto &info) { return "sharing_" + info.param; });
+INSTANTIATE_TEST_SUITE_P(VerilogSharingTestsCI, VerilogSharingFixture,
+                         testing::Values("share_test_1", "share_test_2"),
+                         [](const auto &info) {
+                           return "sharing_" + info.param;
+                         });
 
 INSTANTIATE_TEST_SUITE_P(
     VerilogMemoryTestsCI, VerilogMemoryFixture,
-    testing::Values(
-      "test_flatten_array",
-      "test_memory_1",
-      "test_memory_10",
-      "test_memory_11",
-      "test_memory_12",
-      "test_memory_13",
-      "test_memory_14",
-      "test_memory_15",
-      "test_memory_16",
-      "test_memory_17",
-      "test_memory_18",
-      "test_memory_2",
-      "test_memory_3",
-      "test_memory_4",
-      "test_memory_5",
-      "test_memory_6",
-      "test_memory_7",
-      "test_memory_8",
-      "test_memory_9",
-      "test_smallbound"
-    ),
+    testing::Values("test_flatten_array", "test_memory_1", "test_memory_10",
+                    "test_memory_11", "test_memory_12", "test_memory_13",
+                    "test_memory_14", "test_memory_15", "test_memory_16",
+                    "test_memory_17", "test_memory_18", "test_memory_2",
+                    "test_memory_3", "test_memory_4", "test_memory_5",
+                    "test_memory_6", "test_memory_7", "test_memory_8",
+                    "test_memory_9", "test_smallbound"),
     [](const auto &info) { return "memory_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(
     VerilogTestsCI, VerilogFixture,
-    testing::Values(
-      "bicg",
-      "binary_search",
-      "factorial",
-      "fir",
-      "gaussian",
-      "gcd",
-      "gemver",
-      "if_loop_1",
-      "if_loop_2",
-      "if_loop_3",
-      "iir",
-      "image_resize",
-      "insertion_sort",
-      "iterative_division",
-      "iterative_sqrt",
-      "jacobi_1d_imper",
-      "kernel_2mm",
-      "kernel_3mm",
-      "kmp",
-      "loop_array",
-      "matrix",
-      "matrix_power",
-      "matvec",
-      "mul_example",
-      "pivot",
-      "polyn_mult",
-      "simple_example_1",
-      "sobel",
-      "spmv",
-      "stencil_2d",
-      "sumi3_mem",
-      "test_loop_free",
-      "test_stdint",
-      "threshold",
-      "triangular",
-      "vector_rescale",
-      "video_filter",
-      "while_loop_1",
-      "while_loop_3"
-    ),
-    [](const auto &info) { return info.param; }
-);
+    testing::Values("bicg", "binary_search", "factorial", "fir", "gaussian",
+                    "gcd", "gemver", "if_loop_1", "if_loop_2", "if_loop_3",
+                    "iir", "image_resize", "insertion_sort",
+                    "iterative_division", "iterative_sqrt", "jacobi_1d_imper",
+                    "kernel_2mm", "kernel_3mm", "kmp", "loop_array", "matrix",
+                    "matrix_power", "matvec", "mul_example", "pivot",
+                    "polyn_mult", "simple_example_1", "sobel", "spmv",
+                    "stencil_2d", "sumi3_mem", "test_loop_free", "test_stdint",
+                    "threshold", "triangular", "vector_rescale", "video_filter",
+                    "while_loop_1", "while_loop_3"),
+    [](const auto &info) { return info.param; });
 
 // Verilog tests: NoCI
 INSTANTIATE_TEST_SUITE_P(
     VerilogTests_NoCI, VerilogFixture,
-    testing::Values(
-      "atax",
-      "atax_float",
-      "bicg_float",
-      "float_basic",
-      "gemm",
-      "gemm_float",
-      "gemver_float",
-      "gesummv_float",
-      "get_tanh",
-      "gsum",
-      "gsumif",
-      "histogram",
-      "if_loop_add",
-      "if_loop_mul",
-      "kernel_2mm_float",
-      "kernel_3mm_float",
-      "lu",
-      "matching",
-      "matching_2",
-      "mvt_float",
-      "symm_float",
-      "syr2k_float"
-    ),
+    testing::Values("atax", "atax_float", "bicg_float", "float_basic", "gemm",
+                    "gemm_float", "gemver_float", "gesummv_float", "get_tanh",
+                    "gsum", "gsumif", "histogram", "if_loop_add", "if_loop_mul",
+                    "kernel_2mm_float", "kernel_3mm_float", "lu", "matching",
+                    "matching_2", "mvt_float", "symm_float", "syr2k_float"),
     [](const auto &info) { return info.param; });

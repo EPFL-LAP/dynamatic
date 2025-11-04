@@ -19,14 +19,14 @@
 #define DYNAMATIC_SUPPORT_RTL_RTL_H
 
 #include "dynamatic/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTLTypes.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "mlir/IR/Types.h"
 #include "llvm/Support/JSON.h"
 #include <map>
 #include <string>
-#include "mlir/IR/Types.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
 namespace dynamatic {
 
@@ -55,7 +55,6 @@ replaceRegexes(StringRef input,
 /// performed.
 std::string substituteParams(StringRef input,
                              const ParameterMappings &parameters);
-
 
 /// Returns the bitwidth of the type as string. If the type is a control type 0.
 inline std::string getBitwidthString(mlir::Type type) {
@@ -90,7 +89,9 @@ inline std::string serializeExtraSignals(const mlir::Type &type) {
 }
 
 /// Compute serialized parameters from a handshake operation
-dynamatic::ParameterMappings computeSerializedParameters(llvm::StringRef handshakeOp, hw::ModuleType modType);
+dynamatic::ParameterMappings
+computeSerializedParameters(llvm::StringRef handshakeOp,
+                            hw::ModuleType modType);
 
 class RTLMatch;
 class RTLParameter;
@@ -331,7 +332,7 @@ public:
   /// Temporary function. These parameters should be added to hw.parameters
   /// (generation_params in the future)
   LogicalResult registerParameters(hw::HWModuleExternOp &modOp);
-  
+
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
   /// output directory while generated components are produced by the
