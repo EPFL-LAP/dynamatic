@@ -260,7 +260,7 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       } else {
         // // neither string nor integer attribute... use print method of
         // attribute std::string tmp; llvm::raw_string_ostream os(tmp);
-        // val.print(os);
+        // val.print(os); 
         // serializedParams[key.str()] = os.str();
         return failure();
       }
