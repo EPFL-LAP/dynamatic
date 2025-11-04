@@ -7,17 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements construction of a Binary Decision Diagram (BDD) from a
-// BoolExpression and basic analysis utilities. It provides:
-//
-//  * Building a reduced ordered BDD from a minimized BoolExpression and a user-
-//    defined variable order.
-//  * Traversing a subgraph defined by a designated root and two designated
-//    sinks.
-//  * Enumerating every vertex pair that covers all paths in the subgraph.
-//
-// Each internal node corresponds to a variable in the provided order. Two
-// terminal nodes (0 and 1) are always appended at the end. The implementation
-// assumes the boolean expression is already minimized and read-once compatible.
+// BoolExpression and basic analysis utilities.
 //
 //===----------------------------------------------------------------------===//
 
@@ -73,68 +63,6 @@ BDD::BDD() {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
-}
-
-LogicalResult
-BDD::buildOBDDTreeFromExpression(BoolExpression *expr,
-                                 const std::vector<std::string> &varOrder) {
-  nodes.clear();
-  order = varOrder;
-  rootIndex = 0;
-
-  if (!expr) {
-    llvm::errs() << "BDD: null expression\n";
-    return failure();
-  }
-
-  auto createNode =
-      [&](auto &&self, BoolExpression *exp,
-          const std::vector<std::string> &variableList) -> unsigned {
-    if (exp->type == ExpressionType::Variable ||
-        exp->type == ExpressionType::Zero || exp->type == ExpressionType::One) {
-      unsigned idx = nodes.size();
-      std::string leafVar;
-      if (exp->type == ExpressionType::Variable) {
-        leafVar = exp->toString();
-      } else if (exp->type == ExpressionType::Zero) {
-        leafVar = "0";
-      } else {
-        leafVar = "1";
-      }
-      nodes.emplace_back(BDDNode{leafVar, idx, idx, {}});
-      return idx;
-    }
-
-    // Assume variableList is not empty
-    const std::string &var = variableList[0];
-    std::vector<std::string> subList(std::next(variableList.begin()),
-                                     variableList.end());
-
-    BoolExpression *restrictedNegative = exp->deepCopy();
-    restrict(restrictedNegative, var, false);
-    restrictedNegative = restrictedNegative->boolMinimize();
-
-    BoolExpression *restrictedPositive = exp->deepCopy();
-    restrict(restrictedPositive, var, true);
-    restrictedPositive = restrictedPositive->boolMinimize();
-
-    unsigned negativeInput = self(self, restrictedNegative, subList);
-    unsigned positiveInput = self(self, restrictedPositive, subList);
-
-    unsigned idx = nodes.size();
-    nodes.emplace_back(BDDNode{var, negativeInput, positiveInput, {}});
-
-    nodes[negativeInput].preds.push_back(idx);
-    nodes[positiveInput].preds.push_back(idx);
-
-    delete restrictedNegative;
-    delete restrictedPositive;
-
-    return idx;
-  };
-
-  rootIndex = createNode(createNode, expr, order);
-  return success();
 }
 
 LogicalResult
@@ -266,7 +194,7 @@ void BDD::expandFrom(unsigned idx, BoolExpression *residual,
     expandFrom(tSucc, f1, expanded);
 }
 
-std::vector<unsigned> ReadOnceBDD::collectSubgraph(unsigned root, unsigned t1,
+std::vector<unsigned> BDD::collectSubgraph(unsigned root, unsigned t1,
                                                    unsigned t0) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
@@ -337,7 +265,7 @@ bool BDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
 }
 
 std::vector<std::pair<unsigned, unsigned>>
-BDD::listPathCoveringPairs(unsigned root, unsigned t1, unsigned t0) const {
+BDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
   // Collect and validate the subgraph (sorted, includes root/t1/t0).
   std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
   std::vector<std::pair<unsigned, unsigned>> coverPairs;

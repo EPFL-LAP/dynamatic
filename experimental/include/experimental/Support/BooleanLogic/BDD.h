@@ -7,17 +7,14 @@
 //===----------------------------------------------------------------------===//
 //
 // This file provides a Binary Decision Diagram (BDD) builder and
-// basic analysis utilities. A user-specified variable
-// order is respected.
+// basic analysis utilities. A user-specified variable order is respected.
 //
 // Provided functionality:
-//   * Construction from a minimized BoolExpression and a variable order.
-//   * Reduction to a canonical Reduced Ordered BDD (ROBDD).
-//   * Traversal of a subgraph with a designated root and two designated sinks.
+//   * BDD Construction from a minimized BoolExpression and a variable order.
+//   * Traversal of a BDD subgraph with a designated root and two designated
+//     sinks.
 //   * Enumeration of every vertex pair that covers all paths from the root to
 //     either sink inside that subgraph.
-//
-// This implementation assumes the expression is already minimized.
 //
 //===----------------------------------------------------------------------===//
 
@@ -59,14 +56,6 @@ public:
   /// Create an empty BDD.
   BDD();
 
-  /// Build a tree-structured ordered BDD reflecting Shannon expansion from a
-  /// minimized boolean expression and a variable order. Variables in `varOrder`
-  /// that do not appear in the expression are ignored. Returns `success()` on
-  /// success, or `failure()` if the input is invalid.
-  mlir::LogicalResult
-  buildOBDDTreeFromExpression(BoolExpression *expr,
-                              const std::vector<std::string> &varOrder);
-
   /// Build an ROBDD from a minimized boolean expression and a variable order.
   /// Variables in `varOrder` that do not appear in the expression are ignored.
   /// Returns `success()` on success, or `failure()` if the input is invalid.
@@ -89,7 +78,7 @@ public:
   /// defined by (root, tTrue, tFalse). Returns pairs sorted lexicographically
   /// (first ascending, then second ascending).
   std::vector<std::pair<unsigned, unsigned>>
-  listPathCoveringPairs(unsigned root, unsigned tTrue, unsigned tFalse) const;
+  pairCoverAllPathsList(unsigned root, unsigned tTrue, unsigned tFalse) const;
 
   /// Accessors.
   const std::vector<BDDNode> &getnodes() const { return nodes; }
@@ -99,7 +88,6 @@ public:
   unsigned root() const { return rootIndex; }
   unsigned one() const { return oneIndex; }
   unsigned zero() const { return zeroIndex; }
-  const std::vector<std::string> &getOrder() const { return order; }
 
 private:
   /// Storage: internal nodes first, then terminals zeroIndex and oneIndex.

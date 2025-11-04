@@ -710,13 +710,12 @@ static bool isWhileLoop(CFGLoop *loop) {
          !llvm::is_contained(latchBlocks, headerBlock);
 }
 
-/// Build a MUX tree for a read-once BDD subgraph delimited by
+/// Build a MUX tree for an ROBDD subgraph delimited by
 ///   startIdx  ->  {trueSinkIdx, falseSinkIdx}.
 /// Strategy:
-///   1) Enumerate all start–{true,false} two-vertex cuts (u,v) in ascending
-///   order,
-///      each cut instantiates one MUX stage.
-///   2) Input placement per pair (u,v):
+///   1) Enumerate all start–{true,false} all-paths-covering pairs (u,v) in
+///   ascending order, each pair instantiates one MUX stage. 2) Input placement
+///   per pair (u,v):
 ///        • Choose the largest common predecessor P of {u,v}.
 ///          Whichever endpoint equals P.trueSucc goes to the TRUE input;
 ///          the other goes to FALSE.
@@ -725,8 +724,8 @@ static bool isWhileLoop(CFGLoop *loop) {
 ///   3) Chain the MUXes: select(mux[0]) is the start condition; for i>0,
 ///      select(mux[i]) = out(mux[i-1]).
 ///   4) For non-constant inputs, recurse on the corresponding sub-region;
-///      the recursion’s sinks are the next vertex-cut pair or the subgraph's
-///      sinks.
+///      the recursion’s sinks are the next all-paths-covering pair or the
+///      subgraph's sinks.
 static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
                           const ftd::BlockIndexing &bi, const BDD &bdd,
                           unsigned startIdx, unsigned trueSinkIdx,
@@ -783,8 +782,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     unsigned nodeIdx = 0;
   };
 
-  // Decide how to connect the two endpoints (u, v) of a cut pair
-  // to the false/true inputs of a mux.
+  // Decide how to connect the two vertices (u, v) of a pair to the false/true
+  // inputs of a mux.
   auto decideInputsForPair =
       [&](unsigned u, unsigned v) -> std::pair<InputSpec, InputSpec> {
     // Convert a BDD node index to an InputSpec.
@@ -804,7 +803,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
       return -1;
     };
 
-    // Wrap the two cut endpoints into InputSpec objects.
+    // Wrap the two vertices in the pair into InputSpec objects.
     InputSpec A = nodeToSpec(u), B = nodeToSpec(v);
 
     // Direct edge -> successor becomes constant.
@@ -840,8 +839,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
                                                   : std::pair{B, A};
   };
 
-  // 2-vertex-cut pairs (sorted).
-  auto pairs = bdd.listTwoVertexCuts(startIdx, trueSinkIdx, falseSinkIdx);
+  // List all-paths-covering pairs (sorted).
+  auto pairs = bdd.pairCoverAllPathsList(startIdx, trueSinkIdx, falseSinkIdx);
 
   // No pair → no mux; return `start` condition (maybe inverted).
   if (pairs.empty()) {
@@ -885,7 +884,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     Operation *op = nullptr;
   };
 
-  // Build the list of mux stages from the given vertex-cut pairs
+  // Build the list of mux stages from the given all-paths-covering pairs
   std::vector<MuxSpec> muxChain;
   muxChain.reserve(pairs.size());
 
@@ -972,9 +971,9 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   return muxChain.back().out;
 }
 
-/// Convert the entire read-once BDD into a circuit by invoking buildMuxTree
-/// on the BDD root with terminal nodes {one, zero}. The result is a MUX tree
-/// in which each variable appears exactly once.
+/// Convert the entire ROBDD into a circuit by invoking buildMuxTree on the BDD
+/// root with terminal nodes {one, zero}. The result is a MUX tree in which each
+/// variable appears exactly once.
 static Value BDDToCircuit(PatternRewriter &rewriter, Block *block,
                           const ftd::BlockIndexing &bi, const BDD &bdd) {
   return buildMuxTree(rewriter, block, bi, bdd, bdd.root(), bdd.one(),
@@ -1043,8 +1042,8 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
     // Build BDD on the loop-exit condition and lower to mux chain
     BDD robdd;
-    if (failed(robdd.buildFromExpression(fLoopExit, cofactorList))) {
-      llvm::errs() << "BDD: buildFromExpression failed in "
+    if (failed(robdd.buildROBDDFromExpression(fLoopExit, cofactorList))) {
+      llvm::errs() << "BDD: buildROBDDFromExpression failed in "
                       "addSuppressionInLoop.\n";
       std::abort();
     }
@@ -1156,13 +1155,12 @@ static void insertDirectSuppression(
 
     // Build BDD and lower to mux tree
     BDD robdd;
-    if (failed(robdd.buildFromExpression(fSup, cofactorList))) {
-      llvm::errs() << "BDD: buildFromExpression failed in "
+    if (failed(robdd.buildROBDDFromExpression(fSup, cofactorList))) {
+      llvm::errs() << "BDD: buildROBDDFromExpression failed in "
                       "insertDirectSuppression.\n";
       std::abort();
     }
-    Value branchCond =
-        BDDToCircuit(rewriter, consumer->getBlock(), bi, robdd);
+    Value branchCond = BDDToCircuit(rewriter, consumer->getBlock(), bi, robdd);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
