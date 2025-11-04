@@ -1945,7 +1945,7 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)) {}
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
