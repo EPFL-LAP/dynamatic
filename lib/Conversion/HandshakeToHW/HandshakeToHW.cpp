@@ -23,8 +23,8 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
-#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Support/RTL/RTL.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
@@ -101,8 +101,9 @@ static Type lowerType(Type type) {
 }
 
 // Compute serialized textual parameters (moved from RTL.cpp).
-dynamatic::ParameterMappings dynamatic::computeSerializedParameters(
-    llvm::StringRef handshakeOp, hw::ModuleType modType) {
+dynamatic::ParameterMappings
+dynamatic::computeSerializedParameters(llvm::StringRef handshakeOp,
+                                       hw::ModuleType modType) {
   ParameterMappings pm;
 
   // Bitwidth
@@ -226,7 +227,6 @@ dynamatic::ParameterMappings dynamatic::computeSerializedParameters(
   return pm;
 }
 
-
 namespace {
 
 /// Helper class to build HW modules progressively by adding inputs/outputs
@@ -235,7 +235,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -362,7 +362,7 @@ struct InternalMemLoweringState {
   InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
       : ramOp(ramOp), memInterface(memInterface),
-        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+        ports(getMemoryPorts(memInterface)), portNames(memInterface){};
 };
 
 /// Summarizes information to convert a Handshake function into a
@@ -475,7 +475,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -1049,7 +1049,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1238,11 +1238,13 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
                                                     modBuilder.getPortInfo());
     discriminator.setParameters(extModOp);
 
-    // Compute serialized textual parameters and put them to the external module so export-rtl can read them.
+    // Compute serialized textual parameters and put them to the external module
+    // so export-rtl can read them.
     MLIRContext *ctx = extModOp.getContext();
-    StringRef rtlName = extModOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
-    auto serialized = dynamatic::computeSerializedParameters(rtlName,
-                                                            extModOp.getModuleType());
+    StringRef rtlName =
+        extModOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
+    auto serialized = dynamatic::computeSerializedParameters(
+        rtlName, extModOp.getModuleType());
     std::vector<NamedAttribute> serialAttrs;
     for (auto it = serialized.begin(); it != serialized.end(); ++it) {
       StringRef key = it->first();
@@ -1250,10 +1252,11 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
       serialAttrs.emplace_back(StringAttr::get(ctx, key),
                                StringAttr::get(ctx, val));
     }
-    if (!serialAttrs.empty()){
-      extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"), DictionaryAttr::get(ctx, serialAttrs));
+    if (!serialAttrs.empty()) {
+      extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"),
+                        DictionaryAttr::get(ctx, serialAttrs));
     }
-    
+
     builder.restoreInsertionPoint(instInsertPoint);
   }
 
@@ -1942,8 +1945,7 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2),
-                         IOMapping(8, state.inputIdx, 1)) {};
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -2052,14 +2054,17 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
                     DictionaryAttr::get(ctx, parameters));
   // Compute and add serialized parameters so the RTL exporter can read them
   {
-    ParameterMappings pm = dynamatic::computeSerializedParameters(HW_NAME, extModOp.getModuleType());
+    ParameterMappings pm = dynamatic::computeSerializedParameters(
+        HW_NAME, extModOp.getModuleType());
     std::vector<NamedAttribute> serializedAttrs;
     for (auto it = pm.begin(); it != pm.end(); ++it) {
       StringRef key = it->getKey();
       std::string &val = it->getValue();
-      serializedAttrs.emplace_back(StringAttr::get(ctx, key), StringAttr::get(ctx, val));
+      serializedAttrs.emplace_back(StringAttr::get(ctx, key),
+                                   StringAttr::get(ctx, val));
     }
-    extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"), DictionaryAttr::get(ctx, serializedAttrs));
+    extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"),
+                      DictionaryAttr::get(ctx, serializedAttrs));
   }
   return extModOp;
 }

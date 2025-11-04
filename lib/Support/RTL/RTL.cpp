@@ -98,8 +98,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
-      };
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -249,7 +248,8 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
 LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   // Require precomputed serialized parameters attached during lowering as
   // the `hw.serialized_parameters` attribute.
-  if (auto dict = modOp->getAttrOfType<DictionaryAttr>("hw.serialized_parameters")) {
+  if (auto dict =
+          modOp->getAttrOfType<DictionaryAttr>("hw.serialized_parameters")) {
     for (auto namedAttr : dict.getValue()) {
       StringRef key = namedAttr.getName().getValue();
       Attribute val = namedAttr.getValue();
@@ -258,9 +258,8 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       } else if (auto i = val.dyn_cast<IntegerAttr>()) {
         serializedParams[key.str()] = std::to_string(i.getInt());
       } else {
-        // // neither string nor integer attribute... use print method of attribute
-        // std::string tmp;
-        // llvm::raw_string_ostream os(tmp);
+        // // neither string nor integer attribute... use print method of
+        // attribute std::string tmp; llvm::raw_string_ostream os(tmp);
         // val.print(os);
         // serializedParams[key.str()] = os.str();
         return failure();
