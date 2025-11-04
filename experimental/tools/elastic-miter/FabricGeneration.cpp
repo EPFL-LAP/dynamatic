@@ -491,7 +491,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // equivalent.
   llvm::SmallVector<Value> miterResultValues;
   Location loc = newFuncOp.getLoc();
-  size_t outputBufferSlots = timingInsensitive ? 1 : bufferSlots;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
@@ -505,46 +504,14 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string rhsBlockerName = "rhs_out_bl_" + outName;
     std::string eqName = "out_eq_" + outName;
 
-    Value blockerSource;
-    if (allowNonacceptance) {
-      NDSourceOp ndSourceOp = builder.create<NDSourceOp>(loc);
-      setHandshakeAttributes(builder, ndSourceOp, BB_OUT, "out_nds_" + outName);
-      blockerSource = ndSourceOp.getResult();
-    } else {
-      SourceOp sourceOp = builder.create<SourceOp>(loc);
-      setHandshakeAttributes(builder, sourceOp, BB_OUT, "out_src_" + outName);
-      blockerSource = sourceOp.getResult();
-    }
-
-    LazyForkOp lazyForkOp = builder.create<LazyForkOp>(loc, blockerSource, 2);
-    setHandshakeAttributes(builder, lazyForkOp, BB_OUT, "out_lf_" + outName);
-
-    BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
-        loc, lazyForkOp.getResults()[0], outputBufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    setHandshakeAttributes(builder, lhsNDSBufferOp, BB_OUT,
-                           "out_buf_lhs_nds_" + outName);
-    BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
-        loc, lazyForkOp.getResults()[1], outputBufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    setHandshakeAttributes(builder, rhsNDSBufferOp, BB_OUT,
-                           "out_buf_rhs_nds_" + outName);
-    Value lhsBlockerCtrl = lhsNDSBufferOp.getResult();
-    Value rhsBlockerCtrl = rhsNDSBufferOp.getResult();
-
-    BlockerOp lhsBlockerOp =
-        builder.create<BlockerOp>(loc, lhsResult, lhsBlockerCtrl);
-    setHandshakeAttributes(builder, lhsBlockerOp, BB_OUT, lhsBlockerName);
-    BlockerOp rhsBlockerOp =
-        builder.create<BlockerOp>(loc, rhsResult, rhsBlockerCtrl);
-    setHandshakeAttributes(builder, rhsBlockerOp, BB_OUT, rhsBlockerName);
-
-    Value lhsBufferInput = lhsBlockerOp.getResult();
-    Value rhsBufferInput = rhsBlockerOp.getResult();
+    Value lhsBufferInput, rhsBufferInput;
 
     if (timingInsensitive) {
       lhsNDwName = "";
       rhsNDwName = "";
+
+      lhsBufferInput = lhsResult;
+      rhsBufferInput = rhsResult;
     } else {
       NDWireOp lhsEndNDWireOp;
       NDWireOp rhsEndNDWireOp;

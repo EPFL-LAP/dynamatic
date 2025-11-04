@@ -21,31 +21,36 @@ run() {
 }
 
 # Rewrite A (new)
-# run sup_mul --timing_insensitive --seq_length="0=1&0=2"
-# run sup_fork --allow_nonacceptance --timing_insensitive
-# run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
-# run sup_load --allow_nonacceptance --timing_insensitive --seq_length_enhanced="{in:0}={in:1}&{in:0}<={out:0}"
+run sup_mul --seq_length="0=1&0=2"
+# run sup_fork
+# run sup_and --seq_length="0=1"
+# run sup_load --seq_length="0=1"
 
 # Rewrite B (new)
-# run sup_gamma_mux1 --timing_insensitive --seq_length="1=2"
+# run sup_gamma_mux1 --seq_length="1=2"
 
 # Rewrite C (new)
-# run sup_gamma_mux2_mini --timing_insensitive --seq_length="0=1" --loop=2,0
+# run sup_gamma_mux2_mini --seq_length="0=1" --loop=2,0
 
 # Rewrite D (new)
-# run sup_mux --timing_insensitive --seq_length="1=2" --loop=0,2
+# echo "Running Rewrite D"
+# run sup_mux --seq_length="1=2" --loop=0,2 > sup_mux.txt
 
 # Rewrite E (new)
-# run mux_to_and --timing_insensitive --seq_length="0=1"
+# echo "Running Rewrite E"
+# run mux_to_and --seq_length="0=1" > mux_to_and.txt
 
 # Rewrite F (new)
-# run unify_sup --timing_insensitive --seq_length="0=1"
+# echo "Running Rewrite F"
+# run unify_sup --seq_length="0=1" > unify_sup.txt
 
 # Rewrite G (new)
-run sup_gamma_new2 --timing_insensitive --seq_length="0=2&1=2&2=3"
+# echo "Running Rewrite G"
+# run sup_gamma_new2 --seq_length="0=2&1=2&2=3" > sup_gamma_new2.txt
 
 # Rewrite H (new)
-# run sup_eager_gamma_mux --timing_insensitive --seq_length="0=1"
+# echo "Running Rewrite H"
+# run sup_eager_gamma_mux --seq_length="0=1" > sup_eager_gamma_mux.txt
 
 # run sup_and --allow_nonacceptance --timing_insensitive --seq_length="0=1"
 # run sup_gamma --timing_insensitive

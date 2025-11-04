@@ -57,8 +57,8 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[i, buffers] : llvm::enumerate(config.inputBuffers)) {
-    if (StringRef{config.inputForks[i]}.ends_with("_backedge"))
-      continue;
+    // if (StringRef{config.inputForks[i]}.ends_with("_backedge"))
+    //   continue;
 
     const auto &[lhsBuffer, rhsBuffer] = buffers;
     bufferProperties.push_back(llvm::formatv("({0}.{1}.debug_counter.counter = "
@@ -71,20 +71,22 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits produce the same number of output tokens.
   for (const auto &[i, buffers] : llvm::enumerate(config.outputBuffers)) {
     const auto &[lhsBuffer, rhsBuffer] = buffers;
-    if (lhsBuffer == "" && rhsBuffer == "") {
-      auto [lhsBlocker, rhsBlocker] = config.outputBlockers[i];
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBlocker).str());
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBlocker).str());
-    } else {
-      assert(lhsBuffer != "" && rhsBuffer != "");
-      // When outs_valid is false, the buffer is empty.
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
-      bufferProperties.push_back(
-          llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBuffer).str());
-    }
+    // if (lhsBuffer == "" && rhsBuffer == "") {
+    //   auto [lhsBlocker, rhsBlocker] = config.outputBlockers[i];
+    //   bufferProperties.push_back(
+    //       llvm::formatv("(!{0}.{1}.outs_valid)", moduleName,
+    //       lhsBlocker).str());
+    //   bufferProperties.push_back(
+    //       llvm::formatv("(!{0}.{1}.outs_valid)", moduleName,
+    //       rhsBlocker).str());
+    // } else {
+    //   assert(lhsBuffer != "" && rhsBuffer != "");
+    // When outs_valid is false, the buffer is empty.
+    bufferProperties.push_back(
+        llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
+    bufferProperties.push_back(
+        llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBuffer).str());
+    // }
   }
 
   // Make sure the buffer property will start to hold at one point and from
