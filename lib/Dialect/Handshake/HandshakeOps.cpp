@@ -1964,5 +1964,185 @@ LogicalResult TruncIOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Memory Controller GetOperandName and GetResultName Utilities
+//===----------------------------------------------------------------------===//
+
+/// Load/Store base signal names common to all memory interfaces
+static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
+    MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+
+static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
+  return name.str() + "_" + std::to_string(idx);
+}
+
+inline static StringRef getIfControlOprd(MemoryOpInterface memOp,
+                                         unsigned idx) {
+  if (!memOp.isMasterInterface())
+    return "";
+  switch (idx) {
+  case 0:
+    return MEMREF;
+  case 1:
+    return MEM_START;
+  default:
+    return idx == memOp->getNumOperands() - 1 ? CTRL_END : "";
+  }
+}
+
+static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
+  if (memOp.isMasterInterface() && idx == memOp->getNumResults() - 1)
+    return MEM_END;
+  return "";
+}
+
+/// Common operand naming logic for memory controllers and LSQs.
+inline static std::string getMemOperandName(const FuncMemoryPorts &ports,
+                                            unsigned idx) {
+  // Iterate through all memory ports to find out the type of the operand
+  unsigned ctrlIdx = 0, loadIdx = 0, storeIdx = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    if (blockPorts.hasControl()) {
+      if (idx == blockPorts.ctrlPort->getCtrlInputIndex())
+        return getArrayElemName(CTRL, ctrlIdx);
+      ++ctrlIdx;
+    }
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        if (loadPort->getAddrInputIndex() == idx)
+          return getArrayElemName(LD_ADDR, loadIdx);
+        ++loadIdx;
+      } else {
+        std::optional<StorePort> storePort = cast<StorePort>(accessPort);
+        if (storePort->getAddrInputIndex() == idx)
+          return getArrayElemName(ST_ADDR, storeIdx);
+        if (storePort->getDataInputIndex() == idx)
+          return getArrayElemName(ST_DATA, storeIdx);
+        ++storeIdx;
+      }
+    }
+  }
+
+  return "";
+}
+
+/// Common result naming logic for memory controllers and LSQs.
+static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
+  // Iterate through all memory ports to find out the type of the
+  // operand
+  unsigned loadIdx = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        if (loadPort->getDataOutputIndex() == idx)
+          return getArrayElemName(LD_DATA, loadIdx);
+        ++loadIdx;
+      }
+    }
+  }
+  return "";
+}
+
+std::string LSQOp::getOperandNameImpl(unsigned idx) {
+
+  assert(idx < getOperation()->getNumOperands() && "index too high");
+
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  LSQPorts lsqPorts = getPorts();
+  if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
+         "unknown LSQ/MC operand");
+  return "ldDataFromMC";
+}
+
+std::string LSQOp::getResultNameImpl(unsigned idx) {
+  assert(idx < getOperation()->getNumResults() && "index too high");
+
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  LSQPorts lsqPorts = getPorts();
+  if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
+  MCLoadStorePort mcPort = lsqPorts.getMCPort();
+  if (mcPort.getLoadAddrOutputIndex() == idx)
+    return "ldAddrToMC";
+  if (mcPort.getStoreAddrOutputIndex() == idx)
+    return "stAddrToMC";
+  assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
+  return "stDataToMC";
+}
+
+std::string MemoryControllerOp::getOperandNameImpl(unsigned idx) {
+  assert(idx < getOperation()->getNumOperands() && "index too high");
+
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  MCPorts mcPorts = getPorts();
+  if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to an LSQ
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+  LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+  if (lsqPort.getLoadAddrInputIndex() == idx)
+    return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
+  if (lsqPort.getStoreAddrInputIndex() == idx)
+    return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
+  assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
+  return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
+}
+
+std::string MemoryControllerOp::getResultNameImpl(unsigned idx) {
+  assert(idx < getOperation()->getNumResults() && "index too high");
+
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
+  // Try to get the operand name from the regular ports
+  MCPorts mcPorts = getPorts();
+  if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
+    return name;
+
+  // Get the operand name from a port to an LSQ
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
+  LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+  assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
+  return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+}
+
+namespace dynamatic {
+namespace handshake {
+
+//===----------------------------------------------------------------------===//
+// Operand and Result Names
+//===----------------------------------------------------------------------===//
+
+handshake::HandshakeBaseInterface getHandshakeBase(Operation *op) {
+  if (auto handshakeBase =
+          llvm::dyn_cast<handshake::HandshakeBaseInterface>(op)) {
+    return handshakeBase;
+  }
+  op->emitError() << "must implement HandshakeBaseInterface, op: " << *op;
+  llvm::report_fatal_error("Missing HandshakeBaseInterface");
+}
+
+} // end namespace handshake
+} // end namespace dynamatic
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
