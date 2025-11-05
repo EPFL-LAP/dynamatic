@@ -423,13 +423,6 @@ void BufferPlacementMILP::
     // Get the ports the channels connect and their retiming MILP variables
     Operation *dstOp = *channel.getUsers().begin();
 
-    // No throughput constraints on channels going to stores
-    /// TODO: this is from legacy implementation, we should understand why we
-    /// really do this and figure out if it makes sense (@lucas-rami: I don't
-    /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
-
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
@@ -508,13 +501,6 @@ void BufferPlacementMILP::
   for (Value channel : cfdfc.channels) {
     // Get the ports the channels connect and their retiming MILP variables
     Operation *dstOp = *channel.getUsers().begin();
-
-    // No throughput constraints on channels going to stores
-    /// TODO: this is from legacy implementation, we should understand why we
-    /// really do this and figure out if it makes sense (@lucas-rami: I don't
-    /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -1113,6 +1099,23 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     for (auto &[val, channelTh] : cfVars.channelThroughputs) {
       os << getUniqueName(*val.getUses().begin()) << ": "
          << model->getValue(channelTh) << "\n";
+    }
+    os.unindent();
+    os << "\n";
+  }
+
+  os << "\n# =================== #\n";
+  os << "# Unit Retimings #\n";
+  os << "# =================== #\n\n";
+
+  // Log retimings of all units in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Unit retimings of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (auto &[op, unitVars] : cfVars.unitVars) {
+      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
+         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
     }
     os.unindent();
     os << "\n";
