@@ -70,7 +70,7 @@ void iterateUsesOverNestedForkResults(Value result,
 
 void eraseOpRecursively(Operation *op) {
   for (auto res : op->getResults()) {
-    for (Operation *user : res.getUsers()) {
+    for (Operation *user : llvm::make_early_inc_range(res.getUsers())) {
       if (!isa<SinkOp, ForkOp, BufferOp>(user)) {
         user->emitError("trying to erase this op");
         llvm_unreachable("");
@@ -119,7 +119,7 @@ void materializeValue(Value val) {
   }
 
   // Erase old forks
-  for (Operation *user : val.getUsers()) {
+  for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
     if (user == forkOp)
       continue;
     eraseOpRecursively(user);
