@@ -1114,9 +1114,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
     for (auto &[op, unitVars] : cfVars.unitVars) {
-      os << getUniqueName(op)
-         << ": (in: " << unitVars.retIn.get(GRB_DoubleAttr_X)
-         << ", out: " << unitVars.retOut.get(GRB_DoubleAttr_X) << ")\n";
+      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
+         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
     }
     os.unindent();
     os << "\n";
