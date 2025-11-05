@@ -1,6 +1,5 @@
 #include "dynamatic/Transforms/DropUnlistedFunctions.h"
 
-#include "dynamatic/Conversion/LLVMToControlFlow.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/VectorPattern.h"
