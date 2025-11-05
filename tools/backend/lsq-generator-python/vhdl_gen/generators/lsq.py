@@ -518,19 +518,32 @@ class LSQ:
             ga_ls_order
         )
 
-        # Load Address Port Dispatcher
-        arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
-            ctx,
-            ldp_addr_i, ldp_addr_valid_i, ldp_addr_ready_o,
-            ldq_alloc, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
-        )
+        # When the condition "lsq_submodules.ptq_dispatcher_lda != None" is not true:
+        # The dispatcher module will be set to None when there are zero load ports.
+        # In this case, do not instantiate dispatching logic when there are zero load ports.
+        # - WARNING: This logic needs more testing
+        # - TODO: Also remove the load queue when there are zero load ports.
+        if lsq_submodules.ptq_dispatcher_lda != None:
+            # Load Address Port Dispatcher
+            arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
+                ctx,
+                ldp_addr_i, ldp_addr_valid_i, ldp_addr_ready_o,
+                ldq_alloc, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
+            )
 
-        # Load Data Port Dispatcher
-        arch += lsq_submodules.qtp_dispatcher_ldd.instantiate(
-            ctx,
-            ldp_data_o, ldp_data_valid_o, ldp_data_ready_i,
-            ldq_alloc, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
-        )
+        # When the condition "lsq_submodules.qtp_dispatcher_ldd != None" is not true:
+        # The dispatcher module will be set to None when there are zero load ports.
+        # In this case, do not instantiate dispatching logic when there are zero load ports.
+        # - WARNING: This logic needs more testing
+        # - TODO: Also remove the load queue when there are zero load ports.
+        if lsq_submodules.qtp_dispatcher_ldd != None:
+            # Load Data Port Dispatcher
+            arch += lsq_submodules.qtp_dispatcher_ldd.instantiate(
+                ctx,
+                ldp_data_o, ldp_data_valid_o, ldp_data_ready_i,
+                ldq_alloc, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
+            )
+
         # Store Address Port Dispatcher
         arch += lsq_submodules.ptq_dispatcher_sta.instantiate(
             ctx,

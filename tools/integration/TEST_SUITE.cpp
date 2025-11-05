@@ -201,6 +201,7 @@ INSTANTIATE_TEST_SUITE_P(
       "bicg",
       "bicg_float",
       "binary_search",
+      "covariance",
       "factorial",
       "fir",
       "float_basic",
