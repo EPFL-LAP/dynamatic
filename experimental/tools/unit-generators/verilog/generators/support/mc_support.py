@@ -1,27 +1,15 @@
 def generate_mc_support(name, params):
-    # read_address_mux_name = name + "_read_address_mux"
-    # read_address_ready_name = name + "_read_address_ready"
-    # read_data_signals_name = name + "_read_data_signals"
-    # read_priority_name = name + "_read_priority"
-    # read_memory_arbiter_name = name + "_read_memory_arbiter"
+    read_address_mux_name = name + "_read_address_mux"
+    read_address_ready_name = name + "_read_address_ready"
+    read_data_signals_name = name + "_read_data_signals"
+    read_priority_name = name + "_read_priority"
+    read_memory_arbiter_name = name + "_read_memory_arbiter"
 
-    # write_address_mux_name = name + "_write_address_mux"
-    # write_address_ready_name = name + "_write_address_ready"
-    # write_data_signals_name = name + "_write_data_signals"
-    # write_priority_name = name + "_write_priority"
-    # write_memory_arbiter_name = name + "_write_memory_arbiter"
-
-    read_address_mux_name = "read_address_mux"
-    read_address_ready_name = "read_address_ready"
-    read_data_signals_name = "read_data_signals"
-    read_priority_name = "read_priority"
-    read_memory_arbiter_name = "read_memory_arbiter"
-
-    write_address_mux_name = "write_address_mux"
-    write_address_ready_name = "write_address_ready"
-    write_data_signals_name = "write_data_signals"
-    write_priority_name = "write_priority"
-    write_memory_arbiter_name = "write_memory_arbiter"
+    write_address_mux_name = name + "_write_address_mux"
+    write_address_ready_name = name + "_write_address_ready"
+    write_data_signals_name = name + "_write_data_signals"
+    write_priority_name = name + "_write_priority"
+    write_memory_arbiter_name = name + "_write_memory_arbiter"
 
     return f"""
 // Module of mc_support
@@ -381,7 +369,7 @@ module {write_memory_arbiter_name} #(
   );
 
   // Data handling
-  write_data_signals #(
+  {write_data_signals_name} #(
     .ARBITER_SIZE(ARBITER_SIZE),
     .DATA_TYPE  (DATA_TYPE)
   ) data_signals_inst (

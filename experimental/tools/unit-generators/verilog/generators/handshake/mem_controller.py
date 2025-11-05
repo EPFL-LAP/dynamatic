@@ -18,7 +18,8 @@ def generate_mem_controller(name, params):
 
 
 def _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_type, data_type):
-    mc_support = generate_mc_support("TODO", {})
+    mc_support_name = name + "_mc_support"
+    mc_support = generate_mc_support(mc_support_name, {})
 
     mem_controller_loadless_name = name + "_mem_controller_loadless"
     mem_controller_loadless = _generate_mem_controller_loadless(
@@ -97,7 +98,7 @@ module {name}(
     .storeData     (storeData)
   );
 
-  read_memory_arbiter #(
+  {mc_support_name}_read_memory_arbiter #(
     .ARBITER_SIZE({num_loads}),
     .ADDR_TYPE  ({addr_type}),
     .DATA_TYPE  ({data_type})
@@ -122,7 +123,8 @@ endmodule
 
 def _generate_mem_controller_storeless(name, num_loads, addr_type, data_type):
 
-    mc_support = generate_mc_support("TODO", {})
+    mc_support_name = name + "_mc_support"
+    mc_support = generate_mc_support(mc_support_name, {})
 
     mem_controller_storeless_body = f"""
 
@@ -164,7 +166,7 @@ module {name}(
 
   // MC is "always done with stores"
 
-  read_memory_arbiter #(
+  {mc_support_name}_read_memory_arbiter #(
     .ARBITER_SIZE({num_loads}),
     .ADDR_TYPE  ({addr_type}),
     .DATA_TYPE  ({data_type})
@@ -206,7 +208,8 @@ endmodule
 
 
 def _generate_mem_controller_loadless(name, num_controls, num_stores, addr_type, data_type):
-    mc_support = generate_mc_support("TODO", {})
+    mc_support_name = name + "_mc_support"
+    mc_support = generate_mc_support(mc_support_name, {})
 
     mem_controller_loadless_body = f"""
 
@@ -269,7 +272,7 @@ module {name}(
   assign store_access_port_complete_request = stAddr_valid & stData_valid;
 
   // Instantiate write memory arbiter
-  write_memory_arbiter #(
+  {mc_support_name}_write_memory_arbiter #(
     .ARBITER_SIZE({num_stores}),
     .ADDR_TYPE  ({addr_type}),
     .DATA_TYPE  ({data_type})
