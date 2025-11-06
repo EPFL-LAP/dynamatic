@@ -144,7 +144,7 @@ class valuesToDataTypes<list<string> names> {
     names,
     // Treat ControlType's data type as i0
     "isa<ControlType>($" # name # ".getType()) ? IntegerType::get($_ctxt, 0) :"
-    "$" # name # ".getType().cast<ChannelType>().getDataType()"
+    "mlir::cast<ChannelType>($" # name # ".getType()).getDataType()"
   ), ", ") # "}";
 }
 
@@ -158,7 +158,7 @@ class variadicToExtraSignalArrays<string variadic> {
 
       for (Type type : variadic.getTypes()) {
         extraSignalArrays.push_back(
-          type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+          mlir::cast<ExtraSignalsTypeInterface>(type).getExtraSignals());
       }
 
       return extraSignalArrays;
@@ -179,7 +179,7 @@ class variadicToDataTypes<string variadic> {
           // Treat ControlType's data type as i0
           dataTypes.push_back(IntegerType::get($_ctxt, 0));
         } else {
-          dataTypes.push_back(type.cast<ChannelType>().getDataType());
+          dataTypes.push_back(cast<ChannelType>(type).getDataType());
         }
       }
 
@@ -287,7 +287,7 @@ class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
   CPred<"llvm::all_of($" # name # ".getTypes(), "
     "[](Type type) {"
-    "  return type.cast<ExtraSignalsTypeInterface>().getNumExtraSignals() == 0;"
+    "  return cast<ExtraSignalsTypeInterface>(type).getNumExtraSignals() == 0;"
     "})">
 >;
 
@@ -407,7 +407,7 @@ class HasValidSpecTag<string operand> : PredOpTrait<
 
       return true;
     }
-  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
+  }] # "(cast<ExtraSignalsTypeInterface>($" # operand # ".getType()))">
 >;
 
 class LacksSpecTag<string operand> : PredOpTrait<
@@ -422,12 +422,12 @@ class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
     [](OperandRange::type_range inputTypes,
         ExtraSignalsTypeInterface outputType) {
       bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
-        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
+        return cast<ExtraSignalsTypeInterface>(type).hasExtraSignal("spec");
       });
       return outputType.hasExtraSignal("spec") == inputHasSpecTag;
     }
   }] # "($" # inputVariadic # ".getTypes(), "
-  "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
+  "cast<ExtraSignalsTypeInterface>($" # output # ".getType()))">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

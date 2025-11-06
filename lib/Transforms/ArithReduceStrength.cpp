@@ -439,8 +439,8 @@ struct PromoteSignedCmp : public OpRewritePattern<arith::CmpIOp> {
     // Promote the signed comparison to an equivalent unsigned one if possible
     if (!isPromotionPossible(cmpOp))
       return failure();
-    rewriter.updateRootInPlace(cmpOp,
-                               [&]() { cmpOp.setPredicate(newPredicate); });
+    rewriter.modifyOpInPlace(cmpOp,
+                             [&]() { cmpOp.setPredicate(newPredicate); });
     return success();
   }
 
@@ -471,8 +471,8 @@ struct ArithReduceStrengthPass
     MLIRContext *ctx = &getContext();
 
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
 
     RewritePatternSet patterns{ctx};
     patterns.add<ReplaceMulNegOneUsers

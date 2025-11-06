@@ -35,7 +35,7 @@ struct EraseSingleInputMerge : public OpRewritePattern<handshake::MergeOp> {
     if (mergeOp->getNumOperands() != 1)
       return failure();
 
-    rewriter.updateRootInPlace(mergeOp, [&] {
+    rewriter.modifyOpInPlace(mergeOp, [&] {
       // Replace all occurences of the merge's single result throughout the IR
       // with the merge's single operand. This is equivalent to bypassing the
       // merge
@@ -78,7 +78,7 @@ struct DowngradeIndexlessControlMerge
         cmergeOp.getLoc(), cmergeOp->getOperands());
 
     // We are modifying the operation
-    rewriter.updateRootInPlace(cmergeOp, [&] {
+    rewriter.modifyOpInPlace(cmergeOp, [&] {
       // Then, replace the control merge's first result (the selected input)
       // with the single result of the newly created merge operation
       Value mergeRes = newMergeOp.getResult();
@@ -111,8 +111,8 @@ struct GreedySimplifyMergeLikePass
 
     // Set up a configuration object to customize the behavior of the rewriter
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
 
     // Create a rewrite pattern set and add our two patterns to it
     RewritePatternSet patterns{ctx};

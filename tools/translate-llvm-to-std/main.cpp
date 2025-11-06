@@ -10,6 +10,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
   LLVMContext llvmContext;
   SMDiagnostic err;
   std::unique_ptr<Module> llvmModule =
-      parseAssemblyFile(StringRef(inputFilename), err, llvmContext);
+      parseIRFile(StringRef(inputFilename), err, llvmContext);
   if (!llvmModule) {
     errs() << "Failed to read LLVM IR file.\n";
     err.print(argv[0], errs());

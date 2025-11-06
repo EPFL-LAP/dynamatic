@@ -36,10 +36,10 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
     return mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   }
   if (llvmType->isFloatTy()) {
-    return mlir::FloatType::getF32(context);
+    return mlir::Float32Type::get(context);
   }
   if (llvmType->isDoubleTy()) {
-    return mlir::FloatType::getF64(context);
+    return mlir::Float32Type::get(context);
   }
 
   llvm_unreachable("Unhandled scalar type");
@@ -360,12 +360,12 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF32Type());
+                loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF64Type());
+                loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
@@ -520,7 +520,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
   SmallVector<mlir::Value> indexOperands;
 
-  auto memrefType = baseAddress.getType().dyn_cast<MemRefType>();
+  auto memrefType = dyn_cast<MemRefType>(baseAddress.getType());
 
   if (!memrefType)
     llvm_unreachable("GEP should take memref as reference");
@@ -641,7 +641,7 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
     // NOTE: This condition handles a special case where a load only has
     // constant indices, e.g., tmp = mat[0][0].
     memref = this->valueMap[instAddr];
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
+    auto memrefType = dyn_cast<MemRefType>(memref.getType());
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
       auto constZeroOp = this->builder.create<arith::ConstantOp>(
@@ -677,7 +677,7 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
       llvm_unreachable(
           "Converting a load but the producer hasn't been converted yet!");
     memref = this->valueMap[instAddr];
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
+    auto memrefType = dyn_cast<MemRefType>(memref.getType());
 
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
