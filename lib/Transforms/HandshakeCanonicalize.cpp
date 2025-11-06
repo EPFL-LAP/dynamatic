@@ -162,8 +162,8 @@ struct HandshakeCanonicalizePass
     mlir::ModuleOp mod = getOperation();
 
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns{ctx};
     patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
                  EraseSingleInputMuxes, EraseSingleInputControlMerges,

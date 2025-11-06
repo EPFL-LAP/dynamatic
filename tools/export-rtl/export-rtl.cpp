@@ -135,7 +135,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -158,7 +158,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -331,7 +331,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -1162,8 +1162,7 @@ std::optional<std::string> SMVWriter::getUserSignal(Value val) const {
   std::string argName;
   auto argNamesAttr = userInstance->getArgNames();
   if (operandIndex < argNamesAttr.size()) {
-    if (auto strAttr =
-            argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+    if (auto strAttr = dyn_cast<mlir::StringAttr>(argNamesAttr[operandIndex])) {
       argName = strAttr.getValue().str();
       return instName + "." + argName;
     }
@@ -1292,7 +1291,7 @@ void SMVWriter::constructIOMappings(
     auto signal = getValueName(oprd);
     std::string signalName = signal.str();
 
-    if (oprd.isa<BlockArgument>())
+    if (isa<BlockArgument>(oprd))
       std::replace(signalName.begin(), signalName.end(), '.', '_');
 
     llvm::TypeSwitch<Type, void>(portType)
