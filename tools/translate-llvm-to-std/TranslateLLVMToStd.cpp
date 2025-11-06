@@ -48,7 +48,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
   if (llvmType->isX86_FP80Ty()) {
     llvm::errs() << "Warning: using x86_fp80 type in MLIR translation. This "
                     "type is not currently supported\n";
-    return mlir::FloatType::getF80(context);
+    return mlir::Float80Type::get(context);
   }
   LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
@@ -382,12 +382,12 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF32Type());
+                loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF64Type());
+                loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }

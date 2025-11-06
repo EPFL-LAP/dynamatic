@@ -102,11 +102,11 @@ bool hasHWInOutType(mlir::Type type);
 template <typename... BaseTy>
 bool type_isa(Type type) {
   // First check if the type is the requested type.
-  if (type.isa<BaseTy...>())
+  if (llvm::isa<BaseTy...>(type))
     return true;
 
   // Then check if it is a type alias wrapping the requested type.
-  if (auto alias = type.dyn_cast<TypeAliasType>())
+  if (auto alias = mlir::dyn_cast<TypeAliasType>(type))
     return type_isa<BaseTy...>(alias.getInnerType());
 
   return false;
@@ -125,11 +125,11 @@ BaseTy type_cast(Type type) {
   assert(type_isa<BaseTy>(type) && "type must convert to requested type");
 
   // If the type is the requested type, return it.
-  if (type.isa<BaseTy>())
-    return type.cast<BaseTy>();
+  if (llvm::isa<BaseTy>(type))
+    return mlir::cast<BaseTy>(type);
 
   // Otherwise, it must be a type alias wrapping the requested type.
-  return type_cast<BaseTy>(type.cast<TypeAliasType>().getInnerType());
+  return type_cast<BaseTy>(mlir::cast<TypeAliasType>(type).getInnerType());
 }
 
 template <typename BaseTy>

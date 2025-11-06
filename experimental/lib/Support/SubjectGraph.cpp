@@ -187,7 +187,7 @@ void BaseSubjectGraph::buildSubjectGraphConnections() {
       // Store the Result Number of the input operand in the
       // inputSubjectGraphToResultNumber map.
       inputSubjectGraphToResultNumber[inputSubjectGraph] =
-          inputOperand.cast<OpResult>().getResultNumber();
+          mlir::cast<OpResult>(inputOperand).getResultNumber();
     }
   }
 

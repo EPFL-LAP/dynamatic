@@ -522,7 +522,8 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
       continue;
 
     // We are looking for the control branch: data should be of control type
-    if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+    if (llvm::isa<handshake::ControlType>(
+            branchOp.getDataOperand().getType())) {
       // BB should have only one control branch at most
       if (isControlBranchFound) {
         branchOp->emitError("Multiple control branches found in the BB #" +
@@ -601,8 +602,8 @@ static LogicalResult addSpecTagToValue(Value value) {
 
   // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
   // or ControlType).
-  if (auto valueType =
-          value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
+  if (auto valueType = llvm::dyn_cast<handshake::ExtraSignalsTypeInterface>(
+          value.getType())) {
     // Skip if the spec tag was already added during the algorithm.
     if (!valueType.hasExtraSignal(EXTRA_BIT_SPEC)) {
       llvm::SmallVector<ExtraSignal> newExtraSignals(
@@ -787,8 +788,8 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
   OpBuilder builder(&getContext());
 
   for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-    auto dataResultType =
-        mergeLikeOp.getDataResult().getType().cast<ExtraSignalsTypeInterface>();
+    auto dataResultType = mlir::cast<ExtraSignalsTypeInterface>(
+        mergeLikeOp.getDataResult().getType());
 
     if (dataResultType.hasExtraSignal(EXTRA_BIT_SPEC)) {
       // This MuxOp/CMergeOp is within the speculative region.
@@ -797,7 +798,7 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
       // non-speculative edges.
       for (auto dataOperand : mergeLikeOp.getDataOperands()) {
         auto dataOperandType =
-            dataOperand.getType().cast<ExtraSignalsTypeInterface>();
+            cast<ExtraSignalsTypeInterface>(dataOperand.getType());
 
         if (!dataOperandType.hasExtraSignal(EXTRA_BIT_SPEC)) {
           // Create a NonSpecOp to add the spec tag to the data operand

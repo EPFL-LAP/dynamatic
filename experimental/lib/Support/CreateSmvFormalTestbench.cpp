@@ -84,12 +84,12 @@ static std::string instantiateModuleUnderTest(
   if (syncOutput)
     for (const auto &[i, result] : llvm::enumerate(results)) {
       const auto &[resultName, type] = result;
-      if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      if (llvm::isa<handshake::ControlType, handshake::ChannelType>(type))
         inputVariables.push_back(llvm::formatv("join_global.ins_{0}_ready", i));
     }
   else
     for (const auto &[resultName, type] : results) {
-      if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      if (llvm::isa<handshake::ControlType, handshake::ChannelType>(type))
         inputVariables.push_back(
             llvm::formatv("sink_{0}.{1}", resultName, SINK_READY_NAME.str()));
     }
@@ -238,7 +238,7 @@ static std::string createSupportEntities(
 
   llvm::DenseSet<Type> types;
   for (const auto &[_, type] : arguments)
-    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+    if (llvm::isa<handshake::ControlType, handshake::ChannelType>(type))
       types.insert(type);
   std::ostringstream supportEntities;
 
@@ -279,7 +279,7 @@ static std::string instantiateSequenceGenerators(
     size_t nrOfTokens, bool generateExactNrOfTokens = false) {
   std::ostringstream sequenceGenerators;
   for (const auto &[argumentName, type] : arguments) {
-    if (!type.isa<handshake::ControlType, handshake::ChannelType>())
+    if (!isa<handshake::ControlType, handshake::ChannelType>(type))
       continue;
 
     std::string typePrefixName =
@@ -328,7 +328,7 @@ instantiateSinks(const std::string &moduleName,
   std::ostringstream sinks;
 
   for (const auto &[resultName, type] : results) {
-    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+    if (llvm::isa<handshake::ControlType, handshake::ChannelType>(type))
       sinks << llvm::formatv("  VAR sink_{0} : sink_main({1}.{0}_valid);\n",
                              resultName, moduleName)
                    .str();
@@ -345,7 +345,7 @@ instantiateJoin(const std::string &moduleName,
 
   str << "  VAR join_global : tb_join(";
   for (const auto &[resultName, type] : results) {
-    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+    if (llvm::isa<handshake::ControlType, handshake::ChannelType>(type))
       outputValids.push_back(
           llvm::formatv("{0}.{1}_valid", moduleName, resultName));
   }

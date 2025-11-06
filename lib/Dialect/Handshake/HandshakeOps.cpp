@@ -34,6 +34,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/DenseSet.h"
@@ -41,6 +42,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+
 #include <cassert>
 
 using namespace mlir;
@@ -383,7 +385,7 @@ LogicalResult FuncOp::verify() {
                            << ".";
 
     if (llvm::any_of(portNames,
-                     [&](Attribute attr) { return !attr.isa<StringAttr>(); }))
+                     [&](Attribute attr) { return !isa<StringAttr>(attr); }))
       return emitOpError() << "expected all entries in attribute '" << attrName
                            << "' to be strings.";
 
@@ -424,7 +426,7 @@ parseFuncOpArgs(OpAsmParser &parser,
                 SmallVectorImpl<Type> &resTypes,
                 SmallVectorImpl<DictionaryAttr> &resAttrs) {
   bool isVariadic;
-  if (mlir::function_interface_impl::parseFunctionSignature(
+  if (mlir::function_interface_impl::parseFunctionSignatureWithArguments(
           parser, /*allowVariadic=*/true, entryArgs, isVariadic, resTypes,
           resAttrs)
           .failed())
@@ -481,7 +483,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
                              result.attributes) ||
       parseFuncOpArgs(parser, args, resTypes, resAttributes))
     return failure();
-  mlir::function_interface_impl::addArgAndResultAttrs(
+  mlir::call_interface_impl::addArgAndResultAttrs(
       builder, result, args, resAttributes,
       handshake::FuncOp::getArgAttrsAttrName(result.name),
       handshake::FuncOp::getResAttrsAttrName(result.name));
@@ -696,7 +698,7 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
-  MemRefType memrefType = memRef.getType().cast<MemRefType>();
+  MemRefType memrefType = mlir::cast<MemRefType>(memRef.getType());
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
@@ -920,7 +922,7 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
-  MemRefType memrefType = memref.getType().cast<MemRefType>();
+  MemRefType memrefType = mlir::cast<MemRefType>(memref.getType());
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
@@ -1318,7 +1320,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1351,7 +1353,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1468,9 +1471,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1506,7 +1509,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1834,7 +1837,7 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
       // - operand[0] is a channel type
       // - all operands have the same extra signals
       // Note that this cast throws an error if the assumption is not met
-      operands[0].getType().cast<ChannelType>().getExtraSignals()));
+      mlir::cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
@@ -1856,7 +1859,7 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
       // - operand[0] is a channel type
       // - all operands have the same extra signals
       // Note that this cast throws an error if the assumption is not met
-      operands[0].getType().cast<ChannelType>().getExtraSignals()));
+      mlir::cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 

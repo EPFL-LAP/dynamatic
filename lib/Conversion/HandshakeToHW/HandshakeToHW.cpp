@@ -1199,18 +1199,20 @@ public:
     });
 
     addTargetMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
+                                 ValueRange inputs, Location loc) -> Value {
+      // NOTE (@Jiahui17): Taking the solution here
+      // https://github.com/llvm/circt/blob/main/lib/Dialect/ESI/Passes/ESILowerTypes.cpp
       if (inputs.size() != 1)
-        return std::nullopt;
+        return mlir::Value();
       return inputs[0];
     });
 
     addSourceMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
+                                 ValueRange inputs, Location loc) -> Value {
+      // NOTE (@Jiahui17): Taking the solution here
+      // https://github.com/llvm/circt/blob/main/lib/Dialect/ESI/Passes/ESILowerTypes.cpp
       if (inputs.size() != 1)
-        return std::nullopt;
+        return mlir::Value();
       return inputs[0];
     });
   }

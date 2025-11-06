@@ -163,12 +163,13 @@ LogicalResult LowerFuncToHandshake::computeLinearDominance(
 // CfToHandshakeTypeConverter
 //===-----------------------------------------------------------------------==//
 
-static std::optional<Value> oneToOneVoidMaterialization(OpBuilder &builder,
-                                                        Type /*resultType*/,
-                                                        ValueRange inputs,
-                                                        Location /*loc*/) {
+static Value oneToOneVoidMaterialization(OpBuilder &builder,
+                                         Type /*resultType*/, ValueRange inputs,
+                                         Location /*loc*/) {
+  // NOTE (@Jiahui17): Taking the solution here
+  // https://github.com/llvm/circt/blob/main/lib/Dialect/ESI/Passes/ESILowerTypes.cpp
   if (inputs.size() != 1)
-    return std::nullopt;
+    return mlir::Value();
   return inputs[0];
 }
 
@@ -191,7 +192,10 @@ static Type channelifyType(Type type) {
 
 CfToHandshakeTypeConverter::CfToHandshakeTypeConverter() {
   addConversion(channelifyType);
-  addArgumentMaterialization(oneToOneVoidMaterialization);
+  // NOTE: addArgumentMaterialization() is replaced by
+  // addSourceMaterialization()
+  // addArgumentMaterialization(oneToOneVoidMaterialization);
+  // https://github.com/llvm/llvm-project/pull/116524#issue-2665213624
   addSourceMaterialization(oneToOneVoidMaterialization);
   addTargetMaterialization(oneToOneVoidMaterialization);
 }
@@ -395,17 +399,18 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   TypeConverter::SignatureConversion entryConversion(
       entryBlock->getNumArguments());
   setupEntryBlockConversion(entryBlock, numMemories, rewriter, entryConversion);
-  rewriter.applySignatureConversion(oldBody, entryConversion, typeConv);
+  rewriter.applySignatureConversion(entryBlock, entryConversion, typeConv);
 
-  // Convert the non entry blocks' signatures
-  SmallVector<TypeConverter::SignatureConversion> nonEntryConversions;
-  for (Block &block : llvm::drop_begin(funcOp)) {
-    auto &conv = nonEntryConversions.emplace_back(block.getNumArguments());
-    setupBlockConversion(&block, rewriter, conv);
+  for (Block &nonEntryBlock :
+       llvm::make_early_inc_range(llvm::drop_begin(funcOp.getBody()))) {
+
+    TypeConverter::SignatureConversion nonEntryConversion(
+        /*numOrigInputs=*/nonEntryBlock.getNumArguments());
+
+    setupBlockConversion(&nonEntryBlock, rewriter, nonEntryConversion);
+    rewriter.applySignatureConversion(&nonEntryBlock, nonEntryConversion,
+                                      typeConv);
   }
-  if (failed(rewriter.convertNonEntryRegionTypes(oldBody, *typeConv,
-                                                 nonEntryConversions)))
-    return failure();
 
   // Modify branch-like terminators to forward the new control value through
   // all blocks
@@ -551,8 +556,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
             "might have accidentally maximized the SSA of a placeholder op "
             "like LSQ, MemoryController, or RAMOp.");
       }
-      assert(operand.getType()
-                     .cast<handshake::ExtraSignalsTypeInterface>()
+      assert(cast<handshake::ExtraSignalsTypeInterface>(operand.getType())
                      .getNumExtraSignals() == 0 &&
              "unexpected extra signals");
     }
@@ -1312,7 +1316,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       Operation *sourceFuncLookup =
           mlir::SymbolTable::lookupNearestSymbolFrom(callOp, sourceCalleeAttr);
       auto sourceFunc = dyn_cast<func::FuncOp>(sourceFuncLookup);
-      assert(sourceFunc && sourceFunc.getSymName().startswith("__init") &&
+      assert(sourceFunc && sourceFunc.getSymName().starts_with("__init") &&
              "All placeholder outputs must be initialized via __init* calls");
 
       if (!llvm::is_contained(initCalls, sourceCallOp)) {
@@ -1562,7 +1566,7 @@ struct GetGlobalOpConversion
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
                                                     denseAttr);
     } else {
@@ -1591,7 +1595,7 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
 
 /// Filters out block arguments of type MemRefType
 bool FuncSSAStrategy::maximizeArgument(BlockArgument arg) {
-  return !arg.getType().isa<mlir::MemRefType>();
+  return !isa<mlir::MemRefType>(arg.getType());
 }
 
 namespace {
@@ -1682,14 +1686,14 @@ struct CfToHandshakePass
       // addIllegalDialect rule above and must be converted by a pattern.
       if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
               SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
-        return calledFn.getSymName().startswith("__init");
+        return calledFn.getSymName().starts_with("__init");
       }
       // If symbol lookup fails or it's not a func::FuncOp, treat as default
       // (illegal)
       return false;
     });
     target.addDynamicallyLegalOp<func::FuncOp>(
-        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+        [](func::FuncOp op) { return op.getSymName().starts_with("__init"); });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
@@ -1698,7 +1702,7 @@ struct CfToHandshakePass
     // has no remaining uses. This is safe because all valid calls to __init*
     // were tracked and deleted earlier.
     for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
-      if (func.getSymName().startswith("__init")) {
+      if (func.getSymName().starts_with("__init")) {
         assert(func.use_empty() &&
                "__init function should not have users after transformation");
         func.erase();

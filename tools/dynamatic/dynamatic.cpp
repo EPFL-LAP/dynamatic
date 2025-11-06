@@ -413,7 +413,7 @@ public:
 std::string FrontendState::makeAbsolutePath(StringRef path) {
   SmallString<128> str;
   path::append(str, path);
-  fs::make_absolute(cwd, str);
+  llvm::sys::path::make_absolute(cwd, str);
   return str.str().str();
 }
 

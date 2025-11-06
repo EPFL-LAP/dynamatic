@@ -391,8 +391,8 @@ struct HandshakeCombineSteeringLogicPass
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
     GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns(ctx);
     patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
                  CombineBranchesSameSign, CombineBranchesOppositeSign,

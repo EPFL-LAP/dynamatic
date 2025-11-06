@@ -95,12 +95,12 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     /// Returns the argument name at the given index.
     StringAttr getArgName(unsigned idx) {
-      return getArgNames()[idx].cast<StringAttr>();
+      return mlir::cast<StringAttr>(getArgNames()[idx]);
     }
 
     /// Returns the result name at the given index.
     StringAttr getResName(unsigned idx) {
-      return getResNames()[idx].cast<StringAttr>();
+      return mlir::cast<StringAttr>(getResNames()[idx]);
     }
 
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
@@ -109,7 +109,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     /// safely.
     LogicalResult verifyType() {
       auto type = getFunctionTypeAttr().getValue();
-      if (!type.isa<FunctionType>())
+      if (!llvm::isa<FunctionType>(type))
         return emitOpError(
             "requires '" + getFunctionTypeAttrName().getValue() +
             "' attribute of function type");
@@ -136,7 +136,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
 // InstanceOp
 def InstanceOp : Handshake_Op<"instance", [
-    CallOpInterface,
     HasClock,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {

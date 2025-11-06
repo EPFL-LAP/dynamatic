@@ -23,7 +23,7 @@
 
 // Can not forward declare inline functions with default arguments, so we
 // include the header directly.
-#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/LogicalResult.h"
 
 // Import classes from the `mlir` namespace into the `dynamatic` namespace.  All
 // of the following classes have been already forward declared and imported from
@@ -134,7 +134,6 @@ class OpOperand;
 class OpResult;
 template <typename OpTy>
 class OwningOpRef;
-class ParseResult;
 class Pass;
 class PatternRewriter;
 class Region;
@@ -160,13 +159,10 @@ class VectorType;
 class WalkResult;
 enum class RegionKind;
 struct CallInterfaceCallable;
-struct LogicalResult;
 struct MemRefAccess;
 struct OperationState;
 class OperationName;
 
-template <typename T>
-class FailureOr;
 template <typename SourceOp>
 class OpConversionPattern;
 template <typename T>

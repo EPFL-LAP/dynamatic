@@ -31,6 +31,7 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/StringExtras.h"
+#include <variant>
 
 namespace dynamatic {
 namespace hw {

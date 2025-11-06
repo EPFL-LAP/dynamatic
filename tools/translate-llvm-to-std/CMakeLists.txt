@@ -9,6 +9,7 @@ add_llvm_tool(translate-llvm-to-std
 )
 
 llvm_update_compile_flags(translate-llvm-to-std)
+
 target_link_libraries(translate-llvm-to-std
   PRIVATE
   DynamaticSupport
@@ -33,6 +34,7 @@ target_link_libraries(translate-llvm-to-std
   LLVMCore
   LLVMSupport
   LLVMAnalysis
+  LLVMIRReader
 
   libclang
 )

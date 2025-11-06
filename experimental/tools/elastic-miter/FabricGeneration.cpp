@@ -96,7 +96,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   // on the LHS resNames but are prefixed with EQ_
   SmallVector<Attribute> prefixedResAttr;
   for (Attribute attr : lhsFuncOp.getResNames()) {
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     if (strAttr) {
       prefixedResAttr.push_back(
           builder.getStringAttr("EQ_" + strAttr.getValue().str()));
@@ -121,7 +121,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
   for (Type type : lhsFuncOp.getResultTypes()) {
     // If the type is a handshake::ControlType, keep it
-    if (type.isa<handshake::ControlType>()) {
+    if (isa<handshake::ControlType>(type)) {
       outputTypes.push_back(type);
     } else {
       // Otherwise replace it with !handshake.channel<i1>
@@ -170,7 +170,7 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
 
   // Check that arguments are all handshake.channel or handshake.control type
   for (Type ty : funcOp.getArgumentTypes()) {
-    if (!ty.isa<ChannelType, ControlType>()) {
+    if (!isa<ChannelType, ControlType>(ty)) {
       llvm::errs() << "All arguments need to be of handshake.channel or "
                       "handshake.control type\n";
       return failure();
@@ -179,7 +179,7 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
 
   // Check that results are all handshake.channel or handshake.control type
   for (Type ty : funcOp.getResultTypes()) {
-    if (!ty.isa<ChannelType, ControlType>()) {
+    if (!isa<ChannelType, ControlType>(ty)) {
       llvm::errs() << "All results need to be of handshake.channel or "
                       "handshake.control type\n";
       return failure();
@@ -263,7 +263,7 @@ createReachabilityCircuit(MLIRContext &context,
     }
 
     Attribute attr = funcOp.getArgNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), arg.getType()));
   }
@@ -299,7 +299,7 @@ createReachabilityCircuit(MLIRContext &context,
         op->replaceUsesOfWith(result, endNDWireOp.getResult());
     }
     Attribute attr = funcOp.getResNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.results.push_back(
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
@@ -429,7 +429,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       op->replaceUsesOfWith(rhsArg, rhsNDWireOp.getResult());
 
     Attribute attr = lhsFuncOp.getArgNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
   }
@@ -488,7 +488,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
-    if (lhsResult.getType().isa<handshake::ControlType>()) {
+    if (isa<handshake::ControlType>(lhsResult.getType())) {
       ValueRange joinInputs = {lhsEndBufferOp.getResult(),
                                rhsEndBufferOp.getResult()};
       JoinOp joinOp =
@@ -509,7 +509,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     config.eq.push_back(eqName);
 
     Attribute attr = lhsFuncOp.getResNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     // The result name is prefixed with EQ_
     config.results.push_back(
         std::make_pair("EQ_" + strAttr.getValue().str(), lhsResult.getType()));
