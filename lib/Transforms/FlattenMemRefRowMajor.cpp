@@ -110,7 +110,7 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
 
 static bool hasMultiDimMemRef(ValueRange values) {
   return llvm::any_of(values, [](Value v) {
-    auto memref = v.getType().dyn_cast<MemRefType>();
+    auto memref = dyn_cast<MemRefType>(v.getType());
     if (!memref)
       return false;
     return !isUniDimensional(memref);
@@ -296,8 +296,9 @@ struct CondBranchOpConversion
   matchAndRewrite(mlir::cf::CondBranchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-        op, adaptor.getCondition(), adaptor.getTrueDestOperands(),
-        adaptor.getFalseDestOperands(), op.getTrueDest(), op.getFalseDest());
+        op, adaptor.getCondition(), op.getTrueDest(),
+        adaptor.getTrueDestOperands(), op.getFalseDest(),
+        adaptor.getFalseDestOperands());
     return success();
   }
 };
@@ -380,7 +381,7 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
     });
 
     auto resultsConverted = llvm::all_of(op.getResultTypes(), [](Type type) {
-      if (auto memref = type.dyn_cast<MemRefType>())
+      if (auto memref = dyn_cast<MemRefType>(type))
         return isUniDimensional(memref);
       return true;
     });

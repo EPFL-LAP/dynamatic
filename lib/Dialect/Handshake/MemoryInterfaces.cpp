@@ -73,7 +73,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
   FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
-    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+    // API changed here: https://github.com/llvm/llvm-project/pull/78260
+    // updateRootInPlace -> modifyOpInPlace
+    rewriter.modifyOpInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
   return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
 }
@@ -111,7 +113,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // so that the LSQ can forward its loads and stores to the MC. We need
     // load address, store address, and store data channels from the LSQ to
     // the MC and a load data channel from the MC to the LSQ
-    MemRefType memrefType = memref.getType().cast<MemRefType>();
+    MemRefType memrefType = cast<MemRefType>(memref.getType());
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.

@@ -57,7 +57,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
-    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+    std::string argName = dyn_cast<StringAttr>(portAttr).data();
 
     if (handshake::ChannelType type =
             dyn_cast<handshake::ChannelType>(arg.getType())) {
@@ -74,7 +74,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   // data/control channels (no arrays).
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
-    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    std::string argName = dyn_cast<StringAttr>(portAttr).str();
     if (handshake::ChannelType type =
             dyn_cast<handshake::ChannelType>(resType)) {
       argAndTypeMap.emplace_back(argName, type.getDataType());
