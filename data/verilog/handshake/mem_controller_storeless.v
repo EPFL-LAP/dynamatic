@@ -2,7 +2,8 @@
 module mem_controller_storeless #(
   parameter NUM_LOADS  = 1,
   parameter DATA_TYPE = 32,
-  parameter ADDR_TYPE = 32
+  parameter ADDR_TYPE = 32,
+  parameter BURST_TYPE = 32
 ) (
   input                                     clk,
   input                                     rst,
@@ -29,7 +30,10 @@ module mem_controller_storeless #(
   output [              ADDR_TYPE - 1 : 0] loadAddr,
   output                                    storeEn,
   output [              ADDR_TYPE - 1 : 0] storeAddr,
-  output [              DATA_TYPE - 1 : 0] storeData
+  output [              DATA_TYPE - 1 : 0] storeData,
+  output [               DATA_TYPE - 1 : 0] storeData,
+  output [               BURST_TYPE - 1 : 0] loadBurstLen,
+  output [               BURST_TYPE - 1 : 0] storeBurstLen
 );
   wire allRequestsDone;
 
@@ -37,6 +41,9 @@ module mem_controller_storeless #(
   assign storeAddr = {ADDR_TYPE{1'b0}};
   assign storeData = {DATA_TYPE{1'b0}};
   assign storeEn   = 1'b0;
+
+  assign loadBurstLen  = {BURST_TYPE{1'b1}}; // Max burst length
+  assign storeBurstLen = {BURST_TYPE{1'b0}};
 
   // MC is "always done with stores"
 

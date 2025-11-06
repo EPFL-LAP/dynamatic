@@ -4,7 +4,8 @@ module mem_controller #(
   parameter NUM_LOADS    = 1,
   parameter NUM_STORES   = 1,
   parameter DATA_TYPE   = 32,
-  parameter ADDR_TYPE   = 32
+  parameter ADDR_TYPE   = 32,
+  parameter BURST_TYPE  = 32
 ) (
   input                                      clk,
   input                                      rst,
@@ -43,12 +44,17 @@ module mem_controller #(
   output [               ADDR_TYPE - 1 : 0] loadAddr,
   output                                     storeEn,
   output [               ADDR_TYPE - 1 : 0] storeAddr,
-  output [               DATA_TYPE - 1 : 0] storeData
+  output [               DATA_TYPE - 1 : 0] storeData,
+  output [               BURST_TYPE - 1 : 0] loadBurstLen,
+  output [               BURST_TYPE - 1 : 0] storeBurstLen
 );
   // Internal signal declarations
   wire                      dropLoadEn;
   wire [ADDR_TYPE - 1 : 0] dropLoadAddr;
   wire [DATA_TYPE - 1 : 0] dropLoadData;
+
+  assign loadBurstLen = {BURST_TYPE{1'b1}}; // Max burst length
+  assign storeBurstLen = {BURST_TYPE{1'b1}}; // Max burst length
 
   mem_controller_loadless #(
     .NUM_CONTROLS(NUM_CONTROLS),
