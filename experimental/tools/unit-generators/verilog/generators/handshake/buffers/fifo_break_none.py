@@ -6,9 +6,9 @@ def generate_fifo_break_none(name, params):
     num_slots = params["num_slots"]
 
     if bitwidth == 0:
-        return _generate_fifo_break_none_dataless(name, num_slots)
+        return _generate_fifo_break_none_dataless(name, {"num_slots": num_slots})
     else:
-        return _generate_fifo_break_none(name, num_slots, bitwidth)
+        return _generate_fifo_break_none(name, {"num_slots": num_slots, "bitwidth": bitwidth})
 
 
 def _generate_fifo_break_none(name, params):
