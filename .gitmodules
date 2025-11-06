@@ -1,9 +1,3 @@
-[submodule "polygeist"]
-	path = polygeist
-	url = https://github.com/EPFL-LAP/Polygeist.git
-	branch = main
-  shallow = true
-
 [submodule "visual-dataflow/godot-cpp"]
 	path = visual-dataflow/godot-cpp
 	url = https://github.com/godotengine/godot-cpp
@@ -12,3 +6,8 @@
 [submodule "data/aig"]
 	path = data/aig
 	url = https://github.com/ETHZ-DYNAMO/dataflow-aig-library
+[submodule "llvm-project"]
+	path = llvm-project
+  url = https://github.com/llvm/llvm-project.git
+  branch = main
+  shallow = true
