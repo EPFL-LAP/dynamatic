@@ -696,7 +696,8 @@
       { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 0, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_storeless.v",
     "dependencies": ["mc_support"],
@@ -709,7 +710,8 @@
       { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 0, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_loadless.v",
     "dependencies": ["mc_support"],
@@ -722,9 +724,52 @@
       { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 0, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller.v",
+    "dependencies": ["mem_controller_loadless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 1, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_li_storeless.v",
+    "dependencies": ["mc_support", "mc_li_support"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 1, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_li_loadless.v",
+    "dependencies": ["mc_support", "mc_li_support"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY_INSENSITIVE", "type": "unsigned", "eq": 1, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_li.v",
     "dependencies": ["mem_controller_loadless"],
     "hdl": "verilog"
   },
@@ -807,6 +852,10 @@
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/mc_support.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/mc_li_support.v",
     "hdl": "verilog"
   },
   {
