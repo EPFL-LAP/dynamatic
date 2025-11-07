@@ -23,7 +23,7 @@ def _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, ad
 
     mem_controller_loadless_name = name + "_mem_controller_loadless"
     mem_controller_loadless = _generate_mem_controller_loadless(
-        mem_controller_loadless_name, num_controls, num_stores, addr_type, data_type)
+    mem_controller_loadless_name, num_controls, num_stores, addr_type, data_type)
 
     mem_controller_body = f"""
 // Module of mem_controller
@@ -126,6 +126,8 @@ def _generate_mem_controller_storeless(name, num_loads, addr_type, data_type):
     mc_support_name = name + "_mc_support"
     mc_support = generate_mc_support(mc_support_name, {})
 
+    mc_control_name = mc_support_name + "_mc_control"
+
     mem_controller_storeless_body = f"""
 
 // Module of mem_controller_storeless
@@ -190,7 +192,7 @@ module {name}(
   // of accesses in the block instead of just the number of stores.
   assign allRequestsDone = 1'b1;
 
-  mc_control control (
+  {mc_control_name} control (
     .rst            (rst),
     .clk            (clk),
     .memStart_valid (memStart_valid),
@@ -210,6 +212,8 @@ endmodule
 def _generate_mem_controller_loadless(name, num_controls, num_stores, addr_type, data_type):
     mc_support_name = name + "_mc_support"
     mc_support = generate_mc_support(mc_support_name, {})
+
+    mc_control_name = mc_support_name + "_mc_control"
 
     mem_controller_loadless_body = f"""
 
@@ -321,7 +325,7 @@ module {name}(
   // of accesses in the block instead of just the number of stores.
   assign allRequestsDone = (remainingStores == zeroStore && ctrl_valid == zeroCtrl) ? 1'b1 : 1'b0;
 
-  mc_control control (
+  {mc_control_name} control (
     .rst            (rst),
     .clk            (clk),
     .memStart_valid (memStart_valid),

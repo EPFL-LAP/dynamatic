@@ -9,7 +9,7 @@ def generate_one_slot_break_dv(name, params):
 
 def _generate_one_slot_break_dv(name, bitwidth):
 
-    one_slot_break_dv_dataless_name = name + "_dataless"
+    one_slot_break_dv_dataless_name = name + "one_slot_break_dvr_dataless"
     one_slot_break_dv_dataless = _generate_one_slot_break_dv_dataless(
         one_slot_break_dv_dataless_name)
 

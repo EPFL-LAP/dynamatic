@@ -11,6 +11,8 @@ def generate_mc_support(name, params):
     write_priority_name = name + "_write_priority"
     write_memory_arbiter_name = name + "_write_memory_arbiter"
 
+    mc_control_name = name + "_mc_control"
+
     return f"""
 // Module of mc_support
 
@@ -390,7 +392,7 @@ endmodule
 //  mc_control
 //
 
-module mc_control (
+module {mc_control_name} (
   input  clk,
   input  rst,
   // start input control
