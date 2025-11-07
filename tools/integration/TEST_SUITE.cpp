@@ -199,7 +199,7 @@ TEST_P(VerilogFixture, verilog) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = true,
+      .useVerilogBeta = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -214,7 +214,7 @@ TEST_P(VerilogMemoryFixture, verilog) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
-      .useVerilog = true,
+      .useVerilogBeta = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -230,7 +230,7 @@ TEST_P(VerilogFixture, verilog_NoCI) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = true,
+      .useVerilogBeta = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -431,7 +431,7 @@ INSTANTIATE_TEST_SUITE_P(
       "test_memory_8",
       "test_memory_9",
       "test_smallbound"
-    ),
+      ),
     [](const auto &info) { return "memory_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(
@@ -446,7 +446,6 @@ INSTANTIATE_TEST_SUITE_P(
       "gemver",
       "if_loop_1",
       "if_loop_2",
-      "if_loop_3",
       "iir",
       "image_resize",
       "insertion_sort",
@@ -476,7 +475,7 @@ INSTANTIATE_TEST_SUITE_P(
       "video_filter",
       "while_loop_1",
       "while_loop_3"
-    ),
+      ),
     [](const auto &info) { return info.param; }
 );
 
@@ -505,6 +504,7 @@ INSTANTIATE_TEST_SUITE_P(
       "matching_2",
       "mvt_float",
       "symm_float",
-      "syr2k_float"
-    ),
+      "syr2k_float",
+      "if_loop_3"
+      ),
     [](const auto &info) { return info.param; });
