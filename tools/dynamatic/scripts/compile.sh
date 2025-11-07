@@ -246,7 +246,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
+    -debug-only=dialect-conversion > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
