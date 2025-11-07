@@ -15,7 +15,7 @@ def _generate_fifo_break_none(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
-    fifo_break_dv_name = "fifo_break_dv"
+    fifo_break_dv_name = name + "_fifo_break_dv"
     fifo_break_dv = generate_fifo_break_dv(
         fifo_break_dv_name, {"num_slots": num_slots, "bitwidth": bitwidth})
 
@@ -67,7 +67,7 @@ endmodule
 def _generate_fifo_break_none_dataless(name, params):
     num_slots = params["num_slots"]
 
-    fifo_break_dv_name_dataless = "fifo_break_dv_dataless"
+    fifo_break_dv_name_dataless = name + "_fifo_break_dv_dataless"
     fifo_break_dv_dataless = generate_fifo_break_dv(
         fifo_break_dv_name_dataless, {"num_slots": num_slots, "bitwidth": 0})
 
