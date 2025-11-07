@@ -23,6 +23,13 @@
 
 namespace dynamatic {
 namespace experimental {
+#define GEN_PASS_DECL_FTDCFTOHANDSHAKE
+#include "experimental/Conversion/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+
+namespace dynamatic {
+namespace experimental {
 namespace ftd {
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -35,14 +42,14 @@ public:
                           NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, ctx, benefit), cdAnalysis(cda),
-        gsaAnalysis(gsa){};
+        gsaAnalysis(gsa) {};
 
   FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        cdAnalysis(cda), gsaAnalysis(gsa){};
+        cdAnalysis(cda), gsaAnalysis(gsa) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -84,12 +91,6 @@ public:
   matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 };
-
-#define GEN_PASS_DECL_FTDCFTOHANDSHAKE
-#define GEN_PASS_DEF_FTDCFTOHANDSHAKE
-#include "experimental/Conversion/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createFtdCfToHandshake();
 
 } // namespace ftd
 } // namespace experimental

@@ -60,6 +60,11 @@ using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
 
+namespace dynamatic {
+#define GEN_PASS_DEF_CFTOHANDSHAKE
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+
 //===-----------------------------------------------------------------------==//
 // Helper functions
 //===-----------------------------------------------------------------------==//
@@ -399,17 +404,17 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   TypeConverter::SignatureConversion entryConversion(
       entryBlock->getNumArguments());
   setupEntryBlockConversion(entryBlock, numMemories, rewriter, entryConversion);
-  rewriter.applySignatureConversion(entryBlock, entryConversion, typeConv);
+  rewriter.applySignatureConversion(entryBlock, entryConversion,
+                                    getTypeConverter());
 
   for (Block &nonEntryBlock :
        llvm::make_early_inc_range(llvm::drop_begin(funcOp.getBody()))) {
-
     TypeConverter::SignatureConversion nonEntryConversion(
         /*numOrigInputs=*/nonEntryBlock.getNumArguments());
 
     setupBlockConversion(&nonEntryBlock, rewriter, nonEntryConversion);
     rewriter.applySignatureConversion(&nonEntryBlock, nonEntryConversion,
-                                      typeConv);
+                                      getTypeConverter());
   }
 
   // Modify branch-like terminators to forward the new control value through
@@ -578,6 +583,9 @@ void LowerFuncToHandshake::addMergeOps(handshake::FuncOp funcOp,
   // Insert merge-like operations in all non-entry blocks (with backedges
   // instead as data operands)
   DenseMap<Block *, std::vector<MergeOpInfo>> blockMerges;
+
+  Block *entryBlock = &funcOp.getBody().front();
+
   for (Block &block : llvm::drop_begin(funcOp)) {
     rewriter.setInsertionPointToStart(&block);
 
@@ -689,6 +697,7 @@ void LowerFuncToHandshake::addBranchOps(
 
       // Connect users of the branch to the appropriate branch result
       for (const auto &userGroup : branchUsers) {
+
         rewriter.replaceUsesWithIf(
             branchOprd, getSuccResult(termOp, newOp, userGroup.first),
             [&](OpOperand &oprd) {
@@ -1006,6 +1015,7 @@ void LowerFuncToHandshake::idBasicBlocks(
 LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const ArgReplacements &argReplacements) const {
+
   // Erase all cf-level terminators, accumulating operands to func-level returns
   // as we go
   SmallVector<SmallVector<Value>> returnsOperands;
@@ -1040,9 +1050,10 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     SmallVector<Value> replacements;
     for (BlockArgument blockArg : block.getArguments()) {
       Value mergeRes = argReplacements.at(blockArg);
-      replacements.push_back(mergeRes);
+      // Replacing BA with merge results
       rewriter.replaceAllUsesWith(blockArg, mergeRes);
     }
+    // Replacing the block arguments with merge results
     rewriter.inlineBlockBefore(&block, lastOp, replacements);
   }
 
@@ -1606,9 +1617,13 @@ namespace {
 struct CfToHandshakePass
     : public dynamatic::impl::CfToHandshakeBase<CfToHandshakePass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
     MLIRContext *ctx = &getContext();
-    ModuleOp modOp = getOperation();
+    mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+    NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+    if (!nameAnalysis.isAnalysisValid())
+      return signalPassFailure();
 
     // Put all non-external functions into maximal SSA form
     for (auto funcOp : modOp.getOps<func::FuncOp>()) {
@@ -1708,10 +1723,8 @@ struct CfToHandshakePass
         func.erase();
       }
     }
+    // The name analysis is always preserved across passes
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createCfToHandshake() {
-  return std::make_unique<CfToHandshakePass>();
-}

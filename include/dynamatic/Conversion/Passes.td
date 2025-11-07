@@ -57,7 +57,7 @@ def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
 // CfToHandshake
 //===----------------------------------------------------------------------===//
 
-def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
+def CfToHandshake : Pass<"lower-cf-to-handshake"> {
   let summary = "Lowers func and cf dialects to handshake.";
   let description = [{
     Lowers func-level functions whose body have unstructured control flow into
@@ -65,7 +65,11 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
 }];
-let constructor = "dynamatic::createCfToHandshake()";
+
+  let dependentDialects = [
+  "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect",
+  "mlir::func::FuncDialect", "mlir::memref::MemRefDialect",
+  "handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
