@@ -405,7 +405,6 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "subdiag_fast"
       ),
     [](const auto &info) { return "spec_" + info.param; });
-// clang-format on
 
 // Verilog tests: CI safe
 INSTANTIATE_TEST_SUITE_P(
@@ -508,3 +507,5 @@ INSTANTIATE_TEST_SUITE_P(
       "if_loop_3"
       ),
     [](const auto &info) { return info.param; });
+
+// clang-format on
