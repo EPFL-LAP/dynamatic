@@ -275,10 +275,7 @@ public:
 };
 
 #define GEN_PASS_DECL_CFTOHANDSHAKE
-#define GEN_PASS_DEF_CFTOHANDSHAKE
 #include "dynamatic/Conversion/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
 
 } // namespace dynamatic
 

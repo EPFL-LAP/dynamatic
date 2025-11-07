@@ -120,7 +120,15 @@ static std::optional<CXScalarType> processScalarType(CXType clangType) {
     llvm_unreachable("Unhandled CXType_Unexposed type!");
     return std::nullopt;
   }
+
+  case CXType_Typedef: {
+    CXCursor typedefCursor = clang_getTypeDeclaration(clangType);
+    return processScalarType(clang_getTypedefDeclUnderlyingType(typedefCursor));
+  }
   default: {
+    llvm::errs() << "Type ID of unhandled scalar type: " << clangType.kind
+                 << "\n";
+
     return std::nullopt;
   }
   }
@@ -161,6 +169,8 @@ static std::optional<ArgType> fromCXType(CXType type) {
       return ArgType{scalarType.value(), arrayDimSizes, false};
     }
   }
+
+  llvm::errs() << "Unhandled compound type id: " << type.kind << "\n";
   // TODO: One important thing to handle in the future is the arguments that
   // are **passed by reference**. It is probably correct to promote them to
   // the function return values.

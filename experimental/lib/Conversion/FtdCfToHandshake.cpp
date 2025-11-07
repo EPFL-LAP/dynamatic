@@ -36,15 +36,26 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
 
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_FTDCFTOHANDSHAKE
+#include "experimental/Conversion/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+
 namespace {
 
 struct FtdCfToHandshakePass
-    : public dynamatic::experimental::ftd::impl::FtdCfToHandshakeBase<
+    : public dynamatic::experimental::impl::FtdCfToHandshakeBase<
           FtdCfToHandshakePass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
     MLIRContext *ctx = &getContext();
-    ModuleOp modOp = getOperation();
+    mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+    NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+    if (!nameAnalysis.isAnalysisValid())
+      return signalPassFailure();
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
@@ -99,6 +110,7 @@ struct FtdCfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace
@@ -372,8 +384,4 @@ LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   // in FtdOneToOneConversion.
   castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass> ftd::createFtdCfToHandshake() {
-  return std::make_unique<FtdCfToHandshakePass>();
 }
