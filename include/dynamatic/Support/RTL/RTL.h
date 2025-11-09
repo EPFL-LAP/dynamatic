@@ -54,11 +54,6 @@ replaceRegexes(StringRef input,
 std::string substituteParams(StringRef input,
                              const ParameterMappings &parameters);
 
-/* Helper utilities for handshake type bitwidth and extra-signal serialization
-   were intentionally moved out of this header to avoid exposing Handshake
-   specific APIs from the general RTL header. Implementations that need these
-   utilities should provide their own local helpers. */
-
 class RTLMatch;
 class RTLParameter;
 class RTLComponent;
@@ -96,7 +91,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(std::move(other.name)), type(std::move(other.type)){};
+      : name(std::move(other.name)), type(std::move(other.type)) {};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = std::move(other.name);
@@ -161,7 +156,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()){};
+      : state(state), serialized(serial.str()) {};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -174,7 +169,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc){};
+  RTLRequest(Location loc) : loc(loc) {};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.
