@@ -17,7 +17,7 @@ def _generate_fifo_break_dv(name, params):
     num_slots = params["num_slots"]
     bitwidth = params["bitwidth"]
 
-    if (bitwidth == "0"):
+    if (bitwidth == 0):
         return _generate_fifo_break_dv_dataless(name, params)
 
     return f"""
@@ -58,7 +58,10 @@ module {name}(
 
   always @(posedge clk) begin
     if (rst) begin
-      
+      // Clear memory on reset to mirror VHDL semantics
+      for (i = 0; i < {num_slots}; i = i + 1) begin
+        Memory[i] <= {bitwidth}'d0;
+      end
     end else if (WriteEn) begin
       Memory[Tail] <= ins;
     end

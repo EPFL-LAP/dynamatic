@@ -11,7 +11,7 @@ def generate_one_slot_break_dvr(name, params):
 
 def _generate_one_slot_break_dvr(name, bitwidth):
 
-    one_slot_break_dvr_dataless_name = "one_slot_break_dvr_dataless"
+    one_slot_break_dvr_dataless_name = name + "_one_slot_break_dvr_dataless"
     one_slot_break_dvr_dataless = _generate_one_slot_break_dvr_dataless(
         one_slot_break_dvr_dataless_name)
 
