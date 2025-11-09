@@ -406,7 +406,7 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       ),
     [](const auto &info) { return "spec_" + info.param; });
 
-// Verilog tests: CI safe
+// Verilog tests: CI safe 
 INSTANTIATE_TEST_SUITE_P(
     VerilogMemoryTestsCI, VerilogMemoryFixture,
     testing::Values(
