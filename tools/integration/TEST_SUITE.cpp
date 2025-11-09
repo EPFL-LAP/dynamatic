@@ -469,7 +469,6 @@ INSTANTIATE_TEST_SUITE_P(
       "test_loop_free",
       "test_stdint",
       "threshold",
-      "triangular",
       "vector_rescale",
       "video_filter",
       "while_loop_1",
@@ -504,7 +503,8 @@ INSTANTIATE_TEST_SUITE_P(
       "mvt_float",
       "symm_float",
       "syr2k_float",
-      "if_loop_3"
+      "if_loop_3",
+      "triangular"
       ),
     [](const auto &info) { return info.param; });
 
