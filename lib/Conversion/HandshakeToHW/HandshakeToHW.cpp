@@ -1294,8 +1294,8 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
     MLIRContext *ctx = extModOp.getContext();
     StringRef rtlName =
         extModOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
-  auto serialized = ModuleDiscriminator::computeSerializedParameters(
-    rtlName, extModOp.getModuleType());
+    auto serialized = ModuleDiscriminator::computeSerializedParameters(
+        rtlName, extModOp.getModuleType());
     std::vector<NamedAttribute> serialAttrs;
     for (auto it = serialized.begin(); it != serialized.end(); ++it) {
       StringRef key = it->first();
@@ -2105,8 +2105,8 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
                     DictionaryAttr::get(ctx, parameters));
   // Compute and add serialized parameters so the RTL exporter can read them
   {
-  ParameterMappings pm = ModuleDiscriminator::computeSerializedParameters(
-    HW_NAME, extModOp.getModuleType());
+    ParameterMappings pm = ModuleDiscriminator::computeSerializedParameters(
+        HW_NAME, extModOp.getModuleType());
     std::vector<NamedAttribute> serializedAttrs;
     for (auto it = pm.begin(); it != pm.end(); ++it) {
       StringRef key = it->getKey();
