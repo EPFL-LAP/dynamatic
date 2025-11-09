@@ -19,11 +19,9 @@
 #define DYNAMATIC_SUPPORT_RTL_RTL_H
 
 #include "dynamatic/Dialect/HW/HWOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTLTypes.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "mlir/IR/Types.h"
 #include "llvm/Support/JSON.h"
 #include <map>
 #include <string>
@@ -56,42 +54,10 @@ replaceRegexes(StringRef input,
 std::string substituteParams(StringRef input,
                              const ParameterMappings &parameters);
 
-/// Returns the bitwidth of the type as string. If the type is a control type 0.
-inline std::string getBitwidthString(mlir::Type type) {
-  return std::to_string(dynamatic::handshake::getHandshakeTypeBitWidth(type));
-}
-
-/// Serialize all extra signals present to string.
-inline std::string serializeExtraSignals(const mlir::Type &type) {
-  assert(type.isa<dynamatic::handshake::ExtraSignalsTypeInterface>() &&
-         "type should be ChannelType or ControlType");
-
-  dynamatic::handshake::ExtraSignalsTypeInterface extraSignalsType =
-      type.cast<dynamatic::handshake::ExtraSignalsTypeInterface>();
-
-  std::string extraSignalsValue;
-  llvm::raw_string_ostream extraSignals(extraSignalsValue);
-
-  extraSignals << "{";
-  bool first = true;
-  for (const dynamatic::handshake::ExtraSignal &extraSignal :
-       extraSignalsType.getExtraSignals()) {
-    if (!first)
-      extraSignals << ", ";
-    first = false;
-
-    extraSignals << "\"" << extraSignal.name << "\": ";
-    extraSignals << extraSignal.getBitWidth();
-  }
-  extraSignals << "}";
-
-  return std::string("'") + extraSignals.str() + std::string("'");
-}
-
-/// Compute serialized parameters from a handshake operation
-dynamatic::ParameterMappings
-computeSerializedParameters(llvm::StringRef handshakeOp,
-                            hw::ModuleType modType);
+/* Helper utilities for handshake type bitwidth and extra-signal serialization
+   were intentionally moved out of this header to avoid exposing Handshake
+   specific APIs from the general RTL header. Implementations that need these
+   utilities should provide their own local helpers. */
 
 class RTLMatch;
 class RTLParameter;
