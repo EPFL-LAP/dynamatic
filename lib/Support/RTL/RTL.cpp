@@ -246,7 +246,7 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
 }
 
 LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
-  // Require precomputed serialized parameters attached during lowering as
+  // Require precomputed serialized parameters attached during lowering since
   // the `hw.serialized_parameters` attribute.
   if (auto dict =
           modOp->getAttrOfType<DictionaryAttr>("hw.serialized_parameters")) {
