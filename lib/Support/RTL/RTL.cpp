@@ -98,7 +98,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){}
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {}
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -260,7 +260,7 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       } else {
         // // neither string nor integer attribute... use print method of
         // attribute std::string tmp; llvm::raw_string_ostream os(tmp);
-        // val.print(os); 
+        // val.print(os);
         // serializedParams[key.str()] = os.str();
         return failure();
       }
