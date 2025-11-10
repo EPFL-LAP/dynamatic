@@ -23,6 +23,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -99,6 +100,44 @@ static Type lowerType(Type type) {
       .Default([](auto type) { return nullptr; });
 }
 
+// Local helper: return handshake type bitwidth as string. Kept local to this
+// translation unit because it's only used by the Handshake->HW conversion.
+static std::string getBitwidthString(mlir::Type type) {
+  return std::to_string(dynamatic::handshake::getHandshakeTypeBitWidth(type));
+}
+
+// Local helper: serialize ExtraSignals attached to a ChannelType/ControlType
+// into the same JSON-ish string form previously exposed from the RTL header.
+static std::string serializeExtraSignalsLocal(const mlir::Type &type) {
+  assert(type.isa<dynamatic::handshake::ExtraSignalsTypeInterface>() &&
+         "type should be ChannelType or ControlType");
+
+  dynamatic::handshake::ExtraSignalsTypeInterface extraSignalsType =
+      type.cast<dynamatic::handshake::ExtraSignalsTypeInterface>();
+
+  std::string extraSignalsValue;
+  llvm::raw_string_ostream extraSignals(extraSignalsValue);
+
+  extraSignals << "{";
+  bool first = true;
+  for (const dynamatic::handshake::ExtraSignal &extraSignal :
+       extraSignalsType.getExtraSignals()) {
+    if (!first)
+      extraSignals << ", ";
+    first = false;
+
+    extraSignals << "\"" << extraSignal.name << "\": ";
+    extraSignals << extraSignal.getBitWidth();
+  }
+  extraSignals << "}";
+
+  return std::string("'") + extraSignals.str() + std::string("'");
+}
+
+// NOTE: The definition of `dynamatic::computeSerializedParameters` is
+// provided after the `ModuleDiscriminator` implementation so it can forward
+// to the static method placed next to the discriminator's logic.
+
 namespace {
 
 /// Helper class to build HW modules progressively by adding inputs/outputs
@@ -107,7 +146,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {}
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -234,7 +273,7 @@ struct InternalMemLoweringState {
   InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
       : ramOp(ramOp), memInterface(memInterface),
-        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+        ports(getMemoryPorts(memInterface)), portNames(memInterface) {}
 };
 
 /// Summarizes information to convert a Handshake function into a
@@ -347,7 +386,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {}
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -469,6 +508,12 @@ public:
   /// object was constructed with) to tell the backend how to instantiate the
   /// component.
   void setParameters(hw::HWModuleExternOp modOp);
+
+  /// Computes the textual/serialized parameter mappings for an operation given
+  /// its handshake operation name and the external module type.
+  static ::dynamatic::ParameterMappings
+  computeSerializedParameters(llvm::StringRef handshakeOp,
+                              hw::ModuleType modType);
 
   /// Whether the operations is currently unsupported. Check after construction
   /// and produce a failure if this returns true.
@@ -910,6 +955,140 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
                  DictionaryAttr::get(ctx, parameters));
 }
 
+// Implementation of the parameter serialization logic colocated with the
+// ModuleDiscriminator.
+::dynamatic::ParameterMappings
+ModuleDiscriminator::computeSerializedParameters(llvm::StringRef handshakeOp,
+                                                 hw::ModuleType modType) {
+  ParameterMappings pm;
+
+  // Bitwidth
+  if (
+      // default
+      handshakeOp == "handshake.addi" || handshakeOp == "handshake.andi" ||
+      handshakeOp == "handshake.buffer" || handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.fork" || handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.merge" || handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.sink" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.shli" || handshakeOp == "handshake.blocker" ||
+      handshakeOp == "handshake.uitofp" || handshakeOp == "handshake.sitofp" ||
+      handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.rigidifier" || handshakeOp == "handshake.ori" ||
+      handshakeOp == "handshake.shrsi" || handshakeOp == "handshake.xori" ||
+      handshakeOp == "handshake.negf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.shrui" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
+      // the first input has data bitwidth
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.spec_commit" ||
+      handshakeOp == "handshake.spec_save_commit" ||
+      handshakeOp == "handshake.sharing_wrapper" ||
+      handshakeOp == "handshake.non_spec") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.cond_br" ||
+             handshakeOp == "handshake.select") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.constant") {
+    pm["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (handshakeOp == "handshake.control_merge") {
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["INDEX_BITWIDTH"] = getBitwidthString(modType.getOutputType(1));
+  } else if (handshakeOp == "handshake.extsi" ||
+             handshakeOp == "handshake.trunci" ||
+             handshakeOp == "handshake.extui") {
+    pm["INPUT_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["OUTPUT_BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (handshakeOp == "handshake.load") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getOutputType(1));
+  } else if (handshakeOp == "handshake.mux") {
+    pm["INDEX_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.store") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.speculating_branch") {
+    pm["SPEC_TAG_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.mem_controller" ||
+             handshakeOp == "handshake.lsq") {
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
+  } else if (handshakeOp == "mem_to_bram") {
+    pm["ADDR_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+    pm["DATA_BITWIDTH"] = getBitwidthString(modType.getInputType(4));
+  } else if (handshakeOp == "handshake.addf" ||
+             handshakeOp == "handshake.cmpf" ||
+             handshakeOp == "handshake.mulf" ||
+             handshakeOp == "handshake.subf" ||
+             handshakeOp == "handshake.divf") {
+    int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
+    pm["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
+  } else if (handshakeOp == "handshake.valid_merger") {
+    pm["LEFT_BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    pm["RIGHT_BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "mem_controller" ||
+             handshakeOp == "handshake.truncf" ||
+             handshakeOp == "handshake.extf" ||
+             handshakeOp == "handshake.maximumf" ||
+             handshakeOp == "handshake.minimumf" ||
+             handshakeOp == "handshake.join") {
+    // nothing
+  } else if (handshakeOp == "handshake.ram") {
+    pm["ADDR_WIDTH"] = getBitwidthString(modType.getInputType(1));
+    pm["DATA_WIDTH"] = getBitwidthString(modType.getInputType(4));
+  }
+
+  // Extra signals
+  if (
+      // default
+      handshakeOp == "handshake.addf" || handshakeOp == "handshake.addi" ||
+      handshakeOp == "handshake.andi" || handshakeOp == "handshake.buffer" ||
+      handshakeOp == "handshake.cmpf" || handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.cond_br" ||
+      handshakeOp == "handshake.constant" || handshakeOp == "handshake.extsi" ||
+      handshakeOp == "handshake.fork" || handshakeOp == "handshake.merge" ||
+      handshakeOp == "handshake.mulf" || handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.select" || handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.subf" || handshakeOp == "handshake.extui" ||
+      handshakeOp == "handshake.shli" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.spec_save_commit" ||
+      handshakeOp == "handshake.speculator" ||
+      handshakeOp == "handshake.trunci" || handshakeOp == "handshake.mux" ||
+      handshakeOp == "handshake.control_merge" ||
+      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
+      handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.truncf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
+      handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.not" ||
+      // the first input has extra signals
+      handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
+      handshakeOp == "handshake.spec_commit" ||
+      handshakeOp == "handshake.speculating_branch") {
+    pm["EXTRA_SIGNALS"] = serializeExtraSignalsLocal(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.source" ||
+             handshakeOp == "handshake.non_spec") {
+    pm["EXTRA_SIGNALS"] = serializeExtraSignalsLocal(modType.getOutputType(0));
+  }
+
+  return pm;
+}
+
+// NOTE: The serialized-parameter helper has been moved inside this
+// translation unit and is invoked directly from the places that need it
+// (see usage sites below). We intentionally do not provide a free-function
+// in the `dynamatic` namespace here to avoid exposing this handshake-specific
+// logic from the general RTL header.
+
 namespace {
 
 /// Builder for hardware instances (`hw::InstanceOp`) and their associated
@@ -921,7 +1100,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {}
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1109,6 +1288,26 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
     extModOp = builder.create<hw::HWModuleExternOp>(loc, modNameAttr,
                                                     modBuilder.getPortInfo());
     discriminator.setParameters(extModOp);
+
+    // Compute serialized textual parameters and put them to the external module
+    // so export-rtl can read them.
+    MLIRContext *ctx = extModOp.getContext();
+    StringRef rtlName =
+        extModOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
+    auto serialized = ModuleDiscriminator::computeSerializedParameters(
+        rtlName, extModOp.getModuleType());
+    std::vector<NamedAttribute> serialAttrs;
+    for (auto it = serialized.begin(); it != serialized.end(); ++it) {
+      StringRef key = it->first();
+      const std::string &val = it->second;
+      serialAttrs.emplace_back(StringAttr::get(ctx, key),
+                               StringAttr::get(ctx, val));
+    }
+    if (!serialAttrs.empty()) {
+      extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"),
+                        DictionaryAttr::get(ctx, serialAttrs));
+    }
+
     builder.restoreInsertionPoint(instInsertPoint);
   }
 
@@ -1797,8 +1996,7 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2),
-                         IOMapping(8, state.inputIdx, 1)) {};
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)) {}
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1905,6 +2103,20 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
                           IntegerAttr::get(i32, memState.ports.addrWidth));
   extModOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                     DictionaryAttr::get(ctx, parameters));
+  // Compute and add serialized parameters so the RTL exporter can read them
+  {
+    ParameterMappings pm = ModuleDiscriminator::computeSerializedParameters(
+        HW_NAME, extModOp.getModuleType());
+    std::vector<NamedAttribute> serializedAttrs;
+    for (auto it = pm.begin(); it != pm.end(); ++it) {
+      StringRef key = it->getKey();
+      std::string &val = it->getValue();
+      serializedAttrs.emplace_back(StringAttr::get(ctx, key),
+                                   StringAttr::get(ctx, val));
+    }
+    extModOp->setAttr(StringAttr::get(ctx, "hw.serialized_parameters"),
+                      DictionaryAttr::get(ctx, serializedAttrs));
+  }
   return extModOp;
 }
 
