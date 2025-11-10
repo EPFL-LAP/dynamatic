@@ -420,7 +420,6 @@ INSTANTIATE_TEST_SUITE_P(
       "test_memory_15",
       "test_memory_16",
       "test_memory_17",
-      "test_memory_18",
       "test_memory_2",
       "test_memory_3",
       "test_memory_4",
@@ -432,9 +431,16 @@ INSTANTIATE_TEST_SUITE_P(
       "test_smallbound"
       ),
     [](const auto &info) { return "memory_" + info.param; });
+  
+INSTANTIATE_TEST_SUITE_P(
+    VerilogMemoryTests_NoCI, VerilogMemoryFixture,
+    testing::Values(
+      "test_memory_18"
+      ),
+    [](const auto &info) { return "memory_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(
-    VerilogTestsCI, VerilogFixture,
+    VerilogTests, VerilogFixture,
     testing::Values(
       "bicg",
       "binary_search",
