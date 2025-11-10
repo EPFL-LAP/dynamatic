@@ -26,7 +26,7 @@ LLVM_BINS=$DYNAMATIC_DIR/bin
 export PATH=$PATH:$LLVM_BINS
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+CLANGXX_BIN="$LLVM_BINS/clang++"
 LLVM_OPT="$LLVM_BINS/opt"
 LLVM_TO_STD_TRANSLATION_BIN="$DYNAMATIC_DIR/build/bin/translate-llvm-to-std"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -246,7 +246,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
-    -debug-only=dialect-conversion > "$F_HANDSHAKE"
+    > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 

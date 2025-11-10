@@ -1604,30 +1604,6 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
   }
 };
 
-// Simply Inlining all the blocks other than the first BB into the first BB
-struct InlineAllBlocksIntoOneConversion
-    : public OpConversionPattern<handshake::FuncOp> {
-  using OpConversionPattern<handshake::FuncOp>::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adapter,
-                  ConversionPatternRewriter &rewriter) const override {
-    llvm::errs() << "Hiii!!!\n";
-    Operation *lastOp = &funcOp.front().back();
-    llvm::errs() << "Hiii2!!!\n";
-    for (Block &block :
-         llvm::make_early_inc_range(llvm::drop_begin(funcOp, 1))) {
-      SmallVector<Value> replacements;
-      for (auto _ : block.getArguments()) {
-        replacements.push_back(mlir::Value());
-      }
-
-      llvm::errs() << "Hi!!!\n";
-      rewriter.inlineBlockBefore(&block, lastOp, replacements);
-    }
-    return success();
-  }
-};
-
 //===-----------------------------------------------------------------------==//
 // Pass driver
 //===-----------------------------------------------------------------------==//
@@ -1741,14 +1717,6 @@ struct CfToHandshakePass
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
 
-    // RewritePatternSet inlinePatterns{ctx};
-    // inlinePatterns.add<InlineAllBlocksIntoOneConversion>(ctx);
-
-    // modOp.dump();
-
-    // if (failed(applyPatternsGreedily(modOp, std::move(inlinePatterns))))
-    //   return signalPassFailure();
-
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
       Block *firstBlock = &funcOp.getBlocks().front();
 
@@ -1776,6 +1744,7 @@ struct CfToHandshakePass
       }
     }
     // The name analysis is always preserved across passes
+
     markAnalysesPreserved<NameAnalysis>();
   }
 };

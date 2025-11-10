@@ -1944,7 +1944,17 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
       return getResult();
     }
     // Bypass the preceeding extension operation and the truncation
-    return src;
+    if (srcWidth == dstWidth) {
+      return src;
+    }
+
+    // NOTE (10.11.2025): The current MLIR version does not allow the folder to
+    // change the result type.
+    //
+    // if srcWidth <= dstWidth: we need to use special
+    // canonicalization rewrite to optimize away (ext -> trunc) instead of
+    // folding
+    return nullptr;
   }
 
   // Identical operand and result types mean that the trunc is a no-op
