@@ -163,8 +163,8 @@ static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
 
     // Create a constant with a default value and replace the undefined value
     rewriter.setInsertionPoint(undefOp);
-    auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
-                                                        cstAttr, startValue);
+    auto cstOp = handshake::ConstantOp::create(rewriter, undefOp.getLoc(),
+                                               cstAttr, startValue);
     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
     undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
     namer.replaceOp(cstOp, cstOp);
@@ -206,8 +206,8 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
           intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
     }
 
-    auto newCstOp = rewriter.create<handshake::ConstantOp>(
-        cstOp.getLoc(), valueAttr, controlValue);
+    auto newCstOp = handshake::ConstantOp::create(rewriter, cstOp.getLoc(),
+                                                  valueAttr, controlValue);
 
     newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
 
@@ -227,8 +227,8 @@ LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
   for (Type resType : srcOp->getResultTypes())
     newTypes.push_back(channelifyType(resType));
   auto newOp =
-      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
-                             srcOp->getAttrDictionary().getValue());
+      DstOp::create(rewriter, srcOp->getLoc(), newTypes, adaptor.getOperands(),
+                    srcOp->getAttrDictionary().getValue());
 
   // /!\ This is the main difference from the base function. Without such
   // replacement, a "null operand found" error is present at the end of the
@@ -369,13 +369,13 @@ LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   if (srcWidth < dstWidth) {
     // This is an extension
     newOp =
-        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
-                               castOp->getAttrDictionary().getValue());
+        ExtOp::create(rewriter, castOp.getLoc(), dstType, adaptor.getOperands(),
+                      castOp->getAttrDictionary().getValue());
   } else {
     // This is a truncation
-    newOp = rewriter.create<handshake::TruncIOp>(
-        castOp.getLoc(), dstType, adaptor.getOperands(),
-        castOp->getAttrDictionary().getValue());
+    newOp = handshake::TruncIOp::create(rewriter, castOp.getLoc(), dstType,
+                                        adaptor.getOperands(),
+                                        castOp->getAttrDictionary().getValue());
   }
   this->namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);

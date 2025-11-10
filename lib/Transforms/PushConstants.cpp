@@ -33,7 +33,7 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
     // Determine blocks where the constant is used
     DenseMap<Block *, SmallVector<Operation *, 4>> usingBlocks;
     for (auto *user : constantOp.getResult().getUsers())
-      if (auto block = user->getBlock(); block != defBlock)
+      if (auto *block = user->getBlock(); block != defBlock)
         usingBlocks[block].push_back(user);
       else
         usedByDefiningBlock = true;
@@ -41,9 +41,9 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
     // Create a new constant operation in every block where the constant is used
     for (auto &[block, users] : usingBlocks) {
       builder.setInsertionPointToStart(block);
-      auto newCstOp = builder.create<arith::ConstantOp>(constantOp->getLoc(),
-                                                        constantOp.getValue());
-      for (auto user : users)
+      auto newCstOp = arith::ConstantOp::create(builder, constantOp->getLoc(),
+                                                constantOp.getValue());
+      for (auto *user : users)
         user->replaceUsesOfWith(constantOp.getResult(), newCstOp.getResult());
     }
 

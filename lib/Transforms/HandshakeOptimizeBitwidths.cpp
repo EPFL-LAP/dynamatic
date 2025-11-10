@@ -226,12 +226,12 @@ static ChannelVal modBitWidth(ExtValue extVal, unsigned targetWidth,
     if (ext == ExtType::LOGICAL ||
         (ext == ExtType::UNKNOWN &&
          val.getType().getDataType().isUnsignedInteger())) {
-      newOp = rewriter.create<handshake::ExtUIOp>(loc, dstChannelType, val);
+      newOp = handshake::ExtUIOp::create(rewriter, loc, dstChannelType, val);
     } else {
-      newOp = rewriter.create<handshake::ExtSIOp>(loc, dstChannelType, val);
+      newOp = handshake::ExtSIOp::create(rewriter, loc, dstChannelType, val);
     }
   } else {
-    newOp = rewriter.create<handshake::TruncIOp>(loc, dstChannelType, val);
+    newOp = handshake::TruncIOp::create(rewriter, loc, dstChannelType, val);
   }
 
   inheritBBFromValue(val, newOp);
@@ -334,7 +334,7 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
   Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
   auto newOp =
-      rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs, newRhs);
+      Op::create(rewriter, op.getLoc(), newLhs.getType(), newLhs, newRhs);
   Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   namer.replaceOp(op, newOp);
   inheritBB(op, newOp);
@@ -431,7 +431,7 @@ public:
   /// default implementation of this function.
   virtual Op createOp(ArrayRef<Type> newResTypes, ArrayRef<Value> newOperands,
                       PatternRewriter &rewriter) {
-    return rewriter.create<Op>(op.getLoc(), newResTypes, newOperands);
+    return Op::create(rewriter, op.getLoc(), newResTypes, newOperands);
   }
 
   /// Determines the list of values that the original operation will be replaced
@@ -545,9 +545,9 @@ public:
   handshake::BufferOp createOp(ArrayRef<Type> newResTypes,
                                ArrayRef<Value> newOperands,
                                PatternRewriter &rewriter) override {
-    return rewriter.create<handshake::BufferOp>(
-        op.getLoc(), newOperands[0].getType(), newOperands[0],
-        op->getAttrDictionary().getValue());
+    return handshake::BufferOp::create(rewriter, op.getLoc(),
+                                       newOperands[0].getType(), newOperands[0],
+                                       op->getAttrDictionary().getValue());
   }
 };
 
@@ -676,9 +676,9 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
         modBitWidth({selectOperand, ExtType::LOGICAL}, optWidth, rewriter));
     auto dataOprds = muxOp.getDataOperands();
     newOperands.append(dataOprds.begin(), dataOprds.end());
-    auto newMuxOp = rewriter.create<handshake::MuxOp>(
-        muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
-        muxOp->getAttrs());
+    auto newMuxOp = handshake::MuxOp::create(rewriter, muxOp.getLoc(),
+                                             muxOp->getResultTypes(),
+                                             newOperands, muxOp->getAttrs());
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
     return success();
@@ -718,8 +718,8 @@ struct HandshakeCMergeIndex
         cmergeOp->getOperandTypes().front(),
         indexType.withDataType(rewriter.getIntegerType(optWidth))};
     rewriter.setInsertionPoint(cmergeOp);
-    auto newCmergeOp = rewriter.create<handshake::ControlMergeOp>(
-        cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
+    auto newCmergeOp = handshake::ControlMergeOp::create(
+        rewriter, cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
         cmergeOp->getAttrs());
     namer.replaceOp(cmergeOp, newCmergeOp);
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::LOGICAL},
@@ -1111,8 +1111,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     Value newLhs = modBitWidth({minLhs, extLhs}, optWidth, rewriter);
     Value newRhs = modBitWidth({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
-    auto newOp = rewriter.create<handshake::SelectOp>(
-        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
+    auto newOp = handshake::SelectOp::create(
+        rewriter, selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
     Value newRes = modBitWidth({newOp.getResult(), extLhs}, resWidth, rewriter);
     inheritBB(selectOp, newOp);
     namer.replaceOp(selectOp, newOp);
@@ -1183,8 +1183,8 @@ struct ArithShift : public OpRewritePattern<Op> {
       Value newShifyBy =
           modBitWidth({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift.getType(),
-                                       newToShift, newShifyBy);
+      auto newOp = Op::create(rewriter, op.getLoc(), newToShift.getType(),
+                              newToShift, newShifyBy);
       ChannelVal newRes = newOp.getResult();
       if (isRightShift)
         // In the case of a right shift, we first truncate the result of the
@@ -1248,8 +1248,8 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     Value newLhs = modBitWidth({minLhs, extLhs}, optWidth, rewriter);
     Value newRhs = modBitWidth({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(cmpOp);
-    auto newOp = rewriter.create<handshake::CmpIOp>(
-        cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
+    auto newOp = handshake::CmpIOp::create(
+        rewriter, cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
     namer.replaceOp(cmpOp, newOp);
     inheritBB(cmpOp, newOp);
 
@@ -1549,8 +1549,7 @@ struct HandshakeOptimizeBitwidthsPass
     RewritePatternSet patterns(ctx);
     patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
                  MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
-    if (failed(
-            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
@@ -1568,8 +1567,8 @@ struct HandshakeOptimizeBitwidthsPass
         ops.clear();
         llvm::transform(funcOp.getOps(), std::back_inserter(ops),
                         [&](Operation &op) { return &op; });
-        return applyOpPatternsAndFold(ops, std::move(patterns), config,
-                                      &changed);
+        return applyOpPatternsGreedily(ops, std::move(patterns), config,
+                                       &changed);
       };
 
       // Apply the forward and backward pass continuously until the IR converges

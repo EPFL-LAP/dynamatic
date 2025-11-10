@@ -14,7 +14,6 @@
 
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -22,7 +21,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include <variant>
 
 #define DEBUG_TYPE "arith-reduce-strength"
@@ -84,10 +82,9 @@ Value OpTree::buildTreeRecursive(
         return valIt->second;
       }
       auto cstResult =
-          rewriter
-              .create<arith::ConstantOp>(
-                  op->getLoc(),
-                  rewriter.getIntegerAttr(op->getResult(0).getType(), *value))
+          arith::ConstantOp::create(
+              rewriter, op->getLoc(),
+              rewriter.getIntegerAttr(op->getResult(0).getType(), *value))
               .getResult();
       cstCache[*value] = cstResult;
       return cstResult;
@@ -106,15 +103,15 @@ Value OpTree::buildTreeRecursive(
   Value result;
   switch (opType) {
   case OpType::ADD:
-    result = rewriter.create<arith::AddIOp>(op->getLoc(), leftVal, rightVal)
+    result = arith::AddIOp::create(rewriter, op->getLoc(), leftVal, rightVal)
                  .getResult();
     break;
   case OpType::SUB:
-    result = rewriter.create<arith::SubIOp>(op->getLoc(), leftVal, rightVal)
+    result = arith::SubIOp::create(rewriter, op->getLoc(), leftVal, rightVal)
                  .getResult();
     break;
   case OpType::SHIFT_LEFT:
-    result = rewriter.create<arith::ShLIOp>(op->getLoc(), leftVal, rightVal)
+    result = arith::ShLIOp::create(rewriter, op->getLoc(), leftVal, rightVal)
                  .getResult();
     break;
   }
@@ -200,19 +197,19 @@ struct ReplaceMulNegOneUsers : public OpRewritePattern<arith::MulIOp> {
         Value newLhs = isLhs ? addOp.getRhs() : addOp.getLhs();
         rewriter.replaceOp(
             user,
-            rewriter.create<arith::SubIOp>(loc, newLhs, oprd)->getResults());
+            arith::SubIOp::create(rewriter, loc, newLhs, oprd)->getResults());
         anyChange = true;
       } else if (arith::SubIOp subOp = dyn_cast<arith::SubIOp>(user)) {
         // Substractions are replaced with an equivalemt additiom and,
         // potentially, a sign flip (when the multiplication provides the RHS)
         if (mulRes == subOp.getRhs()) {
           rewriter.replaceOp(
-              user, rewriter.create<arith::AddIOp>(loc, subOp.getLhs(), oprd)
+              user, arith::AddIOp::create(rewriter, loc, subOp.getLhs(), oprd)
                         ->getResults());
           anyChange = true;
         } else {
-          arith::AddIOp addOp = rewriter.create<arith::AddIOp>(
-              mulOp->getLoc(), oprd, subOp.getRhs());
+          arith::AddIOp addOp = arith::AddIOp::create(rewriter, mulOp->getLoc(),
+                                                      oprd, subOp.getRhs());
           Value addRes = addOp.getResult();
           Type dataType = addRes.getType();
 
@@ -223,19 +220,19 @@ struct ReplaceMulNegOneUsers : public OpRewritePattern<arith::MulIOp> {
           IntegerAttr intAttr =
               rewriter.getIntegerAttr(dataType, getMaskAllOnes(dataType));
           arith::ConstantOp maskOp =
-              rewriter.create<arith::ConstantOp>(loc, intAttr);
+              arith::ConstantOp::create(rewriter, loc, intAttr);
 
           // Then create the XOR between the first addition's result and the
           // mask, inverting the former's bits
           arith::XOrIOp xorOp =
-              rewriter.create<arith::XOrIOp>(loc, addRes, maskOp.getResult());
+              arith::XOrIOp::create(rewriter, loc, addRes, maskOp.getResult());
 
           // Finally, add one to the XOR's output to get the negated version of
           // the first result and replace the initial operation
-          arith::ConstantOp cstOneOp = rewriter.create<arith::ConstantOp>(
-              loc, rewriter.getIntegerAttr(dataType, 1));
-          arith::AddIOp negAddOp = rewriter.create<arith::AddIOp>(
-              loc, xorOp.getResult(), cstOneOp.getResult());
+          arith::ConstantOp cstOneOp = arith::ConstantOp::create(
+              rewriter, loc, rewriter.getIntegerAttr(dataType, 1));
+          arith::AddIOp negAddOp = arith::AddIOp::create(
+              rewriter, loc, xorOp.getResult(), cstOneOp.getResult());
           rewriter.replaceOp(user, negAddOp->getResults());
           anyChange = true;
         }
@@ -463,8 +460,8 @@ struct ArithReduceStrengthPass
     /// (area, performance, mixed)
     patterns.add<MulReduceStrength>(maxAdderDepthMul, ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
   };
 };

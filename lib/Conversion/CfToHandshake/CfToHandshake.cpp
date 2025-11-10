@@ -1133,8 +1133,8 @@ LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
   for (Type resType : srcOp->getResultTypes())
     newTypes.push_back(channelifyType(resType));
   auto newOp =
-      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
-                             srcOp->getAttrDictionary().getValue());
+      DstOp::create(rewriter, srcOp->getLoc(), newTypes, adaptor.getOperands(),
+                    srcOp->getAttrDictionary().getValue());
   namer.replaceOp(srcOp, newOp);
   rewriter.replaceOp(srcOp, newOp);
   return success();
@@ -1158,13 +1158,13 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   if (srcWidth < dstWidth) {
     // This is an extension
     newOp =
-        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
-                               castOp->getAttrDictionary().getValue());
+        ExtOp::create(rewriter, castOp.getLoc(), dstType, adaptor.getOperands(),
+                      castOp->getAttrDictionary().getValue());
   } else {
     // This is a truncation
-    newOp = rewriter.create<handshake::TruncIOp>(
-        castOp.getLoc(), dstType, adaptor.getOperands(),
-        castOp->getAttrDictionary().getValue());
+    newOp = handshake::TruncIOp::create(rewriter, castOp.getLoc(), dstType,
+                                        adaptor.getOperands(),
+                                        castOp->getAttrDictionary().getValue());
   }
   namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);
