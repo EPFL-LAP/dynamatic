@@ -172,8 +172,8 @@ void TranslateLLVMToStd::translateFunction(llvm::Function *llvmFunc) {
   }
 
   auto funcType = builder.getFunctionType(argTypes, resTypes);
-  auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
-                                             llvmFunc->getName(), funcType);
+  auto funcOp = func::FuncOp::create(builder, builder.getUnknownLoc(),
+                                     llvmFunc->getName(), funcType);
 
   initializeBlocksAndBlockMapping(llvmFunc, funcOp);
 
@@ -225,8 +225,9 @@ void TranslateLLVMToStd::translateGlobalVars() {
       initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
     }
 
-    auto globalOp = builder.create<memref::GlobalOp>(
+    auto globalOp = memref::GlobalOp::create(
         // clang-format off
+        builder,
         UnknownLoc::get(ctx),
         symNameAttr,
         visibilityAttr,
@@ -275,9 +276,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMap[inst->getOperand(0)];
-      builder.create<func::ReturnOp>(loc, arg);
+      func::ReturnOp::create(builder, loc, arg);
     } else {
-      builder.create<func::ReturnOp>(loc);
+      func::ReturnOp::create(builder, loc);
     }
   } else if (isa<llvm::PHINode>(inst)) {
     // At this stage, Phi nodes are all converted to the block arguments
@@ -350,8 +351,8 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
 
         if (auto *intConst = dyn_cast<ConstantInt>(val)) {
           APInt intVal = intConst->getValue();
-          auto constOp = builder.create<arith::ConstantIntOp>(
-              loc, intVal.getSExtValue(), intVal.getBitWidth());
+          auto constOp = arith::ConstantIntOp::create(
+              builder, loc, intVal.getSExtValue(), intVal.getBitWidth());
           valueMap[val] = constOp->getResult(0);
           loc = constOp->getLoc();
         }
@@ -359,13 +360,13 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
         if (auto *floatConst = dyn_cast<llvm::ConstantFP>(val)) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, builder.getF32Type(), floatVal);
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, builder.getF64Type(), floatVal);
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
@@ -389,8 +390,8 @@ void TranslateLLVMToStd::createGetGlobals(llvm::Function *llvmFunc) {
 
           auto memrefType = globalOp.getType();
 
-          auto getGlobalOp = builder.create<memref::GetGlobalOp>(
-              loc, memrefType, globalOp.getSymName());
+          auto getGlobalOp = memref::GetGlobalOp::create(
+              builder, loc, memrefType, globalOp.getSymName());
 
           valueMap[val] = getGlobalOp.getResult();
         }
@@ -477,7 +478,7 @@ void TranslateLLVMToStd::translateICmpInst(llvm::ICmpInst *inst) {
   }
 
   auto op =
-      builder.create<arith::CmpIOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpIOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
@@ -508,7 +509,7 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
     // clang-format on
   }
   auto op =
-      builder.create<arith::CmpFOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpFOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
@@ -531,8 +532,8 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     // NOTE: memref::LoadOp and memref::StoreOp expect their indices to be of
     // IndexType. Therefore, we cast the i32/i64 indices to IndexType. This
     // pattern will later be folded in the bitwidth optimization pass.
-    auto idxCastOp = builder.create<arith::IndexCastOp>(
-        UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
+    auto idxCastOp = arith::IndexCastOp::create(
+        builder, UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
     indexOperands.push_back(idxCastOp);
   }
 
@@ -571,10 +572,10 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   }
 
   for (int i = 0; i < remainingConstZeros; i++) {
-    auto constZeroOp = builder.create<arith::ConstantOp>(
-        UnknownLoc::get(ctx), builder.getI64IntegerAttr(0));
-    auto idxCastOp = builder.create<arith::IndexCastOp>(
-        UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
+    auto constZeroOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                                 builder.getI64IntegerAttr(0));
+    auto idxCastOp = arith::IndexCastOp::create(
+        builder, UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
     indexOperands.push_back(idxCastOp);
   }
 
@@ -589,8 +590,9 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
-    builder.create<cf::BranchOp>(
+    cf::BranchOp::create(
         // clang-format off
+        builder,
         loc,
         blockMap[nextLLVMBB],
         getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB)
@@ -608,8 +610,9 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
     mlir::Value condition = valueMap[inst->getCondition()];
-    builder.create<cf::CondBranchOp>(
+    cf::CondBranchOp::create(
         // clang-format off
+        builder,
         loc,
         condition,
         blockMap[trueDestBB],
@@ -644,13 +647,14 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
     auto memrefType = dyn_cast<MemRefType>(memref.getType());
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = this->builder.create<arith::ConstantOp>(
-          loc, this->builder.getIndexAttr(0));
+      auto constZeroOp = arith::ConstantOp::create(
+          this->builder, loc, this->builder.getIndexAttr(0));
       indices.push_back(constZeroOp);
     }
   }
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
-  auto newOp = builder.create<memref::LoadOp>(loc, resType, memref, indices);
+  auto newOp =
+      memref::LoadOp::create(this->builder, loc, resType, memref, indices);
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
@@ -681,15 +685,15 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
 
     int constZerosToAdd = memrefType.getShape().size();
     for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = this->builder.create<arith::ConstantOp>(
-          loc, this->builder.getIndexAttr(0));
+      auto constZeroOp = arith::ConstantOp::create(
+          this->builder, loc, this->builder.getIndexAttr(0));
       indices.push_back(constZeroOp);
     }
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
-      builder.create<memref::StoreOp>(loc, storeValue, memref, indices);
+      memref::StoreOp::create(this->builder, loc, storeValue, memref, indices);
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
@@ -706,7 +710,7 @@ void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
 
   auto memrefType = MemRefType::get(shape, getMLIRType(baseElementType, ctx));
 
-  auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
+  auto allocaOp = memref::AllocaOp::create(builder, loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
 }
 
