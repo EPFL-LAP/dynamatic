@@ -110,9 +110,8 @@ Value ConvertIfToSelect::hoistSingleArithOp(scf::IfOp ifOp, Operation *arithOp,
   if (!otherValIsFalse)
     std::swap(trueVal, falseVal);
 
-  return rewriter
-      .create<arith::SelectOp>(ifOp->getLoc(), ifOp.getCondition(), trueVal,
-                               falseVal)
+  return arith::SelectOp::create(rewriter, ifOp->getLoc(), ifOp.getCondition(),
+                                 trueVal, falseVal)
       .getResult();
 };
 
@@ -121,8 +120,8 @@ Value ConvertIfToSelect::createSelectThenArithOp(
     Value otherArithVal, bool otherValIsRhs, PatternRewriter &rewriter) const {
   rewriter.setInsertionPoint(ifOp);
 
-  arith::SelectOp selectOp = rewriter.create<arith::SelectOp>(
-      ifOp->getLoc(), ifOp.getCondition(), trueVal, falseVal);
+  arith::SelectOp selectOp = arith::SelectOp::create(
+      rewriter, ifOp->getLoc(), ifOp.getCondition(), trueVal, falseVal);
   Value lhs = selectOp.getResult();
   Value rhs = otherArithVal;
   if (!otherValIsRhs)
@@ -225,8 +224,8 @@ Value ConvertIfToSelect::tryToConvert(scf::IfOp ifOp,
 
   // If the then block is just a yield too, then the entire if is equivalent to
   // a select
-  return rewriter.create<arith::SelectOp>(ifOp.getLoc(), ifOp.getCondition(),
-                                          thenYielded, elseYielded);
+  return arith::SelectOp::create(rewriter, ifOp.getLoc(), ifOp.getCondition(),
+                                 thenYielded, elseYielded);
 }
 
 namespace {
@@ -245,8 +244,8 @@ struct ScfSimpleIfToSelectPass
     RewritePatternSet patterns{ctx};
     patterns.add<ConvertIfToSelect>(ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
   };
 };
