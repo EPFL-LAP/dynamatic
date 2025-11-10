@@ -67,7 +67,7 @@ struct EraseSingleInputMuxes : public OpRewritePattern<handshake::MuxOp> {
     // Insert a sink to consume the mux's select token
     rewriter.setInsertionPoint(muxOp);
     Value select = muxOp.getSelectOperand();
-    rewriter.create<handshake::SinkOp>(muxOp->getLoc(), select);
+    handshake::SinkOp::create(rewriter, muxOp->getLoc(), select);
 
     rewriter.replaceOp(muxOp, dataOperands.front());
     return success();
@@ -94,8 +94,9 @@ struct EraseSingleInputControlMerges
       rewriter.setInsertionPoint(cmergeOp);
 
       // Create a source operation for the constant
-      handshake::SourceOp srcOp = rewriter.create<handshake::SourceOp>(
-          cmergeOp->getLoc(), handshake::ControlType::get(getContext()));
+      handshake::SourceOp srcOp = handshake::SourceOp::create(
+          rewriter, cmergeOp->getLoc(),
+          handshake::ControlType::get(getContext()));
       inheritBB(cmergeOp, srcOp);
 
       /// NOTE: Sourcing this value may cause problems with very exotic uses of
@@ -105,8 +106,8 @@ struct EraseSingleInputControlMerges
 
       // Build the attribute for the constant
       Type indexResType = indexRes.getType().getDataType();
-      handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
-          cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
+      handshake::ConstantOp cstOp = handshake::ConstantOp::create(
+          rewriter, cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
           srcOp.getResult());
       inheritBB(cmergeOp, cstOp);
 
@@ -138,8 +139,8 @@ struct DowngradeIndexlessControlMerge
 
     // Create a merge operation to replace the cmerge
     rewriter.setInsertionPoint(cmergeOp);
-    handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(
-        cmergeOp.getLoc(), cmergeOp->getOperands());
+    handshake::MergeOp mergeOp = handshake::MergeOp::create(
+        rewriter, cmergeOp.getLoc(), cmergeOp->getOperands());
     inheritBB(cmergeOp, mergeOp);
 
     // Replace the cmerge's data result with the merge's result, erase any
@@ -168,7 +169,7 @@ struct HandshakeCanonicalizePass
     patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
                  EraseSingleInputMuxes, EraseSingleInputControlMerges,
                  DowngradeIndexlessControlMerge>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
 };
