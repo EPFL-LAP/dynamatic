@@ -33,6 +33,7 @@
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Transforms/HandshakeReplaceMemoryInterfaces.h"
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
+#include "dynamatic/Transforms/MarkMemoryInterfaceProtocol.h"
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"
 #include "dynamatic/Transforms/OperationNames.h"
 #include "dynamatic/Transforms/PushConstants.h"

@@ -686,6 +686,12 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     controller. Every load/store operation is required to be tagged with the ID
     of a basic block present in this list.
 
+    Another attribute, `memProtocol`, indicates the type of communication 
+    between the memory controller and the memory unit. The supported protocols
+    are:
+    - 0: Two-Input Port RAM Synchronous (default)
+    - 1: Two-Input Port RAM with FIFO interface (FIFO)
+
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
 
@@ -713,7 +719,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
                        Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
-                       I32ArrayAttr:$connectedBlocks);
+                       I32ArrayAttr:$connectedBlocks, I32Attr:$memProtocol);
   let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
@@ -740,6 +746,31 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
+
+    /// Returns if the communication protocol between memory controller and 
+    /// memory is Two-Input Port RAM Synchronous
+    bool isMemProtocolSync() {
+      return getMemProtocol() == 0;
+    }
+
+    /// Sets the communication protocol between memory controller and 
+    /// memory to Two-Input Port RAM Synchronous
+    void setMemProtocolSync() {
+      setMemProtocol(0);
+    }
+
+    /// Returns if the communication protocol between memory controller and 
+    /// memory is FIFO
+    bool isMemProtocolFIFO() {
+      return getMemProtocol() == 1;
+    } 
+
+    /// Sets the communication protocol between memory controller and 
+    /// memory to FIFO
+    void setMemProtocolFIFO() {
+      setMemProtocol(1);
+    }
+    
   }];
 }
 

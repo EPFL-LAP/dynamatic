@@ -398,6 +398,23 @@ def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
   let constructor = "dynamatic::createMarkMemoryDependencies()";
 }
 
+def MarkMemoryInterfaceProtocol : DynamaticPass<
+  "mark-memory-interface-protocol"> {
+  let summary = "Mark memory accesses with the protocol they should use.";
+  let description = [{
+    Annotates all memory controllers in the IR with the 
+    attribute memProtocol, indicating the protocol that should be used
+    when communicating with the memory system. The pass currently supports two
+    protocols: Synchronous (default) and FIFO. 
+    The protocol is specified as a pass option.
+  }];
+  let constructor = "dynamatic::createMarkMemoryInterfaceProtocolPass()";
+  let options = [
+    Option<"protocol", "protocol", "std::string", "\"synchronous\"",
+      "The memory protocol to use. Options are: 'synchronous' (default), "
+      "'fifo'.">];
+}
+
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
   let summary = "Mark memory accesses with the interface they should connect to.";
   let description = [{

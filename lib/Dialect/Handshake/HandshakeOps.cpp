@@ -707,6 +707,10 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
     blocksAttribute.push_back(size);
   odsState.addAttribute("connectedBlocks",
                         odsBuilder.getI32ArrayAttr(blocksAttribute));
+  // Set "memProtocol" attribute to default value 0
+  odsState.addAttribute(
+      "memProtocol",
+      IntegerAttr::get(IntegerType::get(odsBuilder.getContext(), 32), 0));
 }
 
 /// Attempts to derive the ports for a memory controller. Fails if some of the
