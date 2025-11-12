@@ -92,11 +92,12 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  std::string memoryCommProtocol = "synchronous";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -131,7 +132,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -196,7 +197,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -204,7 +205,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -239,6 +240,22 @@ public:
     addPositionalArg({"generator",
                       "floating-point units generator, values are 'flopoco' "
                       "(default option) or 'vivado'"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetMemoryCommProtocol : public Command {
+public:
+  SetMemoryCommProtocol(FrontendState &state)
+      : Command("set-memory-comm-protocol",
+                "Sets the memory communication protocol between memory "
+                "controllers and memory units",
+                state) {
+    addPositionalArg(
+        {"protocol",
+         "memory communication protocol, values are 'synchronous' (default "
+         "option) or 'fifo'"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -599,6 +616,27 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
   state.fpUnitsGenerator = generator.str();
   return CommandResult::SUCCESS;
 }
+
+CommandResult SetMemoryCommProtocol::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR
+                 << "Please specify a valid memory communication protocol.\n"
+                 << "Options: synchronous, fifo\n";
+    return CommandResult::FAIL;
+  }
+
+  StringRef protocol = args.positionals.front();
+
+  if (protocol != "synchronous" && protocol != "fifo") {
+    llvm::outs() << ERR << "Invalid memory communication protocol: " << protocol
+                 << "\n";
+    llvm::outs() << "Valid options are 'synchronous' and 'fifo'.\n";
+    return CommandResult::FAIL;
+  }
+  state.memoryCommProtocol = protocol.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   if (args.positionals.empty()) {
     llvm::outs() << ERR << "Please specify a non-empty source\n";
@@ -686,7 +724,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver);
+                 fastTokenDelivery, milpSolver, state.memoryCommProtocol);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -825,6 +863,7 @@ int main(int argc, char **argv) {
   commands.add<SetDynamaticPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
+  commands.add<SetMemoryCommProtocol>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);
