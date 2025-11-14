@@ -19,11 +19,11 @@ gtest_discover_tests(
 
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
-# Default: Execute 8 integration tests in parallel
+# Default: Execute 1 integration tests in parallel
 # Can be overridden with -DPARALLEL_FACTOR=<n> at configure time
 # e.g. by running 'cmake -DPARALLEL_FACTOR=<n> -B build'
 # before 'ninja -C build <target>'
-set(PARALLEL_FACTOR 8 CACHE STRING "Parallelism for integration test targets")
+set(PARALLEL_FACTOR 1 CACHE STRING "Parallelism for integration test targets")
 
 add_custom_target(
   run-all-integration-tests
