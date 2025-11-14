@@ -47,7 +47,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf");
+    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24");
 
 namespace dynamatic {
 namespace buffer {
@@ -189,6 +189,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[FPGA24] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
