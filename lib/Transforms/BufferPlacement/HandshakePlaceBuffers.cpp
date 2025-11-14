@@ -25,6 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -618,6 +619,14 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "placement", placement, solverKind, timeout, info, timingDB,
         targetCP);
   }
+
+  if (algorithm == FPGA24) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<fpga24::FPGA24Buffers>(
+        logger, "placement", placement, solverKind, timeout, info, timingDB,
+        targetCP);
+  }
+
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
     SmallVector<CFDFC *, 8> cfdfcs;
