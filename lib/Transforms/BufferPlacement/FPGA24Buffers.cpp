@@ -159,6 +159,18 @@ void FPGA24Buffers::addCustomChannelConstraints(Value channel) {
 void FPGA24Buffers::setup() {
   llvm::errs() << "Hi from the new fpga24 algorithm :3\n";
 
+  // Printing all the CFC's
+  llvm::errs() << "# of CFC's:" << funcInfo.cfdfcs.size() << "\n";
+  int currentCfc = 0;
+  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
+    llvm::errs() << "CFC " << currentCfc << ":\n";
+    llvm::errs() << "# of units in CFC: " << cfdfc->units.size() << "\n";
+    for (auto unit : cfdfc->units) {
+      llvm::errs() << "Unit: " << unit->getName() << "\n";
+    }
+    currentCfc++;
+  }
+
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
   signalTypes.push_back(SignalType::DATA);
