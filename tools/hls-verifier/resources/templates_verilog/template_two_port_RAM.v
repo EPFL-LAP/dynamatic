@@ -23,7 +23,6 @@ parameter TV_OUT = "";
 parameter DATA_WIDTH = 32'd 32;
 parameter ADDR_WIDTH = 32'd 10;
 parameter DEPTH = 32'd 1000;
-parameter DLY  = 0.1;
 
 // Input and Output
 input clk;
@@ -118,9 +117,9 @@ always @ (posedge clk or rst) begin
     end
     else begin
 	  if((we0 == 0) && (ce0 == 1) && (ce1 == 1) && (we1 == 1) && (address0 == address1))
-	      dout0 <= #DLY din1;
+	      dout0 <= #0.1 din1;
 	  else if(ce0 == 1)
-	      dout0 <= #DLY mem[address0];
+	      dout0 <= #0.1 mem[address0];
         else ;
     end
 end
@@ -131,9 +130,9 @@ always @ (posedge clk or rst) begin
     end
     else begin
 	  if((we0 == 1) && (ce0 == 1) && (ce1 == 1) && (we1 == 0) && (address0 == address1))
-            dout1 <= #DLY din0;
+            dout1 <= #0.1 din0;
 	  else if(ce1 == 1)
-            dout1 <= #DLY mem[address1];
+            dout1 <= #0.1 mem[address1];
         else ;
     end
 end
@@ -143,14 +142,14 @@ end
 // Write data from RTL to array
 always @ (posedge clk) begin
     if((we0 == 1) && (ce0 == 1) && (ce1 == 1) && (we1 == 1) && (address0 == address1))
-        mem[address0] <= #DLY din1;
+        mem[address0] <= #0.1 din1;
     else if ((we0 == 1) && (ce0 == 1))
-        mem[address0] <= #DLY din0;
+        mem[address0] <= #0.1 din0;
 end
 
 always @ (posedge clk) begin
     if((ce1 == 1) && (we1 == 1))
-        mem[address1] <= #DLY din1;
+        mem[address1] <= #0.1 din1;
 end
 
 // Write data from array to file

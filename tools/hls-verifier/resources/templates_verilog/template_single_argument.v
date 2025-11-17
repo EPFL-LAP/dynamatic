@@ -147,8 +147,10 @@ initial begin : write_file_proc
     if(TV_OUT !="") begin
         wait(rst === 0);
 
-        //add the initialization step from single_argument.vhd to skip the first '1' from 'done'
-
+        // To read the input files properly 'done' is set to '1' 
+        // at initialization. We skip this first 'done === 1' and 
+        // start writing the output the second time 'done' is 
+        // equal to '1'.
         while(done == 0) begin
                 -> write_process_done;
                 @(negedge clk);
