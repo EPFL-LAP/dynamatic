@@ -101,17 +101,8 @@ def main():
 
     generate_code = generators[args.type]
 
-    # For testing purposes TODO TODELETE
-    # if args.type not in ["fork", "lazy_fork", "control_merge", "mux"]:
-    #     parameters["extra_signals"] = {"spec": 1}
-
     with open(args.output, "w") as file:
         print(header + generate_code(args.name, parameters), file=file)
-    # with open(args.output, "w") as file:
-    #     print(header + generate_code(args.name, parameters)[0], file=file)
-
-    # with open(args.output.split(".")[0] + "_join.v", "w") as file:
-    #     print(header + generate_code(args.name, parameters)[1], file=file)
 
 
 if __name__ == "__main__":
