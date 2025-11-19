@@ -22,17 +22,23 @@ def codeGen(path_rtl, configs):
     ga.generate(path_rtl)
     lsq_submodules.group_allocator = ga
 
-    # Load Address Port Dispatcher
-    ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
-        name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW)
-    ptq_dispatcher_lda.generate(path_rtl)
-    lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
+    # When the condition "if configs.numLdPorts > 0:" is not true:
+    # Do not generating dispatching modules when there are zero load ports.
+    #
+    # - WARNING: This logic needs more testing
+    # - TODO: Also remove the load queue when there are zero load ports.
+    if configs.numLdPorts > 0:
+        # Load Address Port Dispatcher
+        ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
+            name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW)
+        ptq_dispatcher_lda.generate(path_rtl)
+        lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
 
-    # Load Data Port Dispatcher
-    qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
-        name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.dataW, configs.ldpAddrW)
-    qtp_dispatcher_ldd.generate(path_rtl)
-    lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
+        # Load Data Port Dispatcher
+        qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
+            name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.dataW, configs.ldpAddrW)
+        qtp_dispatcher_ldd.generate(path_rtl)
+        lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
 
     # Store Address Port Dispatcher
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
