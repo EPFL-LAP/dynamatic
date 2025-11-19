@@ -154,6 +154,10 @@ begin
     -- Check if file path is defined
     if (TV_OUT /= "") then
 
+      -- To read the input files properly 'done' is set to '1' 
+      -- at initialization. We skip this first 'done === 1' and 
+      -- start writing the output the second time 'done' is 
+      -- equal to '1'.
       wait until rst = '0';
       -- Initialization
       index := 0;
