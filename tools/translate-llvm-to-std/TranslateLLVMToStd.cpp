@@ -521,7 +521,19 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
   SmallVector<mlir::Value> indexOperands;
 
-  auto memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+  MemRefType memrefType;
+
+  if (!baseAddress) {
+    // This is called when there is a chain of GEPs: GEP -> GEP -> ... -> many
+    // loads/stores
+    auto memrefAndIndices =
+        this->gepInstToMemRefAndIndicesMap[gepInst->getPointerOperand()];
+    baseAddress = std::get<0>(memrefAndIndices);
+    memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+    indexOperands = std::get<1>(memrefAndIndices);
+  } else {
+    memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+  }
 
   if (!memrefType)
     llvm_unreachable("GEP should take memref as reference");
@@ -549,34 +561,6 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     //
     // Therefore, we drop the first element in this case
     indexOperands.erase(indexOperands.begin());
-  }
-
-  // NOTE: GEPOp has the following syntax (some details omitted):
-  // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
-  // When you iterate through the indices, it also returns indices from left
-  // to right. However, the following two syntaxes are equivalent in LLVM:
-  // - (1) GEPop %basePtr, %firstDim, 0, 0
-  // - (2) GEPop %basePtr, %firstDim
-  // Notice that, in the second example, the trailing constant 0s are omitted.
-  // Source:
-  // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
-  //
-  // However, memref::LoadOp and memref::StoreOp must have their indices
-  // match the memref. So here we need to fill in the constant zeros.
-  int remainingConstZeros = memrefType.getShape().size() - indexOperands.size();
-
-  if (remainingConstZeros < 0) {
-    llvm_unreachable(
-        "GEP should only omit indices, but shouldn't have more indices than "
-        "the original memref type extracted from the function argument!");
-  }
-
-  for (int i = 0; i < remainingConstZeros; i++) {
-    auto constZeroOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
-                                                 builder.getI64IntegerAttr(0));
-    auto idxCastOp = arith::IndexCastOp::create(
-        builder, UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
-    indexOperands.push_back(idxCastOp);
   }
 
   this->gepInstToMemRefAndIndicesMap[gepInst] =
@@ -624,6 +608,39 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
   }
 }
 
+static void fillConstantZeroes(MemRefType memrefType,
+                               SmallVector<mlir::Value> &indices,
+                               OpBuilder &builder, MLIRContext *ctx) {
+
+  // NOTE: GEPOp has the following syntax (some details omitted):
+  // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
+  // When you iterate through the indices, it also returns indices from left
+  // to right. However, the following two syntaxes are equivalent in LLVM:
+  // - (1) GEPop %basePtr, %firstDim, 0, 0
+  // - (2) GEPop %basePtr, %firstDim
+  // Notice that, in the second example, the trailing constant 0s are omitted.
+  // Source:
+  // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
+  //
+  // However, memref::LoadOp and memref::StoreOp must have their indices
+  // match the memref. So here we need to fill in the constant zeros.
+  int remainingConstZeros = memrefType.getShape().size() - indices.size();
+
+  if (remainingConstZeros < 0) {
+    llvm_unreachable(
+        "GEP should only omit indices, but shouldn't have more indices than "
+        "the original memref type extracted from the function argument!");
+  }
+
+  for (int i = 0; i < remainingConstZeros; i++) {
+    auto constZeroOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                                 builder.getI64IntegerAttr(0));
+    auto idxCastOp = arith::IndexCastOp::create(
+        builder, UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
+    indices.push_back(idxCastOp);
+  }
+}
+
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
@@ -637,6 +654,11 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
     auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
     memref = memrefAndIndices.first;
     indices = memrefAndIndices.second;
+    if (auto memrefType = dyn_cast<MemRefType>(memref.getType())) {
+      fillConstantZeroes(memrefType, indices, builder, ctx);
+    } else {
+      llvm::report_fatal_error("The pointer operand is not a memref type!");
+    }
   } else {
     if (isa<GetElementPtrInst>(instAddr))
       llvm_unreachable(
@@ -674,6 +696,11 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
     auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
     memref = memrefAndIndices.first;
     indices = memrefAndIndices.second;
+    if (auto memrefType = dyn_cast<MemRefType>(memref.getType())) {
+      fillConstantZeroes(memrefType, indices, builder, ctx);
+    } else {
+      llvm::report_fatal_error("The pointer operand is not a memref type!");
+    }
   } else {
     // NOTE: This condition handles a special case where a load only has
     // constant indices, e.g., tmp = mat[0][0].
