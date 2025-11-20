@@ -310,7 +310,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo,
+                                          argReplacements)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
