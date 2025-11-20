@@ -48,7 +48,6 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -165,6 +164,27 @@ LogicalResult LowerFuncToHandshake::computeLinearDominance(
   return success();
 }
 
+/// This function finds the control merge result of a given Block. We
+/// need to use this function to connect the control network to the memory
+/// interface ops (mc, lsq).
+///
+/// NOTE: this works only after we called addMergeOps
+static Value
+getBlockControlMergeOrFuncControl(const BlockArgToMergeResult &argReplacements,
+                                  Block *block) {
+  Operation *parentOp = block->getParentOp();
+
+  auto funcOp = cast<handshake::FuncOp>(parentOp);
+
+  assert(funcOp && "The parent Op of this block must be a handshake::FuncOp");
+
+  // Check if the block is the first block:
+  if (&(funcOp.getBlocks().front()) == block) {
+    return block->getArguments().back();
+  }
+  return argReplacements.at(block->getArguments().back());
+}
+
 //===-----------------------------------------------------------------------==//
 // CfToHandshakeTypeConverter
 //===-----------------------------------------------------------------------==//
@@ -210,8 +230,6 @@ CfToHandshakeTypeConverter::CfToHandshakeTypeConverter() {
 // LowerFuncToHandshake
 //===-----------------------------------------------------------------------==//
 
-using ArgReplacements = DenseMap<BlockArgument, OpResult>;
-
 LogicalResult LowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
@@ -235,7 +253,7 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
   // Stores mapping from each value that passes through a merge-like operation
   // to the data result of that merge operation
-  ArgReplacements argReplacements;
+  BlockArgToMergeResult argReplacements;
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
@@ -249,7 +267,8 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
   // tagged with the BB they belong to (required by memory interface
   // instantiation logic)
   idBasicBlocks(funcOp, rewriter);
-  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo,
+                                          argReplacements)))
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
@@ -398,8 +417,6 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
 
   Region *oldBody = &funcOp.getBody();
 
-  const TypeConverter *typeConv = getTypeConverter();
-
   // Convert the entry block's signature
   Block *entryBlock = &funcOp.getBody().front();
   TypeConverter::SignatureConversion entryConversion(
@@ -414,6 +431,9 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
         /*numOrigInputs=*/nonEntryBlock.getNumArguments());
 
     setupBlockConversion(&nonEntryBlock, rewriter, nonEntryConversion);
+
+    SmallVector<BlockArgument> origArg;
+
     rewriter.applySignatureConversion(&nonEntryBlock, nonEntryConversion,
                                       getTypeConverter());
   }
@@ -575,9 +595,9 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
   }
 }
 
-void LowerFuncToHandshake::addMergeOps(handshake::FuncOp funcOp,
-                                       ConversionPatternRewriter &rewriter,
-                                       ArgReplacements &argReplacements) const {
+void LowerFuncToHandshake::addMergeOps(
+    handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+    BlockArgToMergeResult &argReplacements) const {
   // Create backedge builder to manage operands of merge operations between
   // insertion and reconnection
   BackedgeBuilder edgeBuilder(rewriter, funcOp.getLoc());
@@ -585,8 +605,6 @@ void LowerFuncToHandshake::addMergeOps(handshake::FuncOp funcOp,
   // Insert merge-like operations in all non-entry blocks (with backedges
   // instead as data operands)
   DenseMap<Block *, std::vector<MergeOpInfo>> blockMerges;
-
-  Block *entryBlock = &funcOp.getBody().front();
 
   for (Block &block : llvm::drop_begin(funcOp)) {
     rewriter.setInsertionPointToStart(&block);
@@ -894,7 +912,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
 LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    MemInterfacesInfo &memInfo) const {
+    MemInterfacesInfo &memInfo,
+    const BlockArgToMergeResult &argReplacements) const {
 
   if (memInfo.empty())
     return success();
@@ -921,7 +940,10 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
   auto returns = funcOp.getOps<func::ReturnOp>();
   assert(!returns.empty() && "no returns in function");
   if (std::distance(returns.begin(), returns.end()) == 1) {
-    ctrlEnd = getBlockControl((*returns.begin())->getBlock());
+    Value lastBlockCtrlArg = getBlockControlMergeOrFuncControl(
+        argReplacements, (*returns.begin())->getBlock());
+
+    ctrlEnd = lastBlockCtrlArg;
   } else {
     // Merge the control signals of all blocks with a return to create a control
     // representing the final control flow decision
@@ -929,7 +951,8 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
     func::ReturnOp lastRetOp;
     for (func::ReturnOp retOp : returns) {
       lastRetOp = retOp;
-      controls.push_back(getBlockControl(retOp->getBlock()));
+      controls.push_back(getBlockControlMergeOrFuncControl(argReplacements,
+                                                           retOp->getBlock()));
     }
     rewriter.setInsertionPointToStart(lastRetOp->getBlock());
     auto mergeOp =
@@ -945,8 +968,11 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
   // Create a mapping between each block and its control value in the right
   // format for the memory interface builder
   DenseMap<unsigned, Value> ctrlVals;
-  for (auto [blockIdx, block] : llvm::enumerate(funcOp))
-    ctrlVals.insert({blockIdx, getBlockControl(&block)});
+  for (auto [blockIdx, block] : llvm::enumerate(funcOp)) {
+    Value blockCtrlVal;
+    blockCtrlVal = getBlockControlMergeOrFuncControl(argReplacements, &block);
+    ctrlVals.insert({blockIdx, blockCtrlVal});
+  }
 
   // Each memory region is independent from the others
   for (auto &[memref, memAccesses] : memInfo) {
@@ -1017,7 +1043,7 @@ void LowerFuncToHandshake::idBasicBlocks(
 
 LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    const ArgReplacements &argReplacements) const {
+    const BlockArgToMergeResult &argReplacements) const {
 
   // Erase all cf-level terminators, accumulating operands to func-level returns
   // as we go
@@ -1043,21 +1069,18 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
 
   // Inline all non-entry blocks into the entry block, erasing them as we go
   Operation *lastOp = &funcOp.front().back();
-  for (Block &block : llvm::make_early_inc_range(funcOp)) {
-    if (block.isEntryBlock())
-      continue;
-
+  for (Block &block : llvm::make_early_inc_range(llvm::drop_begin(funcOp))) {
     // Replace all block arguments with the data result of merge-like
     // operations; this effectively connects all merges to the rest of the
     // circuit
-    SmallVector<Value> replacements;
+    SmallVector<Value> mergeResults;
     for (BlockArgument blockArg : block.getArguments()) {
-      Value mergeRes = argReplacements.at(blockArg);
-      // Replacing BA with merge results
-      rewriter.replaceAllUsesWith(blockArg, mergeRes);
+      mergeResults.push_back(argReplacements.at(blockArg));
     }
-    // Replacing the block arguments with merge results
-    // rewriter.inlineBlockBefore(&block, lastOp, replacements);
+    // This call does two things:
+    // - Move all the ops into the target block of lastOp.
+    // - Replacing the block arguments with merge results (replacements).
+    rewriter.inlineBlockBefore(&block, lastOp, mergeResults);
   }
 
   // The terminator's operands are, in order
@@ -1089,10 +1112,12 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
       }
     }
   }
-  endOprds.push_back(getBlockControl(funcOp.getBodyBlock()));
+  endOprds.push_back(getBlockControlMergeOrFuncControl(argReplacements,
+                                                       funcOp.getBodyBlock()));
 
   auto endOp = handshake::EndOp::create(rewriter, lastOp->getLoc(), endOprds);
   endOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
+
   return success();
 }
 
@@ -1716,22 +1741,6 @@ struct CfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
-
-    for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
-      Block *firstBlock = &funcOp.getBlocks().front();
-
-      auto *endOpIt = firstBlock->getTerminator();
-
-      for (Block &otherBlock :
-           llvm::make_early_inc_range(llvm::drop_begin(funcOp))) {
-        for (Operation &op : llvm::make_early_inc_range(otherBlock)) {
-          op.moveBefore(endOpIt);
-        }
-        otherBlock.erase();
-      }
-    }
-
-    modOp.dump();
 
     // Clean up: Remove the definition of each __init* function, but only if it
     // has no remaining uses. This is safe because all valid calls to __init*
