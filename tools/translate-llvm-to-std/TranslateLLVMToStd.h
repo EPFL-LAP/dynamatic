@@ -74,6 +74,8 @@ private:
   /// instruction and the corresponding base address.
   mlir::DenseMap<llvm::Value *, mlir::Value> getInstToMemRefMap;
 
+  mlir::DenseMap<llvm::Value *, mlir::Value> getInstToMemRefMap;
+
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
