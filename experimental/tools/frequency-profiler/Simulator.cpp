@@ -92,7 +92,7 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     int64_t x;
     arg >> x;
     int64_t width = type.getIntOrFloatBitWidth();
-    APInt aparg(width, x);
+    APInt aparg(width, x, /*implicittruc*/ true);
     return aparg;
   }
   if (type.isF32()) {
