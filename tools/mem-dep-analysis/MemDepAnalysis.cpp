@@ -364,7 +364,10 @@ public:
     int depth = loopInfo->getLoopDepth(stmt.getBasicBlock());
 
     for (auto *inst : stmt.getInstructions())
-      if (inst->mayReadOrWriteMemory()) {
+
+      // NOTE (@Jiahui17: the call `memcpy` in the main function might be
+      // analyzed here and trigger an assertion error).
+      if (inst->mayReadOrWriteMemory() && !isa<CallInst>(inst)) {
         auto &memoryAccess = stmt.getArrayAccessFor(inst);
 
         isl::map currentMap = memoryAccess.getLatestAccessRelation();
