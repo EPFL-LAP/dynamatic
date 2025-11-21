@@ -225,6 +225,10 @@ TEST_P(SpecFixture, spec) {
 INSTANTIATE_TEST_SUITE_P(
     MiscBenchmarks, BasicFixture,
     testing::Values(
+      // NOTE: Disabling "test_bitint":
+      // Waiting for a fix in Clang in the upstream (https://github.com/llvm/llvm-project/pull/161796)
+      //
+      // "test_bitint",
       "single_loop",
       "atax",
       "atax_float",
@@ -287,8 +291,7 @@ INSTANTIATE_TEST_SUITE_P(
       "video_filter",
       "while_loop_1",
       "while_loop_3",
-      "test_loop_free",
-      "test_bitint"
+      "test_loop_free"
       ),
       [](const auto &info) { return info.param; });
 
