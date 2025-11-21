@@ -20,7 +20,7 @@
 using namespace mlir;
 using namespace dynamatic;
 
-Type ArgType::getMlirType(OpBuilder &builder) const {
+Type ArgType::getMlirType(OpBuilder &builder, bool flattenArray) const {
   Type baseMLIRElemType;
 
   if (std::holds_alternative<CXBuiltInScalarTypes>(baseElemType)) {
@@ -50,6 +50,17 @@ Type ArgType::getMlirType(OpBuilder &builder) const {
   if (arrayDimensions.empty()) {
     return baseMLIRElemType;
   }
+
+  // Instead of returning memref<8 * 8 * i32> for A[8][8], we just return a
+  // flattened version memref<64 * i32>
+  if (flattenArray) {
+    int64_t flattenedSize = 1;
+    for (auto dim : arrayDimensions) {
+      flattenedSize *= dim;
+    }
+    return MemRefType::get(/* shape = */ {flattenedSize}, baseMLIRElemType);
+  }
+
   return MemRefType::get(llvm::ArrayRef<int64_t>(arrayDimensions),
                          baseMLIRElemType);
 }
@@ -267,7 +278,7 @@ SmallVector<Type> getFuncArgTypes(const std::string &funcName,
                                   OpBuilder &builder) {
   SmallVector<Type> mlirArgTypes;
   for (const ArgType &clangType : map.at(funcName)) {
-    mlirArgTypes.push_back(clangType.getMlirType(builder));
+    mlirArgTypes.push_back(clangType.getMlirType(builder, true));
   }
 
   return mlirArgTypes;
