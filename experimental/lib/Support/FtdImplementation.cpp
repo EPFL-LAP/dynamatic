@@ -443,8 +443,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
 
   for (auto *bb : blocksToAddPhi) {
     rewriter.setInsertionPointToStart(bb);
-    auto mergeOp = rewriter.create<handshake::MergeOp>(bb->front().getLoc(),
-                                                       operandsPerPhi[bb]);
+    auto mergeOp = handshake::MergeOp::create(rewriter, bb->front().getLoc(),
+                                              operandsPerPhi[bb]);
     mergeOp->setAttr(NEW_PHI, rewriter.getUnitAttr());
     newMergePerPhi.insert({bb, mergeOp});
   }
@@ -542,8 +542,8 @@ LogicalResult ftd::createPhiNetworkDeps(
     // connected with an SSA network, and then everything is joined.
     ValueRange operands = dependencies;
     rewriter.setInsertionPointToStart(operand->getOwner()->getBlock());
-    auto joinOp = rewriter.create<handshake::JoinOp>(
-        operand->getOwner()->getLoc(), operands);
+    auto joinOp = handshake::JoinOp::create(
+        rewriter, operand->getOwner()->getLoc(), operands);
     joinOp->moveBefore(operandOwner);
 
     for (unsigned i = 0; i < dependencies.size(); i++) {
@@ -581,8 +581,8 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   // Add a not if the condition is negated.
   if (singleCond->isNegated) {
     rewriter.setInsertionPointToStart(block);
-    auto notOp = rewriter.create<handshake::NotOp>(
-        block->getOperations().front().getLoc(),
+    auto notOp = handshake::NotOp::create(
+        rewriter, block->getOperations().front().getLoc(),
         ftd::channelifyType(condition.getType()), condition);
     notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
     return notOp->getResult(0);
@@ -606,16 +606,16 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
   // Constant case (either 0 or 1)
   rewriter.setInsertionPointToStart(block);
-  auto sourceOp = rewriter.create<handshake::SourceOp>(
-      block->getOperations().front().getLoc());
+  auto sourceOp = handshake::SourceOp::create(
+      rewriter, block->getOperations().front().getLoc());
   Value cnstTrigger = sourceOp.getResult();
 
   auto intType = rewriter.getIntegerType(1);
   auto cstAttr = rewriter.getIntegerAttr(
       intType, (expr->type == ExpressionType::One ? 1 : 0));
 
-  auto constOp = rewriter.create<handshake::ConstantOp>(
-      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
+  auto constOp = handshake::ConstantOp::create(
+      rewriter, block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
 
   constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
@@ -644,9 +644,9 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
                                           bi, needsChannelify);
 
   // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxOperands[0].getType(),
-      muxCond, muxOperands);
+  auto muxOp = handshake::MuxOp::create(
+      rewriter, block->getOperations().front().getLoc(),
+      muxOperands[0].getType(), muxCond, muxOperands);
   muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return muxOp.getResult();
@@ -746,14 +746,14 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
       conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
     // Create the false constant to feed `init`
-    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
+    auto constOp = handshake::ConstantOp::create(rewriter, consumerOp->getLoc(),
+                                                 cstAttr, startValue);
     constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     // Create the `init` operation
     SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
+    auto initMergeOp = handshake::MergeOp::create(
+        rewriter, consumerOp->getLoc(), mergeOperands);
     initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     // The multiplexer is to be fed by the init block, and takes as inputs the
@@ -762,9 +762,9 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
-    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                   regeneratedValue.getType(),
-                                                   selectSignal, muxOperands);
+    auto muxOp = handshake::MuxOp::create(rewriter, regeneratedValue.getLoc(),
+                                          regeneratedValue.getType(),
+                                          selectSignal, muxOperands);
 
     muxOp->setOperand(2, muxOp->getResult(0));
     muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
@@ -813,7 +813,7 @@ using PairOperandConsumer = std::pair<Value, Operation *>;
 // outside the loop.
 static Block *findClosestLoopExit(Operation *consumer, Value connection,
                                   const ftd::BlockIndexing &bi,
-                                  SmallVector<Block *> exitBlocks) {
+                                  const SmallVector<Block *> &exitBlocks) {
   // Find all the paths from the producer to the consumer using DFS
   std::vector<std::vector<Block *>> allPaths =
       findAllPaths(connection.getParentBlock(), consumer->getBlock(), bi);
@@ -882,8 +882,8 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
   rewriter.setInsertionPointToStart(loopExit);
 
-  branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-      loopExit->getOperations().front().getLoc(),
+  branchOp = handshake::ConditionalBranchOp::create(
+      rewriter, loopExit->getOperations().front().getLoc(),
       ftd::getListTypes(connection.getType()), branchCond, connection);
 
   Value newConnection = btlt == MoreProducerThanConsumers
@@ -981,9 +981,9 @@ static void insertDirectSuppression(
     Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
-    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
-        connection);
+    auto branchOp = handshake::ConditionalBranchOp::create(
+        rewriter, consumer->getLoc(), ftd::getListTypes(connection.getType()),
+        branchCond, connection);
 
     // Take into account the possibility of a mux to get the condition input
     // also as data input. In this case, a branch needs to be created, but only
@@ -1274,7 +1274,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         mergeOperands.push_back(conditionValue);
 
         auto initMergeOp =
-            rewriter.create<handshake::MergeOp>(loc, mergeOperands);
+            handshake::MergeOp::create(rewriter, loc, mergeOperands);
 
         initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
@@ -1287,8 +1287,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         auto cstType = rewriter.getIntegerType(1);
         auto cstAttr = IntegerAttr::get(cstType, 0);
         rewriter.setInsertionPointToStart(initMergeOp->getBlock());
-        auto constOp = rewriter.create<handshake::ConstantOp>(
-            initMergeOp->getLoc(), cstAttr, startValue);
+        auto constOp = handshake::ConstantOp::create(
+            rewriter, initMergeOp->getLoc(), cstAttr, startValue);
         constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
         initMergeOp->setOperand(0, constOp.getResult());
       }
@@ -1302,8 +1302,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(loc, gate->result.getType(),
-                                                   conditionValue, operands);
+      auto mux = handshake::MuxOp::create(rewriter, loc, gate->result.getType(),
+                                          conditionValue, operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
       // later removed
