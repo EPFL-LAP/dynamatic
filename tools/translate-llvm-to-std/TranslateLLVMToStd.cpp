@@ -39,7 +39,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
     return mlir::Float32Type::get(context);
   }
   if (llvmType->isDoubleTy()) {
-    return mlir::Float32Type::get(context);
+    return mlir::Float64Type::get(context);
   }
 
   llvm_unreachable("Unhandled scalar type");
