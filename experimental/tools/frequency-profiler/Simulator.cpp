@@ -92,7 +92,7 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     int64_t x;
     arg >> x;
     int64_t width = type.getIntOrFloatBitWidth();
-    APInt aparg(width, x, /*implicittruc*/ true);
+    APInt aparg(width, x, /*isSigned = */ true, /*implicitTrunc = */ true);
     return aparg;
   }
   if (type.isF32()) {
@@ -236,8 +236,11 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount,
+            /* isSigned = */ true, /*implicitTrunc = */ true);
+
   out[0] = shifted;
   return success();
 }
