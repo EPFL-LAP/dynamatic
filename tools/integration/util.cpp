@@ -53,7 +53,10 @@ int runIntegrationTest(IntegrationTestData &config) {
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 
-  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
+  scriptFile << "write-hdl --hdl "
+             << (config.useVerilogBeta ? "verilog-beta"
+                 : config.useVerilog   ? "verilog"
+                                       : "vhdl")
              << std::endl
              << "simulate" << std::endl
              << "exit" << std::endl;
