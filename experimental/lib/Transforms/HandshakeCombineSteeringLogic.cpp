@@ -22,7 +22,6 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 #include <cassert>
 
 using namespace mlir;
@@ -138,7 +137,7 @@ Operation *returnMuxAtSameDepth(Operation *op,
 
   // Otherwise, explore all users in DFS-like traversal until you hit a match
   Operation *finalOp = nullptr;
-  for (auto cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
+  for (auto *cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
     Operation *potentialOp = returnMuxAtSameDepth(cons, referenceMuxOp);
     if (potentialOp != nullptr) {
       finalOp = potentialOp;
@@ -338,8 +337,8 @@ struct RemoveNotCondition
 
     rewriter.setInsertionPointAfter(condBranchOp);
 
-    auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
-        condOp->getLoc(), drivingNot.getOperand(),
+    auto newBranch = handshake::ConditionalBranchOp::create(
+        rewriter, condOp->getLoc(), drivingNot.getOperand(),
         condBranchOp.getDataOperand());
 
     rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),
@@ -397,7 +396,7 @@ struct HandshakeCombineSteeringLogicPass
     patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
                  CombineBranchesSameSign, CombineBranchesOppositeSign,
                  CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
 };

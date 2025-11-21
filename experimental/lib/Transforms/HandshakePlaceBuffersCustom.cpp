@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Buffer placement pass in Handshake functions, it takes the location (i.e.,
-// the predecessor, and which output channel of it), type, and slots of the 
+// the predecessor, and which output channel of it), type, and slots of the
 // buffer that should be placed.
 //
 // This pass facilitates externally prototyping a custom buffer placement
@@ -23,7 +23,6 @@
 
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -89,8 +88,8 @@ struct HandshakePlaceBuffersCustomPass
     // pull the enum itself from the optional
     auto bufferType = bufferTypeOpt.value();
 
-    auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     slots, bufferType);
+    auto bufOp = handshake::BufferOp::create(builder, channel.getLoc(), channel,
+                                             slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
