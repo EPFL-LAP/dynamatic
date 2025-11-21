@@ -157,7 +157,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
-  -passes="inline,mem2reg,consthoist,instcombine<no-verify-fixpoint>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion,loop-unroll-full)),simplifycfg,loop-rotate,simplifycfg,sink,lower-switch,simplifycfg" \
+  -passes="inline,mem2reg,consthoist,instcombine<no-verify-fixpoint>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lower-switch,simplifycfg" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
