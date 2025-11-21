@@ -118,8 +118,10 @@ convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
   values.reserve(numElems);
   convertInitializerToDenseElemAttrRecursive(globVar->getInitializer(), values,
                                              baseMLIRElemType);
+
   return mlir::DenseElementsAttr::get(
-      mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
+      mlir::RankedTensorType::get(/*shape = */ {numElems}, baseMLIRElemType),
+      values);
 }
 
 void convertInitializerToDenseElemAttrRecursive(
@@ -529,6 +531,8 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   SmallVector<llvm::Value *> gepIndices(gepInst->indices());
 
+#if 0
+  // NOTE: this is no longer true as of 21.11.2025. We will not have an extra leading zero.
   if (auto *defInst = gepInst->getPointerOperand();
       isa_and_nonnull<AllocaInst>(defInst) ||
       isa_and_nonnull<GlobalVariable>(defInst)) {
@@ -542,6 +546,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     // Therefore, we drop the first element in this case
     gepIndices.erase(gepIndices.begin());
   }
+#endif
 
   SmallVector<mlir::Value> multipliedIndices;
 
@@ -702,6 +707,7 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
 void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   Location loc = UnknownLoc::get(ctx);
 
+  // flatten the MD array into 1D
   int64_t arraySize = 1;
   llvm::Type *baseElementType = allocaInst->getAllocatedType();
 
