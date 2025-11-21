@@ -83,7 +83,7 @@ private:
   void naiveTranslation(mlir::Type returnType, mlir::ValueRange values,
                         Instruction *inst) {
     MLIRTy op =
-        builder.create<MLIRTy>(UnknownLoc::get(ctx), returnType, values);
+        MLIRTy::create(builder, UnknownLoc::get(ctx), returnType, values);
     // Register the corresponding MLIR value of the result of the original
     // instruction.
     valueMap[inst] = op.getResult();
