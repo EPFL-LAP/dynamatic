@@ -71,7 +71,7 @@ struct ArgType {
   std::vector<int64_t> arrayDimensions;
   bool isPassedByReference;
 
-  mlir::Type getMlirType(OpBuilder &builder) const;
+  mlir::Type getMlirType(OpBuilder &builder, bool flattenArray) const;
 };
 
 using CFuncArgs = SmallVector<ArgType>;

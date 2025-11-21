@@ -203,13 +203,14 @@ void TranslateLLVMToStd::translateGlobalVars() {
       continue;
 
     auto *baseElemType = globalVar->getValueType();
-    SmallVector<int64_t> shape;
+    int64_t numElements = 1;
     while (baseElemType->isArrayTy()) {
-      shape.push_back(baseElemType->getArrayNumElements());
+      numElements *= baseElemType->getArrayNumElements();
       baseElemType = baseElemType->getArrayElementType();
     }
     auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
-    auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+    auto memrefType =
+        MemRefType::get(/* shape = */ {numElements}, baseMLIRElemType);
 
     StringRef symName = constant.getName();
     StringAttr symNameAttr = StringAttr::get(ctx, Twine(symName));
@@ -514,40 +515,19 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
 }
 
 void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
-  // NOTE: this function does not create any corresponding op in the CF MLIR but
-  // only computes the indices for the LOAD/STORE ops that the gepInst drives.
 
-  // Check if the GEP is not chained
-  mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
-  SmallVector<mlir::Value> indexOperands;
+  // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
 
-  MemRefType memrefType;
+  llvm::Type *baseElementType = gepInst->getSourceElementType();
 
-  if (!baseAddress) {
-    // This is called when there is a chain of GEPs: GEP -> GEP -> ... -> many
-    // loads/stores
-    auto memrefAndIndices =
-        this->gepInstToMemRefAndIndicesMap[gepInst->getPointerOperand()];
-    baseAddress = std::get<0>(memrefAndIndices);
-    memrefType = dyn_cast<MemRefType>(baseAddress.getType());
-    indexOperands = std::get<1>(memrefAndIndices);
-  } else {
-    memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+  // Get index calculation:
+  SmallVector<int64_t> multipliers;
+  while (baseElementType->isArrayTy()) {
+    multipliers.push_back(baseElementType->getArrayNumElements());
+    baseElementType = baseElementType->getArrayElementType();
   }
 
-  if (!memrefType)
-    llvm_unreachable("GEP should take memref as reference");
-
-  for (auto &indexUse : gepInst->indices()) {
-    llvm::Value *indexValue = indexUse;
-    mlir::Value mlirIndexValue = valueMap[indexValue];
-    // NOTE: memref::LoadOp and memref::StoreOp expect their indices to be of
-    // IndexType. Therefore, we cast the i32/i64 indices to IndexType. This
-    // pattern will later be folded in the bitwidth optimization pass.
-    auto idxCastOp = arith::IndexCastOp::create(
-        builder, UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
-    indexOperands.push_back(idxCastOp);
-  }
+  SmallVector<llvm::Value *> gepIndices(gepInst->indices());
 
   if (auto *defInst = gepInst->getPointerOperand();
       isa_and_nonnull<AllocaInst>(defInst) ||
@@ -560,11 +540,69 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
     //
     // Therefore, we drop the first element in this case
-    indexOperands.erase(indexOperands.begin());
+    gepIndices.erase(gepIndices.begin());
   }
 
-  this->gepInstToMemRefAndIndicesMap[gepInst] =
-      MemRefAndIndices(baseAddress, indexOperands);
+  SmallVector<mlir::Value> multipliedIndices;
+
+  for (size_t i = 0; i < gepIndices.size(); ++i) {
+    mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
+
+    // Calculate the partitial index
+    int64_t coeff = 1;
+    for (size_t j = i; j < multipliers.size(); j++)
+      coeff *= multipliers[j];
+
+    if (coeff == 1) {
+      multipliedIndices.push_back(mlirIndexValue);
+    } else if (llvm::isPowerOf2_64(coeff)) {
+      auto shiftValue = arith::ConstantOp::create(
+          builder, UnknownLoc::get(ctx),
+          builder.getIntegerAttr(builder.getI64Type(), llvm::Log2_64(coeff)));
+      auto idx = arith::ShLIOp::create(builder, UnknownLoc::get(ctx),
+                                       mlirIndexValue, shiftValue);
+      multipliedIndices.push_back(idx);
+    } else {
+      auto multipliedValue = arith::ConstantOp::create(
+          builder, UnknownLoc::get(ctx),
+          builder.getIntegerAttr(builder.getI64Type(), coeff));
+      auto idx = arith::MulIOp::create(builder, UnknownLoc::get(ctx),
+                                       mlirIndexValue, multipliedValue);
+      multipliedIndices.push_back(idx);
+    }
+  }
+
+  // If we do not start from a memref type, then it must be from a chain of
+  // GEPs. Here we accumulate our result onto that.
+  if (auto pointerOperand = valueMap[gepInst->getPointerOperand()];
+      pointerOperand && !isa<MemRefType>(pointerOperand.getType())) {
+    multipliedIndices.push_back(valueMap[gepInst->getPointerOperand()]);
+  }
+
+  // [START accumulate the array index]
+  // Build balanced tree
+  std::function<mlir::Value(ArrayRef<mlir::Value>)> build =
+      [&](ArrayRef<mlir::Value> vals) -> mlir::Value {
+    assert(vals.size() > 0);
+    if (vals.size() == 1)
+      return vals[0];
+    auto mid = vals.size() / 2;
+    auto lhs = build(vals.take_front(mid));
+    auto rhs = build(vals.drop_front(mid));
+    return arith::AddIOp::create(builder, UnknownLoc::get(ctx), lhs, rhs);
+  };
+  mlir::Value accumulatedArrayIndex = build(multipliedIndices);
+  // [END accumulate the array index]
+
+  valueMap[gepInst] = accumulatedArrayIndex;
+
+  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
+    this->getInstToMemRefMap[gepInst] =
+        this->getInstToMemRefMap[gepInst->getPointerOperand()];
+  } else {
+    mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
+    this->getInstToMemRefMap[gepInst] = baseAddress;
+  }
 }
 
 void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
@@ -608,75 +646,20 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
   }
 }
 
-static void fillConstantZeroes(MemRefType memrefType,
-                               SmallVector<mlir::Value> &indices,
-                               OpBuilder &builder, MLIRContext *ctx) {
-
-  // NOTE: GEPOp has the following syntax (some details omitted):
-  // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
-  // When you iterate through the indices, it also returns indices from left
-  // to right. However, the following two syntaxes are equivalent in LLVM:
-  // - (1) GEPop %basePtr, %firstDim, 0, 0
-  // - (2) GEPop %basePtr, %firstDim
-  // Notice that, in the second example, the trailing constant 0s are omitted.
-  // Source:
-  // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
-  //
-  // However, memref::LoadOp and memref::StoreOp must have their indices
-  // match the memref. So here we need to fill in the constant zeros.
-  int remainingConstZeros = memrefType.getShape().size() - indices.size();
-
-  if (remainingConstZeros < 0) {
-    llvm_unreachable(
-        "GEP should only omit indices, but shouldn't have more indices than "
-        "the original memref type extracted from the function argument!");
-  }
-
-  for (int i = 0; i < remainingConstZeros; i++) {
-    auto constZeroOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
-                                                 builder.getI64IntegerAttr(0));
-    auto idxCastOp = arith::IndexCastOp::create(
-        builder, UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
-    indices.push_back(idxCastOp);
-  }
-}
-
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
-  mlir::Value memref;
-  SmallVector<mlir::Value> indices;
-  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
-    // Logic: In LLVM IR, load/store operations take the pointer computed from
-    // GEP ops, whereas in memref, load operations takes indices (of index
-    // type). This function uses the index operand collected when processing
-    // GEPs as operands of LOAD/STOREs.
-    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    memref = memrefAndIndices.first;
-    indices = memrefAndIndices.second;
-    if (auto memrefType = dyn_cast<MemRefType>(memref.getType())) {
-      fillConstantZeroes(memrefType, indices, builder, ctx);
-    } else {
-      llvm::report_fatal_error("The pointer operand is not a memref type!");
-    }
-  } else {
-    if (isa<GetElementPtrInst>(instAddr))
-      llvm_unreachable(
-          "Converting a load but the producer hasn't been converted yet!");
-    // NOTE: This condition handles a special case where a load only has
-    // constant indices, e.g., tmp = mat[0][0].
-    memref = this->valueMap[instAddr];
-    auto memrefType = dyn_cast<MemRefType>(memref.getType());
-    int constZerosToAdd = memrefType.getShape().size();
-    for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = arith::ConstantOp::create(
-          this->builder, loc, this->builder.getIndexAttr(0));
-      indices.push_back(constZeroOp);
-    }
-  }
+  mlir::Value memref = getInstToMemRefMap[instAddr];
+
+  mlir::Value index = valueMap[loadInst->getPointerOperand()];
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
-  auto newOp =
-      memref::LoadOp::create(this->builder, loc, resType, memref, indices);
+
+  // LoadOp needs the index operand to be of index type
+  auto indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                            builder.getIndexType(), index);
+
+  auto newOp = memref::LoadOp::create(this->builder, loc, resType, memref,
+                                      /*indices = */ {indexOp});
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
@@ -685,57 +668,34 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
   Location loc = UnknownLoc::get(ctx);
   auto *instAddr = storeInst->getPointerOperand();
 
-  mlir::Value memref;
-  SmallVector<mlir::Value> indices;
+  mlir::Value memref = getInstToMemRefMap[instAddr];
+  mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
-    // Logic: In LLVM IR, load/store operations take the pointer computed from
-    // GEP ops, whereas in memref, load operations takes indices (of index
-    // type). This function uses the index operand collected when processing
-    // GEPs as operands of LOAD/STOREs.
-    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    memref = memrefAndIndices.first;
-    indices = memrefAndIndices.second;
-    if (auto memrefType = dyn_cast<MemRefType>(memref.getType())) {
-      fillConstantZeroes(memrefType, indices, builder, ctx);
-    } else {
-      llvm::report_fatal_error("The pointer operand is not a memref type!");
-    }
-  } else {
-    // NOTE: This condition handles a special case where a load only has
-    // constant indices, e.g., tmp = mat[0][0].
-    if (isa<GetElementPtrInst>(instAddr))
-      llvm_unreachable(
-          "Converting a load but the producer hasn't been converted yet!");
-    memref = this->valueMap[instAddr];
-    auto memrefType = dyn_cast<MemRefType>(memref.getType());
-
-    int constZerosToAdd = memrefType.getShape().size();
-    for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = arith::ConstantOp::create(
-          this->builder, loc, this->builder.getIndexAttr(0));
-      indices.push_back(constZeroOp);
-    }
-  }
+  // StoreOp needs the index operand to be of index type
+  auto indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                            builder.getIndexType(), index);
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
-  auto newOp =
-      memref::StoreOp::create(this->builder, loc, storeValue, memref, indices);
+  auto newOp = memref::StoreOp::create(this->builder, loc, storeValue, memref,
+                                       /*indices = */ {indexOp});
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   Location loc = UnknownLoc::get(ctx);
 
-  SmallVector<int64_t> shape;
+  int64_t arraySize = 1;
   llvm::Type *baseElementType = allocaInst->getAllocatedType();
 
   while (baseElementType->isArrayTy()) {
-    shape.push_back(baseElementType->getArrayNumElements());
+    arraySize *= baseElementType->getArrayNumElements();
     baseElementType = baseElementType->getArrayElementType();
   }
 
-  auto memrefType = MemRefType::get(shape, getMLIRType(baseElementType, ctx));
+  assert(arraySize > 0 && "The size of the array must be positive!");
+
+  auto memrefType = MemRefType::get(/*shape =*/{arraySize},
+                                    getMLIRType(baseElementType, ctx));
 
   auto allocaOp = memref::AllocaOp::create(builder, loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);

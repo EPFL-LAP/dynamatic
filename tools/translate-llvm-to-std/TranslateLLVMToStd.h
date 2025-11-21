@@ -74,6 +74,8 @@ private:
   /// to lookup the input base address and indices.
   mlir::DenseMap<llvm::Value *, MemRefAndIndices> gepInstToMemRefAndIndicesMap;
 
+  mlir::DenseMap<llvm::Value *, mlir::Value> getInstToMemRefMap;
+
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
