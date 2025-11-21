@@ -144,7 +144,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
 # - lowerswitch: Convert switch case into branches.
-# - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
+# - instcombine: combine operations. 
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
