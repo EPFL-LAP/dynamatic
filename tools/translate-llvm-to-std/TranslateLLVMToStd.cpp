@@ -647,36 +647,54 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
 }
 
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
-  Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
-  mlir::Value memref = getInstToMemRefMap[instAddr];
-
+  mlir::Value memref;
   mlir::Value index = valueMap[loadInst->getPointerOperand()];
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
 
-  // LoadOp needs the index operand to be of index type
-  auto indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
-                                            builder.getIndexType(), index);
+  mlir::Value indexOp;
 
-  auto newOp = memref::LoadOp::create(this->builder, loc, resType, memref,
+  if (getInstToMemRefMap.count(instAddr)) {
+    memref = getInstToMemRefMap[instAddr];
+    // LoadOp needs the index operand to be of index type
+    indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                         builder.getIndexType(), index);
+  } else {
+    assert(isa<MemRefType>(index.getType()));
+    memref = index;
+    indexOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                        builder.getIndexAttr(0));
+  }
+
+  auto newOp = memref::LoadOp::create(this->builder, UnknownLoc::get(ctx),
+                                      resType, memref,
                                       /*indices = */ {indexOp});
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
-  Location loc = UnknownLoc::get(ctx);
   auto *instAddr = storeInst->getPointerOperand();
-
-  mlir::Value memref = getInstToMemRefMap[instAddr];
+  mlir::Value memref;
   mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  // StoreOp needs the index operand to be of index type
-  auto indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
-                                            builder.getIndexType(), index);
+  mlir::Value indexOp;
+
+  if (getInstToMemRefMap.count(instAddr)) {
+    memref = getInstToMemRefMap[instAddr];
+    // LoadOp needs the index operand to be of index type
+    indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                         builder.getIndexType(), index);
+  } else {
+    assert(isa<MemRefType>(index.getType()));
+    memref = index;
+    indexOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                        builder.getIndexAttr(0));
+  }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
-  auto newOp = memref::StoreOp::create(this->builder, loc, storeValue, memref,
+  auto newOp = memref::StoreOp::create(this->builder, UnknownLoc::get(ctx),
+                                       storeValue, memref,
                                        /*indices = */ {indexOp});
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
