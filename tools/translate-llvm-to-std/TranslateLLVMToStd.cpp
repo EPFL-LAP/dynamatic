@@ -518,8 +518,24 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
 
 void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
-  // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
+  // The GEP instruction calculates the index that the load/store need to use
+  // the access memory.
+  //
+  // For instance A[i][j][k] would be GEP -> ... -> GEP -> load
+  //
+  // In TranslateLLVMToStd, we convert it to additions and multiplications.
+  //
+  // Also, we flatten the memory into 1D. Since it is very hard to reliably
+  // reverse engineer the order between the accesses.
+  //
+  // An example of flattening a multi-dimension array in a row-major order.
+  // Given an array: my_array[A][B][C][D];
+  // we access it as my_array[i][j][k][l];
+  // The flattened index is computed as:
+  //
+  // (B * C * D) * i + (C * D) * j + (D) * k + l
 
+  // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
   llvm::Type *baseElementType = gepInst->getSourceElementType();
 
   // Get index calculation:
@@ -530,6 +546,14 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   }
 
   SmallVector<llvm::Value *> gepIndices(gepInst->indices());
+
+  mlir::Value baseAddress;
+  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
+    baseAddress = this->getInstToMemRefMap[gepInst->getPointerOperand()];
+  } else {
+    baseAddress = valueMap[gepInst->getPointerOperand()];
+  }
+  this->getInstToMemRefMap[gepInst] = baseAddress;
 
 #if 0
   // NOTE: this is no longer true as of 21.11.2025. We will not have an extra leading zero.
@@ -548,6 +572,12 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   }
 #endif
 
+  // A list of value to be accumulated
+  //
+  // For the example above:
+  //
+  // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
+
   SmallVector<mlir::Value> multipliedIndices;
 
   for (size_t i = 0; i < gepIndices.size(); ++i) {
@@ -559,8 +589,50 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
       coeff *= multipliers[j];
 
     if (coeff == 1) {
-      multipliedIndices.push_back(mlirIndexValue);
+      if (auto *constVal = dyn_cast<Constant>(gepIndices[i])) {
+        // Special case: when the GEP index is a constant number
+        //
+        // Here we need to handle tricky examples like this:
+        // %arrayidx2 = getelementptr inbounds nuw i8, ptr %2, i64 4
+        //
+        // Here we are using GEP to advance 4 * i8 = 32 bits. If the
+        // element of the original array was 32-bit wide, then here we need to
+        // increment 1 step (instead of 4).
+        auto memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+        assert(memrefType);
+
+        // This is the size of the actual element (i.e., for 32 in the example
+        // above).
+        unsigned actualBaseElementWidth = memrefType.getElementTypeBitWidth();
+
+        // This is the size that the current GEP assumes (i.e., for i8 in the
+        // example above).
+        unsigned currBaseElementBitWidth =
+            baseElementType->getScalarSizeInBits();
+
+        // This the the number of `currBaseElementBitWidth` that we need to skip
+        // (i.e., 4 in the example above).
+        int64_t constInt = *constVal->getUniqueInteger().getRawData();
+
+        assert(actualBaseElementWidth % (currBaseElementBitWidth * constInt) ==
+                   0 &&
+               "Incorrect alignment!");
+
+        unsigned actualAdvanceValue =
+            actualBaseElementWidth / (currBaseElementBitWidth * constInt);
+
+        auto byteAlignedConstantValue = arith::ConstantOp::create(
+            builder, UnknownLoc::get(ctx),
+            builder.getIntegerAttr(builder.getI64Type(), actualAdvanceValue));
+        multipliedIndices.push_back(byteAlignedConstantValue);
+      } else {
+        multipliedIndices.push_back(mlirIndexValue);
+      }
+
     } else if (llvm::isPowerOf2_64(coeff)) {
+      // Special case: the array dimension is a power of two.
+      // Here we can apply the optimization: multiply by power of 2 is the same
+      // as shifting
       auto shiftValue = arith::ConstantOp::create(
           builder, UnknownLoc::get(ctx),
           builder.getIntegerAttr(builder.getI64Type(), llvm::Log2_64(coeff)));
@@ -568,6 +640,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
                                        mlirIndexValue, shiftValue);
       multipliedIndices.push_back(idx);
     } else {
+      // Regular case: calculate the (paritial) flattened index
       auto multipliedValue = arith::ConstantOp::create(
           builder, UnknownLoc::get(ctx),
           builder.getIntegerAttr(builder.getI64Type(), coeff));
@@ -600,14 +673,6 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // [END accumulate the array index]
 
   valueMap[gepInst] = accumulatedArrayIndex;
-
-  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
-    this->getInstToMemRefMap[gepInst] =
-        this->getInstToMemRefMap[gepInst->getPointerOperand()];
-  } else {
-    mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
-    this->getInstToMemRefMap[gepInst] = baseAddress;
-  }
 }
 
 void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
