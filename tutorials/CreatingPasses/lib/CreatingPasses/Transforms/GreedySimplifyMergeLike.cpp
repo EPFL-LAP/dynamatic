@@ -74,8 +74,8 @@ struct DowngradeIndexlessControlMerge
     // the control merge we are replacing. The merge has the exact same inputs
     // as the control merge
     rewriter.setInsertionPoint(cmergeOp);
-    handshake::MergeOp newMergeOp = handshake::MergeOp::create(
-        rewriter, cmergeOp.getLoc(), cmergeOp->getOperands());
+    handshake::MergeOp newMergeOp = rewriter.create<handshake::MergeOp>(
+        cmergeOp.getLoc(), cmergeOp->getOperands());
 
     // We are modifying the operation
     rewriter.modifyOpInPlace(cmergeOp, [&] {
@@ -119,7 +119,7 @@ struct GreedySimplifyMergeLikePass
     patterns.add<EraseSingleInputMerge, DowngradeIndexlessControlMerge>(ctx);
 
     // Apply our two patterns recursively on all operations in the input module
-    if (failed(applyPatternsGreedily(mod, std::move(patterns), config)))
+    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       signalPassFailure();
   }
 };

@@ -57,11 +57,11 @@ Backedge BackedgeBuilder::get(Type resultType, mlir::LocationAttr optionalLoc) {
   // Create the opearion using either a builder or a rewriter
   Operation *op;
   if (rewriter)
-    op = mlir::UnrealizedConversionCastOp::create(*rewriter, optionalLoc,
-                                                  resultType, ValueRange{});
+    op = rewriter->create<mlir::UnrealizedConversionCastOp>(
+        optionalLoc, resultType, ValueRange{});
   else
-    op = mlir::UnrealizedConversionCastOp::create(*rewriter, optionalLoc,
-                                                  resultType, ValueRange{});
+    op = builder->create<mlir::UnrealizedConversionCastOp>(
+        optionalLoc, resultType, ValueRange{});
   edges.push_back(op);
   return Backedge(op);
 }

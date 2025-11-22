@@ -110,6 +110,7 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
 
   auto xVal = solver->getValue(x);
   auto yVal = solver->getValue(y);
+  auto obj = solver->getObjective();
 
   EXPECT_LE(xVal + yVal, 10 + 1e-6); // Constraint check
 }
@@ -368,6 +369,7 @@ TEST(LinExprOpTest, ChainedAddSub) {
 // [END AI-generated test cases]
 
 // Factories for both solvers
+std::unique_ptr<CPSolver> makeCbc() { return std::make_unique<CbcSolver>(); }
 
 std::unique_ptr<CPSolver> makeGurobi() {
   return std::make_unique<GurobiSolver>();
