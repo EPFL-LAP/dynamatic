@@ -110,6 +110,7 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
 
   auto xVal = solver->getValue(x);
   auto yVal = solver->getValue(y);
+  auto obj = solver->getObjective();
 
   EXPECT_LE(xVal + yVal, 10 + 1e-6); // Constraint check
 }

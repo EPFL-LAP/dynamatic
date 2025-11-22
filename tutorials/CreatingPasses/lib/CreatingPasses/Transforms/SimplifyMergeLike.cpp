@@ -60,8 +60,8 @@ static LogicalResult performSimplification(handshake::FuncOp funcOp,
     // the control merge we are replacing. The merge has the exact same inputs
     // as the control merge
     builder.setInsertionPoint(cmergeOp);
-    handshake::MergeOp newMergeOp = handshake::MergeOp::create(
-        builder, cmergeOp.getLoc(), cmergeOp->getOperands());
+    handshake::MergeOp newMergeOp = builder.create<handshake::MergeOp>(
+        cmergeOp.getLoc(), cmergeOp->getOperands());
 
     // Then, replace the control merge's first result (the selected input) with
     // the single result of the newly created merge operation

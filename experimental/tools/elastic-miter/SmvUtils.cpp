@@ -80,7 +80,7 @@ static int executeWithRedirect(const std::string &command,
 
   // Redirect stdout, keep default of stdin and stderr
   std::string stdoutFileString = stdoutFile.string();
-  SmallVector<std::optional<StringRef>> redirects = {
+  ArrayRef<std::optional<StringRef>> redirects = {
       std::nullopt, stdoutFileString, std::nullopt};
 
   std::string errMsg;
