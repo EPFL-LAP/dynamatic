@@ -137,8 +137,8 @@ static std::optional<CXScalarType> processScalarType(CXType clangType) {
     return processScalarType(clang_getTypedefDeclUnderlyingType(typedefCursor));
   }
   default: {
-    llvm::errs() << "Type ID of unhandled scalar type: " << clangType.kind
-                 << "\n";
+    LLVM_DEBUG(llvm::errs() << "Type ID of unhandled scalar type: "
+                            << clangType.kind << "\n");
 
     return std::nullopt;
   }
@@ -181,7 +181,8 @@ static std::optional<ArgType> fromCXType(CXType type) {
     }
   }
 
-  llvm::errs() << "Unhandled compound type id: " << type.kind << "\n";
+  LLVM_DEBUG(llvm::errs() << "Unhandled compound type id: " << type.kind
+                          << "\n");
   // TODO: One important thing to handle in the future is the arguments that
   // are **passed by reference**. It is probably correct to promote them to
   // the function return values.
@@ -214,9 +215,10 @@ static CXChildVisitResult visitParamDecl(CXCursor cursor, CXCursor parent,
     if (argType.has_value()) {
       args->push_back(argType.value());
     } else {
-      llvm::errs() << "Warning - unable to parse " << getCursorSpelling(cursor)
-                   << " with type "
-                   << clang_getCString(clang_getTypeSpelling(type)) << "!\n";
+      LLVM_DEBUG(llvm::errs()
+                 << "Warning - unable to parse " << getCursorSpelling(cursor)
+                 << " with type "
+                 << clang_getCString(clang_getTypeSpelling(type)) << "!\n");
     }
     // else: Maybe instead of push nothing here, we should have a ArgType that
     // is specifically for "I don't know what it is?"
