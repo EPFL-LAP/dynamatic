@@ -73,7 +73,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
   FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
-    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+    // API changed here: https://github.com/llvm/llvm-project/pull/78260
+    // updateRootInPlace -> modifyOpInPlace
+    rewriter.modifyOpInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
   return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
 }
@@ -98,20 +100,20 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
   if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
     // We only need a memory controller
-    mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads);
+    mcOp = handshake::MemoryControllerOp::create(builder, loc, memref, memStart,
+                                                 inputs.mcInputs, ctrlEnd,
+                                                 inputs.mcBlocks, mcNumLoads);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
-                                             inputs.lsqInputs, ctrlEnd,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+    lsqOp = handshake::LSQOp::create(builder, loc, memref, memStart,
+                                     inputs.lsqInputs, ctrlEnd,
+                                     inputs.lsqGroupSizes, lsqNumLoads);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
     // load address, store address, and store data channels from the LSQ to
     // the MC and a load data channel from the MC to the LSQ
-    MemRefType memrefType = memref.getType().cast<MemRefType>();
+    MemRefType memrefType = cast<MemRefType>(memref.getType());
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.
@@ -127,16 +129,16 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create the memory controller, adding 1 to its load count so that it
     // generates a load data result for the LSQ
-    mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads + 1);
+    mcOp = handshake::MemoryControllerOp::create(
+        builder, loc, memref, memStart, inputs.mcInputs, ctrlEnd,
+        inputs.mcBlocks, mcNumLoads + 1);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
     // outputs that will go to the MC
     inputs.lsqInputs.push_back(mcOp.getOutputs().back());
-    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+    lsqOp = handshake::LSQOp::create(builder, loc, mcOp, inputs.lsqInputs,
+                                     inputs.lsqGroupSizes, lsqNumLoads);
 
     // Resolve the backedges to fully connect the MC and LSQ
     ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
@@ -175,8 +177,8 @@ Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
     builder.setInsertionPointAfter(defOp);
   else
     builder.setInsertionPointToStart(ctrl.getParentBlock());
-  handshake::ConstantOp cstOp = builder.create<handshake::ConstantOp>(
-      ctrl.getLoc(), builder.getI32IntegerAttr(numStores), ctrl);
+  handshake::ConstantOp cstOp = handshake::ConstantOp::create(
+      builder, ctrl.getLoc(), builder.getI32IntegerAttr(numStores), ctrl);
   inheritBBFromValue(ctrl, cstOp);
   return cstOp.getResult();
 }

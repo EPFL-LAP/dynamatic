@@ -73,7 +73,7 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
       "::mlir::MemRefType", "getMemRefType", (ins),
       "", [{
         ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-        return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
+        return cast<mlir::MemRefType>(concreteOp.getMemRef().getType());
       }]
     >,
     InterfaceMethod<[{
