@@ -614,12 +614,12 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
         // (i.e., 4 in the example above).
         int64_t constInt = *constVal->getUniqueInteger().getRawData();
 
-        assert(actualBaseElementWidth % (currBaseElementBitWidth * constInt) ==
+        assert((currBaseElementBitWidth * constInt) % actualBaseElementWidth ==
                    0 &&
                "Incorrect alignment!");
 
         unsigned actualAdvanceValue =
-            actualBaseElementWidth / (currBaseElementBitWidth * constInt);
+            (currBaseElementBitWidth * constInt) / actualBaseElementWidth;
 
         auto byteAlignedConstantValue = arith::ConstantOp::create(
             builder, UnknownLoc::get(ctx),
