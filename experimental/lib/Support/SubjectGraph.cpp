@@ -151,8 +151,8 @@ void BaseSubjectGraph::loadBlifFile(
 }
 
 // Assigns signals to the variables in ChannelSignals struct
-void assignSignals(ChannelSignals &signals, Node *node,
-                   const std::string &nodeName) {
+static void assignSignals(ChannelSignals &signals, Node *node,
+                          const std::string &nodeName) {
   // If nodeName includes "valid" or "ready", assign it to the respective
   // signal. If it does not, assign it to the data signals.
   if (nodeName.find("valid") != std::string::npos) {
