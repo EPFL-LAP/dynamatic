@@ -95,7 +95,7 @@ void BaseSubjectGraph::connectInputNodesHelper(ChannelSignals &currentSignals,
 // Constructs the file path based on Operation name and parameters, calls the
 // Blif parser to load the Blif file
 void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
-                                    const std::string &toAppend) {
+                                    std::string toAppend) {
   std::string moduleType;
   std::string fullPath;
   moduleType = op->getName().getStringRef();
@@ -119,8 +119,8 @@ void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
 }
 
 // Assigns signals to the variables in ChannelSignals struct
-static void assignSignals(ChannelSignals &signals, Node *node,
-                          const std::string &nodeName) {
+void assignSignals(ChannelSignals &signals, Node *node,
+                   const std::string &nodeName) {
   // If nodeName includes "valid" or "ready", assign it to the respective
   // signal. If it does not, assign it to the data signals.
   if (nodeName.find("valid") != std::string::npos) {
