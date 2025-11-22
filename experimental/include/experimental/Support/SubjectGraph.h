@@ -57,7 +57,7 @@ protected:
   bool isBlackbox = false;
 
   void loadBlifFile(std::initializer_list<unsigned int> inputs,
-                    std::string toAppend = "");
+                    const std::string &toAppend = "");
 
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
