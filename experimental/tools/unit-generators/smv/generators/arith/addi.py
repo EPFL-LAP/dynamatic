@@ -16,7 +16,7 @@ def generate_addi(name, params):
 def _generate_addi(name, latency, data_type):
     return f"""
 {generate_binary_op_header(name)}
-  DEFINE result := lhs + rhs;
+  DEFINE result := lhs xor rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """

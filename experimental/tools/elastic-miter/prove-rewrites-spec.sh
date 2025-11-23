@@ -21,7 +21,7 @@ run() {
 }
 
 # Rewrite A (new)
-run sup_mul --seq_length="0=1&0=2"
+run sup_add --seq_length="0=1&0=2"
 # run sup_fork
 # run sup_and --seq_length="0=1"
 # run sup_load --seq_length="0=1"
