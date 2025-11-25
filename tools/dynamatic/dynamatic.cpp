@@ -122,6 +122,10 @@ struct FrontendState {
     return getKernelDir() + getSeparator() + "out";
   }
 
+  std::string getAnalyzePowerPath() const {
+    return dynamaticPath + "/tools/dynamatic/analyze_power";
+  }
+
   std::string makeAbsolutePath(StringRef path);
 };
 
@@ -356,6 +360,17 @@ public:
 
   CommandResult execute(CommandArguments &args) override;
 };
+
+class AnalyzePower : public Command {
+public:
+  AnalyzePower(FrontendState &state)
+      : Command("analyze-power",
+                "Analyzes the power consumption of the design using vectors from simulation",
+                state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 
 class FrontendCommands {
 public:
@@ -771,6 +786,20 @@ CommandResult Synthesize::execute(CommandArguments &args) {
                  floatToString(state.targetCP / 2, 3));
 }
 
+CommandResult AnalyzePower::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script =
+      state.getAnalyzePowerPath() + getSeparator() + "analyze_power.py";
+
+  return execCmd(script, "--output_dir", state.getOutputDir(),
+                 "--kernel_name", state.getKernelName(), 
+                 "--cp", floatToString(state.targetCP, 3));
+}
+
+
 static StringRef removeComment(StringRef input) {
   if (size_t cutAt = input.find('#'); cutAt != std::string::npos)
     return input.take_front(cutAt);
@@ -832,6 +861,7 @@ int main(int argc, char **argv) {
   commands.add<Simulate>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
+  commands.add<AnalyzePower>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 
