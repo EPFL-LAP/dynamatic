@@ -34,7 +34,6 @@ int runIntegrationTest(IntegrationTestData &config) {
   fs::path cSourcePath =
       config.benchmarkPath / config.name / (config.name + ".c");
 
-  std::cout << "[INFO] Running " << config.name << std::endl;
   std::string tmpFilename = "tmp_" + config.name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
@@ -81,8 +80,6 @@ int runIntegrationTest(IntegrationTestData &config) {
     fs::path logFilePath =
         cSourcePath.parent_path() / "out" / "sim" / "report.txt";
     config.simTime = getSimulationTime(logFilePath);
-    std::cout << "[INFO] Benchmark " << config.name
-              << " latency: " << config.simTime << " cycles" << std::endl;
   }
 
   return status;
