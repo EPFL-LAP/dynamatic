@@ -124,9 +124,9 @@ begin
       dout0 <= (others => '0');
     elsif rising_edge(clk) then
       if (ce0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
-        dout0 <= din1 after 0.1 ns;
+        dout0 <= din1;
       elsif (ce0 = '1' and (CONV_INTEGER(address0) < DEPTH)) then
-        dout0 <= mem(CONV_INTEGER(address0)) after 0.1 ns;
+        dout0 <= mem(CONV_INTEGER(address0));
       end if;
     end if;
   end process mem_to_port0;
@@ -138,9 +138,9 @@ begin
       dout1 <= (others => '0');
     elsif rising_edge(clk) then
       if (ce0 = '1' and we0 = '1' and ce1 = '1' and address0 = address1) then
-        dout1 <= din0 after 0.1 ns;
+        dout1 <= din0;
       elsif (ce1 = '1' and (CONV_INTEGER(address1) < DEPTH)) then
-        dout1 <= mem(CONV_INTEGER(address1)) after 0.1 ns;
+        dout1 <= mem(CONV_INTEGER(address1));
       end if;
     end if;
   end process mem_to_port1;
