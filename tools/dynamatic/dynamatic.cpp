@@ -122,10 +122,6 @@ struct FrontendState {
     return getKernelDir() + getSeparator() + "out";
   }
 
-  std::string getAnalyzePowerPath() const {
-    return dynamaticPath + "/tools/dynamatic/analyze_power";
-  }
-
   std::string makeAbsolutePath(StringRef path);
 };
 
@@ -361,11 +357,11 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
-class AnalyzePower : public Command {
+class EstimatePower : public Command {
 public:
-  AnalyzePower(FrontendState &state)
-      : Command("analyze-power",
-                "Analyzes the power consumption of the design using vectors from simulation",
+  EstimatePower(FrontendState &state)
+      : Command("estimate-power",
+                "Estimate the power consumption of the design using switching activity from simulation",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
@@ -786,17 +782,16 @@ CommandResult Synthesize::execute(CommandArguments &args) {
                  floatToString(state.targetCP / 2, 3));
 }
 
-CommandResult AnalyzePower::execute(CommandArguments &args) {
+CommandResult EstimatePower::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string script =
-      state.getAnalyzePowerPath() + getSeparator() + "analyze_power.py";
+  std::string script = state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.sh";
 
-  return execCmd(script, "--output_dir", state.getOutputDir(),
-                 "--kernel_name", state.getKernelName(), 
-                 "--cp", floatToString(state.targetCP, 3));
+  return execCmd(script, state.getOutputDir(),
+                 state.getKernelName(), 
+                 floatToString(state.targetCP, 3));
 }
 
 
@@ -861,7 +856,7 @@ int main(int argc, char **argv) {
   commands.add<Simulate>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
-  commands.add<AnalyzePower>(state);
+  commands.add<EstimatePower>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 

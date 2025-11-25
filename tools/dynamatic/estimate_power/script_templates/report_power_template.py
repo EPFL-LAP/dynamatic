@@ -14,10 +14,9 @@ read_xdc period.xdc
 # Run synthesis
 synth_design -top $TOP_DESIGN -part xc7k160tfbg484-1 -no_iobuf -mode out_of_context -flatten_hierarchy none
 
-## Report pre_all power
-read_saif -out_file unmatched_pre_all.rpt -file %saif2
-report_power -file %{report_folder}/%{date}_pre_all.pwr
-reset_switching_activity -all
+# Report power
+read_saif -file %saif
+report_power -file %{report_folder}/power_analysis.rpt
 
 # Ciao!
 exit

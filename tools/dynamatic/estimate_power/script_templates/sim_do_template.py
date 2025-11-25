@@ -1,7 +1,7 @@
 ################################################################
 # BASE SIMULATION DO STRUCTURE TEMPLATE
 ################################################################
-base_simulation_do = """
+base_simulation_do = r"""
 vlib work
 vmap work work
 project new . simulation work modelsim.ini 0
