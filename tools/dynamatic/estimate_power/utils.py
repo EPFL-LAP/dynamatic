@@ -4,20 +4,25 @@ from string import Template
 import os
 
 # Reload string.Template method
+
+
 class NewTemplate(Template):
     delimiter = '%'
 
 ################################################################
 # Function Definition
 ################################################################
+
+
 def get_date():
     """
         This function will get the running date of the script in isoformat
     """
     current_date = datetime.date.today()
     str_current_data = current_date.isoformat()
-    
+
     return str_current_data
+
 
 def remove_duplicate(file_path):
     """
@@ -27,10 +32,12 @@ def remove_duplicate(file_path):
     if os.path.exists(file_path):
         print("[WARNING] " + file_path + " already exists, deleted!")
         os.remove(file_path)
-        
+
+
 def check_else_create(file_path):
     if not os.path.exists(file_path):
         os.makedirs(file_path)
+
 
 def clean_all(folder_path):
     """
@@ -45,6 +52,7 @@ def clean_all(folder_path):
         # Delete the folder
         os.system(command)
         print("[Cleaning] {} Cleaned".format(folder_path))
+
 
 def target_file_generation(template_file, substitute_dict, target_path):
     """

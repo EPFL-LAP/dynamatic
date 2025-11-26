@@ -27,9 +27,11 @@ class DesignFlag(Enum):
     PRE = "pre"
     POST = "post"
 
+
 class InputFlag(Enum):
     PI = "pi"
     ALL = "all"
+
 
 def run_command(command, power_analysis_dir):
     report = os.path.join(power_analysis_dir, "report.txt")
@@ -39,6 +41,7 @@ def run_command(command, power_analysis_dir):
 ################################################################
 # Main Function
 ################################################################
+
 
 def main(output_dir, kernel_name, clock_period):
     print("[INFO] Running power estimation")
@@ -53,8 +56,8 @@ def main(output_dir, kernel_name, clock_period):
     os.makedirs(power_analysis_dir)
 
     xdc_dict = {
-        'tcp' : clock_period,
-        'halftcp' : clock_period / 2
+        'tcp': clock_period,
+        'halftcp': clock_period / 2
     }
 
     period_xdc_file = os.path.join(power_analysis_dir, "period.xdc")
@@ -62,8 +65,7 @@ def main(output_dir, kernel_name, clock_period):
         template_file=base_xdc,
         substitute_dict=xdc_dict,
         target_path=period_xdc_file
-        )
-
+    )
 
     vhdl_src_folder = os.path.join(output_dir, "sim", "HDL_SRC")
 
@@ -89,12 +91,12 @@ def main(output_dir, kernel_name, clock_period):
 
     # We have four configurations for generating the power estimation on post-synthesis
     # netlist from vivado
-    ## (Case 1) pre_pi:   Generating the SAIF file with behavior simualtion containing only PIs.
-    ## (Case 2) pre_all:  Generating the SAIF file with behavior simulation containing all ports.
-    ## (Case 3) post_pi:  Generating the SAIF file with post-synthesis simulation containing only PIs.
-    ## (Case 4) post_all: Generating the SAIF file with post-synthesis simulaiton containing all ports.
+    # (Case 1) pre_pi:   Generating the SAIF file with behavior simualtion containing only PIs.
+    # (Case 2) pre_all:  Generating the SAIF file with behavior simulation containing all ports.
+    # (Case 3) post_pi:  Generating the SAIF file with post-synthesis simulation containing only PIs.
+    # (Case 4) post_all: Generating the SAIF file with post-synthesis simulaiton containing all ports.
 
-    ## Currently only running pre_all
+    # Currently only running pre_all
     design_flag = DesignFlag.PRE
     input_flag = InputFlag.ALL
 
@@ -103,10 +105,10 @@ def main(output_dir, kernel_name, clock_period):
     if design_flag == DesignFlag.POST:
         #  Step 1: Run Vivado synthesis flow
         synthesis_dict = {
-            'date'   : date,
-            'design' : kernel_name,
-            'hdlsrc' : vhdl_src_folder,
-            'inputs' : vhdl_inputs
+            'date': date,
+            'design': kernel_name,
+            'hdlsrc': vhdl_src_folder,
+            'inputs': vhdl_inputs
         }
 
         synth_script = os.path.join(power_analysis_dir, "synthesis.tcl")
@@ -116,10 +118,10 @@ def main(output_dir, kernel_name, clock_period):
             template_file=base_synthesis_tcl,
             substitute_dict=synthesis_dict,
             target_path=synth_script
-            )
+        )
 
         print("[INFO] Pre-synthesizing" +
-                "to improve switching activity annotation for power estimation")
+              "to improve switching activity annotation for power estimation")
 
         # Run the synthesis flow
         synthesis_command = f"cd {power_analysis_dir}; vivado -mode batch -source synthesis.tcl"
@@ -142,12 +144,12 @@ def main(output_dir, kernel_name, clock_period):
 
     stage = f"{design_flag.value}_{input_flag.value}"
     simulation_dict = {
-        'hdlsrc' : vhdl_src_folder,
-        'design' : kernel_name,
-        'inputs' : sim_inputs,
-        'designsrc' : design_src,
-        'powerflag' : power_flag,
-        'stage' : stage
+        'hdlsrc': vhdl_src_folder,
+        'design': kernel_name,
+        'inputs': sim_inputs,
+        'designsrc': design_src,
+        'powerflag': power_flag,
+        'stage': stage
     }
 
     verify_folder = os.path.join(output_dir, "sim", "HLS_VERIFY")
@@ -158,7 +160,7 @@ def main(output_dir, kernel_name, clock_period):
         template_file=base_simulation_do,
         substitute_dict=simulation_dict,
         target_path=simulation_script
-        )
+    )
 
     print("[INFO] Simulating to obtain switching activity information")
 
@@ -171,12 +173,12 @@ def main(output_dir, kernel_name, clock_period):
 
     # Step 3: Run Power Estimation
     power_dict = {
-        'date' : date,
-        'design' : kernel_name,
-        'hdlsrc' : vhdl_src_folder,
-        'report_folder' : power_analysis_dir,
-        'inputs' : vhdl_inputs,
-        'saif'  : os.path.join(verify_folder, f"{stage}.saif"),
+        'date': date,
+        'design': kernel_name,
+        'hdlsrc': vhdl_src_folder,
+        'report_folder': power_analysis_dir,
+        'inputs': vhdl_inputs,
+        'saif': os.path.join(verify_folder, f"{stage}.saif"),
     }
 
     report_power_script = os.path.join(power_analysis_dir, "report_power.tcl")
@@ -198,12 +200,12 @@ def main(output_dir, kernel_name, clock_period):
     else:
         print("[ERROR] Power estimation failed")
 
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--output_dir", required=True, help="Output folder")
     p.add_argument("--kernel_name", required=True, help="Name of kernel ")
     p.add_argument("--cp", type=float, required=True, help="Clock period for synthesis")
-
 
     args = p.parse_args()
 
