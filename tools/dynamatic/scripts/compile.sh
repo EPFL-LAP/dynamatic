@@ -214,7 +214,7 @@ $DYNAMATIC_OPT_BIN \
   --func-set-arg-names="source=$F_C_SOURCE" \
   --flatten-memref-row-major \
   --canonicalize \
-  --arith-reduce-strength="max-adder-depth-mul=3"
+  --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
   --mark-memory-interfaces \
   > "$F_CF_TRANSFORMED"
