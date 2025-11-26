@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-
-
 ################################################################
 # Environment Setup
 ################################################################
@@ -58,15 +56,15 @@ def main(output_dir, kernel_name, clock_period):
         'tcp' : clock_period,
         'halftcp' : clock_period / 2
     }
-    
+
     period_xdc_file = os.path.join(power_analysis_dir, "period.xdc")
     target_file_generation(
-        template_file=base_xdc, 
-        substitute_dict=xdc_dict, 
+        template_file=base_xdc,
+        substitute_dict=xdc_dict,
         target_path=period_xdc_file
         )
-    
-    
+
+
     vhdl_src_folder = os.path.join(output_dir, "sim", "HDL_SRC")
 
     # Get all the input files
@@ -76,7 +74,7 @@ def main(output_dir, kernel_name, clock_period):
         for f in sorted(os.listdir(vhdl_src_folder))
         if f.endswith(".vhd")
     ]
-    # which file is included varies on pre/post synth workflow 
+    # which file is included varies on pre/post synth workflow
     # so remove the pre-synth file by default
     sim_inputs.remove(f"project addfile {vhdl_src_folder}/{kernel_name}.vhd")
     sim_inputs = "\n".join(sim_inputs)
@@ -110,16 +108,16 @@ def main(output_dir, kernel_name, clock_period):
             'hdlsrc' : vhdl_src_folder,
             'inputs' : vhdl_inputs
         }
-        
+
         synth_script = os.path.join(power_analysis_dir, "synthesis.tcl")
 
         # Generate the corresponding synthesis.tcl file
         target_file_generation(
-            template_file=base_synthesis_tcl, 
-            substitute_dict=synthesis_dict, 
+            template_file=base_synthesis_tcl,
+            substitute_dict=synthesis_dict,
             target_path=synth_script
             )
-        
+
         print("[INFO] Pre-synthesizing" +
                 "to improve switching activity annotation for power estimation")
 
@@ -127,21 +125,21 @@ def main(output_dir, kernel_name, clock_period):
         synthesis_command = f"cd {power_analysis_dir}; vivado -mode batch -source synthesis.tcl"
         if run_command(synthesis_command, power_analysis_dir):
             print("[INFO] Synthesis succeeded")
-        else: 
+        else:
             print("[ERROR] Synthesis failed")
             return
-        
+
     # Step 2: Run Modelsim simulation
     if (input_flag == InputFlag.ALL):
         power_flag = "-r -in -inout -out -internal"
     else:
         power_flag = ""
-        
+
     if (design_flag == DesignFlag.PRE):
         design_src = os.path.join(vhdl_src_folder,  f"{kernel_name}.vhd")
     else:
         design_src = os.path.join(power_analysis_dir, f"{kernel_name}_syn.vhd")
-            
+
     stage = f"{design_flag.value}_{input_flag.value}"
     simulation_dict = {
         'hdlsrc' : vhdl_src_folder,
@@ -151,23 +149,23 @@ def main(output_dir, kernel_name, clock_period):
         'powerflag' : power_flag,
         'stage' : stage
     }
-    
+
     verify_folder = os.path.join(output_dir, "sim", "HLS_VERIFY")
     simulation_script = os.path.join(verify_folder, f"{stage}.do")
 
     # Generate and run the simulation.do file
     target_file_generation(
-        template_file=base_simulation_do, 
-        substitute_dict=simulation_dict, 
+        template_file=base_simulation_do,
+        substitute_dict=simulation_dict,
         target_path=simulation_script
         )
-    
+
     print("[INFO] Simulating to obtain switching activity information")
-        
+
     modelsim_command = f"cd {verify_folder}; vsim -c -do {simulation_script}"
     if run_command(modelsim_command, power_analysis_dir):
         print("[INFO] Simulation succeeded")
-    else: 
+    else:
         print("[ERROR] Simulation failed")
         return
 
@@ -180,13 +178,13 @@ def main(output_dir, kernel_name, clock_period):
         'inputs' : vhdl_inputs,
         'saif'  : os.path.join(verify_folder, f"{stage}.saif"),
     }
-    
+
     report_power_script = os.path.join(power_analysis_dir, "report_power.tcl")
     target_file_generation(
-        template_file=vector_base_report_power_tcl, 
-        substitute_dict=power_dict, 
+        template_file=vector_base_report_power_tcl,
+        substitute_dict=power_dict,
         target_path=report_power_script)
-    
+
     print("[INFO] Launching power estimation")
 
     # Generate and run the report_power tcl script
@@ -197,7 +195,7 @@ def main(output_dir, kernel_name, clock_period):
     run_command(report_power_cmd, power_analysis_dir)
     if run_command(report_power_cmd, power_analysis_dir):
         print("[INFO] Power estimation succeeded")
-    else: 
+    else:
         print("[ERROR] Power estimation failed")
 
 if __name__ == "__main__":

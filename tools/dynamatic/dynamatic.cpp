@@ -787,11 +787,12 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string script = state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.sh";
+  std::string script = state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
 
-  return execCmd(script, state.getOutputDir(),
-                 state.getKernelName(), 
-                 floatToString(state.targetCP, 3));
+  return execCmd("python", script,
+                 "--output_dir", state.getOutputDir(),
+                 "--kernel_name", state.getKernelName(),
+                 "--cp", floatToString(state.targetCP, 3));
 }
 
 
