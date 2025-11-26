@@ -800,7 +800,6 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   // clang-format on
 }
 
-
 static StringRef removeComment(StringRef input) {
   if (size_t cutAt = input.find('#'); cutAt != std::string::npos)
     return input.take_front(cutAt);
