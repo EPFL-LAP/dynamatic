@@ -810,7 +810,10 @@ static void help(FrontendCommands &commands) {
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
+
+  cl::HideUnrelatedOptions(ClangFormatCategory);
+
+  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend. \n This is our external help message, for arguments which are passed directly to the binary. \nYou may find our internal help message more helpful, which describes the arguments which are passed to our custom shell. \nThe internal help message can be accessed by running this binary with no arguments, and then writing 'help'.");
 
   // Get current working directory
   SmallString<128> cwd;
