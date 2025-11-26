@@ -361,12 +361,12 @@ class EstimatePower : public Command {
 public:
   EstimatePower(FrontendState &state)
       : Command("estimate-power",
-                "Estimate the power consumption of the design using switching activity from simulation",
+                "Estimate the power consumption of the design using switching "
+                "activity from simulation",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class FrontendCommands {
 public:
@@ -787,12 +787,17 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string script = state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
 
-  return execCmd("python", script,
-                 "--output_dir", state.getOutputDir(),
-                 "--kernel_name", state.getKernelName(),
-                 "--cp", floatToString(state.targetCP, 3));
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
 }
 
 
