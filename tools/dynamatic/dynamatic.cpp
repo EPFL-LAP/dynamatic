@@ -814,7 +814,13 @@ int main(int argc, char **argv) {
   // Only show our own arguments in the help message
   cl::HideUnrelatedOptions(mainCategory);
 
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend. \nThis is our external help message, for arguments which are passed directly to the binary. \nYou may find our internal help message more helpful, which describes the arguments which are passed to our custom shell. \nThe internal help message can be accessed by running this binary with no arguments, and then writing 'help'.\n");
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Dynamatic Frontend. \nThis is our external help message, for arguments "
+      "which are passed directly to the binary. \nYou may find our internal "
+      "help message more helpful, which describes the arguments which are "
+      "passed to our custom shell. \nThe internal help message can be accessed "
+      "by running this binary with no arguments, and then writing 'help'.\n");
 
   // Get current working directory
   SmallString<128> cwd;
