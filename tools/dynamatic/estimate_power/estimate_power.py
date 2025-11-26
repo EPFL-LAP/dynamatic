@@ -48,6 +48,16 @@ def main(output_dir, kernel_name, clock_period):
 
     date = get_date()
 
+    vhdl_src_folder = os.path.join(output_dir, "hdl")
+    if not os.path.exists(vhdl_src_folder):
+        print(f"[ERROR] {vhdl_src_folder} not found. Please run the 'write-hdl' command")
+        return
+
+    tb_file = os.path.join(output_dir, "sim", "HDL_SRC", f"tb_{kernel_name}.vhd")
+    if not os.path.exists(tb_file):
+        print(f"[ERROR] {tb_file} not found. Please run the 'simulate' command")
+        return
+
     power_analysis_dir = os.path.join(output_dir, "power")
 
     if os.path.exists(power_analysis_dir):
@@ -67,7 +77,6 @@ def main(output_dir, kernel_name, clock_period):
         target_path=period_xdc_file
     )
 
-    vhdl_src_folder = os.path.join(output_dir, "sim", "HDL_SRC")
 
     # Get all the input files
     # As a list of imports for simulation.do
@@ -76,6 +85,8 @@ def main(output_dir, kernel_name, clock_period):
         for f in sorted(os.listdir(vhdl_src_folder))
         if f.endswith(".vhd")
     ]
+    sim_inputs.append(f"project addfile {tb_file}")
+
     # which file is included varies on pre/post synth workflow
     # so remove the pre-synth file by default
     sim_inputs.remove(f"project addfile {vhdl_src_folder}/{kernel_name}.vhd")

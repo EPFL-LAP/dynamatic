@@ -362,8 +362,7 @@ public:
   EstimatePower(FrontendState &state)
       : Command("estimate-power",
                 "Estimate the power consumption of the design using switching "
-                "activity from simulation. \n Reliant on the output of the"
-                "'simulate' command.",
+                "activity from simulation.",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
