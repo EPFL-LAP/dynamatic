@@ -227,7 +227,8 @@ LogicalResult StdExecuter::execute(mlir::arith::ShLIOp, std::vector<Any> &in,
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount,
+            /* isSigned = */ true, /*implicitTrunc = */ true);
   out[0] = shifted;
   return success();
 }
@@ -236,11 +237,9 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
-
   auto shifted =
       APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount,
             /* isSigned = */ true, /*implicitTrunc = */ true);
-
   out[0] = shifted;
   return success();
 }
@@ -249,6 +248,7 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+
   auto shifted =
       APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
   out[0] = shifted;
