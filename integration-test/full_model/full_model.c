@@ -4,7 +4,7 @@
 #include "stdio.h"
 #include "nnet_utils/fc.h"
 
-// hls-fpga-machine-learning `TODO: make preicison dynamic at writer level` insert layer precision
+// hls-fpga-machine-learning 
 #define NB_DEFAULT 16
 #define INT_DEFAULT 6
 #define FRAC_DEFAULT NB_DEFAULT - INT_DEFAULT

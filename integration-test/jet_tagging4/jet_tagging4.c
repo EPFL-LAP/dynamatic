@@ -349,78 +349,78 @@ void jet_tagging4(
     // clang-format on
 ) {
 
-  common_t out0[OUT_L0];
-  common_t out1[OUT_L1];
-  common_t out3[OUT_L3];
-  common_t tmp_input[IN_L0];
+    common_t out0[OUT_L0];
+    common_t out1[OUT_L1];
+    common_t out3[OUT_L3];
+    common_t tmp_input[IN_L0];
 
-  tmp_input[0] = input_0;
-  tmp_input[1] = input_1;
-  tmp_input[2] = input_2;
-  tmp_input[3] = input_3;
-  tmp_input[4] = input_4;
-  tmp_input[5] = input_5;
-  tmp_input[6] = input_6;
-  tmp_input[7] = input_7;
-  tmp_input[8] = input_8;
-  tmp_input[9] = input_9;
-  tmp_input[10] = input_10;
-  tmp_input[11] = input_11;
-  tmp_input[12] = input_12;
-  tmp_input[13] = input_13;
-  tmp_input[14] = input_14;
-  tmp_input[15] = input_15;
+    tmp_input[0] = input_0;
+    tmp_input[1] = input_1;
+    tmp_input[2] = input_2;
+    tmp_input[3] = input_3;
+    tmp_input[4] = input_4;
+    tmp_input[5] = input_5;
+    tmp_input[6] = input_6;
+    tmp_input[7] = input_7;
+    tmp_input[8] = input_8;
+    tmp_input[9] = input_9;
+    tmp_input[10] = input_10;
+    tmp_input[11] = input_11;
+    tmp_input[12] = input_12;
+    tmp_input[13] = input_13;
+    tmp_input[14] = input_14;
+    tmp_input[15] = input_15;
 
-//   if (tmp_input[15] == 996) {
-//     out1[0] = 1024;
-//     out1[1] = 1024;
-//     out1[2] = 1024;
-//     out1[3] = 1024;
-//     out1[4] = 1024;
-//     out1[5] = 1024;
-//     out1[6] = 1024;
-//     out1[7] = 1024;
-//     out1[8] = 1024;
-//     out1[9] = 1024;
-//     out1[10] = 1024;
-//     out1[11] = 1024;
-//     out1[12] = 1024;
-//     out1[13] = 1024;
-//     out1[14] = 1024;
-//     out1[15] = 1024;
-//     out1[16] = 1024;
-//     out1[17] = 1024;
-//     out1[18] = 1024;
-//     out1[19] = 1024;
-//     out1[20] = 1024;
-//     out1[21] = 1024;
-//     out1[22] = 1024;
-//     out1[23] = 1024;
-//     out1[24] = 1024;
-//     out1[25] = 1024;
-//     out1[26] = 1024;
-//     out1[27] = 1024;
-//     out1[28] = 1024;
-//     out1[29] = 1024;
-//     out1[30] = 1024;
-//     out1[31] = 1024;
-//   } else {  
-      /* ----------- Layer 0 ------------ */
-      dense_accum_t acc0;
-      common_t tmp_relu0;
-      DENSE_RELU_LAYER(tmp_input, out0, IN_L0, OUT_L0, w0, b0, acc0, tmp_relu0);
-    
-      /* ----------- Layer 1 ------------ */
-      dense_accum_t acc1;
-      common_t tmp_relu1 = 0;
-      DENSE_RELU_LAYER(out0, out1, IN_L1, OUT_L1, w1, b1, acc1, tmp_relu1);
-    
-    // }
+    if (tmp_input[15] == 996) {
+        out1[0] = 1024;
+        out1[1] = 1024;
+        out1[2] = 1024;
+        out1[3] = 1024;
+        out1[4] = 1024;
+        out1[5] = 1024;
+        out1[6] = 1024;
+        out1[7] = 1024;
+        out1[8] = 1024;
+        out1[9] = 1024;
+        out1[10] = 1024;
+        out1[11] = 1024;
+        out1[12] = 1024;
+        out1[13] = 1024;
+        out1[14] = 1024;
+        out1[15] = 1024;
+        out1[16] = 1024;
+        out1[17] = 1024;
+        out1[18] = 1024;
+        out1[19] = 1024;
+        out1[20] = 1024;
+        out1[21] = 1024;
+        out1[22] = 1024;
+        out1[23] = 1024;
+        out1[24] = 1024;
+        out1[25] = 1024;
+        out1[26] = 1024;
+        out1[27] = 1024;
+        out1[28] = 1024;
+        out1[29] = 1024;
+        out1[30] = 1024;
+        out1[31] = 1024;
+    } else {  
+        /* ----------- Layer 0 ------------ */
+        dense_accum_t acc0;
+        common_t tmp_relu0;
+        DENSE_RELU_LAYER(tmp_input, out0, IN_L0, OUT_L0, w0, b0, acc0, tmp_relu0);
+
+        /* ----------- Layer 1 ------------ */
+        dense_accum_t acc1;
+        common_t tmp_relu1 = 0;
+        DENSE_RELU_LAYER(out0, out1, IN_L1, OUT_L1, w1, b1, acc1, tmp_relu1);
+
+    }
     /* ----------- Layer 3 ------------ */
     dense_accum_t acc3;
     common_t tmp_relu3 = 0;
     DENSE_RELU_LAYER(out1, out3, IN_L3, OUT_L3, w3, b3, acc3, tmp_relu3);
-  
+
     out3_0[0] = out3[0];
     out3_1[0] = out3[1];
     out3_2[0] = out3[2];
