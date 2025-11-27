@@ -50,6 +50,7 @@ int runIntegrationTest(IntegrationTestData &config) {
              << " --buffer-algorithm " << config.bufferAlgorithm
              << (config.useSharing ? " --sharing" : "")
              << (config.useRigidification ? " --rigidification" : "")
+             << (config.useFtd ? " --fast-token-delivery" : "")
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 
