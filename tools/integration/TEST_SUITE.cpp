@@ -49,6 +49,8 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
+class FtdWithSimpleBuffersFixture : public BaseFixture {};
+
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
       // clang-format off
@@ -75,6 +77,24 @@ TEST_P(CBCSolverFixture, basic) {
       .useSharing = false,
       .milpSolver = "cbc",
       .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+TEST_P(FtdWithSimpleBuffersFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .milpSolver = "cbc",
+      .bufferAlgorithm = "on-merges",
+      .useFtd = true,
       .simTime = -1
       // clang-format on
   };
@@ -300,6 +320,18 @@ INSTANTIATE_TEST_SUITE_P(
       "if_loop_mul",
       "iir",
       "matvec"
+      ),
+      [](const auto &info) { return info.param; });
+
+// Smoke test: Using the fast token delivery algorithm to compile the circuit.
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, FtdWithSimpleBuffersFixture,
+    testing::Values(
+      // "matvec" // matvec does not work currently
+      "fir",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir"
       ),
       [](const auto &info) { return info.param; });
 

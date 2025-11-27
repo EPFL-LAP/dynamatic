@@ -31,6 +31,7 @@ struct IntegrationTestData {
   bool useSharing;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
+  bool useFtd = false;
 
   // Results
   int simTime;
