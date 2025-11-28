@@ -8,36 +8,43 @@ use std.textio.all;
 use work.sim_package.all;
 
 ---------------------------------------------------------------------------
-entity single_argument is
+entity two_port_RAM is
   generic (
     -- File paths for read and write
     TV_IN  : string := "";
     TV_OUT : string := "";
-    -- Data bus width
-    DATA_WIDTH : integer := 32
+    -- Memory depth for data
+    DEPTH : integer;
+    -- Bus widths for data and address
+    DATA_WIDTH : integer := 32;
+    ADDR_WIDTH : integer
   );
   port (
     clk  : in std_logic;
     rst  : in std_logic;
     done : in std_logic;
-    -- Single port
-    ce0 : in std_logic;
-    we0 : in std_logic;
-    -- input channel
-    din0 : in std_logic_vector(DATA_WIDTH - 1 downto 0);
-    -- output channel
-    dout0       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    dout0_valid : out std_logic;
-    dout0_ready : in  std_logic
+    -- RAM port-0
+    ce0       : in  std_logic;
+    we0       : in  std_logic;
+    address0  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    dout0 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din0  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    -- RAM port-1
+    ce1       : in  std_logic;
+    we1       : in  std_logic;
+    address1  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    dout1 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0)
   );
-end single_argument;
+end two_port_RAM;
 
 ---------------------------------------------------------------------------
--- Main body of the entity: Single Argument (One-Port RAM)
-architecture behav of single_argument is
+-- Main body of the entity: Two-Port RAM
+architecture behav of two_port_RAM is
   -- Internal signals
-  signal emitToken, tokenEmitted : std_logic;
-  shared variable mem            : std_logic_vector(DATA_WIDTH - 1 downto 0) := (others => '0');
+  type array2D is
+  array (0 to DEPTH - 1) of std_logic_vector(DATA_WIDTH - 1 downto 0);
+  shared variable mem : array2D := (others => (others => '0'));
 begin
 
   ---------------------------------------------------------------------------
@@ -55,14 +62,18 @@ begin
 
     -- Check if file path is defined
     if (TV_IN /= "") then
-
-      wait until rst = '0';
       -- Initialization
       index := 0;
       file_open(file_status, file_ptr, TV_IN, READ_MODE);
 
-      if (file_status /= OPEN_OK) then
-        assert false report "ERROR: Could not open file: " & TV_IN severity failure;
+      if file_status = NAME_ERROR then
+        report "ERROR: File not found: " & TV_IN severity failure;
+      elsif file_status = STATUS_ERROR then
+        report "ERROR: File already open: " & TV_IN severity failure;
+      elsif file_status = MODE_ERROR then
+        report "ERROR: File mode error: " & TV_IN severity failure;
+      elsif file_status /= OPEN_OK then
+        report "ERROR: Unknown file open error: " & TV_IN severity failure;
       end if;
 
       -- Use read_token procedure to read tokens from the file
@@ -83,15 +94,11 @@ begin
         read_token(file_ptr, line_num, token);
 
         -- Read data from file into mem-array (for every transaction)
-        while (done /= '1') loop
-          wait until rising_edge(clk);
+        for i in 0 to DEPTH - 1 loop
+          read_token(file_ptr, line_num, token);
+          mem(i) := hex_str_to_logicVec(token, DATA_WIDTH);
         end loop;
-
         read_token(file_ptr, line_num, token);
-        mem := hex_str_to_logicVec(token, DATA_WIDTH);
-
-        read_token(file_ptr, line_num, token);
-        wait until done = '0';
 
         -- Check for end of [[transaction]]
         if (token(1 to 16) /= "[[/transaction]]") then
@@ -112,20 +119,31 @@ begin
   -- Transfer: mem-array -> RTL ports ---------------------------------------
   mem_to_port0 : process (clk, rst)
   begin
+    -- Simple memory read
     if (rst = '1') then
-      tokenEmitted    <= '0';
-      dout0       <= (others => '0');
-      dout0_valid <= '0';
+      dout0 <= (others => '0');
     elsif rising_edge(clk) then
-      if (not tokenEmitted) then
-        tokenEmitted    <= '1';
-        dout0       <= mem;
-        dout0_valid <= '1';
-      else
-        dout0_valid <= dout0_valid and (not dout0_ready);
+      if (ce0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
+        dout0 <= din1;
+      elsif (ce0 = '1' and (CONV_INTEGER(address0) < DEPTH)) then
+        dout0 <= mem(CONV_INTEGER(address0));
       end if;
     end if;
   end process mem_to_port0;
+
+  mem_to_port1 : process (clk, rst)
+  begin
+    -- Simple memory read
+    if (rst = '1') then
+      dout1 <= (others => '0');
+    elsif rising_edge(clk) then
+      if (ce0 = '1' and we0 = '1' and ce1 = '1' and address0 = address1) then
+        dout1 <= din0;
+      elsif (ce1 = '1' and (CONV_INTEGER(address1) < DEPTH)) then
+        dout1 <= mem(CONV_INTEGER(address1));
+      end if;
+    end if;
+  end process mem_to_port1;
 
   ---------------------------------------------------------------------------
   -- DATA WRITE -------------------------------------------------------------
@@ -135,11 +153,23 @@ begin
   begin
     -- Simple memory write
     if rising_edge(clk) then
-      if (ce0 = '1' and we0 = '1') then
-        mem := din0;
+      if (ce0 = '1' and we0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
+        mem(CONV_INTEGER(address0)) := din1;
+      elsif (ce0 = '1' and we0 = '1') then
+        mem(CONV_INTEGER(address0)) := din0;
       end if;
     end if;
   end process port0_to_mem;
+
+  port1_to_mem : process (clk)
+  begin
+    -- Simple memory write
+    if rising_edge(clk) then
+      if (ce1 = '1' and we1 = '1') then
+        mem(CONV_INTEGER(address1)) := din1;
+      end if;
+    end if;
+  end process port1_to_mem;
 
   -- Transfer: mem-array -> text-file ---------------------------------------
   mem_to_file : process
@@ -153,44 +183,29 @@ begin
 
     -- Check if file path is defined
     if (TV_OUT /= "") then
-
-      wait until rst = '0';
-      -- Initialization
+      wait until done = '1';
       index := 0;
-      while (done /= '1') loop
-        wait until rising_edge(clk);
+
+      -- Open file
+      file_open(file_status, file_ptr, TV_OUT, APPEND_MODE);
+      if (file_status /= OPEN_OK) then
+        assert false report "ERROR: Could not open file " & TV_OUT severity failure;
+      end if;
+
+      -- Write [[transaction]] entries in HLS TB format
+      write(line_num, "[[transaction]]    " & integer'image(index));
+      writeline(file_ptr, line_num);
+      --
+      for i in 0 to DEPTH - 1 loop
+        write(line_num, "0x" & hex_logicVec_to_str(mem(i)));
+        writeline(file_ptr, line_num);
       end loop;
-      wait until done = '0';
+      --
+      write(line_num, string'("[[/transaction]]"));
+      writeline(file_ptr, line_num);
 
-      -- Main loop to write iteratively
-      while true loop
-        while (done /= '1') loop
-          wait until rising_edge(clk);
-        end loop;
-
-        -- Open file (every iteration)
-        file_open(file_status, file_ptr, TV_OUT, APPEND_MODE);
-        if (file_status /= OPEN_OK) then
-          assert false report "ERROR: Could not open file " & TV_OUT severity failure;
-        end if;
-
-        -- Write [[transaction]] entries in HLS TB format
-        write(line_num, "[[transaction]]    " & integer'image(index));
-        writeline(file_ptr, line_num);
-        --
-        write(line_num, "0x" & hex_logicVec_to_str(mem));
-        writeline(file_ptr, line_num);
-        --
-        write(line_num, string'("[[/transaction]]"));
-        writeline(file_ptr, line_num);
-
-        -- Increment index for next [[transaction]]
-        index := index + 1;
-
-        -- Close file (every iteration)
-        file_close(file_ptr);
-        wait until done = '0';
-      end loop;
+      -- Close file
+      file_close(file_ptr);
     end if;
     wait;
 

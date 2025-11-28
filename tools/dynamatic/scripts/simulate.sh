@@ -63,10 +63,10 @@ cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR"
 cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR" 2> /dev/null
 
 # Copy TB supplementary files (memory model, etc.)
-cp "$RESOURCE_DIR/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
-cp "$RESOURCE_DIR/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
-cp "$RESOURCE_DIR/template_single_argument.vhd" "$COSIM_HDL_SRC_DIR/single_argument.vhd"
-cp "$RESOURCE_DIR/template_simpackage.vhd" "$COSIM_HDL_SRC_DIR/simpackage.vhd"
+cp "$RESOURCE_DIR/templates_vhdl/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
+cp "$RESOURCE_DIR/templates_vhdl/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
+cp "$RESOURCE_DIR/templates_vhdl/template_single_argument.vhd" "$COSIM_HDL_SRC_DIR/single_argument.vhd"
+cp "$RESOURCE_DIR/templates_vhdl/template_simpackage.vhd" "$COSIM_HDL_SRC_DIR/simpackage.vhd"
 cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
 
 # Compile kernel's main function to generate inputs and golden outputs for the
