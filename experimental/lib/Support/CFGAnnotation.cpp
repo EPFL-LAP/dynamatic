@@ -321,7 +321,7 @@ dynamatic::experimental::cfg::restoreCfStructure(handshake::FuncOp &funcOp,
     rewriter.setInsertionPointToEnd(&bb);
 
     if (!edges.contains(blockID)) {
-      rewriter.create<func::ReturnOp>(bb.back().getLoc());
+      func::ReturnOp::create(rewriter, bb.back().getLoc());
       continue;
     }
 
@@ -333,14 +333,14 @@ dynamatic::experimental::cfg::restoreCfStructure(handshake::FuncOp &funcOp,
       Operation *condOp = getOpByName(edge.getCondition(), blockID);
       if (!condOp)
         return failure();
-      rewriter.create<cf::CondBranchOp>(bb.back().getLoc(),
-                                        condOp->getResult(0),
-                                        indexToBlock[edge.getTrueSuccessor()],
-                                        indexToBlock[edge.getFalseSuccessor()]);
+      cf::CondBranchOp::create(rewriter, bb.back().getLoc(),
+                               condOp->getResult(0),
+                               indexToBlock[edge.getTrueSuccessor()],
+                               indexToBlock[edge.getFalseSuccessor()]);
     } else {
       unsigned successor = edge.getSuccessor();
-      rewriter.create<cf::BranchOp>(bb.back().getLoc(),
-                                    indexToBlock[successor]);
+      cf::BranchOp::create(rewriter, bb.back().getLoc(),
+                           indexToBlock[successor]);
     }
   }
 

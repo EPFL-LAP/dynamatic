@@ -113,7 +113,7 @@ struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
   LogicalResult
   matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor /*adaptor*/,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.updateRootInPlace(funcOp, [&] {
+    rewriter.modifyOpInPlace(funcOp, [&] {
       bool progress = false;
       do {
         progress = false;

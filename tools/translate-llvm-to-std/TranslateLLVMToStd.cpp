@@ -36,10 +36,10 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
     return mlir::IntegerType::get(context, llvmType->getIntegerBitWidth());
   }
   if (llvmType->isFloatTy()) {
-    return mlir::FloatType::getF32(context);
+    return mlir::Float32Type::get(context);
   }
   if (llvmType->isDoubleTy()) {
-    return mlir::FloatType::getF64(context);
+    return mlir::Float64Type::get(context);
   }
 
   llvm_unreachable("Unhandled scalar type");
@@ -118,8 +118,10 @@ convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
   values.reserve(numElems);
   convertInitializerToDenseElemAttrRecursive(globVar->getInitializer(), values,
                                              baseMLIRElemType);
+
   return mlir::DenseElementsAttr::get(
-      mlir::RankedTensorType::get(shape, baseMLIRElemType), values);
+      mlir::RankedTensorType::get(/*shape = */ {numElems}, baseMLIRElemType),
+      values);
 }
 
 void convertInitializerToDenseElemAttrRecursive(
@@ -172,8 +174,8 @@ void TranslateLLVMToStd::translateFunction(llvm::Function *llvmFunc) {
   }
 
   auto funcType = builder.getFunctionType(argTypes, resTypes);
-  auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
-                                             llvmFunc->getName(), funcType);
+  auto funcOp = func::FuncOp::create(builder, builder.getUnknownLoc(),
+                                     llvmFunc->getName(), funcType);
 
   initializeBlocksAndBlockMapping(llvmFunc, funcOp);
 
@@ -203,13 +205,14 @@ void TranslateLLVMToStd::translateGlobalVars() {
       continue;
 
     auto *baseElemType = globalVar->getValueType();
-    SmallVector<int64_t> shape;
+    int64_t numElements = 1;
     while (baseElemType->isArrayTy()) {
-      shape.push_back(baseElemType->getArrayNumElements());
+      numElements *= baseElemType->getArrayNumElements();
       baseElemType = baseElemType->getArrayElementType();
     }
     auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
-    auto memrefType = MemRefType::get(shape, baseMLIRElemType);
+    auto memrefType =
+        MemRefType::get(/* shape = */ {numElements}, baseMLIRElemType);
 
     StringRef symName = constant.getName();
     StringAttr symNameAttr = StringAttr::get(ctx, Twine(symName));
@@ -225,8 +228,9 @@ void TranslateLLVMToStd::translateGlobalVars() {
       initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
     }
 
-    auto globalOp = builder.create<memref::GlobalOp>(
+    auto globalOp = memref::GlobalOp::create(
         // clang-format off
+        builder,
         UnknownLoc::get(ctx),
         symNameAttr,
         visibilityAttr,
@@ -275,9 +279,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMap[inst->getOperand(0)];
-      builder.create<func::ReturnOp>(loc, arg);
+      func::ReturnOp::create(builder, loc, arg);
     } else {
-      builder.create<func::ReturnOp>(loc);
+      func::ReturnOp::create(builder, loc);
     }
   } else if (isa<llvm::PHINode>(inst)) {
     // At this stage, Phi nodes are all converted to the block arguments
@@ -350,8 +354,8 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
 
         if (auto *intConst = dyn_cast<ConstantInt>(val)) {
           APInt intVal = intConst->getValue();
-          auto constOp = builder.create<arith::ConstantIntOp>(
-              loc, intVal.getSExtValue(), intVal.getBitWidth());
+          auto constOp = arith::ConstantIntOp::create(
+              builder, loc, intVal.getSExtValue(), intVal.getBitWidth());
           valueMap[val] = constOp->getResult(0);
           loc = constOp->getLoc();
         }
@@ -359,13 +363,13 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
         if (auto *floatConst = dyn_cast<llvm::ConstantFP>(val)) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF32Type());
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF64Type());
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
@@ -389,8 +393,8 @@ void TranslateLLVMToStd::createGetGlobals(llvm::Function *llvmFunc) {
 
           auto memrefType = globalOp.getType();
 
-          auto getGlobalOp = builder.create<memref::GetGlobalOp>(
-              loc, memrefType, globalOp.getSymName());
+          auto getGlobalOp = memref::GetGlobalOp::create(
+              builder, loc, memrefType, globalOp.getSymName());
 
           valueMap[val] = getGlobalOp.getResult();
         }
@@ -477,7 +481,7 @@ void TranslateLLVMToStd::translateICmpInst(llvm::ICmpInst *inst) {
   }
 
   auto op =
-      builder.create<arith::CmpIOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpIOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
@@ -508,34 +512,51 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
     // clang-format on
   }
   auto op =
-      builder.create<arith::CmpFOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpFOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
 void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
-  // NOTE: this function does not create any corresponding op in the CF MLIR but
-  // only computes the indices for the LOAD/STORE ops that the gepInst drives.
 
-  // Check if the GEP is not chained
-  mlir::Value baseAddress = valueMap[gepInst->getPointerOperand()];
-  SmallVector<mlir::Value> indexOperands;
+  // The GEP instruction calculates the index that the load/store need to use
+  // the access memory.
+  //
+  // For instance A[i][j][k] would be GEP -> ... -> GEP -> load
+  //
+  // In TranslateLLVMToStd, we convert it to additions and multiplications.
+  //
+  // Also, we flatten the memory into 1D. Since it is very hard to reliably
+  // reverse engineer the order between the accesses.
+  //
+  // An example of flattening a multi-dimension array in a row-major order.
+  // Given an array: my_array[A][B][C][D];
+  // we access it as my_array[i][j][k][l];
+  // The flattened index is computed as:
+  //
+  // (B * C * D) * i + (C * D) * j + (D) * k + l
 
-  auto memrefType = baseAddress.getType().dyn_cast<MemRefType>();
+  // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
+  llvm::Type *baseElementType = gepInst->getSourceElementType();
 
-  if (!memrefType)
-    llvm_unreachable("GEP should take memref as reference");
-
-  for (auto &indexUse : gepInst->indices()) {
-    llvm::Value *indexValue = indexUse;
-    mlir::Value mlirIndexValue = valueMap[indexValue];
-    // NOTE: memref::LoadOp and memref::StoreOp expect their indices to be of
-    // IndexType. Therefore, we cast the i32/i64 indices to IndexType. This
-    // pattern will later be folded in the bitwidth optimization pass.
-    auto idxCastOp = builder.create<arith::IndexCastOp>(
-        UnknownLoc::get(ctx), builder.getIndexType(), mlirIndexValue);
-    indexOperands.push_back(idxCastOp);
+  // Get index calculation:
+  SmallVector<int64_t> multipliers;
+  while (baseElementType->isArrayTy()) {
+    multipliers.push_back(baseElementType->getArrayNumElements());
+    baseElementType = baseElementType->getArrayElementType();
   }
 
+  SmallVector<llvm::Value *> gepIndices(gepInst->indices());
+
+  mlir::Value baseAddress;
+  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
+    baseAddress = this->getInstToMemRefMap[gepInst->getPointerOperand()];
+  } else {
+    baseAddress = valueMap[gepInst->getPointerOperand()];
+  }
+  this->getInstToMemRefMap[gepInst] = baseAddress;
+
+#if 0
+  // NOTE: this is no longer true as of 21.11.2025. We will not have an extra leading zero.
   if (auto *defInst = gepInst->getPointerOperand();
       isa_and_nonnull<AllocaInst>(defInst) ||
       isa_and_nonnull<GlobalVariable>(defInst)) {
@@ -547,39 +568,111 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
     // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
     //
     // Therefore, we drop the first element in this case
-    indexOperands.erase(indexOperands.begin());
+    gepIndices.erase(gepIndices.begin());
   }
+#endif
 
-  // NOTE: GEPOp has the following syntax (some details omitted):
-  // GEPOp %basePtr, %firstDim, %secondDim, %thirdDim, ...
-  // When you iterate through the indices, it also returns indices from left
-  // to right. However, the following two syntaxes are equivalent in LLVM:
-  // - (1) GEPop %basePtr, %firstDim, 0, 0
-  // - (2) GEPop %basePtr, %firstDim
-  // Notice that, in the second example, the trailing constant 0s are omitted.
-  // Source:
-  // https://llvm.org/docs/GetElementPtr.html#why-do-gep-x-1-0-0-and-gep-x-1-alias
+  // A list of value to be accumulated
   //
-  // However, memref::LoadOp and memref::StoreOp must have their indices
-  // match the memref. So here we need to fill in the constant zeros.
-  int remainingConstZeros = memrefType.getShape().size() - indexOperands.size();
+  // For the example above:
+  //
+  // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
 
-  if (remainingConstZeros < 0) {
-    llvm_unreachable(
-        "GEP should only omit indices, but shouldn't have more indices than "
-        "the original memref type extracted from the function argument!");
+  SmallVector<mlir::Value> multipliedIndices;
+
+  for (size_t i = 0; i < gepIndices.size(); ++i) {
+    mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
+
+    // Calculate the partitial index
+    int64_t coeff = 1;
+    for (size_t j = i; j < multipliers.size(); j++)
+      coeff *= multipliers[j];
+
+    if (coeff == 1) {
+      if (auto *constVal = dyn_cast<Constant>(gepIndices[i])) {
+        // Special case: when the GEP index is a constant number
+        //
+        // Here we need to handle tricky examples like this:
+        // %arrayidx2 = getelementptr inbounds nuw i8, ptr %2, i64 4
+        //
+        // Here we are using GEP to advance 4 * i8 = 32 bits. If the
+        // element of the original array was 32-bit wide, then here we need to
+        // increment 1 step (instead of 4).
+        auto memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+        assert(memrefType);
+
+        // This is the size of the actual element (i.e., for 32 in the example
+        // above).
+        unsigned actualBaseElementWidth = memrefType.getElementTypeBitWidth();
+
+        // This is the size that the current GEP assumes (i.e., for i8 in the
+        // example above).
+        unsigned currBaseElementBitWidth =
+            baseElementType->getScalarSizeInBits();
+
+        // This the the number of `currBaseElementBitWidth` that we need to skip
+        // (i.e., 4 in the example above).
+        int64_t constInt = *constVal->getUniqueInteger().getRawData();
+
+        assert((currBaseElementBitWidth * constInt) % actualBaseElementWidth ==
+                   0 &&
+               "Incorrect alignment!");
+
+        unsigned actualAdvanceValue =
+            (currBaseElementBitWidth * constInt) / actualBaseElementWidth;
+
+        auto byteAlignedConstantValue = arith::ConstantOp::create(
+            builder, UnknownLoc::get(ctx),
+            builder.getIntegerAttr(builder.getI64Type(), actualAdvanceValue));
+        multipliedIndices.push_back(byteAlignedConstantValue);
+      } else {
+        multipliedIndices.push_back(mlirIndexValue);
+      }
+
+    } else if (llvm::isPowerOf2_64(coeff)) {
+      // Special case: the array dimension is a power of two.
+      // Here we can apply the optimization: multiply by power of 2 is the same
+      // as shifting
+      auto shiftValue = arith::ConstantOp::create(
+          builder, UnknownLoc::get(ctx),
+          builder.getIntegerAttr(builder.getI64Type(), llvm::Log2_64(coeff)));
+      auto idx = arith::ShLIOp::create(builder, UnknownLoc::get(ctx),
+                                       mlirIndexValue, shiftValue);
+      multipliedIndices.push_back(idx);
+    } else {
+      // Regular case: calculate the (paritial) flattened index
+      auto multipliedValue = arith::ConstantOp::create(
+          builder, UnknownLoc::get(ctx),
+          builder.getIntegerAttr(builder.getI64Type(), coeff));
+      auto idx = arith::MulIOp::create(builder, UnknownLoc::get(ctx),
+                                       mlirIndexValue, multipliedValue);
+      multipliedIndices.push_back(idx);
+    }
   }
 
-  for (int i = 0; i < remainingConstZeros; i++) {
-    auto constZeroOp = builder.create<arith::ConstantOp>(
-        UnknownLoc::get(ctx), builder.getI64IntegerAttr(0));
-    auto idxCastOp = builder.create<arith::IndexCastOp>(
-        UnknownLoc::get(ctx), builder.getIndexType(), constZeroOp);
-    indexOperands.push_back(idxCastOp);
+  // If we do not start from a memref type, then it must be from a chain of
+  // GEPs. Here we accumulate our result onto that.
+  if (auto pointerOperand = valueMap[gepInst->getPointerOperand()];
+      pointerOperand && !isa<MemRefType>(pointerOperand.getType())) {
+    multipliedIndices.push_back(valueMap[gepInst->getPointerOperand()]);
   }
 
-  this->gepInstToMemRefAndIndicesMap[gepInst] =
-      MemRefAndIndices(baseAddress, indexOperands);
+  // [START accumulate the array index]
+  // Build balanced tree
+  std::function<mlir::Value(ArrayRef<mlir::Value>)> build =
+      [&](ArrayRef<mlir::Value> vals) -> mlir::Value {
+    assert(vals.size() > 0);
+    if (vals.size() == 1)
+      return vals[0];
+    auto mid = vals.size() / 2;
+    auto lhs = build(vals.take_front(mid));
+    auto rhs = build(vals.drop_front(mid));
+    return arith::AddIOp::create(builder, UnknownLoc::get(ctx), lhs, rhs);
+  };
+  mlir::Value accumulatedArrayIndex = build(multipliedIndices);
+  // [END accumulate the array index]
+
+  valueMap[gepInst] = accumulatedArrayIndex;
 }
 
 void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
@@ -589,8 +682,9 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
-    builder.create<cf::BranchOp>(
+    cf::BranchOp::create(
         // clang-format off
+        builder,
         loc,
         blockMap[nextLLVMBB],
         getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB)
@@ -608,8 +702,9 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
     mlir::Value condition = valueMap[inst->getCondition()];
-    builder.create<cf::CondBranchOp>(
+    cf::CondBranchOp::create(
         // clang-format off
+        builder,
         loc,
         condition,
         blockMap[trueDestBB],
@@ -622,91 +717,76 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
 }
 
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
-  Location loc = UnknownLoc::get(ctx);
   auto *instAddr = loadInst->getPointerOperand();
   mlir::Value memref;
-  SmallVector<mlir::Value> indices;
-  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
-    // Logic: In LLVM IR, load/store operations take the pointer computed from
-    // GEP ops, whereas in memref, load operations takes indices (of index
-    // type). This function uses the index operand collected when processing
-    // GEPs as operands of LOAD/STOREs.
-    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    memref = memrefAndIndices.first;
-    indices = memrefAndIndices.second;
-  } else {
-    if (isa<GetElementPtrInst>(instAddr))
-      llvm_unreachable(
-          "Converting a load but the producer hasn't been converted yet!");
-    // NOTE: This condition handles a special case where a load only has
-    // constant indices, e.g., tmp = mat[0][0].
-    memref = this->valueMap[instAddr];
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
-    int constZerosToAdd = memrefType.getShape().size();
-    for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = this->builder.create<arith::ConstantOp>(
-          loc, this->builder.getIndexAttr(0));
-      indices.push_back(constZeroOp);
-    }
-  }
+  mlir::Value index = valueMap[loadInst->getPointerOperand()];
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
-  auto newOp = builder.create<memref::LoadOp>(loc, resType, memref, indices);
+
+  mlir::Value indexOp;
+
+  if (getInstToMemRefMap.count(instAddr)) {
+    memref = getInstToMemRefMap[instAddr];
+    // LoadOp needs the index operand to be of index type
+    indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                         builder.getIndexType(), index);
+  } else {
+    assert(isa<MemRefType>(index.getType()));
+    memref = index;
+    indexOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                        builder.getIndexAttr(0));
+  }
+
+  auto newOp = memref::LoadOp::create(this->builder, UnknownLoc::get(ctx),
+                                      resType, memref,
+                                      /*indices = */ {indexOp});
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
-  Location loc = UnknownLoc::get(ctx);
   auto *instAddr = storeInst->getPointerOperand();
-
   mlir::Value memref;
-  SmallVector<mlir::Value> indices;
+  mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  if (this->gepInstToMemRefAndIndicesMap.count(instAddr)) {
-    // Logic: In LLVM IR, load/store operations take the pointer computed from
-    // GEP ops, whereas in memref, load operations takes indices (of index
-    // type). This function uses the index operand collected when processing
-    // GEPs as operands of LOAD/STOREs.
-    auto memrefAndIndices = this->gepInstToMemRefAndIndicesMap[instAddr];
-    memref = memrefAndIndices.first;
-    indices = memrefAndIndices.second;
+  mlir::Value indexOp;
+
+  if (getInstToMemRefMap.count(instAddr)) {
+    memref = getInstToMemRefMap[instAddr];
+    // LoadOp needs the index operand to be of index type
+    indexOp = arith::IndexCastOp::create(builder, UnknownLoc::get(ctx),
+                                         builder.getIndexType(), index);
   } else {
-    // NOTE: This condition handles a special case where a load only has
-    // constant indices, e.g., tmp = mat[0][0].
-    if (isa<GetElementPtrInst>(instAddr))
-      llvm_unreachable(
-          "Converting a load but the producer hasn't been converted yet!");
-    memref = this->valueMap[instAddr];
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
-
-    int constZerosToAdd = memrefType.getShape().size();
-    for (int i = 0; i < constZerosToAdd; i++) {
-      auto constZeroOp = this->builder.create<arith::ConstantOp>(
-          loc, this->builder.getIndexAttr(0));
-      indices.push_back(constZeroOp);
-    }
+    assert(isa<MemRefType>(index.getType()));
+    memref = index;
+    indexOp = arith::ConstantOp::create(builder, UnknownLoc::get(ctx),
+                                        builder.getIndexAttr(0));
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
-  auto newOp =
-      builder.create<memref::StoreOp>(loc, storeValue, memref, indices);
+  auto newOp = memref::StoreOp::create(this->builder, UnknownLoc::get(ctx),
+                                       storeValue, memref,
+                                       /*indices = */ {indexOp});
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   Location loc = UnknownLoc::get(ctx);
 
-  SmallVector<int64_t> shape;
+  // flatten the MD array into 1D
+  int64_t arraySize = 1;
   llvm::Type *baseElementType = allocaInst->getAllocatedType();
 
   while (baseElementType->isArrayTy()) {
-    shape.push_back(baseElementType->getArrayNumElements());
+    arraySize *= baseElementType->getArrayNumElements();
     baseElementType = baseElementType->getArrayElementType();
   }
 
-  auto memrefType = MemRefType::get(shape, getMLIRType(baseElementType, ctx));
+  assert(arraySize > 0 && "The size of the array must be positive!");
 
-  auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
+  auto memrefType = MemRefType::get(/*shape =*/{arraySize},
+                                    getMLIRType(baseElementType, ctx));
+
+  auto allocaOp = memref::AllocaOp::create(builder, loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
 }
 

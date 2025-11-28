@@ -125,7 +125,7 @@ HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     auto namedArguments =
         llvm::zip_equal(instFuncOp.getArgNames(), instOp.getOperandTypes());
     for (auto [argNameAttr, argType] : namedArguments) {
-      StringRef argName = argNameAttr.cast<StringAttr>().strref();
+      StringRef argName = cast<StringAttr>(argNameAttr).strref();
       resTypes.push_back(argType);
       resNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }
@@ -135,7 +135,7 @@ HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     auto namedResults =
         llvm::zip_equal(instFuncOp.getResNames(), instOp.getResultTypes());
     for (auto [argNameAttr, resType] : namedResults) {
-      StringRef argName = argNameAttr.cast<StringAttr>().strref();
+      StringRef argName = cast<StringAttr>(argNameAttr).strref();
       argTypes.push_back(resType);
       argNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }

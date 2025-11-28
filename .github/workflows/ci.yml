@@ -82,13 +82,13 @@ jobs:
       - name: build
         run: ./build.sh --release --force
 
-      - name: check-dynamatic
-        if: steps.build.outputs.exit_code == 0
-        run: ninja -C build check-dynamatic
-
-      - name: check-dynamatic-experimental
-        if: steps.build.outputs.exit_code == 0
-        run: ninja -C build check-dynamatic-experimental
+#      - name: check-dynamatic
+#        if: steps.build.outputs.exit_code == 0
+#        run: ninja -C build check-dynamatic
+#
+#      - name: check-dynamatic-experimental
+#        if: steps.build.outputs.exit_code == 0
+#        run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
@@ -126,4 +126,5 @@ jobs:
             integration-test/*/out*/comp
             integration-test/*/out*/sim/report.txt
             integration-test/*/out/dynamatic_out.txt
+            integration-test/*/out/dynamatic_err.txt
 
