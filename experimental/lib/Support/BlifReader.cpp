@@ -28,6 +28,8 @@ void Node::configureIONode(const std::string &type) {
     isInput = true;
   else if (type == ".outputs")
     isOutput = true;
+  else
+    llvm::errs() << "Unknown IO node type: " << type << "\n";
 }
 
 void Node::configureConstantNode() {
@@ -70,9 +72,11 @@ void LogicNetwork::addLatch(const std::string &inputName,
   latches.emplace_back(regInputNode, regOutputNode);
 }
 
-void LogicNetwork::addIONode(const std::string &name, const std::string &type) {
+Node *LogicNetwork::addIONode(const std::string &name,
+                              const std::string &type) {
   Node *node = createNode(name);
   node->configureIONode(type);
+  return node;
 }
 
 void LogicNetwork::addLogicGate(const std::vector<std::string> &nodes,
@@ -269,6 +273,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
     else if ((type == ".inputs") || (type == ".outputs")) {
       std::string nodeName;
       while (iss >> nodeName) {
+        if (nodeName == "rst")
+          continue; // Skip reset signal
         data->addIONode(nodeName, type);
       }
     }
