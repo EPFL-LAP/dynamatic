@@ -49,6 +49,7 @@ int runIntegrationTest(IntegrationTestData &config) {
   scriptFile << "compile"
              << " --buffer-algorithm " << config.bufferAlgorithm
              << (config.useSharing ? " --sharing" : "")
+             << (config.useRigidification ? " --rigidification" : "")
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 
