@@ -241,6 +241,9 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   )
 
   FetchContent_MakeAvailable(dot2smv)
+
+  # Inform our compiler infrastructure that NuSMV is available.
+  add_compile_definitions(DYNAMATIC_ENABLE_LEQ_BINARIES)
 endif()
 
 # We use GoogleTest for regression tests
