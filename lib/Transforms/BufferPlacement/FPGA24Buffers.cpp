@@ -16,6 +16,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/TransitionCFDFC.h"
 #include "mlir/IR/Value.h"
 
 using namespace llvm::sys;
@@ -157,19 +158,21 @@ void FPGA24Buffers::addCustomChannelConstraints(Value channel) {
 
 // TODO: Same setup as FPGA20Buffers::setup, this is temporary.
 void FPGA24Buffers::setup() {
-  llvm::errs() << "Hi from the new fpga24 algorithm :3\n";
-
-  // Printing all the CFC's
-  llvm::errs() << "# of CFC's:" << funcInfo.cfdfcs.size() << "\n";
-  int currentCfc = 0;
-  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-    llvm::errs() << "CFC " << currentCfc << ":\n";
-    llvm::errs() << "# of units in CFC: " << cfdfc->units.size() << "\n";
-    for (auto unit : cfdfc->units) {
-      llvm::errs() << "Unit: " << unit->getName() << "\n";
-    }
-    currentCfc++;
+  for (auto &transition : funcInfo.archs) {
+    llvm::errs() << transition.srcBB << "->" << transition.dstBB << "\n"; 
   }
+
+    // --- START INSERTION ---
+  // Convert SmallVector to std::vector
+  std::vector<experimental::ArchBB> sequence(funcInfo.archs.begin(), funcInfo.archs.end());
+  
+  // Create the transition graph
+  TransitionCFDFC transGraph(funcInfo.funcOp, sequence);
+  
+  // Run DFS and dump graph
+  transGraph.runDFS();
+  transGraph.dumpGraphViz("transition_cfdfc.dot");
+  // --- END INSERTION ---
 
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
