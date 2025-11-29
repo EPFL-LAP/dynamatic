@@ -1,7 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-entity mulf is
+entity mulf_arch_32_2_034000 is
   generic (
     DATA_TYPE : integer
   );
@@ -22,7 +22,7 @@ entity mulf is
   );
 end entity;
 
-architecture arch_32_2_034000 of mulf is
+architecture arch_32_2_034000 of mulf_arch_32_2_034000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -132,7 +132,32 @@ architecture arch_32_2_034000 of mulf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_2_783000 of mulf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity mulf_arch_32_2_783000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_2_783000 of mulf_arch_32_2_783000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -220,7 +245,33 @@ architecture arch_32_2_783000 of mulf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_2_875333 of mulf is
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity mulf_arch_32_2_875333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_2_875333 of mulf_arch_32_2_875333 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -306,7 +357,32 @@ architecture arch_32_2_875333 of mulf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_2_046000 of mulf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity mulf_arch_64_2_046000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_2_046000 of mulf_arch_64_2_046000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -446,7 +522,33 @@ architecture arch_64_2_046000 of mulf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_2_758000 of mulf is
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity mulf_arch_64_2_758000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_2_758000 of mulf_arch_64_2_758000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -536,7 +638,32 @@ architecture arch_64_2_758000 of mulf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_4_242333 of mulf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity mulf_arch_64_4_242333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_4_242333 of mulf_arch_64_4_242333 is
     
     
     -- legacy comment : main_component went here in component based version

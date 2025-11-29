@@ -1,7 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-entity divf is
+entity divf_arch_64_4_345000 is
   generic (
     DATA_TYPE : integer
   );
@@ -22,7 +22,7 @@ entity divf is
   );
 end entity;
 
-architecture arch_64_4_345000 of divf is
+architecture arch_64_4_345000 of divf_arch_64_4_345000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -169,7 +169,32 @@ architecture arch_64_4_345000 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_4_398000 of divf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_64_4_398000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_4_398000 of divf_arch_64_4_398000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -289,7 +314,33 @@ architecture arch_64_4_398000 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_6_859333 of divf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_64_6_859333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+
+architecture arch_64_6_859333 of divf_arch_64_6_859333 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -393,7 +444,32 @@ architecture arch_64_6_859333 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_16_008000 of divf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_64_16_008000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_16_008000 of divf_arch_64_16_008000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -483,7 +559,32 @@ architecture arch_64_16_008000 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_3_812000 of divf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_32_3_812000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_3_812000 of divf_arch_32_3_812000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -582,7 +683,34 @@ architecture arch_32_3_812000 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_6_629333 of divf is
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_32_6_629333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+
+architecture arch_32_6_629333 of divf_arch_32_6_629333 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -675,7 +803,32 @@ architecture arch_32_6_629333 of divf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_14_152000 of divf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity divf_arch_32_14_152000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_14_152000 of divf_arch_32_14_152000 is
     
     
     -- legacy comment : main_component went here in component based version

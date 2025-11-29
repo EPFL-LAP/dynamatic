@@ -1,7 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-entity addf is
+entity addf_arch_64_2_705000 is
   generic (
     DATA_TYPE : integer
   );
@@ -22,7 +22,7 @@ entity addf is
   );
 end entity;
 
-architecture arch_64_2_705000 of addf is
+architecture arch_64_2_705000 of addf_arch_64_2_705000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -118,7 +118,34 @@ architecture arch_64_2_705000 of addf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_5_091333 of addf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity addf_arch_64_5_091333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+
+
+architecture arch_64_5_091333 of addf_arch_64_5_091333 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -209,7 +236,33 @@ architecture arch_64_5_091333 of addf is
             R     => ip_result
         );
 end architecture;
-architecture arch_64_9_068000 of addf is
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity addf_arch_64_9_068000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_64_9_068000 of addf_arch_64_9_068000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -295,7 +348,32 @@ architecture arch_64_9_068000 of addf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_2_798000 of addf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity addf_arch_32_2_798000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_2_798000 of addf_arch_32_2_798000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -415,7 +493,33 @@ architecture arch_32_2_798000 of addf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_2_922000 of addf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity addf_arch_32_2_922000 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+
+architecture arch_32_2_922000 of addf_arch_32_2_922000 is
     
     
     -- legacy comment : main_component went here in component based version
@@ -509,7 +613,32 @@ architecture arch_32_2_922000 of addf is
             R     => ip_result
         );
 end architecture;
-architecture arch_32_3_649333 of addf is
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity addf_arch_32_3_649333 is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch_32_3_649333 of addf_arch_32_3_649333 is
     
     
     -- legacy comment : main_component went here in component based version
