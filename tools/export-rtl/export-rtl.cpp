@@ -1026,6 +1026,7 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
     HDL hdl(dynamatic::HDL::VERILOG);
     std::string moduleName;
     SmallVector<KeyValuePair> genericParams;
+    std::string archName = "arch";
 
     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
         .Case<hw::HWModuleOp>(
@@ -1035,11 +1036,15 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           genericParams = match.getGenericParameterValues().takeVector();
+          archName = match.getConcreteArchName();
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
-    os << moduleName << " ";
+    if (archName != "" && archName != "arch")
+      os << archName << " ";
+    else
+      os << moduleName << " ";
 
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
