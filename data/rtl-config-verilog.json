@@ -2,11 +2,29 @@
   {
     "name": "handshake.addf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INTERNAL_DELAY", "type": "string", "generic": false},
+      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
     ],
-    "generic": "$DYNAMATIC/data/verilog/arith/addf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "generic": "$DYNAMATIC/data/verilog/arith/flopoco/addf.vhd",
+    "arch-name" : "addf_arch_$DATA_TYPE_$INTERNAL_DELAY",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/vivado/addf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "addf_vivado_support"],
     "hdl": "verilog"
+  },
+  {
+    "name": "addf_vivado_support",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/support/addf_vivado_support.vhd",
+    "module-name": "addf_vivado_support"
   },
   {
     "name": "handshake.addi",
@@ -36,11 +54,34 @@
         "data-lb": 1,
         "extra-eq": 0,
         "generic": true
-      }
+      },
+      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/flopoco/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
+    "dependencies": ["join_type", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.cmpf",
+    "parameters": [
+      { "name": "PREDICATE", "type": "string" },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0,
+        "generic": true
+      },
+      { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join_type"],
+    "dependencies": ["join_type", "cmpf_vivado_support"],
     "hdl": "verilog"
+  },
+  {
+    "name": "cmpf_vivado_support",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/support/cmpf_vivado_support.vhd",    
+    "module-name": "cmpf_vivado_support"
   },
   {
     "name": "handshake.cmpi",
@@ -70,11 +111,29 @@
   {
     "name": "handshake.divf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INTERNAL_DELAY", "type": "string", "generic": false},
+      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
     ],
-    "generic": "$DYNAMATIC/data/verilog/arith/divf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "generic": "$DYNAMATIC/data/verilog/arith/flopoco/divf.vhd",
+    "arch-name" : "divf_arch_$DATA_TYPE_$INTERNAL_DELAY",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.divf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/vivado/divf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "divf_vivado_support"],
     "hdl": "verilog"
+  },
+  {
+    "name": "divf_vivado_support",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/support/divf_vivado_support.vhd",
+    "module-name": "divf_vivado_support"
   },
   {
     "name": "handshake.divsi",
@@ -141,11 +200,29 @@
   {
     "name": "handshake.mulf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INTERNAL_DELAY", "type": "string", "generic": false},
+      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
     ],
-    "generic": "$DYNAMATIC/data/verilog/arith/mulf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "generic": "$DYNAMATIC/data/verilog/arith/flopoco/mulf.vhd",
+    "arch-name" : "mulf_arch_$DATA_TYPE_$INTERNAL_DELAY",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.mulf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/vivado/mulf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "mulf_vivado_support"],
     "hdl": "verilog"
+  },
+  {
+    "name": "mulf_vivado_support",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/support/mulf_vivado_support.vhd",
+    "module-name": "mulf_vivado_support"
   },
   {
     "name": "handshake.muli",
@@ -212,11 +289,27 @@
   {
     "name": "handshake.subf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "flopoco", "generic": false}
     ],
-    "generic": "$DYNAMATIC/data/verilog/arith/subf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "generic": "$DYNAMATIC/data/verilog/arith/flopoco/subf.vhd",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.subf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/vivado/subf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb", "subf_vivado_support"],
     "hdl": "verilog"
+  },
+  {
+    "name": "subf_vivado_support",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/support/subf_vivado_support.vhd",
+    "module-name": "subf_vivado_support"
   },
   {
     "name": "handshake.subi",
@@ -237,12 +330,65 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.truncf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/truncf.v",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.xori",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/xori.v",
     "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.sitofp",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/sitofp.v",
+    "dependencies": ["delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.uitofp",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/uitofp.v",
+    "dependencies": ["delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.fptosi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/fptosi.v",
+    "dependencies": ["delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.absf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/absf.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.extf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/extf.v",
     "hdl": "verilog"
   },
   {
@@ -802,8 +948,7 @@
     "hdl": "verilog"
   },
   {
-    "generic": "$DYNAMATIC/data/verilog/support/flopoco_ip_cores.v",
-    "hdl": "verilog"
+    "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/mc_support.v",
