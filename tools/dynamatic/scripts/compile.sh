@@ -256,7 +256,12 @@ fi
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+	     "Applied transformations to handshake"
+
+export_dot "$F_HANDSHAKE_TRANSFORMED" "${KERNEL_NAME}_nobuf"
+
+#cp "$SRC_DIR/handshake_transformed_annos.mlir" "$F_HANDSHAKE_TRANSFORMED"
+#cp "$SRC_DIR/handshake_transformed_annos_correct.mlir" "$F_HANDSHAKE_TRANSFORMED"
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
@@ -265,7 +270,6 @@ if [[ $USE_SHARING -ne 0 ]]; then
   SHARING_PASS="--credit-based-sharing=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
   echo_info "Set to apply credit-based sharing after buffer placement."
 fi
-
 
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
