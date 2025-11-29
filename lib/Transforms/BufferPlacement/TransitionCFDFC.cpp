@@ -42,7 +42,7 @@ TransitionCFDFC::TransitionCFDFC(handshake::FuncOp funcOp,
   // destination of each arch in the sequence.
   std::vector<unsigned> archSrcStep(sequence.size());
   std::vector<unsigned> archDstStep(sequence.size());
-  std::map<unsigned, unsigned> stepToBB;
+  // REMOVED LOCAL DECLARATION: std::map<unsigned, unsigned> stepToBB;
 
   unsigned currentStep = 0;
   // Initialize with the first arch
@@ -190,11 +190,28 @@ void TransitionCFDFC::dumpGraphViz(StringRef filename) {
 
   file << "digraph TransitionCFDFC {\n";
   file << "  rankdir=TB;\n";
+  file << "  compound=true;\n"; // Enable cluster-to-cluster edges if needed
 
-  // Declare nodes
+  // Group nodes by step to create clusters
+  std::map<unsigned, std::vector<const TransitionNode *>> nodesByStep;
   for (const auto &node : nodes) {
-    file << "  " << node.getDotId() << " [label=\"" << node.getLabel()
-         << "\"];\n";
+    nodesByStep[node.step].push_back(&node);
+  }
+
+  // Create a subgraph for each step
+  for (const auto &[step, stepNodes] : nodesByStep) {
+    unsigned bbID = stepToBB.count(step) ? stepToBB.at(step) : 999;
+
+    file << "  subgraph cluster_" << step << " {\n";
+    file << "    label=\"Step " << step << " (BB " << bbID << ")\";\n";
+    file << "    style=dashed;\n";
+    file << "    color=black;\n";
+
+    for (const auto *node : stepNodes) {
+      file << "    " << node->getDotId() << " [label=\"" << node->getLabel()
+           << "\"];\n";
+    }
+    file << "  }\n";
   }
 
   // Edges
@@ -210,5 +227,5 @@ void TransitionCFDFC::dumpGraphViz(StringRef filename) {
   file.close();
 
   llvm::errs() << "Dumped graph to " << pathStr << "\n";
-  llvm::errs().flush(); // FORCE FLUSH
+  llvm::errs().flush();
 }
