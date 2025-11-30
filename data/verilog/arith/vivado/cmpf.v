@@ -42,13 +42,13 @@ module ENTITY_NAME #(
   );
 
   localparam [7:0]
-    AP_OEQ = 8'b00000001,
-    AP_OGT = 8'b00000010,
-    AP_OGE = 8'b00000011,
-    AP_OLT = 8'b00000100,
-    AP_OLE = 8'b00000101,
-    AP_ONE = 8'b00000110,
-    AP_UNO = 8'b00001000;
+    AP_OEQ = 8'b00010100,
+    AP_OGT = 8'b00100100,
+    AP_OGE = 8'b00110100,
+    AP_OLT = 8'b00001100,
+    AP_OLE = 8'b00011100,
+    AP_ONE = 8'b00101100,
+    AP_UNO = 8'b00000100;
 
 
   // Compare the two strings
@@ -62,25 +62,25 @@ module ENTITY_NAME #(
 
   always @(*) begin
     if(cmp_predicate == oeq_type) begin
-      opcode = AP_OEQ; // 5'b00001
+      opcode = AP_OEQ; // 8'b00010100
     end
     else if (cmp_predicate == ogt_type) begin
-      opcode = AP_OGT; // 5'b00010
+      opcode = AP_OGT; // 8'b00100100
     end
     else if (cmp_predicate == oge_type) begin
-      opcode = AP_OGE; // 5'b00011
+      opcode = AP_OGE; // 8'b00110100
     end
     else if (cmp_predicate == olt_type) begin
-      opcode = AP_OLT; // 5'b00100
+      opcode = AP_OLT; // 8'b00001100
     end
     else if (cmp_predicate == ole_type) begin
-      opcode = AP_OLE; // 5'b00101
+      opcode = AP_OLE; // 8'b00011100
     end
     else if (cmp_predicate == one_type) begin
-      opcode = AP_ONE; // 5'b00110
+      opcode = AP_ONE; // 8'b00101100
     end
     else if (cmp_predicate == uno_type) begin
-      opcode = AP_UNO; // 5'b01000
+      opcode = AP_UNO; // 8'b00000100
     end else begin
       $fatal("Unsupported comparator predicate"); 
     end

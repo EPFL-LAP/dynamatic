@@ -48,7 +48,7 @@ module divf #(
 
   divf_vitis_hls_single_precision_lat_28 divf_vivado_support_u (
     .aclk                 ( clk ),
-    .aclken               ( oehb_ready ),
+    .aclken               ( 1'b1 ),
     .s_axis_a_tvalid      ( join_valid ),
     .s_axis_a_tdata       ( lhs ),
     .s_axis_b_tvalid      ( join_valid ),

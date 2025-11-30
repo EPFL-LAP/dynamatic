@@ -42,17 +42,17 @@ module mulf #(
   oehb_dataless  oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .ins_valid(buff_valid),
+    .ins_valid(join_valid),
     .ins_ready(oehb_ready),
-    .outs_valid(result_valid),
+    .outs_valid(buff_valid),
     .outs_ready(result_ready)
   );
 
 
   //------------------------Instantiation------------------
-  fmul_32ns_32ns_32_8_max_dsp_1_ip fmul_32ns_32ns_32_8_max_dsp_1_ip_u (
+  mulf_vitis_hls_single_precision_lat_4 mulf_vitis_hls_single_precision_lat_4_u (
     .aclk                 ( clk ),
-    .aclken               ( oehb_ready ),
+    .aclken               ( 1'b1 ),
     .s_axis_a_tvalid      ( join_valid ),
     .s_axis_a_tdata       ( lhs ),
     .s_axis_b_tvalid      ( join_valid ),

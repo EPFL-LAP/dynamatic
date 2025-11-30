@@ -49,7 +49,7 @@ module addf #(
 
   fadd_32ns_32ns_32_13_full_dsp_1_ip fadd_32ns_32ns_32_13_full_dsp_1_ip_u (
     .aclk                 ( clk ),
-    .aclken               ( oehb_ready ),
+    .aclken               ( 1'b1 ),
     .s_axis_a_tvalid      ( join_valid ),
     .s_axis_a_tdata       ( lhs ),
     .s_axis_b_tvalid      ( join_valid ),
