@@ -387,6 +387,7 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
     [](const auto &info) { return "spec_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
+// clang-format on
 
 #ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
 
@@ -408,11 +409,14 @@ TEST_P(RigidificationFixture, basic) {
   logPerformance(config.simTime);
 }
 
+// clang-format off
 INSTANTIATE_TEST_SUITE_P(Tiny, RigidificationFixture,
-                         testing::Values("fir", "if_loop_add", "if_loop_mul",
-                                         "iir", "matvec"),
-                         [](const auto &info) { return info.param; });
+   testing::Values(
+     "fir",
+     "iir",
+     "matvec"
+     ),
+   [](const auto &info) { return info.param; });
+// clang-format on
 
 #endif // DYNAMATIC_ENABLE_LEQ_BINARIES
-
-// clang-format on

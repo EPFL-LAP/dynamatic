@@ -20,6 +20,7 @@ F_NUXMV_PROP="$FORMAL_DIR/property.rpt"
 F_NUXMV_CMD="$FORMAL_DIR/prove.cmd"
 
 NUSMV_BINARY="$DYNAMATIC_DIR/ext/NuSMV"
+NUXMV_BINARY="$DYNAMATIC_DIR/ext/nuXmv/bin/nuXmv"
 
 FORMAL_TESTBENCH_GEN="$DYNAMATIC_DIR/build/bin/rigidification-testbench"
 
@@ -83,7 +84,7 @@ exit_on_fail "Created SMV script" \
 
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
-$NUSMV_BINARY -source $F_NUXMV_CMD 
+$NUXMV_BINARY -source $F_NUXMV_CMD 
 exit_on_fail "Performed model checking to verify the formal property" \
   "Failed to check formal properties"
 
