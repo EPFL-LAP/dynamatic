@@ -1040,15 +1040,16 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
-    // HACK: Verilog does not have the concept of architectures. Therefore, we
-    // use this parameter to specify an alternative module name when generating
-    // Verilog code, particularly when the desired module name differs from the
-    // concrete module name.
     raw_indented_ostream &os = data.os;
-    if (archName != "" && archName != "arch")
+    if (archName != "" && archName != "arch") {
+      // HACK: Verilog does not have the concept of architectures. Therefore, we
+      // use this parameter to specify an alternative module name when
+      // generating Verilog code, particularly when the desired module name
+      // differs from the concrete module name.
       os << archName << " ";
-    else
+    } else {
       os << moduleName << " ";
+    }
 
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
