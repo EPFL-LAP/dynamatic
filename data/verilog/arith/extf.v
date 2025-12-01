@@ -24,12 +24,12 @@ module single_to_double (
     assign sign_d = sign_s;
 
     assign exp_d  =
-        (exp_s == 8'b0) ? 11'b0 :               // zero / subnormal → zero / subnormal
+        (exp_s == 8'b0) ? 11'b0 :               // zero / subnormal to zero / subnormal
         (exp_s == 8'hFF) ? 11'h7FF :            // Inf/NaN
                            (exp_s + 11'd896);   // normal conversion
 
     // Convert fraction:
-    // 23-bit → 52-bit by shifting left
+    // 23-bit to 52-bit by shifting left
     assign frac_d =
         (exp_s == 8'h00) ? {frac_s, 29'b0} :    // Subnormal: shift differently
                            {frac_s, 29'b0};     // Normal case

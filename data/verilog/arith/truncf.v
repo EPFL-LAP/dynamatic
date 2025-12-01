@@ -25,7 +25,7 @@ module double_to_single (
                    (exp_d == 11'h0)   ? 8'h00 : // Zero/subnormal
                                         (exp_d - 11'd1023 + 8'd127);
 
-    // Truncate fraction: 52 → 23 bits
+    // Truncate fraction: 52 to 23 bits
     assign frac_s = frac_d[51:29];
 
     assign outs = {sign_s, exp_s, frac_s};
