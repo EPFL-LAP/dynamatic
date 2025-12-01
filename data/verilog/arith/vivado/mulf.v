@@ -21,6 +21,7 @@ module mulf #(
 
   wire join_valid;
   wire buff_valid, oehb_ready;
+  wire [ DATA_TYPE - 1 :0] tmp_result;
 
   // Instantiate the join node
   join_type #(
@@ -39,12 +40,16 @@ module mulf #(
     end
   end
 
-  oehb_dataless  oehb_lhs (
+  oehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .ins_valid(join_valid),
+    .ins(tmp_result),
+    .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
-    .outs_valid(buff_valid),
+    .outs(result),
+    .outs_valid(result_valid),
     .outs_ready(result_ready)
   );
 
@@ -52,13 +57,13 @@ module mulf #(
   //------------------------Instantiation------------------
   mulf_vitis_hls_single_precision_lat_4 mulf_vitis_hls_single_precision_lat_4_u (
     .aclk                 ( clk ),
-    .aclken               ( 1'b1 ),
+    .aclken               ( oehb_ready ),
     .s_axis_a_tvalid      ( join_valid ),
     .s_axis_a_tdata       ( lhs ),
     .s_axis_b_tvalid      ( join_valid ),
     .s_axis_b_tdata       ( rhs ),
-    .m_axis_result_tvalid ( result_valid ),
-    .m_axis_result_tdata  ( result )
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( tmp_result )
 );
 
 endmodule

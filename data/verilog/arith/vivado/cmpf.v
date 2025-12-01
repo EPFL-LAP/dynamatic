@@ -23,9 +23,8 @@ module ENTITY_NAME #(
 
   wire constant_one = 1'b1;
   wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
-
+  wire [ 7 :0] ip_result;
   reg [7:0] opcode;
-  wire ip_unordered, ip_result;
   wire join_valid, oehb_ready, buff_valid;
   wire [7:0] result_tmp;
 
@@ -86,12 +85,16 @@ module ENTITY_NAME #(
     end
   end
 
-  oehb_dataless oehb_lhs (
+  oehb #(
+    .DATA_TYPE(8)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .ins_valid(join_valid),
+    .ins(ip_result),
+    .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
-    .outs_valid(buff_valid),
+    .outs(result_tmp),
+    .outs_valid(result_valid),
     .outs_ready(result_ready)
   ); 
     
@@ -102,8 +105,8 @@ module ENTITY_NAME #(
     .s_axis_b_tdata       ( rhs ),
     .s_axis_operation_tvalid ( join_valid ),
     .s_axis_operation_tdata  ( opcode ),
-    .m_axis_result_tvalid ( result_valid ),
-    .m_axis_result_tdata  ( result_tmp )
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( ip_result )
   );
 
   assign result = result_tmp[0];

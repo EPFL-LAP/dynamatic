@@ -20,7 +20,7 @@ module subf #(
   //assert(DATA_TYPE == 32) else $fatal("subf currently only supports 32-bit operands");
 
   wire join_valid, oehb_ready, buff_valid;
-
+  wire [ DATA_TYPE - 1 :0] tmp_result;
   // subf is the same as addf, but we flip the sign bit of rhs
   wire [DATA_TYPE - 1 : 0] rhs_neg;
 
@@ -40,24 +40,28 @@ module subf #(
     .outs_valid (join_valid             )
   );
 
-  oehb_dataless oehb_lhs (
+  oehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .ins_valid(join_valid),
+    .ins(tmp_result),
+    .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
-    .outs_valid(buff_valid),
+    .outs(result),
+    .outs_valid(result_valid),
     .outs_ready(result_ready)
   ); 
 
   subf_vitis_hls_single_precision_lat_8 subf_vitis_hls_single_precision_lat_8_u (
     .aclk                 ( clk ),
-    .aclken               ( 1'b1 ),
+    .aclken               ( oehb_ready ),
     .s_axis_a_tvalid      ( join_valid ),
     .s_axis_a_tdata       ( lhs ),
     .s_axis_b_tvalid      ( join_valid ),
     .s_axis_b_tdata       ( rhs ),
-    .m_axis_result_tvalid ( result_valid ),
-    .m_axis_result_tdata  ( result )
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( tmp_result )
   );
 
 endmodule
