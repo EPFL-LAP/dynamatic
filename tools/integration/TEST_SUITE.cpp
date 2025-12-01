@@ -49,6 +49,8 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
+class RigidificationFixture : public BaseFixture {};
+
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
       // clang-format off
@@ -383,4 +385,38 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "subdiag_fast"
       ),
     [](const auto &info) { return "spec_" + info.param; });
+
+// Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on
+
+#ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
+
+TEST_P(RigidificationFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .useVerilog = false,
+      .useSharing = false,
+      .useRigidification = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+// clang-format off
+INSTANTIATE_TEST_SUITE_P(Tiny, RigidificationFixture,
+   testing::Values(
+     "fir",
+     "iir",
+     "matvec"
+     ),
+   [](const auto &info) { return info.param; });
+// clang-format on
+
+#endif // DYNAMATIC_ENABLE_LEQ_BINARIES

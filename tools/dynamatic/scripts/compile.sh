@@ -322,8 +322,7 @@ export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash $RIGIDIFICATION_SH $DYNAMATIC_DIR $OUTPUT_DIR $KERNEL_NAME $F_HANDSHAKE_EXPORT \
-    > "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level
