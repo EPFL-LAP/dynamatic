@@ -433,6 +433,8 @@ The `arch-name` option, when present, must map to a string which overrides the d
 }
 ```
 
+**IMPORTANT**: To support this feature also in Veriloge where multiple architectures of the same module can coexist, we use this parameter to select the desired architecture. This parameter effectively replaces the module name, allowing each architecture variant to be treated as a distinct module. For example, when generating a floating-point adder with three pipeline stages—whose structure differs from versions with other pipeline depths—we use the architecture’s name as the module name. Consequently, this architecture name must match the module name defined in the corresponding Verilog file.
+
 #### `use-json-config`
 
 > [!NOTE]
