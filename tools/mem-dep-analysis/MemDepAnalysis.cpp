@@ -364,7 +364,11 @@ public:
     int depth = loopInfo->getLoopDepth(stmt.getBasicBlock());
 
     for (auto *inst : stmt.getInstructions())
-      if (inst->mayReadOrWriteMemory()) {
+      // NOTE (@Jiahui17): the call `memcpy` (or any other function that may
+      // access the memory more than once) in the main function might be
+      // analyzed here and trigger an assertion error. Therefore, CallInst is
+      // ignored in our memory dependency analysis
+      if (inst->mayReadOrWriteMemory() && !isa<CallInst>(inst)) {
         auto &memoryAccess = stmt.getArrayAccessFor(inst);
 
         isl::map currentMap = memoryAccess.getLatestAccessRelation();

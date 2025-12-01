@@ -157,7 +157,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
-  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion,loop-unroll-full)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg" \
+  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -204,14 +204,17 @@ exit_on_fail "Failed to convert to std dialect" \
   "Converted to std dialect"
 
 # cf transformations (dynamatic)
-# - drop-unlist-functions: Dropping the functions that are not needed in HLS
-# compilation
+# - "drop-unlist-functions": Dropping the functions that are not needed in HLS
+# compilation.
+# - "arith-reduce-strength": Convert muls to adds. "max-adder-depth-mul" limits
+# the maximum length of the adder chain created via this pass.
 $DYNAMATIC_OPT_BIN \
   "$F_CF" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
   --flatten-memref-row-major \
   --canonicalize \
+  --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
   --mark-memory-interfaces \
   > "$F_CF_TRANSFORMED"

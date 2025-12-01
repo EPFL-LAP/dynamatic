@@ -14,18 +14,40 @@
 
 #include <gtest/gtest.h>
 
-class BasicFixture : public testing::TestWithParam<std::string> {};
+/// Base class for Dynamatic unit tests
+/// provides utilities
+class BaseFixture : public testing::TestWithParam<std::string> {
+public:
+  /// \brief: This is called to log the number of cycles in the console.
+  void logPerformance(unsigned cycles) const {
+    const std::string &benchmarkName(GetParam());
+    auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string fixtureName(info->test_suite_name());
+    std::cout << "[INFO] Benchmark " << fixtureName << "/" << benchmarkName
+              << " latency: " << cycles << " cycles" << std::endl;
+  }
 
+protected:
+  /// \brief: This is a callback function on the startup of the test.
+  void SetUp() override {
+    const std::string &benchmarkName(GetParam());
+    auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string fixtureName(info->test_suite_name());
+    std::cout << "[INFO] Running " << fixtureName << "/" << benchmarkName
+              << std::endl;
+  }
+};
+
+class BasicFixture : public BaseFixture {};
 // Use CBC MILP solver to test a subset of MiscBenchmarks (CBC is slower than
 // Gurobi)
-class CBCSolverFixture : public testing::TestWithParam<std::string> {};
-
+class CBCSolverFixture : public BaseFixture {};
 // Use FPL22 placement algorithm on a small subset of MiscBenchmarks
-class FPL22Fixture : public testing::TestWithParam<std::string> {};
-class MemoryFixture : public testing::TestWithParam<std::string> {};
-class SharingFixture : public testing::TestWithParam<std::string> {};
-class SharingUnitTestFixture : public testing::TestWithParam<std::string> {};
-class SpecFixture : public testing::TestWithParam<std::string> {};
+class FPL22Fixture : public BaseFixture {};
+class MemoryFixture : public BaseFixture {};
+class SharingFixture : public BaseFixture {};
+class SharingUnitTestFixture : public BaseFixture {};
+class SpecFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
@@ -41,6 +63,7 @@ TEST_P(BasicFixture, basic) {
   };
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 TEST_P(CBCSolverFixture, basic) {
@@ -57,6 +80,7 @@ TEST_P(CBCSolverFixture, basic) {
   };
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 #if 0
@@ -106,6 +130,7 @@ TEST_P(MemoryFixture, basic) {
   };
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 /// This testing fixture runs the test with and without sharing. It checks
@@ -143,6 +168,7 @@ TEST_P(SharingUnitTestFixture, basic) {
             true);
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
+  logPerformance(configWithSharing.simTime);
 }
 
 /// This testing fixture runs the test with and without sharing. It checks
@@ -180,6 +206,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
             true);
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
+  logPerformance(configWithSharing.simTime);
 }
 
 TEST_P(SpecFixture, spec) {
@@ -189,6 +216,7 @@ TEST_P(SpecFixture, spec) {
   EXPECT_EQ(runSpecIntegrationTest(name, simTime), true);
 
   RecordProperty("cycles", std::to_string(simTime));
+  logPerformance(simTime);
 }
 
 // clang-format off
