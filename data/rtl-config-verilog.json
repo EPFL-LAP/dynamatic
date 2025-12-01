@@ -73,7 +73,7 @@
       },
       { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/vivado/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
     "dependencies": ["join_type", "cmpf_vivado_support"],
     "hdl": "verilog"
   },
