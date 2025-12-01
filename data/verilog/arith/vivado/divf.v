@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module subf #(
+module divf #(
   parameter DATA_TYPE = 32
 )(
   // inputs
@@ -17,13 +17,10 @@ module subf #(
   output rhs_ready
 );
 
-  //assert(DATA_TYPE == 32) else $fatal("subf currently only supports 32-bit operands");
+  //assert(DATA_TYPE == 32) else $error("divf currently only supports 32-bit floating point operands");
 
   wire join_valid, oehb_ready, buff_valid;
-
-  // subf is the same as addf, but we flip the sign bit of rhs
-  wire [DATA_TYPE - 1 : 0] rhs_neg;
-
+  wire [ DATA_TYPE - 1 :0] tmp_result;
   // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
   wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
 
@@ -40,48 +37,29 @@ module subf #(
     .outs_valid (join_valid             )
   );
 
-  delay_buffer #(
-    .SIZE(8)
-  ) buff (
+  oehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(oehb_ready),
-    .valid_out(buff_valid)
-  );
-
-  oehb_dataless  oehb_lhs (
-    .clk(clk),
-    .rst(rst),
+    .ins(tmp_result),
     .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
+    .outs(result),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
   );
 
-  ieee2nfloat_lhs  InputIEEE_32bit (
-    .X(lhs),
-    .R(ip_lhs)
+  divf_vitis_hls_single_precision_lat_28 divf_vivado_support_u (
+    .aclk                 ( clk ),
+    .aclken               ( oehb_ready ),
+    .s_axis_a_tvalid      ( join_valid ),
+    .s_axis_a_tdata       ( lhs ),
+    .s_axis_b_tvalid      ( join_valid ),
+    .s_axis_b_tdata       ( rhs ),
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( tmp_result )
   );
 
-  assign rhs_neg = ~rhs + 1;
-
-  ieee2nfloat_rhs  InputIEEE_32bit (
-    .X(rhs_neg),
-    .R(ip_rhs)
-  );
-
-  nfloat2ieee  OutputIEEE_32bit (
-    .X(ip_result),
-    .R(result)
-  );
-
-  ip  FloatingPointAdder (
-    .clk(clk),
-    .ce(oehb_ready),
-    .X(ip_lhs),
-    .Y(ip_rhs),
-    .R(ip_result)
-  );
 
 endmodule

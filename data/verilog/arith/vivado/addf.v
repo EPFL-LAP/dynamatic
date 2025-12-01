@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module divf #(
+module addf #(
   parameter DATA_TYPE = 32
 )(
   // inputs
@@ -16,11 +16,12 @@ module divf #(
   output lhs_ready,
   output rhs_ready
 );
-
-  //assert(DATA_TYPE == 32) else $error("divf currently only supports 32-bit floating point operands");
-
+  
+  // Assert that DATA_TYPE is 32
+  //assert(DATA_TYPE == 32) else $error("addf currently only supports 32-bit floating point operands");
+  
   wire join_valid, oehb_ready, buff_valid;
-
+  wire [ DATA_TYPE - 1 :0] tmp_result;
   // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
   wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
 
@@ -37,48 +38,28 @@ module divf #(
     .outs_valid (join_valid             )
   );
 
-  delay_buffer #(
-    .SIZE(8)
-  ) buff (
+  oehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(oehb_ready),
-    .valid_out(buff_valid)
-  );
-
-  oehb_dataless  oehb_lhs (
-    .clk(clk),
-    .rst(rst),
+    .ins(tmp_result),
     .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
+    .outs(result),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
+  ); 
+
+  fadd_32ns_32ns_32_13_full_dsp_1_ip fadd_32ns_32ns_32_13_full_dsp_1_ip_u (
+    .aclk                 ( clk ),
+    .aclken               ( oehb_ready ),
+    .s_axis_a_tvalid      ( join_valid ),
+    .s_axis_a_tdata       ( lhs ),
+    .s_axis_b_tvalid      ( join_valid ),
+    .s_axis_b_tdata       ( rhs ),
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( tmp_result )
   );
-
-  ieee2nfloat_lhs  InputIEEE_32bit (
-    .X(lhs),
-    .R(ip_lhs)
-  );
-
-  ieee2nfloat_rhs  InputIEEE_32bit (
-    .X(rhs),
-    .R(ip_rhs)
-  );
-
-  nfloat2ieee  OutputIEEE_32bit (
-    .X(ip_result),
-    .R(result)
-  );
-
-  ip  FloatingPointDivider (
-    .clk(clk),
-    .ce(oehb_ready),
-    .X(ip_lhs),
-    .Y(ip_rhs),
-    .R(ip_result)
-  );
-
-
 
 endmodule
