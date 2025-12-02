@@ -140,5 +140,5 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 echo_info "Created synthesis scripts"
 echo_info "Launching Vivado synthesis"
 cd "$SYNTH_DIR"
-/tools/Xilinx/2025.1/Vivado/bin/vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+LD_PRELOAD=/lib/x86_64-linux-gnu/libudev.so.1 /tools/Xilinx/2025.1/Vivado/bin/vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
 exit_on_fail "Logic synthesis failed" "Logic synthesis succeeded"
