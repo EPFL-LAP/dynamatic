@@ -197,7 +197,7 @@ public:
 
   // Add input/output nodes to the circuit. Calls configureIONode on the Node
   // to set I/O type.
-  void addIONode(const std::string &name, const std::string &type);
+  Node *addIONode(const std::string &name, const std::string &type);
 
   // Add latch nodes to the circuit. Calls configureLatch on the Node to set
   // I/O type.
