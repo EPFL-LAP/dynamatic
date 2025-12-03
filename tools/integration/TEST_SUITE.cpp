@@ -209,22 +209,6 @@ TEST_P(VerilogFixture, verilog) {
   EXPECT_EQ(runIntegrationTest(config), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
 }
-TEST_P(VerilogMemoryFixture, verilog) {
-  IntegrationTestData config{
-      // clang-format off
-      .name = GetParam(),
-      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
-      .useVerilogBeta = true,
-      .useSharing = false,
-      .milpSolver = "gurobi",
-      .bufferAlgorithm = "fpga20",
-      .simTime = -1
-      // clang-format on
-  };
-  EXPECT_EQ(runIntegrationTest(config), 0);
-  RecordProperty("cycles", std::to_string(config.simTime));
-}
-
 TEST_P(VerilogFixture, verilog_NoCI) {
   IntegrationTestData config{
       // clang-format off
@@ -408,7 +392,7 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
 
 // Verilog tests: CI safe 
 INSTANTIATE_TEST_SUITE_P(
-    VerilogMemoryTestsCI, VerilogMemoryFixture,
+    VerilogMemoryTests_NoCI, VerilogMemoryFixture,
     testing::Values(
       "test_flatten_array",
       "test_memory_1",
@@ -420,6 +404,7 @@ INSTANTIATE_TEST_SUITE_P(
       "test_memory_15",
       "test_memory_16",
       "test_memory_17",
+      "test_memory_18",
       "test_memory_2",
       "test_memory_3",
       "test_memory_4",
@@ -432,16 +417,35 @@ INSTANTIATE_TEST_SUITE_P(
       ),
     [](const auto &info) { return "memory_" + info.param; });
   
-INSTANTIATE_TEST_SUITE_P(
-    VerilogMemoryTests_NoCI, VerilogMemoryFixture,
-    testing::Values(
-      "test_memory_18"
-      ),
-    [](const auto &info) { return "memory_" + info.param; });
 
+// Verilog tests: NoCI
 INSTANTIATE_TEST_SUITE_P(
-    VerilogTests, VerilogFixture,
+    VerilogTests_NoCI, VerilogFixture,
     testing::Values(
+      "atax",
+      "atax_float",
+      "bicg_float",
+      "float_basic",
+      "gemm",
+      "gemm_float",
+      "gemver_float",
+      "gesummv_float",
+      "get_tanh",
+      "gsum",
+      "gsumif",
+      "histogram",
+      "if_loop_add",
+      "if_loop_mul",
+      "kernel_2mm_float",
+      "kernel_3mm_float",
+      "lu",
+      "matching",
+      "matching_2",
+      "mvt_float",
+      "symm_float",
+      "syr2k_float",
+      "if_loop_3",
+      "triangular"
       "bicg",
       "binary_search",
       "factorial",
@@ -479,38 +483,6 @@ INSTANTIATE_TEST_SUITE_P(
       "video_filter",
       "while_loop_1",
       "while_loop_3"
-      ),
-    [](const auto &info) { return info.param; }
-);
-
-// Verilog tests: NoCI
-INSTANTIATE_TEST_SUITE_P(
-    VerilogTests_NoCI, VerilogFixture,
-    testing::Values(
-      "atax",
-      "atax_float",
-      "bicg_float",
-      "float_basic",
-      "gemm",
-      "gemm_float",
-      "gemver_float",
-      "gesummv_float",
-      "get_tanh",
-      "gsum",
-      "gsumif",
-      "histogram",
-      "if_loop_add",
-      "if_loop_mul",
-      "kernel_2mm_float",
-      "kernel_3mm_float",
-      "lu",
-      "matching",
-      "matching_2",
-      "mvt_float",
-      "symm_float",
-      "syr2k_float",
-      "if_loop_3",
-      "triangular"
       ),
     [](const auto &info) { return info.param; });
 
