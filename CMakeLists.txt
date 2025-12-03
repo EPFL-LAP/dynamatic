@@ -181,16 +181,22 @@ find_package(PkgConfig REQUIRED)
 # - *_INCLUDE_DIRS
 # - *_LIBRARY_DIRS
 # But these variable will not be automatically discovered by the target.
-pkg_check_modules(CBC REQUIRED cbc)
-pkg_check_modules(CLPCORE REQUIRED clp)
-pkg_check_modules(OSI REQUIRED osi)
+pkg_check_modules(CBC QUIET cbc)
+pkg_check_modules(CLPCORE QUIET clp)
+pkg_check_modules(OSI QUIET osi)
 
-# This command makes the include directory of CBC discoverable
-include_directories(dynamatic-opt PRIVATE
-  ${CBC_INCLUDE_DIRS}
-  ${CLPCORE_INCLUDE_DIRS}
-  ${OSI_INCLUDE_DIRS}
-)
+if(CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
+  message(STATUS "CBC available via pkg-config")
+  # This command makes the include directory of CBC discoverable
+  include_directories(dynamatic-opt PRIVATE
+    ${CBC_INCLUDE_DIRS}
+    ${CLPCORE_INCLUDE_DIRS}
+    ${OSI_INCLUDE_DIRS}
+  )
+  add_compile_definitions(DYNAMATIC_ENABLE_CBC)
+else()
+  message(STATUS "One or more of cbc, clp, and osi are missing! Disabling the CBC.")
+endif()
 
 # This command makes the link directory of CBC discoverable
 # Without this, -lCbc would not work on some distros

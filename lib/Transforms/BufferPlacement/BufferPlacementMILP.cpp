@@ -794,17 +794,21 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
 
   std::unique_ptr<CPSolver> modelFeedback;
 
+  // clang-format off
+#ifdef DYNAMATIC_ENABLE_CBC
   if (isa<CbcSolver>(this->model)) {
     modelFeedback = std::make_unique<CbcSolver>();
-  }
+  } else
+#endif // DYNAMATIC_ENABLE_CBC
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-  else if (isa<GurobiSolver>(this->model)) {
+  if (isa<GurobiSolver>(this->model)) {
     modelFeedback = std::make_unique<GurobiSolver>();
-  }
+  } else
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-  else {
+  {
     llvm_unreachable("Aborting on unimplemented solver type!");
   }
+  // clang-format on
 
   // Maps operations to GRBVars that holds the topological order index of MLIR
   // Operations
