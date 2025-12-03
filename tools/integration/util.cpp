@@ -52,10 +52,25 @@ int runIntegrationTest(IntegrationTestData &config) {
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 
-  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
-             << std::endl
-             << "simulate" << std::endl
-             << "exit" << std::endl;
+  // Assert testVHDL or testVerilog is true
+  if (!config.testVHDL && !config.testVerilog) {
+    std::cout << "[ERROR] Either testVHDL or testVerilog must be true"
+              << std::endl;
+    return -1;
+  }
+  // Verify Verilog works correctly
+  if (config.testVerilog) {
+    scriptFile << "write-hdl --hdl verilog" << std::endl
+               << "simulate" << std::endl;
+  }
+  // Verify VHDL works correctly
+  if (config.testVHDL) {
+    // By default, the report containing the simulation time is re-written
+    // during the second simulation (i.e., the VHDL simulation).
+    scriptFile << "write-hdl --hdl vhdl" << std::endl
+               << "simulate" << std::endl;
+  }
+  scriptFile << "exit" << std::endl;
 
   scriptFile.close();
 

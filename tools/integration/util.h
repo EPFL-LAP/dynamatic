@@ -27,7 +27,8 @@ struct IntegrationTestData {
   // Configurations
   std::string name;
   fs::path benchmarkPath;
-  bool useVerilog;
+  bool testVerilog;
+  bool testVHDL = true; // default to true
   bool useSharing;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
