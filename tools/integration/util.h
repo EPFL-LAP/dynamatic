@@ -30,6 +30,11 @@ struct IntegrationTestData {
   bool testVerilog;
   bool testVHDL = true; // default to true
   bool useSharing;
+  bool useVerilog = false;
+  // Use resource sharing to reduce the functional unit usage.
+  bool useSharing = false;
+  // Use model checking to remove redundant logic.
+  bool useRigidification = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
 

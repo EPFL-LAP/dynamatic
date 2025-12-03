@@ -240,7 +240,17 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
     URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
   )
 
-  FetchContent_MakeAvailable(dot2smv)
+  FetchContent_Declare(
+    nuXmv
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR ${EXT_BIN_DIR}/nuXmv
+    URL https://nuxmv.fbk.eu/theme/download.php?file=nuXmv-2.1.0-linux64.tar.xz
+  )
+
+  FetchContent_MakeAvailable(dot2smv nuXmv)
+
+  # Inform our compiler infrastructure that NuSMV is available.
+  add_compile_definitions(DYNAMATIC_ENABLE_LEQ_BINARIES)
 endif()
 
 # We use GoogleTest for regression tests
