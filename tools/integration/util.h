@@ -29,8 +29,6 @@ struct IntegrationTestData {
   fs::path benchmarkPath;
   bool testVerilog;
   bool testVHDL = true; // default to true
-  bool useSharing;
-  bool useVerilog = false;
   // Use resource sharing to reduce the functional unit usage.
   bool useSharing = false;
   // Use model checking to remove redundant logic.
