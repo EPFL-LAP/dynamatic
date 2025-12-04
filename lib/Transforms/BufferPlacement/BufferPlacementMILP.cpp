@@ -23,6 +23,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
+#include <iomanip>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -1102,7 +1103,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-    os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
+    os << "Throughput of CFDFC #" << idx << ": "
+       << llvm::formatv("{0:E20}", throughput) << "\n";
   }
 
   os << "\n# =================== #\n";
