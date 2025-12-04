@@ -76,7 +76,7 @@ module uitofp #(
     // Delay buffer (LATENCY - 1 = 4)
     // -----------------------------------------------------
     delay_buffer #(
-        .LATENCY(LATENCY - 1)
+        .SIZE(LATENCY - 1)
     ) delay_buffer_inst (
         .clk       (clk),
         .rst       (rst),
