@@ -278,21 +278,21 @@ python3 experimental/tools/integration/run_specv2_integration.py collision_donut
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 4 --out out_4_7ns_om --cp 7.00 --use-prof-cache --resolver --min-buffering
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 5 --out out_5_7ns_om --cp 7.00 --use-prof-cache --resolver --min-buffering
 
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --baseline --out out_baseline_7ns_om --transformed-code golden_ratio_v1.c --cp 7.00 --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 2 --out out_2_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 3 --out out_3_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 4 --out out_4_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 5 --out out_5_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 6 --out out_6_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 7 --out out_7_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 8 --out out_8_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 9 --out out_9_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 10 --out out_10_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 11 --out out_11_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 12 --out out_12_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 13 --out out_13_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 14 --out out_14_7ns_om --cp 7.00 --resolver --transformed-code golden_ratio_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --baseline --out out_baseline_7ns_om --transformed-code subdiag_v1.c --cp 7.00 --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 2 --out out_2_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 3 --out out_3_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 4 --out out_4_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 5 --out out_5_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 6 --out out_6_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 7 --out out_7_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 8 --out out_8_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 9 --out out_9_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 10 --out out_10_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 11 --out out_11_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 12 --out out_12_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 13 --out out_13_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 14 --out out_14_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
 
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --baseline --out out_baseline_7ns_om --cp 7.00 --transformed-code sparse_dataspec_modified.c --min-buffering
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code sparse_dataspec_modified.c --min-buffering
@@ -399,7 +399,6 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_18_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_19_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_20_7ns newton 7.000 3.500
-
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_v1_7ns subdiag_fast 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_baseline_7ns subdiag_fast 7.000 3.500
@@ -567,6 +566,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_4_7ns_om single_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_5_7ns_om single_loop 7.000 3.500
 
+
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_baseline_7ns_om collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_0_7ns_om collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_1_7ns_om collision_donut 7.000 3.500
@@ -575,21 +575,21 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_4_7ns_om collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_5_7ns_om collision_donut 7.000 3.500
 
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_baseline_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_1_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_2_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_3_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_4_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_5_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_6_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_7_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_8_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_9_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_10_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_11_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_12_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_13_7ns_om golden_ratio 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_14_7ns_om golden_ratio 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_baseline_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_1_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_2_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_3_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_4_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_5_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_6_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_7_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_8_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_9_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_10_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_11_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_12_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_13_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag/out_14_7ns_om subdiag 7.000 3.500
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_baseline_7ns_om sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_1_7ns_om sparse_dataspec_transformed 7.000 3.500
