@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 import argparse
-import json
+import math
 from pathlib import Path
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
@@ -93,7 +93,7 @@ def main():
     parser.add_argument(
         "--use-prof-cache", action='store_true', help="Use profiling cache")
     parser.add_argument(
-        "--decide-n", action='store_true', help="Decide n. No generation")
+        "--decide-n", help="Decide the value of n. Specify the CFDFC id. No generation")
     parser.add_argument(
         "--synth-control", action='store_true')
     parser.add_argument(
@@ -429,7 +429,7 @@ def main():
             else:
                 return fail(id, "Failed on pre-speculation")
 
-        if args.decide_n:
+        if args.decide_n is not None:
             print("Deciding n")
             handshake_initial_speculation = os.path.join(
                 comp_out_dir, "handshake_initial_speculation.mlir")
@@ -498,10 +498,14 @@ def main():
             else:
                 return fail(id, "Failed buf placement (pre spec)")
 
+            throughput_pre_spec = -1
             with open(os.path.join(comp_out_dir, f"buffer-placement/{kernel_name}/placement.log")) as f:
                 lines = f.readlines()
                 for line in lines:
-                    if line.startswith("CFDFC") or line.startswith("Throughput of CFDFC"):
+                    if line.startswith("CFDFC #"):
+                        print(line)
+                    if line.startswith(f"Throughput of CFDFC #{args.decide_n}"):
+                        throughput_pre_spec = float(line.split(":")[1].strip())
                         print(line)
 
             shutil.move(os.path.join(comp_out_dir, "buffer-placement"),
@@ -523,11 +527,21 @@ def main():
             else:
                 return fail(id, "Failed buf placement (post spec)")
 
+            throughput_post_spec = -1
             with open(os.path.join(comp_out_dir, f"buffer-placement/{kernel_name}/placement.log")) as f:
                 lines = f.readlines()
                 for line in lines:
-                    if line.startswith("CFDFC") or line.startswith("Throughput of CFDFC"):
+                    if line.startswith("CFDFC #"):
                         print(line)
+                    if line.startswith(f"Throughput of CFDFC #{args.decide_n}"):
+                        throughput_post_spec = float(
+                            line.split(":")[1].strip())
+                        print(line)
+
+            print("Throughput pre spec: ", throughput_pre_spec)
+            print("Throughput post spec: ", throughput_post_spec)
+            print("Determined n: ", math.ceil(throughput_post_spec /
+                  throughput_pre_spec) - 1)
 
             return {
                 "id": id,
