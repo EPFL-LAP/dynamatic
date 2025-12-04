@@ -62,9 +62,14 @@ public:
       model = std::make_unique<GurobiSolver>(timeout);
       break;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#ifdef DYNAMATIC_ENABLE_CBC
     case CPSolver::CBC:
       model = std::make_unique<CbcSolver>(timeout);
       break;
+#endif // DYNAMATIC_ENABLE_CBC
+    case CPSolver::DEFAULT:
+      llvm_unreachable("Default option should not be used! Check if you have "
+                       "correctly installed one of CBC or GUROBI milp solver!");
     }
   };
 
