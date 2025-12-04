@@ -15,7 +15,14 @@ real_n = {
 # Get all files in the `decide_n` directory
 decide_n_dir = "decide_n"
 err = False
-for filename in os.listdir(decide_n_dir):
+files = os.listdir(decide_n_dir)
+if len(files) != len(real_n):
+    print(
+        f"Mismatch in number of files: expected {len(real_n)}, found {len(files)}"
+    )
+    err = True
+
+for filename in files:
     if not filename.endswith(".txt"):
         print("Unknown file in decide_n directory:", filename)
         err = True
