@@ -24,6 +24,7 @@
 #include "experimental/Transforms/Speculation/HandshakeSpecPostBuffer.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculationAdapted.h"
+#include "experimental/Transforms/SpeculationV2/HandshakeCopyBuffers.h"
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "experimental/Transforms/SpeculationV2/PostSpecV2.h"
 #include "experimental/Transforms/SpeculationV2/PreSpecV2.h"

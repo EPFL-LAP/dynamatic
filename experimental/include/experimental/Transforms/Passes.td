@@ -194,6 +194,17 @@ def SpecV2GammaPostBuffering : DynamaticPass<"handshake-spec-v2-gamma-post-buffe
   ];
 }
 
+def HandshakeCopyBuffers : DynamaticPass<"handshake-copy-buffers"> {
+  let summary = "Copy buffers";
+  let description = [{
+  }];
+  let options = [
+    Option<"preUnrollingPath", "pre-unrolling-path", "std::string", "", "">,
+    Option<"preUnrollingBB", "pre-unrolling-bb", "unsigned", "", "">,
+    Option<"postUnrollingBB", "post-unrolling-bb", "unsigned", "", "">,
+  ];
+}
+
 def SpecV1Adaptor : DynamaticPass<"handshake-spec-v1-adaptor"> {
   let summary = "Place Speculation operations";
   let description = [{

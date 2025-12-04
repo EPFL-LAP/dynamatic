@@ -13,6 +13,7 @@ add_dynamatic_library(DynamaticSpeculationV2
   SpecV2Lib.cpp
   SpecV1Adaptor.cpp
   SpecV1PostAdaptor.cpp
+  HandshakeCopyBuffers.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
