@@ -318,8 +318,9 @@ void recalculateMCBlocks(FuncOp funcOp) {
         }
       }
     }
-    auto i32Attr = builder.getI32ArrayAttr(llvm::to_vector(bbs));
-    mc.setConnectedBlocksAttr(i32Attr);
+    SmallVector<int32_t> sorted(bbs.begin(), bbs.end());
+    llvm::sort(sorted);
+    mc.setConnectedBlocksAttr(builder.getI32ArrayAttr(sorted));
   }
 }
 
