@@ -9,3 +9,6 @@ python3 experimental/tools/integration/run_specv2_integration.py collision_donut
 python3 experimental/tools/integration/run_specv2_integration.py bisection --decide-n 0 --cp 7.00 --transformed-code bisection_transformed.c > decide_n/bisection.txt
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --decide-n 0 --cp 7.00 > decide_n/sparse_dataspec.txt
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --decide-n 0 --cp 7.00 --transformed-code sparse_dataspec_modified.c > decide_n/sparse_dataspec_transformed.txt
+
+# Validate results
+python3 validate_n.py
