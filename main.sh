@@ -9,8 +9,8 @@ date > start_time.txt
 
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py single_loop --out out_v1_7ns --cp 7.00
+python3 experimental/tools/integration/run_specv2_integration.py single_loop --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 0 --out out_0_7ns --cp 7.00 --resolver
-
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 1 --out out_1_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 2 --out out_2_7ns --cp 7.00 --resolver --use-prof-cache
 python3 experimental/tools/integration/run_specv2_integration.py single_loop --n 3 --out out_3_7ns --cp 7.00 --resolver --use-prof-cache
@@ -34,6 +34,7 @@ python3 experimental/tools/integration/run_specv2_integration.py single_loop --n
 
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py nested_loop --out out_v1_7ns --cp 7.00
+python3 experimental/tools/integration/run_specv2_integration.py nested_loop --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 0 --out out_0_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 1 --out out_1_7ns --cp 7.00 --use-prof-cache --resolver
 python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n 2 --out out_2_7ns --cp 7.00 --use-prof-cache --resolver
@@ -58,6 +59,7 @@ python3 experimental/tools/integration/run_specv2_integration.py nested_loop --n
 
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py fixed_log --default-value=0 --out out_v1_7ns --cp 7.00
+python3 experimental/tools/integration/run_specv2_integration.py fixed_log --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --n 0 --out out_0_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --n 1 --out out_1_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py fixed_log --n 2 --out out_2_7ns --cp 7.00 --resolver --use-prof-cache
@@ -83,6 +85,7 @@ python3 experimental/tools/integration/run_specv2_integration.py fixed_log --n 2
 
 python3 experimental/tools/integration/run_specv2_integration.py newton --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py newton --out out_v1_7ns --cp 7.00 --default-value 0
+python3 experimental/tools/integration/run_specv2_integration.py newton --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py newton --n 0 --out out_0_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py newton --n 1 --out out_1_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py newton --n 2 --out out_2_7ns --cp 7.00 --resolver --use-prof-cache
@@ -107,6 +110,7 @@ python3 experimental/tools/integration/run_specv2_integration.py newton --n 20 -
 
 python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --baseline --out out_baseline_7ns --cp 7.00 --transformed-code subdiag_fast_v1.c
 python3 experimental/tools/integration/run_adapted_spec_integration.py subdiag_fast --out out_v1_7ns --cp 7.00 --transformed-code subdiag_fast_v1.c
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --out out_auto_7ns --cp 7.00 --resolver --decide-n 0 --transformed-code subdiag_fast_v1.c
 python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 0 --out out_0_7ns --cp 7.00 --resolver --transformed-code subdiag_fast_v1.c
 python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 1 --out out_1_7ns --cp 7.00 --resolver --transformed-code subdiag_fast_v1.c
 python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 2 --out out_2_7ns --cp 7.00 --resolver --transformed-code subdiag_fast_v1.c --use-prof-cache
@@ -131,6 +135,7 @@ python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --
 
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py golden_ratio --out out_v1_7ns --cp 7.00 --default-value 0
+python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --out out_auto_7ns --cp 7.00 --resolver --exit-eager-eval --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 0 --out out_0_7ns --cp 7.00 --exit-eager-eval --resolver
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 1 --out out_1_7ns --cp 7.00 --exit-eager-eval --resolver
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 2 --out out_2_7ns --cp 7.00 --exit-eager-eval --resolver --use-prof-cache
@@ -154,6 +159,7 @@ python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --
 python3 experimental/tools/integration/run_specv2_integration.py golden_ratio --n 20 --out out_20_7ns --cp 7.00 --exit-eager-eval --resolver --use-prof-cache
 
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --baseline --out out_baseline_7ns --cp 7.00
+python3 experimental/tools/integration/run_specv2_integration.py collision_donut --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 0 --out out_0_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 1 --out out_1_7ns --cp 7.00 --use-prof-cache --resolver
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 2 --out out_2_7ns --cp 7.00 --use-prof-cache --resolver
@@ -178,6 +184,7 @@ python3 experimental/tools/integration/run_specv2_integration.py collision_donut
 
 
 python3 experimental/tools/integration/run_specv2_integration.py bisection --baseline --out out_baseline_7ns --cp 7.00 --transformed-code bisection_transformed.c
+python3 experimental/tools/integration/run_specv2_integration.py bisection --out out_auto_7ns --cp 7.00 --resolver --decide-n 0 --transformed-code bisection_transformed.c
 python3 experimental/tools/integration/run_specv2_integration.py bisection --n 0 --out out_0_7ns --cp 7.00 --resolver --transformed-code bisection_transformed.c
 python3 experimental/tools/integration/run_specv2_integration.py bisection --n 1 --out out_1_7ns --cp 7.00 --resolver --transformed-code bisection_transformed.c
 python3 experimental/tools/integration/run_specv2_integration.py bisection --n 2 --out out_2_7ns --cp 7.00 --resolver --transformed-code bisection_transformed.c
@@ -202,6 +209,7 @@ python3 experimental/tools/integration/run_specv2_integration.py bisection --n 2
 
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --baseline --out out_baseline_7ns --cp 7.00
 python3 experimental/tools/integration/run_adapted_spec_integration.py sparse_dataspec --out out_v1_7ns --cp 7.00 --default-value 0 --disable-constant-predictor
+python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --out out_auto_7ns --cp 7.00 --resolver --decide-n 0
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --n 0 --out out_0_7ns --cp 7.00 --resolver
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --n 1 --out out_1_7ns --cp 7.00 --resolver --use-prof-cache
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec --n 2 --out out_2_7ns --cp 7.00 --resolver --use-prof-cache
@@ -226,6 +234,7 @@ python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec
 
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --baseline --out out_baseline_7ns --cp 7.00 --transformed-code sparse_dataspec_modified.c
 python3 experimental/tools/integration/run_adapted_spec_integration.py sparse_dataspec_transformed --out out_v1_7ns --cp 7.00 --transformed-code sparse_dataspec_modified.c
+python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --out out_auto_7ns --cp 7.00 --resolver --decide-n 0 --transformed-code sparse_dataspec_modified.c
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --n 0 --out out_0_7ns --cp 7.00 --resolver --transformed-code sparse_dataspec_modified.c
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --n 1 --out out_1_7ns --cp 7.00 --resolver --transformed-code sparse_dataspec_modified.c
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --n 2 --out out_2_7ns --cp 7.00 --resolver --transformed-code sparse_dataspec_modified.c --use-prof-cache
@@ -305,6 +314,7 @@ python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_v1_7ns single_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_baseline_7ns single_loop 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_auto_7ns single_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_0_7ns single_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_1_7ns single_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop/out_2_7ns single_loop 7.000 3.500
@@ -330,6 +340,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_v1_7ns nested_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_baseline_7ns nested_loop 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_auto_7ns nested_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_0_7ns nested_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_1_7ns nested_loop 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/nested_loop/out_2_7ns nested_loop 7.000 3.500
@@ -354,6 +365,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_v1_7ns fixed_log 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_baseline_7ns fixed_log 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_auto_7ns fixed_log 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_0_7ns fixed_log 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_1_7ns fixed_log 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/fixed_log/out_2_7ns fixed_log 7.000 3.500
@@ -378,6 +390,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_v1_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_baseline_7ns newton 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_auto_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_0_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_1_7ns newton 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/newton/out_2_7ns newton 7.000 3.500
@@ -402,6 +415,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_v1_7ns subdiag_fast 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_baseline_7ns subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_auto_7ns subdiag_fast 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_0_7ns subdiag_fast 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_1_7ns subdiag_fast 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_2_7ns subdiag_fast 7.000 3.500
@@ -426,6 +440,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_v1_7ns golden_ratio 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_baseline_7ns golden_ratio 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_auto_7ns golden_ratio 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_0_7ns golden_ratio 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_1_7ns golden_ratio 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/golden_ratio/out_2_7ns golden_ratio 7.000 3.500
@@ -450,6 +465,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_v1_7ns collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_baseline_7ns collision_donut 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_auto_7ns collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_0_7ns collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_1_7ns collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_2_7ns collision_donut 7.000 3.500
@@ -474,6 +490,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_v1_7ns bisection 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_baseline_7ns bisection 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_auto_7ns bisection 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_0_7ns bisection 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_1_7ns bisection 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection/out_2_7ns bisection 7.000 3.500
@@ -498,6 +515,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_v1_7ns sparse_dataspec 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_baseline_7ns sparse_dataspec 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_auto_7ns sparse_dataspec 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_0_7ns sparse_dataspec 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_1_7ns sparse_dataspec 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec/out_2_7ns sparse_dataspec 7.000 3.500
@@ -522,6 +540,7 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_v1_7ns sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_baseline_7ns sparse_dataspec_transformed 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_auto_7ns sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_0_7ns sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_1_7ns sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_2_7ns sparse_dataspec_transformed 7.000 3.500
