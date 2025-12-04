@@ -93,7 +93,9 @@ def main():
     parser.add_argument(
         "--use-prof-cache", action='store_true', help="Use profiling cache")
     parser.add_argument(
-        "--decide-n", help="Decide the value of n. Specify the CFDFC id. No generation")
+        "--decide-n", help="Decide the value of n. Specify the CFDFC id.")
+    parser.add_argument(
+        "--only-decide-n", help="No generation after deciding n", action='store_true')
     parser.add_argument(
         "--synth-control", action='store_true')
     parser.add_argument(
@@ -540,14 +542,16 @@ def main():
 
             print("Throughput pre spec: ", throughput_pre_spec)
             print("Throughput post spec: ", throughput_post_spec)
-            print("Determined n: ", math.ceil(throughput_post_spec /
-                  throughput_pre_spec) - 1)
+            n = math.ceil(throughput_post_spec / throughput_pre_spec) - 1
+            print("Determined n: ", n)
 
-            return {
-                "id": id,
-                "msg": "Decided n",
-                "status": "pass"
-            }
+            if args.only_decide_n:
+                print("Only deciding n; exiting")
+                return {
+                    "id": test_name,
+                    "msg": f"Decided n={n}",
+                    "status": "pass"
+                }
 
         if args.baseline:
             handshake_speculation = handshake_pre_speculation
