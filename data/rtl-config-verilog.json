@@ -73,7 +73,7 @@
       },
       { "name": "FPU_IMPL", "type": "string", "eq": "vivado", "generic": false}
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/vivado/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
     "dependencies": ["join_type", "cmpf_vivado_support"],
     "hdl": "verilog"
   },
@@ -876,9 +876,9 @@
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "generator": "/usr/bin/env python3 $DYNAMATIC/tools/backend/lsq-generator-python/lsq-generator.py -o $OUTPUT_DIR -c $OUTPUT_DIR/$MODULE_NAME.json",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
-    "hdl": "verilog",
+    "hdl": "vhdl",
     "io-kind": "flat",
     "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
     "io-signals": {

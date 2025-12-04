@@ -52,7 +52,6 @@ module uitofp #(
     // -----------------------------------------------------
     reg [31:0] q0, q1, q2, q3, q4;
     wire       buff_valid;
-    wire       oehb_ready;
 
     always @(posedge clk) begin
         if (rst) begin
@@ -61,7 +60,7 @@ module uitofp #(
             q2 <= 32'b0;
             q3 <= 32'b0;
             q4 <= 32'b0;
-        end else if (oehb_ready) begin
+        end else if (ins_ready) begin
             q0 <= converted;
             q1 <= q0;
             q2 <= q1;
@@ -76,13 +75,13 @@ module uitofp #(
     // Delay buffer (LATENCY - 1 = 4)
     // -----------------------------------------------------
     delay_buffer #(
-        .LATENCY(LATENCY - 1)
+        .SIZE(LATENCY - 1)
     ) delay_buffer_inst (
         .clk       (clk),
         .rst       (rst),
-        .ins_valid (ins_valid),
-        .outs_ready(oehb_ready),
-        .outs_valid(buff_valid)
+        .valid_in  (ins_valid),
+        .ready_in  (ins_ready),
+        .valid_out (buff_valid)
     );
 
     // -----------------------------------------------------
