@@ -118,6 +118,8 @@ void HandshakeCopyBuffersPass::runDynamaticPass() {
   }
 
   FuncOp preUnrollingFunc = *mod->getOps<FuncOp>().begin();
+  ModuleOp postUnrollingMod = getOperation();
+  FuncOp postUnrollingFunc = *postUnrollingMod.getOps<FuncOp>().begin();
   MuxOp firstMux;
   bool firstMuxFound = false;
   for (auto mux : preUnrollingFunc.getOps<MuxOp>()) {
@@ -127,35 +129,65 @@ void HandshakeCopyBuffersPass::runDynamaticPass() {
       break;
     }
   }
-  if (!firstMuxFound) {
-    llvm::errs() << "Could not find entry MuxOp in pre-unrolling function at "
-                    "BB: "
-                 << preUnrollingBB << "\n";
-    return signalPassFailure();
-  }
-
-  ModuleOp postUnrollingMod = getOperation();
-  FuncOp postUnrollingFunc = *postUnrollingMod.getOps<FuncOp>().begin();
-  MuxOp postUnrollingEntryMux;
-  bool postUnrollingEntryMuxFound = false;
-  for (auto mux : postUnrollingFunc.getOps<MuxOp>()) {
-    if (getLogicBB(mux) == postUnrollingBB) {
-      postUnrollingEntryMux = mux;
-      postUnrollingEntryMuxFound = true;
-      break;
+  bool legacyMode = false;
+  if (firstMuxFound) {
+    MuxOp postUnrollingEntryMux;
+    bool postUnrollingEntryMuxFound = false;
+    for (auto mux : postUnrollingFunc.getOps<MuxOp>()) {
+      if (getLogicBB(mux) == postUnrollingBB) {
+        postUnrollingEntryMux = mux;
+        postUnrollingEntryMuxFound = true;
+        break;
+      }
+    }
+    if (postUnrollingEntryMuxFound) {
+      legacyMode = true;
+      DenseSet<Operation *> visited;
+      if (failed(performDFS(firstMux, postUnrollingEntryMux, visited,
+                            preUnrollingBB, postUnrollingBB))) {
+        llvm::errs() << "Error during DFS traversal for copying buffers\n";
+        return signalPassFailure();
+      }
     }
   }
-  if (!postUnrollingEntryMuxFound) {
-    llvm::errs() << "Could not find entry MuxOp in post-unrolling function at "
-                    "BB: "
-                 << postUnrollingBB << "\n";
-    return signalPassFailure();
-  }
 
-  DenseSet<Operation *> visited;
-  if (failed(performDFS(firstMux, postUnrollingEntryMux, visited,
-                        preUnrollingBB, postUnrollingBB))) {
-    llvm::errs() << "Error during DFS traversal for copying buffers\n";
-    return signalPassFailure();
+  if (!legacyMode) {
+    llvm::errs() << "Non-legacy mode\n";
+    llvm::SmallVector<Operation *> preEntryPoints;
+    llvm::SmallVector<Operation *> postEntryPoints;
+    preUnrollingFunc.walk([&](Operation *op) {
+      if (getLogicBB(op) != preUnrollingBB)
+        return;
+      for (OpOperand &operand : op->getOpOperands()) {
+        Operation *defOp = operand.get().getDefiningOp();
+        if (defOp && getLogicBB(defOp) == preUnrollingBB - 1) {
+          preEntryPoints.push_back(op);
+        }
+      }
+    });
+    postUnrollingFunc.walk([&](Operation *op) {
+      if (getLogicBB(op) != postUnrollingBB)
+        return;
+      for (OpOperand &operand : op->getOpOperands()) {
+        Operation *defOp = operand.get().getDefiningOp();
+        if (defOp && getLogicBB(defOp) == postUnrollingBB - 1) {
+          postEntryPoints.push_back(op);
+        }
+      }
+    });
+    if (preEntryPoints.size() != postEntryPoints.size()) {
+      llvm::errs() << "Mismatch in number of entry point operations\n";
+      return signalPassFailure();
+    }
+    DenseSet<Operation *> visited;
+    for (size_t i = 0; i < preEntryPoints.size(); ++i) {
+      Operation *preOp = preEntryPoints[i];
+      Operation *postOp = postEntryPoints[i];
+      if (failed(performDFS(preOp, postOp, visited, preUnrollingBB,
+                            postUnrollingBB))) {
+        llvm::errs() << "Error during DFS traversal for copying buffers\n";
+        return signalPassFailure();
+      }
+    }
   }
 }
