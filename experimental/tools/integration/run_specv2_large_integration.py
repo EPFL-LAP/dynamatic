@@ -600,7 +600,7 @@ def main():
                     "python3", DYNAMATIC_ROOT / "experimental" / "tools" /
                     "integration" / "run_specv2_large_integration.py",
                     "single_loop_unrolled_2",
-                    "--n", "4",  # TODO
+                    "--n", str(n),
                     "--resolver",
                     "--out", "out_copy_src_eager", "--factor", "2",
                     "--as-copy-src"
