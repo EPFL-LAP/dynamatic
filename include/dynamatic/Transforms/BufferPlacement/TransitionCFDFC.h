@@ -34,7 +34,7 @@ struct TransitionNode {
   mlir::Operation *op;
   /// The step index of the transition sequence (starts at 0).
   unsigned step;
-  /// Unique ID for the node in the graph (index in the nodes vector).
+  /// Index in the nodes vector.
   size_t id;
 
   TransitionNode(mlir::Operation *op, unsigned step, size_t id)
@@ -62,6 +62,9 @@ public:
 
   void dumpGraphViz(llvm::StringRef filename);
 
+  /// Finds reconvergent paths between Forks and Joins (Merges) and dumps them to a .dot file
+  void findAndDumpReconvergentPaths(llvm::StringRef outputDir);
+
 private:
   /// The function being analyzed.
   handshake::FuncOp funcOp;
@@ -83,6 +86,12 @@ private:
 
   /// Helper for DFS.
   void dfsVisit(size_t u, std::vector<bool> &visited, llvm::raw_ostream &os);
+
+  /// Reverse adjacency list for backward traversal: dst -> list of src.
+  std::vector<std::vector<size_t>> revAdjList;
+
+  /// Builds the reverse adjacency list if not already built.
+  void buildReverseAdjList();
 };
 
 } // namespace buffer
