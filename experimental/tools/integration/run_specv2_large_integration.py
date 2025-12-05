@@ -572,6 +572,7 @@ def main():
                 return fail(id, "Failed on post-speculation")
 
     # Buffer placement (FPGA20)
+    timing_model = DYNAMATIC_ROOT / "data" / "components.json"
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
     start = time.time()
     if args.min_buffering:
@@ -669,7 +670,7 @@ def main():
         with open(handshake_buffered, "w") as f:
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_post_speculation,
-                f"--handshake-place-buffers=algorithm=on-merges frequencies={updated_frequencies} target-period={args.cp} timeout=7200 dump-logs"
+                f"--handshake-place-buffers=algorithm=on-merges frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=7200 dump-logs"
             ],
                 stdout=f,
                 stderr=sys.stdout,
@@ -681,7 +682,6 @@ def main():
                 return fail(id, "Failed to place on-merges buffers")
     else:
         # Buffer placement (FPGA20)
-        timing_model = DYNAMATIC_ROOT / "data" / "components.json"
         with open(handshake_buffered, "w") as f:
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_post_speculation,
