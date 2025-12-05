@@ -205,6 +205,16 @@ def HandshakeCopyBuffers : DynamaticPass<"handshake-copy-buffers"> {
   ];
 }
 
+def HandshakeCutBBsByBuffers : DynamaticPass<"handshake-cut-bbs-by-buffers"> {
+  let summary = "Cut BBs by buffers";
+  let description = [{
+  }];
+  let options = [
+    Option<"preBB", "pre-bb", "unsigned", "", "">,
+    Option<"postBB", "post-bb", "unsigned", "", "">,
+  ];
+}
+
 def SpecV1Adaptor : DynamaticPass<"handshake-spec-v1-adaptor"> {
   let summary = "Place Speculation operations";
   let description = [{

@@ -14,6 +14,7 @@ add_dynamatic_library(DynamaticSpeculationV2
   SpecV1Adaptor.cpp
   SpecV1PostAdaptor.cpp
   HandshakeCopyBuffers.cpp
+  HandshakeCutBBsByBuffers.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
