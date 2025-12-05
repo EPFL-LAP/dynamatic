@@ -105,7 +105,9 @@ def main():
         "--baseline", action='store_true',
         help="Baseline generation")
     parser.add_argument(
-        "--min-buffering", action='store_true')
+        "--min-buffering", action='store_true')  # TODO: rename to copy-buffers
+    parser.add_argument(
+        "--on-merges", action='store_true')
     parser.add_argument(
         "--as-copy-src", action='store_true')
     parser.add_argument(
@@ -662,6 +664,21 @@ def main():
                 print("Placed simple buffers")
             else:
                 return fail(id, "Failed to place simple buffers")
+    elif args.on_merges:
+        # Buffer placement (on merges)
+        with open(handshake_buffered, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_post_speculation,
+                f"--handshake-place-buffers=algorithm=on-merges frequencies={updated_frequencies} target-period={args.cp} timeout=7200 dump-logs"
+            ],
+                stdout=f,
+                stderr=sys.stdout,
+                cwd=comp_out_dir
+            )
+            if result.returncode == 0:
+                print("Placed on-merges buffers")
+            else:
+                return fail(id, "Failed to place on-merges buffers")
     else:
         # Buffer placement (FPGA20)
         timing_model = DYNAMATIC_ROOT / "data" / "components.json"
