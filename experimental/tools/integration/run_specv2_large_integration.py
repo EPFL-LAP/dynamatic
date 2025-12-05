@@ -107,6 +107,8 @@ def main():
     parser.add_argument(
         "--min-buffering", action='store_true')
     parser.add_argument(
+        "--as-copy-src", action='store_true')
+    parser.add_argument(
         "--kmp", action='store_true')
     parser.add_argument(
         "--pre_unrolling")
@@ -571,6 +573,48 @@ def main():
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
     start = time.time()
     if args.min_buffering:
+        if "single_loop" in kernel_name:
+            if args.baseline:
+                # preUnrolling = f"/home/shundroid/dynamatic/integration-test/{kernel_name}/copy_src_baseline.mlir"
+                result = subprocess.run([
+                    "python3", DYNAMATIC_ROOT / "experimental" / "tools" /
+                    "integration" / "run_specv2_large_integration.py",
+                    "single_loop_unrolled_2",
+                    "--baseline", "--out", "out_copy_src_baseline", "--factor", "2",
+                    "--as-copy-src"
+                ],
+                    stdout=sys.stdout,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Generated copy-src for baseline")
+                else:
+                    return fail(id, "Failed to generate copy-src for baseline")
+                preUnrolling = DYNAMATIC_ROOT / "integration-test" / "single_loop_unrolled_2" / \
+                    "out_copy_src_baseline" / "comp" / "handshake_cut_by_buffers.mlir"
+            else:
+                # preUnrolling = f"/home/shundroid/dynamatic/integration-test/{kernel_name}/copy_src_eager.mlir"
+                result = subprocess.run([
+                    "python3", DYNAMATIC_ROOT / "experimental" / "tools" /
+                    "integration" / "run_specv2_large_integration.py",
+                    "single_loop_unrolled_2",
+                    "--n", "4",  # TODO
+                    "--resolver",
+                    "--out", "out_copy_src_eager", "--factor", "2",
+                    "--as-copy-src"
+                ],
+                    stdout=sys.stdout,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Generated copy-src for baseline")
+                else:
+                    return fail(id, "Failed to generate copy-src for baseline")
+                preUnrolling = DYNAMATIC_ROOT / "integration-test" / "single_loop_unrolled_2" / \
+                    "out_copy_src_eager" / "comp" / "handshake_cut_by_buffers.mlir"
+        else:
+            print("not supported kernel: ", kernel_name)
+            return fail(id, "not supported kernel for min-buffering")
         with open(handshake_buffered, "w") as f:
             passes = []
             if "single_loop" in kernel_name:
@@ -580,7 +624,7 @@ def main():
                     ])
                 passes.append(
                     f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb=2 post-unrolling-bb={args.factor}")
-            if "bisection" in kernel_name:
+            elif "bisection" in kernel_name:
                 if args.baseline:
                     for i in range(args.factor - 1):
                         for j in range(10):
@@ -603,6 +647,9 @@ def main():
                         passes.extend([
                             f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb={7 + j + 2} post-unrolling-bb={last_base + j + 2}",
                         ])
+            else:
+                print("not supported kernel: ", kernel_name)
+                return fail(id, "not supported kernel for min-buffering")
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_post_speculation,
                 *passes
@@ -634,6 +681,33 @@ def main():
                 return fail(id, "Failed to place simple buffers")
     end = time.time()
     print(f"Buffer placement time: {end - start} seconds")
+
+    if args.as_copy_src:
+        if "single_loop" in kernel_name:
+            pre_bb = 1
+            post_bb = 2
+        else:
+            print("not supported kernel: ", kernel_name)
+            return fail(id, "not supported kernel for copy-src")
+        handshake_cut_by_buffers = os.path.join(
+            comp_out_dir, "handshake_cut_by_buffers.mlir")
+        with open(handshake_cut_by_buffers, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_buffered,
+                f"--handshake-cut-bbs-by-buffers=pre-bb={pre_bb} post-bb={post_bb}"
+            ],
+                stdout=f,
+                stderr=sys.stdout
+            )
+            if result.returncode == 0:
+                print("Cut by buffers")
+            else:
+                return fail(id, "Failed to cut by buffers")
+        return {
+            "id": id,
+            "msg": "copy-src generation succeeded",
+            "status": "pass"
+        }
 
     # handshake canonicalization
     handshake_canonicalized = os.path.join(
