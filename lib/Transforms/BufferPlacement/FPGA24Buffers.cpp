@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements a stall-eliminating buffer placement algorithm for dataflow circuits.
+// Implements a stall-eliminating buffer placement algorithm for dataflow
+// circuits.
 //
 //===----------------------------------------------------------------------===//
 
@@ -44,7 +45,8 @@ FPGA24Buffers::FPGA24Buffers(CPSolver::SolverKind solverKind, int timeout,
     setup();
 }
 
-// NOTE: This contains the same logic as FPGA20Buffers::extractResult, this is temporary. 
+// NOTE: This contains the same logic as FPGA20Buffers::extractResult, this is
+// temporary.
 void FPGA24Buffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
   for (auto &[channel, chVars] : vars.channelVars) {
@@ -105,7 +107,8 @@ void FPGA24Buffers::extractResult(BufferPlacement &placement) {
   populateCFDFCThroughputAndOccupancy();
 }
 
-// TODO: Same channel constraints as FPGA20Buffers::addCustomChannelConstraints, this is temporary. 
+// TODO: Same channel constraints as FPGA20Buffers::addCustomChannelConstraints,
+// this is temporary.
 void FPGA24Buffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
@@ -159,19 +162,21 @@ void FPGA24Buffers::addCustomChannelConstraints(Value channel) {
 // TODO: Same setup as FPGA20Buffers::setup, this is temporary.
 void FPGA24Buffers::setup() {
   for (auto &transition : funcInfo.archs) {
-    llvm::errs() << transition.srcBB << "->" << transition.dstBB << "\n"; 
+    llvm::errs() << transition.srcBB << "->" << transition.dstBB << "\n";
   }
 
-    // --- START INSERTION ---
+  // --- START INSERTION ---
   // Convert SmallVector to std::vector
-  std::vector<experimental::ArchBB> sequence(funcInfo.archs.begin(), funcInfo.archs.end());
-  
+  std::vector<experimental::ArchBB> sequence(funcInfo.archs.begin(),
+                                             funcInfo.archs.end());
+
   // Create the transition graph
   TransitionCFDFC transGraph(funcInfo.funcOp, sequence);
-  
+
   // Run DFS and dump graph
   transGraph.runDFS();
   transGraph.dumpGraphViz("transition_cfdfc.dot");
+  transGraph.findAndDumpReconvergentPaths("."); // Add this line
   // --- END INSERTION ---
 
   // Signals for which we have variables
