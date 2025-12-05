@@ -414,6 +414,11 @@ def main():
     if args.decide_n is not None:
         original_kernel_name = kernel_name.split("_unrolled")[0]
         decide_n_out = os.path.join(comp_out_dir, "decide_n.txt")
+        if args.transformed_code:
+            original_transformed = args.transformed_code.split("_unrolled")[
+                0] + ".c"
+        else:
+            original_transformed = f"{original_kernel_name}.c"
         with open(decide_n_out, "w") as f:
             result = subprocess.run([
                 "python3", DYNAMATIC_ROOT / "experimental/tools/integration/run_specv2_integration.py",
@@ -422,7 +427,8 @@ def main():
                 "--cp", "7.00",
                 "--resolver",
                 "--decide-n", args.decide_n,
-                "--only-decide-n"
+                "--only-decide-n",
+                "--transformed-code", original_transformed,
             ],
                 stdout=f,
                 stderr=sys.stdout
@@ -442,9 +448,17 @@ def main():
     else:
         bbs_set = []
         # UPDATE THIS!!!!!
-        for i in range(1, args.factor+1):
-            bbs_set.append([i])
+        if "bisection" in kernel_name:
+            for i in range(args.factor):
+                base = 10*i+2
+                bbs_set.append([base, base+1, base+2, base+3])
+        elif "single_loop" in kernel_name:
+            for i in range(1, args.factor+1):
+                bbs_set.append([i])
+        else:
+            print("Kernel not supported for bbs_set generation")
         bbs_set.reverse()
+        print(bbs_set)
         prev = handshake_transformed
         passes = []
         for bbs in bbs_set:
@@ -556,14 +570,39 @@ def main():
             preUnrolling = f"/home/shundroid/dynamatic/integration-test/{kernel_name}/copy_src_eager.mlir"
         with open(handshake_buffered, "w") as f:
             passes = []
-            for i in range(1, args.factor-1+1):
-                passes.extend([
-                    f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb=1 post-unrolling-bb={i}",
-                ])
+            if "single_loop" in kernel_name:
+                for i in range(1, args.factor-1+1):
+                    passes.extend([
+                        f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb=1 post-unrolling-bb={i}",
+                    ])
+                passes.append(
+                    f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb=2 post-unrolling-bb={args.factor}")
+            if "bisection" in kernel_name:
+                if args.baseline:
+                    for i in range(args.factor - 1):
+                        for j in range(10):
+                            passes.extend([
+                                f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb={j + 2} post-unrolling-bb={i * 10 + j + 2}",
+                            ])
+                    last_base = (args.factor - 1) * 10
+                    for j in range(10):
+                        passes.extend([
+                            f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb={10 + j + 2} post-unrolling-bb={last_base + j + 2}",
+                        ])
+                else:
+                    for i in range(args.factor - 1):
+                        for j in range(7):
+                            passes.extend([
+                                f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb={j + 2} post-unrolling-bb={i * 7 + j + 2}",
+                            ])
+                    last_base = (args.factor - 1) * 7
+                    for j in range(7):
+                        passes.extend([
+                            f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb={7 + j + 2} post-unrolling-bb={last_base + j + 2}",
+                        ])
             result = subprocess.run([
                 DYNAMATIC_OPT_BIN, handshake_post_speculation,
-                *passes,
-                f"--handshake-copy-buffers=pre-unrolling-path={preUnrolling} pre-unrolling-bb=2 post-unrolling-bb={args.factor}",
+                *passes
             ],
                 stdout=f,
                 stderr=sys.stdout,
