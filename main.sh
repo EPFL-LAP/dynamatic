@@ -627,4 +627,17 @@ python3 experimental/tools/integration/run_specv2_large_integration.py single_lo
 # timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_baseline_7ns single_loop_unrolled_160 7.000 3.500
 # timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_auto_7ns single_loop_unrolled_160 7.000 3.500
 
+# prof-cache is not used
+# Buffer copy (TODO)
+# python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --min-buffering --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
+# python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --min-buffering --baseline --use-prof-cache --out out_baseline_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
+
+# On-merges
+python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
+python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --baseline --use-prof-cache --out out_baseline_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
+
+# Longer timeout
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_baseline_7ns bisection_unrolled_16 7.000 3.500
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_auto_7ns bisection_unrolled_16 7.000 3.500
+
 date > end_time.txt
