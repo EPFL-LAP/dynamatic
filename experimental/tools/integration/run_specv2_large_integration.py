@@ -109,6 +109,8 @@ def main():
     parser.add_argument(
         "--kmp", action='store_true')
     parser.add_argument(
+        "--pre_unrolling")
+    parser.add_argument(
         "--factor", type=int)
 
     args = parser.parse_args()
@@ -116,6 +118,8 @@ def main():
     n = args.n
     variable = args.variable
     transformed_code_filename = args.transformed_code
+
+    preUnrolling = args.pre_unrolling
 
     c_file = INTEGRATION_FOLDER / test_name / f"{test_name}.c"
     # if result["status"] == "pass":
@@ -443,6 +447,9 @@ def main():
             n = int(n_line.split(":")[-1].strip())
         print(f"Decided n = {n}")
 
+    spec_json_folder = os.path.join(comp_out_dir, "spec_jsons")
+    os.makedirs(spec_json_folder, exist_ok=True)
+
     if args.disable_spec:
         handshake_post_speculation = handshake_transformed
     else:
@@ -464,7 +471,7 @@ def main():
         for bbs in bbs_set:
             # write specv2.json
             spec_json_path = os.path.join(
-                c_file_dir, f"specv2_{bbs[0]}.json")
+                spec_json_folder, f"specv2_{bbs[0]}.json")
             spec_json = {
                 "spec-loop-bbs": bbs
             }
@@ -502,7 +509,7 @@ def main():
             prev_updated_frequencies = updated_frequencies
             for bbs in bbs_set:
                 spec_json_path = os.path.join(
-                    c_file_dir, f"specv2_{bbs[0]}.json")
+                    spec_json_folder, f"specv2_{bbs[0]}.json")
                 # Speculation
                 handshake_speculation = os.path.join(
                     comp_out_dir, f"handshake_speculation_{bbs[0]}.mlir")
@@ -564,10 +571,6 @@ def main():
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
     start = time.time()
     if args.min_buffering:
-        if args.baseline:
-            preUnrolling = f"/home/shundroid/dynamatic/integration-test/{kernel_name}/copy_src_baseline.mlir"
-        else:
-            preUnrolling = f"/home/shundroid/dynamatic/integration-test/{kernel_name}/copy_src_eager.mlir"
         with open(handshake_buffered, "w") as f:
             passes = []
             if "single_loop" in kernel_name:
