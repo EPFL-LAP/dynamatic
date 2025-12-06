@@ -167,34 +167,19 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
 /// the set; the product of all such paths are added".
 static BoolExpression *enumeratePaths(Block *start, Block *end,
                                       const ftd::BlockIndexing &bi,
-                                      const DenseSet<Block *> &controlDeps,
-                                      ArrayRef<Block *> toAvoid = {}) {
+                                      const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
 
   // Find all the paths from the producer to the consumer, using a DFS
-  std::vector<std::vector<Block *>> allPaths =
-      findAllPaths(start, end, bi, nullptr, toAvoid);
+  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
 
   // If the start and end block are the same (e.g., BB0 to BB0) and there is no
   // real path between them, then consider the sop = 1
   if (start == end && allPaths.size() == 0)
     sop = BoolExpression::boolOne();
-  if (start == end) {
-    llvm::errs() << "Start == End: ";
-    start->printAsOperand(llvm::errs());
-    llvm::errs() << "\nAll paths:\n";
 
-    for (const auto &path : allPaths) {
-      llvm::errs() << "  Path: ";
-      for (Block *bb : path) {
-        bb->printAsOperand(llvm::errs());
-        llvm::errs() << " ";
-      }
-      llvm::errs() << "\n";
-    }
-  }
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
 
@@ -679,7 +664,7 @@ struct LocalCFG {
   Block *newProd = nullptr;
   // The consumer block in the local CFG.
   Block *newCons = nullptr;
-  // A replicated block used when the producer is revisited (for loops).
+  // A replicated block used for self-loop delivery (Producer == Consumer).
   Block *secondVisitBB = nullptr;
   // A unique sink (exit) block to which all terminal paths lead.
   Block *sinkBB = nullptr;
@@ -700,9 +685,7 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
   auto L = std::make_unique<LocalCFG>();
   Location loc = builder.getUnknownLoc();
 
-  // Create a temporary container for the region.
-  // MLIR regions must be attached to an operation.
-  // A dummy function is created to keep the local CFG syntactically valid.
+  // Setup Region Container
   OpBuilder::InsertionGuard guard(builder);
   auto funcType = builder.getFunctionType({}, {});
   auto dummyFunc =
@@ -711,140 +694,164 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
   L->region = &R;
   L->containerOp = dummyFunc;
 
-  // Initialize entry and sink blocks.
-  // The entry represents the producer.
-  // The sink is a unified exit block for all terminal paths.
+  // Sink Block: The unified exit for all paths (valid or suppressed).
+  L->sinkBB = new Block();
+  R.push_back(L->sinkBB);
+  L->origMap[L->sinkBB] = nullptr;
+
+  // Producer Block: The entry point of the local CFG.
   Block *entry = new Block();
-  L->region->push_back(entry);
+  R.push_back(entry);
   L->newProd = entry;
   L->origMap[entry] = origProd;
 
-  L->sinkBB = new Block();
-  L->region->push_back(L->sinkBB);
-  L->origMap[L->sinkBB] = nullptr;
-
-  // Build the reachable subgraph using DFS.
-  // Each original block is cloned once.
-  // Edges returning to the producer are redirected to a "secondVisit" node.
   DenseMap<Block *, Block *> cloned;
   DenseSet<Block *> visited;
   cloned[origProd] = entry;
 
-  std::function<void(Block *)> dfs = [&](Block *orig) {
-    Block *clone = cloned[orig];
-    visited.insert(orig);
+  // DFS Function
+  std::function<void(Block *, Block *)> dfs = [&](Block *currOrig, Block *currNew) {
+    visited.insert(currOrig);
 
-    auto *term = orig->getTerminator();
-    SmallVector<Block *, 2> succs;
-    if (term)
-      for (auto it = term->successor_begin(), e = term->successor_end();
-           it != e; ++it)
-        succs.push_back(*it);
-
-    SmallVector<Block *, 2> newSuccs;
-
-    // No successors, or the block is the consumer (different from the producer)
-    // In such cases, connect the block directly to the sink.
-    if (succs.empty() || (orig == origCons && orig != origProd)) {
-      builder.setInsertionPointToEnd(clone);
+    auto *term = currOrig->getTerminator();
+    
+    // Dead End: Implicit flow to Sink.
+    if (!term || term->getNumSuccessors() == 0) {
+      builder.setInsertionPointToEnd(currNew);
       builder.create<cf::BranchOp>(loc, L->sinkBB);
       return;
     }
 
-    for (Block *v : succs) {
-      // Successor revisits the producer
-      // Redirect this edge to a single secondVisitBB, which will later branch
-      // to the sink.
-      if (v == origProd) {
-        if (!L->secondVisitBB) {
-          L->secondVisitBB = new Block();
-          L->region->push_back(L->secondVisitBB);
-          L->origMap[L->secondVisitBB] = nullptr;
+    // LIST 1: The distinct successors in the NEW Local CFG for the current block.
+    // Used to construct the BranchOp/CondBranchOp.
+    SmallVector<Block *, 2> localSuccessors;
+
+    // LIST 2: The successors that are valid and new, requiring further DFS traversal.
+    // Stored as pairs: {Original Successor, New Local Block}.
+    SmallVector<std::pair<Block*, Block*>, 2> successorsToVisit;
+
+    for (auto it = term->successor_begin(), e = term->successor_end(); it != e; ++it) {
+      Block *succOrig = *it;
+      Block *nextBlockInLocalCFG = nullptr; // Where the edge points to in the new graph
+
+      // --- LOGIC: Determine the edge destination based on rules ---
+
+      // Case 1: Consumer Reached (Valid Delivery)
+      if (succOrig == origCons) {
+        if (succOrig == origProd) {
+            // Self-loop delivery
+            if (!L->secondVisitBB) {
+                L->secondVisitBB = new Block();
+                R.push_back(L->secondVisitBB);
+                L->origMap[L->secondVisitBB] = nullptr; 
+                // Terminate SecondVisit immediately to Sink
+                OpBuilder::InsertionGuard g(builder);
+                builder.setInsertionPointToEnd(L->secondVisitBB);
+                builder.create<cf::BranchOp>(loc, L->sinkBB);
+            }
+            nextBlockInLocalCFG = L->secondVisitBB;
+            L->newCons = L->secondVisitBB;
+        } 
+        else {
+            // Standard delivery
+            if (!L->newCons || L->newCons == L->secondVisitBB) {
+                 Block *proxy = new Block();
+                 R.push_back(proxy);
+                 L->origMap[proxy] = succOrig;
+                 L->newCons = proxy;
+                 // Terminate Proxy immediately to Sink
+                 OpBuilder::InsertionGuard g(builder);
+                 builder.setInsertionPointToEnd(proxy);
+                 builder.create<cf::BranchOp>(loc, L->sinkBB);
+            }
+            nextBlockInLocalCFG = L->newCons;
         }
-        newSuccs.push_back(L->secondVisitBB);
-        continue;
+      }
+      // Case 2: Producer revisited, consumer not reached (Invalid)
+      else if (succOrig == origProd) {
+        nextBlockInLocalCFG = L->sinkBB;
+      }
+      // Case 3: Visited
+      else if (visited.count(succOrig)) {
+        if (cloned.count(succOrig)) {
+            nextBlockInLocalCFG = cloned[succOrig];
+        } else {
+            nextBlockInLocalCFG = L->sinkBB;
+        }
+      }
+      // Case 4: Invalid Back-edge
+      else if (bi.isLess(succOrig, currOrig)) {
+        nextBlockInLocalCFG = L->sinkBB;
+      }
+      // Case 5: Valid Forward Edge (Continue Traversal)
+      else {
+        Block *newSucc = new Block();
+        R.push_back(newSucc);
+        cloned[succOrig] = newSucc;
+        L->origMap[newSucc] = succOrig;
+
+        nextBlockInLocalCFG = newSucc;
+        // Schedule this node for DFS visitation
+        successorsToVisit.push_back({succOrig, newSucc});
       }
 
-      // Stop traversal after encountering a block before producer.
-      if (bi.isLess(v, origProd) && v != origCons) {
-        newSuccs.push_back(L->sinkBB);
-        continue;
-      }
-
-      // Regular successor
-      // Clone it if not already cloned.
-      Block *newSucc = nullptr;
-      if (!cloned.count(v)) {
-        newSucc = new Block();
-        L->region->push_back(newSucc);
-        cloned[v] = newSucc;
-        L->origMap[newSucc] = v;
-      } else {
-        newSucc = cloned[v];
-      }
-
-      newSuccs.push_back(newSucc);
-
-      if (!visited.contains(v))
-        dfs(v);
+      // Add the determined destination to the list of local successors
+      localSuccessors.push_back(nextBlockInLocalCFG);
     }
 
-    // Create a terminator in the cloned block that reflects its control-flow
-    // structure.
-    builder.setInsertionPointToEnd(clone);
-    if (newSuccs.size() == 1) {
-      builder.create<cf::BranchOp>(loc, newSuccs[0]);
-    } else if (newSuccs.size() == 2) {
-      // Use a dummy constant as a condition for a two-way branch.
+    // --- CONSTRUCTION: Create the branch instruction ---
+    
+    builder.setInsertionPointToEnd(currNew);
+    if (localSuccessors.size() == 1) {
+      builder.create<cf::BranchOp>(loc, localSuccessors[0]);
+    } else if (localSuccessors.size() == 2) {
+      // Placeholder condition for 2-way branches
       Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-      builder.create<cf::CondBranchOp>(loc, cond, newSuccs[0], newSuccs[1]);
+      builder.create<cf::CondBranchOp>(loc, cond, localSuccessors[0], localSuccessors[1]);
     } else {
-      // For nodes with more than two successors, connect to the sink by
-      // default.
+      // Default fall-through for complex control flow
       builder.create<cf::BranchOp>(loc, L->sinkBB);
+    }
+
+    // --- TRAVERSAL: Continue DFS ---
+    for (auto &pair : successorsToVisit) {
+        dfs(pair.first, pair.second);
     }
   };
 
-  dfs(origProd);
+  // Start DFS
+  dfs(origProd, L->newProd);
 
-  // Connect the secondVisitBB (if any) to the sink.
-  if (L->secondVisitBB) {
-    builder.setInsertionPointToEnd(L->secondVisitBB);
-    builder.create<cf::BranchOp>(loc, L->sinkBB);
-  }
-
-  // Add a return terminator to the sink block.
-  // This ensures the region has a valid exit.
+  // Finalize Sink
   builder.setInsertionPointToEnd(L->sinkBB);
   builder.create<func::ReturnOp>(loc);
 
-  // Identify the cloned consumer block in the new CFG.
-  if (origCons == origProd)
-    L->newCons = L->secondVisitBB;
-  else if (cloned.count(origCons))
-    L->newCons = cloned[origCons];
-  else
-    L->newCons = L->newProd;
+  if (!L->newCons) L->newCons = L->sinkBB;
 
-  // Compute topological order of the local CFG.
-  // A post-order DFS ensures successors are visited before predecessors,
-  // which is required for deterministic Boolean or BDD analysis.
-  visited.clear();
+  // 4. Compute Topological Order
+  DenseSet<Block *> visitedTopo;
   SmallVector<Block *> order;
   std::function<void(Block *)> topo = [&](Block *u) {
-    if (!u || visited.contains(u))
-      return;
-    visited.insert(u);
+    if (!u || visitedTopo.contains(u)) return;
+    visitedTopo.insert(u);
     if (auto *term = u->getTerminator())
-      for (auto it = term->successor_begin(), e = term->successor_end();
-           it != e; ++it)
+      for (auto it = term->successor_begin(), e = term->successor_end(); it != e; ++it)
         topo(*it);
     order.push_back(u);
   };
 
-  topo(entry);
+  topo(L->newProd);
   std::reverse(order.begin(), order.end());
   L->topoOrder = std::move(order);
+
+  // 5. Physical Reordering
+  // Reorder blocks in the region list to match the topological order.
+  // This does not change the graph structure (pointers), only the memory layout/print order.
+  for (Block *b : L->topoOrder) {
+    if (b != L->sinkBB) {
+        b->moveBefore(L->sinkBB);
+    }
+  }
 
   return L;
 }
@@ -862,7 +869,7 @@ static void insertDirectSuppression(
   Value muxCondition = nullptr;
 
   std::string funcName = funcOp.getName().str();
-  std::string dir = "/home/yuaqin/dynamatic-scripts/TempOutputs/";
+  std::string dir = "/home/yuaqin/new/dynamatic-scripts/TempOutputs/";
   std::string cfgFile = dir + funcName + "_localcfg.txt";
   std::string logFile = dir + funcName + "_debuglog.txt";
   std::error_code EC_log;
@@ -877,19 +884,13 @@ static void insertDirectSuppression(
                              (consumer->getOperand(1) == connection ||
                               consumer->getOperand(2) == connection);
 
-  bool accountMuCondition = llvm::isa<handshake::MuxOp>(consumer) &&
-                            consumer->hasAttr(FTD_EXPLICIT_MU) &&
-                            (consumer->getOperand(1) == connection ||
-                             consumer->getOperand(2) == connection);
-  if (accountMuCondition)
-    out << "[FTD] Accounting for MU condition\n"; 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
       cdAnalysis[producerBlock].forwardControlDeps;
 
   // Get the control dependencies from the consumer
   DenseSet<Block *> consControlDeps =
-      cdAnalysis[consumer->getBlock()].forwardControlDeps;
+      cdAnalysis[consumerBlock].forwardControlDeps;
 
   out << "[FTD] Producer block: ";
   if (producerBlock)
@@ -950,30 +951,6 @@ static void insertDirectSuppression(
   if (fProd->type == experimental::boolean::ExpressionType::Zero)
     return;
 
-  Block *anotherMuInputBlock = nullptr;
-  if (accountMuCondition) {
-    // Pick the other data input of the MU mux
-    Value anotherInput = (consumer->getOperand(1) == connection)
-                             ? consumer->getOperand(2)
-                             : consumer->getOperand(1);
-
-    Operation *owner = anotherInput.getDefiningOp();
-
-    // Traverse upwards while the current owner is a conditional branch
-    while (auto cbr = llvm::dyn_cast_or_null<cf::CondBranchOp>(owner)) {
-      Value dataInput = cbr->getOperand(1);
-      owner = dataInput.getDefiningOp();
-    }
-
-    if (owner)
-      anotherMuInputBlock = owner->getBlock();
-    else
-      llvm::report_fatal_error("MU input value has no defining operation.");
-  }
-
-  ArrayRef<Block *> anotherMuInputBlocks =
-    anotherMuInputBlock ? ArrayRef<Block *>(&anotherMuInputBlock, 1)
-                        : ArrayRef<Block *>({});
 
   auto locGraph =
       buildLocalCFGRegion(rewriter, producerBlock, consumerBlock, bi);
@@ -981,10 +958,6 @@ static void insertDirectSuppression(
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
-  out << "[FTD] Avoid Block: ";
-  if (anotherMuInputBlock)
-    anotherMuInputBlock->printAsOperand(out);
-  out << "\n";
   DenseSet<Block *> locConsControlDeps;
   for (Block *nb : locConsControlDepsTmp) {
     Block *orig = locGraph->origMap.lookup(nb);
@@ -993,8 +966,7 @@ static void insertDirectSuppression(
   }
 
   BoolExpression *fCons =
-      enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps,
-                     anotherMuInputBlocks);
+      enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps);
 
   // Debug: append all LocalCFGs to one txt file (no console output)
   {
