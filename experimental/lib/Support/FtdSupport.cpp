@@ -134,7 +134,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       // Do not run DFS if the successor is in the list of blocks to traverse
       bool incorrectPath = false;
       for (auto *toAvoid : blocksToAvoid) {
-        if (toAvoid == successor && bi.isGreater(toAvoid, blockToTraverse)) {
+        if (toAvoid == successor) {
           incorrectPath = true;
           break;
         }

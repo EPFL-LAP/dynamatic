@@ -167,19 +167,34 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
 /// the set; the product of all such paths are added".
 static BoolExpression *enumeratePaths(Block *start, Block *end,
                                       const ftd::BlockIndexing &bi,
-                                      const DenseSet<Block *> &controlDeps) {
+                                      const DenseSet<Block *> &controlDeps,
+                                      ArrayRef<Block *> toAvoid = {}) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
 
   // Find all the paths from the producer to the consumer, using a DFS
-  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
+  std::vector<std::vector<Block *>> allPaths =
+      findAllPaths(start, end, bi, nullptr, toAvoid);
 
   // If the start and end block are the same (e.g., BB0 to BB0) and there is no
   // real path between them, then consider the sop = 1
   if (start == end && allPaths.size() == 0)
     sop = BoolExpression::boolOne();
+  if (start == end) {
+    llvm::errs() << "Start == End: ";
+    start->printAsOperand(llvm::errs());
+    llvm::errs() << "\nAll paths:\n";
 
+    for (const auto &path : allPaths) {
+      llvm::errs() << "  Path: ";
+      for (Block *bb : path) {
+        bb->printAsOperand(llvm::errs());
+        llvm::errs() << " ";
+      }
+      llvm::errs() << "\n";
+    }
+  }
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
 
@@ -680,7 +695,8 @@ struct LocalCFG {
 /// consumer. The subgraph is reconstructed as a region with unique entry
 /// (producer) and exit (sink).
 static std::unique_ptr<LocalCFG>
-buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons) {
+buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
+                    const ftd::BlockIndexing &bi) {
   auto L = std::make_unique<LocalCFG>();
   Location loc = builder.getUnknownLoc();
 
@@ -746,6 +762,12 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons) {
           L->origMap[L->secondVisitBB] = nullptr;
         }
         newSuccs.push_back(L->secondVisitBB);
+        continue;
+      }
+
+      // Stop traversal after encountering a block before producer.
+      if (bi.isLess(v, origProd) && v != origCons) {
+        newSuccs.push_back(L->sinkBB);
         continue;
       }
 
@@ -855,6 +877,12 @@ static void insertDirectSuppression(
                              (consumer->getOperand(1) == connection ||
                               consumer->getOperand(2) == connection);
 
+  bool accountMuCondition = llvm::isa<handshake::MuxOp>(consumer) &&
+                            consumer->hasAttr(FTD_EXPLICIT_MU) &&
+                            (consumer->getOperand(1) == connection ||
+                             consumer->getOperand(2) == connection);
+  if (accountMuCondition)
+    out << "[FTD] Accounting for MU condition\n"; 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
       cdAnalysis[producerBlock].forwardControlDeps;
@@ -922,11 +950,41 @@ static void insertDirectSuppression(
   if (fProd->type == experimental::boolean::ExpressionType::Zero)
     return;
 
-  auto locGraph = buildLocalCFGRegion(rewriter, producerBlock, consumerBlock);
+  Block *anotherMuInputBlock = nullptr;
+  if (accountMuCondition) {
+    // Pick the other data input of the MU mux
+    Value anotherInput = (consumer->getOperand(1) == connection)
+                             ? consumer->getOperand(2)
+                             : consumer->getOperand(1);
+
+    Operation *owner = anotherInput.getDefiningOp();
+
+    // Traverse upwards while the current owner is a conditional branch
+    while (auto cbr = llvm::dyn_cast_or_null<cf::CondBranchOp>(owner)) {
+      Value dataInput = cbr->getOperand(1);
+      owner = dataInput.getDefiningOp();
+    }
+
+    if (owner)
+      anotherMuInputBlock = owner->getBlock();
+    else
+      llvm::report_fatal_error("MU input value has no defining operation.");
+  }
+
+  ArrayRef<Block *> anotherMuInputBlocks =
+    anotherMuInputBlock ? ArrayRef<Block *>(&anotherMuInputBlock, 1)
+                        : ArrayRef<Block *>({});
+
+  auto locGraph =
+      buildLocalCFGRegion(rewriter, producerBlock, consumerBlock, bi);
   ControlDependenceAnalysis locCDA(*locGraph->region);
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
-  
+
+  out << "[FTD] Avoid Block: ";
+  if (anotherMuInputBlock)
+    anotherMuInputBlock->printAsOperand(out);
+  out << "\n";
   DenseSet<Block *> locConsControlDeps;
   for (Block *nb : locConsControlDepsTmp) {
     Block *orig = locGraph->origMap.lookup(nb);
@@ -935,7 +993,8 @@ static void insertDirectSuppression(
   }
 
   BoolExpression *fCons =
-      enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps);
+      enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps,
+                     anotherMuInputBlocks);
 
   // Debug: append all LocalCFGs to one txt file (no console output)
   {
@@ -1145,12 +1204,12 @@ static void insertDirectSuppression(
     llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
     for (auto &p : tmp)
       cofactorList.push_back(p.second);
-    
+
     llvm::errs() << "[CofactorList] ";
     for (const auto &s : cofactorList)
       llvm::errs() << s << " ";
     llvm::errs() << "\n";
-    
+
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
@@ -1242,8 +1301,9 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
       return;
-    // Handle the suppression in all the other cases (including the operand being
-    // a function argument)
+
+    // Handle the suppression in all the other cases (including the operand
+    // being a function argument)
     insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
   }
 }
