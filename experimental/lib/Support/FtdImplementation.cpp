@@ -15,8 +15,8 @@
 #include "experimental/Support/FtdImplementation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
-#include "experimental/Support/BooleanLogic/ROBDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/ROBDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -840,7 +840,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   };
 
   // List all-paths-covering pairs (sorted).
-  auto pairs = robdd.findPairsCoveringAllPaths(startIdx, trueSinkIdx, falseSinkIdx);
+  auto pairs =
+      robdd.findPairsCoveringAllPaths(startIdx, trueSinkIdx, falseSinkIdx);
 
   // No pair → no mux; return `start` condition (maybe inverted).
   if (pairs.empty()) {
@@ -856,7 +857,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
                 nodes[startIdx].falseSucc == trueSinkIdx);
 
     if (!dir && !inv) {
-      llvm::errs() << "convertRobddToCircuit: start node doesn't map to sinks.\n";
+      llvm::errs()
+          << "convertRobddToCircuit: start node doesn't map to sinks.\n";
       llvm::errs() << "  Summary\n";
       llvm::errs() << "    nodes.size = " << nodes.size() << "\n";
       llvm::errs() << "    startIdx   = " << startIdx << "\n";
@@ -971,11 +973,12 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   return muxChain.back().out;
 }
 
-/// Convert the entire ROBDD into a circuit by invoking buildMuxTree on the ROBDD
-/// root with terminal nodes {one, zero}. The result is a MUX tree in which each
-/// variable appears exactly once.
+/// Convert the entire ROBDD into a circuit by invoking buildMuxTree on the
+/// ROBDD root with terminal nodes {one, zero}. The result is a MUX tree in
+/// which each variable appears exactly once.
 static Value convertRobddToCircuit(PatternRewriter &rewriter, Block *block,
-                          const ftd::BlockIndexing &bi, const ROBDD &robdd) {
+                                   const ftd::BlockIndexing &bi,
+                                   const ROBDD &robdd) {
   return buildMuxTree(rewriter, block, bi, robdd, robdd.root(), robdd.one(),
                       robdd.zero());
 }
@@ -1160,7 +1163,8 @@ static void insertDirectSuppression(
                       "insertDirectSuppression.\n";
       std::abort();
     }
-    Value branchCond = convertRobddToCircuit(rewriter, consumer->getBlock(), bi, robdd);
+    Value branchCond =
+        convertRobddToCircuit(rewriter, consumer->getBlock(), bi, robdd);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(

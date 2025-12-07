@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements construction of a Reduced Ordered Binary Decision 
+// This file implements construction of a Reduced Ordered Binary Decision
 // Diagram (ROBDD) from a BoolExpression and basic analysis utilities.
 //
 //===----------------------------------------------------------------------===//
@@ -67,7 +67,7 @@ ROBDD::ROBDD() {
 
 LogicalResult
 ROBDD::buildROBDDFromExpression(BoolExpression *expr,
-                              const std::vector<std::string> &varOrder) {
+                                const std::vector<std::string> &varOrder) {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
@@ -131,7 +131,7 @@ ROBDD::buildROBDDFromExpression(BoolExpression *expr,
 }
 
 void ROBDD::expandFrom(unsigned idx, BoolExpression *residual,
-                     std::vector<char> &expanded) {
+                       std::vector<char> &expanded) {
   if (idx >= order.size() || expanded[idx])
     return;
 
@@ -195,7 +195,7 @@ void ROBDD::expandFrom(unsigned idx, BoolExpression *residual,
 }
 
 std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
-                                                   unsigned t0) const {
+                                             unsigned t0) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
   std::vector<unsigned> subgraph;
@@ -233,8 +233,8 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
   return subgraph;
 }
 
-bool ROBDD::doesPairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
-                            unsigned b) const {
+bool ROBDD::doesPairCoverAllPaths(unsigned root, unsigned t1, unsigned t0,
+                                  unsigned a, unsigned b) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
 
@@ -265,7 +265,8 @@ bool ROBDD::doesPairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsig
 }
 
 std::vector<std::pair<unsigned, unsigned>>
-ROBDD::findPairsCoveringAllPaths(unsigned root, unsigned t1, unsigned t0) const {
+ROBDD::findPairsCoveringAllPaths(unsigned root, unsigned t1,
+                                 unsigned t0) const {
   // Collect and validate the subgraph (sorted, includes root/t1/t0).
   std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
   std::vector<std::pair<unsigned, unsigned>> coverPairs;
