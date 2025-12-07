@@ -56,13 +56,15 @@ public:
   /// Create an empty ROBDD.
   ROBDD();
 
-  /// Build an ROBDD from a minimized boolean expression and a variable order.
-  /// Variables in `varOrder` that do not appear in the expression are ignored.
-  /// Returns `success()` on success, or `failure()` if the input is invalid.
+  /// Build a lightweight ROBDD for CFG reachability analysis.
   ///
-  /// This is a simple method that assumes each variable appears only once in
-  /// the BDD, which matches the case of checking whether a basic block in the
-  /// CFG can be reached.
+  /// Unlike a general ROBDD which may have multiple nodes for the same variable
+  /// (representing different sub-functions), this specialized implementation
+  /// enforces a **one-node-per-variable** constraint.
+  ///
+  /// This design exploits the specific structure of CFG path conditions, allowing
+  /// for a simplified, linear-sized construction without the need for a global
+  /// unique-table for node deduplication.
   mlir::LogicalResult
   buildROBDDFromExpression(BoolExpression *expr,
                            const std::vector<std::string> &varOrder);
@@ -70,15 +72,16 @@ public:
   /// Traverse the subgraph reachable from `root` until either `tTrue` or
   /// `tFalse` (treated as local sinks). Aborts if any path reaches the global
   /// 0/1 terminals prematurely. Returns the list of node indices in the
-  /// subgraph (sorted ascending, always including `root`, `tTrue`, `tFalse`).
+  /// subgraph (sorted in ascending order, always including `root`, `tTrue`, `tFalse`).
   std::vector<unsigned> collectSubgraph(unsigned root, unsigned tTrue,
                                         unsigned tFalse) const;
-
-  /// Enumerate all pairs of vertices that cover all paths within the subgraph
-  /// defined by (root, tTrue, tFalse). Returns pairs sorted lexicographically
-  /// (first ascending, then second ascending).
+  
+  /// Enumerates all non-trivial pairs of vertices that cover all paths within
+  /// the subgraph defined by (root, tTrue, tFalse). Trivial covers (e.g., those containing the root node or both terminals) are explicitly excluded from the results.
+  ///
+  /// Returns pairs sorted lexicographically (first ascending, then second ascending).
   std::vector<std::pair<unsigned, unsigned>>
-  pairCoverAllPathsList(unsigned root, unsigned tTrue, unsigned tFalse) const;
+  findPairsCoveringAllPaths(unsigned root, unsigned tTrue, unsigned tFalse) const;
 
   /// Accessors.
   const std::vector<ROBDDNode> &getnodes() const { return nodes; }
@@ -108,7 +111,7 @@ private:
                   std::vector<char> &expanded);
 
   /// Helper: test whether nodes `a` and `b` cover all paths.
-  bool pairCoverAllPaths(unsigned root, unsigned tTrue, unsigned tFalse,
+  bool doesPairCoverAllPaths(unsigned root, unsigned tTrue, unsigned tFalse,
                          unsigned a, unsigned b) const;
 };
 

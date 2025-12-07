@@ -233,7 +233,7 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
   return subgraph;
 }
 
-bool ROBDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
+bool ROBDD::doesPairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
                             unsigned b) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
@@ -265,7 +265,7 @@ bool ROBDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned 
 }
 
 std::vector<std::pair<unsigned, unsigned>>
-ROBDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
+ROBDD::findPairsCoveringAllPaths(unsigned root, unsigned t1, unsigned t0) const {
   // Collect and validate the subgraph (sorted, includes root/t1/t0).
   std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
   std::vector<std::pair<unsigned, unsigned>> coverPairs;
@@ -273,7 +273,7 @@ ROBDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
   // Scan all pairs in ascending order.
   for (size_t i = 1; i < cand.size() - 2; ++i) {
     for (size_t j = i + 1; j < cand.size(); ++j) {
-      if (pairCoverAllPaths(root, t1, t0, cand[i], cand[j])) {
+      if (doesPairCoverAllPaths(root, t1, t0, cand[i], cand[j])) {
         coverPairs.emplace_back(cand[i], cand[j]);
       }
     }

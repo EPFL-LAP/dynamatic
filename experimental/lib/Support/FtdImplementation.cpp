@@ -840,7 +840,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   };
 
   // List all-paths-covering pairs (sorted).
-  auto pairs = robdd.pairCoverAllPathsList(startIdx, trueSinkIdx, falseSinkIdx);
+  auto pairs = robdd.findPairsCoveringAllPaths(startIdx, trueSinkIdx, falseSinkIdx);
 
   // No pair → no mux; return `start` condition (maybe inverted).
   if (pairs.empty()) {
