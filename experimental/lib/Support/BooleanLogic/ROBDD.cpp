@@ -233,60 +233,76 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
   return subgraph;
 }
 
-bool ROBDD::doesPairCoverAllPaths(unsigned root, unsigned t1, unsigned t0,
-                                  unsigned a, unsigned b) const {
-  std::vector<char> vis(nodes.size(), 0);
-  std::vector<unsigned> st{root};
+bool ROBDD::doesPairCoverAllPaths(unsigned rootNode, unsigned trueTerminal,
+                                  unsigned falseTerminal, unsigned coverNodeA,
+                                  unsigned coverNodeB) const {
+  // Use a visited array to avoid cycles and redundant processing.
+  std::vector<char> visited(nodes.size(), 0);
+  std::vector<unsigned> workStack{rootNode};
 
-  auto push = [&](unsigned v) {
-    if (v == a || v == b)
-      return; // skip banned nodes
-    if (v < nodes.size() && !vis[v])
-      st.push_back(v);
+  // Helper to push valid successors to the stack.
+  auto pushToStack = [&](unsigned v) {
+    // If we hit either of the covering nodes, the path is "blocked" or
+    // "covered" by them, so we stop traversing this path (effectively treating
+    // them as sinks).
+    if (v == coverNodeA || v == coverNodeB)
+      return;
+
+    if (v < nodes.size() && !visited[v])
+      workStack.push_back(v);
   };
 
-  while (!st.empty()) {
-    unsigned u = st.back();
-    st.pop_back();
-    if (u >= nodes.size() || vis[u] || u == a || u == b)
-      continue;
-    vis[u] = 1;
+  while (!workStack.empty()) {
+    unsigned u = workStack.back();
+    workStack.pop_back();
 
-    // Reaching either sink means not covering all paths.
-    if (u == t1 || u == t0)
+    // Standard DFS checks: bounds, visited, or hitting the cover nodes (double
+    // check).
+    if (u >= nodes.size() || visited[u] || u == coverNodeA || u == coverNodeB)
+      continue;
+    visited[u] = 1;
+
+    // If we managed to reach either terminal without hitting coverNodeA or
+    // coverNodeB, then the pair does NOT cover all paths.
+    if (u == trueTerminal || u == falseTerminal)
       return false;
 
     const auto &nd = nodes[u];
-    push(nd.falseSucc);
-    push(nd.trueSucc);
+    pushToStack(nd.falseSucc);
+    pushToStack(nd.trueSucc);
   }
-  // Neither sink reachable -> covering all paths.
+
+  // If the stack is empty and we never reached a terminal,
+  // all paths were covered by the pair.
   return true;
 }
 
 std::vector<std::pair<unsigned, unsigned>>
-ROBDD::findPairsCoveringAllPaths(unsigned root, unsigned t1,
-                                 unsigned t0) const {
-  // Collect and validate the subgraph (sorted, includes root/t1/t0).
-  std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
-  std::vector<std::pair<unsigned, unsigned>> coverPairs;
+ROBDD::findPairsCoveringAllPaths(unsigned rootNode, unsigned trueTerminal,
+                                 unsigned falseTerminal) const {
+  // Collect and validate the subgraph (sorted, includes root, trueTerminal,
+  // falseTerminal).
+  std::vector<unsigned> candidates =
+      collectSubgraph(rootNode, trueTerminal, falseTerminal);
+  std::vector<std::pair<unsigned, unsigned>> coveringPairs;
 
   // Scan all pairs in ascending order.
-  for (size_t i = 1; i < cand.size() - 2; ++i) {
-    for (size_t j = i + 1; j < cand.size(); ++j) {
-      if (doesPairCoverAllPaths(root, t1, t0, cand[i], cand[j])) {
-        coverPairs.emplace_back(cand[i], cand[j]);
+  for (size_t i = 1; i < candidates.size() - 2; ++i) {
+    for (size_t j = i + 1; j < candidates.size(); ++j) {
+      if (doesPairCoverAllPaths(rootNode, trueTerminal, falseTerminal,
+                                candidates[i], candidates[j])) {
+        coveringPairs.emplace_back(candidates[i], candidates[j]);
       }
     }
   }
 
   // Sort lexicographically by (first, second).
-  std::sort(coverPairs.begin(), coverPairs.end(),
-            [](const auto &a, const auto &b) {
-              if (a.first != b.first)
-                return a.first < b.first;
-              return a.second < b.second;
+  std::sort(coveringPairs.begin(), coveringPairs.end(),
+            [](const auto &lhs, const auto &rhs) {
+              if (lhs.first != rhs.first)
+                return lhs.first < rhs.first;
+              return lhs.second < rhs.second;
             });
 
-  return coverPairs;
+  return coveringPairs;
 }
