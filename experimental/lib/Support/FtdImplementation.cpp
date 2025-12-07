@@ -889,6 +889,12 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   };
 
   // Build the list of mux stages from the given all-paths-covering pairs
+  //
+  // NOTE: The vector contains a sequence of path-covering vertex pairs
+  // sorted topologically from the root towards the sinks. Each pair represents
+  // a sequential stage in the decomposition. We construct a chain of Muxes
+  // where the i-th Mux corresponds to the i-th pair, and its selection is
+  // driven by the output of the (i-1)-th Mux (or the root variable for i=0).
   std::vector<MuxSpec> muxChain;
   muxChain.reserve(pairs.size());
 
