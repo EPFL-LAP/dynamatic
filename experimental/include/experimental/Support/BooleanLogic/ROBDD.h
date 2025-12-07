@@ -1,4 +1,4 @@
-//===- BDD.h - BDD construction and analysis --------------------*- C++ -*-===//
+//===- ROBDD.h - ROBDD construction and analysis ----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,20 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file provides a Binary Decision Diagram (BDD) builder and
-// basic analysis utilities. A user-specified variable order is respected.
+// This file provides a Reduced Ordered Binary Decision Diagram (ROBDD) builder
+// and basic analysis utilities. A user-specified variable order is respected.
 //
 // Provided functionality:
-//   * BDD Construction from a minimized BoolExpression and a variable order.
-//   * Traversal of a BDD subgraph with a designated root and two designated
+//   * ROBDD Construction from a minimized BoolExpression and a variable order.
+//   * Traversal of an ROBDD subgraph with a designated root and two designated
 //     sinks.
 //   * Enumeration of every vertex pair that covers all paths from the root to
 //     either sink inside that subgraph.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_BDD_H
-#define DYNAMATIC_SUPPORT_BDD_H
+#ifndef DYNAMATIC_SUPPORT_ROBDD_H
+#define DYNAMATIC_SUPPORT_ROBDD_H
 
 #include <string>
 #include <utility>
@@ -41,20 +41,20 @@ void restrict(BoolExpression *exp, const std::string &var,
 /// falseSucc : successor index when var evaluates to false
 /// trueSucc  : successor index when var evaluates to true
 /// preds     : indices of all predecessor nodes that point to this node
-struct BDDNode {
+struct ROBDDNode {
   std::string var;
   unsigned falseSucc;
   unsigned trueSucc;
   std::vector<unsigned> preds;
 };
 
-/// Container for a reduced ordered BDD built from a BoolExpression.
+/// Container for a reduced ordered BDD (ROBDD) built from a BoolExpression.
 /// Each internal node is indexed by its position in the user-defined variable
 /// order. Two additional nodes at the end are the 0 and 1 terminals.
-class BDD {
+class ROBDD {
 public:
-  /// Create an empty BDD.
-  BDD();
+  /// Create an empty ROBDD.
+  ROBDD();
 
   /// Build an ROBDD from a minimized boolean expression and a variable order.
   /// Variables in `varOrder` that do not appear in the expression are ignored.
@@ -81,7 +81,7 @@ public:
   pairCoverAllPathsList(unsigned root, unsigned tTrue, unsigned tFalse) const;
 
   /// Accessors.
-  const std::vector<BDDNode> &getnodes() const { return nodes; }
+  const std::vector<ROBDDNode> &getnodes() const { return nodes; }
   const std::vector<unsigned> &getpreds(unsigned idx) const {
     return nodes[idx].preds;
   }
@@ -91,12 +91,12 @@ public:
 
 private:
   /// Storage: internal nodes first, then terminals zeroIndex and oneIndex.
-  std::vector<BDDNode> nodes;
+  std::vector<ROBDDNode> nodes;
 
   /// Variable order used to build the diagram (minimized & filtered).
   std::vector<std::string> order;
 
-  /// Index of the BDD root node.
+  /// Index of the ROBDD root node.
   unsigned rootIndex = 0;
   /// Index of the constant 0 terminal.
   unsigned zeroIndex = 0;
@@ -116,4 +116,4 @@ private:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_BDD_H
+#endif // DYNAMATIC_SUPPORT_ROBDD_H

@@ -2,7 +2,7 @@ add_dynamatic_library(DynamaticExperimentalSupportBooleanLogic
   BoolExpression.cpp
   Lexer.cpp
   Parser.cpp
-  BDD.cpp
+  ROBDD.cpp
 
   LINK_LIBS PRIVATE
   DynamaticSupportEspresso

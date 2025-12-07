@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Analysis/GSAAnalysis.h"
-#include "experimental/Support/BooleanLogic/BDD.h"
+#include "experimental/Support/BooleanLogic/ROBDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

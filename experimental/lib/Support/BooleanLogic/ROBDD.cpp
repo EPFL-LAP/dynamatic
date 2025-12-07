@@ -1,4 +1,4 @@
-//===- BDD.cpp - BDD construction and analysis ------------------*- C++ -*-===//
+//===- ROBDD.cpp - ROBDD construction and analysis --------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements construction of a Binary Decision Diagram (BDD) from a
-// BoolExpression and basic analysis utilities.
+// This file implements construction of a Reduced Ordered Binary Decision 
+// Diagram (ROBDD) from a BoolExpression and basic analysis utilities.
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Support/BooleanLogic/BDD.h"
+#include "experimental/Support/BooleanLogic/ROBDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 
 #include <algorithm>
@@ -59,21 +59,21 @@ void dynamatic::experimental::boolean::restrict(BoolExpression *exp,
   }
 }
 
-BDD::BDD() {
+ROBDD::ROBDD() {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
 }
 
 LogicalResult
-BDD::buildROBDDFromExpression(BoolExpression *expr,
+ROBDD::buildROBDDFromExpression(BoolExpression *expr,
                               const std::vector<std::string> &varOrder) {
   nodes.clear();
   order.clear();
   rootIndex = zeroIndex = oneIndex = 0;
 
   if (!expr) {
-    llvm::errs() << "BDD: null expression\n";
+    llvm::errs() << "ROBDD: null expression\n";
     return failure();
   }
 
@@ -107,7 +107,7 @@ BDD::buildROBDDFromExpression(BoolExpression *expr,
   zeroIndex = n;
   oneIndex = n + 1;
   for (unsigned i = 0; i < n; ++i)
-    nodes[i] = BDDNode{order[i], zeroIndex, oneIndex, {}};
+    nodes[i] = ROBDDNode{order[i], zeroIndex, oneIndex, {}};
   nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
   nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
 
@@ -130,7 +130,7 @@ BDD::buildROBDDFromExpression(BoolExpression *expr,
   return success();
 }
 
-void BDD::expandFrom(unsigned idx, BoolExpression *residual,
+void ROBDD::expandFrom(unsigned idx, BoolExpression *residual,
                      std::vector<char> &expanded) {
   if (idx >= order.size() || expanded[idx])
     return;
@@ -194,7 +194,7 @@ void BDD::expandFrom(unsigned idx, BoolExpression *residual,
     expandFrom(tSucc, f1, expanded);
 }
 
-std::vector<unsigned> BDD::collectSubgraph(unsigned root, unsigned t1,
+std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
                                                    unsigned t0) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
@@ -233,7 +233,7 @@ std::vector<unsigned> BDD::collectSubgraph(unsigned root, unsigned t1,
   return subgraph;
 }
 
-bool BDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
+bool ROBDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
                             unsigned b) const {
   std::vector<char> vis(nodes.size(), 0);
   std::vector<unsigned> st{root};
@@ -265,7 +265,7 @@ bool BDD::pairCoverAllPaths(unsigned root, unsigned t1, unsigned t0, unsigned a,
 }
 
 std::vector<std::pair<unsigned, unsigned>>
-BDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
+ROBDD::pairCoverAllPathsList(unsigned root, unsigned t1, unsigned t0) const {
   // Collect and validate the subgraph (sorted, includes root/t1/t0).
   std::vector<unsigned> cand = collectSubgraph(root, t1, t0);
   std::vector<std::pair<unsigned, unsigned>> coverPairs;

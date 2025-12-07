@@ -15,7 +15,7 @@
 #include "experimental/Support/FtdImplementation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
-#include "experimental/Support/BooleanLogic/BDD.h"
+#include "experimental/Support/BooleanLogic/ROBDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
@@ -727,18 +727,18 @@ static bool isWhileLoop(CFGLoop *loop) {
 ///      the recursion’s sinks are the next all-paths-covering pair or the
 ///      subgraph's sinks.
 static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
-                          const ftd::BlockIndexing &bi, const BDD &bdd,
+                          const ftd::BlockIndexing &bi, const ROBDD &robdd,
                           unsigned startIdx, unsigned trueSinkIdx,
                           unsigned falseSinkIdx) {
 
-  const auto &nodes = bdd.getnodes();
+  const auto &nodes = robdd.getnodes();
 
   // Look up the boolean signal for a given condition variable name and
   // return it as the select input of a mux (converted to a handshake channel).
   auto getSel = [&](const std::string &varName) -> Value {
     auto condBlkOpt = bi.getBlockFromCondition(varName);
     if (!condBlkOpt.has_value()) {
-      llvm::errs() << "BddToCircuit: cannot map condition '" << varName
+      llvm::errs() << "convertRobddToCircuit: cannot map condition '" << varName
                    << "'.\n";
       return nullptr;
     }
@@ -776,7 +776,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   // Describes one mux data input:
   //  - isConst  : true if this input is a boolean constant
   //  - constVal : value of the constant if isConst == true
-  //  - nodeIdx  : BDD node index if this input is driven by a variable
+  //  - nodeIdx  : ROBDD node index if this input is driven by a variable
   struct InputSpec {
     bool isConst = false, constVal = false;
     unsigned nodeIdx = 0;
@@ -786,7 +786,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   // inputs of a mux.
   auto decideInputsForPair =
       [&](unsigned u, unsigned v) -> std::pair<InputSpec, InputSpec> {
-    // Convert a BDD node index to an InputSpec.
+    // Convert a ROBDD node index to an InputSpec.
     auto nodeToSpec = [&](unsigned idx) -> InputSpec {
       return {false, false, idx};
     };
@@ -840,7 +840,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   };
 
   // List all-paths-covering pairs (sorted).
-  auto pairs = bdd.pairCoverAllPathsList(startIdx, trueSinkIdx, falseSinkIdx);
+  auto pairs = robdd.pairCoverAllPathsList(startIdx, trueSinkIdx, falseSinkIdx);
 
   // No pair → no mux; return `start` condition (maybe inverted).
   if (pairs.empty()) {
@@ -856,7 +856,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
                 nodes[startIdx].falseSucc == trueSinkIdx);
 
     if (!dir && !inv) {
-      llvm::errs() << "BddToCircuit: start node doesn't map to sinks.\n";
+      llvm::errs() << "convertRobddToCircuit: start node doesn't map to sinks.\n";
       llvm::errs() << "  Summary\n";
       llvm::errs() << "    nodes.size = " << nodes.size() << "\n";
       llvm::errs() << "    startIdx   = " << startIdx << "\n";
@@ -914,13 +914,13 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     // node. This ignores inF/inT.constVal and uses the terminal identity
     // instead.
     if (i + 1 == muxChain.size()) {
-      if (muxChain[i].inF.nodeIdx == bdd.one())
+      if (muxChain[i].inF.nodeIdx == robdd.one())
         inF = c1;
-      else if (muxChain[i].inF.nodeIdx == bdd.zero())
+      else if (muxChain[i].inF.nodeIdx == robdd.zero())
         inF = c0;
-      if (muxChain[i].inT.nodeIdx == bdd.one())
+      if (muxChain[i].inT.nodeIdx == robdd.one())
         inT = c1;
-      else if (muxChain[i].inT.nodeIdx == bdd.zero())
+      else if (muxChain[i].inT.nodeIdx == robdd.zero())
         inT = c0;
     }
 
@@ -951,7 +951,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
 
     if (!muxChain[i].inF.isConst) {
       unsigned s = muxChain[i].inF.nodeIdx;
-      Value sub = buildMuxTree(rewriter, block, bi, bdd, s, subT, subF);
+      Value sub = buildMuxTree(rewriter, block, bi, robdd, s, subT, subF);
       if (!sub)
         return nullptr;
       // operand index 1 = false
@@ -959,7 +959,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     }
     if (!muxChain[i].inT.isConst) {
       unsigned s = muxChain[i].inT.nodeIdx;
-      Value sub = buildMuxTree(rewriter, block, bi, bdd, s, subT, subF);
+      Value sub = buildMuxTree(rewriter, block, bi, robdd, s, subT, subF);
       if (!sub)
         return nullptr;
       // operand index 2 = true
@@ -971,13 +971,13 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   return muxChain.back().out;
 }
 
-/// Convert the entire ROBDD into a circuit by invoking buildMuxTree on the BDD
+/// Convert the entire ROBDD into a circuit by invoking buildMuxTree on the ROBDD
 /// root with terminal nodes {one, zero}. The result is a MUX tree in which each
 /// variable appears exactly once.
-static Value BDDToCircuit(PatternRewriter &rewriter, Block *block,
-                          const ftd::BlockIndexing &bi, const BDD &bdd) {
-  return buildMuxTree(rewriter, block, bi, bdd, bdd.root(), bdd.one(),
-                      bdd.zero());
+static Value convertRobddToCircuit(PatternRewriter &rewriter, Block *block,
+                          const ftd::BlockIndexing &bi, const ROBDD &robdd) {
+  return buildMuxTree(rewriter, block, bi, robdd, robdd.root(), robdd.one(),
+                      robdd.zero());
 }
 
 using PairOperandConsumer = std::pair<Value, Operation *>;
@@ -1040,14 +1040,14 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
     // Sort the cofactors alphabetically
     std::sort(cofactorList.begin(), cofactorList.end());
 
-    // Build BDD on the loop-exit condition and lower to mux chain
-    BDD robdd;
+    // Build ROBDD on the loop-exit condition and lower to mux chain
+    ROBDD robdd;
     if (failed(robdd.buildROBDDFromExpression(fLoopExit, cofactorList))) {
-      llvm::errs() << "BDD: buildROBDDFromExpression failed in "
+      llvm::errs() << "ROBDD: buildROBDDFromExpression failed in "
                       "addSuppressionInLoop.\n";
       std::abort();
     }
-    Value branchCond = BDDToCircuit(rewriter, loopExit, bi, robdd);
+    Value branchCond = convertRobddToCircuit(rewriter, loopExit, bi, robdd);
 
     Operation *loopTerminator = loopExit->getTerminator();
     assert(isa<cf::CondBranchOp>(loopTerminator) &&
@@ -1153,14 +1153,14 @@ static void insertDirectSuppression(
 
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
 
-    // Build BDD and lower to mux tree
-    BDD robdd;
+    // Build ROBDD and lower to mux tree
+    ROBDD robdd;
     if (failed(robdd.buildROBDDFromExpression(fSup, cofactorList))) {
-      llvm::errs() << "BDD: buildROBDDFromExpression failed in "
+      llvm::errs() << "ROBDD: buildROBDDFromExpression failed in "
                       "insertDirectSuppression.\n";
       std::abort();
     }
-    Value branchCond = BDDToCircuit(rewriter, consumer->getBlock(), bi, robdd);
+    Value branchCond = convertRobddToCircuit(rewriter, consumer->getBlock(), bi, robdd);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
@@ -1192,7 +1192,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   auto cda = ControlDependenceAnalysis(region).getAllBlockDeps();
 
   // Skip the prod-cons if the producer is part of the operations related to
-  // the BDD expansion or INIT merges
+  // the ROBDD expansion or INIT merges
   if (consumerOp->hasAttr(FTD_OP_TO_SKIP) ||
       consumerOp->hasAttr(FTD_INIT_MERGE))
     return;
@@ -1226,7 +1226,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
       return;
 
     // Skip the prod-cons if the consumer is part of the operations
-    // related to the BDD expansion or INIT merges
+    // related to the ROBDD expansion or INIT merges
     if (producerOp->hasAttr(FTD_OP_TO_SKIP) ||
         producerOp->hasAttr(FTD_INIT_MERGE))
       return;
