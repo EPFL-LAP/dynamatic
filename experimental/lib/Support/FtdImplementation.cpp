@@ -954,14 +954,15 @@ static void insertDirectSuppression(
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
-
+  
+  bool debuglog = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuaqin/new/dynamatic-scripts/TempOutputs/";
   std::string cfgFile = dir + funcName + "_localcfg.txt";
   std::string logFile = dir + funcName + "_debuglog.txt";
   std::error_code EC_log;
   llvm::raw_fd_ostream log(logFile, EC_log,
-                           static_cast<llvm::sys::fs::OpenFlags>(0x0004));
+                          static_cast<llvm::sys::fs::OpenFlags>(0x0004));
   llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
 
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
@@ -979,43 +980,45 @@ static void insertDirectSuppression(
   DenseSet<Block *> consControlDeps =
       cdAnalysis[consumerBlock].forwardControlDeps;
 
-  out << "[FTD] Producer block: ";
-  if (producerBlock)
-    producerBlock->printAsOperand(out);
-  else
-    out << "(null)";
-  out << ", Consumer block: ";
-  if (consumerBlock)
-    consumerBlock->printAsOperand(out);
-  else
-    out << "(null)";
-  out << "\n";
-  // Debug: dump consumer block control deps
-  {
-    Block *consumerBlock = consumer->getBlock();
-    auto &prodEntry = cdAnalysis[producerBlock];
-    auto &depsEntry = cdAnalysis[consumerBlock];
+  if (debuglog) {
+    out << "[FTD] Producer block: ";
+    if (producerBlock)
+      producerBlock->printAsOperand(out);
+    else
+      out << "(null)";
+    out << ", Consumer block: ";
+    if (consumerBlock)
+      consumerBlock->printAsOperand(out);
+    else
+      out << "(null)";
+    out << "\n";
+    // Debug: dump consumer block control deps
+    {
+      Block *consumerBlock = consumer->getBlock();
+      auto &prodEntry = cdAnalysis[producerBlock];
+      auto &depsEntry = cdAnalysis[consumerBlock];
 
-    auto printBlockSet = [&](llvm::StringRef label,
-                             const DenseSet<Block *> &S) {
-      out << label << " = { ";
-      bool first = true;
-      for (Block *b : S) {
-        if (!first)
-          out << ", ";
-        if (b)
-          b->printAsOperand(out);
-        else
-          out << "<null>";
-        first = false;
-      }
-      out << " }\n";
-    };
-    printBlockSet("[FTD] prod forwardControlDeps",
-                  prodEntry.forwardControlDeps);
-    printBlockSet("[FTD] cons forwardControlDeps",
-                  depsEntry.forwardControlDeps);
-    printBlockSet("[FTD] cons allControlDeps", depsEntry.allControlDeps);
+      auto printBlockSet = [&](llvm::StringRef label,
+                              const DenseSet<Block *> &S) {
+        out << label << " = { ";
+        bool first = true;
+        for (Block *b : S) {
+          if (!first)
+            out << ", ";
+          if (b)
+            b->printAsOperand(out);
+          else
+            out << "<null>";
+          first = false;
+        }
+        out << " }\n";
+      };
+      printBlockSet("[FTD] prod forwardControlDeps",
+                    prodEntry.forwardControlDeps);
+      printBlockSet("[FTD] cons forwardControlDeps",
+                    depsEntry.forwardControlDeps);
+      printBlockSet("[FTD] cons allControlDeps", depsEntry.allControlDeps);
+    }
   }
 
   // If the mux condition is to be taken into account, then the control
@@ -1037,7 +1040,6 @@ static void insertDirectSuppression(
       return; 
   }
 
-
   auto locGraph =
       buildLocalCFGRegion(rewriter, producerBlock, consumerBlock, bi);
   ControlDependenceAnalysis locCDA(*locGraph->region);
@@ -1054,8 +1056,7 @@ static void insertDirectSuppression(
   BoolExpression *fCons = 
       enumeratePaths(*locGraph, bi, locConsControlDeps);
 
-  // Debug: append all LocalCFGs to one txt file (no console output)
-  {
+  if (debuglog) {
     std::error_code EC;
     llvm::raw_fd_ostream file(cfgFile, EC,
                               static_cast<llvm::sys::fs::OpenFlags>(0x0004));
@@ -1134,7 +1135,7 @@ static void insertDirectSuppression(
     }
   }
 
-  {
+  if (debuglog) {
     auto printBlockSet = [&](llvm::StringRef label,
                              const DenseSet<Block *> &S) {
       out << label << " = { ";
@@ -1160,7 +1161,7 @@ static void insertDirectSuppression(
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     DenseSet<Block *> condControlDeps =
         cdAnalysis[muxConditionBlock].forwardControlDeps;
-    {
+    if (debuglog) {
       auto printBlockSet = [&](llvm::StringRef label,
                                const DenseSet<Block *> &S) {
         out << label << " = { ";
@@ -1180,36 +1181,49 @@ static void insertDirectSuppression(
       printBlockSet("[FTD] muxControlDeps", condControlDeps);
     }
   }
-  out << "fCons-no-mux  = " << fCons->toString() << "\n";
+  if (debuglog) {
+    out << "fCons-no-mux  = " << fCons->toString() << "\n";
+  }
+
   if (accountMuxCondition) {
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     BoolExpression *selectOperandCondition =
         BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
-
-    out << "[MUX] Mux Condition Block: ";
-    if (muxConditionBlock)
-      muxConditionBlock->printAsOperand(out);
-    else
-      out << "(null)";
-    out << "\n";
+    if (debuglog) {
+      out << "[MUX] Mux Condition Block: ";
+      if (muxConditionBlock)
+        muxConditionBlock->printAsOperand(out);
+      else
+        out << "(null)";
+      out << "\n";
+    }
 
     if (!bi.isLess(muxConditionBlock, producerBlock)) {
       if (consumer->getOperand(1) == connection) {
-        out << "MuxCondN  = "
-            << (selectOperandCondition->boolNegate())->toString() << "\n";
-        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
+        if (debuglog) {
+          out << "MuxCondN  = "
+              << (selectOperandCondition->boolNegate())->toString() << "\n";
+          selectOperandCondition->boolNegate();
+        }
+        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition->boolNegate());
       } else {
-        out << "MuxCond  = " << selectOperandCondition->toString() << "\n";
+        if (debuglog) {
+          out << "MuxCond  = " << selectOperandCondition->toString() << "\n";
+        }
         fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
       }
     }
   }
 
+  if (debuglog) {
+    out << "fCons  = " << fCons->toString() << "\n";
+  }
   // f_supp = f_prod and not f_cons
-  out << "fCons  = " << fCons->toString() << "\n";
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
-  out << "fSupmin  = " << fSup->toString() << "\n";
+  if (debuglog){
+    out << "fSupmin  = " << fSup->toString() << "\n";
+  }
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
@@ -1232,12 +1246,12 @@ static void insertDirectSuppression(
     llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
     for (auto &p : tmp)
       cofactorList.push_back(p.second);
-
-    llvm::errs() << "[CofactorList] ";
-    for (const auto &s : cofactorList)
-      llvm::errs() << s << " ";
-    llvm::errs() << "\n";
-
+    if (debuglog) {
+      llvm::errs() << "[CofactorList] ";
+      for (const auto &s : cofactorList)
+        llvm::errs() << s << " ";
+      llvm::errs() << "\n";
+    }
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
