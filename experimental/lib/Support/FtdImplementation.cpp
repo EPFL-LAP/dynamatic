@@ -340,7 +340,7 @@ runCytronAlgorithm(Region &funcRegion, DenseMap<Block *, Value> &inputBlocks) {
 
 LogicalResult experimental::ftd::createPhiNetwork(
     Region &funcRegion, PatternRewriter &rewriter, SmallVector<Value> &vals,
-    SmallVector<OpOperand *> &toSubstitue) {
+    SmallVector<OpOperand *> &toSubstitute) {
 
   if (vals.empty()) {
     llvm::errs() << "Input of \"createPhiNetwork\" is empty";
@@ -478,7 +478,7 @@ LogicalResult experimental::ftd::createPhiNetwork(
     inputPerBlock[&bb] = foundValue;
   }
 
-  for (auto &op : toSubstitue)
+  for (auto &op : toSubstitute)
     op->set(inputPerBlock[op->getOwner()->getBlock()]);
 
   return success();

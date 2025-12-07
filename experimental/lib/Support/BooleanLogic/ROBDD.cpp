@@ -15,6 +15,7 @@
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 
 #include <algorithm>
+#include <climits>
 #include <functional>
 #include <set>
 #include <string>
@@ -86,8 +87,13 @@ ROBDD::buildROBDDFromExpression(BoolExpression *expr,
     nodes.resize(2);
     zeroIndex = 0;
     oneIndex = 1;
-    nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
-    nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
+
+    // Terminals have no variables and no successors (indicated by specific
+    // sentinel values like UINT_MAX). Note: We create BOTH terminals to
+    // maintain valid zeroIndex/oneIndex invariants for the class, even if one
+    // of them is unreachable in this specific trivial graph.
+    nodes[zeroIndex] = {"", UINT_MAX, UINT_MAX, {}};
+    nodes[oneIndex] = {"", UINT_MAX, UINT_MAX, {}};
     rootIndex = (rootExpr->type == ExpressionType::One) ? oneIndex : zeroIndex;
     return success();
   }
