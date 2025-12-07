@@ -105,15 +105,20 @@ ROBDD::buildROBDDFromExpression(BoolExpression *expr,
     if (present.find(v) != present.end())
       order.push_back(v);
 
-  // Pre-allocate all internal nodes; initially connect them to the terminals.
+  // Pre-allocate all internal nodes.
+  // Note: We initialize successors to UINT_MAX to indicate they are currently
+  // unconnected/dummies. These fields will be overwritten with actual indices
+  // during the expansion phase.
   const unsigned n = (unsigned)order.size();
   nodes.resize(n + 2);
   zeroIndex = n;
   oneIndex = n + 1;
+
   for (unsigned i = 0; i < n; ++i)
-    nodes[i] = ROBDDNode{order[i], zeroIndex, oneIndex, {}};
-  nodes[zeroIndex] = {"", zeroIndex, zeroIndex, {}};
-  nodes[oneIndex] = {"", oneIndex, oneIndex, {}};
+    nodes[i] = ROBDDNode{order[i], UINT_MAX, UINT_MAX, {}};
+
+  nodes[zeroIndex] = {"", UINT_MAX, UINT_MAX, {}};
+  nodes[oneIndex] = {"", UINT_MAX, UINT_MAX, {}};
 
   // Root is always the first internal node (smallest variable index).
   rootIndex = 0;
@@ -212,7 +217,7 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned rootNode,
     // Bounds check and visited check
     if (u >= nodes.size() || visited[u])
       continue;
-    
+
     visited[u] = 1;
     subgraph.push_back(u);
 
