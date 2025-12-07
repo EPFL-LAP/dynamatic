@@ -845,7 +845,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
   auto pairs =
       robdd.findPairsCoveringAllPaths(startIdx, trueSinkIdx, falseSinkIdx);
 
-  // No pair → no mux; return `start` condition (maybe inverted).
+  // No pair -> no mux; return `start` condition with a possible Boolean
+  // negation.
   if (pairs.empty()) {
     // Root is a terminal: return constant value 1/0.
     if (startIdx == trueSinkIdx)
