@@ -100,12 +100,10 @@ ROBDD::buildROBDDFromExpression(BoolExpression *expr,
 
   // Keep only variables that still appear after minimization and respect
   // the order provided by the user.
-  {
-    std::set<std::string> present = rootExpr->getVariables();
-    for (const auto &v : varOrder)
-      if (present.find(v) != present.end())
-        order.push_back(v);
-  }
+  std::set<std::string> present = rootExpr->getVariables();
+  for (const auto &v : varOrder)
+    if (present.find(v) != present.end())
+      order.push_back(v);
 
   // Pre-allocate all internal nodes; initially connect them to the terminals.
   const unsigned n = (unsigned)order.size();
@@ -200,22 +198,26 @@ void ROBDD::expandFrom(unsigned idx, BoolExpression *residual,
     expandFrom(tSucc, f1, expanded);
 }
 
-std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
-                                             unsigned t0) const {
-  std::vector<char> vis(nodes.size(), 0);
-  std::vector<unsigned> st{root};
+std::vector<unsigned> ROBDD::collectSubgraph(unsigned rootNode,
+                                             unsigned trueTerminal,
+                                             unsigned falseTerminal) const {
+  std::vector<char> visited(nodes.size(), 0);
+  std::vector<unsigned> workStack{rootNode};
   std::vector<unsigned> subgraph;
 
-  while (!st.empty()) {
-    unsigned u = st.back();
-    st.pop_back();
-    if (u >= nodes.size() || vis[u])
+  while (!workStack.empty()) {
+    unsigned u = workStack.back();
+    workStack.pop_back();
+
+    // Bounds check and visited check
+    if (u >= nodes.size() || visited[u])
       continue;
-    vis[u] = 1;
+    
+    visited[u] = 1;
     subgraph.push_back(u);
 
     // Stop expansion at the designated local sinks.
-    if (u == t1 || u == t0)
+    if (u == trueTerminal || u == falseTerminal)
       continue;
 
     // Abort if we accidentally reach the global terminals.
@@ -225,15 +227,15 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned root, unsigned t1,
     }
 
     const auto &nd = nodes[u];
-    st.push_back(nd.falseSucc);
-    st.push_back(nd.trueSucc);
+    workStack.push_back(nd.falseSucc);
+    workStack.push_back(nd.trueSucc);
   }
 
-  // Ensure both sinks appear in the final list.
-  if (std::find(subgraph.begin(), subgraph.end(), t1) == subgraph.end())
-    subgraph.push_back(t1);
-  if (std::find(subgraph.begin(), subgraph.end(), t0) == subgraph.end())
-    subgraph.push_back(t0);
+  // Ensure both designated sinks appear in the final list (if they weren't reached).
+  if (std::find(subgraph.begin(), subgraph.end(), trueTerminal) == subgraph.end())
+    subgraph.push_back(trueTerminal);
+  if (std::find(subgraph.begin(), subgraph.end(), falseTerminal) == subgraph.end())
+    subgraph.push_back(falseTerminal);
 
   std::sort(subgraph.begin(), subgraph.end());
   return subgraph;
