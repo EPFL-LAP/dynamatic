@@ -160,36 +160,144 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
   }
 }
 
+/// A lightweight DFS to check if 'end' is reachable from 'start'.
+static bool isReachable(Block *start, Block *end) {
+  if (start == end) return true;
+
+  DenseSet<Block *> visited;
+  SmallVector<Block *, 8> stack;
+  stack.push_back(start);
+  visited.insert(start);
+
+  while (!stack.empty()) {
+    Block *curr = stack.pop_back_val();
+    
+    if (curr == end) return true;
+
+    for (Block *succ : curr->getSuccessors()) {
+      if (!visited.count(succ)) {
+        visited.insert(succ);
+        stack.push_back(succ);
+      }
+    }
+  }
+  return false;
+}
+
+struct LocalCFG {
+  // The MLIR region representing the local subgraph.
+  Region *region = nullptr;
+  // Mapping: block in local graph -> original block.
+  DenseMap<Block *, Block *> origMap;
+  // The producer block in the local CFG.
+  Block *newProd = nullptr;
+  // The consumer block in the local CFG.
+  Block *newCons = nullptr;
+  // A replicated block used for self-loop delivery (Producer == Consumer).
+  Block *secondVisitBB = nullptr;
+  // A unique sink (exit) block to which all terminal paths lead.
+  Block *sinkBB = nullptr;
+  // Topological order of the reconstructed region.
+  SmallVector<Block *, 8> topoOrder;
+  // Temporary parent operation that owns the region.
+  Operation *containerOp = nullptr;
+
+  ~LocalCFG() = default;
+};
+
 /// The boolean condition to either generate or suppress a token are computed
 /// by considering all the paths from the producer (`start`) to the consumer
 /// (`end`). "Each path identifies a Boolean product of elementary conditions
 /// expressing the reaching of the target BB from the corresponding member of
 /// the set; the product of all such paths are added".
-static BoolExpression *enumeratePaths(Block *start, Block *end,
+static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
                                       const ftd::BlockIndexing &bi,
                                       const DenseSet<Block *> &controlDeps) {
-  // Start with a boolean expression of zero (so that new conditions can be
-  // added)
+  
+  // 1. Path Finding using Iterative DFS
+  std::vector<std::vector<Block *>> allPaths;
+  
+  struct StackFrame {
+    Block *u;
+    unsigned currIdx;
+    unsigned numSuccs;
+  };
+
+  std::vector<StackFrame> dfsStack;
+  std::vector<Block *> currentLocalPath; // Acts as 'visited in current path'
+
+  if (lcfg.newProd && lcfg.newCons) {
+    Block *root = lcfg.newProd;
+    auto *term = root->getTerminator();
+    unsigned n = term ? term->getNumSuccessors() : 0;
+    
+    dfsStack.push_back({root, 0, n});
+    currentLocalPath.push_back(root);
+  } else {
+    return BoolExpression::boolZero();
+  }
+
+  while (!dfsStack.empty()) {
+    StackFrame &frame = dfsStack.back();
+
+    // --- Case A: Reached Consumer ---
+    if (frame.u == lcfg.newCons) {
+      std::vector<Block *> origPath;
+      bool validMapping = true;
+      
+      for (Block *lb : currentLocalPath) {
+        Block *ob = lcfg.origMap.lookup(lb);
+        if (!ob && lb == lcfg.secondVisitBB) {
+            ob = lcfg.origMap.lookup(lcfg.newProd);
+        }
+        if (!ob) { validMapping = false; break; }
+        origPath.push_back(ob);
+      }
+
+      if (validMapping) allPaths.push_back(origPath);
+
+      currentLocalPath.pop_back();
+      dfsStack.pop_back();
+      continue;
+    }
+
+    // --- Case B: Traverse Successors ---
+    if (frame.currIdx < frame.numSuccs) {
+      auto *term = frame.u->getTerminator();
+      Block *succ = term->getSuccessor(frame.currIdx);
+      frame.currIdx++;
+
+      // 1. Skip Sink (Suppression)
+      // 2. [CRITICAL FIX] Skip Cycle: Check if succ is already in current path
+      // This prevents infinite loops while allowing the structure to exist.
+      bool isCycle = std::find(currentLocalPath.begin(), currentLocalPath.end(), succ) != currentLocalPath.end();
+
+      if (succ != lcfg.sinkBB && !isCycle) {
+        auto *succTerm = succ->getTerminator();
+        unsigned succN = succTerm ? succTerm->getNumSuccessors() : 0;
+        
+        dfsStack.push_back({succ, 0, succN});
+        currentLocalPath.push_back(succ);
+      }
+    } 
+    // --- Case C: Backtrack ---
+    else {
+      currentLocalPath.pop_back();
+      dfsStack.pop_back();
+    }
+  }
+
+  if (allPaths.empty())
+    return BoolExpression::boolZero();
+
+  // 2. Expression Generation
   BoolExpression *sop = BoolExpression::boolZero();
 
-  // Find all the paths from the producer to the consumer, using a DFS
-  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
-
-  // If the start and end block are the same (e.g., BB0 to BB0) and there is no
-  // real path between them, then consider the sop = 1
-  if (start == end && allPaths.size() == 0)
-    sop = BoolExpression::boolOne();
-
-  // For each path
   for (const std::vector<Block *> &path : allPaths) {
-
     DenseSet<unsigned> tempCofactorSet;
-    // Compute the product of the conditions which allow that path to be
-    // executed
     BoolExpression *minterm =
         getPathExpression(path, tempCofactorSet, bi, controlDeps, false);
 
-    // Add the value to the result
     sop = BoolExpression::boolOr(sop, minterm);
   }
   return sop->boolMinimizeSop();
@@ -655,27 +763,6 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   return muxOp.getResult();
 }
 
-struct LocalCFG {
-  // The MLIR region representing the local subgraph.
-  Region *region = nullptr;
-  // Mapping: block in local graph -> original block.
-  DenseMap<Block *, Block *> origMap;
-  // The producer block in the local CFG.
-  Block *newProd = nullptr;
-  // The consumer block in the local CFG.
-  Block *newCons = nullptr;
-  // A replicated block used for self-loop delivery (Producer == Consumer).
-  Block *secondVisitBB = nullptr;
-  // A unique sink (exit) block to which all terminal paths lead.
-  Block *sinkBB = nullptr;
-  // Topological order of the reconstructed region.
-  SmallVector<Block *, 8> topoOrder;
-  // Temporary parent operation that owns the region.
-  Operation *containerOp = nullptr;
-
-  ~LocalCFG() = default;
-};
-
 /// Build a local control-flow subgraph (LocalCFG) between a producer and
 /// consumer. The subgraph is reconstructed as a region with unique entry
 /// (producer) and exit (sink).
@@ -945,18 +1032,17 @@ static void insertDirectSuppression(
 
   // Get rid of common entries in the two sets
   eliminateCommonBlocks(prodControlDeps, consControlDeps);
-  // Compute the activation function of producer and consumer
-  BoolExpression *fProd =
-      enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
-  if (fProd->type == experimental::boolean::ExpressionType::Zero)
-    return;
+  // If producer is unreachable, the suppression is not needed.
+  if (!isReachable(entryBlock, producerBlock)) {
+      return; 
+  }
 
 
   auto locGraph =
       buildLocalCFGRegion(rewriter, producerBlock, consumerBlock, bi);
   ControlDependenceAnalysis locCDA(*locGraph->region);
   DenseSet<Block *> locConsControlDepsTmp =
-      locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+      locCDA.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
 
   DenseSet<Block *> locConsControlDeps;
   for (Block *nb : locConsControlDepsTmp) {
@@ -965,8 +1051,8 @@ static void insertDirectSuppression(
       locConsControlDeps.insert(orig);
   }
 
-  BoolExpression *fCons =
-      enumeratePaths(producerBlock, consumerBlock, bi, locConsControlDeps);
+  BoolExpression *fCons = 
+      enumeratePaths(*locGraph, bi, locConsControlDeps);
 
   // Debug: append all LocalCFGs to one txt file (no console output)
   {
@@ -1120,40 +1206,10 @@ static void insertDirectSuppression(
   }
 
   // f_supp = f_prod and not f_cons
-  out << "fProd  = " << fProd->toString() << "\n";
   out << "fCons  = " << fCons->toString() << "\n";
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
   out << "fSupmin  = " << fSup->toString() << "\n";
-  if (fProd->type == experimental::boolean::ExpressionType::Zero) {
-    out << "[FTD] fProd == 0 detected\n";
-    out << "  producer block: ";
-    if (producerBlock)
-      producerBlock->printAsOperand(out);
-    else
-      out << "<null>";
-    out << "\n";
-
-    out << "  consumer block: ";
-    if (consumerBlock)
-      consumerBlock->printAsOperand(out);
-    else
-      out << "<null>";
-    out << "\n";
-
-    out << "  producer (connection): ";
-    if (Operation *def = connection.getDefiningOp()) {
-      out << def->getName() << " @ ";
-      def->getLoc().print(out);
-    } else {
-      out << "<block argument>";
-    }
-    out << "\n";
-
-    out << "  consumer: " << consumer->getName() << " @ ";
-    consumer->getLoc().print(out);
-    out << "\n";
-  }
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
