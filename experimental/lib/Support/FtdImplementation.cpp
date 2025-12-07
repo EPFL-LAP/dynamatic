@@ -804,16 +804,18 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     };
 
     // Wrap the two vertices in the pair into InputSpec objects.
-    InputSpec A = nodeToSpec(u), B = nodeToSpec(v);
+    InputSpec specU = nodeToSpec(u);
+    InputSpec specV = nodeToSpec(v);
 
-    // If there's a direct edge connecting u and v -> successor becomes constant.
+    // If there's a direct edge connecting u and v -> successor becomes
+    // constant.
     int uv = edge(u, v), vu = edge(v, u);
     if (uv != -1 && vu == -1) {
-      B.isConst = true;
-      B.constVal = (uv == +1);
+      specV.isConst = true;
+      specV.constVal = (uv == +1);
     } else if (vu != -1 && uv == -1) {
-      A.isConst = true;
-      A.constVal = (vu == +1);
+      specU.isConst = true;
+      specU.constVal = (vu == +1);
     }
 
     // The largest common predecessor decides who goes to true.
@@ -835,8 +837,8 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
       }
     }
 
-    return (nodes[chosenP].trueSucc == B.nodeIdx) ? std::pair{A, B}
-                                                  : std::pair{B, A};
+    return (nodes[chosenP].trueSucc == specV.nodeIdx) ? std::pair{specU, specV}
+                                                      : std::pair{specV, specU};
   };
 
   // List all-paths-covering pairs (sorted).
