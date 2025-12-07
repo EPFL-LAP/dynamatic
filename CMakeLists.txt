@@ -181,16 +181,22 @@ find_package(PkgConfig REQUIRED)
 # - *_INCLUDE_DIRS
 # - *_LIBRARY_DIRS
 # But these variable will not be automatically discovered by the target.
-pkg_check_modules(CBC REQUIRED cbc)
-pkg_check_modules(CLPCORE REQUIRED clp)
-pkg_check_modules(OSI REQUIRED osi)
+pkg_check_modules(CBC QUIET cbc)
+pkg_check_modules(CLPCORE QUIET clp)
+pkg_check_modules(OSI QUIET osi)
 
-# This command makes the include directory of CBC discoverable
-include_directories(dynamatic-opt PRIVATE
-  ${CBC_INCLUDE_DIRS}
-  ${CLPCORE_INCLUDE_DIRS}
-  ${OSI_INCLUDE_DIRS}
-)
+if(CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
+  message(STATUS "CBC available via pkg-config")
+  # This command makes the include directory of CBC discoverable
+  include_directories(dynamatic-opt PRIVATE
+    ${CBC_INCLUDE_DIRS}
+    ${CLPCORE_INCLUDE_DIRS}
+    ${OSI_INCLUDE_DIRS}
+  )
+  add_compile_definitions(DYNAMATIC_ENABLE_CBC)
+else()
+  message(STATUS "One or more of cbc, clp, and osi are missing! Disabling the CBC.")
+endif()
 
 # This command makes the link directory of CBC discoverable
 # Without this, -lCbc would not work on some distros
@@ -240,7 +246,17 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
     URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
   )
 
-  FetchContent_MakeAvailable(dot2smv)
+  FetchContent_Declare(
+    nuXmv
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR ${EXT_BIN_DIR}/nuXmv
+    URL https://nuxmv.fbk.eu/theme/download.php?file=nuXmv-2.1.0-linux64.tar.xz
+  )
+
+  FetchContent_MakeAvailable(dot2smv nuXmv)
+
+  # Inform our compiler infrastructure that NuSMV is available.
+  add_compile_definitions(DYNAMATIC_ENABLE_LEQ_BINARIES)
 endif()
 
 # We use GoogleTest for regression tests

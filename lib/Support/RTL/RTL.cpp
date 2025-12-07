@@ -299,27 +299,43 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                                   llvm::StringRef handshakeOp,
                                                   hw::ModuleType &modType) {
   if (
+      // clang-format off
       // default (All(Data)TypesMatch)
-      handshakeOp == "handshake.addi" || handshakeOp == "handshake.andi" ||
-      handshakeOp == "handshake.buffer" || handshakeOp == "handshake.cmpi" ||
-      handshakeOp == "handshake.fork" || handshakeOp == "handshake.lazy_fork" ||
-      handshakeOp == "handshake.merge" || handshakeOp == "handshake.muli" ||
-      handshakeOp == "handshake.sink" || handshakeOp == "handshake.subi" ||
-      handshakeOp == "handshake.shli" || handshakeOp == "handshake.blocker" ||
-      handshakeOp == "handshake.uitofp" || handshakeOp == "handshake.sitofp" ||
+      handshakeOp == "handshake.addi" ||
+      handshakeOp == "handshake.andi" ||
+      handshakeOp == "handshake.buffer" ||
+      handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.fork" ||
+      handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.merge" ||
+      handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.shli" ||
+      handshakeOp == "handshake.blocker" ||
+      handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
-      handshakeOp == "handshake.rigidifier" || handshakeOp == "handshake.ori" ||
-      handshakeOp == "handshake.shrsi" || handshakeOp == "handshake.xori" ||
-      handshakeOp == "handshake.negf" || handshakeOp == "handshake.divsi" ||
-      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
-      handshakeOp == "handshake.shrui" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.rigidifier" ||
+      handshakeOp == "handshake.ori" ||
+      handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" ||
+      handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" ||
+      handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.remsi" ||
       handshakeOp == "handshake.not" ||
+      handshakeOp == "handshake.ready_remover" ||
       // the first input has data bitwidth
       handshakeOp == "handshake.speculator" ||
       handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.non_spec") {
+      handshakeOp == "handshake.non_spec"
+      // clang-format on
+  ) {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (handshakeOp == "handshake.cond_br" ||
@@ -415,46 +431,82 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                         hw::ModuleType &modType) {
 
   if (
+      // clang-format off
       // default (AllExtraSignalsMatch)
-      handshakeOp == "handshake.addf" || handshakeOp == "handshake.addi" ||
-      handshakeOp == "handshake.andi" || handshakeOp == "handshake.buffer" ||
-      handshakeOp == "handshake.cmpf" || handshakeOp == "handshake.cmpi" ||
+      handshakeOp == "handshake.addf" ||
+      handshakeOp == "handshake.addi" ||
+      handshakeOp == "handshake.andi" ||
+      handshakeOp == "handshake.buffer" ||
+      handshakeOp == "handshake.cmpf" ||
+      handshakeOp == "handshake.cmpi" ||
       handshakeOp == "handshake.cond_br" ||
-      handshakeOp == "handshake.constant" || handshakeOp == "handshake.extsi" ||
-      handshakeOp == "handshake.fork" || handshakeOp == "handshake.merge" ||
-      handshakeOp == "handshake.mulf" || handshakeOp == "handshake.muli" ||
-      handshakeOp == "handshake.select" || handshakeOp == "handshake.sink" ||
-      handshakeOp == "handshake.subf" || handshakeOp == "handshake.extui" ||
-      handshakeOp == "handshake.shli" || handshakeOp == "handshake.subi" ||
+      handshakeOp == "handshake.constant" ||
+      handshakeOp == "handshake.extsi" ||
+      handshakeOp == "handshake.fork" ||
+      handshakeOp == "handshake.merge" ||
+      handshakeOp == "handshake.mulf" ||
+      handshakeOp == "handshake.muli" ||
+      handshakeOp == "handshake.select" ||
+      handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.subf" ||
+      handshakeOp == "handshake.extui" ||
+      handshakeOp == "handshake.shli" ||
+      handshakeOp == "handshake.subi" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.speculator" ||
-      handshakeOp == "handshake.trunci" || handshakeOp == "handshake.mux" ||
+      handshakeOp == "handshake.trunci" ||
+      handshakeOp == "handshake.mux" ||
       handshakeOp == "handshake.control_merge" ||
-      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.uitofp" ||
-      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
-      handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
-      handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
-      handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
-      handshakeOp == "handshake.truncf" || handshakeOp == "handshake.divsi" ||
-      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
-      handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
-      handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
-      handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.blocker" ||
+      handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" ||
+      handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.divf" ||
+      handshakeOp == "handshake.ori" ||
+      handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" ||
+      handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.truncf" ||
+      handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" ||
+      handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.extf" ||
+      handshakeOp == "handshake.maximumf" ||
+      handshakeOp == "handshake.minimumf" ||
+      handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.join" ||
+      handshakeOp == "handshake.remsi" ||
       handshakeOp == "handshake.not" ||
+      handshakeOp == "handshake.valid_merger" ||
+      handshakeOp == "handshake.ready_remover" ||
       // the first input has extra signals
-      handshakeOp == "handshake.load" || handshakeOp == "handshake.store" ||
+      handshakeOp == "handshake.load" ||
+      handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
-      handshakeOp == "handshake.speculating_branch") {
+      handshakeOp == "handshake.speculating_branch"
+      // clang-format on
+
+  ) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  } else if (handshakeOp == "handshake.source" ||
-             handshakeOp == "handshake.non_spec") {
+  } else if (
+      // clang-format off
+      handshakeOp == "handshake.source" ||
+      handshakeOp == "handshake.non_spec"
+      // clang-format on
+  ) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
-  } else if (handshakeOp == "handshake.mem_controller" ||
-             handshakeOp == "mem_to_bram" || handshakeOp == "handshake.lsq" ||
-             handshakeOp == "handshake.sharing_wrapper" ||
-             handshakeOp == "handshake.ram") {
+  } else if (
+      // clang-format off
+      handshakeOp == "handshake.mem_controller" ||
+      handshakeOp == "mem_to_bram" ||
+      handshakeOp == "handshake.lsq" ||
+      handshakeOp == "handshake.sharing_wrapper" ||
+      handshakeOp == "handshake.ram"
+      // clang-format on
+  ) {
     // Skip
   } else {
     modOp.emitError("Failed to get extra signals of operation");

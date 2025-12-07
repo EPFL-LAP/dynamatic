@@ -878,13 +878,14 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
   addUnsigned("ADDR_WIDTH", ports.addrWidth);
   addUnsigned("SIZE", resType.getNumElements());
 
-  if (auto initialValueAttr = op->getInitialValueAttr()) {
+  if (auto initialValueAttr =
+          dyn_cast<DenseElementsAttr>(op->getInitialValueAttr())) {
     Type elemType = initialValueAttr.getElementType();
     std::vector<std::string> strValues;
     strValues.reserve(initialValueAttr.getNumElements());
     if (isa<IntegerType>(elemType)) {
-      for (auto val : initialValueAttr.getValues<int32_t>()) {
-        strValues.push_back(std::to_string(val));
+      for (auto val : initialValueAttr.getValues<APInt>()) {
+        strValues.push_back(std::to_string(val.getSExtValue()));
       }
     } else if (isa<Float32Type>(elemType)) {
       for (auto val : initialValueAttr.getValues<float>()) {
@@ -893,7 +894,7 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
     } else {
       assert(false && "Unsupported constant type!");
     }
-    addString("INITIAL_VALUES", llvm::join(strValues, " "));
+    addString("INITIAL_VALUES", llvm::join(strValues, ","));
   }
 }
 

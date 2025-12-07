@@ -33,10 +33,15 @@
     - [2. Writing A Simple Pass](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/2.WritingASimplePass.md)
     - [3. Greedy Pattern Rewriting](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/3.GreedyPatternRewriting.md)
 
+- [Testing & CI]()
+  - [Introduction](DeveloperGuide/TestingCI/Introduction.md)
+  - [Integration Tests](DeveloperGuide/TestingCI/IntegrationTests.md)
+  - [Formatting Checks](DeveloperGuide/TestingCI/Formatting.md)
+  - [GitHub Actions](DeveloperGuide/TestingCI/Actions.md)
   
 - [Compiler Intrinsics]()
   - [Backend](DeveloperGuide/CompilerIntrinsics/Backend.md)
-  - [BetaBackend](DeveloperGuide/CompilerIntrinsics/BetaBackend.md)
+  - [Full Backend](DeveloperGuide/CompilerIntrinsics/FullBackend.md)
   - [Extra Signals Type Verification](DeveloperGuide/CompilerIntrinsics/ExtraSignalsTypeVerification.md)
   - [MLIR Op Instantiation C Level](DeveloperGuide/CompilerIntrinsics/MLIROpInstantiationCLevel.md)
   - [MLIR Primer](DeveloperGuide/CompilerIntrinsics/MLIRPrimer.md)

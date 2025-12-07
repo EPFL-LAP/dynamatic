@@ -34,7 +34,6 @@ int runIntegrationTest(IntegrationTestData &config) {
   fs::path cSourcePath =
       config.benchmarkPath / config.name / (config.name + ".c");
 
-  std::cout << "[INFO] Running " << config.name << std::endl;
   std::string tmpFilename = "tmp_" + config.name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
@@ -50,13 +49,29 @@ int runIntegrationTest(IntegrationTestData &config) {
   scriptFile << "compile"
              << " --buffer-algorithm " << config.bufferAlgorithm
              << (config.useSharing ? " --sharing" : "")
+             << (config.useRigidification ? " --rigidification" : "")
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 
-  scriptFile << "write-hdl --hdl " << (config.useVerilog ? "verilog" : "vhdl")
-             << std::endl
-             << "simulate" << std::endl
-             << "exit" << std::endl;
+  // Assert testVHDL or testVerilog is true
+  if (!config.testVHDL && !config.testVerilog) {
+    std::cout << "[ERROR] Either testVHDL or testVerilog must be true"
+              << std::endl;
+    return -1;
+  }
+  // Verify Verilog works correctly
+  if (config.testVerilog) {
+    scriptFile << "write-hdl --hdl verilog" << std::endl
+               << "simulate" << std::endl;
+  }
+  // Verify VHDL works correctly
+  if (config.testVHDL) {
+    // By default, the report containing the simulation time is re-written
+    // during the second simulation (i.e., the VHDL simulation).
+    scriptFile << "write-hdl --hdl vhdl" << std::endl
+               << "simulate" << std::endl;
+  }
+  scriptFile << "exit" << std::endl;
 
   scriptFile.close();
 
@@ -81,8 +96,6 @@ int runIntegrationTest(IntegrationTestData &config) {
     fs::path logFilePath =
         cSourcePath.parent_path() / "out" / "sim" / "report.txt";
     config.simTime = getSimulationTime(logFilePath);
-    std::cout << "[INFO] Benchmark " << config.name
-              << " latency: " << config.simTime << " cycles" << std::endl;
   }
 
   return status;
@@ -104,7 +117,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
                                   "dynamatic" / "scripts" / "simulate.sh";
 
   const std::string RTL_CONFIG =
-      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
+      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl.json";
 
   const std::string SIMULATOR_NAME = "vsim"; // modelsim
 
