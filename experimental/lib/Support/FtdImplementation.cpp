@@ -806,7 +806,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
     // Wrap the two vertices in the pair into InputSpec objects.
     InputSpec A = nodeToSpec(u), B = nodeToSpec(v);
 
-    // Direct edge -> successor becomes constant.
+    // If there's a direct edge connecting u and v -> successor becomes constant.
     int uv = edge(u, v), vu = edge(v, u);
     if (uv != -1 && vu == -1) {
       B.isConst = true;
@@ -816,7 +816,7 @@ static Value buildMuxTree(PatternRewriter &rewriter, Block *block,
       A.constVal = (vu == +1);
     }
 
-    // Largest common predecessor decides who goes to true.
+    // The largest common predecessor decides who goes to true.
     // nodes[].preds are already sorted in ascending order.
     unsigned chosenP = 0;
     const auto &predU = nodes[u].preds;

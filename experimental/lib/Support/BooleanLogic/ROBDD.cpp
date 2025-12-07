@@ -236,10 +236,13 @@ std::vector<unsigned> ROBDD::collectSubgraph(unsigned rootNode,
     workStack.push_back(nd.trueSucc);
   }
 
-  // Ensure both designated sinks appear in the final list (if they weren't reached).
-  if (std::find(subgraph.begin(), subgraph.end(), trueTerminal) == subgraph.end())
+  // Ensure both designated sinks appear in the final list (if they weren't
+  // reached).
+  if (std::find(subgraph.begin(), subgraph.end(), trueTerminal) ==
+      subgraph.end())
     subgraph.push_back(trueTerminal);
-  if (std::find(subgraph.begin(), subgraph.end(), falseTerminal) == subgraph.end())
+  if (std::find(subgraph.begin(), subgraph.end(), falseTerminal) ==
+      subgraph.end())
     subgraph.push_back(falseTerminal);
 
   std::sort(subgraph.begin(), subgraph.end());
