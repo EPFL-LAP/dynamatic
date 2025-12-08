@@ -1,3 +1,8 @@
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DYNAMATIC_DIR="$(cd "$SCRIPT_DIR" && pwd)"
+
+cd $DYNAMATIC_DIR
+
 kernels=(
   single_loop
   nested_loop

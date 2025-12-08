@@ -18,6 +18,8 @@ from script_templates import *
 # Small handwritten util functions
 from utils import *
 
+from switching_extraction import *
+
 
 ################################################################
 # Experiment Enums
@@ -48,7 +50,7 @@ def main(output_dir, kernel_name, clock_period):
 
     date = get_date()
 
-    vhdl_src_folder = os.path.join(output_dir, "hdl")
+    vhdl_src_folder = os.path.join(output_dir, "sim", "HDL_SRC")
     if not os.path.exists(vhdl_src_folder):
         print(f"[ERROR] {vhdl_src_folder} not found. Please run the 'write-hdl' command")
         return
@@ -173,14 +175,21 @@ def main(output_dir, kernel_name, clock_period):
         target_path=simulation_script
     )
 
-    print("[INFO] Simulating to obtain switching activity information")
+    # print("[INFO] Simulating to obtain switching activity information")
 
-    modelsim_command = f"cd {verify_folder}; vsim -c -do {simulation_script}"
-    if run_command(modelsim_command, power_analysis_dir):
-        print("[INFO] Simulation succeeded")
-    else:
-        print("[ERROR] Simulation failed")
-        return
+    # modelsim_command = f"cd {verify_folder}; vsim -c -do {simulation_script}"
+    # if run_command(modelsim_command, power_analysis_dir):
+    #     print("[INFO] Simulation succeeded")
+    # else:
+    #     print("[ERROR] Simulation failed")
+    #     return
+
+    # Step 2: Make saif file from vcd file
+    saif = os.path.join(verify_folder, f"{stage}.saif")
+
+    trace = os.path.join(verify_folder, "trace.vcd")
+    vcd = VcdParser(trace)
+    vcd.write_saif(saif)
 
     # Step 3: Run Power Estimation
     power_dict = {
@@ -189,7 +198,7 @@ def main(output_dir, kernel_name, clock_period):
         'hdlsrc': vhdl_src_folder,
         'report_folder': power_analysis_dir,
         'inputs': vhdl_inputs,
-        'saif': os.path.join(verify_folder, f"{stage}.saif"),
+        'saif': saif,
     }
 
     report_power_script = os.path.join(power_analysis_dir, "report_power.tcl")
@@ -205,7 +214,7 @@ def main(output_dir, kernel_name, clock_period):
         f"cd {power_analysis_dir};" +
         f"vivado -mode batch -source {report_power_script}"
     )
-    run_command(report_power_cmd, power_analysis_dir)
+
     if run_command(report_power_cmd, power_analysis_dir):
         print("[INFO] Power estimation succeeded")
     else:
