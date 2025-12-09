@@ -94,6 +94,56 @@ void CPBuffers::extractResult(BufferPlacement &placement) {
     logResults(placement);
 }
 
+void CPBuffers::addCustomChannelConstraints(Value channel) {
+  ChannelVars &chVars = vars.channelVars[channel];
+  handshake::ChannelBufProps &props = channelProps[channel];
+  GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+
+  if (props.minOpaque > 0) {
+    // Force the MILP to use opaque slots
+    model.addConstr(dataBuf == 1, "custom_forceOpaque");
+    if (props.minTrans > 0) {
+      // If the properties ask for both opaque and transparent slots, let
+      // opaque slots take over. Transparents slots will be placed "manually"
+      // from the total number of slots indicated by the MILP's result
+      unsigned minTotalSlots = props.minOpaque + props.minTrans;
+      model.addConstr(chVars.bufNumSlots >= minTotalSlots,
+                      "custom_minOpaqueAndTrans");
+    } else {
+      // Force the MILP to place a minimum number of opaque slots
+      model.addConstr(chVars.bufNumSlots >= props.minOpaque,
+                      "custom_minOpaque");
+    }
+  } else if (props.minTrans > 0) {
+    // Force the MILP to place a minimum number of transparent slots
+    model.addConstr(chVars.bufNumSlots >= props.minTrans + dataBuf,
+                    "custom_minTrans");
+  } else if (props.minSlots > 0) {
+    // Force the MILP to place a minimum number of slots
+    model.addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
+  }
+  if (props.minOpaque + props.minTrans + props.minSlots > 0)
+    model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
+
+  // Set a maximum number of slots to be placed
+  if (props.maxOpaque.has_value()) {
+    if (*props.maxOpaque == 0) {
+      // Force the MILP to use transparent slots
+      model.addConstr(dataBuf == 0, "custom_forceTransparent");
+    }
+    if (props.maxTrans.has_value()) {
+      // Force the MILP to use a maximum number of slots
+      unsigned maxSlots = *props.maxTrans + *props.maxOpaque;
+      if (maxSlots == 0) {
+        model.addConstr(chVars.bufPresent == 0, "custom_noBuffers");
+        model.addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
+      } else {
+        model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
+      }
+    }
+  }
+}
+
 void CPBuffers::setup() {
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
@@ -115,11 +165,12 @@ void CPBuffers::setup() {
     // llvm::errs() << "Adding vars for channel: " << channel << "\n";
     // llvm::errs() <<  channel.getDefiningOp()->getName().getStringRef() <<
     // "\n";
-    if (auto op = channel.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op))
-        llvm::errs() << channel << " is unbundle\n";
+    // if (auto op = channel.getDefiningOp(); op)
+    //   if (isa<handshake::UnbundleOp>(op))
+    //     llvm::errs() << channel << " is unbundle\n";
     allChannels.push_back(channel);
     addChannelVars(channel, signalTypes);
+    addCustomChannelConstraints(channel);
 
     // Add path and elasticity constraints over all channels in the function
     // that are not adjacent to a memory interface

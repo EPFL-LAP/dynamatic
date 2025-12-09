@@ -53,14 +53,14 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (auto op = channel.getDefiningOp(); op)
       if (isa<handshake::UnbundleOp>(op) &&
           !isa<handshake::ControlType>(channel.getType())) {
-        llvm::errs() << "skipping" << channel << "\n";
+        // llvm::errs() << "skipping" << channel << "\n";
         continue;
       }
-    llvm::errs() << channel << " has " << channel.getType()
-                 << "slots to place.\n";
+    // llvm::errs() << channel << " has " << channel.getType()
+    //              << "slots to place.\n";
     unsigned numSlotsToPlace =
         static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    llvm::errs() << "  - numSlotsToPlace = " << numSlotsToPlace << "\n";
+    // llvm::errs() << "  - numSlotsToPlace = " << numSlotsToPlace << "\n";
 
     // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
     // nothing.
@@ -98,18 +98,18 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   if (logger)
     logResults(placement);
 
-  llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+  // llvm::MapVector<size_t, double> cfdfcTPResult;
+  // for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+  //   auto [cf, cfVars] = cfdfcWithVars;
+  //   double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
-    cfdfcTPResult[idx] = tmpThroughput;
-  }
+  //   cfdfcTPResult[idx] = tmpThroughput;
+  // }
 
-  // Create and add the handshake.tp attribute
-  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-      funcInfo.funcOp.getContext(), cfdfcTPResult);
-  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+  // // Create and add the handshake.tp attribute
+  // auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+  //     funcInfo.funcOp.getContext(), cfdfcTPResult);
+  // setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
@@ -183,9 +183,10 @@ void FPGA20Buffers::setup() {
     // llvm::errs() << "Adding vars for channel: " << channel << "\n";
     // llvm::errs() <<  channel.getDefiningOp()->getName().getStringRef() <<
     // "\n";
-    if (auto op = channel.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op))
-        llvm::errs() << channel << " is unbundle\n";
+    // if (auto op = channel.getDefiningOp(); op)
+    //   if (isa<handshake::UnbundleOp>(op))
+    //     // llvm::errs() << channel << " is unbundle\n";
+    //     continue;
     allChannels.push_back(channel);
     addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);

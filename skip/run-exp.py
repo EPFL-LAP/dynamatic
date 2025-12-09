@@ -12,6 +12,7 @@ from resize_fifo import *
 from compile import *
 from synthesis import *
 from simulate import *
+from write_csv import *
 
     
 def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
@@ -105,46 +106,125 @@ def find_best_fork_fifo_size(test_dir: Path, basename: str, cp: float, n: int,
     return best_fifo
 
 
+def find_cp_by_adding_slack(test_dir: Path, basename: str, n:int, log_file: Path):
+    vivado_dir = test_dir / VIVADO_DIR
+    vivado_dir.mkdir(parents=True, exist_ok=True)
 
-def find_best_timing(test_dir: Path, basename: str, log_file: Path):
-    cps = []
-    clock_cycles = []
-    best_perf = float("inf")
+    for current_cp in [4, 6, 8, 10]:
+        iter_dir = vivado_dir / f"One_attempt_cp_{current_cp:.2f}"
+        iter_dir.mkdir(parents=True, exist_ok=True)
 
-    cp = 10
-    while cp >= 3.0:
-        log(f"\n=== Testing target CP = {cp} ns ===", log_file)
+        constraints_path = iter_dir / "constraints.xdc"
 
-        buffer_cp(cp, test_dir, log_file)
+        half_period = current_cp / 2
+
+        constraints_content = (
+            f"create_clock -name clk -period {current_cp} "
+            f"-waveform {{0.000 {half_period}}} [get_ports clk]\n"
+        )
+        constraints_path.write_text(constraints_content)
+
+        iter_log = iter_dir / "place_and_route.log"
+
+        synth_rc = place_and_route(test_dir, iter_dir, basename, constraints_path, iter_log)
+
+        if synth_rc != 0: 
+            log(f"Place and Route failed at CP={current_cp}\n", log_file) 
+            return None
+
+        rpt = iter_dir / "timing_post_pr.rpt"
+        slack_value = parse_slack_from_report(rpt)
+        log(f"[CP {current_cp}] Slack = {slack_value}\n", log_file)
+
+        if slack_value is None:
+            log("No slack found in report, stopping.\n", log_file)
+            continue
 
         simulate_test(test_dir, basename, log_file)
         sim_out = test_dir / SIM_DIR / "report.txt"
         cycle = parse_cycles(sim_out)
 
         if cycle is None:
-            log(f"⚠️ Simulation failed for CP={cp}, skipping...", log_file)
+            log(f" Simulation failed for CP={current_cp}, skipping...", log_file)
+            continue
+
+        break
+
+
+
+    write_to_csv(benchmark=basename,
+            N=n,
+            target_cp=current_cp,
+            real_cp=current_cp - slack_value,
+            cycles=cycle,
+            input_file=test_dir / VIVADO_DIR / f"One_attempt_cp_{current_cp:.2f}" / "utilization_post_pr.rpt",
+            output_csv=test_dir / "results_one_attempt.csv")
+
+    return current_cp - slack_value
+
+
+
+def find_best_timing(test_dir: Path, basename: str, start_cp:float, n: int, log_file: Path):
+    cps = []
+    clock_cycles = []
+    best_perf = float("inf")
+
+    target_cp = start_cp
+    while target_cp >= 3.0:
+        log(f"\n=== Testing target CP = {target_cp} ns ===", log_file)
+
+        buffer_cp(target_cp, test_dir, log_file)
+        canonicalize_handshake(test_dir, log_file)
+        lower_handshake_to_hw(test_dir, log_file)
+
+        simulate_test(test_dir, basename, log_file)
+        sim_out = test_dir / SIM_DIR / "report.txt"
+        cycle = parse_cycles(sim_out)
+
+        if cycle is None:
+            log(f" Simulation failed for CP={target_cp}, skipping...", log_file)
             continue
         clock_cycles.append(cycle)
 
-        cp = find_real_cp(test_dir, basename, cp, log_file)
-        cps.append(cp)
+        real_cp = find_real_cp(test_dir, basename, target_cp - 0.3, log_file)
+        cps.append(real_cp)
 
-        perf = cycle * cp
+        perf = cycle * real_cp
         best_perf = min(best_perf, perf)
-        log(f"Performance metric: {perf:.2f}", log_file)
+        log(f"$$$ Target CP: {target_cp} ns", log_file)
+        log(f"$$$ Cycles: {cycle}", log_file)
+        log(f"$$$ Real CP: {real_cp:.2f} ns", log_file)
+        log(f"$$$ Performance metric: {perf:.2f}", log_file)
 
-        # 5️⃣ Stop if performance degrades >5% from best
-        if perf > 1.05 * best_perf:
-            log("🛑 Stopping early: performance worsened >5%", log_file)
+
+        # Stop if performance degrades >5% from best
+        if perf > 1.2 * best_perf:
+            log(" Stopping early: performance worsened >20%", log_file)
             break
-        cp -= 0.5
+        target_cp -= 0.5
 
-    best_cp = cps[-1] if cps else 10
-    log(f"\n✅ Best CP found: {best_cp:.2f} ns", log_file)
-    return best_cp
+    if cps and clock_cycles:
+        perfs = [c * r for c, r in zip(clock_cycles, cps)]
+        best_idx = perfs.index(min(perfs))
+
+        log("\n===  Best Configuration Found ===", log_file)
+        log(f"Target CP : {start_cp - 0.5 * best_idx:.2f} ns", log_file)
+        log(f"Real   CP : {cps[best_idx]:.2f} ns", log_file)
+        log(f"Cycles    : {clock_cycles[best_idx]}", log_file)
+        log(f"Performance metric : {perfs[best_idx]:.2f}", log_file)
+
+        write_to_csv(benchmark=basename,
+                      N=n,
+                      target_cp=start_cp - 0.5 * best_idx,
+                      real_cp=cps[best_idx],
+                      cycles=clock_cycles[best_idx],
+                      input_file=test_dir / VIVADO_DIR / f"Timing_based_target_{start_cp - 0.5 * best_idx:.2f}_cp_{cps[best_idx]:.2f}" / "utilization_post_pr.rpt",
+                      output_csv=test_dir / "results.csv")
+    else:
+        log("\n No valid results found during CP tuning.", log_file)
 
 
-def run_pipeline(test_name: str, n: int, fifo_start: int, run_root: Path):
+def run_pipeline(test_name: str, n: int, seed, run_root: Path):
     src_dir = TEST_DIR / test_name
     if not src_dir.exists():
         print(f"Source directory not found for test {test_name}")
@@ -163,21 +243,32 @@ def run_pipeline(test_name: str, n: int, fifo_start: int, run_root: Path):
     basename = test_name
     cp = 10
 
-    best_fifo = find_best_fork_fifo_size(test_out_dir, basename, cp, n, fifo_start, log_file)
+    # best_fifo = find_best_fork_fifo_size(test_out_dir, basename, cp, n, fifo_start, log_file)
 
-    # compile again with the best size
-    compile(test_out_dir, basename, cp, n, best_fifo, log_file)
+    # # compile again with the best size
+    # compile(test_out_dir, basename, cp, n, best_fifo, log_file)
 
-    resize_fifo(test_out_dir, basename, best_fifo)
+    compile(test_out_dir, basename, cp, n, 10, log_file)
 
-    find_best_timing(test_out_dir, basename, log_file)
+    resize_fifo(test_out_dir, basename, 10, seed)
+
+    achieved = find_cp_by_adding_slack(test_out_dir, basename, n, log_file)
+
+    # add 0.5 to achieved and then round it up to the nearest 0.5
+    if achieved is not None:
+        start_cp = achieved + 0.5
+        start_cp = round(start_cp * 2) / 2
+        log(f"Starting from {start_cp} ns", log_file)
+
+    find_best_timing(test_out_dir, basename, start_cp, n, log_file)
+
 
     # best_target_cp = find_best_target_cp(test_out_dir, basename, log_file)
 
     # find_real_cp(test_out_dir, basename, best_target_cp, log_file)
 
 
-    print(f"✅ Finished {test_name}-{n}")
+    print(f" Finished {test_name}-{n}")
     
 
 def read_inputs(input_file):
@@ -193,13 +284,19 @@ def read_inputs(input_file):
                 print(f"Skipping invalid line: {line}")
                 continue
             test, n_str = parts[0], parts[1]
-            fifo_start = int(parts[2]) if len(parts) == 3 else 10  # default if missing
             try:
                 n = int(n_str)
             except ValueError:
                 print(f"Invalid n value in line: {line}")
                 continue
-            inputs.append((test, n, fifo_start))
+            seed = None
+            if len(parts) == 3:
+                try:
+                    seed = int(parts[2])
+                except ValueError:
+                    print(f"Invalid seed value in line: {line}")
+                    continue
+            inputs.append((test, n, seed))
     return inputs
 
 def main():
@@ -220,8 +317,8 @@ def main():
 
     print(f"Found {len(inputs)} test pairs to run.")
 
-    for test, n, fifo_start in inputs:
-        run_pipeline(test, n, fifo_start, run_root)
+    for test, n, seed in inputs:
+        run_pipeline(test, n, seed, run_root)
 
 
 if __name__ == "__main__":

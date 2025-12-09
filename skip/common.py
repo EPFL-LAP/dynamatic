@@ -31,29 +31,6 @@ def shell(*args, **kwargs):
     return run(*args, **kwargs, check=True)
 
 
-# def run_cmd(cmd, cwd=None, timeout=None, log_file=None):
-#     """Run a shell command safely with timeout and optional logging."""
-#     try:
-#         result = subprocess.run(
-#             cmd,
-#             cwd=cwd,
-#             shell=True,
-#             text=True,
-#             timeout=timeout,
-#             capture_output=True
-#         )
-#         if log_file:
-#             with open(log_file, "a") as f:
-#                 f.write(f"\n[CMD] {cmd}\n")
-#                 f.write(result.stdout)
-#                 f.write(result.stderr)
-#         return result.returncode
-#     except subprocess.TimeoutExpired:
-#         if log_file:
-#             with open(log_file, "a") as f:
-#                 f.write(f"\n[TIMEOUT] {cmd}\n")
-#         return 124
-
 
 
 def run_cmd(cmd, cwd=None, timeout=None, log_file=None):

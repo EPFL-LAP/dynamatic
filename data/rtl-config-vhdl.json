@@ -501,7 +501,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tehb_init.vhd",
     "module-name": "tehb_init",
-    "dependencies": ["tehb_dataless"]
+    "dependencies": ["tehb_dataless_init"]
   },
   {
     "name": "handshake.init",

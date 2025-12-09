@@ -152,10 +152,10 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       // unbundle second output should be ignored since it is not a handshake
       // channel
       if (isa<handshake::UnbundleOp>(op) &&
-          !isa<handshake::ControlType>(res.getType())){
-            llvm::errs() << "skipping" << res << "\n";
-            continue;
-          }
+          !isa<handshake::ControlType>(res.getType())) {
+        // llvm::errs() << "skipping" << res << "\n";
+        continue;
+      }
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))
         return failure();

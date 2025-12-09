@@ -61,9 +61,9 @@ def canonicalize_handshake(test_dir: Path, log_file: Path):
     log(f"Running Handshake canonicalization...", log_file)
     rc = run_cmd(cmd, cwd=None, timeout=TIMEOUT * 10, log_file=log_file)
     if rc != 0:
-        log("❌ Failed to canonicalize Handshake.", log_file)
+        log("Failed to canonicalize Handshake.", log_file)
         return False
-    log("✅ Canonicalized Handshake.", log_file)
+    log("Canonicalized Handshake.", log_file)
     return True
 
 
@@ -81,7 +81,7 @@ def lower_handshake_to_hw(test_dir: Path, log_file: Path):
     log("Lowering Handshake to HW...", log_file)
     rc = run_cmd(cmd, cwd=None, timeout=TIMEOUT * 10, log_file=log_file)
     if rc != 0:
-        log("❌ Failed to lower Handshake to HW.", log_file)
+        log("Failed to lower Handshake to HW.", log_file)
         return False
-    log("✅ Lowered Handshake to HW.", log_file)
+    log("Lowered Handshake to HW.", log_file)
     return True

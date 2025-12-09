@@ -302,7 +302,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       // time at unit's input port + the unit's combinational data delay
       // llvm::errs() << "Adding unit timing constraint for " << uniqueName
       //              << " on signal " << getSignalName(signalType) << delay
-      //              << "- " << in << out.getu << "\n";
+      //              << "- " << in << out << "\n";
       // llvm::errs() << out << "\n";
       // llvm::errs() << out.getUses().begin()->getOwner()->getName() << "\n";
 

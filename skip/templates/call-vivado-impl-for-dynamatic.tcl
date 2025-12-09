@@ -8,12 +8,12 @@ if {[catch {
   }
   read_xdc PATH_TO_CONSTRAINTS_FILE
   synth_design -top TOP_MODULE -part xc7k160tfbg484-3 -no_iobuf -mode out_of_context
-  report_utilization > PATH_TO_TEST_FOLDER/out/vivado/utilization_post_syn.rpt
-  report_timing > PATH_TO_TEST_FOLDER/out/vivado/timing_post_syn.rpt
+  report_utilization > PATH_TO_PLACE_AND_ROUTE/utilization_post_syn.rpt
+  report_timing > PATH_TO_PLACE_AND_ROUTE/timing_post_syn.rpt
   place_design
   route_design
-  report_utilization > PATH_TO_TEST_FOLDER/out/vivado/utilization_post_pr.rpt
-  report_timing > PATH_TO_TEST_FOLDER/out/vivado/timing_post_pr.rpt
+  report_utilization > PATH_TO_PLACE_AND_ROUTE/utilization_post_pr.rpt
+  report_timing > PATH_TO_PLACE_AND_ROUTE/timing_post_pr.rpt
 } result]} {
   puts "Error during tcl script execution: $result"
   exit

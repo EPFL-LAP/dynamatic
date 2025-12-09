@@ -1,10 +1,16 @@
 set-src integration-test/histogram/histogram.c
 
+#set-src integration-test/jacobi_1d_imper/jacobi_1d_imper.c
+
+#set-src integration-test/kernel_2mm/kernel_2mm.c
+
+
 #set-src integration-test/matrix_power/matrix_power.c
 
+set-src integration-test/memory/test_memory_19/test_memory_19.c
 
 set-clock-period 10
-compile --skippable-seq-n 2 --buffer-algorithm cpbuf --fork-fifo-size 6
+compile --skippable-seq-n 0 --buffer-algorithm cpbuf --fork-fifo-size 10
 #compile --buffer-algorithm fpga20
 
 write-hdl

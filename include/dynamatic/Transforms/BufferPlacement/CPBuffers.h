@@ -1,4 +1,4 @@
-//===- FPGA20Buffers.h - FPGA'20 buffer placement ---------------*- C++ -*-===//
+//===- CPBuffers.h - FPGA'20 buffer placement -------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,10 +7,10 @@
 //===----------------------------------------------------------------------===//
 //
 //
-// This file declares the `FPGA20Placement` class, which inherits the abstract
+// This file declares the `CPBuffers` class, which inherits the abstract
 // `BufferPlacementMILP` class to setup and solve a real MILP from which
 // buffering decisions can be made. Every public member declared in this file is
-// under the `dynamatic::buffer::fpga20` namespace, as to not create name
+// under the `dynamatic::buffer::cpbuf` namespace, as to not create name
 // conflicts for common structs with other implementors of
 // `BufferPlacementMILP`.
 //
@@ -67,6 +67,10 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
+  /// Adds channel-specific buffering constraints that were parsed from IR
+  /// annotations to the Gurobi model.
+  void addCustomChannelConstraints(Value channel);
+
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
