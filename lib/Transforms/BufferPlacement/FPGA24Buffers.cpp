@@ -174,6 +174,9 @@ void FPGA24Buffers::setup() {
   DataflowGraph dfg(funcInfo.funcOp, sequence);
   dfg.runDFS();
   dfg.dumpGraphViz("dataflow_graph.dot");
+
+  std::vector<ReconvergentPath> reconvergentPaths = dfg.findReconvergentPaths();
+  dfg.dumpReconvergentPaths(reconvergentPaths, "reconvergent_paths.dot");
   // --- END INSERTION ---
 
   // Signals for which we have variables
