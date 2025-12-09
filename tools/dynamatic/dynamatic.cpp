@@ -92,6 +92,7 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  std::string hdl = "vhdl";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
@@ -700,6 +701,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+      state.hdl = "verilog";
     } else if (it->second == "smv") {
       hdl = "smv";
     } else if (it->second == "vhdl-beta") {
@@ -736,10 +738,21 @@ CommandResult Simulate::execute(CommandArguments &args) {
     }
   }
 
+  if (simulator == "ghdl" && state.hdl != "vhdl") {
+    llvm::errs() << "Simulator 'ghdl' is not compatible with this HDL. Use "
+                    "'vsim', 'xsim' or 'verilator'. \n";
+  }
+
+  if (simulator == "verilator" && state.hdl != "verilog") {
+    llvm::errs()
+        << "Simulator 'verilator' is not compatible with this HDL. Use "
+           "'vsim', 'xsim' or 'ghdl'. \n";
+  }
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, state.hdl);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {

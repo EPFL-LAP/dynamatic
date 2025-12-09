@@ -8,6 +8,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "HlsVhdlTb.h"
 #include "VerificationContext.h"
@@ -66,46 +67,50 @@ struct MemRefToDualPortRAM {
   }
 
   void declareConstants(mlir::raw_indented_ostream &os,
+                        VerificationContext &ctx,
                         const std::string &inputVectorPath,
                         const std::string &outputFilePath) {
     int dataWidth = type.getElementTypeBitWidth();
     int dataDepth = type.getNumElements();
     int addrWidth = max((int)ceil(log2(dataDepth)), 1);
-    declareConstant(os, "INPUT_" + argName, "STRING",
+    declareConstant(ctx, os, "INPUT_" + argName, STRING,
                     "\"" + inputVectorPath + "/input_" + argName + ".dat" +
                         "\"");
-    declareConstant(os, "OUTPUT_" + argName, "STRING",
+    declareConstant(ctx, os, "OUTPUT_" + argName, STRING,
                     "\"" + outputFilePath + "/output_" + argName + ".dat" +
                         "\"");
-    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+    declareConstant(ctx, os, "DATA_WIDTH_" + argName, INTEGER,
                     to_string(dataWidth));
-    declareConstant(os, "ADDR_WIDTH_" + argName, "INTEGER",
+    declareConstant(ctx, os, "ADDR_WIDTH_" + argName, INTEGER,
                     to_string(addrWidth));
-    declareConstant(os, "DATA_DEPTH_" + argName, "INTEGER",
+    declareConstant(ctx, os, "DATA_DEPTH_" + argName, INTEGER,
                     to_string(dataDepth));
   }
 
   // Declare signals appear in the circuit interface
-  void declareSignals(mlir::raw_indented_ostream &os) {
+  void declareSignals(mlir::raw_indented_ostream &os,
+                      VerificationContext &ctx) {
     for (auto &[_, sigName, bitwidth] : memrefToDPRAM) {
       if (sigName == WE0_PORT or sigName == CE1_PORT) {
-        declareSTL(os, argName + "_" + sigName, std::nullopt);
+        declareSTL(ctx, os, argName + "_" + sigName, std::nullopt);
       } else {
-        declareSTL(os, argName + "_" + sigName, to_string(bitwidth));
+        declareSTL(ctx, os, argName + "_" + sigName, bitwidth);
       }
     }
     int dataWidth = type.getElementTypeBitWidth();
     // Declare unused interfaces in the two port RAM
-    declareSTL(os, argName + "_" + D_OUT0_PORT, to_string(dataWidth));
-    declareSTL(os, argName + "_" + D_IN1_PORT, to_string(dataWidth),
-               "(others => \'0\')");
+    declareSTL(ctx, os, argName + "_" + D_OUT0_PORT, dataWidth);
+
+    declareSTL(ctx, os, argName + "_" + D_IN1_PORT, dataWidth, 0);
+
     // The write enable of the read interface is not used
-    declareSTL(os, argName + "_" + WE1_PORT, nullopt, "\'0\'");
+    declareSTL(ctx, os, argName + "_" + WE1_PORT, nullopt, 0);
     // The read enable of the write interface is not used
-    declareSTL(os, argName + "_" + CE0_PORT, nullopt, "\'1\'");
+    declareSTL(ctx, os, argName + "_" + CE0_PORT, nullopt, 1);
   }
 
-  void instantiateRAMModel(mlir::raw_indented_ostream &os) {
+  void instantiateRAMModel(mlir::raw_indented_ostream &os,
+                           VerificationContext &ctx) {
     Instance memInst("two_port_RAM", "mem_inst_" + argName);
 
     memInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
@@ -124,9 +129,9 @@ struct MemRefToDualPortRAM {
     memInst.connect(D_OUT0_PORT, argName + "_" + D_OUT0_PORT);
     memInst.connect(D_IN1_PORT, argName + "_" + D_IN1_PORT);
     memInst.connect(WE1_PORT, argName + "_" + WE1_PORT);
-    memInst.connect(CE0_PORT, "\'1\'");
+    memInst.connect(CE0_PORT, CONST_ONE);
 
-    memInst.emitVhdl(os);
+    memInst.emitVhdl(os, ctx);
   }
 
   void connectToDuv(Instance &duvInst) {
@@ -135,19 +140,27 @@ struct MemRefToDualPortRAM {
   }
 };
 
+std::string toBinaryString(int initialValue, unsigned int bitwidth) {
+  boost::dynamic_bitset<> intInBinary(bitwidth, initialValue);
+  std::string binaryString;
+  to_string(intInBinary, binaryString);
+  return binaryString;
+};
+
 // Centralizes the signal declaration for single argument models (both as inputs
 // and outputs)
 void declareSignalsSingleArgumentModel(mlir::raw_indented_ostream &os,
+                                       VerificationContext &ctx,
                                        const std::string &argName,
                                        unsigned dataWidth) {
   // The single argument block needs to define all these signals, regardless
   // of using as an input argument or an output argument
-  declareSTL(os, argName + "_" + CE0_PORT);
-  declareSTL(os, argName + "_" + WE0_PORT);
-  declareSTL(os, argName + "_din0", to_string(dataWidth));
-  declareSTL(os, argName + "_dout0", to_string(dataWidth));
-  declareSTL(os, argName + "_dout0_valid");
-  declareSTL(os, argName + "_dout0_ready");
+  declareSTL(ctx, os, argName + "_" + CE0_PORT);
+  declareSTL(ctx, os, argName + "_" + WE0_PORT);
+  declareSTL(ctx, os, argName + "_din0", dataWidth);
+  declareSTL(ctx, os, argName + "_dout0", dataWidth);
+  declareSTL(ctx, os, argName + "_dout0_valid");
+  declareSTL(ctx, os, argName + "_dout0_ready");
 }
 
 void commonSingleArgumentDeclaration(Instance &inst,
@@ -181,6 +194,7 @@ struct StartToChannelConnector {
       : type(type), argName(argName) {}
 
   void declareConstants(mlir::raw_indented_ostream &os,
+                        VerificationContext &ctx,
                         const std::string &inputVectorPath,
                         const std::string &outputFilePath) {
 
@@ -188,28 +202,30 @@ struct StartToChannelConnector {
     // specify any input vector file ("").
     std::string inputFile =
         "\"" + inputVectorPath + "/input_" + argName + ".dat" + "\"";
-    declareConstant(os, "INPUT_" + argName, "STRING", inputFile);
+    declareConstant(ctx, os, "INPUT_" + argName, STRING, inputFile);
 
-    declareConstant(os, "OUTPUT_" + argName, "STRING",
+    declareConstant(ctx, os, "OUTPUT_" + argName, STRING,
                     "\"" + outputFilePath + "/output_" + argName + ".dat" +
                         "\"");
     int dataWidth = type.getDataBitWidth();
-    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+    declareConstant(ctx, os, "DATA_WIDTH_" + argName, INTEGER,
                     to_string(dataWidth));
   }
 
-  void declareSignals(mlir::raw_indented_ostream &os) {
-    declareSignalsSingleArgumentModel(os, argName, type.getDataBitWidth());
+  void declareSignals(mlir::raw_indented_ostream &os,
+                      VerificationContext &ctx) {
+    declareSignalsSingleArgumentModel(os, ctx, argName, type.getDataBitWidth());
   }
 
-  void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os) {
+  void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os,
+                                      VerificationContext &ctx) {
     Instance argInst("single_argument", "arg_inst_" + argName);
 
     commonSingleArgumentDeclaration(argInst, argName);
-    argInst.connect(CE0_PORT, "'1'")
-        .connect(WE0_PORT, "'0'")
+    argInst.connect(CE0_PORT, CONST_ONE)
+        .connect(WE0_PORT, CONST_ZERO)
         .connect(D_IN0_PORT, "(others => '0')");
-    argInst.emitVhdl(os);
+    argInst.emitVhdl(os, ctx);
   }
 
   void connectToDuv(Instance &duvInst) {
@@ -228,38 +244,41 @@ struct ChannelToEndConnector {
       : type(type), argName(argName) {}
 
   void declareConstants(mlir::raw_indented_ostream &os,
+                        VerificationContext &ctx,
                         const std::string &inputVectorPath,
                         const std::string &outputFilePath) {
 
     // If the single argument is an output (e.g., the return value), we don't
     // specify any input vector file ("").
     std::string inputFile = "\"\"";
-    declareConstant(os, "INPUT_" + argName, "STRING", inputFile);
+    declareConstant(ctx, os, "INPUT_" + argName, STRING, inputFile);
 
-    declareConstant(os, "OUTPUT_" + argName, "STRING",
+    declareConstant(ctx, os, "OUTPUT_" + argName, STRING,
                     "\"" + outputFilePath + "/output_" + argName + ".dat" +
                         "\"");
     int dataWidth = type.getDataBitWidth();
-    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+    declareConstant(ctx, os, "DATA_WIDTH_" + argName, INTEGER,
                     to_string(dataWidth));
   }
 
-  void declareSignals(mlir::raw_indented_ostream &os) {
+  void declareSignals(mlir::raw_indented_ostream &os,
+                      VerificationContext &ctx) {
     // The valid signal from the circuit, which drives the write enable (we)
     // pin of the single enable module
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
-    declareSignalsSingleArgumentModel(os, argName, type.getDataBitWidth());
+    declareSTL(ctx, os, argName + "_valid");
+    declareSTL(ctx, os, argName + "_ready");
+    declareSignalsSingleArgumentModel(os, ctx, argName, type.getDataBitWidth());
   }
 
-  void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os) {
+  void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os,
+                                      VerificationContext &ctx) {
     Instance argInst("single_argument", "arg_inst_" + argName);
 
     commonSingleArgumentDeclaration(argInst, argName);
-    argInst.connect(CE0_PORT, "'1'")
+    argInst.connect(CE0_PORT, CONST_ONE)
         .connect(WE0_PORT, argName + "_valid")
         .connect(D_IN0_PORT, argName + "_din0");
-    argInst.emitVhdl(os);
+    argInst.emitVhdl(os, ctx);
   }
 
   void connectToDuv(Instance &duvInst) {
@@ -295,8 +314,8 @@ struct StartToControlConnector {
       // ready signals are ignored.
       //
       // [TODO] Should this handshake also happen only once per TB transaction?
-      duvInst.connect(argName + "_valid", "\'1\'")
-          .connect(argName + "_ready", "open");
+      duvInst.connect(argName + "_valid", CONST_ONE)
+          .connect(argName + "_ready", OPEN);
     }
   }
 };
@@ -312,9 +331,10 @@ struct ControlToEndConnector {
 
   ControlToEndConnector(handshake::ControlType type, const std::string &argName)
       : type(type), argName(argName) {}
-  void declareSignals(mlir::raw_indented_ostream &os) {
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
+  void declareSignals(mlir::raw_indented_ostream &os,
+                      VerificationContext &ctx) {
+    declareSTL(ctx, os, argName + "_valid");
+    declareSTL(ctx, os, argName + "_ready");
   }
   void connectToDuv(Instance &duvInst) {
     duvInst.connect(argName + "_valid", argName + "_valid")
@@ -337,13 +357,13 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
        getInputArguments<handshake::ChannelType>(funcOp)) {
 
     StartToChannelConnector c(type, argName);
-    c.declareConstants(os, inputVectorPath, outputFilePath);
+    c.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
 
   // The files and configuration of the two port RAM model of the arrays
   for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     MemRefToDualPortRAM m(type, argName);
-    m.declareConstants(os, inputVectorPath, outputFilePath);
+    m.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
 
   // The files and configuration of the single_argument model of the data output
@@ -351,11 +371,11 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToEndConnector c(type, argName);
-    c.declareConstants(os, inputVectorPath, outputFilePath);
+    c.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
-  declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
-  declareConstant(os, "RESET_LATENCY", "TIME", "10.00 ns");
-  declareConstant(os, "TRANSACTION_NUM", "INTEGER", to_string(1));
+  declareConstant(ctx, os, "HALF_CLK_PERIOD", TIME, "2.00");
+  declareConstant(ctx, os, "RESET_LATENCY", TIME, "10.00");
+  declareConstant(ctx, os, "TRANSACTION_NUM", INTEGER, to_string(1));
 }
 
 // This writes the signal declarations fot the testbench
@@ -367,26 +387,26 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
 
   handshake::FuncOp *funcOp = ctx.funcOp;
 
-  declareSTL(os, "tb_clk", std::nullopt, "'0'");
-  declareSTL(os, "tb_rst", std::nullopt, "'0'");
+  declareReg(ctx, os, "tb_clk", std::nullopt, 0);
+  declareReg(ctx, os, "tb_rst", std::nullopt, 0);
 
   // The interface that indicates the global "start" signal.
-  declareSTL(os, "tb_start_valid", std::nullopt, "'0'");
-  declareSTL(os, "tb_start_ready", std::nullopt, "'0'");
+  declareReg(ctx, os, "tb_start_valid", std::nullopt, 0);
+  declareSTL(ctx, os, "tb_start_ready", std::nullopt, 0);
 
   // Testbench state signal.
-  declareSTL(os, "tb_started");
+  declareReg(ctx, os, "tb_started");
 
   // The interface that indicates the global "done" signal.
-  declareSTL(os, "tb_global_valid");
-  declareSTL(os, "tb_global_ready");
-  declareSTL(os, "tb_stop");
+  declareSTL(ctx, os, "tb_global_valid");
+  declareReg(ctx, os, "tb_global_ready");
+  declareReg(ctx, os, "tb_stop");
 
   // Signals of data input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     StartToChannelConnector c(type, argName);
-    c.declareSignals(os);
+    c.declareSignals(os, ctx);
   }
 
   // Signals of control input channels
@@ -400,27 +420,33 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
 
     MemRefToDualPortRAM m(type, argName);
-    m.declareSignals(os);
+    m.declareSignals(os, ctx);
   }
 
   // Signals of data output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToEndConnector c(type, argName);
-    c.declareSignals(os);
+    c.declareSignals(os, ctx);
   }
 
   // Signals of control output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
     ControlToEndConnector c(type, argName);
-    c.declareSignals(os);
+    c.declareSignals(os, ctx);
   }
 
   os << "\n";
 
-  declareSTL(os, "tb_temp_idle", std::nullopt, "'1'");
-  os << "shared variable transaction_idx : INTEGER := 0;\n";
+  declareReg(ctx, os, "tb_temp_idle", std::nullopt, 1);
+
+  if (ctx.simLanguage == VHDL) {
+    os << "shared variable transaction_idx : INTEGER := 0;\n";
+  }
+  if (ctx.simLanguage == VERILOG) {
+    os << " integer transaction_idx = 0;\n";
+  }
   os.flush();
 }
 
@@ -433,19 +459,19 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     StartToChannelConnector c(type, argName);
-    c.instantiateSingleArgumentModel(os);
+    c.instantiateSingleArgumentModel(os, ctx);
   }
 
   // Instantiate dual port RAMs for the memory interfaces
   for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     MemRefToDualPortRAM m(type, argName);
-    m.instantiateRAMModel(os);
+    m.instantiateRAMModel(os, ctx);
   }
 
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToEndConnector c(type, argName);
-    c.instantiateSingleArgumentModel(os);
+    c.instantiateSingleArgumentModel(os, ctx);
   }
 }
 
@@ -496,7 +522,7 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
     c.connectToDuv(duvInst);
   }
 
-  duvInst.emitVhdl(os);
+  duvInst.emitVhdl(os, ctx);
 }
 
 void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
@@ -505,56 +531,121 @@ void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
   unsigned idx = 0;
 
   Instance joinInst("tb_join", "join_valids");
+  if (ctx.simLanguage == VHDL) {
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
+      joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                       argName + "_valid");
+      joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                       argName + "_ready");
+    }
 
-  for (auto &[type, argName] :
-       getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
-    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                     argName + "_valid");
-    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                     argName + "_ready");
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
+      joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                       argName + "_valid");
+      joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                       argName + "_ready");
+    }
   }
 
-  for (auto &[type, argName] :
-       getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
-    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                     argName + "_valid");
-    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                     argName + "_ready");
+  if (ctx.simLanguage == VERILOG) {
+    std::vector<std::string> allArgsInsValid;
+    std::vector<std::string> allArgsInsReady;
+
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
+      allArgsInsValid.push_back(argName + "_valid");
+      allArgsInsReady.push_back(argName + "_ready");
+      idx++;
+    }
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
+      allArgsInsValid.push_back(argName + "_valid");
+      allArgsInsReady.push_back(argName + "_ready");
+      idx++;
+    }
+
+    std::string argNameInsValid = "{";
+    for (unsigned int i = 0; i < allArgsInsValid.size() - 1; i++) {
+      argNameInsValid += allArgsInsValid.at(i) + ",";
+    }
+    argNameInsValid += allArgsInsValid.back() + "}";
+
+    std::string argNameInsReady = "{";
+    for (unsigned int i = 0; i < allArgsInsReady.size() - 1; i++) {
+      argNameInsReady += allArgsInsReady.at(i) + ",";
+    }
+    argNameInsReady += allArgsInsReady.back() + "}";
+
+    joinInst.connect("ins_valid", argNameInsValid);
+
+    joinInst.connect("ins_ready", argNameInsReady);
   }
+
   joinInst.parameter("SIZE", std::to_string(/* Size = last index + 1 */ idx));
 
   joinInst.connect("outs_valid", "tb_global_valid");
   joinInst.connect("outs_ready", "tb_global_ready");
 
-  joinInst.emitVhdl(os);
+  joinInst.emitVhdl(os, ctx);
 }
 
 void getOutputTagGeneration(mlir::raw_indented_ostream &os,
                             VerificationContext &ctx) {
   handshake::FuncOp *funcOp = ctx.funcOp;
 
-  // Reading / Dumping the content of the memory into the file
-  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
+  if (ctx.simLanguage == VHDL) {
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+      os << llvm::formatv(VHDL_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
+
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] :
+         getInputArguments<handshake::ChannelType>(funcOp)) {
+      os << llvm::formatv(VHDL_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
+
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ChannelType>(funcOp)) {
+      os << llvm::formatv(VHDL_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
   }
 
-  // Reading / Dumping the content of the memory into the file
-  for (auto &[type, argName] :
-       getInputArguments<handshake::ChannelType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
-  }
+  if (ctx.simLanguage == VERILOG) {
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+      os << llvm::formatv(VERILOG_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
 
-  // Reading / Dumping the content of the memory into the file
-  for (auto &[type, argName] :
-       getOutputArguments<handshake::ChannelType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] :
+         getInputArguments<handshake::ChannelType>(funcOp)) {
+      os << llvm::formatv(VERILOG_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
+
+    // Reading / Dumping the content of the memory into the file
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ChannelType>(funcOp)) {
+      os << llvm::formatv(VERILOG_PROC_WRITE_TRANSACTIONS.c_str(), argName);
+    }
   }
 }
 
 void vhdlTbCodegen(VerificationContext &ctx) {
 
   std::error_code ec;
-  llvm::raw_fd_ostream fileStream(ctx.getVhdlTestbenchPath(), ec);
+  std::string filename;
+  if (ctx.simLanguage == VHDL) {
+    filename = ctx.getVhdlTestbenchPath();
+  }
+  if (ctx.simLanguage == VERILOG) {
+    filename = ctx.getVerilogTestbenchPath();
+  }
+  llvm::raw_fd_ostream fileStream(filename, ec);
+
   if (ec) {
     llvm::errs() << "Error opening file: " << ec.message() << "\n";
     // Handle error appropriately, e.g., return, exit, etc.
@@ -562,22 +653,35 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   }
   mlir::raw_indented_ostream os(fileStream);
 
-  os << VHDL_LIBRARY_HEADER;
-  os << "entity tb is\n";
-  os << "end entity tb;\n\n";
-  os << "architecture behavior of tb is\n\n";
-  os.indent();
-  getConstantDeclaration(os, ctx);
-  getSignalDeclaration(os, ctx);
-  os.unindent();
-  os << "begin\n\n";
-  os.indent();
-  getDuvInstanceGeneration(os, ctx);
-  getMemoryInstanceGeneration(os, ctx);
-  deriveGlobalCompletionSignal(os, ctx);
-  getOutputTagGeneration(os, ctx);
-  os << COMMON_TB_BODY;
-  os.unindent();
-  os << "end architecture behavior;\n";
-  os.flush();
+  if (ctx.simLanguage == VHDL) {
+    os << VHDL_LIBRARY_HEADER;
+    os.indent();
+    getConstantDeclaration(os, ctx);
+    getSignalDeclaration(os, ctx);
+    os.unindent();
+    os << "begin\n\n";
+    os.indent();
+    getDuvInstanceGeneration(os, ctx);
+    getMemoryInstanceGeneration(os, ctx);
+    deriveGlobalCompletionSignal(os, ctx);
+    getOutputTagGeneration(os, ctx);
+    os << VHDL_COMMON_TB_BODY;
+    os.unindent();
+    os << "end architecture behavior;\n";
+    os.flush();
+  }
+
+  if (ctx.simLanguage == VERILOG) {
+    os << VERILOG_LIBRARY_HEADER;
+    getConstantDeclaration(os, ctx);
+    getSignalDeclaration(os, ctx);
+    getDuvInstanceGeneration(os, ctx);
+    getMemoryInstanceGeneration(os, ctx);
+    deriveGlobalCompletionSignal(os, ctx);
+    getOutputTagGeneration(os, ctx);
+    os << VERILOG_COMMON_TB_BODY;
+    os.unindent();
+    os << "endmodule\n";
+    os.flush();
+  }
 }
