@@ -7,6 +7,7 @@ add_dynamatic_library(DynamaticSupport
   MILP.cpp
   System.cpp
   TimingModels.cpp
+  DataflowGraph.cpp
 
   LINK_LIBS PUBLIC
   DynamaticSupportJSON
