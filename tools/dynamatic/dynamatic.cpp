@@ -101,7 +101,6 @@ struct FrontendState {
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
 
-
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
@@ -272,13 +271,15 @@ public:
 class SetOutputDir : public Command {
 public:
   SetOutputDir(FrontendState &state)
-      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
     addPositionalArg({"out_dir", "out dir name"});
   }
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class Compile : public Command {
 public:
@@ -650,7 +651,8 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
   llvm::StringRef outputDir = args.positionals.front();
 
   // reject trivial bad cases
-  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars

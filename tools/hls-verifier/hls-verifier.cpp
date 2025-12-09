@@ -149,6 +149,12 @@ int main(int argc, char **argv) {
                                cl::value_desc("HDL for simulation"),
                                cl::init("vhdl"));
 
+  cl::opt<std::string> hdlType("hdl",
+                               cl::desc("HDL used for simulation. Can either "
+                                        "be 'vhdl' (default) or 'verilog'"),
+                               cl::value_desc("HDL for simulation"),
+                               cl::init("vhdl"));
+
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
 
