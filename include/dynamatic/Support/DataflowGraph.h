@@ -17,10 +17,22 @@
 #include "experimental/Support/StdProfiler.h"
 #include "llvm/ADT/SmallVector.h"
 
+#include <set>
 #include <utility>
 #include <vector>
 
 namespace dynamatic {
+
+/// A reconvergent path is a subgraph where multiple paths diverge from a fork
+/// and reconverge at a join. This is important for latency balancing.
+struct ReconvergentPath {
+  size_t forkNodeId; // <- The divergence point (fork operation).
+  size_t joinNodeId; // <- The convergence point (merge/mux operation).
+  std::set<size_t> nodeIds; // <- All nodes on paths from fork to join.
+
+  ReconvergentPath(size_t fork, size_t join, std::set<size_t> nodes)
+      : forkNodeId(fork), joinNodeId(join), nodeIds(std::move(nodes)) {}
+};
 
 struct DataflowGraphNode {
   mlir::Operation *op; // <- The underlying operation.
@@ -79,6 +91,13 @@ private:
   // A helper for runDFS()
   void dfsVisit(size_t nodeId, std::vector<bool> &visited,
                 llvm::raw_ostream &os);
+
+  // Reverse adjacency list for backward traversal (built on demand).
+  std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
+
+  // Build the reverse adjacency list if not already built.
+  void buildReverseAdjList();
+
 public:
   DataflowGraph(handshake::FuncOp funcOp,
                 const std::vector<dynamatic::experimental::ArchBB> &sequence);
@@ -92,6 +111,17 @@ public:
 
   void runDFS();
   void dumpGraphViz(llvm::StringRef filename);
+
+  // === Reconvergent Path Analysis === //
+
+  /// Find all reconvergent paths in the graph.
+  /// A reconvergent path is where dataflow diverges at a fork and reconverges
+  /// at a join (merge/mux). Returns paths with > 2 nodes (non-trivial).
+  std::vector<ReconvergentPath> findReconvergentPaths();
+
+  /// Dump reconvergent paths to a GraphViz file for visualization.
+  void dumpReconvergentPaths(const std::vector<ReconvergentPath> &paths,
+                             llvm::StringRef filename);
 };
 
 } // namespace dynamatic

@@ -19,6 +19,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <queue>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -256,4 +257,194 @@ void DataflowGraph::dumpGraphViz(llvm::StringRef filename) {
   file << "}\n";
   file.close();
   llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";
+}
+
+// === Reconvergent Path Analysis === //
+
+void DataflowGraph::buildReverseAdjList() {
+  if (!revAdjList.empty())
+    return;
+
+  revAdjList.resize(nodes.size());
+  for (size_t srcId = 0; srcId < adjList.size(); ++srcId) {
+    for (size_t edgeId : adjList[srcId]) {
+      size_t dstId = edges[edgeId].dstId;
+      revAdjList[dstId].push_back(srcId);
+    }
+  }
+}
+
+std::vector<ReconvergentPath> DataflowGraph::findReconvergentPaths() {
+  buildReverseAdjList();
+
+  std::vector<size_t> forks;
+  std::vector<size_t> joins;
+
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    Operation *op = nodes[i].op;
+    if (isa<handshake::ForkOp>(op) || isa<handshake::LazyForkOp>(op)) {
+      forks.push_back(i);
+    } else if (isa<handshake::MergeOp>(op) ||
+               isa<handshake::ControlMergeOp>(op) ||
+               isa<handshake::MuxOp>(op)) {
+      joins.push_back(i);
+    }
+  }
+
+  // Track unique node sets we've seen
+  std::set<std::set<size_t>> seenNodeSets;
+  std::vector<ReconvergentPath> paths;
+
+  for (size_t forkId : forks) {
+    // BFS forward from fork to find all reachable nodes
+    std::vector<bool> reachableFromFork(nodes.size(), false);
+    std::queue<size_t> fwdQueue;
+    fwdQueue.push(forkId);
+    reachableFromFork[forkId] = true;
+
+    while (!fwdQueue.empty()) {
+      size_t u = fwdQueue.front();
+      fwdQueue.pop();
+      for (size_t edgeId : adjList[u]) {
+        size_t v = edges[edgeId].dstId;
+        if (!reachableFromFork[v]) {
+          reachableFromFork[v] = true;
+          fwdQueue.push(v);
+        }
+      }
+    }
+
+    for (size_t joinId : joins) {
+      // Skip if join is not reachable from fork
+      if (!reachableFromFork[joinId])
+        continue;
+
+      // BFS backward from join to find all nodes that can reach it
+      std::vector<bool> canReachJoin(nodes.size(), false);
+      std::queue<size_t> bwdQueue;
+      bwdQueue.push(joinId);
+      canReachJoin[joinId] = true;
+
+      while (!bwdQueue.empty()) {
+        size_t u = bwdQueue.front();
+        bwdQueue.pop();
+        for (size_t v : revAdjList[u]) {
+          if (!canReachJoin[v]) {
+            canReachJoin[v] = true;
+            bwdQueue.push(v);
+          }
+        }
+      }
+
+      // The fork must have >=2 direct successors that can reach the join.
+      // Otherwise it's just a linear chain, not actual divergence/reconvergence.
+      unsigned numDivergingPaths = 0;
+      for (size_t edgeId : adjList[forkId]) {
+        size_t successor = edges[edgeId].dstId;
+        if (canReachJoin[successor])
+          numDivergingPaths++;
+      }
+
+      // Skip if only 0 or 1 path from fork reaches join (not reconvergent)
+      if (numDivergingPaths < 2)
+        continue;
+
+      // Nodes reachable from fork AND can reach join
+      std::set<size_t> intersection;
+      for (size_t i = 0; i < nodes.size(); ++i) {
+        if (reachableFromFork[i] && canReachJoin[i])
+          intersection.insert(i);
+      }
+
+      // Skip trivial paths and deduplicate identical node sets
+      if (intersection.size() > 2 && !seenNodeSets.count(intersection)) {
+        seenNodeSets.insert(intersection);
+        paths.emplace_back(forkId, joinId, std::move(intersection));
+      }
+    }
+  }
+
+  llvm::errs() << "Found " << paths.size() << " reconvergent paths from "
+               << forks.size() << " forks and " << joins.size() << " joins.\n";
+
+  return paths;
+}
+
+void DataflowGraph::dumpReconvergentPaths(
+    const std::vector<ReconvergentPath> &paths, llvm::StringRef filename) {
+  llvm::SmallString<256> fullPath;
+  if (llvm::sys::path::is_absolute(filename)) {
+    fullPath = filename;
+  } else {
+    if (auto ec = llvm::sys::fs::current_path(fullPath)) {
+      llvm::errs() << "Failed to get current path: " << ec.message() << "\n";
+      fullPath = filename;
+    } else {
+      llvm::sys::path::append(fullPath, filename);
+    }
+  }
+
+  std::ofstream file(fullPath.str().str());
+  if (!file.is_open()) {
+    llvm::errs() << "Failed to open file: " << fullPath << "\n";
+    return;
+  }
+
+  file << "digraph ReconvergentPaths {\n";
+  file << "  rankdir=TB;\n";
+  file << "  bgcolor=white;\n";
+  file << "  compound=true;\n\n";
+
+  for (size_t pathIdx = 0; pathIdx < paths.size(); ++pathIdx) {
+    const ReconvergentPath &path = paths[pathIdx];
+
+    file << "  subgraph cluster_path_" << pathIdx << " {\n";
+    file << "    label=\"Path " << pathIdx << " (Fork: "
+         << nodes[path.forkNodeId].getLabel() << " -> Join: "
+         << nodes[path.joinNodeId].getLabel() << ")\";\n";
+    file << "    style=rounded;\n";
+    file << "    color=blue;\n";
+    file << "    bgcolor=\"#e8f4fc\";\n\n";
+
+    // Emit nodes with unique IDs per path to avoid conflicts
+    for (size_t nodeId : path.nodeIds) {
+      std::string uniqueId = "p" + std::to_string(pathIdx) + "_" +
+                             nodes[nodeId].getDotId();
+      std::string color = "";
+      if (nodeId == path.forkNodeId)
+        color = ", style=filled, fillcolor=\"#90EE90\""; // Green for fork
+      else if (nodeId == path.joinNodeId)
+        color = ", style=filled, fillcolor=\"#FFB6C1\""; // Pink for join
+
+      file << "    " << uniqueId << " [label=\"" << nodes[nodeId].getLabel()
+           << "\"" << color << "];\n";
+    }
+
+    file << "\n";
+
+    // Emit edges within this path (different styles for intra/inter-BB)
+    for (size_t srcId : path.nodeIds) {
+      for (size_t edgeId : adjList[srcId]) {
+        const DataflowGraphEdge &edge = edges[edgeId];
+        size_t dstId = edge.dstId;
+        if (path.nodeIds.count(dstId)) {
+          std::string srcUniqueId = "p" + std::to_string(pathIdx) + "_" +
+                                    nodes[srcId].getDotId();
+          std::string dstUniqueId = "p" + std::to_string(pathIdx) + "_" +
+                                    nodes[dstId].getDotId();
+          std::string style = (edge.type == INTRA_BB) ? "solid" : "dashed";
+          std::string color = (edge.type == INTRA_BB) ? "black" : "blue";
+          file << "    " << srcUniqueId << " -> " << dstUniqueId
+               << " [style=" << style << ", color=" << color << "];\n";
+        }
+      }
+    }
+
+    file << "  }\n\n";
+  }
+
+  file << "}\n";
+  file.close();
+  llvm::errs() << "Dumped " << paths.size() << " reconvergent paths to "
+               << fullPath << "\n";
 }
