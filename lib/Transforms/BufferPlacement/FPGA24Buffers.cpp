@@ -16,6 +16,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Support/DataflowGraph.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/TransitionCFDFC.h"
 #include "mlir/IR/Value.h"
@@ -170,13 +171,9 @@ void FPGA24Buffers::setup() {
   std::vector<experimental::ArchBB> sequence(funcInfo.archs.begin(),
                                              funcInfo.archs.end());
 
-  // Create the transition graph
-  TransitionCFDFC transGraph(funcInfo.funcOp, sequence);
-
-  // Run DFS and dump graph
-  transGraph.runDFS();
-  transGraph.dumpGraphViz("transition_cfdfc.dot");
-  transGraph.findAndDumpReconvergentPaths("."); // Add this line
+  DataflowGraph dfg(funcInfo.funcOp, sequence);
+  dfg.runDFS();
+  dfg.dumpGraphViz("dataflow_graph.dot");
   // --- END INSERTION ---
 
   // Signals for which we have variables
