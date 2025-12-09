@@ -640,4 +640,8 @@ python3 experimental/tools/integration/run_specv2_large_integration.py bisection
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_baseline_7ns bisection_unrolled_16 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_auto_7ns bisection_unrolled_16 7.000 3.500
 
+python3 experimental/tools/integration/run_specv2_large_integration.py kmp --on-merges --out out_baseline_7ns --factor 10 --disable-spec
+python3 experimental/tools/integration/run_gamma.py kmp --on-merges --out out_eager_7ns --factor 10
+
+
 date > end_time.txt

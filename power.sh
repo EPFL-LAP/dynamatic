@@ -26,6 +26,17 @@ variants=(
 
 for k in "${kernels[@]}"; do
   for v in "${variants[@]}"; do
+
+    # skip v1 for kernels that don't have it
+    if [[ ( "$v" == "out_v1_7ns" && "$k" == "bisection" )       || \
+          ( "$v" == "out_v1_7ns" && "$k" == "collision_donut" ) || \
+          ( "$v" == "out_v1_7ns" && "$k" == "if_float" )        || \
+          ( "$v" == "out_auto_7ns" && "$k" == "if_float" )        || \
+          ( "$v" == "out_auto_7ns" && "$k" == "if_float2" )        || \
+          ( "$v" == "out_v1_7ns" && "$k" == "if_float2" ) ]]; then
+      continue
+    fi
+
     python tools/dynamatic/estimate_power/estimate_power.py \
       --output_dir "$DYNAMATIC_DIR/integration-test/$k/$v" \
       --kernel_name "$k" \

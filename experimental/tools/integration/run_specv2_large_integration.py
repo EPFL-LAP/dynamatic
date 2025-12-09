@@ -270,7 +270,7 @@ def main():
             f"--func-set-arg-names=source={transformed_code}",
             "--mark-memory-dependencies",
             "--flatten-memref-row-major",
-            "--mark-memory-interfaces"
+            '--force-memory-interface=force-mc=true',
         ],
             stdout=f,
             stderr=sys.stdout
@@ -306,7 +306,7 @@ def main():
             DYNAMATIC_OPT_BIN, cf_transformed,
             "--arith-reduce-strength=max-adder-depth-mul=1",
             "--push-constants",
-            "--mark-memory-interfaces"
+            "--force-memory-interface=force-mc=true"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -466,6 +466,10 @@ def main():
         elif "single_loop" in kernel_name:
             for i in range(1, args.factor+1):
                 bbs_set.append([i])
+        elif "kmp" in kernel_name:
+            # for i in range(args.factor):
+            bbs_set.append([3, 4])
+            loop = False
         else:
             print("Kernel not supported for bbs_set generation")
         bbs_set.reverse()

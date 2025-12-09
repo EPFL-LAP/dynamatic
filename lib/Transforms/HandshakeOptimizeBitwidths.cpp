@@ -1650,10 +1650,13 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
 
   // Handshake operations
   addHandshakeDataPatterns(fwPatterns, true);
-  fwPatterns.add<ForwardCycleOptNoCfg<handshake::MergeOp>,
-                 ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
-                 ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
-      ctx, getAnalysis<NameAnalysis>());
+
+  // bug on kmp
+  // fwPatterns.add<ForwardCycleOptNoCfg<handshake::MergeOp>,
+  //                ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
+  //                ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
+  //     ctx, getAnalysis<NameAnalysis>());
+
 
   // arith operations
   addArithPatterns(fwPatterns, true);
