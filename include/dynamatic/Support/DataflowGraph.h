@@ -60,7 +60,7 @@ struct DataflowGraphEdge {
 
   DataflowGraphEdge(size_t srcId, size_t dstId, DataflowGraphEdgeType type,
                     mlir::Value channel)
-      : srcId(srcId), dstId(dstId), type(type), channel(channel) {}
+      : srcId(srcId), dstId(dstId), channel(channel), type(type) {}
 };
 
 // A non-cyclic dataflow graph unrolled along a transition sequence.
