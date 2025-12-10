@@ -565,23 +565,6 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   }
   this->getInstToMemRefMap[gepInst] = baseAddress;
 
-#if 0
-  // NOTE: this is no longer true as of 21.11.2025. We will not have an extra leading zero.
-  if (auto *defInst = gepInst->getPointerOperand();
-      isa_and_nonnull<AllocaInst>(defInst) ||
-      isa_and_nonnull<GlobalVariable>(defInst)) {
-    // NOTE: If GEP calculates value from a memory allocation (which is a
-    // global value), an extra zero index value is required at the beginning
-    // to calculate the address.
-    //
-    // Reference:
-    // https://llvm.org/docs/GetElementPtr.html#why-is-the-extra-0-index-required
-    //
-    // Therefore, we drop the first element in this case
-    gepIndices.erase(gepIndices.begin());
-  }
-#endif
-
   // A list of value to be accumulated
   //
   // For the example above:
