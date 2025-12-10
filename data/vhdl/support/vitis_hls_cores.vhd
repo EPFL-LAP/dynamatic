@@ -157,6 +157,8 @@ begin
     dividend_u  <= STD_LOGIC_VECTOR(UNSIGNED(not dividend0) + 1) when dividend0(in0_WIDTH-1) = '1' else dividend0;
     divisor_u   <= STD_LOGIC_VECTOR(UNSIGNED(not divisor0) + 1) when divisor0(in1_WIDTH-1) = '1' else divisor0;
 
+
+
 process (clk)
 begin
     if (clk'event and clk = '1') then
@@ -201,6 +203,11 @@ use IEEE.std_logic_1164.all;
 
 -- This is the module that is instantiated in the handshake unit.
 -- See `tools/unit-generators/vhdl/generators/support/arith_ip.py` for its instantiation logic
+
+-- Total latency of this module: 35 cycles : 
+-- > 2 (from the input/output regs) 
+-- > 32 (divider regs) 
+-- > 1 (input reg of the divider)
 
 entity divsi_vitis_hls_wrapper is
     port (
@@ -418,6 +425,11 @@ use IEEE.std_logic_1164.all;
 -- This is the module that is instantiated in the handshake unit.
 -- See `tools/unit-generators/vhdl/generators/support/arith_ip.py` for its instantiation logic
 
+-- Total latency of this module: 35 cycles : 
+-- > 2 (from the input/output regs) 
+-- > 32 (divider regs) 
+-- > 1 (input reg of the divider)
+
 entity remsi_vitis_hls_wrapper is
     port (
         clk : IN STD_LOGIC;
@@ -511,6 +523,7 @@ begin
     quot   <= STD_LOGIC_VECTOR(RESIZE(dividend_tmp(in0_WIDTH), out_WIDTH));
     remd   <= STD_LOGIC_VECTOR(RESIZE(remd_tmp(in0_WIDTH), out_WIDTH));
 
+    -- Input buffer (latency = 1)
     tran_tmp_proc : process (clk)
     begin
         if (clk'event and clk='1') then
@@ -522,6 +535,7 @@ begin
         end if;
     end process tran_tmp_proc;
 
+    -- Pipeline registers (latency = 32)
     run_proc: for i in 0 to in0_WIDTH-1 generate
     begin
         comb_tmp(i) <= remd_tmp(i)(in0_WIDTH-2 downto 0) & dividend_tmp(i)(in0_WIDTH-1);
@@ -604,6 +618,7 @@ begin
     dividend_u  <= dividend0;
     divisor_u   <= divisor0;
 
+-- Input regs (latency = 1)
 process (clk)
 begin
     if (clk'event and clk = '1') then
@@ -614,6 +629,7 @@ begin
     end if;
 end process;
 
+-- Output regs (latency = 1)
 process (clk)
 begin
     if (clk'event and clk = '1') then
@@ -632,6 +648,11 @@ use IEEE.std_logic_1164.all;
 
 -- This is the module that is instantiated in the handshake unit.
 -- See `tools/unit-generators/vhdl/generators/support/arith_ip.py` for its instantiation logic
+
+-- Total latency of this module: 35 cycles : 
+-- > 2 (from the input/output regs) 
+-- > 32 (divider regs) 
+-- > 1 (input reg of the divider)
 
 entity divui_vitis_hls_wrapper is
     port (
