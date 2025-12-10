@@ -29,6 +29,8 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/MemoryDependency.h"
 
+#define DEBUG_TYPE "translate-llvm-to-std"
+
 /// Returns the corresponding scalar MLIR Type from a given LLVM type
 static mlir::Type getMLIRType(llvm::Type *llvmType,
                               mlir::MLIRContext *context) {
@@ -41,8 +43,17 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
   if (llvmType->isDoubleTy()) {
     return mlir::Float64Type::get(context);
   }
+  // long double is mapped to F80 in LLVM (we don't have floating point units to
+  // handle that).
+  if (llvmType->isX86_FP80Ty()) {
+    llvm::errs() << "Warning: using x86_fp80 type in MLIR translation. This "
+                    "type is not currently supported\n";
+    return mlir::FloatType::getF80(context);
+  }
+  LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";
+             llvmType->dump(););
 
-  llvm_unreachable("Unhandled scalar type");
+  llvm::report_fatal_error("Unhandled scalar type");
 }
 
 /// NOTE: This is taken literally from "mlir/lib/Target/LLVMIR/ModuleImport.cpp"
@@ -141,7 +152,7 @@ void convertInitializerToDenseElemAttrRecursive(
                                                  baseMLIRElemType);
     } else {
       llvm::errs() << "Unhandled constant element type:\n";
-      llvm_unreachable("Unhandled base element type.");
+      llvm::report_fatal_error("Unhandled base element type.");
     }
   }
 }
