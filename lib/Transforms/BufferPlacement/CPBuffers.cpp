@@ -1,4 +1,4 @@
-//===- FPGA20Buffers.cpp - FPGA'20 buffer placement -------------*- C++ -*-===//
+//===- CPBuffers.cpp - FPGA'20 buffer placement -------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements FPGA'20 smart buffer placement.
+// Implements buffer placement for CP
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/CPBuffers.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
@@ -25,27 +25,25 @@ using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-using namespace dynamatic::buffer::fpga20;
+using namespace dynamatic::buffer::cpbuf;
 
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod)
+CPBuffers::CPBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                     const TimingDatabase &timingDB, double targetPeriod)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod, Logger &logger,
-                             StringRef milpName)
+CPBuffers::CPBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                     const TimingDatabase &timingDB, double targetPeriod,
+                     Logger &logger, StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                           milpName) {
   if (!unsatisfiable)
     setup();
 }
 
-void FPGA20Buffers::extractResult(BufferPlacement &placement) {
+void CPBuffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
@@ -53,14 +51,11 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (auto op = channel.getDefiningOp(); op)
       if (isa<handshake::UnbundleOp>(op) &&
           !isa<handshake::ControlType>(channel.getType())) {
-        // llvm::errs() << "skipping" << channel << "\n";
         continue;
       }
-    // llvm::errs() << channel << " has " << channel.getType()
-    //              << "slots to place.\n";
+
     unsigned numSlotsToPlace =
         static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    // llvm::errs() << "  - numSlotsToPlace = " << numSlotsToPlace << "\n";
 
     // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
     // nothing.
@@ -83,9 +78,9 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     }
 
     // See docs/Specs/Buffering.md
-    // In FPGA20, buffers only break the data and valid paths.
-    // We insert TEHBs after all Merge-like operations to break the ready paths.
-    // We only break the ready path if the channel is on cycle.
+    // In FPGA20 which this is based on, buffers only break the data and valid
+    // paths. We insert TEHBs after all Merge-like operations to break the ready
+    // paths. We only break the ready path if the channel is on cycle.
     Operation *srcOp = channel.getDefiningOp();
     if (srcOp && isa<handshake::MuxOp, handshake::MergeOp>(srcOp) &&
         srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
@@ -97,22 +92,9 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
   if (logger)
     logResults(placement);
-
-  // llvm::MapVector<size_t, double> cfdfcTPResult;
-  // for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-  //   auto [cf, cfVars] = cfdfcWithVars;
-  //   double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-
-  //   cfdfcTPResult[idx] = tmpThroughput;
-  // }
-
-  // // Create and add the handshake.tp attribute
-  // auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-  //     funcInfo.funcOp.getContext(), cfdfcTPResult);
-  // setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
-void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
+void CPBuffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
   GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
@@ -162,7 +144,7 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   }
 }
 
-void FPGA20Buffers::setup() {
+void CPBuffers::setup() {
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
   signalTypes.push_back(SignalType::DATA);
@@ -185,8 +167,7 @@ void FPGA20Buffers::setup() {
     // "\n";
     // if (auto op = channel.getDefiningOp(); op)
     //   if (isa<handshake::UnbundleOp>(op))
-    //     // llvm::errs() << channel << " is unbundle\n";
-    //     continue;
+    //     llvm::errs() << channel << " is unbundle\n";
     allChannels.push_back(channel);
     addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
@@ -206,27 +187,6 @@ void FPGA20Buffers::setup() {
     addUnitTimingConstraints(&op, SignalType::DATA);
   }
 
-  // Create CFDFC variables and add throughput constraints for each CFDFC that
-  // was marked to be optimized
-  // SmallVector<CFDFC *> cfdfcs;
-  // for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-  //   if (!optimize)
-  //     continue;
-  //   cfdfcs.push_back(cfdfc);
-  //   addCFDFCVars(*cfdfc);
-  //   // addMuxConstraint(*cfdfc);
-  //   addSteadyStateReachabilityConstraints(*cfdfc);
-  //   addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
-  //   addUnitThroughputConstraints(*cfdfc);
-  // }
-  // addBackedgeConstraints();
-  // addDataBufConstraint();
-
-  // GRBLinExpr objective = addBackedgeObjective(allChannels);
-  // Add the MILP objective and mark the MILP ready to be optimized
-  // addMaxThroughputObjective(allChannels, cfdfcs, objective);
-
-  // addBackedgeConstraints();
   addMinBufferAreaObjective(allChannels);
   markReadyToOptimize();
 }

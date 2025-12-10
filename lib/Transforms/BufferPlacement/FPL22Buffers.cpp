@@ -96,8 +96,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
-
-  populateCFDFCThroughputAndOccupancy();
 }
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
@@ -174,7 +172,7 @@ struct Pin {
 
   /// Simple member-by-member constructor.
   Pin(Value channel, SignalType signalType)
-      : channel(channel), signalType(signalType) {};
+      : channel(channel), signalType(signalType){};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -189,7 +187,7 @@ struct MixedDomainConstraint {
 
   /// Simple member-by-member constructor.
   MixedDomainConstraint(Pin input, Pin output, double internalDelay)
-      : input(input), output(output), internalDelay(internalDelay) {};
+      : input(input), output(output), internalDelay(internalDelay){};
 };
 
 } // namespace
@@ -396,7 +394,9 @@ void CFDFCUnionBuffers::setup() {
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
+  GRBLinExpr objective = addBackedgeObjective(allChannels);
+
+  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs, objective);
   markReadyToOptimize();
 }
 

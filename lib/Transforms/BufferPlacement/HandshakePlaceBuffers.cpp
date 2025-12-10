@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
-#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -23,17 +22,16 @@
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/CPBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <string>
 
@@ -48,15 +46,8 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    CostAware("costaware"), MAPBUF("mapbuf");
+    CostAware("costaware"), MAPBUF("mapbuf"), CPBUF("cpbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-
-namespace dynamatic {
-namespace buffer {
-#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
-#include "dynamatic/Transforms/Passes.h.inc"
-} // namespace buffer
-} // namespace dynamatic
 
 namespace {
 
@@ -94,77 +85,7 @@ public:
       delete log;
   }
 };
-
 } // namespace
-
-namespace dynamatic {
-namespace buffer {
-
-/// Public pass driver for the buffer placement pass. Unlike most other
-/// Dynamatic passes, users may wish to access the pass's internal state to
-/// derive insights useful for different kinds of IR processing. To facilitate
-/// users' workflow and minimize code duplication, this driver is public and
-/// exposes most of its behavior in protected virtual methods which may be
-/// overriden by sub-types of the pass.
-struct HandshakePlaceBuffersPass
-    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
-          HandshakePlaceBuffersPass> {
-
-  /// Trivial field-by-field constructor.
-  HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
-                            StringRef timingModels, bool firstCFDFC,
-                            double targetCP, unsigned timeout, bool dumpLogs);
-
-  /// Use the auto-generated construtors from tblgen
-  using HandshakePlaceBuffersBase::HandshakePlaceBuffersBase;
-
-  void runOnOperation() override;
-
-protected:
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-  /// Called for all buffer placement strategies that not require Gurobi to
-  /// be installed on the host system.
-  LogicalResult placeUsingMILP();
-
-  /// Checks a couple of invariants in the function that are required by our
-  /// buffer placement algorithm. Fails when the function does not satisfy at
-  /// least one invariant.
-  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
-
-  /// Places buffers in the function, according to the logic dictated by the
-  /// algorithm the pass was instantiated with.
-  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB,
-                                     CFDFCAnalysis &cfdfcAnalysis);
-
-  /// Identifies and extracts all existing CFDFCs in the function using
-  /// estimated transition frequencies between its basic blocks. Fills the
-  /// `cfdfcs` vector with the extracted cycles. CFDFC identification works by
-  /// iteratively solving MILPs until the MILP solution indicates that no
-  /// "executable cycle" remains in the circuit.
-  virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
-                                  std::vector<CFDFC> &cfdfcs);
-
-  /// Computes an optimal buffer placement for a Handhsake function by solving
-  /// a large MILP over the entire dataflow circuit represented by the
-  /// function. Fills the `placement` map with placement decisions derived
-  /// from the MILP's solution.
-  virtual LogicalResult getBufferPlacement(FuncInfo &info,
-                                           TimingDatabase &timingDB,
-                                           Logger *logger,
-                                           BufferPlacement &placement);
-#endif
-  /// Called for all buffer placement strategies that do not require Gurobi to
-  /// be installed on the host system.
-  LogicalResult placeWithoutUsingMILP();
-
-  /// Instantiates buffers inside the IR, following placement decisions
-  /// determined by the buffer placement MILP.
-  virtual void instantiateBuffers(BufferPlacement &placement,
-                                  std::vector<CFDFC> &cfdfcs);
-};
-
-} // namespace buffer
-} // namespace dynamatic
 
 BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
                            std::error_code &ec) {
@@ -188,17 +109,13 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
 }
 
-void HandshakePlaceBuffersPass::runOnOperation() {
+void HandshakePlaceBuffersPass::runDynamaticPass() {
   // Buffer placement requires that all values are used exactly once
-  mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+  mlir::ModuleOp modOp = getOperation();
   if (failed(verifyIRMaterialized(modOp))) {
     modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
     return;
   }
-
-  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  if (!nameAnalysis.isAnalysisValid())
-    return signalPassFailure();
 
   // Map algorithms to the function to call to execute them
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
@@ -209,6 +126,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[CPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -264,15 +182,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       }
     }
   });
-
-  // Make sure all operation names are unique and haven't changed from what is
-  // cached. Also name operations that do not currently have a name (unless
-  // instructed otherwise)
-  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
-    return signalPassFailure();
-
-  // The name analysis is always preserved across passes
-  markAnalysesPreserved<NameAnalysis>();
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -286,8 +195,9 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
       return failure();
   }
+  markAnalysesPreserved<NameAnalysis>();
 
-  ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+  mlir::ModuleOp modOp = getOperation();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
@@ -313,16 +223,11 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
-  auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
-
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    // Create an empty list of CFDFCs for funcOp
-    if (failed(placeBuffers(funcToInfo[funcOp], timingDB, cfdfcAnalysis)))
+    if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
       return failure();
   }
-
-  markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
   return success();
 }
 
@@ -348,31 +253,34 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       }
     }
 
-    std::optional<unsigned> srcBB = opBlocks[&op];
-    for (OpResult res : op.getResults()) {
-      Operation *user = *res.getUsers().begin();
-      std::optional<unsigned> dstBB = opBlocks[user];
+    // std::optional<unsigned> srcBB = opBlocks[&op];
+    // for (OpResult res : op.getResults()) {
+    //   Operation *user = *res.getUsers().begin();
+    //   std::optional<unsigned> dstBB = opBlocks[user];
 
-      // All transitions between blocks must exist in the original CFG
-      if (srcBB && dstBB && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB)) {
-        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
-        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
-            dstBB == endBB) {
-          /// NOTE: (lucas-rami) This is probably the start->end control channel
-          /// which goes from the entry block to the exit block. This is fine in
-          /// general so we let this pass without triggering a warning or error
-          continue;
-        }
+    //   // All transitions between blocks must exist in the original CFG
+    //   if (srcBB && dstBB && *srcBB != *dstBB &&
+    //       !transitions[*srcBB].contains(*dstBB)) {
+    //     auto endBB =
+    //     *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator()); if
+    //     (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+    //         dstBB == endBB) {
+    //       /// NOTE: (lucas-rami) This is probably the start->end control
+    //       channel
+    //       /// which goes from the entry block to the exit block. This is fine
+    //       in
+    //       /// general so we let this pass without triggering a warning or
+    //       error continue;
+    //     }
 
-        return op.emitError()
-               << "Result " << res.getResultNumber() << " defined in block "
-               << *srcBB << " is used in block " << *dstBB
-               << ". This connection does not exist according to the CFG "
-                  "graph. Solving the buffer placement MILP would yield an "
-                  "incorrect placement.";
-      }
-    }
+    //     return op.emitError()
+    //            << "Result " << res.getResultNumber() << " defined in block "
+    //            << *srcBB << " is used in block " << *dstBB
+    //            << ". This connection does not exist according to the CFG "
+    //               "graph. Solving the buffer placement MILP would yield an "
+    //               "incorrect placement.";
+    //   }
+    // }
   }
   return success();
 }
@@ -409,13 +317,15 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
     os << "- Number of channels: " << cf->channels.size() << "\n";
     os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
     os.unindent();
+    cf->writeDot(log.getLogDir() + "/cfdfc_" + std::to_string(idx) + ".dot");
   }
 
   os.flush();
 }
 
-LogicalResult HandshakePlaceBuffersPass::placeBuffers(
-    FuncInfo &info, TimingDatabase &timingDB, CFDFCAnalysis &cfdfcAnalysis) {
+LogicalResult
+HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
+                                        TimingDatabase &timingDB) {
   // Use a wrapper around a logger to benefit from RAII
   std::error_code ec;
   BufferLogger bufLogger(info.funcOp, dumpLogs, ec);
@@ -427,33 +337,34 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
   }
   Logger *logger = dumpLogs ? *bufLogger : nullptr;
 
-  // Get CFDFCs from the function unless the functions has no archs (i.e.,
-  // it has a single block) in which case there are no CFDFCs
-  std::vector<CFDFC> cfdfcs;
-  if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
-    return failure();
+  // // Get CFDFCs from the function unless the functions has no archs (i.e.,
+  // // it has a single block) in which case there are no CFDFCs
+  // SmallVector<CFDFC> cfdfcs;
+  // if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
+  //   return failure();
 
-  // All extracted CFDFCs must be optimized
-  for (CFDFC &cf : cfdfcs)
-    info.cfdfcs[&cf] = true;
+  // // All extracted CFDFCs must be optimized
+  // for (CFDFC &cf : cfdfcs)
+  //   info.cfdfcs[&cf] = true;
 
-  // Create a new map for the cfdfc extraction
-  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+  // // Create a new map for the cfdfc extraction
+  // llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
 
-  // Iterate through all extracted cfdfc
-  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-    auto &[cf, _] = cfAndOpt;
-    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
-      // Add the bb to the corresponding in the cfdfc result map
-      cfdfcResult[idx].push_back(cf->cycle[i]);
-    }
-    cfdfcResult[idx].push_back(cf->cycle.back());
-  }
+  // // Iterate through all extracted cfdfc
+  // for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+  //   auto &[cf, _] = cfAndOpt;
+  //   for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+  //     // Add the bb to the corresponding in the cfdfc result map
+  //     cfdfcResult[idx].push_back(cf->cycle[i]);
+  //   }
+  //   cfdfcResult[idx].push_back(cf->cycle.back());
+  // }
 
-  // Create and add the handshake.cfdfc attribute
-  auto cfdfcMap =
-      handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
-  setDialectAttr(info.funcOp, cfdfcMap);
+  // // Create and add the handshake.cfdfc attribute
+  // auto cfdfcMap =
+  //     handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(),
+  //     cfdfcResult);
+  // setDialectAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);
@@ -463,14 +374,13 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
   if (failed(getBufferPlacement(info, timingDB, logger, placement)))
     return failure();
 
-  instantiateBuffers(placement, cfdfcs);
-  cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
+  instantiateBuffers(placement);
   return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    Logger *logger,
-                                                   std::vector<CFDFC> &cfdfcs) {
+                                                   SmallVector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
   // Store all archs in a set. We use a pointer to each arch as the key type to
@@ -625,6 +535,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "placement", placement, env, info, timingDB, targetCP,
         blifFiles, lutDelay, lutSize, acyclicType);
   }
+  if (algorithm == CPBUF) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<cpbuf::CPBuffers>(logger, "placement", placement,
+                                                 env, info, timingDB, targetCP);
+  }
 
   llvm_unreachable("unknown algorithm");
 }
@@ -640,9 +555,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
-  auto modOp = llvm::dyn_cast<ModuleOp>(getOperation());
-
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
     llvm::MapVector<Value, ChannelBufProps> channelProps;
@@ -682,95 +595,13 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       result.numOneSlotR = props.minTrans;
       placement[channel] = result;
     }
-
-    // Since we are not using MILP, we do not need to access to CFDFC to get the
-    // throughput information.
-    //
-    // We cannot pass the reference of a temporary object to std::vector<..>&,
-    // so we have to create this empty vector.
-    std::vector<CFDFC> dummy;
-    instantiateBuffers(placement, dummy);
+    instantiateBuffers(placement);
   }
 
   return success();
 }
 
-/// Adding a new buffer op changes the CFDFC graph. This function updates the
-/// cfdfc that contain the channel.
-/// - bufOp: The buffer to be inserted into the CFDFC.
-/// - CFDFC: The CFDFC.
-/// - totalChannelLatency: The total number of sequential latency on DV path.
-/// - totalChanOccupancy: The total number of tokens to be distributed on the
-///   CFDFC.
-/// - remainingTknsToDistribute: The remaining tokens to be distributed on the
-///   channel.
-static void insertBufferOpAndOccupancyInCFDFC(
-    handshake::BufferOp bufOp, CFDFC &cfdfc, unsigned totalChannelLatency,
-    unsigned totalChannelOccupancy, double &remainingTknsToDistribute) {
-
-  // When we add a new buffer op, the value remains the same object (now
-  // used by a different user). Therefore, we just need to add the newly
-  // added operation and channel.
-  cfdfc.units.insert(bufOp.getOperation());
-  cfdfc.channels.insert(bufOp.getResult());
-
-  double tokensInBufOp;
-  // The MILP solution returns the token occupancy per each channel in the
-  // CFDFC.
-  //
-  // The tokens in the CFDFC might be smaller than the total number slots of the
-  // channel. Therefore, we need to calculate the number of tokens per different
-  // buffer slots.
-  if (totalChannelOccupancy < (double)totalChannelLatency) {
-    // Case "#tokens in the channel" < "Total latency of the channel":
-    // Distribute tokens among slots with latency (the tokens
-    // are not blocking each other, so they will only be stopped by the
-    // sequential buffer slot).
-    //
-    // Example:
-    // - Channel: producer -> T, DV, DV, DV -> receiver
-    // - Number of tokens: 2
-    // (remark: DV introduces a 1-cycle delay on data and valid, T does not
-    // introduce a delay on any path).
-    // In this case, the token must occupy the 3 DV slots but the T
-    // slots; each DV slot holds 2/3 tokens.
-    tokensInBufOp =
-        (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
-  } else {
-    // Case "#tokens in the channel" => "Total latency of the channel":
-    // Assign one token to each bufer slot with latency, the rest is assigned
-    // bottom (from the receiver of the channel) -> up (to the producer
-    // of the channel).
-    //
-    // Example:
-    // - Channel: producer -> T, T, DV, DV, T -> receiver
-    // - Number of tokens: 3
-    //
-    // In this case, the token must occupy in the 2 DV slots and the last T
-    // slot.
-    tokensInBufOp =
-        // Assign to the slot with DV latency >= 1
-        bufOp.getLatencyDV() +
-        // Assign to the slots DV latency = 1. We insert buffers into the
-        // CFDFC starting from the channel that is the closest to the receiver,
-        // so this function does not need to take care of the order between the
-        // slots without DV latency.
-        fmin(bufOp.getNumSlots() - bufOp.getLatencyDV(),
-             remainingTknsToDistribute);
-
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
-  }
-
-  // Sanity check: we should never assign more tokens to the buffer than its
-  // buffer slot.
-  assert(tokensInBufOp <= bufOp.getNumSlots() &&
-         "Should not assign tokens to a buffer more than its slots!");
-  remainingTknsToDistribute -= tokensInBufOp;
-}
-
-void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
-                                                   std::vector<CFDFC> &cfdfcs) {
+void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
@@ -780,17 +611,12 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-
-    // We need to record the list of placed buffers. We will calculate their
-    // token occupancy in each CFDFC below.
-    SmallVector<handshake::BufferOp, 2> placedBuffers;
     auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, numSlots, bufferType);
-      placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -814,40 +640,14 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
-
-    unsigned totalChannelLatency = 0;
-    for (auto bufOp : placedBuffers) {
-      totalChannelLatency += bufOp.getLatencyDV();
-    }
-
-    // Insert the buffers and their token occupancy into the CFDFCs that contain
-    // them.
-    for (auto &cfdfc : cfdfcs) {
-      // Skipping the CFDFCs that do not contain the channel.
-      if (!cfdfc.channels.contains(channel))
-        continue;
-
-      // How many tokens are distributed into the buffers placed on the channel?
-      // This variable is updated after every buffer placed.
-      double currNumTokensOfChannelInCFDFC = cfdfc.channelOccupancy.at(channel);
-      double totalChannelOccupancy = currNumTokensOfChannelInCFDFC;
-      for (auto &bufOp : llvm::reverse(placedBuffers)) {
-        // Insert the buffer ops into the CFDFC that contains the original
-        // channel, and assign the token occupancy (i.e.,
-        // numTokensOfChannelInCFDFC) to each buffer. We start from the end of
-        // the channel (e.g., the one closest to the receiver) to the beginning
-        // of the channel.
-        //
-        // reverse(placedBuffers): the first inserted buffer is the one closest
-        // to the sender.
-        insertBufferOpAndOccupancyInCFDFC(bufOp, cfdfc, totalChannelLatency,
-                                          totalChannelOccupancy,
-                                          currNumTokensOfChannelInCFDFC);
-      }
-
-      // Set the channel occupancy to zero (they are transferred to the buffer
-      // placed).
-      cfdfc.channelOccupancy[channel] = 0.0;
-    }
   }
+}
+
+std::unique_ptr<dynamatic::DynamaticPass>
+dynamatic::buffer::createHandshakePlaceBuffers(
+    StringRef algorithm, StringRef frequencies, StringRef timingModels,
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+  return std::make_unique<HandshakePlaceBuffersPass>(
+      algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
+      dumpLogs);
 }

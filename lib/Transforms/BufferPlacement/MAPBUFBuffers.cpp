@@ -127,8 +127,6 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
   auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
       funcInfo.funcOp.getContext(), cfdfcTPResult);
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
-
-  populateCFDFCThroughputAndOccupancy();
 }
 
 // Check if the path from leaf to root has already been computed, if so then
@@ -319,7 +317,9 @@ void MAPBUFBuffers::setup() {
     addUnitThroughputConstraints(*cfdfc);
   }
 
-  addMaxThroughputObjective(allChannels, cfdfcs);
+  GRBLinExpr objective = addBackedgeObjective(allChannels);
+
+  addMaxThroughputObjective(allChannels, cfdfcs, objective);
   markReadyToOptimize();
 }
 

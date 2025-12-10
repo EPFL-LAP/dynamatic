@@ -137,7 +137,7 @@ def list_transp_buffers(test_dir, fifo_size) -> list:
     return transp_buffers
 
 
-def resize_fifo(test_dir, base_name, fifo_size):
+def resize_fifo(test_dir, base_name, fifo_size, rtl_config_name, seed):
 
     tbuffers = list_transp_buffers(test_dir, fifo_size)
 
@@ -145,7 +145,7 @@ def resize_fifo(test_dir, base_name, fifo_size):
     wlf_file = test_dir / SIM_DIR / "HLS_VERIFY" / "vsim.wlf"
     log_file = test_dir / RUN_LOG_NAME
 
-    simulate_test(test_dir, base_name, log_file)
+    simulate_test(test_dir, base_name, rtl_config_name, log_file)
     baseline_cycles = parse_cycles(log_file)
     log(f"Initial BASELINE Cycles: {baseline_cycles}", log_file)
 
@@ -180,7 +180,7 @@ def resize_fifo(test_dir, base_name, fifo_size):
     log("\n=== Running BASELINE simulation after initial resize ===", log_file)
     sim_log = test_dir / SIM_DIR / "report.txt"
     try:
-        simulate_test(test_dir, base_name, sim_log)
+        simulate_test(test_dir, base_name, rtl_config_name, sim_log)
         baseline_cycles = parse_cycles(sim_log)
     except Exception:
         log("[FATAL] Baseline simulation failed. Cannot proceed with optimization.", log_file)
@@ -198,7 +198,10 @@ def resize_fifo(test_dir, base_name, fifo_size):
     # Candidates are all buffers that were not removed (max_len > 0)
     candidate_buffers = [buf for buf, max_len in results.items() if max_len > 0]
 
-    # random.shuffle(candidate_buffers)
+    if seed is not None:
+        log(f"Shuffling candidate buffers with seed {seed}", log_file)
+        random.seed(seed)
+        random.shuffle(candidate_buffers)
     
     if not candidate_buffers:
         log("No buffers for removal optimization.", log_file)
@@ -210,52 +213,69 @@ def resize_fifo(test_dir, base_name, fifo_size):
     shutil.copyfile(handshake_transformed, temp_backup)
     log(f"MLIR file backed up to: {temp_backup}", log_file)
     
-    removed_list = optimize_buffer_removal(
-        test_dir, 
-        base_name, 
-        candidate_buffers, 
-        baseline_cycles,
-        fifo_size,
-        results,
-        0,
-        False
-    )
+
+
+    # removed_list = optimize_buffer_removal(
+    #     test_dir, 
+    #     base_name, 
+    #     candidate_buffers, 
+    #     baseline_cycles,
+    #     fifo_size,
+    #     results,
+    #     0,
+    #     False
+    # )
     
-    # B. The 'handshake_transformed.mlir' file is now the optimized result (or the last trial's result)
-    # Restore the FINAL optimized state from the last successful trial (i.e., the current file)
-    # to the backup, or simply report the results.
+    for i in range(fifo_size-1):
+        global total_num
+        total_num = len(candidate_buffers)
+
+        log(f"\n=== Applying Buffer Resize Optimization to size {i} ===", log_file)
+        resized_buffers, _, _ = optimize_buffer_resize(
+            test_dir, 
+            base_name, 
+            candidate_buffers, 
+            baseline_cycles,
+            rtl_config_name,
+            i,
+            fifo_size,
+            results,
+            0,
+            False
+        )
+        candidate_buffers = [buf for buf in candidate_buffers if buf not in resized_buffers]
     
-    log(f"\nOptimization complete. Successfully removed {len(removed_list)} more buffers.", log_file)
-    # The current handshake_transformed.mlir holds the final optimized state.
+        log(f"\nOptimization complete. Successfully resized {len(resized_buffers)} buffers to {i}", log_file)
+        # The current handshake_transformed.mlir holds the final optimized state.
     
     # Cleanup: Remove the temporary backup
     os.remove(temp_backup)
 
 
 
-    tbuffers = list_transp_buffers(test_dir, fifo_size)
+    # tbuffers = list_transp_buffers(test_dir, fifo_size)
 
 
-    for buf_name in tbuffers:
-        log_path = extract_log(buf_name, wlf_file, test_dir)
-        if not log_path:
-            continue
-        max_len = parse_fifo_depth(log_path, fifo_size)
-        if max_len is None:
-            continue
-        results[buf_name] = max_len
-        log(f"{buf_name:<12} max_len = {max_len}", log_file)
+    # for buf_name in tbuffers:
+    #     log_path = extract_log(buf_name, wlf_file, test_dir)
+    #     if not log_path:
+    #         continue
+    #     max_len = parse_fifo_depth(log_path, fifo_size)
+    #     if max_len is None:
+    #         continue
+    #     results[buf_name] = max_len
+    #     log(f"{buf_name:<12} max_len = {max_len}", log_file)
 
-    log("\n=== Applying MLIR modifications ===", log_file)
-    total_slots = 0
-    for buf, max_len in sorted(results.items()):
-        if max_len == 0:
-            log(f"[REMOVE] {buf} (max_len={max_len})", log_file)
-            remove_buffer(test_dir, buf)
-        else:
-            log(f"[RESIZE] {buf} -> {max_len}", log_file)
-            resize_buffer(test_dir, buf, max_len)
-            total_slots += max_len
+    # log("\n=== Applying MLIR modifications ===", log_file)
+    # total_slots = 0
+    # for buf, max_len in sorted(results.items()):
+    #     if max_len == 0:
+    #         log(f"[REMOVE] {buf} (max_len={max_len})", log_file)
+    #         remove_buffer(test_dir, buf)
+    #     else:
+    #         log(f"[RESIZE] {buf} -> {max_len}", log_file)
+    #         resize_buffer(test_dir, buf, max_len)
+    #         total_slots += max_len
     
     buffer_cp(10, test_dir, log_file)
     canonicalize_handshake(test_dir, log_file)
@@ -265,7 +285,7 @@ def resize_fifo(test_dir, base_name, fifo_size):
     log("\n=== After buffering ===", log_file)
     sim_log = test_dir / SIM_DIR / "report.txt"
     try:
-        simulate_test(test_dir, base_name, sim_log)
+        simulate_test(test_dir, base_name, rtl_config_name, sim_log)
         baseline_cycles = parse_cycles(sim_log)
     except Exception:
         log("[FATAL] Baseline simulation failed. Cannot proceed with optimization.", log_file)
@@ -278,7 +298,7 @@ def resize_fifo(test_dir, base_name, fifo_size):
     log(f"BASELINE Cycles: {baseline_cycles}", log_file)
     
 
-def check_performance(test_dir: Path, basename: str, baseline_cycles: int) -> bool:
+def check_performance(test_dir: Path, basename: str, rtl_config_name, baseline_cycles: int) -> bool:
 
     log_file = test_dir / RUN_LOG_NAME
 
@@ -290,7 +310,7 @@ def check_performance(test_dir: Path, basename: str, baseline_cycles: int) -> bo
     sim_log_path = test_dir / SIM_DIR / "report.txt"
     
     try:
-        simulate_test(test_dir, basename, sim_log_path)
+        simulate_test(test_dir, basename, rtl_config_name, sim_log_path)
     except Exception as e:
         log(f"[ERROR] Simulation failed: {e}", log_file)
         return False
@@ -301,7 +321,7 @@ def check_performance(test_dir: Path, basename: str, baseline_cycles: int) -> bo
         log("[ERROR] Could not parse cycles from simulation output.", log_file)
         return False
     
-    if new_cycles > 1.005 * baseline_cycles:
+    if new_cycles >  baseline_cycles + 5:
         log(f"[PERF FAIL] Cycles increased: {baseline_cycles} -> {new_cycles}", log_file)
         return False
     else:
@@ -309,11 +329,9 @@ def check_performance(test_dir: Path, basename: str, baseline_cycles: int) -> bo
         return True
     
 
-total_num = None
 def optimize_buffer_removal(test_dir: Path, basename: str, buffer_list: list, baseline_cycles: int, fifo_size, results, processed_num, skip) -> list:
     global total_num
-    if (total_num is None):
-        total_num = len(buffer_list)
+
     removed_buffers = []
     log_file = test_dir / RUN_LOG_NAME
     handshake_transformed = test_dir / COMP_DIR / "handshake_transformed.mlir"
@@ -333,7 +351,7 @@ def optimize_buffer_removal(test_dir: Path, basename: str, buffer_list: list, ba
 
     
     # Performance check
-    if not skip and check_performance(test_dir, basename, baseline_cycles):
+    if not skip and check_performance(test_dir, basename, rtl_config_name, baseline_cycles):
         log(f"[OPTIMIZE] Success: Removed {len(buffer_list)} buffers: {buffer_list}", log_file)
         # Keep these removals permanently (overwrite backup)
         shutil.copyfile(handshake_transformed, temp_backup)
@@ -361,3 +379,61 @@ def optimize_buffer_removal(test_dir: Path, basename: str, buffer_list: list, ba
         is_good = False
 
     return removed_buffers, new_processed_num, is_good
+
+
+
+
+def optimize_buffer_resize(test_dir: Path, basename: str, buffer_list: list, baseline_cycles: int, rtl_config_name, target_size, fifo_size, results, processed_num, skip) -> list:
+    global total_num
+
+    resized_buffers = []
+    log_file = test_dir / RUN_LOG_NAME
+    handshake_transformed = test_dir / COMP_DIR / "handshake_transformed.mlir"
+    temp_backup = handshake_transformed.with_suffix(".mlir.bak")
+
+    if not buffer_list:
+        return resized_buffers, processed_num, True
+
+    log(f"Processed {processed_num}/{total_num} until now", log_file)
+    # Backup current state before trying this batch
+    shutil.copyfile(handshake_transformed, temp_backup)
+
+    # Try removing all buffers in this list
+    for buf in buffer_list:
+        if target_size > 0:
+            log(f"[TRY RESZIZE] {buf} to {target_size}", log_file)
+            resize_buffer(test_dir, buf, target_size)
+        else:
+            log(f"[TRY REMOVE] {buf}", log_file)
+            remove_buffer(test_dir, buf)
+
+    
+    # Performance check
+    if not skip and check_performance(test_dir, basename, rtl_config_name, baseline_cycles):
+        log(f"[OPTIMIZE] Success: Resized {len(buffer_list)} buffers to {target_size}: {buffer_list}", log_file)
+        # Keep these removals permanently (overwrite backup)
+        shutil.copyfile(handshake_transformed, temp_backup)
+        resized_buffers.extend(buffer_list)
+        new_processed_num  = processed_num + len(buffer_list)
+        is_good = True
+    else:
+        # Revert and recurse on halves
+        shutil.copyfile(temp_backup, handshake_transformed)
+        if len(buffer_list) == 1:
+            return resized_buffers, processed_num + 1, False
+
+        log(f"[TRIAL FAILED] Performance hurt. Reverting and recursing on {len(buffer_list)} buffers.", log_file)
+
+        midpoint = len(buffer_list) // 2
+        first_half = buffer_list[:midpoint]
+        second_half = buffer_list[midpoint:]
+
+        rem_buffs_1, p_num_1, is_good_1 = optimize_buffer_resize(test_dir, basename, first_half, baseline_cycles, rtl_config_name, target_size, fifo_size, results, processed_num, False)
+        resized_buffers.extend(rem_buffs_1)
+        rem_buffs_2, p_num_2, is_good_2 = optimize_buffer_resize(test_dir, basename, second_half, baseline_cycles, rtl_config_name, target_size, fifo_size, results, p_num_1, is_good_1)
+        resized_buffers.extend(rem_buffs_2)
+        new_processed_num = p_num_2
+
+        is_good = False
+
+    return resized_buffers, new_processed_num, is_good

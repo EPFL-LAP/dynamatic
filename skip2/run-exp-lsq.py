@@ -15,13 +15,13 @@ from simulate import *
 from write_csv import *
 
     
-def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
+def find_best_target_cp(test_dir: Path, basename: str, rtl_config_name, log_file: Path):
 
     # Baseline latency (at 10 ns)
     with open(log_file, "a") as log:
         log.write("\n===== Target CP tuning =====\n")
 
-    simulate_test(test_dir, basename, log_file)
+    simulate_test(test_dir, basename, rtl_config_name, log_file)
     sim_out = test_dir / SIM_DIR / "report.txt"
     baseline_cycles = parse_cycles(sim_out)
 
@@ -42,7 +42,7 @@ def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
         lower_handshake_to_hw(test_dir, log_file)
 
         # Simulate
-        simulate_test(test_dir, basename, log_file)
+        simulate_test(test_dir, basename, rtl_config_name, log_file)
         cycles = parse_cycles(sim_out)
 
         with open(log_file, "a") as log:
@@ -65,7 +65,7 @@ def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
 
 
 def find_best_fork_fifo_size(test_dir: Path, basename: str, cp: float, n: int,
-    start_fifo_size: int, log_file: Path):
+    start_fifo_size: int, rtl_config_name, log_file: Path):
     best_fifo = start_fifo_size
     best_cycles = None
 
@@ -74,13 +74,13 @@ def find_best_fork_fifo_size(test_dir: Path, basename: str, cp: float, n: int,
         log(f"Testing fork_fifo_size = {fifo}", log_file)
 
         # === Compile ===
-        rc = compile(test_dir, basename, cp, n, fifo, log_file)
+        rc = compile(test_dir, basename, cp, n, fifo, rtl_config_name, log_file)
         if rc != 0:
             log(f"Compilation failed for fork_fifo_size={fifo}", log_file)
             break
 
         # === Simulate ===
-        rc = simulate_test(test_dir, basename, log_file)
+        rc = simulate_test(test_dir, basename, rtl_config_name, log_file)
         if rc != 0:
             log(f"Simulation failed (rc={rc}) for fork_fifo_size={fifo}", log_file)
             break
@@ -106,7 +106,7 @@ def find_best_fork_fifo_size(test_dir: Path, basename: str, cp: float, n: int,
     return best_fifo
 
 
-def find_cp_by_adding_slack(test_dir: Path, basename: str, load:int, store:int, log_file: Path):
+def find_cp_by_adding_slack(test_dir: Path, basename: str, load:int, store:int, rtl_config_name, log_file: Path):
     vivado_dir = test_dir / VIVADO_DIR
     vivado_dir.mkdir(parents=True, exist_ok=True)
 
@@ -140,7 +140,7 @@ def find_cp_by_adding_slack(test_dir: Path, basename: str, load:int, store:int, 
             log("No slack found in report, stopping.\n", log_file)
             continue
 
-        simulate_test(test_dir, basename, log_file)
+        simulate_test(test_dir, basename, rtl_config_name, log_file)
         sim_out = test_dir / SIM_DIR / "report.txt"
         cycle = parse_cycles(sim_out)
 
@@ -165,7 +165,7 @@ def find_cp_by_adding_slack(test_dir: Path, basename: str, load:int, store:int, 
 
 
 
-def find_best_timing(test_dir: Path, basename: str, start_cp:float, load: int, store: int, log_file: Path):
+def find_best_timing(test_dir: Path, basename: str, start_cp:float, load: int, store: int, rtl_config_name, log_file: Path):
     cps = []
     clock_cycles = []
     best_perf = float("inf")
@@ -178,7 +178,7 @@ def find_best_timing(test_dir: Path, basename: str, start_cp:float, load: int, s
         canonicalize_handshake(test_dir, log_file)
         lower_handshake_to_hw(test_dir, log_file)
 
-        simulate_test(test_dir, basename, log_file)
+        simulate_test(test_dir, basename, rtl_config_name, log_file)
         sim_out = test_dir / SIM_DIR / "report.txt"
         cycle = parse_cycles(sim_out)
 
@@ -226,7 +226,7 @@ def find_best_timing(test_dir: Path, basename: str, start_cp:float, load: int, s
         log("\n No valid results found during CP tuning.", log_file)
 
 
-def run_pipeline(test_name: str, load: int, store: int, run_root: Path):
+def run_pipeline(test_name: str, load: int, store: int, seed, run_root: Path):
     src_dir = TEST_DIR / test_name
     if not src_dir.exists():
         print(f"Source directory not found for test {test_name}")
@@ -235,6 +235,8 @@ def run_pipeline(test_name: str, load: int, store: int, run_root: Path):
     # Create test-specific run folder
     test_out_dir = run_root / f"{test_name}-{load}-{store}"
     test_out_dir.mkdir(parents=True, exist_ok=True)
+
+    rtl_config_name = f"rtl-config-vhdl-{test_name}-{load}-{store}.json"
 
     # Copy .c and .h files from the integration-test folder
     for ext in ("*.c", "*.h"):
@@ -250,11 +252,11 @@ def run_pipeline(test_name: str, load: int, store: int, run_root: Path):
     # # compile again with the best size
     # compile(test_out_dir, basename, cp, n, best_fifo, log_file)
 
-    compile(test_out_dir, basename, cp, load, store, 10, log_file)
+    compile(test_out_dir, basename, cp, load, store, 10, rtl_config_name, log_file)
 
-    resize_fifo(test_out_dir, basename, 10)
+    resize_fifo(test_out_dir, basename, 10, rtl_config_name, seed)
 
-    achieved = find_cp_by_adding_slack(test_out_dir, basename, load, store, log_file)
+    achieved = find_cp_by_adding_slack(test_out_dir, basename, load, store, rtl_config_name, log_file)
 
     # add 0.5 to achieved and then round it up to the nearest 0.5
     if achieved is not None:
@@ -262,7 +264,7 @@ def run_pipeline(test_name: str, load: int, store: int, run_root: Path):
         start_cp = round(start_cp * 2) / 2
         log(f"Starting from {start_cp} ns", log_file)
 
-    find_best_timing(test_out_dir, basename, start_cp, load, store, log_file)
+    find_best_timing(test_out_dir, basename, start_cp, load, store, rtl_config_name, log_file)
 
 
     # best_target_cp = find_best_target_cp(test_out_dir, basename, log_file)
@@ -282,7 +284,7 @@ def read_inputs(input_file):
             if not line or line.startswith("#"):
                 continue
             parts = line.split()
-            if len(parts) != 3:
+            if len(parts) not in (3, 4):
                 print(f"Skipping invalid line: {line}")
                 continue
             test, load_str, store_str = parts[0], parts[1], parts[2]
@@ -292,7 +294,14 @@ def read_inputs(input_file):
             except ValueError:
                 print(f"Invalid n value in line: {line}")
                 continue
-            inputs.append((test, load, store))
+            seed = None
+            if len(parts) == 4:
+                try:
+                    seed = int(parts[3])
+                except ValueError:
+                    print(f"Invalid seed value in line: {line}")
+                    continue
+            inputs.append((test, load, store, seed))
     return inputs
 
 def main():
@@ -313,8 +322,8 @@ def main():
 
     print(f"Found {len(inputs)} test pairs to run.")
 
-    for test, load, store in inputs:
-        run_pipeline(test, load, store, run_root)
+    for test, load, store, seed in inputs:
+        run_pipeline(test, load, store, seed, run_root)
 
 
 if __name__ == "__main__":

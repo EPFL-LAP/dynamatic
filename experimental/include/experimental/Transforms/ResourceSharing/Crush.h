@@ -18,10 +18,18 @@
 
 namespace dynamatic {
 namespace experimental {
+namespace sharing {
 
 #define GEN_PASS_DECL_CREDITBASEDSHARING
+#define GEN_PASS_DEF_CREDITBASEDSHARING
 #include "experimental/Transforms/Passes.h.inc"
 
+std::unique_ptr<dynamatic::DynamaticPass> createCreditBasedSharing(
+    StringRef algorithm = "fpga20", StringRef frequencies = "",
+    StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
+    unsigned timeout = 180, bool dumpLogs = false);
+
+} // namespace sharing
 } // namespace experimental
 } // namespace dynamatic
 

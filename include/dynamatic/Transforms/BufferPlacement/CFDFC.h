@@ -23,6 +23,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -46,15 +47,6 @@ struct CFDFC {
   /// Number of executions of the CFDFC.
   unsigned numExecs;
 
-  /// (Available after placement) The achieved throughput after the placement
-  double throughput;
-  /// (Available after placement) The number of tokens per unit.
-  mlir::DenseMap<Operation *, double> unitOccupancy;
-  /// (Available after placement) The number of tokens per channel. After
-  /// instantiating the buffers, this value is cleared and transferred to the
-  /// buffer(s).
-  mlir::DenseMap<Value, double> channelOccupancy;
-
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
@@ -64,6 +56,8 @@ struct CFDFC {
   // block. The distinction is important for the buffer placement MILP, which
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
+
+  void writeDot(const std::string &fileName);
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are

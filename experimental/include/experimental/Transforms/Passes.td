@@ -67,23 +67,31 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   ];
 }
 
-def CreditBasedSharing : Pass<"credit-based-sharing"> {
-  let summary = "Credit-based sharing of functional units.";
-  let description = [{ Share functional units for better resource utilization.
-  The behavior of this pass depends on whether the buffer placement pass was ran
-  in the same pass pipeline before:
-  - If yes, this pass share functional units as much as possible without
-  penalizing the performance.
-  - Otherwise, it simply shares all units of the same type.}];
+def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
+  let summary = "Credit-Based Sharing of Functional Units";
+  let description = [{ Sharing functional units for better resource utilization.
+  This pass currently target maintaining the performance while using as few
+  functional units as possible.}];
+  let constructor = "dynamatic::experimental::sharing::createCreditBasedSharing()";
 
-  let options = [
+  let options = [Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
+      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), 'fpl22'.">,
+      Option<"frequencies", "frequencies", "std::string", "",
+      "Path to CSV-formatted file containing estimated transition frequencies "
+      "between basic blocks in the kernel.">,
       Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
       "components.">,
-      Option<"targetCP", "target-period", "double", "",
-      "Target clock period for the buffer placement CFDFC">];
-
-  let dependentDialects = ["handshake::HandshakeDialect"];
+      Option<"firstCFDFC", "first-cfdfc", "bool", "false",
+      "If true, only extract the first CFDFC from the input file">,
+      Option<"targetCP", "target-period", "double", "4.0",
+      "Target clock period for the buffer placement CFDFC">,
+      Option<"timeout", "timeout", "unsigned", "180",
+      "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
+      Option<"dumpLogs", "dump-logs", "bool", "false",
+      "If true, dump debugging information (identified CFDFCs, MILP "
+      "placement decisions, solution summaries) into a directory named "
+      "'buffer-placement' at the binary's location.">];
 }
 
 def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {

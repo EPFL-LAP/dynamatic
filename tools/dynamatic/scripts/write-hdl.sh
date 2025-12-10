@@ -11,6 +11,7 @@ DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 HDL=$4
+RTL_CONFIG_NAME=$5
 
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
@@ -26,7 +27,7 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 # Set the correct config file
 RTL_CONFIG=""
 if [ "$HDL" == "vhdl" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
+  RTL_CONFIG="$DYNAMATIC_DIR/data/$RTL_CONFIG_NAME"
 elif [ "$HDL" == "vhdl-beta" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-beta.json"
   HDL="vhdl"

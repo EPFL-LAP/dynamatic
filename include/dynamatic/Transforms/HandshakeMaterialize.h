@@ -52,7 +52,8 @@ constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_MOD(
 /// does not have exactly one use within a Handshake function.
 LogicalResult verifyIRMaterialized(mlir::ModuleOp modOp);
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeMaterialize();
+std::unique_ptr<dynamatic::DynamaticPass>
+createHandshakeMaterialize(const std::string &forkFifoSize = "0");
 
 } // namespace dynamatic
 

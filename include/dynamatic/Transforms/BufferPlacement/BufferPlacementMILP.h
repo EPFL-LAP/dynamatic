@@ -79,6 +79,8 @@ struct ChannelVars {
   GRBVar dataLatency;
   /// Usage of a shift register on the channel (binary).
   GRBVar shiftReg;
+  /// Whether the channel is a backedge or not (binary).
+  GRBVar isBackedge;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -267,6 +269,12 @@ protected:
   /// steady state.
   void addSteadyStateReachabilityConstraints(CFDFC &cfdfc);
 
+  void addBackedgeConstraints();
+
+  void addDataBufConstraint();
+
+  void addMuxConstraint(CFDFC &cfdfc);
+
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel
   /// variables were created for the data signal.
@@ -355,17 +363,23 @@ protected:
   /// extracted CFDFCs.
   unsigned getChannelNumExecs(Value channel);
 
-  /// Adds the MILP model's objective. The objective maximizes throughput while
-  /// minimizing buffer usage, with throughput prioritized. It has a positive
-  /// "throughput term" for every provided CFDFC. These terms are weighted by
-  /// the "importance" of the CFDFC compared to the others, which is determined
-  /// using an estimation of the total number of executions over each provided
-  /// channel. The objective has a negative term for each buffer placement
-  /// decision and for each buffer slot placed on any of the provide channels.
+  GRBLinExpr addBackedgeObjective(ValueRange allChannels);
+
+  void addMinBufferAreaObjective(ValueRange channels);
+
+  /// Adds the MILP model's objective. The objective maximizes throughput
+  /// while minimizing buffer usage, with throughput prioritized. It has a
+  /// positive "throughput term" for every provided CFDFC. These terms are
+  /// weighted by the "importance" of the CFDFC compared to the others,
+  /// which is determined using an estimation of the total number of
+  /// executions over each provided channel. The objective has a negative
+  /// term for each buffer placement decision and for each buffer slot
+  /// placed on any of the provide channels.
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
-  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
+  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs,
+                                 GRBLinExpr objective);
 
   /// Adds the MILP model's objective. The objective maximizes throughput while
   /// minimizing buffer area, with throughput prioritized. It has a positive
@@ -387,32 +401,6 @@ protected:
   /// Logs placement decisisons and achieved throughputs after MILP
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
-
-  /// Store the buffer placement MILP solution. This makes it possible for a
-  /// later pass in the pass pipeline to retrieve the throughput and occupancy
-  /// of each CFDFC of the current function.
-  void populateCFDFCThroughputAndOccupancy() {
-    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-      auto [cf, cfVars] = cfdfcWithVars;
-      double cfThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      cf->throughput = cfThroughput;
-
-      // Store the unit occupancy into the CFDFC data structure.
-      for (auto &[op, var] : cfVars.unitVars) {
-        double occupancy =
-            var.retOut.get(GRB_DoubleAttr_X) - var.retIn.get(GRB_DoubleAttr_X);
-        assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
-        cf->unitOccupancy[op] = occupancy;
-      }
-
-      // Store the channel occupancy into the CFDFC data structure.
-      for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = var.get(GRB_DoubleAttr_X);
-        assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
-        cf->channelOccupancy[val] = occupancy;
-      }
-    }
-  }
 
 private:
   /// Common logic for all constructors. Fills the channel to buffering

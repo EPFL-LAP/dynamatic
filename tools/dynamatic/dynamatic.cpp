@@ -90,6 +90,7 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
+  std::string polygeistPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
@@ -137,7 +138,8 @@ struct Argument {
 struct CommandArguments {
   SmallVector<StringRef> positionals;
   mlir::DenseSet<StringRef> flags;
-  StringMap<StringRef> options;
+  StringMap<StringRef> options;                   // single-valued options
+  StringMap<SmallVector<StringRef>> multiOptions; // multi-valued options
 };
 
 class Command {
@@ -148,6 +150,7 @@ public:
   StringMap<Argument> positionals;
   StringMap<Argument> flags;
   StringMap<Argument> options;
+  StringMap<Argument> multiOptions;
 
   Command(StringRef keyword, StringRef desc, FrontendState &state)
       : keyword(keyword), desc(desc), state(state) {}
@@ -160,13 +163,25 @@ public:
   void addFlag(const Argument &arg) {
     assert(!flags.contains(arg.name) && "duplicate flag name");
     assert(!options.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and flag have same name");
     flags[arg.name] = arg;
   }
 
   void addOption(const Argument &arg) {
     assert(!options.contains(arg.name) && "duplicate option name");
     assert(!flags.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and option have same name");
     options[arg.name] = arg;
+  }
+
+  void addMultiOption(const Argument &arg) {
+    assert(!multiOptions.contains(arg.name) && "duplicate multi-option name");
+    assert(!flags.contains(arg.name) && "multi-option and flag have same name");
+    assert(!options.contains(arg.name) &&
+           "multi-option and option have same name");
+    multiOptions[arg.name] = arg;
   }
 
   CommandResult parseAndExecute(ArrayRef<std::string> tokens);
@@ -191,6 +206,9 @@ private:
 
   LogicalResult parseOption(StringRef name, StringRef value,
                             CommandArguments &args) const;
+
+  LogicalResult parseMultiOption(StringRef name, SmallVector<StringRef> value,
+                                 CommandArguments &args) const;
 };
 
 class Exit : public Command {
@@ -215,6 +233,17 @@ public:
       : Command("set-dynamatic-path",
                 "Sets the path to Dynamatic's top-level directory", state) {
     addPositionalArg({"path", "path to Dynamatic's top-level directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetPolygeistPath : public Command {
+public:
+  SetPolygeistPath(FrontendState &state)
+      : Command("set-polygeist-path",
+                "Sets the path to Polygeist installation directory", state) {
+    addPositionalArg({"path", "path to Polygeist installation directory"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -271,6 +300,8 @@ public:
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
+  static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
+  static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -285,6 +316,13 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addOption(
+        {FORK_FIFO_SIZE,
+         "Adds buffers with the specified size to the output of every fork"});
+    addMultiOption({
+        SKIPPABLE_SEQ_N,
+        "Number of Comparators in SkippableSeq",
+    });
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -300,6 +338,7 @@ public:
 class WriteHDL : public Command {
 public:
   static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral rtlConfigName = "rtl-config-name";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -308,6 +347,7 @@ public:
             "export-dot tool",
             state) {
     addOption({HDL, "HDL to use for design's top-level"});
+    addOption({rtlConfigName, "Name of the RTL config file to use"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -414,6 +454,19 @@ CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
         }
         if (failed(parseOption(name, *nextToken, parsed)))
           return CommandResult::SYNTAX_ERROR;
+      } else if (multiOptions.contains(name)) {
+        // This is a multi-valued option
+        SmallVector<StringRef> values;
+        ++tokIt;
+        StringRef nextTokenStr = *tokIt;
+        while (tokIt != opts.end() && !nextTokenStr.starts_with("--")) {
+          values.push_back(*tokIt);
+          ++tokIt;
+          nextTokenStr = *tokIt;
+        }
+        --tokIt; // Adjust for the loop increment
+        if (failed(parseMultiOption(name, values, parsed)))
+          return CommandResult::SYNTAX_ERROR;
       } else {
         llvm::errs() << ERR << "Unknow flag/option '" << tok << "'\n";
         return CommandResult::SYNTAX_ERROR;
@@ -458,6 +511,18 @@ LogicalResult Command::parseOption(StringRef name, StringRef value,
   args.options.insert({name, value});
   return success();
 };
+
+LogicalResult Command::parseMultiOption(StringRef name,
+                                        SmallVector<StringRef> values,
+                                        CommandArguments &args) const {
+  if (args.multiOptions.contains(name)) {
+    llvm::errs() << ERR << "Multi-option '" << name
+                 << "' given more than once\n";
+    return failure();
+  }
+  args.multiOptions[name] = values;
+  return success();
+}
 
 std::string Command::getShortCmdDesc() const {
   std::stringstream ss;
@@ -512,22 +577,23 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
-  if (args.positionals.empty()) {
-    llvm::outs() << ERR << "Please specify a valid path.\n";
-    return CommandResult::FAIL;
-  }
-
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
-  if (!fs::exists(dynamaticPath + sep + "bin" + sep + "dynamatic")) {
-    llvm::outs()
-        << ERR
-        << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
-           "seem to have been built.\n";
+  // Check whether the path makes sense
+  if (!fs::exists(dynamaticPath + sep + "polygeist")) {
+    llvm::outs() << ERR << "'" << dynamaticPath
+                 << "' doesn't seem to point to Dynamatic, expected to "
+                    "find, for example, a directory named 'polygeist' there.\n";
+    return CommandResult::FAIL;
+  }
+  if (!fs::exists(dynamaticPath + sep + "bin")) {
+    llvm::outs() << ERR
+                 << "No 'bin' directory in provided path, Dynamatic doesn't "
+                    "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
@@ -535,14 +601,33 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetVivadoPath::execute(CommandArguments &args) {
-  if (args.positionals.empty()) {
+CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  // Remove the separator at the end of the path if there is one
+  StringRef sep = sys::path::get_separator();
+  std::string polygeistPath = args.positionals.front().str();
+  if (StringRef(polygeistPath).ends_with(sep))
+    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
+
+  // Check whether the path makes sense
+  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
+    llvm::outs()
+        << ERR << "'" << polygeistPath
+        << "' doesn't seem to point to Polygeist, expected to "
+           "find, for example, a directory named 'llvm-project/' there.\n";
+    return CommandResult::FAIL;
+  }
+  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
     llvm::outs() << ERR
-                 << "Please specify a valid path such as\n "
-                    "/home/username/Xilinx/2025.1/Vivado/\n";
+                 << "No 'bin' directory in provided path, Polygeist doesn't "
+                    "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
+  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
+  return CommandResult::SUCCESS;
+}
+
+CommandResult SetVivadoPath::execute(CommandArguments &args) {
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -551,14 +636,6 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
-  if (!fs::exists(vivadoPath)) {
-    llvm::outs() << ERR
-                 << "The path to Vivado does not exist, "
-                    "please specify a valid top-level Vivado directory such "
-                    "as\n /home/username/Xilinx/2025.1/Vivado/\n";
-    return CommandResult::FAIL;
-  }
-
   if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
@@ -571,36 +648,17 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
-  if (args.positionals.empty()) {
-    llvm::outs() << ERR << "Please specify a valid FP unit generator.\n"
-                 << "Options: flopoco, vivado\n";
-    return CommandResult::FAIL;
-  }
-
   StringRef generator = args.positionals.front();
-
   if (generator.empty()) {
-    llvm::outs() << ERR << "Please specify a floating-point units generator.\n"
-                 << "Options: flopoco, vivado\n";
+    llvm::outs() << ERR << "Please specify a floating-point units generator.\n";
     return CommandResult::FAIL;
   }
   state.fpUnitsGenerator = generator.str();
   return CommandResult::SUCCESS;
 }
 CommandResult SetSrc::execute(CommandArguments &args) {
-  if (args.positionals.empty()) {
-    llvm::outs() << ERR << "Please specify a non-empty source\n";
-    return CommandResult::FAIL;
-  }
-
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
-  if (!fs::exists(sourcePath)) {
-    llvm::outs() << ERR << "Source path <<" << sourcePath
-                 << ">> does not exist. Kindly enter a valid source path\n";
-    return CommandResult::FAIL;
-  }
-
   if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
                  << "Expected source file to have .c extension, but got '"
@@ -613,11 +671,6 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 }
 
 CommandResult SetCP::execute(CommandArguments &args) {
-  if (args.positionals.empty()) {
-    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
-    return CommandResult::FAIL;
-  }
-
   // Parse the float argument and check if the argument is legal.
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
@@ -635,13 +688,15 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string skippableSeqNListString = "none";
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string forkFifoSize = "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
         it->second == "fpl22" || it->second == "costaware" ||
-        it->second == "mapbuf") {
+        it->second == "mapbuf" || it->second == "cpbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
@@ -650,19 +705,37 @@ CommandResult Compile::execute(CommandArguments &args) {
              "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
              "(throughput- and timing-driven buffering), or 'costaware' "
              "(throughput- and area-driven buffering), or 'mapbuf' "
-             "(simultaneous technology mapping and buffer placement).";
+             "(simultaneous technology mapping and buffer placement), or "
+             "'cpbuf' (only buffering for critical path).";
       return CommandResult::FAIL;
+    }
+  }
+
+  if (auto it = args.options.find(FORK_FIFO_SIZE); it != args.options.end()) {
+    int val = std::stoi(std::string(it->second));
+    forkFifoSize = std::to_string(val);
+  }
+
+  if (auto it = args.multiOptions.find(SKIPPABLE_SEQ_N);
+      it != args.multiOptions.end()) {
+    skippableSeqNListString = "";
+    for (const auto &valStr : it->second) {
+      int val = std::stoi(std::string(valStr));
+      skippableSeqNListString += std::to_string(val) + ",";
     }
   }
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
-
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
+  state.polygeistPath = state.polygeistPath.empty()
+                            ? state.dynamaticPath + getSeparator() + "polygeist"
+                            : state.polygeistPath;
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 state.fpUnitsGenerator, rigidification, disableLSQ,
+                 fastTokenDelivery, forkFifoSize, skippableSeqNListString);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -688,8 +761,14 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     }
   }
 
+  std::string extractedRtlConfigName = "rtl-config-vhdl.json";
+  if (auto it = args.options.find(rtlConfigName); it != args.options.end()) {
+    extractedRtlConfigName = it->second.str();
+  }
+    
+
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl);
+                 state.getKernelName(), hdl, extractedRtlConfigName); 
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -784,6 +863,7 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
+  commands.add<SetPolygeistPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);

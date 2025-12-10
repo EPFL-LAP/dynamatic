@@ -13,14 +13,32 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 BUFFER_ALGORITHM=$5
 TARGET_CP=$6
-USE_SHARING=$7
-FPUNITS_GEN=$8
-USE_RIGIDIFICATION=${9}
-DISABLE_LSQ=${10}
-FAST_TOKEN_DELIVERY=${11}
+POLYGEIST_PATH=$7
+USE_SHARING=$8
+FPUNITS_GEN=$9
+USE_RIGIDIFICATION=${10}
+DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
+FORK_FIFO_SIZE=${13}
 
-POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+for i in {1..13}; do shift; done
+
+SKIPPABLE_ACTTIVE=0
+SKIPPABLE_SEQ_N=()
+
+if [ "$1" != "none" ]; then
+  SKIPPABLE_ACTTIVE=1
+  while [[ "$#" -gt 0 && "${1}" != "--" ]]; do
+    SKIPPABLE_ACTTIVE=1
+    SKIPPABLE_SEQ_N+=("$1")
+    shift
+  done
+else
+  shift
+fi
+
+POLYGEIST_CLANG_BIN="$POLYGEIST_PATH/build/bin/cgeist"
+CLANGXX_BIN="$POLYGEIST_PATH/llvm-project/build/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -41,6 +59,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_ROUZBEH="$COMP_DIR/handshake_rouzbeh.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
@@ -97,7 +116,7 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
+  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
   -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE"
@@ -165,20 +184,44 @@ else
 fi
 
 # handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
+# with skippable sequentializer
+if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
+      --handshake-replace-memory-interfaces \
+      --handshake-combine-steering-logic \
+   > "$F_HANDSHAKE_ROUZBEH"
+  exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
+    "Applied transformations to handshake with skippable sequentializer"
+  
+  F_HANDSHAKE=$F_HANDSHAKE_ROUZBEH
+
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-minimize-cst-width \
+    --handshake-optimize-bitwidths \
+    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+
+# without skippable sequentializer
+else
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+fi
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
-  # NOTE: to use this in dynamatic-opt, do ${SHARING_PASS:+"$SHARING_PASS"} to
-  # conditionally pass the string as an argument if not empty.
-  SHARING_PASS="--credit-based-sharing=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
+  BUFFER_PLACEMENT_PASS="credit-based-sharing"
   echo_info "Set to apply credit-based sharing after buffer placement."
+else
+  BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
 
 # Buffer placement
@@ -188,8 +231,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
-    ${SHARING_PASS:+"$SHARING_PASS"} \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -213,9 +255,8 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
-    ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
@@ -231,6 +272,8 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
+
+dot -Tpng "$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" > "$COMP_DIR/${KERNEL_NAME}_DEP_G.png"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification

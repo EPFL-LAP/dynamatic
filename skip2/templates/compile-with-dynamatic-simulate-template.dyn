@@ -1,0 +1,10 @@
+# Set the source file to run
+set-src PATH_TO_C_FILE
+
+write-hdl --rtl-config-name RTL_CONFIG_NAME
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

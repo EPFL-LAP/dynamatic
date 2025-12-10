@@ -174,6 +174,9 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     LSQ never happen on the same cycle.   
   }];
   let constructor = "dynamatic::createHandshakeMaterialize()";
+  let options =
+    [Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",
+            "Size of the fifo in the output of each fork">];
 }
 
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
@@ -242,7 +245,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
+def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -254,10 +257,11 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     which needs to be setup separately from Dynamatic (and is under a different,
     non-open-source licence).
   }];
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', 'cp'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -286,8 +290,6 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
     "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
     "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
-
-  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 
