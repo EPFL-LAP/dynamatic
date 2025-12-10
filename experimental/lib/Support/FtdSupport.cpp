@@ -105,6 +105,19 @@ bool ftd::isSameLoopBlocks(Block *source, Block *dest,
   return isSameLoop(li.getLoopFor(source), li.getLoopFor(dest));
 }
 
+//// Recursively check whether `inner` is the same loop as `outer`, or is
+/// nested inside `outer` (i.e., any ancestor of `inner` matches `outer`).
+static bool isSameOrInnerLoop(const CFGLoop *inner, const CFGLoop *outer) {
+  if (!inner || !outer)
+    return false;
+  return (inner == outer || isSameOrInnerLoop(inner->getParentLoop(), outer));
+}
+
+bool ftd::isSameOrInnerLoopBlocks(Block *source, Block *dest,
+                                  const mlir::CFGLoopInfo &li) {
+  return isSameOrInnerLoop(li.getLoopFor(source), li.getLoopFor(dest));
+}
+
 /// Recursive function which allows to obtain all the paths from block `start`
 /// to block `end` using a DFS.
 static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
