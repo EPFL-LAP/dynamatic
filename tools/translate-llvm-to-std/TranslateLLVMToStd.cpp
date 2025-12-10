@@ -548,7 +548,8 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
   llvm::Type *baseElementType = gepInst->getSourceElementType();
 
-  // Get index calculation:
+  // Get the dimensions of the original array from the function type.
+  // For the example above, it would be {A, B, C, D}
   SmallVector<int64_t> multipliers;
   while (baseElementType->isArrayTy()) {
     multipliers.push_back(baseElementType->getArrayNumElements());
@@ -559,20 +560,23 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   mlir::Value baseAddress;
   if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
+    // When the GEP directly gets calculates from a AllocaInst (i.e., an
+    // internal array) or a pointer in the function argument (i.e.,
+    // my_array[A][B][C][D] in the example above). Here we get the corresponding
+    // memref in MLIR using getInstToMemRefMap.
     baseAddress = this->getInstToMemRefMap[gepInst->getPointerOperand()];
   } else {
+    // Otherwise, there should be a chain of GEPs (TODO: assert this
+    // assumption). The base address is the result of the previous GEP.
     baseAddress = valueMap[gepInst->getPointerOperand()];
   }
   this->getInstToMemRefMap[gepInst] = baseAddress;
 
-  // A list of value to be accumulated
-  //
-  // For the example above:
-  //
+  // A list of value to be accumulated. For the example above:
   // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
-
   SmallVector<mlir::Value> multipliedIndices;
 
+  // [START calculate the flattened array indices]
   for (size_t i = 0; i < gepIndices.size(); ++i) {
     mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
 
@@ -642,6 +646,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
       multipliedIndices.push_back(idx);
     }
   }
+  // [END calculate the flattened array indices]
 
   // If we do not start from a memref type, then it must be from a chain of
   // GEPs. Here we accumulate our result onto that.
@@ -651,18 +656,19 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   }
 
   // [START accumulate the array index]
+  // We construct a balanced tree of additions to accumulate the final index.
   // Build balanced tree
-  std::function<mlir::Value(ArrayRef<mlir::Value>)> build =
+  std::function<mlir::Value(ArrayRef<mlir::Value>)> buildAdderTree =
       [&](ArrayRef<mlir::Value> vals) -> mlir::Value {
     assert(!vals.empty());
     if (vals.size() == 1)
       return vals[0];
     auto mid = vals.size() / 2;
-    auto lhs = build(vals.take_front(mid));
-    auto rhs = build(vals.drop_front(mid));
+    auto lhs = buildAdderTree(vals.take_front(mid));
+    auto rhs = buildAdderTree(vals.drop_front(mid));
     return builder.create<arith::AddIOp>(UnknownLoc::get(ctx), lhs, rhs);
   };
-  mlir::Value accumulatedArrayIndex = build(multipliedIndices);
+  mlir::Value accumulatedArrayIndex = buildAdderTree(multipliedIndices);
   // [END accumulate the array index]
 
   valueMap[gepInst] = accumulatedArrayIndex;
