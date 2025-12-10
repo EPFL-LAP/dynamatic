@@ -245,8 +245,8 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       if (!failed(
               timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
 
-        int64_t latency_int = static_cast<int64_t>(latency);
-        latencyInterface.setLatency(latency_int);
+        int64_t latencyInt = static_cast<int64_t>(latency);
+        latencyInterface.setLatency(latencyInt);
       } else {
         op->emitError("Failed to get latency from timing model");
         return signalPassFailure();
@@ -818,8 +818,8 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       if (numSlots == 0)
         return;
 
-      auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, numSlots, bufferType);
+      auto bufOp = handshake::BufferOp::create(builder, bufferIn.getLoc(),
+                                               bufferIn, numSlots, bufferType);
       placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);

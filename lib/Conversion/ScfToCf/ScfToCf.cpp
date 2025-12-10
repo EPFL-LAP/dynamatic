@@ -93,14 +93,14 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
     Operation *terminator = lastBodyBlock->getTerminator();
     rewriter.setInsertionPointToEnd(lastBodyBlock);
     auto step = forOp.getStep();
-    auto stepped = rewriter.create<arith::AddIOp>(loc, iv, step).getResult();
+    auto stepped = arith::AddIOp::create(rewriter, loc, iv, step).getResult();
     if (!stepped)
       return failure();
 
     SmallVector<Value, 8> loopCarried;
     loopCarried.push_back(stepped);
     loopCarried.append(terminator->operand_begin(), terminator->operand_end());
-    rewriter.create<cf::BranchOp>(loc, conditionBlock, loopCarried);
+    cf::BranchOp::create(rewriter, loc, conditionBlock, loopCarried);
     rewriter.eraseOp(terminator);
 
     // The initial values of loop-carried values is obtained from the operands
@@ -109,15 +109,15 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
     destOperands.push_back(lowerBound);
     llvm::append_range(destOperands, forOp.getInitArgs());
     rewriter.setInsertionPointToEnd(initBlock);
-    rewriter.create<cf::BranchOp>(loc, conditionBlock, destOperands);
+    cf::BranchOp::create(rewriter, loc, conditionBlock, destOperands);
 
     // With the body block done, we can fill in the condition block.
     rewriter.setInsertionPointToEnd(conditionBlock);
-    auto comparison = rewriter.create<arith::CmpIOp>(loc, pred, iv, upperBound);
+    auto comparison =
+        arith::CmpIOp::create(rewriter, loc, pred, iv, upperBound);
 
-    rewriter.create<cf::CondBranchOp>(loc, comparison, firstBodyBlock,
-                                      ArrayRef<Value>(), endBlock,
-                                      ArrayRef<Value>());
+    cf::CondBranchOp::create(rewriter, loc, comparison, firstBodyBlock,
+                             ArrayRef<Value>(), endBlock, ArrayRef<Value>());
     // The result of the loop operation is the values of the condition block
     // arguments except the induction variable on the last iteration.
     rewriter.replaceOp(forOp, conditionBlock->getArguments().drop_front());

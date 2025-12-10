@@ -89,8 +89,9 @@ static handshake::ExtSIOp insertExtOp(handshake::ConstantOp toExtend,
                                       handshake::ConstantOp toReplace,
                                       PatternRewriter &rewriter) {
   rewriter.setInsertionPointAfter(toExtend);
-  auto extOp = rewriter.create<handshake::ExtSIOp>(
-      toExtend.getLoc(), toReplace.getResult().getType(), toExtend.getResult());
+  auto extOp = handshake::ExtSIOp::create(rewriter, toExtend.getLoc(),
+                                          toReplace.getResult().getType(),
+                                          toExtend.getResult());
   inheritBB(toExtend, extOp);
   return extOp;
 }
@@ -162,8 +163,8 @@ struct MinimizeConstantBitwidth
     }
 
     // Create a new constant to replace the matched one with
-    auto newCstOp = rewriter.create<handshake::ConstantOp>(
-        cstOp->getLoc(), newAttr, cstOp.getCtrl());
+    auto newCstOp = handshake::ConstantOp::create(rewriter, cstOp->getLoc(),
+                                                  newAttr, cstOp.getCtrl());
     rewriter.replaceOp(cstOp, insertExtOp(newCstOp, cstOp, rewriter));
     return success();
   }
@@ -188,11 +189,11 @@ struct HandshakeMinimizeCstWidthPass
     mlir::ModuleOp mod = getOperation();
 
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns{ctx};
     patterns.add<MinimizeConstantBitwidth>(optNegatives, ctx);
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
     LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");

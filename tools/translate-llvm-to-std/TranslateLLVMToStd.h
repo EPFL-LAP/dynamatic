@@ -69,10 +69,10 @@ private:
   /// In LLVM IR to CF, we convert GEP -> LOAD/STORE to LOAD/STORE.
   /// - In LLVM IR: load and store take pointer operand
   /// - In MLIR IR: load and store take base address and indices
-  /// We use this data structure to store the base address and indices provided
-  /// by GEPs when processing GEPs. This will be used in LOAD/STORE conversions
-  /// to lookup the input base address and indices.
-  mlir::DenseMap<llvm::Value *, MemRefAndIndices> gepInstToMemRefAndIndicesMap;
+  ///
+  /// We use this data structure to store the mapping between the GEP
+  /// instruction and the corresponding base address.
+  mlir::DenseMap<llvm::Value *, mlir::Value> getInstToMemRefMap;
 
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
@@ -83,7 +83,7 @@ private:
   void naiveTranslation(mlir::Type returnType, mlir::ValueRange values,
                         Instruction *inst) {
     MLIRTy op =
-        builder.create<MLIRTy>(UnknownLoc::get(ctx), returnType, values);
+        MLIRTy::create(builder, UnknownLoc::get(ctx), returnType, values);
     // Register the corresponding MLIR value of the result of the original
     // instruction.
     valueMap[inst] = op.getResult();

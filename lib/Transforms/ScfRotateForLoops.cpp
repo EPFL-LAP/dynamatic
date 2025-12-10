@@ -44,9 +44,9 @@ struct RotateLoop : public OpRewritePattern<scf::ForOp> {
 
     // Create a do-while that is equivalent to the loop
     ValueRange whileArgsRange(whileOpArgs);
-    auto whileOp =
-        rewriter.create<scf::WhileOp>(forOp.getLoc(), whileArgsRange.getTypes(),
-                                      whileOpArgs, nullptr, nullptr);
+    auto whileOp = scf::WhileOp::create(rewriter, forOp.getLoc(),
+                                        whileArgsRange.getTypes(), whileOpArgs,
+                                        nullptr, nullptr);
 
     // Move all operations from the for loop body to the "before" region of the
     // while loop
@@ -56,10 +56,12 @@ struct RotateLoop : public OpRewritePattern<scf::ForOp> {
 
     // Check the for loop condition at the end of the before block
     rewriter.setInsertionPointToEnd(&beforeBlock);
-    auto addOp = rewriter.create<arith::AddIOp>(
-        forOp->getLoc(), beforeBlock.getArguments().front(), forOp.getStep());
-    auto cmpOp = rewriter.create<arith::CmpIOp>(
-        forOp->getLoc(), pred, addOp.getResult(), forOp.getUpperBound());
+    auto addOp = arith::AddIOp::create(rewriter, forOp->getLoc(),
+                                       beforeBlock.getArguments().front(),
+                                       forOp.getStep());
+    auto cmpOp =
+        arith::CmpIOp::create(rewriter, forOp->getLoc(), pred,
+                              addOp.getResult(), forOp.getUpperBound());
 
     // Get the yield operation that was moved from the for loop body to the
     // before block
@@ -78,7 +80,7 @@ struct RotateLoop : public OpRewritePattern<scf::ForOp> {
     // the before block
     Block &afterBlock = whileOp.getAfter().front();
     rewriter.setInsertionPointToStart(&afterBlock);
-    rewriter.create<scf::YieldOp>(condOp->getLoc(), afterBlock.getArguments());
+    scf::YieldOp::create(rewriter, condOp->getLoc(), afterBlock.getArguments());
 
     // Replace for's results with while's results (drop while's first result,
     // which is the IV)
@@ -129,14 +131,14 @@ struct ScfForLoopRotationPass
   void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
 
     RewritePatternSet patterns{ctx};
     patterns.add<RotateLoop>(ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
   };
 };

@@ -43,7 +43,7 @@ static std::string createMiterProperties(const std::string &moduleName,
   // INVARSPEC (model.EQ_A_valid -> model.EQ_A_out)
   // INVARSPEC (model.EQ_B_valid -> model.EQ_B_out)
   for (const auto &[resultName, resultType] : config.results) {
-    if (resultType.isa<handshake::ChannelType>())
+    if (isa<handshake::ChannelType>(resultType))
       properties << llvm::formatv("INVARSPEC ({0}.{1}_valid -> {0}.{1}_out)",
                                   moduleName, resultName)
                         .str();
