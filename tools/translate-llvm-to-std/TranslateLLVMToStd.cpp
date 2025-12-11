@@ -798,14 +798,23 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
   // can be implemented using something smarter.
   mlir::Value memref;
 
-  if (valueMap.count(callInst->getArgOperand(0))) {
+  // We will treat dest as memref[offset], and store the specified values there
+  // - When the ptr a function argument, the offset is zero.
+  // - When the ptr is from a GEP, the offset is the value calculated from
+  // there.
+  mlir::Value offset;
+
+  if (valueMap.count(callInst->getArgOperand(0)) &&
+      isa_and_nonnull<MemRefType>(
+          valueMap[callInst->getArgOperand(0)].getType())) {
     // Case: When the ptr operand is a function argument
     memref = valueMap[callInst->getArgOperand(0)];
-  } else if (gepInstToMemRefAndIndicesMap.count(callInst->getArgOperand(0))) {
+    offset = builder.create<arith::ConstantOp>(
+        UnknownLoc::get(ctx), IntegerAttr::get(builder.getIndexType(), 0));
+  } else if (getInstToMemRefMap.count(callInst->getArgOperand(0))) {
     // Case: When the ptr operand is a GEP
-    auto [memrefFromGep, _] =
-        gepInstToMemRefAndIndicesMap[callInst->getArgOperand(0)];
-    memref = memrefFromGep;
+    memref = getInstToMemRefMap[callInst->getArgOperand(0)];
+    offset = valueMap[callInst->getArgOperand(0)];
   } else {
     // clang-format off
     LLVM_DEBUG(
@@ -866,12 +875,15 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
         UnknownLoc::get(ctx), valueInTargetType, elemWidth);
 
     for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
-      memref.dump();
-      auto constIdx = builder.create<arith::ConstantOp>(
-          UnknownLoc::get(ctx),
-          IntegerAttr::get(builder.getIndexType(), elemPos));
+      auto constIdx = builder.create<arith::ConstantIntOp>(
+          UnknownLoc::get(ctx), elemPos, offset.getType());
+      // Add the constant op with the offset
+      auto offsetPlusPos =
+          builder.create<arith::AddIOp>(UnknownLoc::get(ctx), offset, constIdx);
+      mlir::Value storeIndex = builder.create<arith::IndexCastOp>(
+          UnknownLoc::get(ctx), builder.getIndexType(), offsetPlusPos);
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), constOp, memref,
-                                      constIdx.getResult());
+                                      storeIndex);
     }
   }
 }
