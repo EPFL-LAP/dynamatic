@@ -787,6 +787,149 @@ void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   valueMap[allocaInst] = allocaOp->getResult(0);
 }
 
+void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
+  Function *calledFunc = callInst->getCalledFunction();
+  assert(calledFunc);
+  assert(calledFunc->getIntrinsicID() == Intrinsic::memset);
+  // -- Semantic of the memset intrinsic: --
+  //
+  // memset(dest : ptr, val : i8, length : i64, isVolatile : i1);
+  // TODO: For now, we convert it to a set of stores; maybe in the future it
+  // can be implemented using something smarter.
+  mlir::Value memref = valueMap[callInst->getArgOperand(0)];
+  if (!memref || !isa<MemRefType>(memref.getType()))
+    llvm::report_fatal_error(
+        "Cannot determine the base ptr of the memset intrinsic!");
+
+  mlir::Value valToSet = valueMap[callInst->getArgOperand(1)];
+  if (!valToSet || !isa<mlir::IntegerType>(valToSet.getType()))
+    llvm::report_fatal_error(
+        "Cannot determine the value to set of the memset intrinsic!");
+
+  assert(valToSet.getType().getIntOrFloatBitWidth() == 8 &&
+         "We assume that memset sets values of i8.");
+
+  mlir::Value mlirLengthVal = valueMap[callInst->getArgOperand(2)];
+  if (!mlirLengthVal || !isa<mlir::IntegerType>(mlirLengthVal.getType()))
+    llvm::report_fatal_error(
+        "Cannot determine the length to set of the memset intrinsic!");
+
+  //
+  unsigned length = 0;
+  if (auto *constLength =
+          llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(2))) {
+    length = constLength->getLimitedValue();
+  } else {
+    llvm::report_fatal_error(
+        "Cannot determine the length to set of the memset intrinsic!");
+  }
+
+  // Determine:
+  // - the value to be stored in the data type of the memref
+  // - the number of elements
+  auto memrefElemType =
+      mlir::cast<MemRefType>(memref.getType()).getElementType();
+
+  unsigned elemWidth = memrefElemType.getIntOrFloatBitWidth();
+
+  // Say we store 1 (in i8) for length 64, with the element type i32
+  // Here we need to store 64 * i8 / i32 = 16 elements
+  int64_t valueInTargetType = 0;
+  assert(elemWidth % 8 == 0 && "");
+  if (auto *constInst =
+          llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1))) {
+    auto i8value = constInst->getLimitedValue();
+
+    for (size_t bytePos = 0; bytePos < elemWidth / 8; ++bytePos) {
+      valueInTargetType += i8value << (bytePos * 8);
+    }
+    unsigned numElemsToStore = length * 8 / elemWidth;
+
+    auto constOp = builder.create<arith::ConstantIntOp>(
+        UnknownLoc::get(ctx), valueInTargetType, elemWidth);
+
+    for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
+      memref.dump();
+      auto constIdx = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx),
+          IntegerAttr::get(builder.getIndexType(), elemPos));
+      builder.create<memref::StoreOp>(UnknownLoc::get(ctx), constOp, memref,
+                                      constIdx.getResult());
+    }
+  }
+}
+
+void TranslateLLVMToStd::translateFunnelShiftIntrinsic(
+    llvm::CallInst *callInst) {
+  Function *calledFunc = callInst->getCalledFunction();
+  assert(calledFunc);
+  assert(calledFunc->getIntrinsicID() == Intrinsic::fshl ||
+         calledFunc->getIntrinsicID() == Intrinsic::fshr);
+  // -- Conversion for LLVM funnel shift intrinsic (llvm.fshl) --
+  // Semantic:
+  // r = fshl(a, b, c)
+  // - concate: Wide = {a : b}
+  // - shift to left: Wide <<= c
+  // - take msb (same width as a and b)
+  //
+  // -- Conversion for LLVM funnel shift intrinsic (llvm.fshr) --
+  // Semantic:
+  // r = fshl(a, b, c)
+  // - concate: Wide = {a : b}
+  // - shift to right: Wide >>= c
+  // - take lsb (same width as a and b)
+  //
+  // This block handles both.
+  mlir::Value a = valueMap[callInst->getArgOperand(0)];
+  mlir::Value b = valueMap[callInst->getArgOperand(1)];
+  mlir::Value c = valueMap[callInst->getArgOperand(2)];
+
+  unsigned width = a.getType().getIntOrFloatBitWidth();
+
+  assert(a.getType().getIntOrFloatBitWidth() ==
+         b.getType().getIntOrFloatBitWidth());
+
+  // 1. Extend to width a + b
+
+  auto aExt = builder.create<arith::ExtUIOp>(
+      UnknownLoc::get(ctx), mlir::IntegerType::get(ctx, width * 2), a);
+  auto bExt = builder.create<arith::ExtUIOp>(
+      UnknownLoc::get(ctx), mlir::IntegerType::get(ctx, width * 2), b);
+  auto cExt = builder.create<arith::ExtUIOp>(
+      UnknownLoc::get(ctx), mlir::IntegerType::get(ctx, width * 2), c);
+
+  auto constValueWidth = builder.create<arith::ConstantIntOp>(
+      UnknownLoc::get(ctx), width, aExt.getType().getIntOrFloatBitWidth());
+
+  // 2. Shift `a` and OR `b`
+  auto aShift = builder.create<arith::ShLIOp>(UnknownLoc::get(ctx), aExt,
+                                              constValueWidth);
+  auto aConcatB =
+      builder.create<arith::OrIOp>(UnknownLoc::get(ctx), aShift, bExt);
+
+  // 3. Shift the wide value by c
+  mlir::Value wideShifted;
+  mlir::Value resultExt;
+
+  if (calledFunc->getIntrinsicID() == Intrinsic::fshl) {
+    wideShifted =
+        builder.create<arith::ShLIOp>(UnknownLoc::get(ctx), aConcatB, cExt);
+    // 4. Take the upper part.
+    // - First shift the upper `width` bits to the lsb position
+    resultExt = builder.create<arith::ShRUIOp>(UnknownLoc::get(ctx),
+                                               wideShifted, constValueWidth);
+  } else {
+    resultExt =
+        builder.create<arith::ShRUIOp>(UnknownLoc::get(ctx), aConcatB, cExt);
+  }
+
+  // - Then truncate the result down to `width`-bit
+  auto result = builder.create<arith::TruncIOp>(
+      UnknownLoc::get(ctx), mlir::IntegerType::get(ctx, width), resultExt);
+
+  valueMap[callInst] = result;
+}
+
 void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
@@ -806,72 +949,10 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<math::AbsFOp>(retType, {arg}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::memset) {
-    // -- Semantic of the memset intrinsic: --
-    //
-    // memset(dest : ptr, val : i8, length : i64, isVolatile : i1);
-    // TODO: For now, we convert it to a set of stores; maybe in the future it
-    // can be implemented using something smarter.
-    mlir::Value memref = valueMap[callInst->getArgOperand(0)];
-    if (!memref || !isa<MemRefType>(memref.getType()))
-      llvm::report_fatal_error(
-          "Cannot determine the base ptr of the memset intrinsic!");
-
-    mlir::Value valToSet = valueMap[callInst->getArgOperand(1)];
-    if (!valToSet || !isa<mlir::IntegerType>(valToSet.getType()))
-      llvm::report_fatal_error(
-          "Cannot determine the value to set of the memset intrinsic!");
-
-    assert(valToSet.getType().getIntOrFloatBitWidth() == 8 &&
-           "We assume that memset sets values of i8.");
-
-    mlir::Value mlirLengthVal = valueMap[callInst->getArgOperand(2)];
-    if (!mlirLengthVal || !isa<mlir::IntegerType>(mlirLengthVal.getType()))
-      llvm::report_fatal_error(
-          "Cannot determine the length to set of the memset intrinsic!");
-
-    //
-    unsigned length = 0;
-    if (auto *constLength =
-            llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(2))) {
-      length = constLength->getLimitedValue();
-    } else {
-      llvm::report_fatal_error(
-          "Cannot determine the length to set of the memset intrinsic!");
-    }
-
-    // Determine:
-    // - the value to be stored in the data type of the memref
-    // - the number of elements
-    auto memrefElemType =
-        mlir::cast<MemRefType>(memref.getType()).getElementType();
-
-    unsigned elemWidth = memrefElemType.getIntOrFloatBitWidth();
-
-    // Say we store 1 (in i8) for length 64, with the element type i32
-    // Here we need to store 64 * i8 / i32 = 16 elements
-    int64_t valueInTargetType = 0;
-    assert(elemWidth % 8 == 0 && "");
-    if (auto *constInst =
-            llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1))) {
-      auto i8value = constInst->getLimitedValue();
-
-      for (size_t bytePos = 0; bytePos < elemWidth / 8; ++bytePos) {
-        valueInTargetType += i8value << (bytePos * 8);
-      }
-      unsigned numElemsToStore = length * 8 / elemWidth;
-
-      auto constOp = builder.create<arith::ConstantIntOp>(
-          UnknownLoc::get(ctx), valueInTargetType, elemWidth);
-
-      for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
-        memref.dump();
-        auto constIdx = builder.create<arith::ConstantOp>(
-            UnknownLoc::get(ctx),
-            IntegerAttr::get(builder.getIndexType(), elemPos));
-        builder.create<memref::StoreOp>(UnknownLoc::get(ctx), constOp, memref,
-                                        constIdx.getResult());
-      }
-    }
+    this->translateMemsetIntrinsic(callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::fshl ||
+             calledFunc->getIntrinsicID() == Intrinsic::fshr) {
+    this->translateFunnelShiftIntrinsic(callInst);
   } else {
     llvm::errs() << "Unhandled intrinsic:";
     callInst->dump();
