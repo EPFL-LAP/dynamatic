@@ -120,6 +120,9 @@ private:
   void translateAllocaInst(llvm::AllocaInst *allocaInst);
   void translateCallInst(llvm::CallInst *callInst);
 
+  void translateFunnelShiftIntrinsic(llvm::CallInst *callInst);
+  void translateMemsetIntrinsic(llvm::CallInst *callInst);
+
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                                        BasicBlock *nextBB);
 };
