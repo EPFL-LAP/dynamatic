@@ -109,6 +109,15 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.remui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/remui.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
@@ -371,6 +380,15 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/fptosi.v",
+    "dependencies": ["delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.fptoui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/fptoui.v",
     "dependencies": ["delay_buffer", "oehb"],
     "hdl": "verilog"
   },

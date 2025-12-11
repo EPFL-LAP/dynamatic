@@ -1637,6 +1637,7 @@ struct CfToHandshakePass
         OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
         OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
         OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+        OneToOneConversion<arith::RemUIOp, handshake::RemUIOp>,
         OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
         OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
@@ -1658,6 +1659,7 @@ struct CfToHandshakePass
         OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
         OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
         OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+        OneToOneConversion<arith::FPToUIOp, handshake::FPToUIOp>,
         OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
         OneToOneConversion<math::AbsFOp, handshake::AbsFOp>
         // clang-format on

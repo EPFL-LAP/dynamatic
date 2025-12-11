@@ -126,6 +126,7 @@ if __name__ == "__main__":
     generators.add("handshake", "uitofp")
     generators.add("handshake", "sitofp")
     generators.add("handshake", "fptosi")
+    generators.add("handshake", "fptoui")
     generators.add("handshake", "ready_remover")
     generators.add("handshake", "valid_merger")
     generators.add("handshake", "top_join")

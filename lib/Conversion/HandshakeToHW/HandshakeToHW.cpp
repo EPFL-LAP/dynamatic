@@ -687,6 +687,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::AndIOp,
           handshake::DivFOp,
           handshake::RemSIOp,
+          handshake::RemUIOp,
           handshake::DivSIOp,
           handshake::DivUIOp,
           handshake::MaximumFOp,
@@ -705,6 +706,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::SIToFPOp,
           handshake::UIToFPOp,
           handshake::FPToSIOp,
+          handshake::FPToUIOp,
           handshake::AbsFOp,
           handshake::MaxSIOp
           // clang-format on
@@ -2138,6 +2140,7 @@ public:
         ConvertToHWInstance<handshake::DivSIOp>,
         ConvertToHWInstance<handshake::DivUIOp>,
         ConvertToHWInstance<handshake::RemSIOp>,
+        ConvertToHWInstance<handshake::RemUIOp>,
         ConvertToHWInstance<handshake::ExtSIOp>,
         ConvertToHWInstance<handshake::ExtUIOp>,
         ConvertToHWInstance<handshake::MulFOp>,
@@ -2156,6 +2159,7 @@ public:
         ConvertToHWInstance<handshake::SIToFPOp>,
         ConvertToHWInstance<handshake::UIToFPOp>,
         ConvertToHWInstance<handshake::FPToSIOp>,
+        ConvertToHWInstance<handshake::FPToUIOp>,
         ConvertToHWInstance<handshake::ExtFOp>,
         ConvertToHWInstance<handshake::AbsFOp>,
         ConvertToHWInstance<handshake::MaxSIOp>,

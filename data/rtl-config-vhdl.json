@@ -136,6 +136,19 @@
     ]
   },
   {
+    "name": "handshake.remui",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t remui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "vitis_hls_cores"
+    ]
+  },
+  {
     "name": "handshake.divui",
     "parameters": [
       {
@@ -480,6 +493,16 @@
       }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p latency=$LATENCY bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
+    "name": "handshake.fptoui",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptoui -p latency=$LATENCY bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.rigidifier",

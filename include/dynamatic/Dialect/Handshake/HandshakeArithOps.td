@@ -287,6 +287,15 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   let summary = "Signed integer remainder.";
 }
 
+def Handshake_RemUIOp : Handshake_Arith_IntBinaryOp<"remui", [
+  IsIntSizedChannel<32, "lhs">,
+  IsIntSizedChannel<32, "rhs">,
+  IsIntSizedChannel<32, "result">,
+  LatencyInterface
+]> {
+  let summary = "Unsigned integer remainder.";
+}
+
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   IsIntSizedChannel<32, "lhs">,
   IsIntSizedChannel<32, "rhs">,
@@ -447,6 +456,14 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
   LatencyInterface
 ]> {
   let summary = "Converts a float to signed integer.";
+}
+
+def Handshake_FPToUIOp : Handshake_Arith_FToICastOp<"fptoui", [
+  IsFloatSizedChannel<32, "in">,
+  IsIntSizedChannel<32, "out">,
+  LatencyInterface
+]> {
+  let summary = "Converts a float to unsigned integer.";
 }
 
 def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
