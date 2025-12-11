@@ -934,10 +934,8 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
   assert(calledFunc);
-
-  if (!calledFunc->isIntrinsic()) {
-    assert(false && "Function calls are not currently supported");
-  }
+  assert(calledFunc->isIntrinsic() &&
+         "Function calls are not currently supported");
 
   if (calledFunc->getIntrinsicID() == Intrinsic::smax) {
     mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
@@ -954,8 +952,7 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
              calledFunc->getIntrinsicID() == Intrinsic::fshr) {
     this->translateFunnelShiftIntrinsic(callInst);
   } else {
-    llvm::errs() << "Unhandled intrinsic:";
-    callInst->dump();
+    LLVM_DEBUG(llvm::errs() << "Unhandled intrinsic:"; callInst->dump(););
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
   }
