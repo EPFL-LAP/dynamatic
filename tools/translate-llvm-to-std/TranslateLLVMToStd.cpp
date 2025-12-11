@@ -796,10 +796,27 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
   // memset(dest : ptr, val : i8, length : i64, isVolatile : i1);
   // TODO: For now, we convert it to a set of stores; maybe in the future it
   // can be implemented using something smarter.
-  mlir::Value memref = valueMap[callInst->getArgOperand(0)];
-  if (!memref || !isa<MemRefType>(memref.getType()))
+  mlir::Value memref;
+
+  if (valueMap.count(callInst->getArgOperand(0))) {
+    // Case: When the ptr operand is a function argument
+    memref = valueMap[callInst->getArgOperand(0)];
+  } else if (gepInstToMemRefAndIndicesMap.count(callInst->getArgOperand(0))) {
+    // Case: When the ptr operand is a GEP
+    auto [memrefFromGep, _] =
+        gepInstToMemRefAndIndicesMap[callInst->getArgOperand(0)];
+    memref = memrefFromGep;
+  } else {
+    // clang-format off
+    LLVM_DEBUG(
+        llvm::errs() << "Cannot determine the base ptr of memset!\n";
+        llvm::errs() << "llvm value:\n";
+        callInst->getArgOperand(0)->dump();
+    );
+    // clang-format on
     llvm::report_fatal_error(
         "Cannot determine the base ptr of the memset intrinsic!");
+  }
 
   mlir::Value valToSet = valueMap[callInst->getArgOperand(1)];
   if (!valToSet || !isa<mlir::IntegerType>(valToSet.getType()))
