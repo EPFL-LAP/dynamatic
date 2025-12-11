@@ -871,18 +871,26 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
     }
     unsigned numElemsToStore = length * 8 / elemWidth;
 
-    auto constOp = builder.create<arith::ConstantIntOp>(
+    auto valueToSave = builder.create<arith::ConstantIntOp>(
         UnknownLoc::get(ctx), valueInTargetType, elemWidth);
 
     for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
-      auto constIdx = builder.create<arith::ConstantIntOp>(
-          UnknownLoc::get(ctx), elemPos, offset.getType());
+
+      LLVM_DEBUG(llvm::errs()
+                     << "Converting element position: " << elemPos << "\n";);
+      auto constIdx = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx),
+          builder.getIntegerAttr(offset.getType(), elemPos));
       // Add the constant op with the offset
       auto offsetPlusPos =
           builder.create<arith::AddIOp>(UnknownLoc::get(ctx), offset, constIdx);
-      mlir::Value storeIndex = builder.create<arith::IndexCastOp>(
-          UnknownLoc::get(ctx), builder.getIndexType(), offsetPlusPos);
-      builder.create<memref::StoreOp>(UnknownLoc::get(ctx), constOp, memref,
+
+      mlir::Value storeIndex = offsetPlusPos;
+      if (!isa<IndexType>(offsetPlusPos.getType())) {
+        builder.create<arith::IndexCastOp>(
+            UnknownLoc::get(ctx), builder.getIndexType(), offsetPlusPos);
+      }
+      builder.create<memref::StoreOp>(UnknownLoc::get(ctx), valueToSave, memref,
                                       storeIndex);
     }
   }
