@@ -35,7 +35,7 @@ public:
                      OpBuilder &builder, FuncNameToCFuncArgsMap &argMap,
                      MLIRContext *ctx, StringRef funcName)
       : funcName(funcName), mlirModule(mlirModule), llvmModule(llvmModule),
-        builder(builder), ctx(ctx), argMap(argMap){};
+        builder(builder), ctx(ctx), argMap(argMap) {};
 
   /// Calling this method will translate the funcName to mlirModule. TODO: maybe
   /// we could return a newly created "OwnOpReference<ModuleOp>" instead?
