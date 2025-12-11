@@ -18,15 +18,17 @@ module divsi #(
 );
 
   wire join_valid;
+  wire oehb_ready;
+  wire buff_valid;
 
   // Instantiate the join node
   join_type #(
     .SIZE(2)
   ) join_inputs (
-    .ins_valid  ({rhs_valid, lhs_valid}),
-    .outs_ready (result_ready             ),
-    .ins_ready  ({rhs_ready, lhs_ready}  ),
-    .outs_valid (join_valid             )
+    .ins_valid ({rhs_valid, lhs_valid}),
+    .outs_ready (oehb_ready),
+    .ins_ready ({rhs_ready, lhs_ready}),
+    .outs_valid (join_valid)
   );
 
   divsi_vitis_hls_wrapper ip (
@@ -34,23 +36,37 @@ module divsi #(
       .reset(rst),
       .din0(lhs),
       .din1(rhs),
-      .ce(result_ready),
+      .ce(oehb_ready),
       .dout(result)
   );
 
+  oehb_dataless oehb_inst (
+    .clk(clk),
+    .rst(rst),
+    .ins_valid(buff_valid),
+    .ins_ready(oehb_ready),
+    .outs_valid(result_valid),
+    .outs_ready(result_ready)
+  ); 
+
   delay_buffer #(
-    .SIZE(35)
+    .SIZE(34)
   ) buff (
     .clk(clk),
     .rst(rst),
     .valid_in(join_valid),
-    .ready_in(result_ready),
-    .valid_out(result_valid)
+    .ready_in(oehb_ready),
+    .valid_out(buff_valid)
   );
 
 endmodule
 
-// [START This part was translated from the VHDL using AI]
+// [START This part is translated from the VHDL file using an AI tool]
+
+// Total latency of this module: 35 cycles : 
+// > 2 (from the input/output regs) 
+// > 32 (divider regs) 
+// > 1 (input reg of the divider)
 
 module divsi_vitis_hls_wrapper (
     input  wire        clk,
@@ -232,4 +248,4 @@ module dynamatic_units_sdiv_32ns_32ns_32_36_1_div_u #(
 
 endmodule
 
-// [END This part was translated from the VHDL using AI]
+// [END This part is translated from the VHDL file using an AI tool]
