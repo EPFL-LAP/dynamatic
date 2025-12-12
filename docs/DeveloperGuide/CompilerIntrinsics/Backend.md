@@ -108,6 +108,120 @@ An example entry is:
       "flopoco_ip_cores", "vivado_ip_wrappers"
     ]
   },
+  { 
+    "name": "second_dependency",
+    "generic": "/path/to/second/dependency.vhd",
+  }
+]
+```
+
+At the moment the dependency management system is relatively barebone; only parameter-less components can appear in dependencies since there is no existing mechanism to transfer the original component's parameters to the component it depends on (therefore, any dependency with at least one parameter will fail to match due to the lack of parameters provided during dependency resolution, see [matching logic](#matching-logic)).
+
+#### `module-name`
+
+> [!NOTE]
+> The `module-name` option supports parameter substitution.
+
+During RTL emission, the backend associates a module name to each RTL component concretization to uniquely identify it with respect to
+
+1. differently named RTL components, and to
+2. other concretizations of the same RTL component with different RTL parameter values.
+
+By default, the backend derives a unique module name for each concretization using the following logic.
+
+- For generic components, the module name is set to be the filename part of the filepath, without the file extension. For the example given in the [generic section](#generic) which associates the string `$DYNAMATIC/data/vhdl/handshake/mux.vhd` to the `generic` key, the derived module name would simply be `mux`.
+- For generated components, the module name is provided by the backend logic itself, and is in general derived from the specific RTL parameter values associated to the concretization.
+
+The [`MODULE_NAME` backend parameter](#backend-parameters) stores, for each component concretization, the associated module name. This allows JSON values supporting parameter substitution to include the name of the RTL module they are expected to generate during concretization.
+
+> [!WARNING]
+> The backend uses module names to determine whether different component concretizations should be identical. When an RTL component is selected for concretization and the derived module name is identical to a previously  concretized component, then the current component will be assumed to be identical to the previous one and therefore will not be concretized anew. This makes sense when considering that each module name indicates the actual name of the RTL module (Verilog `module` keyword or VHDL `entity` keyword) that the backend expects the concretization step to bring into the "current workspace" (i.e., to implement in a file inside the output directory). Multiple modules with the same name would cause name clashes, making the resulting RTL ambiguous.
+
+The `module-name`, when present, must map to a string which overrides the default module name for the component. In the following example, the generic `handshake.mux` component would normally get asssigned the `mux` module name by default, but if the actual RTL module inside the file was named `a_different_mux_name` we could indicate this using the option as follows (some JSON content omitted for brevity).
+
+```json
+{
+  "name": "handshake.mux",
+  "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
+  "module-name": "a_different_mux_name"
+}
+```
+
+#### `arch-name`
+
+> [!NOTE]
+> The `arch-name` option supports parameter substitution.
+
+The internal implementation of VHDL entities is contained in so-called "architectures". Because there may be multiple such architectures for a single entity, each of them maps to a unique name inside the VHDL implementation. Instantiating a VHDL entitiy requires that one specifies the chosen architecure by name in addition to the entity name itself. By default, the backend assumes that the architecture to choose when instantiating VHDL entities is called "arch".
+
+The `arch-name` option, when present, must map to a string which overrides the default architecture name for the component. If the architecture of our usual `handshake.mux` example was named `a_different_arch_name` then we could indicate this using the option as follow (some JSON content omitted for brevity).
+
+```json
+{
+  "name": "handshake.mux",
+  "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
+  "arch-name": "a_different_arch_name"
+}
+```
+
+**IMPORTANT**: To support this feature also in Veriloge where multiple architectures of the same module can coexist, we use this parameter to select the desired architecture. This parameter effectively replaces the module name, allowing each architecture variant to be treated as a distinct module. For example, when generating a floating-point adder with three pipeline stages—whose structure differs from versions with other pipeline depths—we use the architecture’s name as the module name. Consequently, this architecture name must match the module name defined in the corresponding Verilog file.
+
+#### `use-json-config`
+
+> [!NOTE]
+> The `use-json-config` option supports parameter substitution.
+
+When an RTL component is very complex and/or heavily parameterized (e.g., the LSQ), it may be cumbersome or impossible to specify all of its parameters using our rather simple RTL typed parameter system. Such components may provide the `use-json-config` option which, when present, must map to a string indicating the path to a file in which the backend can JSON-serialize all RTL parameters associated to the concretization. This file can then be deserialized from a component generator to get back all generation parameters easily. Consequentlt, this option does not really make sense for generic components.
+
+Below is an example of how you would use such a parameter for generating an LSQ by first having the backend serialize all its RTL parameters to a JSON file.
+
+```json
+{
+  "name": "handshake.lsq",
+  "generic": "/my/lsq/generator --config \"$OUTPUT_DIR/$MODULE_NAME.json\"",
+  "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json"
+}
+```
+
+#### `hdl`
+
+The `hdl` option, when present, must map to a string indicating the hardware description language (HDL) in which the concretized component is written. Possible values are `vhdl` (default), or `verilog`. If the `handshake.mux` component was written in Verilog, we would explictly specify it as follows.
+
+```json
+{
+  "name": "handshake.mux",
+  "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
+  "hdl": "verilog"
+}
+```
+
+#### `io-kind`
+
+The `io-kind` option, when present, must map to a string indicating the naming convention to use for the module's ports that logically belong to arrays of bitvectors. This matters when instantiating the associated RTL component because the backend must know how to name each of the individual bitvectors to do the port mapping.
+
+- Generic RTL modules may have to use something akin to an array of bitvectors to represent such variable-sized ports. In this case, each individual bitvector's name will be formed from the base port name and a numeric index into the array it represents. This `io-kind` is called `hierarchical` (default).
+- RTL generators, like Chisel, may flatten such arrays into separate bitvectors. In this case, each individual bitvector's name will be formed from the base port name along with a textual suffix indicating the logical port index. This `io-kind` is called `flat`.
+
+Let's take the example of a multiplexer implementation with a configurable number of data inputs. Its VHDL implementation could follow any of the two conventions.
+
+With `hierarchical` IO, the component's JSON description (some content omitted for brevity) and RTL implementation would look like the following.
+
+```json
+{
+  "name": "handshake.mux",
+  "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
+  "io-kind": "hierarchical"
+}
+```
+
+```vhdl
+entity mux is
+  generic (SIZE : integer; DATA_WIDTH : integer);
+  ports (
+    -- all other IO omitted for brevity
+    dataInputs : in array(SIZE) of std_logic_vector(DATA_WIDTH - 1 downto 0)
+  );
+end entity;
 ```
 
 This entry matches to the `AddFOp` op based on the `name` field. 

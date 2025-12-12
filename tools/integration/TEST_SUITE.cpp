@@ -49,12 +49,14 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
+class RigidificationFixture : public BaseFixture {};
+
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = false,
+      .testVerilog = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -71,7 +73,7 @@ TEST_P(CBCSolverFixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = false,
+      .testVerilog = true,
       .useSharing = false,
       .milpSolver = "cbc",
       .bufferAlgorithm = "fpga20",
@@ -89,7 +91,7 @@ TEST_P(FPL22Fixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpl22",
@@ -121,7 +123,7 @@ TEST_P(MemoryFixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
-      .useVerilog = false,
+      .testVerilog = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -141,7 +143,7 @@ TEST_P(SharingUnitTestFixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -154,7 +156,7 @@ TEST_P(SharingUnitTestFixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -179,7 +181,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -192,7 +194,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
@@ -383,4 +385,38 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "subdiag_fast"
       ),
     [](const auto &info) { return "spec_" + info.param; });
+
+// Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on
+
+#ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
+
+TEST_P(RigidificationFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useRigidification = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+// clang-format off
+INSTANTIATE_TEST_SUITE_P(Tiny, RigidificationFixture,
+   testing::Values(
+     "fir",
+     "iir",
+     "matvec"
+     ),
+   [](const auto &info) { return info.param; });
+// clang-format on
+
+#endif // DYNAMATIC_ENABLE_LEQ_BINARIES

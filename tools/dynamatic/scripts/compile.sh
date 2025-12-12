@@ -71,7 +71,7 @@ export_dot() {
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" "--label-type=uname" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
@@ -157,7 +157,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
-  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg" \
+  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -216,7 +216,6 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --mark-memory-interfaces \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -322,8 +321,7 @@ export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash $RIGIDIFICATION_SH $DYNAMATIC_DIR $OUTPUT_DIR $KERNEL_NAME $F_HANDSHAKE_EXPORT \
-    > "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level

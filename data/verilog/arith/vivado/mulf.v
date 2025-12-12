@@ -21,12 +21,7 @@ module mulf #(
 
   wire join_valid;
   wire buff_valid, oehb_ready;
-
-  // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
-
-  // intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  wire [ DATA_TYPE + 1 :0] ip_result;
+  wire [ DATA_TYPE - 1 :0] tmp_result;
 
   // Instantiate the join node
   join_type #(
@@ -38,46 +33,37 @@ module mulf #(
     .outs_valid (join_valid             )
   );
 
-  delay_buffer #(
-    .SIZE(3)
-  ) buff (
-    .clk(clk),
-    .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(oehb_ready),
-    .valid_out(buff_valid)
-  );
+  // Accept only inputs both of 32-bit floating point format
+  if (DATA_TYPE != 32) begin
+    initial begin
+      $fatal("mulf currently only supports 32-bit inputs");
+    end
+  end
 
-  oehb_dataless oehb_lhs (
+  oehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) oehb_lhs (
     .clk(clk),
     .rst(rst),
+    .ins(tmp_result),
     .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
+    .outs(result),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
   );
 
-  ieee2nfloat_lhs  InputIEEE_32bit (
-    .X(lhs),
-    .R(ip_lhs)
-  );
 
-  ieee2nfloat_rhs  InputIEEE_32bit (
-    .X(rhs),
-    .R(ip_rhs)
-  );
-
-  nfloat2ieee  OutputIEEE_32bit (
-    .X(ip_result),
-    .R(result)
-  );
-
-  ip  FloatingPointMultiplier (
-    .clk(clk),
-    .ce(oehb_ready),
-    .X(ip_lhs),
-    .Y(ip_rhs),
-    .R(ip_result)
-  );
+  //------------------------Instantiation------------------
+  mulf_vitis_hls_single_precision_lat_4 mulf_vitis_hls_single_precision_lat_4_u (
+    .aclk                 ( clk ),
+    .aclken               ( oehb_ready ),
+    .s_axis_a_tvalid      ( join_valid ),
+    .s_axis_a_tdata       ( lhs ),
+    .s_axis_b_tvalid      ( join_valid ),
+    .s_axis_b_tdata       ( rhs ),
+    .m_axis_result_tvalid ( buff_valid ),
+    .m_axis_result_tdata  ( tmp_result )
+);
 
 endmodule

@@ -185,13 +185,11 @@ if __name__ == "__main__":
                         required=True, help="Address bus width")
     parser.add_argument("--size", type=int, required=True,
                         help="Number of memory elements")
-    parser.add_argument("--values", nargs="*", default=[],
-                        help="List of initial values (space separated, e.g. --values 1 2 3 4)",
+    parser.add_argument("--values", 
+                        help="List of initial values (comma separated, e.g. --values \"1,2,3,4\")",
                         )
 
     args = parser.parse_args()
-
-    # values = args.values.split(",")
 
     with open(args.output, "w") as f:
         f.write(
@@ -201,6 +199,6 @@ if __name__ == "__main__":
                 args.data_width,
                 args.addr_width,
                 args.size,
-                args.values,
+                args.values.split(","),
             )
         )

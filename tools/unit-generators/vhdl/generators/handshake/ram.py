@@ -45,7 +45,7 @@ end entity;
 
     architecture = f"""
 architecture arch of {name} is
-  type ram_type is array (0 to SIZE - 1) of std_logic_vector({data_width} - 1 downto 0);
+  type ram_type is array (0 to {size} - 1) of std_logic_vector({data_width} - 1 downto 0);
   {_gen_intial_block(data_width, size, values)}
 begin
   read_proc : process(clk)
@@ -93,9 +93,9 @@ def _to_twos_complement(n, bitwidth, addr):
 def _gen_intial_block(data_width: int, size: int, init_vals: List[int]):
 
     if init_vals == []:
-        return "  signal ram : ram_type\n"
+        return "  signal ram : ram_type;\n"
 
-    init_strings: List[str] = ["signal ram : ram_type := ("]
+    init_strings = []
 
     for addr, val in enumerate(init_vals):
         init_strings.append(
@@ -105,4 +105,4 @@ def _gen_intial_block(data_width: int, size: int, init_vals: List[int]):
         for _ in range(int(size) - len(init_vals)):
             init_strings.append('"' + f"{0:0{data_width}b}" + '"')
 
-    return "  \n".join(init_strings + [");"])
+    return "signal ram : ram_type := (" + ",\n".join(init_strings)  + ");"

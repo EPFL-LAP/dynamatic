@@ -66,6 +66,16 @@
   },
   {
     "name": "handshake.ram",
+    "parameters": [
+      {
+        "name": "SIZE",
+        "type": "unsigned"
+      },
+      {
+        "name" : "INITIAL_VALUES",
+        "type" : "string"
+      }
+    ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ram -p data_width=$DATA_WIDTH addr_width=$ADDR_WIDTH size=$SIZE values=\"($INITIAL_VALUES)\""
   },
   {
@@ -452,6 +462,16 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sitofp -p latency=$LATENCY bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.uitofp",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t uitofp -p latency=$LATENCY bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.fptosi",
     "parameters": [
       {
@@ -468,6 +488,10 @@
   {
     "name": "handshake.valid_merger",
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t valid_merger -p left_bitwidth=$LEFT_BITWIDTH right_bitwidth=$RIGHT_BITWIDTH"
+  },
+  {
+    "name": "handshake.ready_remover",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ready_remover -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.blocker",
