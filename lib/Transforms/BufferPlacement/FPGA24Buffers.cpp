@@ -168,15 +168,44 @@ void FPGA24Buffers::setup() {
 
   // --- START INSERTION ---
   // Convert SmallVector to std::vector
-  std::vector<experimental::ArchBB> sequence(funcInfo.archs.begin(),
-                                             funcInfo.archs.end());
+  std::vector<experimental::ArchBB> transitions(funcInfo.archs.begin(),
+                                                funcInfo.archs.end());
 
-  DataflowGraph dfg(funcInfo.funcOp, sequence);
-  dfg.runDFS();
-  dfg.dumpGraphViz("dataflow_graph.dot");
+  unsigned sequenceLength = 2;
+  auto allSequences =
+      DataflowGraph::enumerateSequences(transitions, sequenceLength);
 
-  std::vector<ReconvergentPath> reconvergentPaths = dfg.findReconvergentPaths();
-  dfg.dumpReconvergentPaths(reconvergentPaths, "reconvergent_paths.dot");
+  std::vector<DataflowGraph> allGraphs;
+  std::vector<std::pair<size_t, std::pair<const DataflowGraph *,
+                                          std::vector<ReconvergentPath>>>>
+      allReconvergentPaths;
+
+  for (size_t seqIdx = 0; seqIdx < allSequences.size(); ++seqIdx) {
+    const auto &sequence = allSequences[seqIdx];
+
+    allGraphs.emplace_back();
+    allGraphs.back().buildGraphFromSequence(funcInfo.funcOp, sequence);
+  }
+
+  // Find reconvergent paths for each graph (after all graphs are built)
+  for (size_t seqIdx = 0; seqIdx < allGraphs.size(); ++seqIdx) {
+    std::vector<ReconvergentPath> reconvergentPaths =
+        allGraphs[seqIdx].findReconvergentPaths();
+    if (!reconvergentPaths.empty()) {
+      allReconvergentPaths.emplace_back(
+          seqIdx,
+          std::make_pair(&allGraphs[seqIdx], std::move(reconvergentPaths)));
+    }
+  }
+
+  // Dump all graphs to a single file
+  DataflowGraph::dumpAllGraphsToFile(allGraphs, "dataflow_graphs.dot");
+
+  // Dump all reconvergent paths to a single file
+  if (!allReconvergentPaths.empty()) {
+    DataflowGraph::dumpAllReconvergentPathsToFile(allReconvergentPaths,
+                                                  "reconvergent_paths.dot");
+  }
   // --- END INSERTION ---
 
   // Signals for which we have variables
