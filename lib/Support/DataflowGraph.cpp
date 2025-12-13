@@ -18,6 +18,7 @@
 #include "llvm/Support/Path.h"
 
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <queue>
 
@@ -34,51 +35,74 @@ std::string DataflowGraphNode::getLabel() const {
   return opName + "\\nStep: " + std::to_string(step);
 }
 
-DataflowGraph::DataflowGraph(
-    handshake::FuncOp funcOp,
-    const std::vector<dynamatic::experimental::ArchBB> &sequence)
-    : funcOp(funcOp) {
+std::vector<std::vector<experimental::ArchBB>> DataflowGraph::enumerateSequences(
+    const std::vector<experimental::ArchBB> &transitions,
+    unsigned sequenceLength) {
+  // sequenceLength is the number of steps to visit.
+  // Number of transitions needed = sequenceLength - 1.
+  // Minimum is 2 steps (1 transition).
+  if (sequenceLength < 2 || transitions.empty())
+    return {};
 
+  unsigned numTransitions = sequenceLength - 1;
+
+  // srcBB -> list of transitions starting from that BB
+  std::map<unsigned, std::vector<const experimental::ArchBB *>> transitionsFrom;
+  for (const auto &t : transitions) {
+    transitionsFrom[t.srcBB].push_back(&t);
+  }
+
+  std::vector<std::vector<experimental::ArchBB>> result;
+
+  // enumerate all sequences with the required number of transitions using DFS
+  std::function<void(std::vector<experimental::ArchBB> &)> dfs =
+      [&](std::vector<experimental::ArchBB> &current) {
+        if (current.size() == numTransitions) {
+          result.push_back(current);
+          return;
+        }
+
+        unsigned lastDstBB = current.back().dstBB;
+        auto it = transitionsFrom.find(lastDstBB);
+        if (it == transitionsFrom.end())
+          return;
+
+        for (const auto *next : it->second) {
+          current.push_back(*next);
+          dfs(current);
+          current.pop_back();
+        }
+      };
+
+  // Start from each transition
+  for (const auto &t : transitions) {
+    std::vector<experimental::ArchBB> seq = {t};
+    dfs(seq);
+  }
+
+  llvm::errs() << "Enumerated " << result.size() << " sequences of "
+               << sequenceLength << " steps from " << transitions.size()
+               << " transitions.\n";
+
+  return result;
+}
+
+void DataflowGraph::buildGraphFromSequence(
+    handshake::FuncOp funcOp,
+    const std::vector<experimental::ArchBB> &sequence) {
   if (sequence.empty())
     return;
 
+  this->funcOp = funcOp;
   LogicBBs logicBBs = getLogicBBs(funcOp);
 
-  // Build step-to-BB mapping and track arch connections.
-  // ====================================================
-  // We need to track which step each arch's source and destination map to,
-  // so that inter-BB edges are only created along the actual arch sequence.
+  // Map each step to its BB 
+  // =======================
 
-  std::vector<unsigned> archSrcStep(sequence.size());
-  std::vector<unsigned> archDstStep(sequence.size());
-
-  unsigned maxStep = 0;
+  // Step 0 is the first srcBB, then each transition adds its dstBB as the next step.
   stepToBB[0] = sequence[0].srcBB;
-  stepToBB[1] = sequence[0].dstBB;
-  archSrcStep[0] = 0;
-  archDstStep[0] = 1;
-  maxStep = 1;
-
-  for (size_t i = 1; i < sequence.size(); ++i) {
-    const ArchBB &prev = sequence[i - 1];
-    const ArchBB &curr = sequence[i];
-
-    if (prev.dstBB == curr.srcBB) {
-      // Current arch continues from previous arch's destination
-      archSrcStep[i] = archDstStep[i - 1];
-      maxStep++;
-      archDstStep[i] = maxStep;
-      stepToBB[maxStep] = curr.dstBB;
-    } else {
-      // Current arch starts from a different BB - need new steps for both
-      maxStep++;
-      archSrcStep[i] = maxStep;
-      stepToBB[maxStep] = curr.srcBB;
-
-      maxStep++;
-      archDstStep[i] = maxStep;
-      stepToBB[maxStep] = curr.dstBB;
-    }
+  for (size_t i = 0; i < sequence.size(); ++i) {
+    stepToBB[i + 1] = sequence[i].dstBB;
   }
 
   // Populate nodes in order of steps.
@@ -115,14 +139,14 @@ DataflowGraph::DataflowGraph(
     }
   }
 
-  // Populate inter-BB edges (between steps along arch sequence).
-  // ============================================================
-  // Only create edges from archSrcStep[i] to archDstStep[i].
+  // Populate inter-BB edges (between consecutive steps along the sequence).
+  // =======================================================================
+  // For transition i: srcStep = i, dstStep = i+1.
   // For self-loops (srcBB == dstBB), only backedge channels cross iterations.
 
   for (size_t i = 0; i < sequence.size(); ++i) {
-    unsigned srcStep = archSrcStep[i];
-    unsigned dstStep = archDstStep[i];
+    unsigned srcStep = i;
+    unsigned dstStep = i + 1;
     bool isSelfLoop = (sequence[i].srcBB == sequence[i].dstBB);
 
     for (const auto &node : nodes) {
@@ -257,6 +281,82 @@ void DataflowGraph::dumpGraphViz(llvm::StringRef filename) {
   file << "}\n";
   file.close();
   llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";
+}
+
+void DataflowGraph::dumpAllGraphsToFile(const std::vector<DataflowGraph> &graphs,
+                                        llvm::StringRef filename) {
+  llvm::SmallString<256> fullPath;
+  if (llvm::sys::path::is_absolute(filename)) {
+    fullPath = filename;
+  } else {
+    if (auto ec = llvm::sys::fs::current_path(fullPath)) {
+      llvm::errs() << "Failed to get current path: " << ec.message() << "\n";
+      fullPath = filename;
+    } else {
+      llvm::sys::path::append(fullPath, filename);
+    }
+  }
+
+  std::ofstream file(fullPath.str().str());
+  if (!file.is_open()) {
+    llvm::errs() << "Failed to open file: " << fullPath << "\n";
+    return;
+  }
+
+  file << "digraph AllDataflowGraphs {\n";
+  file << "  rankdir=TB;\n";
+  file << "  bgcolor=white;\n";
+  file << "  compound=true;\n\n";
+
+  for (size_t graphIdx = 0; graphIdx < graphs.size(); ++graphIdx) {
+    const DataflowGraph &graph = graphs[graphIdx];
+    std::string graphPrefix = "g" + std::to_string(graphIdx) + "_";
+
+    file << "  subgraph cluster_graph_" << graphIdx << " {\n";
+    file << "    label=\"Sequence " << graphIdx << "\";\n";
+    file << "    style=bold;\n";
+    file << "    color=darkblue;\n";
+    file << "    bgcolor=\"#f8f8ff\";\n\n";
+
+    // Group nodes by step to create nested clusters
+    std::map<unsigned, std::vector<const DataflowGraphNode *>> nodesByStep;
+    for (const auto &node : graph.nodes) {
+      nodesByStep[node.step].push_back(&node);
+    }
+
+    // Emit nodes grouped by step in subgraph clusters
+    for (const auto &[step, stepNodes] : nodesByStep) {
+      unsigned bbID = graph.stepToBB.count(step) ? graph.stepToBB.at(step) : 999;
+
+      file << "    subgraph cluster_" << graphPrefix << "step_" << step << " {\n";
+      file << "      label=\"Step " << step << " (BB " << bbID << ")\";\n";
+      file << "      style=solid;\n";
+      file << "      color=black;\n";
+      file << "      bgcolor=\"#f0f0f0\";\n";
+
+      for (const auto *node : stepNodes) {
+        file << "      " << graphPrefix << node->getDotId() << " [label=\""
+             << node->getLabel() << "\"];\n";
+      }
+      file << "    }\n\n";
+    }
+
+    // Emit edges with different styles
+    for (const auto &edge : graph.edges) {
+      std::string style = (edge.type == INTRA_BB) ? "solid" : "dashed";
+      std::string color = (edge.type == INTRA_BB) ? "black" : "blue";
+
+      file << "    " << graphPrefix << graph.nodes[edge.srcId].getDotId()
+           << " -> " << graphPrefix << graph.nodes[edge.dstId].getDotId()
+           << " [style=" << style << ", color=" << color << "];\n";
+    }
+
+    file << "  }\n\n";
+  }
+
+  file << "}\n";
+  file.close();
+  llvm::errs() << "Dumped " << graphs.size() << " dataflow graphs to " << fullPath << "\n";
 }
 
 // === Reconvergent Path Analysis === //
@@ -447,4 +547,92 @@ void DataflowGraph::dumpReconvergentPaths(
   file.close();
   llvm::errs() << "Dumped " << paths.size() << " reconvergent paths to "
                << fullPath << "\n";
+}
+
+void DataflowGraph::dumpAllReconvergentPathsToFile(
+    const std::vector<std::pair<size_t, std::pair<const DataflowGraph *,
+                                                  std::vector<ReconvergentPath>>>> &graphPaths,
+    llvm::StringRef filename) {
+  llvm::SmallString<256> fullPath;
+  if (llvm::sys::path::is_absolute(filename)) {
+    fullPath = filename;
+  } else {
+    if (auto ec = llvm::sys::fs::current_path(fullPath)) {
+      llvm::errs() << "Failed to get current path: " << ec.message() << "\n";
+      fullPath = filename;
+    } else {
+      llvm::sys::path::append(fullPath, filename);
+    }
+  }
+
+  std::ofstream file(fullPath.str().str());
+  if (!file.is_open()) {
+    llvm::errs() << "Failed to open file: " << fullPath << "\n";
+    return;
+  }
+
+  file << "digraph AllReconvergentPaths {\n";
+  file << "  rankdir=TB;\n";
+  file << "  bgcolor=white;\n";
+  file << "  compound=true;\n\n";
+
+  size_t totalPaths = 0;
+  for (const auto &[graphIdx, graphAndPaths] : graphPaths) {
+    const DataflowGraph *graph = graphAndPaths.first;
+    const std::vector<ReconvergentPath> &paths = graphAndPaths.second;
+
+    for (size_t pathIdx = 0; pathIdx < paths.size(); ++pathIdx) {
+      const ReconvergentPath &path = paths[pathIdx];
+      std::string uniquePrefix = "g" + std::to_string(graphIdx) + "_p" +
+                                 std::to_string(pathIdx) + "_";
+
+      file << "  subgraph cluster_" << uniquePrefix << " {\n";
+      file << "    label=\"Seq " << graphIdx << " / Path " << pathIdx
+           << " (Fork: " << graph->nodes[path.forkNodeId].getLabel()
+           << " -> Join: " << graph->nodes[path.joinNodeId].getLabel()
+           << ")\";\n";
+      file << "    style=rounded;\n";
+      file << "    color=blue;\n";
+      file << "    bgcolor=\"#e8f4fc\";\n\n";
+
+      // Emit nodes with unique IDs
+      for (size_t nodeId : path.nodeIds) {
+        std::string uniqueId = uniquePrefix + graph->nodes[nodeId].getDotId();
+        std::string color = "";
+        if (nodeId == path.forkNodeId)
+          color = ", style=filled, fillcolor=\"#90EE90\""; // Green for fork
+        else if (nodeId == path.joinNodeId)
+          color = ", style=filled, fillcolor=\"#FFB6C1\""; // Pink for join
+
+        file << "    " << uniqueId << " [label=\""
+             << graph->nodes[nodeId].getLabel() << "\"" << color << "];\n";
+      }
+
+      file << "\n";
+
+      // Emit edges within this path
+      for (size_t srcId : path.nodeIds) {
+        for (size_t edgeId : graph->adjList[srcId]) {
+          const DataflowGraphEdge &edge = graph->edges[edgeId];
+          size_t dstId = edge.dstId;
+          if (path.nodeIds.count(dstId)) {
+            std::string srcUniqueId = uniquePrefix + graph->nodes[srcId].getDotId();
+            std::string dstUniqueId = uniquePrefix + graph->nodes[dstId].getDotId();
+            std::string style = (edge.type == INTRA_BB) ? "solid" : "dashed";
+            std::string edgeColor = (edge.type == INTRA_BB) ? "black" : "blue";
+            file << "    " << srcUniqueId << " -> " << dstUniqueId
+                 << " [style=" << style << ", color=" << edgeColor << "];\n";
+          }
+        }
+      }
+
+      file << "  }\n\n";
+      totalPaths++;
+    }
+  }
+
+  file << "}\n";
+  file.close();
+  llvm::errs() << "Dumped " << totalPaths << " reconvergent paths from "
+               << graphPaths.size() << " graphs to " << fullPath << "\n";
 }
