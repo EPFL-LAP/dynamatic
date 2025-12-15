@@ -58,6 +58,9 @@ def fail(id, msg):
         "status": "fail"
     }
 
+def bb_pair(s):
+    a, b = s.split(",")
+    return (a, b)
 
 def main():
     """
@@ -76,7 +79,7 @@ def main():
     parser.add_argument(
         "--out", type=str, help="out dir name (Default: out)", default="out")
     parser.add_argument(
-        "--cp", type=str, help="clock period", default="10.000")
+        "--cp", type=str, help="clock period", required=True)
     parser.add_argument(
         "--use-prof-cache", action='store_true', help="Use profiling cache")
     parser.add_argument(
@@ -90,6 +93,23 @@ def main():
     parser.add_argument(
         "--disable-spec", action='store_true',
         help="Disable speculation")
+    parser.add_argument(
+        "--rewrite-a-only", action='store_true',
+        help="Use rewrite a only")
+    parser.add_argument(
+        "--on-merges", action='store_true',
+        help="Use naive buffering algorithm")
+    parser.add_argument(
+        "--factor", type=int,
+        help="Unroll factor")
+
+    parser.add_argument(
+        "--rewrite-a-bbs",
+        action="append",
+        type=bb_pair,
+        metavar="BB1,BB2",
+        help="Apply rewrite A to the given (bb1, bb2) pair. Repeatable."
+    )
 
     args = parser.parse_args()
     test_name = args.test_name
@@ -232,7 +252,7 @@ def main():
             f"--func-set-arg-names=source={transformed_code}",
             "--mark-memory-dependencies",
             "--flatten-memref-row-major",
-            "--mark-memory-interfaces"
+            "--force-memory-interface=force-mc"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -268,7 +288,7 @@ def main():
             DYNAMATIC_OPT_BIN, cf_transformed,
             "--arith-reduce-strength=max-adder-depth-mul=1",
             "--push-constants",
-            "--mark-memory-interfaces"
+            "--force-memory-interface=force-mc"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -381,63 +401,135 @@ def main():
         updated_frequencies = frequencies
         handshake_speculation = handshake_transformed
     else:
-        handshake_pre_speculation = os.path.join(
-            comp_out_dir, "handshake_pre_speculation.mlir")
-        with open(handshake_pre_speculation, "w") as f:
-            result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_transformed,
-                f"--handshake-pre-spec-v2-gamma=branch-bb={args.branch_bb} merge-bb={args.merge_bb}",
-                "--handshake-materialize",
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Added speculative units")
-            else:
-                return fail(id, "Failed to add speculative units")
+        # apply rewrite sequence with either rewrite c or rewrite b
+        if not args.rewrite_a_only:
+            handshake_pre_speculation = os.path.join(
+                comp_out_dir, "handshake_pre_speculation.mlir")
+            with open(handshake_pre_speculation, "w") as f:
+                # manually convert to commit-based control flow
+                # since the automatic algorithm for this is not finished
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_transformed,
+                    f"--handshake-pre-spec-v2-gamma=branch-bb={args.branch_bb} merge-bb={args.merge_bb}",
+                    "--handshake-materialize",
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Added speculative units")
+                else:
+                    return fail(id, "Failed to add speculative units")
 
-        handshake_speculation = os.path.join(
-            comp_out_dir, "handshake_speculation.mlir")
-        bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
-        with open(handshake_speculation, "w") as f:
-            result = subprocess.run([
-                DYNAMATIC_OPT_BIN, handshake_pre_speculation,
-                f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} prioritized-side={args.prioritized_side} steps-until={args.steps_until} {"one-sided" if args.one_sided else ""} {"emulate-prediction" if args.emulate_prediction else ""}",
-                "--handshake-materialize",
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Added speculative units")
-            else:
-                return fail(id, "Failed to add speculative units")
+            handshake_speculation = os.path.join(
+                comp_out_dir, "handshake_speculation.mlir")
+            bb_mapping = os.path.join(comp_out_dir, "bb_mapping.csv")
+            with open(handshake_speculation, "w") as f:
+                result = subprocess.run([
+                    DYNAMATIC_OPT_BIN, handshake_pre_speculation,
+                    f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={args.branch_bb} merge-bb={args.merge_bb} prioritized-side={args.prioritized_side} steps-until={args.steps_until} {"one-sided" if args.one_sided else ""} {"emulate-prediction" if args.emulate_prediction else ""}",
+                    "--handshake-materialize",
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Added speculative units")
+                else:
+                    return fail(id, "Failed to add speculative units")
 
-        updated_frequencies = os.path.join(
-            comp_out_dir, "updated_frequencies.csv")
-        with open(updated_frequencies, "w") as f:
-            result = subprocess.run([
-                "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
-                "--frequencies=" + frequencies,
-                "--mapping=" + bb_mapping
-            ],
-                stdout=f,
-                stderr=sys.stdout
-            )
-            if result.returncode == 0:
-                print("Updated frequencies.csv")
-            else:
-                return fail(id, "Failed to update frequencies.csv")
+            updated_frequencies = os.path.join(
+                comp_out_dir, "updated_frequencies.csv")
+            with open(updated_frequencies, "w") as f:
+                result = subprocess.run([
+                    "python3", DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
+                    "--frequencies=" + frequencies,
+                    "--mapping=" + bb_mapping
+                ],
+                    stdout=f,
+                    stderr=sys.stdout
+                )
+                if result.returncode == 0:
+                    print("Updated frequencies.csv")
+                else:
+                    return fail(id, "Failed to update frequencies.csv")
+                
+        # only apply rewrite a
+        else:
+            # if only applying rewrite a, we don't do the "maximizing eager approach"
+            # we take a targetted list of where to apply eager execution
+
+            # targeted conversion of branches to suppressors 
+            pre_spec_in = handshake_transformed
+
+            for i, (branch_bb, merge_bb) in enumerate(args.rewrite_a_bbs):
+                pre_spec_out = os.path.join(
+                    comp_out_dir, f"handshake_pre_speculation_{i}.mlir")
+
+                print(f"Running pre-spec {i}")
+                with open(pre_spec_out, "w") as f:
+                    command = [
+                        DYNAMATIC_OPT_BIN, pre_spec_in,
+                        f"--handshake-pre-spec-v2-gamma-rewrite-a=branch-bb={branch_bb}",
+                        "--handshake-materialize",
+                    ]
+                    r = subprocess.run(list(command), stdout=f, stderr=sys.stdout)
+                    if r.returncode != 0:
+                        return fail(id, "Failed pre-speculation")
+
+                pre_spec_in = pre_spec_out  # advance to numbered output
+
+            # targeted movement of suppressors using rewrite a
+            post_spec_in = pre_spec_in
+            freq_in = frequencies  # initial frequencies
+
+            for i, (branch_bb, merge_bb) in enumerate(args.rewrite_a_bbs):
+                post_spec_out = os.path.join(
+                    comp_out_dir, f"handshake_speculation_{i}.mlir")
+                bb_mapping = os.path.join(comp_out_dir, f"bb_mapping_{i}.csv")
+
+                print(f"Running post-spec {i}")
+                with open(post_spec_out, "w") as f:
+                    command = [DYNAMATIC_OPT_BIN, post_spec_in,
+                        f"--handshake-spec-v2-gamma-rewrite-a=bb-mapping={bb_mapping} branch-bb={branch_bb} merge-bb={merge_bb}",
+                        "--handshake-materialize"]
+                    r = subprocess.run(list(command), stdout=f, stderr=sys.stdout)
+                    if r.returncode != 0:
+                        return fail(id, "Failed speculation")
+
+                post_spec_in = post_spec_out
+
+                updated_frequencies = os.path.join(
+                    comp_out_dir, f"updated_frequencies_{i}.csv")
+
+                with open(updated_frequencies, "w") as f:
+                    r = subprocess.run([
+                        "python3",
+                        DYNAMATIC_ROOT / "experimental/tools/integration/update_frequencies.py",
+                        "--frequencies=" + freq_in,
+                        "--mapping=" + bb_mapping
+                    ], stdout=f, stderr=sys.stdout)
+
+                freq_in = updated_frequencies  # chain
+
+                if r.returncode != 0:
+                    return fail(id, "Failed to update frequencies.csv")
+                
+            handshake_speculation = post_spec_out
+
 
     # Buffer placement (FPGA20)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
+    buffer_algorithm = "fpga20"
+    if args.on_merges:
+        buffer_algorithm = "on-merges"
+        
     timing_model = DYNAMATIC_ROOT / "data" / "components.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm={buffer_algorithm} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout,
@@ -448,22 +540,25 @@ def main():
         else:
             return fail(id, "Failed to place simple buffers")
 
-    # handshake_gamma_post_buffering = handshake_buffered
-    handshake_gamma_post_buffering = os.path.join(
-        comp_out_dir, "handshake_gamma_post_buffering.mlir")
-    with open(handshake_gamma_post_buffering, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_buffered,
-            f"--handshake-spec-v2-gamma-post-buffering=prioritized-side={args.prioritized_side}"
-        ],
-            stdout=f,
-            stderr=sys.stdout,
-            cwd=comp_out_dir
-        )
-        if result.returncode == 0:
-            print("gamma post buffering")
-        else:
-            return fail(id, "Failed gamma post buffering")
+    if not args.rewrite_a_only:
+        handshake_gamma_post_buffering = os.path.join(
+            comp_out_dir, "handshake_gamma_post_buffering.mlir")
+        with open(handshake_gamma_post_buffering, "w") as f:
+            result = subprocess.run([
+                DYNAMATIC_OPT_BIN, handshake_buffered,
+                f"--handshake-spec-v2-gamma-post-buffering=prioritized-side={args.prioritized_side}"
+            ],
+                stdout=f,
+                stderr=sys.stdout,
+                cwd=comp_out_dir
+            )
+            if result.returncode == 0:
+                print("gamma post buffering")
+            else:
+                return fail(id, "Failed gamma post buffering")
+    else:
+        handshake_gamma_post_buffering = handshake_buffered
+
 
     # handshake canonicalization
     handshake_canonicalized = os.path.join(

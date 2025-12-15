@@ -1,4 +1,4 @@
-#include "PreSpecV2GammaKmp.h"
+#include "PreSpecV2GammaRewriteA.h"
 #include "JSONImporter.h"
 #include "SpecV2Lib.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -19,21 +19,21 @@ namespace speculationv2 {
 
 // Implement the base class and auto-generated create functions.
 // Must be called from the .cpp file to avoid multiple definitions
-#define GEN_PASS_DEF_PRESPECV2GAMMAKMP
+#define GEN_PASS_DEF_PRESPECV2GAMMAREWRITEA
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace speculationv2
 } // namespace experimental
 } // namespace dynamatic
 
-struct PreSpecV2GammaKmpPass
+struct PreSpecV2GammaRewriteAPass
     : public dynamatic::experimental::speculationv2::impl::
-          PreSpecV2GammaKmpBase<PreSpecV2GammaKmpPass> {
-  using PreSpecV2GammaKmpBase<PreSpecV2GammaKmpPass>::PreSpecV2GammaKmpBase;
+          PreSpecV2GammaRewriteABase<PreSpecV2GammaRewriteAPass> {
+  using PreSpecV2GammaRewriteABase<PreSpecV2GammaRewriteAPass>::PreSpecV2GammaRewriteABase;
   void runDynamaticPass() override;
 };
 
-void PreSpecV2GammaKmpPass::runDynamaticPass() {
+void PreSpecV2GammaRewriteAPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp

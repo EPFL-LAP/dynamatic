@@ -456,9 +456,11 @@ def main():
 
     if args.disable_spec:
         handshake_post_speculation = handshake_transformed
+        updated_frequencies = frequencies
     else:
         bbs_set = []
         # UPDATE THIS!!!!!
+        loop = True
         if "bisection" in kernel_name:
             for i in range(args.factor):
                 base = 10*i+2
@@ -486,11 +488,18 @@ def main():
             with open(spec_json_path, "w") as spec_f:
                 json.dump(spec_json, spec_f, indent=4)
             print(f"Wrote {spec_json_path}")
-            passes.extend([
-                f"--handshake-pre-spec-v2=json-path={spec_json_path}",
-                "--handshake-materialize",
-                "--handshake-canonicalize"
-            ])
+            if loop:
+                passes.extend([
+                    f"--handshake-pre-spec-v2=json-path={spec_json_path}",
+                    "--handshake-materialize",
+                    "--handshake-canonicalize"
+                ])
+            else:
+                passes.extend([
+                    f"--handshake-spec-v2-gamma=bb-mapping={bb_mapping} branch-bb={branch_bb} merge-bb={merge_bb}",
+                    "--handshake-materialize",
+                    "--handshake-canonicalize"
+                ])
 
         # Pre-speculation
         handshake_pre_speculation = os.path.join(

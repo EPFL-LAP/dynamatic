@@ -1,4 +1,4 @@
-#include "SpecV2GammaKmp.h"
+#include "SpecV2GammaRewriteA.h"
 #include "JSONImporter.h"
 #include "SpecV2Lib.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -37,21 +37,21 @@ namespace speculationv2 {
 
 // Implement the base class and auto-generated create functions.
 // Must be called from the .cpp file to avoid multiple definitions
-#define GEN_PASS_DEF_SPECV2GAMMAKMP
+#define GEN_PASS_DEF_SPECV2GAMMAREWRITEA
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace speculationv2
 } // namespace experimental
 } // namespace dynamatic
 
-struct SpecV2GammaKmpPass
-    : public dynamatic::experimental::speculationv2::impl::SpecV2GammaKmpBase<
-          SpecV2GammaKmpPass> {
-  using SpecV2GammaKmpBase<SpecV2GammaKmpPass>::SpecV2GammaKmpBase;
+struct SpecV2GammaRewriteAPass
+    : public dynamatic::experimental::speculationv2::impl::SpecV2GammaRewriteABase<
+          SpecV2GammaRewriteAPass> {
+  using SpecV2GammaRewriteABase<SpecV2GammaRewriteAPass>::SpecV2GammaRewriteABase;
   void runDynamaticPass() override;
 };
 
-void SpecV2GammaKmpPass::runDynamaticPass() {
+void SpecV2GammaRewriteAPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp
@@ -60,6 +60,26 @@ void SpecV2GammaKmpPass::runDynamaticPass() {
          "Expected a single FuncOp in the module");
 
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
+
+  DenseSet<PasserOp> frontiers;
+  for (auto passer : funcOp.getOps<PasserOp>()) {
+    frontiers.insert(passer);
+  }
+
+  bool frontiersUpdated;
+  do {
+    frontiersUpdated = false;
+    for (auto passerOp : frontiers) {
+      if (isEligibleForPasserMotionOverPM(passerOp)) {
+        performPasserMotionPastPM(passerOp, frontiers);
+        frontiersUpdated = true;
+        // If frontiers are updated, the iterator is outdated.
+        // Break and restart the loop.
+        break;
+      }
+    }
+    // If no frontiers were updated, we can stop.
+  } while (frontiersUpdated);
 
   // if (stepsUntil >= 1) {
   //   DenseSet<PasserOp> frontiers;

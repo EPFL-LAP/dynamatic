@@ -8,10 +8,10 @@ add_dynamatic_library(DynamaticSpeculationV2
   SpecV2PostBuffering.cpp
   SpecV2CutCondDep.cpp
   SpecV2Gamma.cpp
-  SpecV2GammaKmp.cpp
+  SpecV2GammaRewriteA.cpp
   SpecV2GammaPostBuffering.cpp
   PreSpecV2Gamma.cpp
-  PreSpecV2GammaKmp.cpp
+  PreSpecV2GammaRewriteA.cpp
   SpecV2Lib.cpp
   SpecV1Adaptor.cpp
   SpecV1PostAdaptor.cpp

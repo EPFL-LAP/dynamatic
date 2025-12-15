@@ -2,8 +2,8 @@
 #define KMP_KMP_H
 typedef int in_int_t;
 typedef int out_int_t;
-#define PATTERN_SIZE 64
-#define STRING_SIZE 200
+#define PATTERN_SIZE 16
+#define STRING_SIZE 150
 
 void kmp(in_int_t pattern[PATTERN_SIZE],
         in_int_t input1[STRING_SIZE],
