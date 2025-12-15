@@ -396,7 +396,7 @@ TEST_P(RigidificationFixture, basic) {
       // clang-format off
       .name = GetParam(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .useVerilog = false,
+      .testVerilog = false,
       .useSharing = false,
       .useRigidification = true,
       .milpSolver = "gurobi",
