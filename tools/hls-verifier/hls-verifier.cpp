@@ -142,19 +142,12 @@ int main(int argc, char **argv) {
   cl::opt<std::string> simulatorType(
       "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
       cl::value_desc("Simulator of choice"), cl::init("vsim"));
+
   static cl::opt<bool> isSeparateHandshake(
       "separate-handshake", cl::Optional,
       cl::desc("If specified, every argument / result with channel or control "
                "type will have a separate handshake."),
       cl::init(false));
-  cl::opt<bool> vivadoFPU(
-      "vivado-fpu",
-      cl::desc("Use Vivado FPU for floating-point operations (default: false)"),
-      cl::value_desc("vivado-fpu"), cl::init(false));
-
-  cl::opt<std::string> simulatorType(
-      "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
-      cl::value_desc("Simulator of choice"), cl::init("vsim"));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
