@@ -26,7 +26,7 @@ if_float_experiments=(baseline_7ns v1_7ns 0_two_sided_7ns 0_one_sided_7ns)
 # unrolled kernels
 single_loop_unrolled_160_experiments=(baseline_7ns auto_7ns)
 bisection_unrolled_16_experiments=(baseline_7ns auto_7ns)
-kmp_experiments=(baseline_7ns auto_7ns)
+kmp_experiments=(baseline_7ns eager_7ns)
 
 
 # =====================================================================
@@ -95,6 +95,7 @@ for k in "${kernels[@]}"; do
       --kernel_name "$k" \
       --cp 7 \
       --synth "pre" \
-      --license "without" \
+      --license "without" 
+
   done
 done

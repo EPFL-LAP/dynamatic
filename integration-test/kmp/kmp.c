@@ -191,7 +191,7 @@ int main(void) {
   out_int_t results[10];
 
   int flip;
-  srand(2);
+  srand(1);
   for (int i = 0; i < STRING_SIZE; ++i) {
     int ideal = i % 2;
     flip = (rand() % 10 == 0);
