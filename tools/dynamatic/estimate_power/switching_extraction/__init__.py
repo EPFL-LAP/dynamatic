@@ -1,0 +1,1 @@
+from .vcd_parser import VcdParser

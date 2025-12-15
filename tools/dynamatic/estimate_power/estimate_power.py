@@ -45,7 +45,7 @@ def run_command(command, power_analysis_dir):
 ################################################################
 
 
-def main(output_dir, kernel_name, clock_period):
+def main(output_dir, kernel_name, clock_period, use_post_synth_netlist, generate_saif_with_license):
     print("[INFO] Running power estimation")
 
     date = get_date()
@@ -109,8 +109,13 @@ def main(output_dir, kernel_name, clock_period):
     # (Case 3) post_pi:  Generating the SAIF file with post-synthesis simulation containing only PIs.
     # (Case 4) post_all: Generating the SAIF file with post-synthesis simulaiton containing all ports.
 
-    # Currently only running pre_all
-    design_flag = DesignFlag.PRE
+
+    if use_post_synth_netlist:
+        design_flag = DesignFlag.POST
+    else:
+        design_flag = DesignFlag.PRE
+
+    # Currently only running with all
     input_flag = InputFlag.ALL
 
     # only need to do this synth if doing power estimation
@@ -144,52 +149,60 @@ def main(output_dir, kernel_name, clock_period):
             print("[ERROR] Synthesis failed")
             return
 
-    # Step 2: Run Modelsim simulation
-    if (input_flag == InputFlag.ALL):
-        power_flag = "-r -in -inout -out -internal"
-    else:
-        power_flag = ""
-
-    if (design_flag == DesignFlag.PRE):
-        design_src = os.path.join(vhdl_src_folder,  f"{kernel_name}.vhd")
-    else:
-        design_src = os.path.join(power_analysis_dir, f"{kernel_name}_syn.vhd")
-
-    stage = f"{design_flag.value}_{input_flag.value}"
-    simulation_dict = {
-        'hdlsrc': vhdl_src_folder,
-        'design': kernel_name,
-        'inputs': sim_inputs,
-        'designsrc': design_src,
-        'powerflag': power_flag,
-        'stage': stage
-    }
-
+    # Step 2: Generate SAIF file
     verify_folder = os.path.join(output_dir, "sim", "HLS_VERIFY")
-    simulation_script = os.path.join(verify_folder, f"{stage}.do")
+    stage = f"{design_flag.value}_{input_flag.value}"
 
-    # Generate and run the simulation.do file
-    target_file_generation(
-        template_file=base_simulation_do,
-        substitute_dict=simulation_dict,
-        target_path=simulation_script
-    )
-
-    # print("[INFO] Simulating to obtain switching activity information")
-
-    # modelsim_command = f"cd {verify_folder}; vsim -c -do {simulation_script}"
-    # if run_command(modelsim_command, power_analysis_dir):
-    #     print("[INFO] Simulation succeeded")
-    # else:
-    #     print("[ERROR] Simulation failed")
-    #     return
-
-    # Step 2: Make saif file from vcd file
     saif = os.path.join(verify_folder, f"{stage}.saif")
 
-    trace = os.path.join(verify_folder, "trace.vcd")
-    vcd = VcdParser(trace)
-    vcd.write_saif(saif)
+    if generate_saif_with_license:
+        if (input_flag == InputFlag.ALL):
+            power_flag = "-r -in -inout -out -internal"
+        else:
+            power_flag = ""
+
+        if (design_flag == DesignFlag.PRE):
+            design_src = os.path.join(vhdl_src_folder,  f"{kernel_name}.vhd")
+        else:
+            design_src = os.path.join(power_analysis_dir, f"{kernel_name}_syn.vhd")
+
+        simulation_dict = {
+            'hdlsrc': vhdl_src_folder,
+            'design': kernel_name,
+            'inputs': sim_inputs,
+            'designsrc': design_src,
+            'powerflag': power_flag,
+            'stage': stage
+        }
+
+        simulation_script = os.path.join(verify_folder, f"{stage}.do")
+
+        # Generate and run the simulation.do file
+        target_file_generation(
+            template_file=base_simulation_do,
+            substitute_dict=simulation_dict,
+            target_path=simulation_script
+        )
+
+        print("[INFO] Simulating to obtain switching activity information")
+
+        modelsim_command = f"cd {verify_folder}; vsim -c -do {simulation_script}"
+        if run_command(modelsim_command, power_analysis_dir):
+            print("[INFO] Simulation succeeded")
+        else:
+            print("[ERROR] Simulation failed")
+            return
+    else:
+        # Step 2: Make saif file from vcd file
+        trace = os.path.join(verify_folder, "trace.vcd")
+
+        if not os.path.exists(trace):
+            print(f"[ERROR] {trace} not found. Please make sure simulation ran correctly.")
+            return
+
+        vcd = VcdParser(trace)
+        vcd.write_saif(saif)
+        
 
     # Step 3: Run Power Estimation
     power_dict = {
@@ -226,7 +239,33 @@ if __name__ == "__main__":
     p.add_argument("--output_dir", required=True, help="Output folder")
     p.add_argument("--kernel_name", required=True, help="Name of kernel ")
     p.add_argument("--cp", type=float, required=True, help="Clock period for synthesis")
+    p.add_argument(
+        "--synth",
+        choices=["pre", "post"],
+        required=True,
+        help=(
+            "Generate the SAIF file by simulating the pre-synthesis netlist, "
+            "or the post-synthesis netlist. Using the post-synthesis netlist "
+            "gives higher accuracy, but currently simulation may hang on some kernels."
+        ),
+    )
+    p.add_argument(
+        "--license",
+        choices=["with", "without"],
+        required=True,
+        help=(
+            "Whether to generate the SAIF file using a licensed "
+            "Questa Power Aware Simulator, or to generate it by "
+            "converting a VCD trace from the free ModelSim."
+            "The licensed generation method gives higher accuracy, "
+            "and should be used if a license is available."
+        ),
+    )
+
 
     args = p.parse_args()
 
-    main(args.output_dir, args.kernel_name, args.cp)
+    use_post_synth_netlist = (args.synth == "post")
+    generate_saif_with_license = (args.license == "with")
+
+    main(args.output_dir, args.kernel_name, args.cp, use_post_synth_netlist, generate_saif_with_license)
