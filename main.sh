@@ -624,13 +624,8 @@ python3 experimental/tools/integration/run_specv2_large_integration.py single_lo
 # rm integration-test/single_loop_unrolled_160/specv2_*
 
 # Longer timeout
-# timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_baseline_7ns single_loop_unrolled_160 7.000 3.500
-# timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_auto_7ns single_loop_unrolled_160 7.000 3.500
-
-# prof-cache is not used
-# Buffer copy (TODO)
-# python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --min-buffering --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
-# python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --min-buffering --baseline --use-prof-cache --out out_baseline_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_baseline_7ns single_loop_unrolled_160 7.000 3.500
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_auto_7ns single_loop_unrolled_160 7.000 3.500
 
 # On-merges
 python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
@@ -640,8 +635,13 @@ python3 experimental/tools/integration/run_specv2_large_integration.py bisection
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_baseline_7ns bisection_unrolled_16 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_auto_7ns bisection_unrolled_16 7.000 3.500
 
-python3 experimental/tools/integration/run_specv2_large_integration.py kmp --on-merges --out out_baseline_7ns --factor 10 --disable-spec
-python3 experimental/tools/integration/run_gamma.py kmp --on-merges --out out_eager_7ns --factor 10
+
+
+python3 experimental/tools/integration/run_gamma_integration.py kmp --on-merges --out out_baseline_7ns --cp 7 --disable-spec --rewrite-a-only
+python3 experimental/tools/integration/run_gamma_integration.py kmp --on-merges --out out_eager_7ns --cp 7 --factor 10 --rewrite-a-only --rewrite-a-bbs 39,40 --rewrite-a-bbs 35,36 --rewrite-a-bbs 31,32 --rewrite-a-bbs 27,28 --rewrite-a-bbs 23,24 --rewrite-a-bbs 19,20 --rewrite-a-bbs 15,16 --rewrite-a-bbs 11,12 --rewrite-a-bbs 7,8 --rewrite-a-bbs 3,4
+
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_baseline_7ns kmp 7.000 3.500
+timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_eager_7ns kmp 7.000 3.500
 
 
 date > end_time.txt
