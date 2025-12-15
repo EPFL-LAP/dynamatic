@@ -194,6 +194,34 @@ def SpecV2GammaPostBuffering : DynamaticPass<"handshake-spec-v2-gamma-post-buffe
   ];
 }
 
+def PreSpecV2GammaKmp : DynamaticPass<"handshake-pre-spec-v2-gamma-kmp"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
+    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
+  ];
+}
+
+def SpecV2GammaKmp : DynamaticPass<"handshake-spec-v2-gamma-kmp"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let options = [
+    Option<"branchBB", "branch-bb", "unsigned", "false", "branching bb">,
+    Option<"mergeBB", "merge-bb", "unsigned", "false", "merging bb">,
+    Option<"oneSided", "one-sided", "bool", "false", "one-sided spec">,
+    Option<"prioritizedSide", "prioritized-side", "unsigned", "", "">,
+    Option<"stepsUntil", "steps-until", "unsigned", "", "">,
+    Option<"bbMapping", "bb-mapping", "std::string", "",
+           "Path to the output bb mapping file.">,
+    Option<"emulatePrediction", "emulate-prediction", "bool", "false",
+           "Emulate prediction behavior (with oneSided option)">,
+  ];
+}
+
+
 def HandshakeCopyBuffers : DynamaticPass<"handshake-copy-buffers"> {
   let summary = "Copy buffers";
   let description = [{
