@@ -1,4 +1,5 @@
 from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
+from math import log2, ceil
 
 
 def generate_fifo_break_dv(name, params):
@@ -14,8 +15,13 @@ def generate_fifo_break_dv(name, params):
 
 
 def _generate_fifo_break_dv(name, params):
-    num_slots = params["num_slots"]
+    num_slots = int(params["num_slots"])
     bitwidth = params["bitwidth"]
+
+    # Special case: When NUM_SLOTS = 1, there is just one memory location so
+    # the head and tail can be technically omitted. For syntax consistency, we
+    # still keep one bit.
+    ptr_width = max(ceil(log2(num_slots)), 1)
 
     if (bitwidth == 0):
         return _generate_fifo_break_dv_dataless(name, params)
