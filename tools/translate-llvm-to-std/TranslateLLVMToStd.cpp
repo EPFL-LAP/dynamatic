@@ -887,7 +887,7 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
 
       mlir::Value storeIndex = offsetPlusPos;
       if (!isa<IndexType>(offsetPlusPos.getType())) {
-        builder.create<arith::IndexCastOp>(
+        storeIndex = builder.create<arith::IndexCastOp>(
             UnknownLoc::get(ctx), builder.getIndexType(), offsetPlusPos);
       }
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), valueToSave, memref,
