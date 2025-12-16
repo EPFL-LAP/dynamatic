@@ -287,21 +287,21 @@ python3 experimental/tools/integration/run_specv2_integration.py collision_donut
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 4 --out out_4_7ns_om --cp 7.00 --use-prof-cache --resolver --min-buffering
 python3 experimental/tools/integration/run_specv2_integration.py collision_donut --n 5 --out out_5_7ns_om --cp 7.00 --use-prof-cache --resolver --min-buffering
 
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --baseline --out out_baseline_7ns_om --transformed-code subdiag_v1.c --cp 7.00 --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 2 --out out_2_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 3 --out out_3_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 4 --out out_4_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 5 --out out_5_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 6 --out out_6_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 7 --out out_7_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 8 --out out_8_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 9 --out out_9_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 10 --out out_10_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 11 --out out_11_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 12 --out out_12_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 13 --out out_13_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
-python3 experimental/tools/integration/run_specv2_integration.py subdiag --n 14 --out out_14_7ns_om --cp 7.00 --resolver --transformed-code subdiag_v1.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --baseline --out out_baseline_7ns_om --transformed-code subdiag_fast.c --cp 7.00 --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 2 --out out_2_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 3 --out out_3_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 4 --out out_4_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 5 --out out_5_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 6 --out out_6_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 7 --out out_7_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 8 --out out_8_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 9 --out out_9_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 10 --out out_10_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 11 --out out_11_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 12 --out out_12_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 13 --out out_13_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
+python3 experimental/tools/integration/run_specv2_integration.py subdiag_fast --n 14 --out out_14_7ns_om --cp 7.00 --resolver --transformed-code subdiag_fast.c --use-prof-cache --min-buffering
 
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --baseline --out out_baseline_7ns_om --cp 7.00 --transformed-code sparse_dataspec_modified.c --min-buffering
 python3 experimental/tools/integration/run_specv2_integration.py sparse_dataspec_transformed --n 1 --out out_1_7ns_om --cp 7.00 --resolver --transformed-code sparse_dataspec_modified.c --min-buffering
@@ -637,8 +637,8 @@ timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATI
 
 
 
-python3 experimental/tools/integration/run_gamma_integration.py kmp --on-merges --out out_baseline_7ns --cp 7 --disable-spec --rewrite-a-only
-python3 experimental/tools/integration/run_gamma_integration.py kmp --on-merges --out out_eager_7ns --cp 7 --factor 10 --rewrite-a-only --rewrite-a-bbs 39,40 --rewrite-a-bbs 35,36 --rewrite-a-bbs 31,32 --rewrite-a-bbs 27,28 --rewrite-a-bbs 23,24 --rewrite-a-bbs 19,20 --rewrite-a-bbs 15,16 --rewrite-a-bbs 11,12 --rewrite-a-bbs 7,8 --rewrite-a-bbs 3,4
+python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_baseline_7ns --cp 7 --disable-spec --rewrite-a-only --skip-merge-bitwidth-opt
+python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_eager_7ns --cp 7 --factor 10 --rewrite-a-only --rewrite-a-bbs 39,40 --rewrite-a-bbs 35,36 --rewrite-a-bbs 31,32 --rewrite-a-bbs 27,28 --rewrite-a-bbs 23,24 --rewrite-a-bbs 19,20 --rewrite-a-bbs 15,16 --rewrite-a-bbs 11,12 --rewrite-a-bbs 7,8 --rewrite-a-bbs 3,4 --skip-merge-bitwidth-opt
 
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_baseline_7ns kmp 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_eager_7ns kmp 7.000 3.500

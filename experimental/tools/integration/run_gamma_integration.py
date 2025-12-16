@@ -111,6 +111,12 @@ def main():
         help="Apply rewrite A to the given (bb1, bb2) pair. Repeatable."
     )
 
+    parser.add_argument(
+        "--skip-merge-bitwidth-opt",
+        action="store_true",
+        help="Don't optimize merge bitwidths."
+    )
+
     args = parser.parse_args()
     test_name = args.test_name
 
@@ -328,6 +334,7 @@ def main():
         else:
             return fail(id, "Failed to compile cf to handshake")
 
+    skip_merge_bitwidth_opt = f"skip-merges={'true' if args.skip_merge_bitwidth_opt else 'false'}"
     # handshake transformations
     handshake_transformed = os.path.join(
         comp_out_dir, "handshake_transformed.mlir")
@@ -335,7 +342,7 @@ def main():
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake,
             "--handshake-analyze-lsq-usage", "--handshake-replace-memory-interfaces",
-            "--handshake-minimize-cst-width", "--handshake-optimize-bitwidths",
+            "--handshake-minimize-cst-width", f"--handshake-optimize-bitwidths={skip_merge_bitwidth_opt}",
             "--handshake-materialize", "--handshake-infer-basic-blocks",
             # "--handshake-canonicalize"
         ],
@@ -529,7 +536,7 @@ def main():
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm={buffer_algorithm} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm={buffer_algorithm} frequencies={updated_frequencies} timing-models={timing_model} target-period={args.cp} timeout=1000 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout,

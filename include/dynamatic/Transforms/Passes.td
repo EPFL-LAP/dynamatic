@@ -176,16 +176,23 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   let constructor = "dynamatic::createHandshakeMaterialize()";
 }
 
-def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
-                                                ["mlir::arith::ArithDialect"]> {
+def HandshakeOptimizeBitwidths
+    : DynamaticPass<"handshake-optimize-bitwidths",
+                    ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
     Reduces the bitwidths of channels wherever possible. Uses a standard
     forward-backward iterative process to identify opportunities for bitwidth
     reduction, considering the specific semantics of all operations present at
-    the Handhsake level.
+    the Handshake level.
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
+
+  let options = [
+    Option<"skipMerges", "skip-merges", "bool",
+          /*default=*/"false",
+          "Skip bitwidth optimization across merge/mux/cmerge operations.">
+  ];
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
