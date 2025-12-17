@@ -657,6 +657,26 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     // at least one opaque and one transparent slot, unless a constraint
     // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+
+      if (mergeLikeOp->getNumOperands() == 1) {
+
+        // Single-input case: inspect the unique data predecessor
+        auto *predOp = mergeLikeOp->getOperand(0).getDefiningOp();
+        if (!predOp)
+          return mergeLikeOp->emitError(
+              "single-input merge operand has no defining operation");
+
+        // Logical basic block of the predecessor operation
+        auto predBB = getLogicBB(predOp);
+
+        // Logical basic block of the merge operation
+        auto mergeBB = getLogicBB(mergeLikeOp);
+
+        // Skip forcing buffers when both operations are in the same logical block
+        if (predBB && mergeBB && *predBB == *mergeBB)
+          continue;
+      }
+
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
         resProps.minTrans = std::max(resProps.minTrans, 1U);
