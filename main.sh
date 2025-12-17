@@ -594,21 +594,21 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_4_7ns_om collision_donut 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/collision_donut/out_5_7ns_om collision_donut 7.000 3.500
 
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_baseline_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_1_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_2_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_3_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_4_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_5_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_6_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_7_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_8_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_9_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_10_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_11_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_12_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_13_7ns_om subdiag 7.000 3.500
-timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_14_7ns_om subdiag 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_baseline_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_1_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_2_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_3_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_4_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_5_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_6_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_7_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_8_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_9_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_10_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_11_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_12_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_13_7ns_om subdiag_fast 7.000 3.500
+timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/subdiag_fast/out_14_7ns_om subdiag_fast 7.000 3.500
 
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_baseline_7ns_om sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_1_7ns_om sparse_dataspec_transformed 7.000 3.500
@@ -616,29 +616,29 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_3_7ns_om sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_4_7ns_om sparse_dataspec_transformed 7.000 3.500
 
-# Large Benchmarks
+Large Benchmarks
 
-# prof-cache is not used
+prof-cache is not used
 python3 experimental/tools/integration/run_specv2_large_integration.py single_loop_unrolled_160 --min-buffering --baseline --use-prof-cache --out out_baseline_7ns --factor 160 --pre_unrolling $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/copy_src_baseline.mlir
 python3 experimental/tools/integration/run_specv2_large_integration.py single_loop_unrolled_160 --min-buffering --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 160 --pre_unrolling $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/copy_src_eager.mlir
-# rm integration-test/single_loop_unrolled_160/specv2_*
+rm integration-test/single_loop_unrolled_160/specv2_*
 
-# Longer timeout
+Longer timeout
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_baseline_7ns single_loop_unrolled_160 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_auto_7ns single_loop_unrolled_160 7.000 3.500
 
-# On-merges
+On-merges
 python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
 python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --baseline --use-prof-cache --out out_baseline_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
 
-# Longer timeout
+Longer timeout
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_baseline_7ns bisection_unrolled_16 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_auto_7ns bisection_unrolled_16 7.000 3.500
 
 
 
-python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_baseline_7ns --cp 7 --disable-spec --rewrite-a-only --skip-merge-bitwidth-opt
-python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_eager_7ns --cp 7 --factor 10 --rewrite-a-only --rewrite-a-bbs 39,40 --rewrite-a-bbs 35,36 --rewrite-a-bbs 31,32 --rewrite-a-bbs 27,28 --rewrite-a-bbs 23,24 --rewrite-a-bbs 19,20 --rewrite-a-bbs 15,16 --rewrite-a-bbs 11,12 --rewrite-a-bbs 7,8 --rewrite-a-bbs 3,4 --skip-merge-bitwidth-opt
+python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_baseline_7ns --cp 7 --disable-spec --rewrite-a-only --skip-merge-bitwidth-opt --on-merges
+python3 experimental/tools/integration/run_gamma_integration.py kmp --out out_eager_7ns --cp 7 --factor 10 --rewrite-a-only --rewrite-a-bbs 39,40 --rewrite-a-bbs 35,36 --rewrite-a-bbs 31,32 --rewrite-a-bbs 27,28 --rewrite-a-bbs 23,24 --rewrite-a-bbs 19,20 --rewrite-a-bbs 15,16 --rewrite-a-bbs 11,12 --rewrite-a-bbs 7,8 --rewrite-a-bbs 3,4 --skip-merge-bitwidth-opt --on-merges
 
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_baseline_7ns kmp 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/kmp/out_eager_7ns kmp 7.000 3.500
