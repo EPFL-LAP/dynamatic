@@ -616,22 +616,21 @@ timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_3_7ns_om sparse_dataspec_transformed 7.000 3.500
 timeout --kill-after=10s 900s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/sparse_dataspec_transformed/out_4_7ns_om sparse_dataspec_transformed 7.000 3.500
 
-Large Benchmarks
+# Large Benchmarks
 
-prof-cache is not used
+# prof-cache is not used
 python3 experimental/tools/integration/run_specv2_large_integration.py single_loop_unrolled_160 --min-buffering --baseline --use-prof-cache --out out_baseline_7ns --factor 160 --pre_unrolling $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/copy_src_baseline.mlir
 python3 experimental/tools/integration/run_specv2_large_integration.py single_loop_unrolled_160 --min-buffering --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 160 --pre_unrolling $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/copy_src_eager.mlir
-rm integration-test/single_loop_unrolled_160/specv2_*
 
-Longer timeout
+# Longer timeout
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_baseline_7ns single_loop_unrolled_160 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/single_loop_unrolled_160/out_auto_7ns single_loop_unrolled_160 7.000 3.500
 
-On-merges
+# On-merges
 python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --decide-n 0 --resolver --use-prof-cache --out out_auto_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
 python3 experimental/tools/integration/run_specv2_large_integration.py bisection_unrolled_16 --on-merges --baseline --use-prof-cache --out out_baseline_7ns --factor 16 --transformed-code bisection_transformed_unrolled_16.c
 
-Longer timeout
+# Longer timeout
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_baseline_7ns bisection_unrolled_16 7.000 3.500
 timeout --kill-after=10s 9000s ./tools/dynamatic/scripts/synthesize.sh $DYNAMATIC_DIR $DYNAMATIC_DIR/integration-test/bisection_unrolled_16/out_auto_7ns bisection_unrolled_16 7.000 3.500
 
