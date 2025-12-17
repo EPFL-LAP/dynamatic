@@ -17,7 +17,6 @@ from write_csv import *
     
 def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
 
-    # Baseline latency (at 10 ns)
     with open(log_file, "a") as log:
         log.write("\n===== Target CP tuning =====\n")
 
@@ -26,12 +25,12 @@ def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
     baseline_cycles = parse_cycles(sim_out)
 
     with open(log_file, "a") as log:
-        log.write(f"Baseline latency = {baseline_cycles} cycles at 10.0 ns\n")
+        log.write(f"Baseline latency = {baseline_cycles} cycles at {MAX_CP} ns\n")
 
-    best_cp = 10.0
+    best_cp = MAX_CP
     best_cycles = baseline_cycles
 
-    cp = 9.5
+    cp = best_cp - 0.5
     while cp >= 3.0:
         with open(log_file, "a") as log:
             log.write(f"\n--- Trying CP = {cp} ns ---\n")
@@ -48,6 +47,12 @@ def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
         with open(log_file, "a") as log:
             log.write(f"→ Latency = {cycles} cycles\n")
 
+        if cycles is None:
+            with open(log_file, "a") as log:
+                log.write("Could not parse cycles, Skipping.\n")
+                cp -= 0.5
+            continue
+        
         # stop if performance degrades (>1% slower)
         if cycles > baseline_cycles * 1.01:
             with open(log_file, "a") as log:
@@ -59,7 +64,7 @@ def find_best_target_cp(test_dir: Path, basename: str, log_file: Path):
         cp -= 0.5
 
     with open(log_file, "a") as log:
-        log.write(f"\n✅ Best CP: {best_cp} ns (latency = {best_cycles} cycles)\n")
+        log.write(f"\n Best CP: {best_cp} ns (latency = {best_cycles} cycles)\n")
 
     return best_cp
 
@@ -102,7 +107,7 @@ def find_best_fork_fifo_size(test_dir: Path, basename: str, cp: float, n: int,
             log(f"Performance worsened at {fifo} ({cycles} cycles). Keeping best={best_fifo}.", log_file)
             break
 
-    log(f"✅ Best fork_fifo_size = {best_fifo} ({best_cycles} cycles)", log_file)
+    log(f"Best fork_fifo_size = {best_fifo} ({best_cycles} cycles)", log_file)
     return best_fifo
 
 
@@ -183,6 +188,7 @@ def find_best_timing(test_dir: Path, basename: str, start_cp:float, n: int, log_
 
         if cycle is None:
             log(f" Simulation failed for CP={target_cp}, skipping...", log_file)
+            target_cp -= 0.5
             continue
         clock_cycles.append(cycle)
 
@@ -197,10 +203,9 @@ def find_best_timing(test_dir: Path, basename: str, start_cp:float, n: int, log_
         log(f"$$$ Performance metric: {perf:.2f}", log_file)
 
 
-        # Stop if performance degrades >5% from best
-        if perf > 1.2 * best_perf:
-            log(" Stopping early: performance worsened >20%", log_file)
-            break
+        # if perf > 1.2 * best_perf:
+        #     log(" Stopping early: performance worsened >20%", log_file)
+        #     break
         target_cp -= 0.5
 
     if cps and clock_cycles:
@@ -241,23 +246,23 @@ def run_pipeline(test_name: str, n: int, seed, run_root: Path):
 
     log_file = test_out_dir / RUN_LOG_NAME
     basename = test_name
-    cp = 10
 
     # best_fifo = find_best_fork_fifo_size(test_out_dir, basename, cp, n, fifo_start, log_file)
 
     # # compile again with the best size
     # compile(test_out_dir, basename, cp, n, best_fifo, log_file)
 
-    compile(test_out_dir, basename, cp, n, 10, log_file)
+    compile(test_out_dir, basename, MAX_CP, n, MAX_FIFO_SIZE, log_file)
 
-    resize_fifo(test_out_dir, basename, 10, seed)
+    resize_fifo(test_out_dir, basename, MAX_FIFO_SIZE, seed)
 
-    achieved = find_cp_by_adding_slack(test_out_dir, basename, n, log_file)
+    # achieved = find_cp_by_adding_slack(test_out_dir, basename, n, log_file)
 
-    # add 0.5 to achieved and then round it up to the nearest 0.5
-    if achieved is not None:
-        start_cp = achieved + 0.5
-        start_cp = round(start_cp * 2) / 2
+    best_target_cp = find_best_target_cp(test_out_dir, basename, log_file)
+
+    start_cp = MAX_CP
+    if best_target_cp is not None:
+        start_cp = best_target_cp
         log(f"Starting from {start_cp} ns", log_file)
 
     find_best_timing(test_out_dir, basename, start_cp, n, log_file)
