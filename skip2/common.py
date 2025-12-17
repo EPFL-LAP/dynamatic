@@ -7,7 +7,7 @@ from subprocess import run
 import sys
 
 # === CONFIG ===
-TIMEOUT = 20  # You can convert to seconds if using Python timeout
+TIMEOUT = 60
 DYNAMATIC_PATH = Path("./bin/dynamatic")
 DYNAMATIC_OPT_BIN = Path("./bin/dynamatic-opt")
 TEST_DIR = Path("./integration-test")
@@ -28,6 +28,9 @@ SIM_DIR = Path("out/sim")
 VIVADO_DIR = Path("out/vivado")
 RUNS_BASE = Path("./skip2/runs")  # where all timestamped folders go
 RUN_LOG_NAME = "run.log"
+
+MAX_CP = 15
+MAX_FIFO_SIZE = 15
 
 
 def shell(*args, **kwargs):

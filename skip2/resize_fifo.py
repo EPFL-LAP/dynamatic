@@ -172,7 +172,7 @@ def resize_fifo(test_dir, base_name, fifo_size, rtl_config_name, seed):
             pass
 
 
-    buffer_cp(10, test_dir, log_file)
+    buffer_cp(MAX_CP, test_dir, log_file)
     canonicalize_handshake(test_dir, log_file)
     lower_handshake_to_hw(test_dir, log_file)
 
@@ -277,7 +277,7 @@ def resize_fifo(test_dir, base_name, fifo_size, rtl_config_name, seed):
     #         resize_buffer(test_dir, buf, max_len)
     #         total_slots += max_len
     
-    buffer_cp(10, test_dir, log_file)
+    buffer_cp(MAX_CP, test_dir, log_file)
     canonicalize_handshake(test_dir, log_file)
     lower_handshake_to_hw(test_dir, log_file)
 
@@ -302,7 +302,7 @@ def check_performance(test_dir: Path, basename: str, rtl_config_name, baseline_c
 
     log_file = test_dir / RUN_LOG_NAME
 
-    buffer_cp(10, test_dir, log_file)
+    buffer_cp(MAX_CP, test_dir, log_file)
     canonicalize_handshake(test_dir, log_file)
     lower_handshake_to_hw(test_dir, log_file)
 

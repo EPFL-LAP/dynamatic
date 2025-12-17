@@ -70,7 +70,7 @@ def find_real_cp(test_dir: Path, basename: str, start_cp: float, log_file: Path)
             log(f"Slack >= 0 ({slack_value})\n", log_file)
             return current_cp
 
-        adjust = abs(round(slack_value, 2))
+        adjust = max(abs(round(slack_value, 2)), 0.01)
         current_cp = round(current_cp + adjust, 2)
         log(f"Slack < 0 ({slack_value}), increasing CP to {current_cp} and retrying.\n", log_file)
 
