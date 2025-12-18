@@ -1,0 +1,86 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 01:31:38 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : gaussian
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             2.865ns  (required time - arrival time)
+  Source:                 buffer43/outs_reg[5]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.850ns period=7.700ns})
+  Destination:            buffer58/fifo/Memory_reg[0][2]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.850ns period=7.700ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            7.700ns  (clk rise@7.700ns - clk rise@0.000ns)
+  Data Path Delay:        4.582ns  (logic 0.693ns (15.124%)  route 3.889ns (84.876%))
+  Logic Levels:           9  (LUT3=2 LUT5=2 LUT6=5)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 8.183 - 7.700 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=851, unset)          0.508     0.508    buffer43/clk
+                         FDRE                                         r  buffer43/outs_reg[5]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.226     0.734 r  buffer43/outs_reg[5]/Q
+                         net (fo=6, unplaced)         0.420     1.154    buffer58/fifo/D[3]
+                         LUT3 (Prop_lut3_I0_O)        0.119     1.273 r  buffer58/fifo/dataReg[0]_i_6/O
+                         net (fo=1, unplaced)         0.705     1.978    buffer58/fifo/buffer58_outs[5]
+                         LUT6 (Prop_lut6_I0_O)        0.043     2.021 r  buffer58/fifo/dataReg[0]_i_2__4/O
+                         net (fo=4, unplaced)         0.268     2.289    control_merge1/tehb/control/dataReg_reg[0]_0
+                         LUT6 (Prop_lut6_I2_O)        0.043     2.332 f  control_merge1/tehb/control/transmitValue_i_5__10/O
+                         net (fo=5, unplaced)         0.405     2.737    control_merge2/tehb/control/outs_reg[5]_3
+                         LUT5 (Prop_lut5_I1_O)        0.043     2.780 f  control_merge2/tehb/control/outputValid_i_5__0/O
+                         net (fo=23, unplaced)        0.307     3.087    buffer31/fifo/control_merge2_index
+                         LUT3 (Prop_lut3_I0_O)        0.047     3.134 f  buffer31/fifo/transmitValue_i_13__0/O
+                         net (fo=2, unplaced)         0.255     3.389    buffer60/fifo/buffer31_outs
+                         LUT6 (Prop_lut6_I2_O)        0.043     3.432 f  buffer60/fifo/transmitValue_i_9__2/O
+                         net (fo=2, unplaced)         0.255     3.687    buffer60/fifo/transmitValue_i_9__2_n_0
+                         LUT6 (Prop_lut6_I2_O)        0.043     3.730 r  buffer60/fifo/transmitValue_i_5__2/O
+                         net (fo=1, unplaced)         0.705     4.435    fork24/control/generateBlocks[7].regblock/transmitValue_reg_3[2]
+                         LUT6 (Prop_lut6_I0_O)        0.043     4.478 r  fork24/control/generateBlocks[7].regblock/transmitValue_i_3__3/O
+                         net (fo=14, unplaced)        0.295     4.773    buffer58/fifo/anyBlockStop
+                         LUT5 (Prop_lut5_I3_O)        0.043     4.816 r  buffer58/fifo/Memory[0][6]_i_1__0/O
+                         net (fo=5, unplaced)         0.274     5.090    buffer58/fifo/WriteEn3_out
+                         FDRE                                         r  buffer58/fifo/Memory_reg[0][2]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        7.700     7.700 r  
+                                                      0.000     7.700 r  clk (IN)
+                         net (fo=851, unset)          0.483     8.183    buffer58/fifo/clk
+                         FDRE                                         r  buffer58/fifo/Memory_reg[0][2]/C
+                         clock pessimism              0.000     8.183    
+                         clock uncertainty           -0.035     8.147    
+                         FDRE (Setup_fdre_C_CE)      -0.192     7.955    buffer58/fifo/Memory_reg[0][2]
+  -------------------------------------------------------------------
+                         required time                          7.955    
+                         arrival time                          -5.090    
+  -------------------------------------------------------------------
+                         slack                                  2.865    
+
+
+
+

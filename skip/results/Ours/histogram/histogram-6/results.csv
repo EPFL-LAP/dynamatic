@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+histogram,6,7.5,7.62,1191,642,1480,0,2001

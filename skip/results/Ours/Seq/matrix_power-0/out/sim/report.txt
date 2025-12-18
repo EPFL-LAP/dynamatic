@@ -1,0 +1,2212 @@
+[INFO  HLS_VERIFIER] Executing modelsim: [vsim -c -do simulation.do]
+Reading pref.tcl
+
+# 2020.1
+
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# End time: 00:43:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# ** Error: (vcom-11) Could not find work.and_n.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd(21): (vcom-1195) Cannot find expanded name "work.and_n".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd(21): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd(40): VHDL Compiler exiting
+# End time: 00:43:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_to_bram.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+# End time: 00:43:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/cond_br_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+# End time: 00:43:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of cond_br_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of merge_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power
+# -- Compiling architecture behavioral of matrix_power
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(667): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(667): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(685): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(685): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(709): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(709): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(733): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(733): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(757): (vcom-1195) Cannot find expanded name "work.mem_controller".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(757): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(798): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(798): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(809): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(809): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(821): (vcom-1195) Cannot find expanded name "work.mux_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(821): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(836): (vcom-1195) Cannot find expanded name "work.mux_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(836): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_init.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(851): (vcom-1195) Cannot find expanded name "work.tehb_init".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(851): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(863): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(863): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(878): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(878): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(896): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(896): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(908): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(908): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(920): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(920): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(935): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(935): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.control_merge_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(947): (vcom-1195) Cannot find expanded name "work.control_merge_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(947): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(962): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(962): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_1.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(974): (vcom-1195) Cannot find expanded name "work.handshake_constant_1".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(974): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(985): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(985): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_2.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(993): (vcom-1195) Cannot find expanded name "work.handshake_constant_2".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(993): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1004): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1004): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1019): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1019): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1031): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1031): Unknown expanded name.
+# -- Loading entity cond_br_dataless
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1056): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1056): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1068): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1068): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1078): (vcom-1195) Cannot find expanded name "work.mux_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1078): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1093): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1093): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1103): (vcom-1195) Cannot find expanded name "work.mux_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1103): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_init.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1118): (vcom-1195) Cannot find expanded name "work.tehb_init".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1118): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1130): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1130): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1145): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1145): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1163): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1163): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1175): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1175): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1196): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1196): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1208): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1208): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1220): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1220): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1232): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1232): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1244): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1244): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1262): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1262): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1274): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1274): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1286): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1286): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1301): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1301): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1313): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1313): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1334): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1334): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1352): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1352): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1364): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1364): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1376): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1376): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.control_merge_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1394): (vcom-1195) Cannot find expanded name "work.control_merge_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1394): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1409): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1409): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1427): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1427): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1439): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1439): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1450): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1450): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1462): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1462): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1470): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1470): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1481): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1481): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1493): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1493): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_3.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1501): (vcom-1195) Cannot find expanded name "work.handshake_constant_3".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1501): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1512): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1512): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1524): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1524): Unknown expanded name.
+# -- Loading entity handshake_constant_4
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1543): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1543): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1555): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1555): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1573): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1573): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_5.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1581): (vcom-1195) Cannot find expanded name "work.handshake_constant_5".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1581): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1592): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1592): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1604): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1604): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.load.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1622): (vcom-1195) Cannot find expanded name "work.load".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1622): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1640): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1640): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1655): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1655): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.load.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1667): (vcom-1195) Cannot find expanded name "work.load".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1667): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.load.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1685): (vcom-1195) Cannot find expanded name "work.load".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1685): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1703): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1703): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1718): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1718): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1733): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1733): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1745): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1745): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1757): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1757): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1772): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1772): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1784): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1784): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1799): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1799): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1809): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1809): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1823): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1823): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.load.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1835): (vcom-1195) Cannot find expanded name "work.load".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1835): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.muli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1853): (vcom-1195) Cannot find expanded name "work.muli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1853): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1868): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1868): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1883): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1883): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1898): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1898): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1910): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1910): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1922): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1922): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1937): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1937): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1949): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1949): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1964): (vcom-1195) Cannot find expanded name "work.tehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1964): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1974): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1974): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1988): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1988): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.load.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2000): (vcom-1195) Cannot find expanded name "work.load".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2000): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2018): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2018): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2033): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2033): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2048): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2048): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2060): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2060): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.shli.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2072): (vcom-1195) Cannot find expanded name "work.shli".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2072): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2087): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2087): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2099): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2099): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2111): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2111): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2126): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2126): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2138): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2138): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tfifo_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2153): (vcom-1195) Cannot find expanded name "work.tfifo_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2153): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.store.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2163): (vcom-1195) Cannot find expanded name "work.store".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2163): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2185): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2185): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2200): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2200): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2212): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2212): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2227): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2227): Unknown expanded name.
+# -- Loading entity handshake_cmpi_0
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2254): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2254): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2266): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2266): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2293): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2293): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.sink.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2311): (vcom-1195) Cannot find expanded name "work.sink".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2311): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2320): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2320): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2338): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2338): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.sink.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2356): (vcom-1195) Cannot find expanded name "work.sink".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2356): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2365): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2365): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.sink_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2405): (vcom-1195) Cannot find expanded name "work.sink_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2405): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2413): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2413): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2425): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2425): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2437): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2437): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_0.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2445): (vcom-1195) Cannot find expanded name "work.handshake_constant_0".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2445): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2456): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2456): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.source.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2468): (vcom-1195) Cannot find expanded name "work.source".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2468): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_constant_3.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2476): (vcom-1195) Cannot find expanded name "work.handshake_constant_3".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2476): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.extsi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2487): (vcom-1195) Cannot find expanded name "work.extsi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2487): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.addi.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2499): (vcom-1195) Cannot find expanded name "work.addi".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2499): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2514): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2514): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2526): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2526): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.trunci.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2541): (vcom-1195) Cannot find expanded name "work.trunci".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2541): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.oehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2568): (vcom-1195) Cannot find expanded name "work.oehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2568): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2580): (vcom-1195) Cannot find expanded name "work.handshake_fork".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2580): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.cond_br.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2601): (vcom-1195) Cannot find expanded name "work.cond_br".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2601): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.sink.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2619): (vcom-1195) Cannot find expanded name "work.sink".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2619): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.fork_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2643): (vcom-1195) Cannot find expanded name "work.fork_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2643): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2659): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 408, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd(3): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd(3): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd(5): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# ** Error: (vcom-11) Could not find work.or_n.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd(25): (vcom-1195) Cannot find expanded name "work.or_n".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd(25): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.eager_fork_register_block.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd(35): (vcom-1195) Cannot find expanded name "work.eager_fork_register_block".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd(35): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd(49): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(6): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power_wrapper
+# -- Compiling architecture behavioral of matrix_power_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity matrix_power
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matrix_power_wrapper.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd(5): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd(5): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd(7): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/addi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of addi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/sink.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of sink.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd(5): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd(5): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd(7): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/cond_br.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of cond_br.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd(26): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd(26): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd(49): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/sink_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink_dataless
+# -- Compiling architecture arch of sink_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of sink_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/elastic_fifo_inner_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner_dataless
+# -- Compiling architecture arch of elastic_fifo_inner_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of elastic_fifo_inner_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tfifo_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo_dataless
+# -- Compiling architecture arch of tfifo_dataless
+# -- Loading entity elastic_fifo_inner_dataless
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tfifo_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(6): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/delay_buffer.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity delay_buffer
+# -- Compiling architecture arch of delay_buffer
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of delay_buffer.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/source.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of source.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/trunci.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of trunci.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_dataless_init.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless_init
+# -- Compiling architecture arch of tehb_dataless_init
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_dataless_init.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd(50): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd(50): Unknown expanded name.
+# -- Loading entity fork_dataless
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd(73): VHDL Compiler exiting
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/extsi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+# End time: 00:43:55 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of extsi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:55 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of oehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/shli.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity shli
+# -- Compiling architecture arch of shli
+# -- Loading entity join
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of shli.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/store.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of store.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd(6): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd(34): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd(34): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd(51): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd(51): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd(67): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/types.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of types.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/muli.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mul_4_stage
+# -- Compiling architecture behav of mul_4_stage
+# -- Compiling entity muli
+# -- Compiling architecture arch of muli
+# -- Loading entity join
+# -- Loading entity mul_4_stage
+# -- Loading entity delay_buffer
+# -- Loading entity oehb
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of muli.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity mux_dataless
+# -- Compiling architecture arch of mux_dataless
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mux_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(98): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matrix_power
+# -- Loading entity two_port_RAM
+# ** Error: (vcom-11) Could not find work.tb_join.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(247): (vcom-1195) Cannot find expanded name "work.tb_join".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(247): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(481): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_fork.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/eager_fork_register_block.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of eager_fork_register_block.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/logic.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of logic.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_init.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_init
+# -- Compiling architecture arch of tehb_init
+# -- Loading entity tehb_dataless_init
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_init.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power
+# -- Compiling architecture behavioral of matrix_power
+# -- Loading entity fork_dataless
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(685): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(685): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(709): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(709): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(733): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(733): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(757): (vcom-1195) Cannot find expanded name "work.mem_controller".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(757): Unknown expanded name.
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# -- Loading entity tehb_init
+# -- Loading package types
+# -- Loading entity handshake_fork
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(878): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(878): Unknown expanded name.
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity control_merge_dataless
+# -- Loading entity handshake_constant_1
+# -- Loading entity source
+# -- Loading entity handshake_constant_2
+# -- Loading entity addi
+# -- Loading entity oehb_dataless
+# -- Loading entity cond_br_dataless
+# -- Loading entity tehb_dataless
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1145): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1145): Unknown expanded name.
+# -- Loading entity trunci
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1244): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1244): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1334): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1334): Unknown expanded name.
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity load
+# -- Loading entity shli
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1809): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1809): Unknown expanded name.
+# -- Loading entity muli
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1974): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(1974): Unknown expanded name.
+# -- Loading entity tfifo_dataless
+# -- Loading entity store
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity sink_dataless
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd(2659): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 30, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity gate
+# -- Compiling architecture arch of gate
+# -- Loading entity join
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of gate.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of fork_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# ** Error: (vcom-11) Could not find work.read_memory_arbiter.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(49): (vcom-1195) Cannot find expanded name "work.read_memory_arbiter".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(49): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mc_control.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(75): (vcom-1195) Cannot find expanded name "work.mc_control".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(75): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd(88): VHDL Compiler exiting
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity read_address_mux
+# -- Compiling architecture arch of read_address_mux
+# -- Compiling entity read_address_ready
+# -- Compiling architecture arch of read_address_ready
+# -- Compiling entity read_data_signals
+# -- Compiling architecture arch of read_data_signals
+# -- Compiling entity read_priority
+# -- Compiling architecture arch of read_priority
+# -- Compiling entity read_memory_arbiter
+# -- Compiling architecture arch of read_memory_arbiter
+# -- Loading entity read_priority
+# -- Loading entity read_address_mux
+# -- Loading entity read_address_ready
+# -- Loading entity read_data_signals
+# -- Compiling entity write_address_mux
+# -- Compiling architecture arch of write_address_mux
+# -- Compiling entity write_address_ready
+# -- Compiling architecture arch of write_address_ready
+# -- Compiling entity write_data_signals
+# -- Compiling architecture arch of write_data_signals
+# -- Compiling entity write_priority
+# -- Compiling architecture arch of write_priority
+# -- Compiling entity write_memory_arbiter
+# -- Compiling architecture arch of write_memory_arbiter
+# -- Loading entity write_priority
+# -- Loading entity write_address_mux
+# -- Loading entity write_address_ready
+# -- Loading entity write_data_signals
+# -- Compiling entity mc_control
+# -- Compiling architecture arch of mc_control
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mc_support.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mux.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+# End time: 00:43:56 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of oehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:56 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# ** Error: (vcom-11) Could not find work.mem_controller_loadless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(64): (vcom-1195) Cannot find expanded name "work.mem_controller_loadless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(64): Unknown expanded name.
+# -- Loading entity read_memory_arbiter
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd(117): VHDL Compiler exiting
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# -- Loading entity tehb
+# -- Loading entity fork_dataless
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of control_merge_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_loadless
+# -- Compiling architecture arch of mem_controller_loadless
+# -- Loading entity write_memory_arbiter
+# -- Loading entity mc_control
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller_loadless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of load.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(98): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matrix_power
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of tb_matrix_power.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power
+# -- Compiling architecture behavioral of matrix_power
+# -- Loading entity fork_dataless
+# -- Loading package types
+# -- Loading entity mem_controller_storeless
+# -- Loading entity mem_controller
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# -- Loading entity tehb_init
+# -- Loading entity handshake_fork
+# -- Loading entity mux
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity control_merge_dataless
+# -- Loading entity handshake_constant_1
+# -- Loading entity source
+# -- Loading entity handshake_constant_2
+# -- Loading entity addi
+# -- Loading entity oehb_dataless
+# -- Loading entity cond_br_dataless
+# -- Loading entity tehb_dataless
+# -- Loading entity trunci
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity load
+# -- Loading entity shli
+# -- Loading entity gate
+# -- Loading entity muli
+# -- Loading entity tfifo_dataless
+# -- Loading entity store
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity sink_dataless
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matrix_power.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# -- Loading entity read_memory_arbiter
+# -- Loading entity mc_control
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller_storeless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 00:43:57 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# -- Loading entity mem_controller_loadless
+# -- Loading entity read_memory_arbiter
+# End time: 00:43:57 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_to_bram.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/cond_br_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_cmpi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/merge_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power_wrapper.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power_wrapper
+# -- Compiling architecture behavioral of matrix_power_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity matrix_power
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/addi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/sink.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/cond_br.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/sink_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink_dataless
+# -- Compiling architecture arch of sink_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/elastic_fifo_inner_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner_dataless
+# -- Compiling architecture arch of elastic_fifo_inner_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tfifo_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo_dataless
+# -- Compiling architecture arch of tfifo_dataless
+# -- Loading entity elastic_fifo_inner_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/delay_buffer.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity delay_buffer
+# -- Compiling architecture arch of delay_buffer
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/source.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/trunci.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_dataless_init.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless_init
+# -- Compiling architecture arch of tehb_dataless_init
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/extsi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/shli.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity shli
+# -- Compiling architecture arch of shli
+# -- Loading entity join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/store.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/types.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/muli.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mul_4_stage
+# -- Compiling architecture behav of mul_4_stage
+# -- Compiling entity muli
+# -- Compiling architecture arch of muli
+# -- Loading entity join
+# -- Loading entity mul_4_stage
+# -- Loading entity delay_buffer
+# -- Loading entity oehb
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity mux_dataless
+# -- Compiling architecture arch of mux_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_constant_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/handshake_fork.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/eager_fork_register_block.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/logic.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tehb_init.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_init
+# -- Compiling architecture arch of tehb_init
+# -- Loading entity tehb_dataless_init
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/gate.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity gate
+# -- Compiling architecture arch of gate
+# -- Loading entity join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/fork_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mc_support.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity read_address_mux
+# -- Compiling architecture arch of read_address_mux
+# -- Compiling entity read_address_ready
+# -- Compiling architecture arch of read_address_ready
+# -- Compiling entity read_data_signals
+# -- Compiling architecture arch of read_data_signals
+# -- Compiling entity read_priority
+# -- Compiling architecture arch of read_priority
+# -- Compiling entity read_memory_arbiter
+# -- Compiling architecture arch of read_memory_arbiter
+# -- Loading entity read_priority
+# -- Loading entity read_address_mux
+# -- Loading entity read_address_ready
+# -- Loading entity read_data_signals
+# -- Compiling entity write_address_mux
+# -- Compiling architecture arch of write_address_mux
+# -- Compiling entity write_address_ready
+# -- Compiling architecture arch of write_address_ready
+# -- Compiling entity write_data_signals
+# -- Compiling architecture arch of write_data_signals
+# -- Compiling entity write_priority
+# -- Compiling architecture arch of write_priority
+# -- Compiling entity write_memory_arbiter
+# -- Compiling architecture arch of write_memory_arbiter
+# -- Loading entity write_priority
+# -- Loading entity write_address_mux
+# -- Loading entity write_address_ready
+# -- Loading entity write_data_signals
+# -- Compiling entity mc_control
+# -- Compiling architecture arch of mc_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mux.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/oehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/control_merge_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# -- Loading entity tehb
+# -- Loading entity fork_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_loadless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_loadless
+# -- Compiling architecture arch of mem_controller_loadless
+# -- Loading entity write_memory_arbiter
+# -- Loading entity mc_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/load.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd(98): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matrix_power
+# -- Loading entity two_port_RAM
+# -- Loading entity tb_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/matrix_power.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matrix_power
+# -- Compiling architecture behavioral of matrix_power
+# -- Loading entity fork_dataless
+# -- Loading package types
+# -- Loading entity mem_controller_storeless
+# -- Loading entity mem_controller
+# -- Loading entity handshake_constant_0
+# -- Loading entity extsi
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# -- Loading entity tehb_init
+# -- Loading entity handshake_fork
+# -- Loading entity mux
+# -- Loading entity oehb
+# -- Loading entity tehb
+# -- Loading entity control_merge_dataless
+# -- Loading entity handshake_constant_1
+# -- Loading entity source
+# -- Loading entity handshake_constant_2
+# -- Loading entity addi
+# -- Loading entity oehb_dataless
+# -- Loading entity cond_br_dataless
+# -- Loading entity tehb_dataless
+# -- Loading entity trunci
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity load
+# -- Loading entity shli
+# -- Loading entity gate
+# -- Loading entity muli
+# -- Loading entity tfifo_dataless
+# -- Loading entity store
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity sink_dataless
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller_storeless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# -- Loading entity read_memory_arbiter
+# -- Loading entity mc_control
+ModelSim> # vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/mem_controller.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# -- Loading entity mem_controller_loadless
+# -- Loading entity read_memory_arbiter
+ModelSim> # 51 compiles, 0 failed with no errors.
+# vsim tb 
+# Start time: 00:43:59 on Dec 16,2025
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.tb(behavior)
+# Loading work.types
+# Loading ieee.math_real(body)
+# Loading work.matrix_power(behavioral)
+# Loading work.fork_dataless(arch)
+# Loading work.or_n(arch)
+# Loading work.eager_fork_register_block(arch)
+# Loading work.mem_controller_storeless(arch)
+# Loading work.read_memory_arbiter(arch)
+# Loading work.read_priority(arch)
+# Loading work.read_address_mux(arch)
+# Loading work.read_address_ready(arch)
+# Loading work.read_data_signals(arch)
+# Loading work.mc_control(arch)
+# Loading work.mem_controller(arch)
+# Loading work.mem_controller_loadless(arch)
+# Loading work.write_memory_arbiter(arch)
+# Loading work.write_priority(arch)
+# Loading work.write_address_mux(arch)
+# Loading work.write_address_ready(arch)
+# Loading work.write_data_signals(arch)
+# Loading work.handshake_constant_0(arch)
+# Loading work.extsi(arch)
+# Loading work.mux_dataless(arch)
+# Loading work.tehb_init(arch)
+# Loading work.tehb_dataless_init(arch)
+# Loading work.handshake_fork(arch)
+# Loading work.mux(arch)
+# Loading work.oehb(arch)
+# Loading work.oehb_dataless(arch)
+# Loading work.tehb(arch)
+# Loading work.tehb_dataless(arch)
+# Loading work.control_merge_dataless(arch)
+# Loading work.merge_dataless(arch)
+# Loading work.handshake_constant_1(arch)
+# Loading work.source(arch)
+# Loading work.handshake_constant_2(arch)
+# Loading work.addi(arch)
+# Loading work.join(arch)
+# Loading work.and_n(arch)
+# Loading work.cond_br_dataless(arch)
+# Loading work.trunci(arch)
+# Loading work.handshake_constant_3(arch)
+# Loading work.handshake_constant_4(arch)
+# Loading work.handshake_constant_5(arch)
+# Loading work.load(arch)
+# Loading work.shli(arch)
+# Loading work.gate(arch)
+# Loading work.muli(arch)
+# Loading work.mul_4_stage(behav)
+# Loading work.delay_buffer(arch)
+# Loading work.tfifo_dataless(arch)
+# Loading work.elastic_fifo_inner_dataless(arch)
+# Loading work.store(arch)
+# Loading work.handshake_cmpi_0(arch)
+# Loading work.cond_br(arch)
+# Loading work.sink(arch)
+# Loading work.sink_dataless(arch)
+# Loading work.two_port_ram(behav)
+# Loading work.tb_join(arch)
+# ** Warning: Design size of 18041 statements exceeds ModelSim-Intel FPGA Starter Edition recommended capacity.
+# Expect performance to be adversely affected.
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli5
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli4
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli3
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli2
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli1
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Note: Simulation done! Latency = 2670 cycles
+#    Time: 10690 ns  Iteration: 1  Instance: /tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 10690 ns  Iteration: 1  Process: /tb/generate_sim_done_proc File: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd
+# Break in Process generate_sim_done_proc at /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd line 400
+# Stopped at /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-21-42/matrix_power-0/out/sim/HDL_SRC/tb_matrix_power.vhd line 400
+# End time: 00:44:01 on Dec 16,2025, Elapsed time: 0:00:02
+# Errors: 1, Warnings: 114
+Comparison of [mat] : Pass
+Comparison of [row] : Pass
+Comparison of [col] : Pass
+Comparison of [a] : Pass
+[INFO  HLS_VERIFIER] C and VHDL outputs match

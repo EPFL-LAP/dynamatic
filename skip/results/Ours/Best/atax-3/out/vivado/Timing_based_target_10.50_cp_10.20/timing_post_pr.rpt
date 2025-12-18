@@ -1,0 +1,95 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 06:06:27 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : atax
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.559ns  (required time - arrival time)
+  Source:                 buffer10/control/fullReg_reg/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@5.100ns period=10.200ns})
+  Destination:            mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@5.100ns period=10.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.200ns  (clk rise@10.200ns - clk rise@0.000ns)
+  Data Path Delay:        9.633ns  (logic 3.756ns (38.993%)  route 5.877ns (61.007%))
+  Logic Levels:           13  (CARRY4=1 DSP48E1=1 LUT3=4 LUT4=1 LUT5=2 LUT6=4)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 10.683 - 10.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=2874, unset)         0.508     0.508    buffer10/control/clk
+    SLICE_X82Y97         FDRE                                         r  buffer10/control/fullReg_reg/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X82Y97         FDRE (Prop_fdre_C_Q)         0.254     0.762 r  buffer10/control/fullReg_reg/Q
+                         net (fo=57, routed)          0.722     1.484    buffer10/control/fullReg_reg_0
+    SLICE_X80Y96         LUT3 (Prop_lut3_I1_O)        0.043     1.527 r  buffer10/control/dataReg[2]_i_1__5/O
+                         net (fo=6, routed)           0.564     2.091    buffer10/control/dataReg_reg[4][0]
+    SLICE_X82Y98         LUT6 (Prop_lut6_I0_O)        0.043     2.134 r  buffer10/control/result0_i_2/O
+                         net (fo=1, routed)           0.270     2.404    cmpi0/DI[0]
+    SLICE_X81Y98         CARRY4 (Prop_carry4_DI[0]_CO[2])
+                                                      0.267     2.671 f  cmpi0/result0/CO[2]
+                         net (fo=19, routed)          0.436     3.107    buffer10/control/CO[0]
+    SLICE_X85Y98         LUT5 (Prop_lut5_I0_O)        0.131     3.238 r  buffer10/control/minusOp_carry_i_6__2/O
+                         net (fo=11, routed)          0.167     3.404    control_merge2/tehb/control/outputValid_reg_6
+    SLICE_X85Y99         LUT4 (Prop_lut4_I1_O)        0.129     3.533 f  control_merge2/tehb/control/Tail[3]_i_3__16/O
+                         net (fo=11, routed)          0.450     3.983    control_merge2/tehb/control/outputValid_reg_1
+    SLICE_X87Y94         LUT3 (Prop_lut3_I0_O)        0.043     4.026 r  control_merge2/tehb/control/fullReg_i_5__2/O
+                         net (fo=1, routed)           0.209     4.236    control_merge2/tehb/control/buffer63_outs_valid
+    SLICE_X87Y93         LUT6 (Prop_lut6_I0_O)        0.043     4.279 r  control_merge2/tehb/control/fullReg_i_2__4/O
+                         net (fo=74, routed)          0.529     4.807    buffer23/control/p_1_in
+    SLICE_X92Y90         LUT6 (Prop_lut6_I0_O)        0.043     4.850 f  buffer23/control/Memory[0][28]_i_1/O
+                         net (fo=3, routed)           0.414     5.264    buffer77/fifo/D[28]
+    SLICE_X89Y90         LUT3 (Prop_lut3_I1_O)        0.054     5.318 f  buffer77/fifo/minusOp_carry__0_i_11/O
+                         net (fo=5, routed)           0.339     5.657    buffer77/fifo/Memory_reg[0][28]_0
+    SLICE_X89Y88         LUT6 (Prop_lut6_I3_O)        0.131     5.788 r  buffer77/fifo/g0_b2__23_i_12/O
+                         net (fo=22, routed)          0.607     6.396    buffer77/fifo/mulf1/ieee2nfloat_1/sfracX1__0
+    SLICE_X85Y83         LUT3 (Prop_lut3_I1_O)        0.050     6.446 r  buffer77/fifo/g0_b2__32_i_2/O
+                         net (fo=12, routed)          0.569     7.015    mulf1/operator/SignificandMultiplication/tile_0_mult/ip_rhs[13]
+    DSP48_X4Y30          DSP48E1 (Prop_dsp48e1_A[13]_P[20])
+                                                      2.475     9.490 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0/P[20]
+                         net (fo=2, routed)           0.600    10.091    mem_controller5/read_arbiter/data/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid323_Out0_copy324_c1_reg[2][3]
+    SLICE_X73Y77         LUT5 (Prop_lut5_I3_O)        0.050    10.141 r  mem_controller5/read_arbiter/data/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1[1]_i_1__0/O
+                         net (fo=1, routed)           0.000    10.141    mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1_reg[2]_0[1]
+    SLICE_X73Y77         FDRE                                         r  mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       10.200    10.200 r  
+                                                      0.000    10.200 r  clk (IN)
+                         net (fo=2874, unset)         0.483    10.683    mulf1/operator/SignificandMultiplication/clk
+    SLICE_X73Y77         FDRE                                         r  mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1_reg[1]/C
+                         clock pessimism              0.000    10.683    
+                         clock uncertainty           -0.035    10.647    
+    SLICE_X73Y77         FDRE (Setup_fdre_C_D)        0.052    10.699    mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid319_Out0_copy320_c1_reg[1]
+  -------------------------------------------------------------------
+                         required time                         10.699    
+                         arrival time                         -10.141    
+  -------------------------------------------------------------------
+                         slack                                  0.559    
+
+
+
+

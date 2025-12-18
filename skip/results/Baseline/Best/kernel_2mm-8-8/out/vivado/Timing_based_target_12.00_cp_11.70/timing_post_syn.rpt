@@ -1,0 +1,102 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 15:29:44 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : kernel_2mm
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             5.396ns  (required time - arrival time)
+  Source:                 fork22/generateBlocks[1].regblock/transmitValue_reg/C
+                            (rising edge-triggered cell FDSE clocked by clk  {rise@0.000ns fall@5.850ns period=11.700ns})
+  Destination:            lsq3/handshake_lsq_lsq3_core/stq_addr_7_q_reg[0]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@5.850ns period=11.700ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            11.700ns  (clk rise@11.700ns - clk rise@0.000ns)
+  Data Path Delay:        6.051ns  (logic 1.355ns (22.393%)  route 4.696ns (77.607%))
+  Logic Levels:           15  (CARRY4=4 LUT2=1 LUT3=1 LUT4=3 LUT5=1 LUT6=5)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 12.183 - 11.700 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=3008, unset)         0.508     0.508    fork22/generateBlocks[1].regblock/clk
+                         FDSE                                         r  fork22/generateBlocks[1].regblock/transmitValue_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDSE (Prop_fdse_C_Q)         0.226     0.734 r  fork22/generateBlocks[1].regblock/transmitValue_reg/Q
+                         net (fo=6, unplaced)         0.420     1.154    fork24/control/generateBlocks[3].regblock/transmitValue_4
+                         LUT4 (Prop_lut4_I1_O)        0.119     1.273 f  fork24/control/generateBlocks[3].regblock/alpha_ready_INST_0_i_6/O
+                         net (fo=1, unplaced)         0.705     1.978    buffer25/control/transmitValue_i_3__27
+                         LUT6 (Prop_lut6_I0_O)        0.043     2.021 f  buffer25/control/alpha_ready_INST_0_i_5/O
+                         net (fo=5, unplaced)         0.272     2.293    control_merge0/tehb/control/transmitValue_reg_13
+                         LUT6 (Prop_lut6_I1_O)        0.043     2.336 f  control_merge0/tehb/control/transmitValue_i_4__18/O
+                         net (fo=16, unplaced)        0.298     2.634    control_merge1/tehb/control/transmitValue_reg_19
+                         LUT5 (Prop_lut5_I3_O)        0.043     2.677 f  control_merge1/tehb/control/transmitValue_i_2__41/O
+                         net (fo=15, unplaced)        0.297     2.974    control_merge1/tehb/control/transmitValue_i_2__41_n_0
+                         LUT2 (Prop_lut2_I0_O)        0.043     3.017 f  control_merge1/tehb/control/transmitValue_i_6__4/O
+                         net (fo=7, unplaced)         0.279     3.296    control_merge1/tehb/control/transmitValue_i_6__4_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.043     3.339 r  control_merge1/tehb/control/dataReg[4]_i_3__5/O
+                         net (fo=18, unplaced)        0.279     3.618    control_merge1/tehb/control/transmitValue_reg_1
+                         LUT3 (Prop_lut3_I1_O)        0.043     3.661 f  control_merge1/tehb/control/fullReg_i_2__15/O
+                         net (fo=35, unplaced)        0.317     3.978    control_merge2/tehb/control/transmitValue_reg_38
+                         LUT6 (Prop_lut6_I3_O)        0.043     4.021 f  control_merge2/tehb/control/B_loadEn_INST_0_i_4/O
+                         net (fo=20, unplaced)        0.304     4.325    buffer24/fifo/Full_reg_0
+                         LUT4 (Prop_lut4_I1_O)        0.047     4.372 r  buffer24/fifo/stq_addr_0_q[6]_i_5__0/O
+                         net (fo=24, unplaced)        0.308     4.680    lsq3/handshake_lsq_lsq3_core/buffer24_outs_valid
+                         LUT4 (Prop_lut4_I3_O)        0.043     4.723 r  lsq3/handshake_lsq_lsq3_core/stq_addr_0_q[6]_i_12/O
+                         net (fo=2, unplaced)         0.470     5.193    lsq3/handshake_lsq_lsq3_core/handshake_lsq_lsq3_core_sta_dispatcher/entry_port_options_1_1
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.245     5.438 r  lsq3/handshake_lsq_lsq3_core/stq_addr_0_q_reg[6]_i_3__0/CO[3]
+                         net (fo=1, unplaced)         0.007     5.445    lsq3/handshake_lsq_lsq3_core/stq_addr_0_q_reg[6]_i_3__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     5.495 r  lsq3/handshake_lsq_lsq3_core/stq_addr_4_q_reg[6]_i_3__0/CO[3]
+                         net (fo=1, unplaced)         0.000     5.495    lsq3/handshake_lsq_lsq3_core/stq_addr_4_q_reg[6]_i_3__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     5.545 r  lsq3/handshake_lsq_lsq3_core/stq_addr_0_q_reg[6]_i_7/CO[3]
+                         net (fo=1, unplaced)         0.000     5.545    lsq3/handshake_lsq_lsq3_core/stq_addr_0_q_reg[6]_i_7_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.154     5.699 f  lsq3/handshake_lsq_lsq3_core/stq_addr_4_q_reg[6]_i_6/O[3]
+                         net (fo=1, unplaced)         0.456     6.155    lsq3/handshake_lsq_lsq3_core/handshake_lsq_lsq3_core_sta_dispatcher/TEMP_11_double_out_110_out[15]
+                         LUT6 (Prop_lut6_I4_O)        0.120     6.275 r  lsq3/handshake_lsq_lsq3_core/stq_addr_7_q[6]_i_1__0/O
+                         net (fo=8, unplaced)         0.284     6.559    lsq3/handshake_lsq_lsq3_core/stq_addr_wen_7
+                         FDRE                                         r  lsq3/handshake_lsq_lsq3_core/stq_addr_7_q_reg[0]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       11.700    11.700 r  
+                                                      0.000    11.700 r  clk (IN)
+                         net (fo=3008, unset)         0.483    12.183    lsq3/handshake_lsq_lsq3_core/clk
+                         FDRE                                         r  lsq3/handshake_lsq_lsq3_core/stq_addr_7_q_reg[0]/C
+                         clock pessimism              0.000    12.183    
+                         clock uncertainty           -0.035    12.147    
+                         FDRE (Setup_fdre_C_CE)      -0.192    11.955    lsq3/handshake_lsq_lsq3_core/stq_addr_7_q_reg[0]
+  -------------------------------------------------------------------
+                         required time                         11.955    
+                         arrival time                          -6.559    
+  -------------------------------------------------------------------
+                         slack                                  5.396    
+
+
+
+

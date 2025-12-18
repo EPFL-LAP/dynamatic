@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+atax,3,4.0,6.92,3265,1415,2879,2,3902

@@ -1,0 +1,37 @@
+module {
+  func.func @bicg(%arg0: memref<900xi32> {handshake.arg_name = "a"}, %arg1: memref<30xi32> {handshake.arg_name = "s"}, %arg2: memref<30xi32> {handshake.arg_name = "q"}, %arg3: memref<30xi32> {handshake.arg_name = "p"}, %arg4: memref<30xi32> {handshake.arg_name = "r"}) -> i32 {
+    %c0 = arith.constant {handshake.name = "constant2"} 0 : index
+    cf.br ^bb1(%c0 : index) {handshake.name = "br0"}
+  ^bb1(%0: index):  // 2 preds: ^bb0, ^bb3
+    %c0_0 = arith.constant {handshake.name = "constant3"} 0 : index
+    %1 = memref.load %arg2[%0] {handshake.deps = #handshake<deps[["store1", 2]]>, handshake.mem_interface = #handshake.mem_interface<LSQ: 0>, handshake.name = "load0"} : memref<30xi32>
+    cf.br ^bb2(%c0_0, %1 : index, i32) {handshake.name = "br1"}
+  ^bb2(%2: index, %3: i32):  // 2 preds: ^bb1, ^bb2
+    %c30 = arith.constant {handshake.name = "constant4"} 30 : index
+    %c1 = arith.constant {handshake.name = "constant5"} 1 : index
+    %4 = arith.muli %0, %c30 {handshake.name = "muli2"} : index
+    %5 = arith.addi %2, %4 {handshake.name = "addi2"} : index
+    %6 = memref.load %arg0[%5] {handshake.mem_interface = #handshake.mem_interface<MC>, handshake.name = "load1"} : memref<900xi32>
+    %7 = memref.load %arg1[%2] {handshake.deps = #handshake<deps[["store0", 1], ["store0", 3]]>, handshake.mem_interface = #handshake.mem_interface<LSQ: 0>, handshake.name = "load2"} : memref<30xi32>
+    %8 = memref.load %arg4[%0] {handshake.mem_interface = #handshake.mem_interface<MC>, handshake.name = "load3"} : memref<30xi32>
+    %9 = arith.muli %8, %6 {handshake.name = "muli0"} : i32
+    %10 = arith.addi %7, %9 {handshake.name = "addi0"} : i32
+    memref.store %10, %arg1[%2] {handshake.deps = #handshake<deps[["load2", 1], ["store0", 1]]>, handshake.mem_interface = #handshake.mem_interface<LSQ: 0>, handshake.name = "store0"} : memref<30xi32>
+    %11 = memref.load %arg3[%2] {handshake.mem_interface = #handshake.mem_interface<MC>, handshake.name = "load4"} : memref<30xi32>
+    %12 = arith.muli %6, %11 {handshake.name = "muli1"} : i32
+    %13 = arith.addi %3, %12 {handshake.name = "addi1"} : i32
+    %14 = arith.addi %2, %c1 {handshake.name = "addi3"} : index
+    %15 = arith.cmpi ult, %14, %c30 {handshake.name = "cmpi0"} : index
+    cf.cond_br %15, ^bb2(%14, %13 : index, i32), ^bb3 {handshake.name = "cond_br0"}
+  ^bb3:  // pred: ^bb2
+    %c30_1 = arith.constant {handshake.name = "constant6"} 30 : index
+    %c1_2 = arith.constant {handshake.name = "constant7"} 1 : index
+    memref.store %13, %arg2[%0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 1>, handshake.name = "store1"} : memref<30xi32>
+    %16 = arith.addi %0, %c1_2 {handshake.name = "addi4"} : index
+    %17 = arith.cmpi ult, %16, %c30_1 {handshake.name = "cmpi1"} : index
+    cf.cond_br %17, ^bb1(%16 : index), ^bb4 {handshake.name = "cond_br1"}
+  ^bb4:  // pred: ^bb3
+    return {handshake.name = "return0"} %13 : i32
+  }
+}
+

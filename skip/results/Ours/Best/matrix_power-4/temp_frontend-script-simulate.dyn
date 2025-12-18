@@ -1,0 +1,10 @@
+# Set the source file to run
+set-src skip/runs/run_2025-12-16_00-16-27/matrix_power-4/matrix_power.c
+
+write-hdl
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

@@ -1,0 +1,1172 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[INFO] Compiled cf to handshake
+[INFO] Applied transformations to handshake
+[INFO] Built kernel for profiling
+[INFO] Ran kernel for profiling
+[INFO] Profiled cf-level
+[INFO] Running smart buffer placement with CP = 15.000 and algorithm = 'cpbuf'
+[INFO] Placed smart buffers
+[INFO] Canonicalized handshake
+[INFO] Created histogram DOT
+[INFO] Converted histogram DOT to PNG
+[INFO] Created histogram_CFG DOT
+[INFO] Converted histogram_CFG DOT to PNG
+Error: dot: can't open /beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/out/comp/histogram_DEP_G.dot
+[INFO] Lowered to HW
+[INFO] Compilation succeeded
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> set-clock-period 15   
+dynamatic> compile --buffer-algorithm cpbuf --fork-fifo-size 15
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> exit
+
+Goodbye!
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Initial BASELINE Cycles: None
+buffer0 ----> 0
+buffer0      max_len = 0
+buffer1 ----> 1
+buffer1      max_len = 1
+buffer2 ----> 0
+buffer2      max_len = 0
+buffer3 ----> 1
+buffer3      max_len = 1
+buffer4 ----> 0
+buffer4      max_len = 0
+buffer5 ----> 0
+buffer5      max_len = 0
+buffer6 ----> 0
+buffer6      max_len = 0
+buffer7 ----> 1
+buffer7      max_len = 1
+buffer8 ----> 1
+buffer8      max_len = 1
+buffer9 ----> 9
+buffer9      max_len = 9
+buffer10 ----> 0
+buffer10     max_len = 0
+buffer11 ----> 0
+buffer11     max_len = 0
+buffer12 ----> 0
+buffer12     max_len = 0
+buffer13 ----> 1
+buffer13     max_len = 1
+
+=== Applying MLIR modifications (remove) ===
+[REMOVE] buffer0 (max_len=0)
+[REMOVE] buffer10 (max_len=0)
+[REMOVE] buffer11 (max_len=0)
+[REMOVE] buffer12 (max_len=0)
+[REMOVE] buffer2 (max_len=0)
+[REMOVE] buffer4 (max_len=0)
+[REMOVE] buffer5 (max_len=0)
+[REMOVE] buffer6 (max_len=0)
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== Running BASELINE simulation after initial resize ===
+BASELINE Cycles: 1058
+
+=== Applying Buffer Removal Optimization ===
+MLIR file backed up to: skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/out/comp/handshake_transformed.mlir.bak
+
+=== Applying Buffer Resize Optimization to size 0 ===
+Processed 0/6 until now
+[TRY REMOVE] buffer1
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 1786
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 0/6 until now
+[TRY REMOVE] buffer1
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer7
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1058 (Baseline: 1058)
+[OPTIMIZE] Success: Resized 3 buffers to 0: ['buffer1', 'buffer3', 'buffer7']
+Processed 3/6 until now
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer13
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 3/6 until now
+[TRY REMOVE] buffer8
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1058 (Baseline: 1058)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer8']
+Processed 4/6 until now
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer13
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 4/6 until now
+[TRY REMOVE] buffer9
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 2043
+Processed 5/6 until now
+[TRY REMOVE] buffer13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 2021
+
+Optimization complete. Successfully resized 4 buffers to 0
+
+=== Applying Buffer Resize Optimization to size 1 ===
+Processed 0/2 until now
+[TRY RESZIZE] buffer9 to 1
+[TRY RESZIZE] buffer13 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 1445
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 0/2 until now
+[TRY RESZIZE] buffer9 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 1445
+Processed 1/2 until now
+[TRY RESZIZE] buffer13 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1058 (Baseline: 1058)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer13']
+
+Optimization complete. Successfully resized 1 buffers to 1
+
+=== Applying Buffer Resize Optimization to size 2 ===
+Processed 0/1 until now
+[TRY RESZIZE] buffer9 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1058 -> 1218
+
+Optimization complete. Successfully resized 0 buffers to 2
+
+=== Applying Buffer Resize Optimization to size 3 ===
+Processed 0/1 until now
+[TRY RESZIZE] buffer9 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1058 (Baseline: 1058)
+[OPTIMIZE] Success: Resized 1 buffers to 3: ['buffer9']
+
+Optimization complete. Successfully resized 1 buffers to 3
+
+=== Applying Buffer Resize Optimization to size 4 ===
+
+Optimization complete. Successfully resized 0 buffers to 4
+
+=== Applying Buffer Resize Optimization to size 5 ===
+
+Optimization complete. Successfully resized 0 buffers to 5
+
+=== Applying Buffer Resize Optimization to size 6 ===
+
+Optimization complete. Successfully resized 0 buffers to 6
+
+=== Applying Buffer Resize Optimization to size 7 ===
+
+Optimization complete. Successfully resized 0 buffers to 7
+
+=== Applying Buffer Resize Optimization to size 8 ===
+
+Optimization complete. Successfully resized 0 buffers to 8
+
+=== Applying Buffer Resize Optimization to size 9 ===
+
+Optimization complete. Successfully resized 0 buffers to 9
+
+=== Applying Buffer Resize Optimization to size 10 ===
+
+Optimization complete. Successfully resized 0 buffers to 10
+
+=== Applying Buffer Resize Optimization to size 11 ===
+
+Optimization complete. Successfully resized 0 buffers to 11
+
+=== Applying Buffer Resize Optimization to size 12 ===
+
+Optimization complete. Successfully resized 0 buffers to 12
+
+=== Applying Buffer Resize Optimization to size 13 ===
+
+Optimization complete. Successfully resized 0 buffers to 13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== After buffering ===
+BASELINE Cycles: 1058
+
+===== Target CP tuning =====
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Baseline latency = 1058 cycles at 10.0 ns
+
+--- Trying CP = 14.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 14.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 13.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 13.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 12.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 12.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 11.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1058 cycles
+
+--- Trying CP = 11.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1059 cycles
+
+--- Trying CP = 10.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1059 cycles
+
+--- Trying CP = 10.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1059 cycles
+
+--- Trying CP = 9.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 2020 cycles
+Latency degraded, stopping search.
+
+Best CP: 10.0 ns (latency = 1059 cycles)
+Starting from 10.0 ns
+
+=== Testing target CP = 10.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.202
+
+Slack >= 0 (1.202)
+
+$$$ Target CP: 10.0 ns
+$$$ Cycles: 1059
+$$$ Real CP: 9.70 ns
+$$$ Performance metric: 10272.30
+
+=== Testing target CP = 9.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.988
+
+Slack >= 0 (0.988)
+
+$$$ Target CP: 9.5 ns
+$$$ Cycles: 2020
+$$$ Real CP: 9.20 ns
+$$$ Performance metric: 18584.00
+
+=== Testing target CP = 9.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.058
+
+Slack >= 0 (1.058)
+
+$$$ Target CP: 9.0 ns
+$$$ Cycles: 1059
+$$$ Real CP: 8.70 ns
+$$$ Performance metric: 9213.30
+
+=== Testing target CP = 8.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.661
+
+Slack >= 0 (0.661)
+
+$$$ Target CP: 8.5 ns
+$$$ Cycles: 2020
+$$$ Real CP: 8.20 ns
+$$$ Performance metric: 16564.00
+
+=== Testing target CP = 8.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.556
+
+Slack >= 0 (0.556)
+
+$$$ Target CP: 8.0 ns
+$$$ Cycles: 1059
+$$$ Real CP: 7.70 ns
+$$$ Performance metric: 8154.30
+
+=== Testing target CP = 7.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.548
+
+Slack >= 0 (0.548)
+
+$$$ Target CP: 7.5 ns
+$$$ Cycles: 1058
+$$$ Real CP: 7.20 ns
+$$$ Performance metric: 7617.60
+
+=== Testing target CP = 7.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.062
+
+Slack >= 0 (0.062)
+
+$$$ Target CP: 7.0 ns
+$$$ Cycles: 1058
+$$$ Real CP: 6.70 ns
+$$$ Performance metric: 7088.60
+
+=== Testing target CP = 6.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.324
+
+Slack < 0 (-0.324), increasing CP to 6.52 and retrying.
+
+[Iteration 1] Slack = -0.404
+
+Slack < 0 (-0.404), increasing CP to 6.92 and retrying.
+
+[Iteration 2] Slack = 0.083
+
+Slack >= 0 (0.083)
+
+$$$ Target CP: 6.5 ns
+$$$ Cycles: 1058
+$$$ Real CP: 6.92 ns
+$$$ Performance metric: 7321.36
+
+=== Testing target CP = 6.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.773
+
+Slack < 0 (-0.773), increasing CP to 6.47 and retrying.
+
+[Iteration 1] Slack = -0.27
+
+Slack < 0 (-0.27), increasing CP to 6.74 and retrying.
+
+[Iteration 2] Slack = 0.072
+
+Slack >= 0 (0.072)
+
+$$$ Target CP: 6.0 ns
+$$$ Cycles: 1058
+$$$ Real CP: 6.74 ns
+$$$ Performance metric: 7130.92
+
+=== Testing target CP = 5.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.406
+
+Slack < 0 (-1.406), increasing CP to 6.61 and retrying.
+
+[Iteration 1] Slack = 0.203
+
+Slack >= 0 (0.203)
+
+$$$ Target CP: 5.5 ns
+$$$ Cycles: 2020
+$$$ Real CP: 6.61 ns
+$$$ Performance metric: 13352.20
+
+=== Testing target CP = 5.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.708
+
+Slack < 0 (-1.708), increasing CP to 6.41 and retrying.
+
+[Iteration 1] Slack = -0.02
+
+Slack < 0 (-0.02), increasing CP to 6.43 and retrying.
+
+[Iteration 2] Slack = -0.213
+
+Slack < 0 (-0.213), increasing CP to 6.64 and retrying.
+
+[Iteration 3] Slack = 0.24
+
+Slack >= 0 (0.24)
+
+$$$ Target CP: 5.0 ns
+$$$ Cycles: 2020
+$$$ Real CP: 6.64 ns
+$$$ Performance metric: 13412.80
+
+=== Testing target CP = 4.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.075
+
+Slack < 0 (-2.075), increasing CP to 6.28 and retrying.
+
+[Iteration 1] Slack = -0.063
+
+Slack < 0 (-0.063), increasing CP to 6.34 and retrying.
+
+[Iteration 2] Slack = -0.278
+
+Slack < 0 (-0.278), increasing CP to 6.62 and retrying.
+
+[Iteration 3] Slack = 0.104
+
+Slack >= 0 (0.104)
+
+$$$ Target CP: 4.5 ns
+$$$ Cycles: 2020
+$$$ Real CP: 6.62 ns
+$$$ Performance metric: 13372.40
+
+=== Testing target CP = 4.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.63
+
+Slack < 0 (-2.63), increasing CP to 6.33 and retrying.
+
+[Iteration 1] Slack = -0.08
+
+Slack < 0 (-0.08), increasing CP to 6.41 and retrying.
+
+[Iteration 2] Slack = -0.22
+
+Slack < 0 (-0.22), increasing CP to 6.63 and retrying.
+
+[Iteration 3] Slack = 0.23
+
+Slack >= 0 (0.23)
+
+$$$ Target CP: 4.0 ns
+$$$ Cycles: 2020
+$$$ Real CP: 6.63 ns
+$$$ Performance metric: 13392.60
+
+=== Testing target CP = 3.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.457
+
+Slack < 0 (-2.457), increasing CP to 5.66 and retrying.
+
+[Iteration 1] Slack = -0.044
+
+Slack < 0 (-0.044), increasing CP to 5.7 and retrying.
+
+[Iteration 2] Slack = 0.031
+
+Slack >= 0 (0.031)
+
+$$$ Target CP: 3.5 ns
+$$$ Cycles: 3023
+$$$ Real CP: 5.70 ns
+$$$ Performance metric: 17231.10
+
+=== Testing target CP = 3.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":10,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0]],"ldPortIdx":[[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq1","numBBs":1,"numLdChannels":1,"numLoadPorts":1,"numLoads":[1],"numStChannels":1,"numStorePorts":1,"numStores":[1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0]],"stResp":0,"storeOffsets":[[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 10, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 7, 'fifoDepth_S': 17, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0]], 'ldPortIdx': [[0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq1', 'numBBs': 1, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0]], 'stResp': 0, 'storeOffsets': [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-08-39/histogram-7-17/histogram.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-histogram-7-17.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.765
+
+Slack < 0 (-2.765), increasing CP to 5.47 and retrying.
+
+[Iteration 1] Slack = 0.027
+
+Slack >= 0 (0.027)
+
+$$$ Target CP: 3.0 ns
+$$$ Cycles: 3023
+$$$ Real CP: 5.47 ns
+$$$ Performance metric: 16535.81
+
+===  Best Configuration Found ===
+Target CP : 7.00 ns
+Real   CP : 6.70 ns
+Cycles    : 1058
+Performance metric : 7088.60

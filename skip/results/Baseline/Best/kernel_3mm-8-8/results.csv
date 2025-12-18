@@ -1,0 +1,2 @@
+Benchmark,Load,Store,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+kernel_3mm,8,8,6.0,5.7,5809,2721,3661,9,8939

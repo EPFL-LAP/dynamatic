@@ -1,0 +1,113 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Wed Dec 17 01:06:11 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : jacobi_1d_imper
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             8.296ns  (required time - arrival time)
+  Source:                 buffer14/outs_reg[7]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Destination:            mem_controller1/stores/count_stores.counter_reg[29]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            14.200ns  (clk rise@14.200ns - clk rise@0.000ns)
+  Data Path Delay:        5.891ns  (logic 1.795ns (30.468%)  route 4.096ns (69.532%))
+  Logic Levels:           18  (CARRY4=10 LUT2=1 LUT3=2 LUT4=1 LUT5=1 LUT6=3)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 14.683 - 14.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=594, unset)          0.508     0.508    buffer14/clk
+    SLICE_X8Y142         FDRE                                         r  buffer14/outs_reg[7]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X8Y142         FDRE (Prop_fdre_C_Q)         0.254     0.762 f  buffer14/outs_reg[7]/Q
+                         net (fo=5, routed)           0.432     1.194    buffer14/buffer14_outs[7]
+    SLICE_X9Y141         LUT2 (Prop_lut2_I1_O)        0.043     1.237 r  buffer14/result0_carry_i_4/O
+                         net (fo=1, routed)           0.000     1.237    cmpi0/S[3]
+    SLICE_X9Y141         CARRY4 (Prop_carry4_S[3]_CO[3])
+                                                      0.187     1.424 r  cmpi0/result0_carry/CO[3]
+                         net (fo=1, routed)           0.000     1.424    cmpi0/result0_carry_n_0
+    SLICE_X9Y142         CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.127     1.551 f  cmpi0/result0_carry__0/CO[0]
+                         net (fo=27, routed)          0.977     2.528    cmpi0/outs_reg[8]_inv[0]
+    SLICE_X16Y149        LUT6 (Prop_lut6_I0_O)        0.130     2.658 r  cmpi0/dataReg[0]_i_4__0/O
+                         net (fo=6, routed)           0.200     2.859    control_merge2/fork_valid/generateBlocks[1].regblock/dataReg_reg[0]_0
+    SLICE_X15Y150        LUT5 (Prop_lut5_I3_O)        0.043     2.902 r  control_merge2/fork_valid/generateBlocks[1].regblock/transmitValue_i_2__31/O
+                         net (fo=8, routed)           0.449     3.351    control_merge2/tehb/control/transmitValue_reg_1
+    SLICE_X16Y147        LUT6 (Prop_lut6_I5_O)        0.043     3.394 f  control_merge2/tehb/control/A_storeEn_INST_0_i_5/O
+                         net (fo=3, routed)           0.447     3.840    buffer23/control/dataReg_reg[7]
+    SLICE_X19Y142        LUT3 (Prop_lut3_I1_O)        0.043     3.883 f  buffer23/control/A_storeEn_INST_0_i_3/O
+                         net (fo=10, routed)          0.272     4.155    fork16/generateBlocks[0].regblock/dataReg_reg[0]
+    SLICE_X17Y140        LUT6 (Prop_lut6_I2_O)        0.043     4.198 f  fork16/generateBlocks[0].regblock/A_storeEn_INST_0_i_1/O
+                         net (fo=3, routed)           0.296     4.494    mem_controller0/read_arbiter/data/fullReg_reg
+    SLICE_X17Y141        LUT3 (Prop_lut3_I2_O)        0.053     4.547 r  mem_controller0/read_arbiter/data/A_storeEn_INST_0/O
+                         net (fo=41, routed)          1.023     5.570    fork22/generateBlocks[0].regblock/count_stores.counter_reg[3]_0
+    SLICE_X17Y154        LUT4 (Prop_lut4_I3_O)        0.131     5.701 r  fork22/generateBlocks[0].regblock/minusOp_carry_i_6__0/O
+                         net (fo=1, routed)           0.000     5.701    mem_controller1/stores/S[0]
+    SLICE_X17Y154        CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.251     5.952 r  mem_controller1/stores/minusOp_carry/CO[3]
+                         net (fo=1, routed)           0.000     5.952    mem_controller1/stores/minusOp_carry_n_0
+    SLICE_X17Y155        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.001 r  mem_controller1/stores/minusOp_carry__0/CO[3]
+                         net (fo=1, routed)           0.000     6.001    mem_controller1/stores/minusOp_carry__0_n_0
+    SLICE_X17Y156        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.050 r  mem_controller1/stores/minusOp_carry__1/CO[3]
+                         net (fo=1, routed)           0.000     6.050    mem_controller1/stores/minusOp_carry__1_n_0
+    SLICE_X17Y157        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.099 r  mem_controller1/stores/minusOp_carry__2/CO[3]
+                         net (fo=1, routed)           0.000     6.099    mem_controller1/stores/minusOp_carry__2_n_0
+    SLICE_X17Y158        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.148 r  mem_controller1/stores/minusOp_carry__3/CO[3]
+                         net (fo=1, routed)           0.000     6.148    mem_controller1/stores/minusOp_carry__3_n_0
+    SLICE_X17Y159        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.197 r  mem_controller1/stores/minusOp_carry__4/CO[3]
+                         net (fo=1, routed)           0.000     6.197    mem_controller1/stores/minusOp_carry__4_n_0
+    SLICE_X17Y160        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     6.246 r  mem_controller1/stores/minusOp_carry__5/CO[3]
+                         net (fo=1, routed)           0.000     6.246    mem_controller1/stores/minusOp_carry__5_n_0
+    SLICE_X17Y161        CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.153     6.399 r  mem_controller1/stores/minusOp_carry__6/O[1]
+                         net (fo=1, routed)           0.000     6.399    mem_controller1/stores/minusOp_carry__6_n_6
+    SLICE_X17Y161        FDRE                                         r  mem_controller1/stores/count_stores.counter_reg[29]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       14.200    14.200 r  
+                                                      0.000    14.200 r  clk (IN)
+                         net (fo=594, unset)          0.483    14.683    mem_controller1/stores/clk
+    SLICE_X17Y161        FDRE                                         r  mem_controller1/stores/count_stores.counter_reg[29]/C
+                         clock pessimism              0.000    14.683    
+                         clock uncertainty           -0.035    14.647    
+    SLICE_X17Y161        FDRE (Setup_fdre_C_D)        0.048    14.695    mem_controller1/stores/count_stores.counter_reg[29]
+  -------------------------------------------------------------------
+                         required time                         14.695    
+                         arrival time                          -6.399    
+  -------------------------------------------------------------------
+                         slack                                  8.296    
+
+
+
+

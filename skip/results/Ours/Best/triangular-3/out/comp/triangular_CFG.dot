@@ -1,0 +1,18 @@
+digraph "triangular" {
+  node [shape=box];
+  "^bb0" [label="^bb0", shape="oval"];
+  "^bb0" -> "^bb1"[color="black"];
+  "^bb1" [label="^bb1", shape="oval"];
+  "^bb1" -> "^bb2"[label="true", color="black"];
+  "^bb1" -> "^bb6"[label="false", color="black"];
+  "^bb2" [label="^bb2", shape="oval"];
+  "^bb2" -> "^bb3"[color="black"];
+  "^bb3" [label="^bb3", shape="oval"];
+  "^bb3" -> "^bb4"[label="true", color="black"];
+  "^bb3" -> "^bb5"[label="false", color="black"];
+  "^bb4" [label="^bb4", shape="oval"];
+  "^bb4" -> "^bb3"[color="red"];
+  "^bb5" [label="^bb5", shape="oval"];
+  "^bb5" -> "^bb1"[color="red"];
+  "^bb6" [label="^bb6", shape="oval"];
+}

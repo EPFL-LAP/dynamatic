@@ -1,0 +1,117 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 02:40:23 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : histogram
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.198ns  (required time - arrival time)
+  Source:                 control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_reg/C
+                            (rising edge-triggered cell FDSE clocked by clk  {rise@0.000ns fall@3.835ns period=7.670ns})
+  Destination:            buffer11/dataReg_reg[10]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.835ns period=7.670ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            7.670ns  (clk rise@7.670ns - clk rise@0.000ns)
+  Data Path Delay:        7.242ns  (logic 1.721ns (23.764%)  route 5.521ns (76.236%))
+  Logic Levels:           22  (CARRY4=6 LUT3=1 LUT4=2 LUT5=7 LUT6=6)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 8.153 - 7.670 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=1656, unset)         0.508     0.508    control_merge0/fork_valid/generateBlocks[1].regblock/clk
+    SLICE_X18Y147        FDSE                                         r  control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_reg/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X18Y147        FDSE (Prop_fdse_C_Q)         0.254     0.762 f  control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_reg/Q
+                         net (fo=4, routed)           0.449     1.211    control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_1
+    SLICE_X18Y147        LUT6 (Prop_lut6_I1_O)        0.043     1.254 f  control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_i_2__55/O
+                         net (fo=7, routed)           0.298     1.552    control_merge0/fork_valid/generateBlocks[1].regblock/transmitValue_reg_19
+    SLICE_X19Y147        LUT4 (Prop_lut4_I0_O)        0.043     1.595 f  control_merge0/fork_valid/generateBlocks[1].regblock/feature_loadAddr[9]_INST_0_i_3/O
+                         net (fo=137, routed)         0.349     1.944    control_merge0/tehb/control/dataReg_reg[31]
+    SLICE_X16Y145        LUT5 (Prop_lut5_I2_O)        0.043     1.987 r  control_merge0/tehb/control/memEnd_valid_i_58/O
+                         net (fo=2, routed)           0.514     2.501    cmpi0/buffer11_outs[12]
+    SLICE_X13Y147        LUT4 (Prop_lut4_I1_O)        0.043     2.544 r  cmpi0/memEnd_valid_i_37/O
+                         net (fo=1, routed)           0.000     2.544    cmpi0/memEnd_valid_i_37_n_0
+    SLICE_X13Y147        CARRY4 (Prop_carry4_S[2]_CO[3])
+                                                      0.188     2.732 r  cmpi0/memEnd_valid_reg_i_14/CO[3]
+                         net (fo=1, routed)           0.000     2.732    cmpi0/memEnd_valid_reg_i_14_n_0
+    SLICE_X13Y148        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     2.781 r  cmpi0/memEnd_valid_reg_i_5/CO[3]
+                         net (fo=1, routed)           0.000     2.781    cmpi0/memEnd_valid_reg_i_5_n_0
+    SLICE_X13Y149        CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     2.830 r  cmpi0/memEnd_valid_reg_i_3/CO[3]
+                         net (fo=84, routed)          0.312     3.142    init0/control/result[0]
+    SLICE_X12Y148        LUT5 (Prop_lut5_I2_O)        0.043     3.185 r  init0/control/start_ready_INST_0_i_17/O
+                         net (fo=78, routed)          0.299     3.484    init0/control/dataReg_reg[0]
+    SLICE_X9Y148         LUT5 (Prop_lut5_I0_O)        0.043     3.527 r  init0/control/transmitValue_i_3__4/O
+                         net (fo=23, routed)          0.412     3.939    cmpi3/p_2_in
+    SLICE_X7Y147         LUT6 (Prop_lut6_I4_O)        0.043     3.982 r  cmpi3/Memory[0][0]_i_24/O
+                         net (fo=1, routed)           0.207     4.189    cmpi3/Memory[0][0]_i_24_n_0
+    SLICE_X5Y147         LUT5 (Prop_lut5_I4_O)        0.043     4.232 r  cmpi3/Memory[0][0]_i_16/O
+                         net (fo=1, routed)           0.000     4.232    cmpi3/Memory[0][0]_i_16_n_0
+    SLICE_X5Y147         CARRY4 (Prop_carry4_S[1]_CO[3])
+                                                      0.257     4.489 r  cmpi3/Memory_reg[0][0]_i_7/CO[3]
+                         net (fo=1, routed)           0.000     4.489    cmpi3/Memory_reg[0][0]_i_7_n_0
+    SLICE_X5Y148         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     4.538 r  cmpi3/Memory_reg[0][0]_i_3/CO[3]
+                         net (fo=1, routed)           0.000     4.538    cmpi3/Memory_reg[0][0]_i_3_n_0
+    SLICE_X5Y149         CARRY4 (Prop_carry4_CI_CO[2])
+                                                      0.107     4.645 f  cmpi3/Memory_reg[0][0]_i_2/CO[2]
+                         net (fo=9, routed)           0.174     4.819    buffer68/fifo/result[0]
+    SLICE_X4Y148         LUT5 (Prop_lut5_I4_O)        0.123     4.942 f  buffer68/fifo/Head[2]_i_6__1/O
+                         net (fo=4, routed)           0.432     5.374    buffer68/fifo/buffer68_outs
+    SLICE_X4Y155         LUT6 (Prop_lut6_I0_O)        0.043     5.417 r  buffer68/fifo/transmitValue_i_3__32/O
+                         net (fo=2, routed)           0.165     5.582    buffer68/fifo/transmitValue_i_3__32_n_0
+    SLICE_X5Y156         LUT5 (Prop_lut5_I3_O)        0.043     5.625 f  buffer68/fifo/transmitValue_i_2__47/O
+                         net (fo=8, routed)           0.342     5.967    fork6/control/generateBlocks[0].regblock/buffer54_outs_ready
+    SLICE_X12Y156        LUT3 (Prop_lut3_I1_O)        0.043     6.010 r  fork6/control/generateBlocks[0].regblock/fullReg_i_22/O
+                         net (fo=1, routed)           0.220     6.231    fork6/control/generateBlocks[0].regblock/fullReg_i_22_n_0
+    SLICE_X14Y156        LUT6 (Prop_lut6_I0_O)        0.043     6.274 f  fork6/control/generateBlocks[0].regblock/fullReg_i_12/O
+                         net (fo=1, routed)           0.426     6.700    fork6/control/generateBlocks[0].regblock/fullReg_i_12_n_0
+    SLICE_X16Y154        LUT5 (Prop_lut5_I0_O)        0.043     6.743 f  fork6/control/generateBlocks[0].regblock/fullReg_i_5__0/O
+                         net (fo=1, routed)           0.406     7.149    fork6/control/generateBlocks[0].regblock/fullReg_i_5__0_n_0
+    SLICE_X17Y153        LUT6 (Prop_lut6_I0_O)        0.043     7.192 f  fork6/control/generateBlocks[0].regblock/fullReg_i_3/O
+                         net (fo=27, routed)          0.195     7.388    control_merge0/fork_valid/generateBlocks[1].regblock/cmpi0_result_ready
+    SLICE_X18Y152        LUT6 (Prop_lut6_I1_O)        0.043     7.431 r  control_merge0/fork_valid/generateBlocks[1].regblock/dataReg[31]_i_1__0/O
+                         net (fo=32, routed)          0.319     7.750    buffer11/E[0]
+    SLICE_X20Y149        FDRE                                         r  buffer11/dataReg_reg[10]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        7.670     7.670 r  
+                                                      0.000     7.670 r  clk (IN)
+                         net (fo=1656, unset)         0.483     8.153    buffer11/clk
+    SLICE_X20Y149        FDRE                                         r  buffer11/dataReg_reg[10]/C
+                         clock pessimism              0.000     8.153    
+                         clock uncertainty           -0.035     8.117    
+    SLICE_X20Y149        FDRE (Setup_fdre_C_CE)      -0.169     7.948    buffer11/dataReg_reg[10]
+  -------------------------------------------------------------------
+                         required time                          7.948    
+                         arrival time                          -7.750    
+  -------------------------------------------------------------------
+                         slack                                  0.198    
+
+
+
+

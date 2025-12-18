@@ -1,0 +1,17 @@
+digraph "jacobi_1d_imper" {
+  node [shape=box];
+  "^bb0" [label="^bb0", shape="oval"];
+  "^bb0" -> "^bb1"[color="black"];
+  "^bb1" [label="^bb1", shape="oval"];
+  "^bb1" -> "^bb2"[color="black"];
+  "^bb2" [label="^bb2", shape="oval"];
+  "^bb2" -> "^bb2"[label="true", color="red"];
+  "^bb2" -> "^bb3"[label="false", color="black"];
+  "^bb3" [label="^bb3", shape="oval"];
+  "^bb3" -> "^bb3"[label="true", color="red"];
+  "^bb3" -> "^bb4"[label="false", color="black"];
+  "^bb4" [label="^bb4", shape="oval"];
+  "^bb4" -> "^bb1"[label="true", color="red"];
+  "^bb4" -> "^bb5"[label="false", color="black"];
+  "^bb5" [label="^bb5", shape="oval"];
+}

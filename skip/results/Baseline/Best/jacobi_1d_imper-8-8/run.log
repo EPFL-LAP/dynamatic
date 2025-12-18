@@ -1,0 +1,1164 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[INFO] Compiled cf to handshake
+[INFO] Applied transformations to handshake
+[INFO] Built kernel for profiling
+[INFO] Ran kernel for profiling
+[INFO] Profiled cf-level
+[INFO] Running smart buffer placement with CP = 15.000 and algorithm = 'cpbuf'
+[INFO] Placed smart buffers
+[INFO] Canonicalized handshake
+[INFO] Created jacobi_1d_imper DOT
+[INFO] Converted jacobi_1d_imper DOT to PNG
+[INFO] Created jacobi_1d_imper_CFG DOT
+[INFO] Converted jacobi_1d_imper_CFG DOT to PNG
+Error: dot: can't open /beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/comp/jacobi_1d_imper_DEP_G.dot
+[INFO] Lowered to HW
+[INFO] Compilation succeeded
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> set-clock-period 15   
+dynamatic> compile --buffer-algorithm cpbuf --fork-fifo-size 15
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> exit
+
+Goodbye!
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Initial BASELINE Cycles: None
+buffer0 ----> 0
+buffer0      max_len = 0
+buffer1 ----> 0
+buffer1      max_len = 0
+buffer2 ----> 6
+buffer2      max_len = 6
+buffer3 ----> 6
+buffer3      max_len = 6
+buffer4 ----> 0
+buffer4      max_len = 0
+buffer5 ----> 0
+buffer5      max_len = 0
+buffer6 ----> 0
+buffer6      max_len = 0
+buffer7 ----> 0
+buffer7      max_len = 0
+buffer8 ----> 0
+buffer8      max_len = 0
+buffer9 ----> 0
+buffer9      max_len = 0
+buffer10 ----> 0
+buffer10     max_len = 0
+buffer11 ----> 0
+buffer11     max_len = 0
+buffer12 ----> 0
+buffer12     max_len = 0
+buffer13 ----> 0
+buffer13     max_len = 0
+buffer14 ----> 0
+buffer14     max_len = 0
+buffer15 ----> 0
+buffer15     max_len = 0
+buffer16 ----> 0
+buffer16     max_len = 0
+buffer17 ----> 6
+buffer17     max_len = 6
+buffer18 ----> 0
+buffer18     max_len = 0
+buffer19 ----> 0
+buffer19     max_len = 0
+buffer20 ----> 0
+buffer20     max_len = 0
+buffer21 ----> 0
+buffer21     max_len = 0
+buffer22 ----> 0
+buffer22     max_len = 0
+buffer23 ----> 0
+buffer23     max_len = 0
+buffer24 ----> 0
+buffer24     max_len = 0
+buffer25 ----> 0
+buffer25     max_len = 0
+buffer26 ----> 0
+buffer26     max_len = 0
+buffer27 ----> 1
+buffer27     max_len = 1
+buffer28 ----> 0
+buffer28     max_len = 0
+buffer29 ----> 0
+buffer29     max_len = 0
+buffer30 ----> 0
+buffer30     max_len = 0
+buffer31 ----> 1
+buffer31     max_len = 1
+
+=== Applying MLIR modifications (remove) ===
+[REMOVE] buffer0 (max_len=0)
+[REMOVE] buffer1 (max_len=0)
+[REMOVE] buffer10 (max_len=0)
+[REMOVE] buffer11 (max_len=0)
+[REMOVE] buffer12 (max_len=0)
+[REMOVE] buffer13 (max_len=0)
+[REMOVE] buffer14 (max_len=0)
+[REMOVE] buffer15 (max_len=0)
+[REMOVE] buffer16 (max_len=0)
+[REMOVE] buffer18 (max_len=0)
+[REMOVE] buffer19 (max_len=0)
+[REMOVE] buffer20 (max_len=0)
+[REMOVE] buffer21 (max_len=0)
+[REMOVE] buffer22 (max_len=0)
+[REMOVE] buffer23 (max_len=0)
+[REMOVE] buffer24 (max_len=0)
+[REMOVE] buffer25 (max_len=0)
+[REMOVE] buffer26 (max_len=0)
+[REMOVE] buffer28 (max_len=0)
+[REMOVE] buffer29 (max_len=0)
+[REMOVE] buffer30 (max_len=0)
+[REMOVE] buffer4 (max_len=0)
+[REMOVE] buffer5 (max_len=0)
+[REMOVE] buffer6 (max_len=0)
+[REMOVE] buffer7 (max_len=0)
+[REMOVE] buffer8 (max_len=0)
+[REMOVE] buffer9 (max_len=0)
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== Running BASELINE simulation after initial resize ===
+BASELINE Cycles: 1180
+
+=== Applying Buffer Removal Optimization ===
+MLIR file backed up to: skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/comp/handshake_transformed.mlir.bak
+
+=== Applying Buffer Resize Optimization to size 0 ===
+Processed 0/5 until now
+[TRY REMOVE] buffer2
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer27
+[TRY REMOVE] buffer31
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1180 (Baseline: 1180)
+[OPTIMIZE] Success: Resized 5 buffers to 0: ['buffer2', 'buffer3', 'buffer17', 'buffer27', 'buffer31']
+
+Optimization complete. Successfully resized 5 buffers to 0
+
+=== Applying Buffer Resize Optimization to size 1 ===
+
+Optimization complete. Successfully resized 0 buffers to 1
+
+=== Applying Buffer Resize Optimization to size 2 ===
+
+Optimization complete. Successfully resized 0 buffers to 2
+
+=== Applying Buffer Resize Optimization to size 3 ===
+
+Optimization complete. Successfully resized 0 buffers to 3
+
+=== Applying Buffer Resize Optimization to size 4 ===
+
+Optimization complete. Successfully resized 0 buffers to 4
+
+=== Applying Buffer Resize Optimization to size 5 ===
+
+Optimization complete. Successfully resized 0 buffers to 5
+
+=== Applying Buffer Resize Optimization to size 6 ===
+
+Optimization complete. Successfully resized 0 buffers to 6
+
+=== Applying Buffer Resize Optimization to size 7 ===
+
+Optimization complete. Successfully resized 0 buffers to 7
+
+=== Applying Buffer Resize Optimization to size 8 ===
+
+Optimization complete. Successfully resized 0 buffers to 8
+
+=== Applying Buffer Resize Optimization to size 9 ===
+
+Optimization complete. Successfully resized 0 buffers to 9
+
+=== Applying Buffer Resize Optimization to size 10 ===
+
+Optimization complete. Successfully resized 0 buffers to 10
+
+=== Applying Buffer Resize Optimization to size 11 ===
+
+Optimization complete. Successfully resized 0 buffers to 11
+
+=== Applying Buffer Resize Optimization to size 12 ===
+
+Optimization complete. Successfully resized 0 buffers to 12
+
+=== Applying Buffer Resize Optimization to size 13 ===
+
+Optimization complete. Successfully resized 0 buffers to 13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== After buffering ===
+BASELINE Cycles: 1180
+
+===== Target CP tuning =====
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Baseline latency = 1180 cycles at 10.0 ns
+
+--- Trying CP = 14.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 14.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 13.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 13.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 12.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 12.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 11.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 11.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 10.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 10.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 9.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 9.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 8.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1180 cycles
+
+--- Trying CP = 8.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1183 cycles
+
+--- Trying CP = 7.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1329 cycles
+Latency degraded, stopping search.
+
+Best CP: 8.0 ns (latency = 1183 cycles)
+Starting from 8.0 ns
+
+=== Testing target CP = 8.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.426
+
+Slack >= 0 (0.426)
+
+$$$ Target CP: 8.0 ns
+$$$ Cycles: 1183
+$$$ Real CP: 7.70 ns
+$$$ Performance metric: 9109.10
+
+=== Testing target CP = 7.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.132
+
+Slack >= 0 (0.132)
+
+$$$ Target CP: 7.5 ns
+$$$ Cycles: 1329
+$$$ Real CP: 7.20 ns
+$$$ Performance metric: 9568.80
+
+=== Testing target CP = 7.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.008
+
+Slack < 0 (-0.008), increasing CP to 6.71 and retrying.
+
+[Iteration 1] Slack = 0.02
+
+Slack >= 0 (0.02)
+
+$$$ Target CP: 7.0 ns
+$$$ Cycles: 1185
+$$$ Real CP: 6.71 ns
+$$$ Performance metric: 7951.35
+
+=== Testing target CP = 6.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.018
+
+Slack >= 0 (0.018)
+
+$$$ Target CP: 6.5 ns
+$$$ Cycles: 1185
+$$$ Real CP: 6.20 ns
+$$$ Performance metric: 7347.00
+
+=== Testing target CP = 6.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.272
+
+Slack >= 0 (0.272)
+
+$$$ Target CP: 6.0 ns
+$$$ Cycles: 1182
+$$$ Real CP: 5.70 ns
+$$$ Performance metric: 6737.40
+
+=== Testing target CP = 5.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.075
+
+Slack >= 0 (0.075)
+
+$$$ Target CP: 5.5 ns
+$$$ Cycles: 1182
+$$$ Real CP: 5.20 ns
+$$$ Performance metric: 6146.40
+
+=== Testing target CP = 5.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.189
+
+Slack < 0 (-0.189), increasing CP to 4.89 and retrying.
+
+[Iteration 1] Slack = -0.29
+
+Slack < 0 (-0.29), increasing CP to 5.18 and retrying.
+
+[Iteration 2] Slack = 0.1
+
+Slack >= 0 (0.1)
+
+$$$ Target CP: 5.0 ns
+$$$ Cycles: 1182
+$$$ Real CP: 5.18 ns
+$$$ Performance metric: 6122.76
+
+=== Testing target CP = 4.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.572
+
+Slack < 0 (-0.572), increasing CP to 4.77 and retrying.
+
+[Iteration 1] Slack = -0.074
+
+Slack < 0 (-0.074), increasing CP to 4.84 and retrying.
+
+[Iteration 2] Slack = -0.247
+
+Slack < 0 (-0.247), increasing CP to 5.09 and retrying.
+
+[Iteration 3] Slack = 0.078
+
+Slack >= 0 (0.078)
+
+$$$ Target CP: 4.5 ns
+$$$ Cycles: 1182
+$$$ Real CP: 5.09 ns
+$$$ Performance metric: 6016.38
+
+=== Testing target CP = 4.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.838
+
+Slack < 0 (-0.838), increasing CP to 4.54 and retrying.
+
+[Iteration 1] Slack = -0.146
+
+Slack < 0 (-0.146), increasing CP to 4.69 and retrying.
+
+[Iteration 2] Slack = -0.132
+
+Slack < 0 (-0.132), increasing CP to 4.82 and retrying.
+
+[Iteration 3] Slack = -0.227
+
+Slack < 0 (-0.227), increasing CP to 5.05 and retrying.
+
+[Iteration 4] Slack = 0.06
+
+Slack >= 0 (0.06)
+
+$$$ Target CP: 4.0 ns
+$$$ Cycles: 1475
+$$$ Real CP: 5.05 ns
+$$$ Performance metric: 7448.75
+
+=== Testing target CP = 3.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.477
+
+Slack < 0 (-1.477), increasing CP to 4.68 and retrying.
+
+[Iteration 1] Slack = -0.224
+
+Slack < 0 (-0.224), increasing CP to 4.9 and retrying.
+
+[Iteration 2] Slack = 0.007
+
+Slack >= 0 (0.007)
+
+$$$ Target CP: 3.5 ns
+$$$ Cycles: 1483
+$$$ Real CP: 4.90 ns
+$$$ Performance metric: 7266.70
+
+=== Testing target CP = 3.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0],[0]],"ldPortIdx":[[0],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq2","numBBs":2,"numLdChannels":1,"numLoadPorts":1,"numLoads":[0,1],"numStChannels":1,"numStorePorts":1,"numStores":[1,0],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0], [0]], 'ldPortIdx': [[0], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq2', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 1, 'numLoads': [0, 1], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [1, 0], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+{"addrWidth":7,"bufferDepth":0,"dataWidth":32,"fifoDepth":16,"fifoDepth_L":16,"fifoDepth_S":16,"groupMulti":0,"headLagEn":0,"indexWidth":4,"ldOrder":[[0,0,0],[0]],"ldPortIdx":[[0,1,2],[0]],"loadOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"loadPorts":[[0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"master":true,"name":"handshake_lsq_lsq3","numBBs":2,"numLdChannels":1,"numLoadPorts":3,"numLoads":[3,0],"numStChannels":1,"numStorePorts":1,"numStores":[0,1],"pipe0En":0,"pipe1En":0,"pipeCompEn":0,"stPortIdx":[[0],[0]],"stResp":0,"storeOffsets":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"storePorts":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}
+{'addrWidth': 7, 'bufferDepth': 0, 'dataWidth': 32, 'fifoDepth': 16, 'fifoDepth_L': 8, 'fifoDepth_S': 8, 'groupMulti': 0, 'headLagEn': 0, 'indexWidth': 4, 'ldOrder': [[0, 0, 0], [0]], 'ldPortIdx': [[0, 1, 2], [0]], 'loadOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'loadPorts': [[0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'master': True, 'name': 'handshake_lsq_lsq3', 'numBBs': 2, 'numLdChannels': 1, 'numLoadPorts': 3, 'numLoads': [3, 0], 'numStChannels': 1, 'numStorePorts': 1, 'numStores': [0, 1], 'pipe0En': 0, 'pipe1En': 0, 'pipeCompEn': 0, 'stPortIdx': [[0], [0]], 'stResp': 0, 'storeOffsets': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'storePorts': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/jacobi_1d_imper.c
+dynamatic> write-hdl --rtl-config-name rtl-config-vhdl-jacobi_1d_imper-8-8.json
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.977
+
+Slack < 0 (-1.977), increasing CP to 4.68 and retrying.
+
+[Iteration 1] Slack = -0.224
+
+Slack < 0 (-0.224), increasing CP to 4.9 and retrying.
+
+[Iteration 2] Slack = 0.007
+
+Slack >= 0 (0.007)
+
+$$$ Target CP: 3.0 ns
+$$$ Cycles: 1483
+$$$ Real CP: 4.90 ns
+$$$ Performance metric: 7266.70
+
+===  Best Configuration Found ===
+Target CP : 4.50 ns
+Real   CP : 5.09 ns
+Cycles    : 1182
+Performance metric : 6016.38

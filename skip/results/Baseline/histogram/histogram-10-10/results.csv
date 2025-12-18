@@ -1,0 +1,2 @@
+Benchmark,Load,Store,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+histogram,10,10,7.0,6.7,1346,1379,1759,0,4638

@@ -1,0 +1,10 @@
+# Set the source file to run
+set-src skip2/runs/run_2025-12-16_15-08-19/get_tanh-2-5/get_tanh.c
+
+write-hdl --rtl-config-name rtl-config-vhdl-get_tanh-2-5.json
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

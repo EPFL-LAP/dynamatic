@@ -1,0 +1,112 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 00:32:22 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : get_tanh
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             3.803ns  (required time - arrival time)
+  Source:                 load3/data_tehb/control/fullReg_reg/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Destination:            load3/data_tehb/dataReg_reg[25]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            14.200ns  (clk rise@14.200ns - clk rise@0.000ns)
+  Data Path Delay:        10.143ns  (logic 1.857ns (18.309%)  route 8.286ns (81.691%))
+  Logic Levels:           21  (CARRY4=3 LUT2=1 LUT3=3 LUT4=4 LUT5=3 LUT6=7)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 14.683 - 14.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=1456, unset)         0.508     0.508    load3/data_tehb/control/clk
+    SLICE_X33Y80         FDRE                                         r  load3/data_tehb/control/fullReg_reg/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X33Y80         FDRE (Prop_fdre_C_Q)         0.216     0.724 r  load3/data_tehb/control/fullReg_reg/Q
+                         net (fo=75, routed)          0.993     1.717    mem_controller2/read_arbiter/data/fullReg
+    SLICE_X25Y66         LUT5 (Prop_lut5_I4_O)        0.051     1.768 f  mem_controller2/read_arbiter/data/data_tehb/expSum_c1[2]_i_1/O
+                         net (fo=6, routed)           0.515     2.284    mem_controller2/read_arbiter/data/A_loadData[31][1]
+    SLICE_X28Y65         LUT4 (Prop_lut4_I0_O)        0.134     2.418 f  mem_controller2/read_arbiter/data/exc_c1[1]_i_5__0/O
+                         net (fo=2, routed)           0.334     2.752    mem_controller2/read_arbiter/data/exc_c1[1]_i_5__0_n_0
+    SLICE_X29Y65         LUT5 (Prop_lut5_I4_O)        0.138     2.890 r  mem_controller2/read_arbiter/data/g0_b2_i_13/O
+                         net (fo=1, routed)           0.352     3.242    mem_controller2/read_arbiter/data/cmpf0/gen_flopoco_ip.operator/ieee2nfloat_0/eqOp1_in
+    SLICE_X34Y68         LUT6 (Prop_lut6_I0_O)        0.131     3.373 r  mem_controller2/read_arbiter/data/g0_b2_i_7/O
+                         net (fo=23, routed)          0.517     3.890    mem_controller2/read_arbiter/data/cmpf0/gen_flopoco_ip.operator/ieee2nfloat_0/sfracX1__0
+    SLICE_X39Y64         LUT3 (Prop_lut3_I1_O)        0.053     3.943 f  mem_controller2/read_arbiter/data/g0_b2__18_i_1/O
+                         net (fo=58, routed)          0.662     4.604    mem_controller2/read_arbiter/data/A_loadData_1_sn_1
+    SLICE_X26Y63         LUT3 (Prop_lut3_I0_O)        0.131     4.735 r  mem_controller2/read_arbiter/data/eqOp_carry_i_4/O
+                         net (fo=1, routed)           0.000     4.735    cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry__0_0[0]
+    SLICE_X26Y63         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.251     4.986 r  cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry/CO[3]
+                         net (fo=1, routed)           0.000     4.986    cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry_n_0
+    SLICE_X26Y64         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     5.035 r  cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry__0/CO[3]
+                         net (fo=1, routed)           0.000     5.035    cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry__0_n_0
+    SLICE_X26Y65         CARRY4 (Prop_carry4_CI_CO[2])
+                                                      0.107     5.142 r  cmpf0/gen_flopoco_ip.operator/operator/ExpFracCmp/eqOp_carry__1/CO[2]
+                         net (fo=1, routed)           0.178     5.320    mem_controller2/read_arbiter/data/dataReg_reg[0][0]
+    SLICE_X28Y65         LUT6 (Prop_lut6_I0_O)        0.123     5.443 r  mem_controller2/read_arbiter/data/A_storeData[0]_INST_0_i_5/O
+                         net (fo=13, routed)          0.497     5.940    control_merge2/tehb/control/cmpf0_result
+    SLICE_X28Y77         LUT6 (Prop_lut6_I0_O)        0.043     5.983 f  control_merge2/tehb/control/A_storeData[0]_INST_0_i_2/O
+                         net (fo=39, routed)          0.534     6.517    control_merge2/tehb/control/fullReg_reg_3
+    SLICE_X22Y71         LUT3 (Prop_lut3_I0_O)        0.043     6.560 f  control_merge2/tehb/control/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1[2]_i_1__1/O
+                         net (fo=156, routed)         0.634     7.194    control_merge2/tehb/control/oehb_ready_1
+    SLICE_X26Y74         LUT4 (Prop_lut4_I0_O)        0.043     7.237 f  control_merge2/tehb/control/sticky_c3_i_1__0/O
+                         net (fo=297, routed)         0.358     7.595    control_merge2/tehb/control/mulf2_result_ready
+    SLICE_X23Y73         LUT2 (Prop_lut2_I0_O)        0.043     7.638 f  control_merge2/tehb/control/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1[2]_i_1__0/O
+                         net (fo=156, routed)         0.319     7.956    control_merge2/tehb/control/oehb_ready_0
+    SLICE_X26Y73         LUT4 (Prop_lut4_I0_O)        0.043     7.999 f  control_merge2/tehb/control/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1[2]_i_1/O
+                         net (fo=157, routed)         0.330     8.329    fork7/control/generateBlocks[1].regblock/oehb_ready_2
+    SLICE_X27Y73         LUT6 (Prop_lut6_I4_O)        0.043     8.372 f  fork7/control/generateBlocks[1].regblock/transmitValue_i_3__2/O
+                         net (fo=1, routed)           0.303     8.675    fork7/control/generateBlocks[1].regblock/transmitValue_i_3__2_n_0
+    SLICE_X27Y74         LUT6 (Prop_lut6_I0_O)        0.043     8.718 f  fork7/control/generateBlocks[1].regblock/transmitValue_i_2__6/O
+                         net (fo=8, routed)           0.387     9.105    mem_controller2/read_arbiter/data/transmitValue_reg_0
+    SLICE_X31Y80         LUT6 (Prop_lut6_I2_O)        0.043     9.148 r  mem_controller2/read_arbiter/data/transmitValue_i_2__5/O
+                         net (fo=2, routed)           0.096     9.244    fork6/control/generateBlocks[3].regblock/transmitValue_reg_16
+    SLICE_X31Y80         LUT6 (Prop_lut6_I5_O)        0.043     9.287 f  fork6/control/generateBlocks[3].regblock/transmitValue_i_2__1/O
+                         net (fo=7, routed)           0.277     9.564    fork5/control/generateBlocks[0].regblock/cmpf0_result_ready
+    SLICE_X33Y80         LUT5 (Prop_lut5_I1_O)        0.043     9.607 r  fork5/control/generateBlocks[0].regblock/fullReg_i_2__0/O
+                         net (fo=4, routed)           0.216     9.823    fork5/control/generateBlocks[0].regblock/fullReg_i_2__0_n_0
+    SLICE_X33Y80         LUT4 (Prop_lut4_I1_O)        0.043     9.866 r  fork5/control/generateBlocks[0].regblock/dataReg[31]_i_1/O
+                         net (fo=32, routed)          0.785    10.651    load3/data_tehb/dataReg_reg[31]_0[0]
+    SLICE_X23Y66         FDRE                                         r  load3/data_tehb/dataReg_reg[25]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       14.200    14.200 r  
+                                                      0.000    14.200 r  clk (IN)
+                         net (fo=1456, unset)         0.483    14.683    load3/data_tehb/clk
+    SLICE_X23Y66         FDRE                                         r  load3/data_tehb/dataReg_reg[25]/C
+                         clock pessimism              0.000    14.683    
+                         clock uncertainty           -0.035    14.647    
+    SLICE_X23Y66         FDRE (Setup_fdre_C_CE)      -0.194    14.453    load3/data_tehb/dataReg_reg[25]
+  -------------------------------------------------------------------
+                         required time                         14.453    
+                         arrival time                         -10.651    
+  -------------------------------------------------------------------
+                         slack                                  3.803    
+
+
+
+

@@ -1,0 +1,112 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 02:04:37 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : get_tanh
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -0.101ns  (required time - arrival time)
+  Source:                 mulf1/operator/sigProdExt_c2_reg[23]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.200ns period=6.400ns})
+  Destination:            mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1_reg[2]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.200ns period=6.400ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            6.400ns  (clk rise@6.400ns - clk rise@0.000ns)
+  Data Path Delay:        6.472ns  (logic 3.658ns (56.523%)  route 2.814ns (43.477%))
+  Logic Levels:           18  (CARRY4=8 DSP48E1=1 LUT4=2 LUT5=3 LUT6=4)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 6.883 - 6.400 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=1773, unset)         0.508     0.508    mulf1/operator/clk
+    SLICE_X43Y66         FDRE                                         r  mulf1/operator/sigProdExt_c2_reg[23]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X43Y66         FDRE (Prop_fdre_C_Q)         0.198     0.706 r  mulf1/operator/sigProdExt_c2_reg[23]/Q
+                         net (fo=1, routed)           0.412     1.118    mulf1/operator/SignificandMultiplication/tile_0_mult/sigProdExt_c2[22]
+    SLICE_X43Y65         LUT6 (Prop_lut6_I1_O)        0.120     1.238 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_34/O
+                         net (fo=1, routed)           0.160     1.399    mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_34_n_0
+    SLICE_X43Y64         LUT6 (Prop_lut6_I3_O)        0.043     1.442 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_28/O
+                         net (fo=1, routed)           0.172     1.614    mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_28_n_0
+    SLICE_X42Y65         LUT5 (Prop_lut5_I1_O)        0.043     1.657 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_25/O
+                         net (fo=1, routed)           0.000     1.657    mulf1/operator/RoundingAdder/Mfull_c0_3[0]
+    SLICE_X42Y65         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.238     1.895 r  mulf1/operator/RoundingAdder/Mfull_c0_i_21__0/CO[3]
+                         net (fo=1, routed)           0.000     1.895    mulf1/operator/RoundingAdder/Mfull_c0_i_21__0_n_0
+    SLICE_X42Y66         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     1.945 r  mulf1/operator/RoundingAdder/Mfull_c0_i_20__0/CO[3]
+                         net (fo=1, routed)           0.000     1.945    mulf1/operator/RoundingAdder/Mfull_c0_i_20__0_n_0
+    SLICE_X42Y67         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     1.995 r  mulf1/operator/RoundingAdder/Mfull_c0_i_19__0/CO[3]
+                         net (fo=1, routed)           0.000     1.995    mulf1/operator/RoundingAdder/Mfull_c0_i_19__0_n_0
+    SLICE_X42Y68         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.045 r  mulf1/operator/RoundingAdder/Mfull_c0_i_18__0/CO[3]
+                         net (fo=1, routed)           0.000     2.045    mulf1/operator/RoundingAdder/Mfull_c0_i_18__0_n_0
+    SLICE_X42Y69         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.095 r  mulf1/operator/RoundingAdder/g0_b2__47_i_4/CO[3]
+                         net (fo=1, routed)           0.000     2.095    mulf1/operator/RoundingAdder/g0_b2__47_i_4_n_0
+    SLICE_X42Y70         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.145 r  mulf1/operator/RoundingAdder/g0_b2__47_i_6/CO[3]
+                         net (fo=1, routed)           0.000     2.145    mulf1/operator/RoundingAdder/g0_b2__47_i_6_n_0
+    SLICE_X42Y71         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.195 r  mulf1/operator/RoundingAdder/minusOp_carry_i_9/CO[3]
+                         net (fo=1, routed)           0.000     2.195    mulf1/operator/RoundingAdder/minusOp_carry_i_9_n_0
+    SLICE_X42Y72         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.102     2.297 f  mulf1/operator/RoundingAdder/minusOp_carry_i_11/O[0]
+                         net (fo=3, routed)           0.397     2.694    mulf1/operator/RoundingAdder/ip_result__0[28]
+    SLICE_X40Y72         LUT4 (Prop_lut4_I0_O)        0.119     2.813 f  mulf1/operator/RoundingAdder/g0_b2__47_i_9/O
+                         net (fo=1, routed)           0.213     3.027    mulf1/operator/RoundingAdder/g0_b2__47_i_9_n_0
+    SLICE_X41Y71         LUT5 (Prop_lut5_I4_O)        0.043     3.070 f  mulf1/operator/RoundingAdder/g0_b2__47_i_8/O
+                         net (fo=33, routed)          0.128     3.198    mulf1/operator/RoundingAdder/g0_b2__47_i_8_n_0
+    SLICE_X41Y71         LUT5 (Prop_lut5_I4_O)        0.043     3.241 r  mulf1/operator/RoundingAdder/Mfull_c0_i_24__0/O
+                         net (fo=4, routed)           0.217     3.457    mulf1/operator/RoundingAdder/Mfull_c0_i_24__0_n_0
+    SLICE_X41Y72         LUT4 (Prop_lut4_I1_O)        0.043     3.500 r  mulf1/operator/RoundingAdder/g0_b2__47_i_5/O
+                         net (fo=22, routed)          0.287     3.788    mulf1/operator/RoundingAdder/mulf2/ieee2nfloat_0/sfracX1__0
+    SLICE_X41Y71         LUT6 (Prop_lut6_I1_O)        0.043     3.831 r  mulf1/operator/RoundingAdder/Mfull_c0_i_14__0/O
+                         net (fo=1, routed)           0.291     4.121    mulf2/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_1[3]
+    DSP48_X2Y28          DSP48E1 (Prop_dsp48e1_B[3]_P[17])
+                                                      2.280     6.401 r  mulf2/operator/SignificandMultiplication/tile_0_mult/Mfull_c0/P[17]
+                         net (fo=3, routed)           0.535     6.937    mulf1/operator/RoundingAdder/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid323_Out0_copy324_c1_reg[2][0]
+    SLICE_X43Y73         LUT6 (Prop_lut6_I5_O)        0.043     6.980 r  mulf1/operator/RoundingAdder/g0_b0__70/O
+                         net (fo=1, routed)           0.000     6.980    mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1_reg[2]_1[2]
+    SLICE_X43Y73         FDRE                                         r  mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1_reg[2]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        6.400     6.400 r  
+                                                      0.000     6.400 r  clk (IN)
+                         net (fo=1773, unset)         0.483     6.883    mulf2/operator/SignificandMultiplication/clk
+    SLICE_X43Y73         FDRE                                         r  mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1_reg[2]/C
+                         clock pessimism              0.000     6.883    
+                         clock uncertainty           -0.035     6.847    
+    SLICE_X43Y73         FDRE (Setup_fdre_C_D)        0.031     6.878    mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1_reg[2]
+  -------------------------------------------------------------------
+                         required time                          6.878    
+                         arrival time                          -6.980    
+  -------------------------------------------------------------------
+                         slack                                 -0.101    
+
+
+
+

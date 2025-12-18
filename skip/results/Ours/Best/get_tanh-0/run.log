@@ -1,0 +1,1132 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[INFO] Compiled cf to handshake
+[INFO][SKIP] Created Skip Conditions
+[INFO][SKIP] Created Waiting Signals
+[INFO][SKIP] Gated Successor Accesses
+[INFO][SKIP] Dependency graph written to /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-22-03/get_tanh-0/out/comp/get_tanh_DEP_G.dot
+[INFO][SKIP] Inserted Out with LSQs circuit successfully! 
+[INFO] Applied transformations to handshake with skippable sequentializer
+[INFO] Applied transformations to handshake
+[INFO] Built kernel for profiling
+[INFO] Ran kernel for profiling
+[INFO] Profiled cf-level
+[INFO] Running smart buffer placement with CP = 15.000 and algorithm = 'cpbuf'
+[INFO] Placed smart buffers
+[INFO] Canonicalized handshake
+[INFO] Created get_tanh DOT
+[INFO] Converted get_tanh DOT to PNG
+[INFO] Created get_tanh_CFG DOT
+[INFO] Converted get_tanh_CFG DOT to PNG
+[INFO] Lowered to HW
+[INFO] Compilation succeeded
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> set-clock-period 15   
+dynamatic> compile --skippable-seq-n 0 --buffer-algorithm cpbuf --fork-fifo-size 15
+dynamatic> write-hdl
+dynamatic> exit
+
+Goodbye!
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Initial BASELINE Cycles: None
+buffer1 ----> 0
+buffer1      max_len = 0
+buffer2 ----> 0
+buffer2      max_len = 0
+buffer3 ----> 6
+buffer3      max_len = 6
+buffer4 ----> 1
+buffer4      max_len = 1
+buffer5 ----> 0
+buffer5      max_len = 0
+buffer6 ----> 6
+buffer6      max_len = 6
+buffer7 ----> 0
+buffer7      max_len = 0
+buffer8 ----> 6
+buffer8      max_len = 6
+buffer9 ----> 0
+buffer9      max_len = 0
+buffer10 ----> 6
+buffer10     max_len = 6
+buffer11 ----> 0
+buffer11     max_len = 0
+buffer12 ----> 0
+buffer12     max_len = 0
+buffer13 ----> 0
+buffer13     max_len = 0
+buffer14 ----> 0
+buffer14     max_len = 0
+buffer15 ----> 0
+buffer15     max_len = 0
+buffer16 ----> 0
+buffer16     max_len = 0
+buffer17 ----> 1
+buffer17     max_len = 1
+buffer18 ----> 1
+buffer18     max_len = 1
+buffer19 ----> 1
+buffer19     max_len = 1
+buffer20 ----> 1
+buffer20     max_len = 1
+buffer21 ----> 1
+buffer21     max_len = 1
+buffer22 ----> 0
+buffer22     max_len = 0
+buffer23 ----> 0
+buffer23     max_len = 0
+buffer24 ----> 0
+buffer24     max_len = 0
+buffer25 ----> 0
+buffer25     max_len = 0
+buffer26 ----> 0
+buffer26     max_len = 0
+buffer27 ----> 1
+buffer27     max_len = 1
+
+=== Applying MLIR modifications (remove) ===
+[REMOVE] buffer1 (max_len=0)
+[REMOVE] buffer11 (max_len=0)
+[REMOVE] buffer12 (max_len=0)
+[REMOVE] buffer13 (max_len=0)
+[REMOVE] buffer14 (max_len=0)
+[REMOVE] buffer15 (max_len=0)
+[REMOVE] buffer16 (max_len=0)
+[REMOVE] buffer2 (max_len=0)
+[REMOVE] buffer22 (max_len=0)
+[REMOVE] buffer23 (max_len=0)
+[REMOVE] buffer24 (max_len=0)
+[REMOVE] buffer25 (max_len=0)
+[REMOVE] buffer26 (max_len=0)
+[REMOVE] buffer5 (max_len=0)
+[REMOVE] buffer7 (max_len=0)
+[REMOVE] buffer9 (max_len=0)
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== Running BASELINE simulation after initial resize ===
+BASELINE Cycles: 4186
+
+=== Applying Buffer Removal Optimization ===
+MLIR file backed up to: skip/runs/run_2025-12-16_00-22-03/get_tanh-0/out/comp/handshake_transformed.mlir.bak
+
+=== Applying Buffer Resize Optimization to size 0 ===
+Processed 0/11 until now
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer4
+[TRY REMOVE] buffer6
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+[TRY REMOVE] buffer19
+[TRY REMOVE] buffer20
+[TRY REMOVE] buffer21
+[TRY REMOVE] buffer27
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 3197 (Baseline: 4186)
+[OPTIMIZE] Success: Resized 11 buffers to 0: ['buffer3', 'buffer4', 'buffer6', 'buffer8', 'buffer10', 'buffer17', 'buffer18', 'buffer19', 'buffer20', 'buffer21', 'buffer27']
+
+Optimization complete. Successfully resized 11 buffers to 0
+
+=== Applying Buffer Resize Optimization to size 1 ===
+
+Optimization complete. Successfully resized 0 buffers to 1
+
+=== Applying Buffer Resize Optimization to size 2 ===
+
+Optimization complete. Successfully resized 0 buffers to 2
+
+=== Applying Buffer Resize Optimization to size 3 ===
+
+Optimization complete. Successfully resized 0 buffers to 3
+
+=== Applying Buffer Resize Optimization to size 4 ===
+
+Optimization complete. Successfully resized 0 buffers to 4
+
+=== Applying Buffer Resize Optimization to size 5 ===
+
+Optimization complete. Successfully resized 0 buffers to 5
+
+=== Applying Buffer Resize Optimization to size 6 ===
+
+Optimization complete. Successfully resized 0 buffers to 6
+
+=== Applying Buffer Resize Optimization to size 7 ===
+
+Optimization complete. Successfully resized 0 buffers to 7
+
+=== Applying Buffer Resize Optimization to size 8 ===
+
+Optimization complete. Successfully resized 0 buffers to 8
+
+=== Applying Buffer Resize Optimization to size 9 ===
+
+Optimization complete. Successfully resized 0 buffers to 9
+
+=== Applying Buffer Resize Optimization to size 10 ===
+
+Optimization complete. Successfully resized 0 buffers to 10
+
+=== Applying Buffer Resize Optimization to size 11 ===
+
+Optimization complete. Successfully resized 0 buffers to 11
+
+=== Applying Buffer Resize Optimization to size 12 ===
+
+Optimization complete. Successfully resized 0 buffers to 12
+
+=== Applying Buffer Resize Optimization to size 13 ===
+
+Optimization complete. Successfully resized 0 buffers to 13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== After buffering ===
+BASELINE Cycles: 3197
+
+===== Target CP tuning =====
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Baseline latency = 3197 cycles at 15 ns
+
+--- Trying CP = 14.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 4186 cycles
+Latency degraded, stopping search.
+
+ Best CP: 15 ns (latency = 3197 cycles)
+Starting from 15 ns
+
+=== Testing target CP = 15 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 4.945
+
+Slack >= 0 (4.945)
+
+$$$ Target CP: 15 ns
+$$$ Cycles: 3197
+$$$ Real CP: 14.70 ns
+$$$ Performance metric: 46995.90
+
+=== Testing target CP = 14.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 3.803
+
+Slack >= 0 (3.803)
+
+$$$ Target CP: 14.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 14.20 ns
+$$$ Performance metric: 59441.20
+
+=== Testing target CP = 14.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 3.054
+
+Slack >= 0 (3.054)
+
+$$$ Target CP: 14.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 13.70 ns
+$$$ Performance metric: 57348.20
+
+=== Testing target CP = 13.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 3.072
+
+Slack >= 0 (3.072)
+
+$$$ Target CP: 13.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 13.20 ns
+$$$ Performance metric: 55255.20
+
+=== Testing target CP = 13.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 3.68
+
+Slack >= 0 (3.68)
+
+$$$ Target CP: 13.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 12.70 ns
+$$$ Performance metric: 53162.20
+
+=== Testing target CP = 12.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 2.076
+
+Slack >= 0 (2.076)
+
+$$$ Target CP: 12.5 ns
+$$$ Cycles: 3197
+$$$ Real CP: 12.20 ns
+$$$ Performance metric: 39003.40
+
+=== Testing target CP = 12.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 2.251
+
+Slack >= 0 (2.251)
+
+$$$ Target CP: 12.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 11.70 ns
+$$$ Performance metric: 48976.20
+
+=== Testing target CP = 11.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 2.577
+
+Slack >= 0 (2.577)
+
+$$$ Target CP: 11.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 11.20 ns
+$$$ Performance metric: 46883.20
+
+=== Testing target CP = 11.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.901
+
+Slack >= 0 (1.901)
+
+$$$ Target CP: 11.0 ns
+$$$ Cycles: 3198
+$$$ Real CP: 10.70 ns
+$$$ Performance metric: 34218.60
+
+=== Testing target CP = 10.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.811
+
+Slack >= 0 (1.811)
+
+$$$ Target CP: 10.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 10.20 ns
+$$$ Performance metric: 42697.20
+
+=== Testing target CP = 10.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.243
+
+Slack >= 0 (1.243)
+
+$$$ Target CP: 10.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 9.70 ns
+$$$ Performance metric: 40604.20
+
+=== Testing target CP = 9.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 1.152
+
+Slack >= 0 (1.152)
+
+$$$ Target CP: 9.5 ns
+$$$ Cycles: 3197
+$$$ Real CP: 9.20 ns
+$$$ Performance metric: 29412.40
+
+=== Testing target CP = 9.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.969
+
+Slack >= 0 (0.969)
+
+$$$ Target CP: 9.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 8.70 ns
+$$$ Performance metric: 36418.20
+
+=== Testing target CP = 8.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.621
+
+Slack >= 0 (0.621)
+
+$$$ Target CP: 8.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 8.20 ns
+$$$ Performance metric: 34325.20
+
+=== Testing target CP = 8.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.567
+
+Slack >= 0 (0.567)
+
+$$$ Target CP: 8.0 ns
+$$$ Cycles: 4186
+$$$ Real CP: 7.70 ns
+$$$ Performance metric: 32232.20
+
+=== Testing target CP = 7.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.46
+
+Slack >= 0 (0.46)
+
+$$$ Target CP: 7.5 ns
+$$$ Cycles: 4186
+$$$ Real CP: 7.20 ns
+$$$ Performance metric: 30139.20
+
+=== Testing target CP = 7.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = 0.195
+
+Slack >= 0 (0.195)
+
+$$$ Target CP: 7.0 ns
+$$$ Cycles: 3197
+$$$ Real CP: 6.70 ns
+$$$ Performance metric: 21419.90
+
+=== Testing target CP = 6.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.399
+
+Slack < 0 (-0.399), increasing CP to 6.6 and retrying.
+
+[Iteration 1] Slack = -0.032
+
+Slack < 0 (-0.032), increasing CP to 6.63 and retrying.
+
+[Iteration 2] Slack = 0.008
+
+Slack >= 0 (0.008)
+
+$$$ Target CP: 6.5 ns
+$$$ Cycles: 3197
+$$$ Real CP: 6.63 ns
+$$$ Performance metric: 21196.11
+
+=== Testing target CP = 6.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.912
+
+Slack < 0 (-0.912), increasing CP to 6.61 and retrying.
+
+[Iteration 1] Slack = 0.205
+
+Slack >= 0 (0.205)
+
+$$$ Target CP: 6.0 ns
+$$$ Cycles: 5176
+$$$ Real CP: 6.61 ns
+$$$ Performance metric: 34213.36
+
+=== Testing target CP = 5.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.544
+
+Slack < 0 (-1.544), increasing CP to 6.74 and retrying.
+
+[Iteration 1] Slack = 0.159
+
+Slack >= 0 (0.159)
+
+$$$ Target CP: 5.5 ns
+$$$ Cycles: 4197
+$$$ Real CP: 6.74 ns
+$$$ Performance metric: 28287.78
+
+=== Testing target CP = 5.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.008
+
+Slack < 0 (-2.008), increasing CP to 6.71 and retrying.
+
+[Iteration 1] Slack = 0.01
+
+Slack >= 0 (0.01)
+
+$$$ Target CP: 5.0 ns
+$$$ Cycles: 4187
+$$$ Real CP: 6.71 ns
+$$$ Performance metric: 28094.77
+
+=== Testing target CP = 4.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.557
+
+Slack < 0 (-2.557), increasing CP to 6.76 and retrying.
+
+[Iteration 1] Slack = 0.058
+
+Slack >= 0 (0.058)
+
+$$$ Target CP: 4.5 ns
+$$$ Cycles: 4197
+$$$ Real CP: 6.76 ns
+$$$ Performance metric: 28371.72
+
+=== Testing target CP = 4.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.91
+
+Slack < 0 (-2.91), increasing CP to 6.61 and retrying.
+
+[Iteration 1] Slack = -0.003
+
+Slack < 0 (-0.003), increasing CP to 6.62 and retrying.
+
+[Iteration 2] Slack = -0.078
+
+Slack < 0 (-0.078), increasing CP to 6.7 and retrying.
+
+[Iteration 3] Slack = 0.096
+
+Slack >= 0 (0.096)
+
+$$$ Target CP: 4.0 ns
+$$$ Cycles: 4197
+$$$ Real CP: 6.70 ns
+$$$ Performance metric: 28119.90
+
+=== Testing target CP = 3.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -3.199
+
+Slack < 0 (-3.199), increasing CP to 6.4 and retrying.
+
+[Iteration 1] Slack = -0.101
+
+Slack < 0 (-0.101), increasing CP to 6.5 and retrying.
+
+[Iteration 2] Slack = 0.011
+
+Slack >= 0 (0.011)
+
+$$$ Target CP: 3.5 ns
+$$$ Cycles: 6267
+$$$ Real CP: 6.50 ns
+$$$ Performance metric: 40735.50
+
+=== Testing target CP = 3.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_00-22-03/get_tanh-0/get_tanh.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -3.615
+
+Slack < 0 (-3.615), increasing CP to 6.32 and retrying.
+
+[Iteration 1] Slack = -0.2
+
+Slack < 0 (-0.2), increasing CP to 6.52 and retrying.
+
+[Iteration 2] Slack = 0.079
+
+Slack >= 0 (0.079)
+
+$$$ Target CP: 3.0 ns
+$$$ Cycles: 5266
+$$$ Real CP: 6.52 ns
+$$$ Performance metric: 34334.32
+
+===  Best Configuration Found ===
+Target CP : 6.50 ns
+Real   CP : 6.63 ns
+Cycles    : 3197
+Performance metric : 21196.11

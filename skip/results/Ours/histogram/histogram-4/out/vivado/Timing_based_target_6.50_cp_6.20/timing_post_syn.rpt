@@ -1,0 +1,119 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 12:46:50 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : histogram
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -1.800ns  (required time - arrival time)
+  Source:                 fork0/generateBlocks[8].regblock/transmitValue_reg/C
+                            (rising edge-triggered cell FDSE clocked by clk  {rise@0.000ns fall@3.100ns period=6.200ns})
+  Destination:            buffer7/dataReg_reg[0]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@3.100ns period=6.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            6.200ns  (clk rise@6.200ns - clk rise@0.000ns)
+  Data Path Delay:        7.747ns  (logic 1.884ns (24.319%)  route 5.863ns (75.681%))
+  Logic Levels:           22  (CARRY4=7 LUT3=1 LUT4=2 LUT5=3 LUT6=9)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 6.683 - 6.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=1191, unset)         0.508     0.508    fork0/generateBlocks[8].regblock/clk
+                         FDSE                                         r  fork0/generateBlocks[8].regblock/transmitValue_reg/C
+  -------------------------------------------------------------------    -------------------
+                         FDSE (Prop_fdse_C_Q)         0.226     0.734 r  fork0/generateBlocks[8].regblock/transmitValue_reg/Q
+                         net (fo=14, unplaced)        0.439     1.173    control_merge0/tehb/control/transmitValue
+                         LUT5 (Prop_lut5_I2_O)        0.119     1.292 f  control_merge0/tehb/control/n_ready_INST_0_i_3/O
+                         net (fo=10, unplaced)        0.287     1.579    control_merge0/tehb/control/dataReg_reg[0]
+                         LUT6 (Prop_lut6_I5_O)        0.043     1.622 r  control_merge0/tehb/control/start_ready_INST_0_i_9/O
+                         net (fo=137, unplaced)       0.351     1.973    control_merge0/tehb/control/transmitValue_reg_5
+                         LUT5 (Prop_lut5_I2_O)        0.043     2.016 f  control_merge0/tehb/control/feature_loadAddr[0]_INST_0_i_1/O
+                         net (fo=7, unplaced)         0.412     2.428    cmpi0/buffer7_outs[0]
+                         LUT4 (Prop_lut4_I1_O)        0.049     2.477 r  cmpi0/feature_loadEn_INST_0_i_51/O
+                         net (fo=1, unplaced)         0.000     2.477    cmpi0/feature_loadEn_INST_0_i_51_n_0
+                         CARRY4 (Prop_carry4_DI[0]_CO[3])
+                                                      0.284     2.761 r  cmpi0/feature_loadEn_INST_0_i_31/CO[3]
+                         net (fo=1, unplaced)         0.007     2.768    cmpi0/feature_loadEn_INST_0_i_31_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.818 r  cmpi0/feature_loadEn_INST_0_i_14/CO[3]
+                         net (fo=1, unplaced)         0.000     2.818    cmpi0/feature_loadEn_INST_0_i_14_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.868 r  cmpi0/feature_loadEn_INST_0_i_5/CO[3]
+                         net (fo=1, unplaced)         0.000     2.868    cmpi0/feature_loadEn_INST_0_i_5_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.918 f  cmpi0/feature_loadEn_INST_0_i_2/CO[3]
+                         net (fo=47, unplaced)        0.669     3.587    init0/control/result[0]
+                         LUT5 (Prop_lut5_I2_O)        0.043     3.630 f  init0/control/start_ready_INST_0_i_10/O
+                         net (fo=40, unplaced)        0.321     3.951    init0/control/dataReg_reg[0]
+                         LUT6 (Prop_lut6_I0_O)        0.043     3.994 f  init0/control/Memory[0][31]_i_4/O
+                         net (fo=38, unplaced)        0.319     4.313    buffer11/fifo/p_2_in
+                         LUT4 (Prop_lut4_I3_O)        0.043     4.356 r  buffer11/fifo/Memory[2][0]_i_43/O
+                         net (fo=1, unplaced)         0.377     4.733    cmpi2/Memory_reg[2][0]_i_8_0
+                         LUT6 (Prop_lut6_I1_O)        0.043     4.776 r  cmpi2/Memory[2][0]_i_23/O
+                         net (fo=1, unplaced)         0.000     4.776    cmpi2/Memory[2][0]_i_23_n_0
+                         CARRY4 (Prop_carry4_S[1]_CO[3])
+                                                      0.246     5.022 r  cmpi2/Memory_reg[2][0]_i_8/CO[3]
+                         net (fo=1, unplaced)         0.007     5.029    cmpi2/Memory_reg[2][0]_i_8_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     5.079 r  cmpi2/Memory_reg[2][0]_i_4/CO[3]
+                         net (fo=1, unplaced)         0.000     5.079    cmpi2/Memory_reg[2][0]_i_4_n_0
+                         CARRY4 (Prop_carry4_CI_CO[2])
+                                                      0.122     5.201 f  cmpi2/Memory_reg[2][0]_i_2/CO[2]
+                         net (fo=6, unplaced)         0.276     5.477    buffer46/fifo/result[0]
+                         LUT3 (Prop_lut3_I0_O)        0.122     5.599 f  buffer46/fifo/Head[1]_i_4__1/O
+                         net (fo=2, unplaced)         0.255     5.854    buffer46/fifo/buffer46_outs
+                         LUT6 (Prop_lut6_I4_O)        0.043     5.897 f  buffer46/fifo/Head[1]_i_2__0/O
+                         net (fo=13, unplaced)        0.294     6.191    buffer46/fifo/Empty_reg_0
+                         LUT6 (Prop_lut6_I3_O)        0.043     6.234 r  buffer46/fifo/transmitValue_i_2__11/O
+                         net (fo=5, unplaced)         0.272     6.506    buffer34/fifo/anyBlockStop
+                         LUT6 (Prop_lut6_I3_O)        0.043     6.549 f  buffer34/fifo/transmitValue_i_2__10/O
+                         net (fo=5, unplaced)         0.250     6.799    buffer34/fifo/transmitValue_reg
+                         LUT6 (Prop_lut6_I0_O)        0.043     6.842 r  buffer34/fifo/fullReg_i_7__0/O
+                         net (fo=1, unplaced)         0.705     7.547    fork6/control/generateBlocks[7].regblock/transmitValue_reg_2
+                         LUT6 (Prop_lut6_I0_O)        0.043     7.590 r  fork6/control/generateBlocks[7].regblock/fullReg_i_4/O
+                         net (fo=21, unplaced)        0.305     7.895    control_merge0/fork_valid/generateBlocks[1].regblock/anyBlockStop
+                         LUT6 (Prop_lut6_I2_O)        0.043     7.938 r  control_merge0/fork_valid/generateBlocks[1].regblock/dataReg[31]_i_1/O
+                         net (fo=32, unplaced)        0.317     8.255    buffer7/E[0]
+                         FDRE                                         r  buffer7/dataReg_reg[0]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        6.200     6.200 r  
+                                                      0.000     6.200 r  clk (IN)
+                         net (fo=1191, unset)         0.483     6.683    buffer7/clk
+                         FDRE                                         r  buffer7/dataReg_reg[0]/C
+                         clock pessimism              0.000     6.683    
+                         clock uncertainty           -0.035     6.647    
+                         FDRE (Setup_fdre_C_CE)      -0.192     6.455    buffer7/dataReg_reg[0]
+  -------------------------------------------------------------------
+                         required time                          6.455    
+                         arrival time                          -8.255    
+  -------------------------------------------------------------------
+                         slack                                 -1.800    
+
+
+
+

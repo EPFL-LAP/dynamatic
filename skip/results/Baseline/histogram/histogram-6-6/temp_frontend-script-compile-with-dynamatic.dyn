@@ -1,0 +1,14 @@
+# Set the source file to run
+set-src skip2/runs/run_2025-12-16_16-04-49/histogram-6-6/histogram.c
+
+# Set clock period
+set-clock-period 15   
+
+# Compile
+compile --buffer-algorithm cpbuf --fork-fifo-size 15
+
+# Generate the VHDL design corresponding to the source code
+write-hdl --rtl-config-name rtl-config-vhdl-histogram-6-6.json
+
+# Exit the frontend
+exit

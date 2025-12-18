@@ -1,0 +1,10 @@
+# Set the source file to run
+set-src skip2/runs/run_2025-12-16_15-10-08/mvt_float-8-8/mvt_float.c
+
+write-hdl --rtl-config-name rtl-config-vhdl-mvt_float-8-8.json
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

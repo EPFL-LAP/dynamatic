@@ -1,0 +1,2289 @@
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:51 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# End time: 01:35:51 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_4.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:51 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# ** Error: (vcom-11) Could not find work.and_n.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd(21): (vcom-1195) Cannot find expanded name "work.and_n".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd(21): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd(40): VHDL Compiler exiting
+# End time: 01:35:51 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:51 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_to_bram.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+# End time: 01:35:51 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:51 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/cond_br_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of cond_br_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of merge_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd(3): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd(3): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd(5): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# ** Error: (vcom-11) Could not find work.or_n.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd(25): (vcom-1195) Cannot find expanded name "work.or_n".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd(25): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.eager_fork_register_block.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd(35): (vcom-1195) Cannot find expanded name "work.eager_fork_register_block".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd(35): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd(49): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(6): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/elastic_fifo_inner.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner
+# -- Compiling architecture arch of elastic_fifo_inner
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of elastic_fifo_inner.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd(5): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd(5): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd(7): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/addi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of addi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/sink.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of sink.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd(5): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd(5): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd(7): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join_handshake.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join_handshake
+# -- Compiling architecture arch of join_handshake
+# -- Loading entity join
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of join_handshake.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/cond_br.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of cond_br.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# ** Error: (vcom-11) Could not find work.oehb_dataless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd(26): (vcom-1195) Cannot find expanded name "work.oehb_dataless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd(26): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd(49): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/sink_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink_dataless
+# -- Compiling architecture arch of sink_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of sink_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/elastic_fifo_inner_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner_dataless
+# -- Compiling architecture arch of elastic_fifo_inner_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of elastic_fifo_inner_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_5.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(9): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(9): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(10): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tfifo_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo_dataless
+# -- Compiling architecture arch of tfifo_dataless
+# -- Loading entity elastic_fifo_inner_dataless
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tfifo_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(6): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/delay_buffer.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity delay_buffer
+# -- Compiling architecture arch of delay_buffer
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of delay_buffer.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/source.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of source.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/trunci.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of trunci.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_2.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_dataless_init.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless_init
+# -- Compiling architecture arch of tehb_dataless_init
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_dataless_init.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd(50): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd(50): Unknown expanded name.
+# -- Loading entity fork_dataless
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd(73): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian_wrapper
+# -- Compiling architecture behavioral of gaussian_wrapper
+# -- Loading entity mem_to_bram
+# ** Error: (vcom-11) Could not find work.gaussian.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd(155): (vcom-1195) Cannot find expanded name "work.gaussian".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd(155): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd(188): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/extsi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of extsi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# End time: 01:35:52 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_3.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:52 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of oehb_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_6
+# -- Compiling architecture arch of handshake_constant_6
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_6.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/shli.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity shli
+# -- Compiling architecture arch of shli
+# -- Loading entity join
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of shli.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tfifo.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo
+# -- Compiling architecture arch of tfifo
+# -- Loading entity elastic_fifo_inner
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tfifo.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/store.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of store.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd(4): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd(4): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd(6): VHDL Compiler exiting
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd(34): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd(34): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.tehb.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd(51): (vcom-1195) Cannot find expanded name "work.tehb".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd(51): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd(67): VHDL Compiler exiting
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/types.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of types.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/muli.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mul_4_stage
+# -- Compiling architecture behav of mul_4_stage
+# -- Compiling entity muli
+# -- Compiling architecture arch of muli
+# -- Loading entity join
+# -- Loading entity mul_4_stage
+# -- Loading entity delay_buffer
+# -- Loading entity oehb
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of muli.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity mux_dataless
+# -- Compiling architecture arch of mux_dataless
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mux_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_0.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_fork.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/eager_fork_register_block.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of eager_fork_register_block.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/logic.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of logic.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_init.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_init
+# -- Compiling architecture arch of tehb_init
+# -- Loading entity tehb_dataless_init
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tehb_init.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_cmpi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity join
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_1.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/subi.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity subi
+# -- Compiling architecture arch of subi
+# -- Loading entity join
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of subi.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian
+# -- Compiling architecture behavioral of gaussian
+# -- Loading entity fork_dataless
+# ** Error: (vcom-11) Could not find work.mem_controller.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1239): (vcom-1195) Cannot find expanded name "work.mem_controller".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1239): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_controller_storeless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1280): (vcom-1195) Cannot find expanded name "work.mem_controller_storeless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1280): Unknown expanded name.
+# -- Loading entity handshake_constant_0
+# -- Loading package types
+# -- Loading entity handshake_fork
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_constant_2
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1415): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1415): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1433): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1433): Unknown expanded name.
+# -- Loading entity tehb_init
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1535): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1535): Unknown expanded name.
+# -- Loading entity tehb
+# -- Loading entity oehb
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1604): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1604): Unknown expanded name.
+# -- Loading entity control_merge_dataless
+# -- Loading entity source
+# -- Loading entity addi
+# -- Loading entity tehb_dataless
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1759): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1759): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1789): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1789): Unknown expanded name.
+# -- Loading entity tfifo
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1945): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(1945): Unknown expanded name.
+# -- Loading entity trunci
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2002): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2002): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2020): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2020): Unknown expanded name.
+# -- Loading entity oehb_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity cond_br_dataless
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2830): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2830): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2848): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2848): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2974): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(2974): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3016): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3016): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3082): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3082): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3100): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3100): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mux.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3199): (vcom-1195) Cannot find expanded name "work.mux".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3199): Unknown expanded name.
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_constant_6
+# -- Loading entity shli
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3681): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3681): Unknown expanded name.
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity sink_dataless
+# -- Loading entity join_handshake
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3837): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(3837): Unknown expanded name.
+# -- Loading entity load
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(4020): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(4020): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.gate.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(4176): (vcom-1195) Cannot find expanded name "work.gate".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(4176): Unknown expanded name.
+# -- Loading entity muli
+# -- Loading entity subi
+# -- Loading entity tfifo_dataless
+# -- Loading entity tehb_dataless_init
+# -- Loading entity store
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd(5240): VHDL Compiler exiting
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 66, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity gate
+# -- Compiling architecture arch of gate
+# -- Loading entity join
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of gate.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of fork_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# ** Error: (vcom-11) Could not find work.read_memory_arbiter.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(49): (vcom-1195) Cannot find expanded name "work.read_memory_arbiter".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(49): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mc_control.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(75): (vcom-1195) Cannot find expanded name "work.mc_control".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(75): Unknown expanded name.
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd(88): VHDL Compiler exiting
+# End time: 01:35:53 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 6, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:53 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity read_address_mux
+# -- Compiling architecture arch of read_address_mux
+# -- Compiling entity read_address_ready
+# -- Compiling architecture arch of read_address_ready
+# -- Compiling entity read_data_signals
+# -- Compiling architecture arch of read_data_signals
+# -- Compiling entity read_priority
+# -- Compiling architecture arch of read_priority
+# -- Compiling entity read_memory_arbiter
+# -- Compiling architecture arch of read_memory_arbiter
+# -- Loading entity read_priority
+# -- Loading entity read_address_mux
+# -- Loading entity read_address_ready
+# -- Loading entity read_data_signals
+# -- Compiling entity write_address_mux
+# -- Compiling architecture arch of write_address_mux
+# -- Compiling entity write_address_ready
+# -- Compiling architecture arch of write_address_ready
+# -- Compiling entity write_data_signals
+# -- Compiling architecture arch of write_data_signals
+# -- Compiling entity write_priority
+# -- Compiling architecture arch of write_priority
+# -- Compiling entity write_memory_arbiter
+# -- Compiling architecture arch of write_memory_arbiter
+# -- Loading entity write_priority
+# -- Loading entity write_address_mux
+# -- Loading entity write_address_ready
+# -- Loading entity write_data_signals
+# -- Compiling entity mc_control
+# -- Compiling architecture arch of mc_control
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of mc_support.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mux.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of oehb.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(75): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity gaussian
+# -- Loading entity two_port_RAM
+# ** Error: (vcom-11) Could not find work.single_argument.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(159): (vcom-1195) Cannot find expanded name "work.single_argument".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(159): Unknown expanded name.
+# -- Loading entity tb_join
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(379): VHDL Compiler exiting
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# ** Error: (vcom-11) Could not find work.mem_controller_loadless.
+# ** Error (suppressible): /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(64): (vcom-1195) Cannot find expanded name "work.mem_controller_loadless".
+# ** Error: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(64): Unknown expanded name.
+# -- Loading entity read_memory_arbiter
+# ** Note: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd(117): VHDL Compiler exiting
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# -- Loading entity tehb
+# -- Loading entity fork_dataless
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of control_merge_dataless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian_wrapper
+# -- Compiling architecture behavioral of gaussian_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity gaussian
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of gaussian_wrapper.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_loadless
+# -- Compiling architecture arch of mem_controller_loadless
+# -- Loading entity write_memory_arbiter
+# -- Loading entity mc_control
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller_loadless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of load.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian
+# -- Compiling architecture behavioral of gaussian
+# -- Loading entity fork_dataless
+# -- Loading package types
+# -- Loading entity mem_controller
+# -- Loading entity mem_controller_storeless
+# -- Loading entity handshake_constant_0
+# -- Loading entity handshake_fork
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_constant_2
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# -- Loading entity mux
+# -- Loading entity tehb_init
+# -- Loading entity tehb
+# -- Loading entity oehb
+# -- Loading entity control_merge_dataless
+# -- Loading entity source
+# -- Loading entity addi
+# -- Loading entity tehb_dataless
+# -- Loading entity tfifo
+# -- Loading entity trunci
+# -- Loading entity oehb_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity cond_br_dataless
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_constant_6
+# -- Loading entity shli
+# -- Loading entity gate
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity sink_dataless
+# -- Loading entity join_handshake
+# -- Loading entity load
+# -- Loading entity muli
+# -- Loading entity subi
+# -- Loading entity tfifo_dataless
+# -- Loading entity tehb_dataless_init
+# -- Loading entity store
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of gaussian.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# -- Loading entity read_memory_arbiter
+# -- Loading entity mc_control
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller_storeless.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(75): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity gaussian
+# -- Loading entity two_port_RAM
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of tb_gaussian.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 01:35:54 on Dec 16,2025
+# vcom -work work -2008 -explicit /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# -- Loading entity mem_controller_loadless
+# -- Loading entity read_memory_arbiter
+# End time: 01:35:54 on Dec 16,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_controller.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_4.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_to_bram.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram
+# -- Compiling architecture arch of mem_to_bram
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/cond_br_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br_dataless
+# -- Compiling architecture arch of cond_br_dataless
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_cmpi_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/merge_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity merge_dataless
+# -- Compiling architecture arch of merge_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/elastic_fifo_inner.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner
+# -- Compiling architecture arch of elastic_fifo_inner
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/addi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity addi
+# -- Compiling architecture arch of addi
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/sink.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink
+# -- Compiling architecture arch of sink
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join_handshake.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join_handshake
+# -- Compiling architecture arch of join_handshake
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/cond_br.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cond_br
+# -- Compiling architecture arch of cond_br
+# -- Loading entity cond_br_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless
+# -- Compiling architecture arch of tehb_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/sink_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity sink_dataless
+# -- Compiling architecture arch of sink_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/elastic_fifo_inner_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity elastic_fifo_inner_dataless
+# -- Compiling architecture arch of elastic_fifo_inner_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_5.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tfifo_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo_dataless
+# -- Compiling architecture arch of tfifo_dataless
+# -- Loading entity elastic_fifo_inner_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/delay_buffer.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity delay_buffer
+# -- Compiling architecture arch of delay_buffer
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/source.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity source
+# -- Compiling architecture arch of source
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/trunci.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity trunci
+# -- Compiling architecture arch of trunci
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_2.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_dataless_init.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_dataless_init
+# -- Compiling architecture arch of tehb_dataless_init
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/extsi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity extsi
+# -- Compiling architecture arch of extsi
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_3.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb_dataless
+# -- Compiling architecture arch of oehb_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_6.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_6
+# -- Compiling architecture arch of handshake_constant_6
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/shli.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity shli
+# -- Compiling architecture arch of shli
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tfifo.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tfifo
+# -- Compiling architecture arch of tfifo
+# -- Loading entity elastic_fifo_inner
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/store.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity store
+# -- Compiling architecture arch of store
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/types.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb
+# -- Compiling architecture arch of tehb
+# -- Loading entity tehb_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/muli.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mul_4_stage
+# -- Compiling architecture behav of mul_4_stage
+# -- Compiling entity muli
+# -- Compiling architecture arch of muli
+# -- Loading entity join
+# -- Loading entity mul_4_stage
+# -- Loading entity delay_buffer
+# -- Loading entity oehb
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Compiling entity mux_dataless
+# -- Compiling architecture arch of mux_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_constant_0.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_fork.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity handshake_fork
+# -- Compiling architecture arch of handshake_fork
+# -- Loading package NUMERIC_STD
+# -- Loading entity fork_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/eager_fork_register_block.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity eager_fork_register_block
+# -- Compiling architecture arch of eager_fork_register_block
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/logic.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity and_n
+# -- Compiling architecture arch of and_n
+# -- Compiling entity nand_n
+# -- Compiling architecture arch of nand_n
+# -- Compiling entity or_n
+# -- Compiling architecture arch of or_n
+# -- Compiling entity nor_n
+# -- Compiling architecture arch of nor_n
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tehb_init.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tehb_init
+# -- Compiling architecture arch of tehb_init
+# -- Loading entity tehb_dataless_init
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/handshake_cmpi_1.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cmpi_1
+# -- Compiling architecture arch of handshake_cmpi_1
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/subi.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity subi
+# -- Compiling architecture arch of subi
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity join
+# -- Compiling architecture arch of join
+# -- Loading entity and_n
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gate.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package types
+# -- Compiling entity gate
+# -- Compiling architecture arch of gate
+# -- Loading entity join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/fork_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity fork_dataless
+# -- Compiling architecture arch of fork_dataless
+# -- Loading entity or_n
+# -- Loading entity eager_fork_register_block
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mc_support.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity read_address_mux
+# -- Compiling architecture arch of read_address_mux
+# -- Compiling entity read_address_ready
+# -- Compiling architecture arch of read_address_ready
+# -- Compiling entity read_data_signals
+# -- Compiling architecture arch of read_data_signals
+# -- Compiling entity read_priority
+# -- Compiling architecture arch of read_priority
+# -- Compiling entity read_memory_arbiter
+# -- Compiling architecture arch of read_memory_arbiter
+# -- Loading entity read_priority
+# -- Loading entity read_address_mux
+# -- Loading entity read_address_ready
+# -- Loading entity read_data_signals
+# -- Compiling entity write_address_mux
+# -- Compiling architecture arch of write_address_mux
+# -- Compiling entity write_address_ready
+# -- Compiling architecture arch of write_address_ready
+# -- Compiling entity write_data_signals
+# -- Compiling architecture arch of write_data_signals
+# -- Compiling entity write_priority
+# -- Compiling architecture arch of write_priority
+# -- Compiling entity write_memory_arbiter
+# -- Compiling architecture arch of write_memory_arbiter
+# -- Loading entity write_priority
+# -- Loading entity write_address_mux
+# -- Loading entity write_address_ready
+# -- Loading entity write_data_signals
+# -- Compiling entity mc_control
+# -- Compiling architecture arch of mc_control
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mux.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity mux
+# -- Compiling architecture arch of mux
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/oehb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity oehb
+# -- Compiling architecture arch of oehb
+# -- Loading entity oehb_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/control_merge_dataless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity control_merge_dataless
+# -- Compiling architecture arch of control_merge_dataless
+# -- Loading entity merge_dataless
+# -- Loading entity tehb
+# -- Loading entity fork_dataless
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian_wrapper.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian_wrapper
+# -- Compiling architecture behavioral of gaussian_wrapper
+# -- Loading entity mem_to_bram
+# -- Loading entity gaussian
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_loadless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_loadless
+# -- Compiling architecture arch of mem_controller_loadless
+# -- Loading entity write_memory_arbiter
+# -- Loading entity mc_control
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/load.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity load
+# -- Compiling architecture arch of load
+# -- Loading entity tehb
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/gaussian.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity gaussian
+# -- Compiling architecture behavioral of gaussian
+# -- Loading entity fork_dataless
+# -- Loading package types
+# -- Loading entity mem_controller
+# -- Loading entity mem_controller_storeless
+# -- Loading entity handshake_constant_0
+# -- Loading entity handshake_fork
+# -- Loading entity extsi
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_constant_2
+# -- Loading package MATH_REAL
+# -- Loading entity mux_dataless
+# -- Loading entity mux
+# -- Loading entity tehb_init
+# -- Loading entity tehb
+# -- Loading entity oehb
+# -- Loading entity control_merge_dataless
+# -- Loading entity source
+# -- Loading entity addi
+# -- Loading entity tehb_dataless
+# -- Loading entity tfifo
+# -- Loading entity trunci
+# -- Loading entity oehb_dataless
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity cond_br
+# -- Loading entity sink
+# -- Loading entity cond_br_dataless
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_constant_6
+# -- Loading entity shli
+# -- Loading entity gate
+# -- Loading entity handshake_cmpi_1
+# -- Loading entity sink_dataless
+# -- Loading entity join_handshake
+# -- Loading entity load
+# -- Loading entity muli
+# -- Loading entity subi
+# -- Loading entity tfifo_dataless
+# -- Loading entity tehb_dataless_init
+# -- Loading entity store
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller_storeless.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller_storeless
+# -- Compiling architecture arch of mem_controller_storeless
+# -- Loading entity read_memory_arbiter
+# -- Loading entity mc_control
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd(75): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity gaussian
+# -- Loading entity two_port_RAM
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# vcom -work work -2008 -explicit -stats=none /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/mem_controller.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package types
+# -- Compiling entity mem_controller
+# -- Compiling architecture arch of mem_controller
+# -- Loading entity mem_controller_loadless
+# -- Loading entity read_memory_arbiter
+# 57 compiles, 0 failed with no errors.
+# vsim tb 
+# Start time: 01:35:56 on Dec 16,2025
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.tb(behavior)
+# Loading work.types
+# Loading ieee.math_real(body)
+# Loading work.gaussian(behavioral)
+# Loading work.fork_dataless(arch)
+# Loading work.or_n(arch)
+# Loading work.eager_fork_register_block(arch)
+# Loading work.mem_controller(arch)
+# Loading work.mem_controller_loadless(arch)
+# Loading work.write_memory_arbiter(arch)
+# Loading work.write_priority(arch)
+# Loading work.write_address_mux(arch)
+# Loading work.write_address_ready(arch)
+# Loading work.write_data_signals(arch)
+# Loading work.mc_control(arch)
+# Loading work.read_memory_arbiter(arch)
+# Loading work.read_priority(arch)
+# Loading work.read_address_mux(arch)
+# Loading work.read_address_ready(arch)
+# Loading work.read_data_signals(arch)
+# Loading work.mem_controller_storeless(arch)
+# Loading work.handshake_constant_0(arch)
+# Loading work.handshake_fork(arch)
+# Loading work.extsi(arch)
+# Loading work.handshake_constant_1(arch)
+# Loading work.handshake_constant_2(arch)
+# Loading work.mux_dataless(arch)
+# Loading work.mux(arch)
+# Loading work.tehb_init(arch)
+# Loading work.tehb_dataless_init(arch)
+# Loading work.tehb(arch)
+# Loading work.tehb_dataless(arch)
+# Loading work.oehb(arch)
+# Loading work.oehb_dataless(arch)
+# Loading work.control_merge_dataless(arch)
+# Loading work.merge_dataless(arch)
+# Loading work.source(arch)
+# Loading work.addi(arch)
+# Loading work.join(arch)
+# Loading work.and_n(arch)
+# Loading work.tfifo(arch)
+# Loading work.elastic_fifo_inner(arch)
+# Loading work.trunci(arch)
+# Loading work.handshake_constant_3(arch)
+# Loading work.handshake_cmpi_0(arch)
+# Loading work.cond_br(arch)
+# Loading work.cond_br_dataless(arch)
+# Loading work.sink(arch)
+# Loading work.handshake_constant_4(arch)
+# Loading work.handshake_constant_5(arch)
+# Loading work.handshake_constant_6(arch)
+# Loading work.shli(arch)
+# Loading work.gate(arch)
+# Loading work.handshake_cmpi_1(arch)
+# Loading work.sink_dataless(arch)
+# Loading work.join_handshake(arch)
+# Loading work.load(arch)
+# Loading work.muli(arch)
+# Loading work.mul_4_stage(behav)
+# Loading work.delay_buffer(arch)
+# Loading work.subi(arch)
+# Loading work.tfifo_dataless(arch)
+# Loading work.elastic_fifo_inner_dataless(arch)
+# Loading work.store(arch)
+# Loading work.two_port_ram(behav)
+# Loading work.single_argument(behav)
+# Loading work.tb_join(arch)
+# ** Warning: Design size of 31598 statements exceeds ModelSim-Intel FPGA Starter Edition recommended capacity.
+# Expect performance to be adversely affected.
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli5
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux29
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux29
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli3
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux28
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux28
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli1
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux12
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux12
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux11
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux11
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux29
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux29
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux28
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux28
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux8
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux9
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux11
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux11
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux12
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux12
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux5
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux6
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 4  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux24
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux23
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 5  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 2  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 2  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 2  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux17
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux18
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux16
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux19
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux22
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux26
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux25
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux27
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux7
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux15
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux14
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux13
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux10
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux20
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux21
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux21
+# ** Note: Simulation done! Latency = 12320 cycles
+#    Time: 49290 ns  Iteration: 1  Instance: /tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 49290 ns  Iteration: 1  Process: /tb/generate_sim_done_proc File: /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd
+# Break in Process generate_sim_done_proc at /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd line 298
+# Stopped at /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_00-15-16/gaussian-1/out/sim/HDL_SRC/tb_gaussian.vhd line 298
+# End time: 01:36:15 on Dec 16,2025, Elapsed time: 0:00:19
+# Errors: 1, Warnings: 264

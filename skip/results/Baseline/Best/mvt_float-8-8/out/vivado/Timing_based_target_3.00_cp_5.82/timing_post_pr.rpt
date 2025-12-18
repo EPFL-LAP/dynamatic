@@ -1,0 +1,82 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 17:14:01 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : mvt_float
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.063ns  (required time - arrival time)
+  Source:                 mem_controller3/read_arbiter/data/out_reg_reg[0][24]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.910ns period=5.820ns})
+  Destination:            mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.910ns period=5.820ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.820ns  (clk rise@5.820ns - clk rise@0.000ns)
+  Data Path Delay:        5.728ns  (logic 2.957ns (51.620%)  route 2.771ns (48.380%))
+  Logic Levels:           7  (DSP48E1=1 LUT3=1 LUT4=1 LUT5=3 LUT6=1)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 6.303 - 5.820 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=3706, unset)         0.508     0.508    mem_controller3/read_arbiter/data/clk
+    SLICE_X15Y65         FDRE                                         r  mem_controller3/read_arbiter/data/out_reg_reg[0][24]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X15Y65         FDRE (Prop_fdre_C_Q)         0.216     0.724 f  mem_controller3/read_arbiter/data/out_reg_reg[0][24]/Q
+                         net (fo=3, routed)           0.521     1.245    mem_controller3/read_arbiter/data/out_reg_reg[0][31]_0[1]
+    SLICE_X15Y64         LUT5 (Prop_lut5_I1_O)        0.043     1.288 f  mem_controller3/read_arbiter/data/data_tehb/exc_c1[1]_i_11__0/O
+                         net (fo=2, routed)           0.412     1.701    mem_controller3/read_arbiter/data/load5_dataOut[24]
+    SLICE_X13Y64         LUT4 (Prop_lut4_I0_O)        0.048     1.749 f  mem_controller3/read_arbiter/data/g0_b2__23_i_18/O
+                         net (fo=1, routed)           0.238     1.986    mem_controller3/read_arbiter/data/g0_b2__23_i_18_n_0
+    SLICE_X13Y62         LUT5 (Prop_lut5_I4_O)        0.129     2.115 r  mem_controller3/read_arbiter/data/g0_b2__23_i_16/O
+                         net (fo=2, routed)           0.139     2.254    mem_controller3/read_arbiter/data/mulf1/ieee2nfloat_1/eqOp1_in
+    SLICE_X13Y62         LUT6 (Prop_lut6_I0_O)        0.043     2.297 r  mem_controller3/read_arbiter/data/g0_b2__23_i_12/O
+                         net (fo=24, routed)          0.429     2.727    mem_controller3/read_arbiter/data/mulf1/ieee2nfloat_1/sfracX1__0
+    SLICE_X14Y60         LUT3 (Prop_lut3_I1_O)        0.043     2.770 r  mem_controller3/read_arbiter/data/g0_b2__44_i_2/O
+                         net (fo=13, routed)          0.507     3.277    mulf1/operator/SignificandMultiplication/tile_0_mult/ip_rhs[1]
+    DSP48_X1Y22          DSP48E1 (Prop_dsp48e1_A[1]_P[21])
+                                                      2.392     5.669 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0/P[21]
+                         net (fo=3, routed)           0.524     6.193    mem_controller5/read_arbiter/data/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid323_Out0_copy324_c1_reg[2][4]
+    SLICE_X21Y56         LUT5 (Prop_lut5_I3_O)        0.043     6.236 r  mem_controller5/read_arbiter/data/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1[1]_i_1__0/O
+                         net (fo=1, routed)           0.000     6.236    mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1_reg[2]_0[0]
+    SLICE_X21Y56         FDRE                                         r  mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.820     5.820 r  
+                                                      0.000     5.820 r  clk (IN)
+                         net (fo=3706, unset)         0.483     6.303    mulf1/operator/SignificandMultiplication/clk
+    SLICE_X21Y56         FDRE                                         r  mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1_reg[1]/C
+                         clock pessimism              0.000     6.303    
+                         clock uncertainty           -0.035     6.267    
+    SLICE_X21Y56         FDRE (Setup_fdre_C_D)        0.032     6.299    mulf1/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid321_Out0_copy322_c1_reg[1]
+  -------------------------------------------------------------------
+                         required time                          6.299    
+                         arrival time                          -6.236    
+  -------------------------------------------------------------------
+                         slack                                  0.063    
+
+
+
+

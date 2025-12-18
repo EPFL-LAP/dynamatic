@@ -1,0 +1,4 @@
+digraph G {
+  "store0" -> "load2" [label="N=0"];
+  "load0" -> "store1" [label="N=0"];
+}

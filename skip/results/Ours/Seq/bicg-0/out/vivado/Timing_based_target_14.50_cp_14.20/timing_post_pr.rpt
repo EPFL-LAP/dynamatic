@@ -1,0 +1,87 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 00:51:48 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : bicg
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             8.165ns  (required time - arrival time)
+  Source:                 buffer20/fifo/Empty_reg/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Destination:            muli1/multiply_unit/q0_reg/CEA2
+                            (rising edge-triggered cell DSP48E1 clocked by clk  {rise@0.000ns fall@7.100ns period=14.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            14.200ns  (clk rise@14.200ns - clk rise@0.000ns)
+  Data Path Delay:        5.676ns  (logic 0.893ns (15.732%)  route 4.783ns (84.268%))
+  Logic Levels:           9  (CARRY4=1 LUT1=1 LUT3=1 LUT4=2 LUT5=1 LUT6=3)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 14.683 - 14.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=853, unset)          0.508     0.508    buffer20/fifo/clk
+    SLICE_X56Y110        FDRE                                         r  buffer20/fifo/Empty_reg/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X56Y110        FDRE (Prop_fdre_C_Q)         0.216     0.724 r  buffer20/fifo/Empty_reg/Q
+                         net (fo=24, routed)          0.705     1.429    buffer6/transmitValue_reg_23
+    SLICE_X55Y111        LUT6 (Prop_lut6_I1_O)        0.043     1.472 r  buffer6/result0_carry_i_2__0/O
+                         net (fo=1, routed)           0.097     1.570    cmpi0/DI[1]
+    SLICE_X54Y111        CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.245     1.815 f  cmpi0/result0_carry/CO[3]
+                         net (fo=52, routed)          0.900     2.715    buffer6/control/transmitValue_reg_24[0]
+    SLICE_X65Y114        LUT5 (Prop_lut5_I4_O)        0.043     2.758 r  buffer6/control/q_storeEn_INST_0_i_3/O
+                         net (fo=4, routed)           0.358     3.115    fork13/control/generateBlocks[0].regblock/q_storeEn_1
+    SLICE_X64Y114        LUT6 (Prop_lut6_I5_O)        0.043     3.158 r  fork13/control/generateBlocks[0].regblock/q_storeEn_INST_0/O
+                         net (fo=42, routed)          0.492     3.650    fork13/control/generateBlocks[0].regblock/transmitValue_reg_2
+    SLICE_X63Y113        LUT3 (Prop_lut3_I0_O)        0.043     3.693 r  fork13/control/generateBlocks[0].regblock/fullReg_i_4__5/O
+                         net (fo=1, routed)           0.173     3.866    control_merge1/tehb/control/fullReg_i_2__4
+    SLICE_X62Y112        LUT6 (Prop_lut6_I0_O)        0.043     3.909 f  control_merge1/tehb/control/fullReg_i_3__3/O
+                         net (fo=1, routed)           0.253     4.163    fork11/control/generateBlocks[4].regblock/dataReg_reg[31]_0
+    SLICE_X62Y111        LUT4 (Prop_lut4_I3_O)        0.043     4.206 f  fork11/control/generateBlocks[4].regblock/fullReg_i_2__4/O
+                         net (fo=3, routed)           0.311     4.517    muli1/oehb/control/dataReg_reg[31]
+    SLICE_X62Y109        LUT4 (Prop_lut4_I1_O)        0.047     4.564 f  muli1/oehb/control/fullReg_i_2__3/O
+                         net (fo=8, routed)           0.561     5.125    muli1/oehb/control/outputValid_reg_1
+    SLICE_X58Y106        LUT1 (Prop_lut1_I0_O)        0.127     5.252 r  muli1/oehb/control/q0_reg_i_1__0/O
+                         net (fo=50, routed)          0.933     6.184    muli1/multiply_unit/oehb_ready
+    DSP48_X2Y40          DSP48E1                                      r  muli1/multiply_unit/q0_reg/CEA2
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       14.200    14.200 r  
+                                                      0.000    14.200 r  clk (IN)
+                         net (fo=853, unset)          0.483    14.683    muli1/multiply_unit/clk
+    DSP48_X2Y40          DSP48E1                                      r  muli1/multiply_unit/q0_reg/CLK
+                         clock pessimism              0.000    14.683    
+                         clock uncertainty           -0.035    14.647    
+    DSP48_X2Y40          DSP48E1 (Setup_dsp48e1_CLK_CEA2)
+                                                     -0.298    14.349    muli1/multiply_unit/q0_reg
+  -------------------------------------------------------------------
+                         required time                         14.349    
+                         arrival time                          -6.184    
+  -------------------------------------------------------------------
+                         slack                                  8.165    
+
+
+
+

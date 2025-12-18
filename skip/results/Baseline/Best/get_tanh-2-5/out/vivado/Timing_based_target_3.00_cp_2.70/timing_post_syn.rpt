@@ -1,0 +1,106 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 17:16:21 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : get_tanh
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -4.444ns  (required time - arrival time)
+  Source:                 mulf1/operator/sigProdExt_c2_reg[20]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@1.350ns period=2.700ns})
+  Destination:            mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid325_In0_c1_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@1.350ns period=2.700ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            2.700ns  (clk rise@2.700ns - clk rise@0.000ns)
+  Data Path Delay:        7.078ns  (logic 3.602ns (50.889%)  route 3.476ns (49.111%))
+  Logic Levels:           15  (CARRY4=7 DSP48E1=1 LUT4=1 LUT5=3 LUT6=3)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 3.183 - 2.700 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=2180, unset)         0.508     0.508    mulf1/operator/clk
+                         FDRE                                         r  mulf1/operator/sigProdExt_c2_reg[20]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.226     0.734 r  mulf1/operator/sigProdExt_c2_reg[20]/Q
+                         net (fo=1, unplaced)         0.501     1.235    mulf1/operator/SignificandMultiplication/tile_0_mult/sigProdExt_c2[19]
+                         LUT6 (Prop_lut6_I0_O)        0.119     1.354 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_32/O
+                         net (fo=1, unplaced)         0.244     1.598    mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_32_n_0
+                         LUT6 (Prop_lut6_I3_O)        0.043     1.641 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_28/O
+                         net (fo=1, unplaced)         0.244     1.885    mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_28_n_0
+                         LUT5 (Prop_lut5_I1_O)        0.043     1.928 r  mulf1/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_i_25/O
+                         net (fo=1, unplaced)         0.000     1.928    mulf1/operator/RoundingAdder/S[0]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.238     2.166 r  mulf1/operator/RoundingAdder/Mfull_c0_i_21__0/CO[3]
+                         net (fo=1, unplaced)         0.007     2.173    mulf1/operator/RoundingAdder/Mfull_c0_i_21__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.223 r  mulf1/operator/RoundingAdder/Mfull_c0_i_20__0/CO[3]
+                         net (fo=1, unplaced)         0.000     2.223    mulf1/operator/RoundingAdder/Mfull_c0_i_20__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.273 r  mulf1/operator/RoundingAdder/Mfull_c0_i_19__0/CO[3]
+                         net (fo=1, unplaced)         0.000     2.273    mulf1/operator/RoundingAdder/Mfull_c0_i_19__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.323 r  mulf1/operator/RoundingAdder/Mfull_c0_i_18__0/CO[3]
+                         net (fo=1, unplaced)         0.000     2.323    mulf1/operator/RoundingAdder/Mfull_c0_i_18__0_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.373 r  mulf1/operator/RoundingAdder/g0_b2__47_i_6/CO[3]
+                         net (fo=1, unplaced)         0.000     2.373    mulf1/operator/RoundingAdder/g0_b2__47_i_6_n_0
+                         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     2.423 r  mulf1/operator/RoundingAdder/g0_b2__47_i_8/CO[3]
+                         net (fo=1, unplaced)         0.000     2.423    mulf1/operator/RoundingAdder/g0_b2__47_i_8_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.154     2.577 f  mulf1/operator/RoundingAdder/minusOp_carry_i_9__0/O[3]
+                         net (fo=3, unplaced)         0.322     2.899    mulf1/operator/RoundingAdder/ip_result__0[27]
+                         LUT5 (Prop_lut5_I0_O)        0.120     3.019 f  mulf1/operator/RoundingAdder/minusOp_carry__0_i_4__0/O
+                         net (fo=3, unplaced)         0.723     3.742    mulf1/operator/RoundingAdder/exc_c2_reg[1][4]
+                         LUT5 (Prop_lut5_I0_O)        0.043     3.785 r  mulf1/operator/RoundingAdder/Mfull_c0_i_23/O
+                         net (fo=3, unplaced)         0.262     4.047    mulf1/operator/RoundingAdder/mulf2/ieee2nfloat_0/eqOp1_in
+                         LUT4 (Prop_lut4_I0_O)        0.043     4.090 r  mulf1/operator/RoundingAdder/g0_b2__47_i_7/O
+                         net (fo=22, unplaced)        0.306     4.396    mulf1/operator/RoundingAdder/mulf2/ieee2nfloat_0/sfracX1__0
+                         LUT6 (Prop_lut6_I1_O)        0.043     4.439 r  mulf1/operator/RoundingAdder/Mfull_c0_i_1__0/O
+                         net (fo=1, unplaced)         0.434     4.873    mulf2/operator/SignificandMultiplication/tile_0_mult/Mfull_c0_1[16]
+                         DSP48E1 (Prop_dsp48e1_B[16]_P[25])
+                                                      2.280     7.153 r  mulf2/operator/SignificandMultiplication/tile_0_mult/Mfull_c0/P[25]
+                         net (fo=1, unplaced)         0.434     7.586    mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid325_In0_c0[1]
+                         FDRE                                         r  mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid325_In0_c1_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        2.700     2.700 r  
+                                                      0.000     2.700 r  clk (IN)
+                         net (fo=2180, unset)         0.483     3.183    mulf2/operator/SignificandMultiplication/clk
+                         FDRE                                         r  mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid325_In0_c1_reg[1]/C
+                         clock pessimism              0.000     3.183    
+                         clock uncertainty           -0.035     3.147    
+                         FDRE (Setup_fdre_C_D)       -0.005     3.142    mulf2/operator/SignificandMultiplication/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid325_In0_c1_reg[1]
+  -------------------------------------------------------------------
+                         required time                          3.142    
+                         arrival time                          -7.586    
+  -------------------------------------------------------------------
+                         slack                                 -4.444    
+
+
+
+

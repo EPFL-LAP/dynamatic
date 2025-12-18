@@ -1,0 +1,2 @@
+Benchmark,Load,Store,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+get_tanh,2,5,6.5,6.8,5010,1044,1814,4,3352

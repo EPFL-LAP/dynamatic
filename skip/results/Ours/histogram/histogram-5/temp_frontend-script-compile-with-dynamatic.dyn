@@ -1,0 +1,14 @@
+# Set the source file to run
+set-src skip/runs/run_2025-12-16_11-47-13/histogram-5/histogram.c
+
+# Set clock period
+set-clock-period 15   
+
+# Compile
+compile --skippable-seq-n 5 --buffer-algorithm cpbuf --fork-fifo-size 15
+
+# Generate the VHDL design corresponding to the source code
+write-hdl
+
+# Exit the frontend
+exit

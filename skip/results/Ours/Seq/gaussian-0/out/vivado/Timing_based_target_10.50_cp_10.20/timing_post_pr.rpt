@@ -1,0 +1,100 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 01:22:46 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : gaussian
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             2.711ns  (required time - arrival time)
+  Source:                 control_merge0/tehb/control/fullReg_reg/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@5.100ns period=10.200ns})
+  Destination:            buffer42/outs_reg[1]/CE
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@5.100ns period=10.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.200ns  (clk rise@10.200ns - clk rise@0.000ns)
+  Data Path Delay:        7.145ns  (logic 1.138ns (15.927%)  route 6.007ns (84.073%))
+  Logic Levels:           16  (CARRY4=1 LUT2=2 LUT3=1 LUT4=1 LUT5=3 LUT6=8)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 10.683 - 10.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=843, unset)          0.508     0.508    control_merge0/tehb/control/clk
+    SLICE_X9Y139         FDRE                                         r  control_merge0/tehb/control/fullReg_reg/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X9Y139         FDRE (Prop_fdre_C_Q)         0.216     0.724 r  control_merge0/tehb/control/fullReg_reg/Q
+                         net (fo=13, routed)          0.518     1.242    control_merge0/tehb/control/fullReg_reg_0
+    SLICE_X9Y137         LUT5 (Prop_lut5_I1_O)        0.043     1.285 f  control_merge0/tehb/control/transmitValue_i_2__41/O
+                         net (fo=7, routed)           0.552     1.837    control_merge0/tehb/control/dataReg_reg[0]
+    SLICE_X6Y136         LUT6 (Prop_lut6_I0_O)        0.043     1.880 r  control_merge0/tehb/control/dataReg[5]_i_5__0/O
+                         net (fo=10, routed)          0.411     2.291    buffer4/control/transmitValue_reg
+    SLICE_X0Y130         LUT2 (Prop_lut2_I1_O)        0.043     2.334 f  buffer4/control/transmitValue_i_2__40/O
+                         net (fo=9, routed)           0.263     2.596    buffer4/control/fullReg_reg_5
+    SLICE_X3Y130         LUT6 (Prop_lut6_I2_O)        0.043     2.639 f  buffer4/control/dataReg[2]_i_2/O
+                         net (fo=5, routed)           0.330     2.970    buffer4/control/fullReg_reg_2
+    SLICE_X3Y129         LUT4 (Prop_lut4_I0_O)        0.043     3.013 r  buffer4/control/dataReg[4]_i_2/O
+                         net (fo=2, routed)           0.260     3.272    buffer4/control/dataReg[4]_i_2_n_0
+    SLICE_X5Y131         LUT2 (Prop_lut2_I0_O)        0.043     3.315 r  buffer4/control/dataReg[6]_i_4/O
+                         net (fo=2, routed)           0.260     3.575    buffer4/control/dataReg[6]_i_4_n_0
+    SLICE_X6Y131         LUT6 (Prop_lut6_I0_O)        0.043     3.618 f  buffer4/control/dataReg[5]_i_1__4/O
+                         net (fo=4, routed)           0.309     3.927    buffer13/control/mux2_outs[5]
+    SLICE_X6Y130         LUT5 (Prop_lut5_I2_O)        0.043     3.970 r  buffer13/control/out0_valid_INST_0_i_15/O
+                         net (fo=1, routed)           0.000     3.970    cmpi2/S[2]
+    SLICE_X6Y130         CARRY4 (Prop_carry4_S[2]_CO[3])
+                                                      0.177     4.147 f  cmpi2/out0_valid_INST_0_i_11/CO[3]
+                         net (fo=33, routed)          0.723     4.870    buffer23/fifo/result[0]
+    SLICE_X9Y138         LUT3 (Prop_lut3_I0_O)        0.049     4.919 f  buffer23/fifo/ctrlEnd_ready_i_5/O
+                         net (fo=4, routed)           0.181     5.100    control_merge2/tehb/control/outs_reg[5]_4
+    SLICE_X9Y136         LUT6 (Prop_lut6_I3_O)        0.129     5.229 r  control_merge2/tehb/control/outputValid_i_5__0/O
+                         net (fo=23, routed)          0.518     5.747    buffer31/fifo/control_merge2_index
+    SLICE_X16Y134        LUT6 (Prop_lut6_I1_O)        0.043     5.790 r  buffer31/fifo/outputValid_i_2/O
+                         net (fo=40, routed)          0.258     6.048    buffer33/control/p_2_in
+    SLICE_X14Y133        LUT6 (Prop_lut6_I3_O)        0.043     6.091 r  buffer33/control/Empty_i_2__4/O
+                         net (fo=6, routed)           0.258     6.349    fork24/control/generateBlocks[7].regblock/fullReg_i_4__5_2
+    SLICE_X12Y134        LUT6 (Prop_lut6_I5_O)        0.043     6.392 f  fork24/control/generateBlocks[7].regblock/fullReg_i_8/O
+                         net (fo=1, routed)           0.413     6.806    fork24/control/generateBlocks[7].regblock/fullReg_i_8_n_0
+    SLICE_X7Y133         LUT6 (Prop_lut6_I1_O)        0.043     6.849 r  fork24/control/generateBlocks[7].regblock/fullReg_i_4__5/O
+                         net (fo=7, routed)           0.442     7.291    control_merge2/tehb/control/dataReg_reg[5]_1
+    SLICE_X8Y134         LUT5 (Prop_lut5_I3_O)        0.051     7.342 r  control_merge2/tehb/control/outs[6]_i_1__2/O
+                         net (fo=7, routed)           0.311     7.653    buffer42/E[0]
+    SLICE_X7Y135         FDRE                                         r  buffer42/outs_reg[1]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)       10.200    10.200 r  
+                                                      0.000    10.200 r  clk (IN)
+                         net (fo=843, unset)          0.483    10.683    buffer42/clk
+    SLICE_X7Y135         FDRE                                         r  buffer42/outs_reg[1]/C
+                         clock pessimism              0.000    10.683    
+                         clock uncertainty           -0.035    10.647    
+    SLICE_X7Y135         FDRE (Setup_fdre_C_CE)      -0.283    10.364    buffer42/outs_reg[1]
+  -------------------------------------------------------------------
+                         required time                         10.364    
+                         arrival time                          -7.653    
+  -------------------------------------------------------------------
+                         slack                                  2.711    
+
+
+
+

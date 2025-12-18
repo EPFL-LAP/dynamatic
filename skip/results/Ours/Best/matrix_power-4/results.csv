@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+matrix_power,4,3.0,4.97,1057,700,1838,3,2182

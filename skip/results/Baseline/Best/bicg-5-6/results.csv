@@ -1,0 +1,2 @@
+Benchmark,Load,Store,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+bicg,5,6,4.5,4.2,1877,938,1795,6,2949

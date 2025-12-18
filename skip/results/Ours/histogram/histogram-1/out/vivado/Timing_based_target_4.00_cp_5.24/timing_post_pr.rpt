@@ -1,0 +1,107 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 12:10:30 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : histogram
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -0.073ns  (required time - arrival time)
+  Source:                 load5/data_tehb/dataReg_reg[30]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.620ns period=5.240ns})
+  Destination:            addf0/operator/RightShifterComponent/level4_c1_reg[5]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.620ns period=5.240ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.240ns  (clk rise@5.240ns - clk rise@0.000ns)
+  Data Path Delay:        5.284ns  (logic 1.700ns (32.173%)  route 3.584ns (67.827%))
+  Logic Levels:           17  (CARRY4=6 LUT3=1 LUT4=2 LUT5=4 LUT6=4)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 5.723 - 5.240 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=857, unset)          0.508     0.508    load5/data_tehb/clk
+    SLICE_X6Y97          FDRE                                         r  load5/data_tehb/dataReg_reg[30]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X6Y97          FDRE (Prop_fdre_C_Q)         0.232     0.740 f  load5/data_tehb/dataReg_reg[30]/Q
+                         net (fo=1, routed)           0.409     1.149    mem_controller2/read_arbiter/data/Q[30]
+    SLICE_X7Y95          LUT5 (Prop_lut5_I4_O)        0.119     1.268 f  mem_controller2/read_arbiter/data/ltOp_carry__2_i_11/O
+                         net (fo=7, routed)           0.417     1.684    mem_controller2/read_arbiter/data/sel_prev_reg[0]_33
+    SLICE_X3Y93          LUT4 (Prop_lut4_I2_O)        0.043     1.727 r  mem_controller2/read_arbiter/data/level4_c1[25]_i_11/O
+                         net (fo=1, routed)           0.138     1.865    mem_controller2/read_arbiter/data/level4_c1[25]_i_11_n_0
+    SLICE_X3Y93          LUT5 (Prop_lut5_I4_O)        0.043     1.908 r  mem_controller2/read_arbiter/data/level4_c1[25]_i_8/O
+                         net (fo=4, routed)           0.175     2.083    mem_controller2/read_arbiter/data/level4_c1[25]_i_8_n_0
+    SLICE_X1Y92          LUT6 (Prop_lut6_I0_O)        0.043     2.126 r  mem_controller2/read_arbiter/data/level4_c1[23]_i_6/O
+                         net (fo=22, routed)          0.290     2.416    mem_controller2/read_arbiter/data/level4_c1[23]_i_6_n_0
+    SLICE_X3Y94          LUT3 (Prop_lut3_I1_O)        0.043     2.459 f  mem_controller2/read_arbiter/data/level4_c1[13]_i_2/O
+                         net (fo=5, routed)           0.297     2.755    mem_controller3/read_arbiter/data/level4_c1_reg[13]
+    SLICE_X3Y94          LUT6 (Prop_lut6_I4_O)        0.043     2.798 r  mem_controller3/read_arbiter/data/ltOp_carry__0_i_3/O
+                         net (fo=1, routed)           0.252     3.050    addf0/operator/ltOp_carry__1_0[1]
+    SLICE_X5Y94          CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.242     3.292 r  addf0/operator/ltOp_carry__0/CO[3]
+                         net (fo=1, routed)           0.000     3.292    addf0/operator/ltOp_carry__0_n_0
+    SLICE_X5Y95          CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     3.341 r  addf0/operator/ltOp_carry__1/CO[3]
+                         net (fo=1, routed)           0.000     3.341    addf0/operator/ltOp_carry__1_n_0
+    SLICE_X5Y96          CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     3.390 r  addf0/operator/ltOp_carry__2/CO[3]
+                         net (fo=1, routed)           0.000     3.390    addf0/operator/ltOp_carry__2_n_0
+    SLICE_X5Y97          CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.127     3.517 r  addf0/operator/ltOp_carry__3/CO[0]
+                         net (fo=78, routed)          0.271     3.788    load5/data_tehb/control/CO[0]
+    SLICE_X7Y98          LUT6 (Prop_lut6_I0_O)        0.130     3.918 r  load5/data_tehb/control/i__carry_i_1/O
+                         net (fo=1, routed)           0.180     4.098    addf0/operator/p_1_in[3]
+    SLICE_X4Y97          CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.184     4.282 r  addf0/operator/_inferred__1/i__carry/CO[3]
+                         net (fo=1, routed)           0.000     4.282    addf0/operator/_inferred__1/i__carry_n_0
+    SLICE_X4Y98          CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.104     4.386 r  addf0/operator/_inferred__1/i__carry__0/O[0]
+                         net (fo=4, routed)           0.310     4.696    addf0/operator/RightShifterComponent/ps_c1_reg[3]_0[0]
+    SLICE_X3Y98          LUT4 (Prop_lut4_I0_O)        0.120     4.816 r  addf0/operator/RightShifterComponent/level4_c1[24]_i_2/O
+                         net (fo=7, routed)           0.249     5.064    load5/data_tehb/control/ps_c1_reg[3]_0
+    SLICE_X2Y99          LUT5 (Prop_lut5_I3_O)        0.043     5.107 f  load5/data_tehb/control/level4_c1[25]_i_6/O
+                         net (fo=37, routed)          0.277     5.384    mem_controller3/read_arbiter/data/level4_c1_reg[9]
+    SLICE_X5Y100         LUT5 (Prop_lut5_I2_O)        0.043     5.427 r  mem_controller3/read_arbiter/data/level4_c1[5]_i_3/O
+                         net (fo=1, routed)           0.322     5.749    mem_controller2/read_arbiter/data/level4_c1_reg[5]
+    SLICE_X4Y100         LUT6 (Prop_lut6_I4_O)        0.043     5.792 r  mem_controller2/read_arbiter/data/level4_c1[5]_i_1/O
+                         net (fo=1, routed)           0.000     5.792    addf0/operator/RightShifterComponent/level4_c1_reg[25]_0[5]
+    SLICE_X4Y100         FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[5]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.240     5.240 r  
+                                                      0.000     5.240 r  clk (IN)
+                         net (fo=857, unset)          0.483     5.723    addf0/operator/RightShifterComponent/clk
+    SLICE_X4Y100         FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[5]/C
+                         clock pessimism              0.000     5.723    
+                         clock uncertainty           -0.035     5.687    
+    SLICE_X4Y100         FDRE (Setup_fdre_C_D)        0.032     5.719    addf0/operator/RightShifterComponent/level4_c1_reg[5]
+  -------------------------------------------------------------------
+                         required time                          5.719    
+                         arrival time                          -5.792    
+  -------------------------------------------------------------------
+                         slack                                 -0.073    
+
+
+
+

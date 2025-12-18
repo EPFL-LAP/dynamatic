@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+triangular,3,8.0,7.7,130,791,1745,3,2338

@@ -1,0 +1,1186 @@
+starting place and route
+
+****** Vivado v2024.2 (64-bit)
+  **** SW Build 5239630 on Fri Nov 08 22:34:34 MST 2024
+  **** IP Build 5239520 on Sun Nov 10 16:12:51 MST 2024
+  **** SharedData Build 5239561 on Fri Nov 08 14:39:27 MST 2024
+  **** Start of session at: Tue Dec 16 15:23:25 2025
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/vivado/Timing_based_target_6.50_cp_6.20/temp-call-vivado-impl-for-dynamatic.tcl -notrace
+No verilog files found: no files matched glob pattern "skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/*.v"
+Command: synth_design -top jacobi_1d_imper -part xc7k160tfbg484-3 -no_iobuf -mode out_of_context
+Starting synth_design
+Attempting to get a license for feature 'Synthesis' and/or device 'xc7k160t'
+INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xc7k160t'
+INFO: [Device 21-403] Loading part xc7k160tfbg484-3
+INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 7 processes.
+INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
+INFO: [Synth 8-7075] Helper process launched with PID 2149768
+---------------------------------------------------------------------------------
+Starting RTL Elaboration : Time (s): cpu = 00:00:02 ; elapsed = 00:00:03 . Memory (MB): peak = 1882.996 ; gain = 409.801 ; free physical = 47288 ; free virtual = 189532
+---------------------------------------------------------------------------------
+INFO: [Synth 8-638] synthesizing module 'jacobi_1d_imper' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/jacobi_1d_imper.vhd:36]
+INFO: [Synth 8-638] synthesizing module 'fork_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 3 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'or_n' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+	Parameter SIZE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'or_n' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+INFO: [Synth 8-638] synthesizing module 'eager_fork_register_block' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/eager_fork_register_block.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'eager_fork_register_block' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/eager_fork_register_block.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2.vhd:42]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1717]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core_ga' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:50]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core_ga' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:50]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core_lda' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:645]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core_lda' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:645]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core_ldd' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:918]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core_ldd' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:918]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core_sta' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1170]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core_sta' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1170]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq2_core_std' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1443]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core_std' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1443]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2_core' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2_core.vhd:1717]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq2.vhd:42]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3.vhd:54]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:2317]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core_ga' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:58]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core_ga' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:58]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core_lda' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:773]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core_lda' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:773]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core_ldd' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:1284]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core_ldd' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:1284]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core_sta' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:1758]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core_sta' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:1758]
+INFO: [Synth 8-638] synthesizing module 'handshake_lsq_lsq3_core_std' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:2031]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core_std' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:2031]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3_core' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3_core.vhd:2317]
+INFO: [Synth 8-256] done synthesizing module 'handshake_lsq_lsq3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_lsq_lsq3.vhd:54]
+INFO: [Synth 8-638] synthesizing module 'handshake_constant_0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_0.vhd:21]
+	Parameter DATA_WIDTH bound to: 1 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_constant_0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_0.vhd:21]
+INFO: [Synth 8-638] synthesizing module 'extsi' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 1 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'mux' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/mux.vhd:31]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 3 - type: integer 
+	Parameter SELECT_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'mux' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/mux.vhd:31]
+INFO: [Synth 8-638] synthesizing module 'control_merge_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/control_merge_dataless.vhd:25]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter INDEX_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'merge_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/merge_dataless.vhd:20]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'merge_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/merge_dataless.vhd:20]
+INFO: [Synth 8-638] synthesizing module 'tehb' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+	Parameter DATA_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'tehb_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb_dataless.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'tehb_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb_dataless.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'tehb' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'or_n__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'or_n__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'control_merge_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/control_merge_dataless.vhd:25]
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-638] synthesizing module 'handshake_constant_1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_1.vhd:21]
+	Parameter DATA_WIDTH bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_constant_1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_1.vhd:21]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 2 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'tehb__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+	Parameter DATA_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'tehb__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'mux__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/mux.vhd:31]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+	Parameter SELECT_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'mux__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/mux.vhd:31]
+INFO: [Synth 8-638] synthesizing module 'tehb__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'tehb__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 5 - type: integer 
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 5 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'or_n__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+	Parameter SIZE bound to: 5 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'or_n__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'trunci' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+	Parameter INPUT_TYPE bound to: 8 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'trunci' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 8 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'lazy_fork_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/lazy_fork_dataless.vhd:19]
+	Parameter SIZE bound to: 4 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'and_n' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+	Parameter SIZE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'and_n' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+INFO: [Synth 8-256] done synthesizing module 'lazy_fork_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/lazy_fork_dataless.vhd:19]
+INFO: [Synth 8-638] synthesizing module 'source' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/source.vhd:15]
+INFO: [Synth 8-256] done synthesizing module 'source' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/source.vhd:15]
+INFO: [Synth 8-638] synthesizing module 'handshake_constant_2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_2.vhd:21]
+	Parameter DATA_WIDTH bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_constant_2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_2.vhd:21]
+INFO: [Synth 8-638] synthesizing module 'trunci__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+	Parameter INPUT_TYPE bound to: 32 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'trunci__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+INFO: [Synth 8-638] synthesizing module 'handshake_constant_3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_3.vhd:21]
+	Parameter DATA_WIDTH bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_constant_3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_3.vhd:21]
+INFO: [Synth 8-638] synthesizing module 'tfifo_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo_dataless.vhd:20]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'elastic_fifo_inner_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner_dataless.vhd:20]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'elastic_fifo_inner_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'tfifo_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo_dataless.vhd:20]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 3 - type: integer 
+	Parameter DATA_TYPE bound to: 2 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized4' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized4' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 2 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 2 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized4' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 2 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized4' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'addi' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+	Parameter DATA_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-638] synthesizing module '\join ' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/join.vhd:18]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'and_n__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+	Parameter SIZE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'and_n__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+INFO: [Synth 8-256] done synthesizing module '\join ' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/join.vhd:18]
+INFO: [Synth 8-256] done synthesizing module 'addi' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'tfifo' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo.vhd:23]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+	Parameter DATA_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'elastic_fifo_inner' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:23]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+	Parameter DATA_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'elastic_fifo_inner' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:23]
+INFO: [Synth 8-256] done synthesizing module 'tfifo' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'load' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/load.vhd:32]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+	Parameter ADDR_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'tehb__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+	Parameter DATA_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'tehb__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'tehb__parameterized3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'tehb__parameterized3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tehb.vhd:22]
+INFO: [Synth 8-256] done synthesizing module 'load' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/load.vhd:32]
+INFO: [Synth 8-638] synthesizing module 'addi__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'addi__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'shli' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/shli.vhd:26]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'shli' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/shli.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'oehb' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'oehb_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb_dataless.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'oehb_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb_dataless.vhd:17]
+INFO: [Synth 8-256] done synthesizing module 'oehb' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'tfifo__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo.vhd:23]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'elastic_fifo_inner__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:23]
+	Parameter NUM_SLOTS bound to: 1 - type: integer 
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'elastic_fifo_inner__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:23]
+INFO: [Synth 8-256] done synthesizing module 'tfifo__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/tfifo.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'store' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/store.vhd:32]
+	Parameter DATA_TYPE bound to: 32 - type: integer 
+	Parameter ADDR_TYPE bound to: 7 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'store' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/store.vhd:32]
+INFO: [Synth 8-638] synthesizing module 'addi__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+	Parameter DATA_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'addi__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'oehb__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+	Parameter DATA_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'oehb__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized3' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized3' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'trunci__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+	Parameter INPUT_TYPE bound to: 9 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'trunci__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+INFO: [Synth 8-638] synthesizing module 'handshake_cmpi_0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_cmpi_0.vhd:26]
+	Parameter DATA_TYPE bound to: 9 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_cmpi_0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_cmpi_0.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized4' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 4 - type: integer 
+	Parameter DATA_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'fork_dataless__parameterized5' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+	Parameter SIZE bound to: 4 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'or_n__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+	Parameter SIZE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'or_n__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:58]
+INFO: [Synth 8-256] done synthesizing module 'fork_dataless__parameterized5' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/fork_dataless.vhd:20]
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized4' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'cond_br' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'cond_br_dataless' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br_dataless.vhd:24]
+INFO: [Synth 8-256] done synthesizing module 'cond_br_dataless' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br_dataless.vhd:24]
+INFO: [Synth 8-256] done synthesizing module 'cond_br' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+INFO: [Synth 8-638] synthesizing module 'sink' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'sink' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+INFO: [Synth 8-638] synthesizing module 'oehb__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+	Parameter DATA_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'oehb__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'cond_br__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+	Parameter DATA_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'cond_br__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+INFO: [Synth 8-638] synthesizing module 'cond_br__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+	Parameter DATA_TYPE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'cond_br__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/cond_br.vhd:31]
+INFO: [Synth 8-638] synthesizing module 'sink__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+	Parameter DATA_TYPE bound to: 2 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'sink__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized5' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 3 - type: integer 
+	Parameter DATA_TYPE bound to: 8 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized5' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'lazy_fork_dataless__parameterized0' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/lazy_fork_dataless.vhd:19]
+	Parameter SIZE bound to: 3 - type: integer 
+INFO: [Synth 8-638] synthesizing module 'and_n__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+	Parameter SIZE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'and_n__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/logic.vhd:16]
+INFO: [Synth 8-256] done synthesizing module 'lazy_fork_dataless__parameterized0' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/lazy_fork_dataless.vhd:19]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized6' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 3 - type: integer 
+	Parameter DATA_TYPE bound to: 1 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized6' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized5' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 3 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized5' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'handshake_constant_4' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_4.vhd:21]
+	Parameter DATA_WIDTH bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_constant_4' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_constant_4.vhd:21]
+INFO: [Synth 8-638] synthesizing module 'extsi__parameterized6' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+	Parameter INPUT_TYPE bound to: 2 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'extsi__parameterized6' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/extsi.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'addi__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+	Parameter DATA_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'addi__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/addi.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'handshake_fork__parameterized7' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+	Parameter SIZE bound to: 2 - type: integer 
+	Parameter DATA_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_fork__parameterized7' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_fork.vhd:23]
+INFO: [Synth 8-638] synthesizing module 'trunci__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+	Parameter INPUT_TYPE bound to: 4 - type: integer 
+	Parameter OUTPUT_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'trunci__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/trunci.vhd:24]
+INFO: [Synth 8-638] synthesizing module 'oehb__parameterized2' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+	Parameter DATA_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'oehb__parameterized2' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/oehb.vhd:22]
+INFO: [Synth 8-638] synthesizing module 'handshake_cmpi_1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_cmpi_1.vhd:26]
+	Parameter DATA_TYPE bound to: 4 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'handshake_cmpi_1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/handshake_cmpi_1.vhd:26]
+INFO: [Synth 8-638] synthesizing module 'sink__parameterized1' [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+	Parameter DATA_TYPE bound to: 3 - type: integer 
+INFO: [Synth 8-256] done synthesizing module 'sink__parameterized1' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/sink.vhd:19]
+INFO: [Synth 8-256] done synthesizing module 'jacobi_1d_imper' (0#1) [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/jacobi_1d_imper.vhd:36]
+WARNING: [Synth 8-6014] Unused sequential element fifo_valid_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner_dataless.vhd:48]
+WARNING: [Synth 8-6014] Unused sequential element Tail_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner_dataless.vhd:65]
+WARNING: [Synth 8-6014] Unused sequential element Head_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner_dataless.vhd:80]
+WARNING: [Synth 8-6014] Unused sequential element fifo_valid_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:51]
+WARNING: [Synth 8-6014] Unused sequential element Tail_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:72]
+WARNING: [Synth 8-6014] Unused sequential element Head_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:43]
+WARNING: [Synth 8-6014] Unused sequential element fifo_valid_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:51]
+WARNING: [Synth 8-6014] Unused sequential element Tail_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:72]
+WARNING: [Synth 8-6014] Unused sequential element Head_reg was removed.  [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/hdl/elastic_fifo_inner.vhd:43]
+WARNING: [Synth 8-7129] Port clk in module cond_br_dataless is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module cond_br_dataless is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[2] in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[1] in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[0] in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins_valid in module sink__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module handshake_cmpi_1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module handshake_cmpi_1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module trunci__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module trunci__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[3] in module trunci__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module addi__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module addi__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized6 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized6 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module handshake_constant_1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module handshake_constant_1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module source is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module source is either unconnected or has no load
+WARNING: [Synth 8-7129] Port outs_ready in module source is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized5 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized5 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module handshake_constant_4 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module handshake_constant_4 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[7] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[6] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[5] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[4] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[3] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[2] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[1] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[0] in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins_valid in module sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module handshake_cmpi_0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module handshake_cmpi_0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module trunci__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module trunci__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[8] in module trunci__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module addi__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module addi__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module store is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module store is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized3 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized3 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized1 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module handshake_constant_3 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module handshake_constant_3 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module lazy_fork_dataless__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module lazy_fork_dataless__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module merge_dataless is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module merge_dataless is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module mux is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module mux is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module trunci is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module trunci is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[7] in module trunci is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module mux__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module mux__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module sink__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module sink__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[1] in module sink__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[0] in module sink__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins_valid in module sink__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module addi__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module addi__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module shli is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module shli is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rhs[31] in module shli is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module addi is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module addi is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized4 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized4 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module extsi__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module extsi__parameterized2 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port clk in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[31] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[30] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[29] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[28] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[27] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[26] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[25] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[24] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[23] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[22] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[21] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[20] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[19] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[18] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[17] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[16] in module trunci__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ins[15] in module trunci__parameterized0 is either unconnected or has no load
+INFO: [Common 17-14] Message 'Synth 8-7129' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+---------------------------------------------------------------------------------
+Finished RTL Elaboration : Time (s): cpu = 00:00:04 ; elapsed = 00:00:05 . Memory (MB): peak = 2032.965 ; gain = 559.770 ; free physical = 47552 ; free virtual = 189800
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:04 ; elapsed = 00:00:05 . Memory (MB): peak = 2047.809 ; gain = 574.613 ; free physical = 49077 ; free virtual = 191325
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:04 ; elapsed = 00:00:05 . Memory (MB): peak = 2047.809 ; gain = 574.613 ; free physical = 49077 ; free virtual = 191325
+---------------------------------------------------------------------------------
+Netlist sorting complete. Time (s): cpu = 00:00:00.07 ; elapsed = 00:00:00.07 . Memory (MB): peak = 2047.809 ; gain = 0.000 ; free physical = 49022 ; free virtual = 191273
+INFO: [Project 1-570] Preparing netlist for logic optimization
+
+Processing XDC Constraints
+Initializing timing engine
+Parsing XDC File [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/vivado/Timing_based_target_6.50_cp_6.20/constraints.xdc]
+Finished Parsing XDC File [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/vivado/Timing_based_target_6.50_cp_6.20/constraints.xdc]
+Completed Processing XDC Constraints
+
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 2179.590 ; gain = 0.000 ; free physical = 48860 ; free virtual = 191117
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Constraint Validation Runtime : Time (s): cpu = 00:00:00.09 ; elapsed = 00:00:00.03 . Memory (MB): peak = 2179.590 ; gain = 0.000 ; free physical = 48847 ; free virtual = 191105
+---------------------------------------------------------------------------------
+Finished Constraint Validation : Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 2179.590 ; gain = 706.395 ; free physical = 48504 ; free virtual = 190825
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Loading Part and Timing Information
+---------------------------------------------------------------------------------
+Loading part: xc7k160tfbg484-3
+---------------------------------------------------------------------------------
+Finished Loading Part and Timing Information : Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 2187.594 ; gain = 714.398 ; free physical = 48507 ; free virtual = 190828
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying 'set_property' XDC Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 2187.594 ; gain = 714.398 ; free physical = 48507 ; free virtual = 190828
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:11 ; elapsed = 00:00:11 . Memory (MB): peak = 2187.594 ; gain = 714.398 ; free physical = 48338 ; free virtual = 190733
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start RTL Component Statistics 
+---------------------------------------------------------------------------------
+Detailed RTL Component Info : 
++---Adders : 
+	   2 Input   32 Bit       Adders := 3     
+	   3 Input   16 Bit       Adders := 32    
+	   2 Input    9 Bit       Adders := 2     
+	   2 Input    7 Bit       Adders := 2     
+	   2 Input    4 Bit       Adders := 1     
+	   3 Input    3 Bit       Adders := 4     
+	   2 Input    3 Bit       Adders := 10    
++---Registers : 
+	               32 Bit    Registers := 39    
+	                9 Bit    Registers := 2     
+	                8 Bit    Registers := 18    
+	                7 Bit    Registers := 42    
+	                4 Bit    Registers := 5     
+	                3 Bit    Registers := 17    
+	                2 Bit    Registers := 8     
+	                1 Bit    Registers := 214   
++---Muxes : 
+	   2 Input   32 Bit        Muxes := 182   
+	   2 Input    8 Bit        Muxes := 6     
+	   2 Input    7 Bit        Muxes := 50    
+	   2 Input    4 Bit        Muxes := 4     
+	   2 Input    3 Bit        Muxes := 11    
+	   2 Input    2 Bit        Muxes := 8     
+	   2 Input    1 Bit        Muxes := 379   
+---------------------------------------------------------------------------------
+Finished RTL Component Statistics 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Part Resource Summary
+---------------------------------------------------------------------------------
+Part Resources:
+DSPs: 600 (col length:100)
+BRAMs: 650 (col length: RAMB18 100 RAMB36 50)
+---------------------------------------------------------------------------------
+Finished Part Resource Summary
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Cross Boundary and Area Optimization
+---------------------------------------------------------------------------------
+WARNING: [Synth 8-7080] Parallel synthesis criteria is not met
+---------------------------------------------------------------------------------
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:27 ; elapsed = 00:00:28 . Memory (MB): peak = 2266.367 ; gain = 793.172 ; free physical = 50445 ; free virtual = 192632
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying XDC Timing Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:00:32 ; elapsed = 00:00:32 . Memory (MB): peak = 2266.367 ; gain = 793.172 ; free physical = 50351 ; free virtual = 192547
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Timing Optimization
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Timing Optimization : Time (s): cpu = 00:00:40 ; elapsed = 00:00:41 . Memory (MB): peak = 2388.945 ; gain = 915.750 ; free physical = 50709 ; free virtual = 193040
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Technology Mapping
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Technology Mapping : Time (s): cpu = 00:00:43 ; elapsed = 00:00:44 . Memory (MB): peak = 2491.969 ; gain = 1018.773 ; free physical = 49812 ; free virtual = 192225
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished IO Insertion : Time (s): cpu = 00:00:45 ; elapsed = 00:00:46 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48840 ; free virtual = 191193
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Instances
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Instances : Time (s): cpu = 00:00:45 ; elapsed = 00:00:46 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48832 ; free virtual = 191185
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Rebuilding User Hierarchy
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48546 ; free virtual = 190901
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Ports
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Ports : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48489 ; free virtual = 190844
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48403 ; free virtual = 190759
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Nets
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Nets : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48394 ; free virtual = 190751
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Writing Synthesis Report
+---------------------------------------------------------------------------------
+
+Report BlackBoxes: 
++-+--------------+----------+
+| |BlackBox name |Instances |
++-+--------------+----------+
++-+--------------+----------+
+
+Report Cell Usage: 
++------+-------+------+
+|      |Cell   |Count |
++------+-------+------+
+|1     |CARRY4 |   152|
+|2     |LUT1   |   178|
+|3     |LUT2   |   152|
+|4     |LUT3   |   557|
+|5     |LUT4   |  1512|
+|6     |LUT5   |  1124|
+|7     |LUT6   |  2279|
+|8     |MUXF7  |   105|
+|9     |FDCE   |    79|
+|10    |FDRE   |  1863|
+|11    |FDSE   |    47|
++------+-------+------+
+---------------------------------------------------------------------------------
+Finished Writing Synthesis Report : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.906 ; gain = 1026.711 ; free physical = 48386 ; free virtual = 190743
+---------------------------------------------------------------------------------
+Synthesis finished with 0 errors, 0 critical warnings and 29 warnings.
+Synthesis Optimization Runtime : Time (s): cpu = 00:00:44 ; elapsed = 00:00:45 . Memory (MB): peak = 2499.906 ; gain = 894.930 ; free physical = 48334 ; free virtual = 190691
+Synthesis Optimization Complete : Time (s): cpu = 00:00:46 ; elapsed = 00:00:47 . Memory (MB): peak = 2499.914 ; gain = 1026.711 ; free physical = 48334 ; free virtual = 190691
+INFO: [Project 1-571] Translating synthesized netlist
+Netlist sorting complete. Time (s): cpu = 00:00:00.04 ; elapsed = 00:00:00.04 . Memory (MB): peak = 2513.781 ; gain = 0.000 ; free physical = 48307 ; free virtual = 190666
+INFO: [Netlist 29-17] Analyzing 257 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-570] Preparing netlist for logic optimization
+Parsing XDC File [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/vivado/Timing_based_target_6.50_cp_6.20/constraints.xdc]
+Finished Parsing XDC File [/beta/rouzbeh/clean/dynamatic/skip2/runs/run_2025-12-16_15-09-25/jacobi_1d_imper-8-8/out/vivado/Timing_based_target_6.50_cp_6.20/constraints.xdc]
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+Netlist sorting complete. Time (s): cpu = 00:00:00.01 ; elapsed = 00:00:00 . Memory (MB): peak = 2575.746 ; gain = 0.000 ; free physical = 44228 ; free virtual = 186606
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Synth Design complete | Checksum: d74635ff
+INFO: [Common 17-83] Releasing license: Synthesis
+209 Infos, 110 Warnings, 0 Critical Warnings and 0 Errors encountered.
+synth_design completed successfully
+synth_design: Time (s): cpu = 00:00:53 ; elapsed = 00:00:53 . Memory (MB): peak = 2575.746 ; gain = 1102.613 ; free physical = 43043 ; free virtual = 185410
+INFO: [Common 17-2834] synth_design peak Physical Memory [PSS] (MB): overall = 1672.024; main = 1536.230; forked = 228.153
+INFO: [Common 17-2834] synth_design peak Virtual Memory [VSS] (MB): overall = 3297.938; main = 2575.750; forked = 916.996
+Command: place_design
+Attempting to get a license for feature 'Implementation' and/or device 'xc7k160t'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xc7k160t'
+INFO: [Common 17-83] Releasing license: Implementation
+INFO: [DRC 23-27] Running DRC with 8 threads
+WARNING: [DRC 23-814] Not all possible (connectivity based) DRCs may have been run because this design is seen as Out of Context.
+INFO: [Vivado_Tcl 4-198] DRC finished with 0 Errors
+INFO: [Vivado_Tcl 4-199] Please refer to the DRC report (report_drc) for more information.
+Running DRC as a precondition to command place_design
+INFO: [DRC 23-27] Running DRC with 8 threads
+WARNING: [DRC 23-814] Not all possible (connectivity based) DRCs may have been run because this design is seen as Out of Context.
+INFO: [Vivado_Tcl 4-198] DRC finished with 0 Errors
+INFO: [Vivado_Tcl 4-199] Please refer to the DRC report (report_drc) for more information.
+INFO: [Place 30-611] Multithreading enabled for place_design using a maximum of 8 CPUs
+
+Starting Placer Task
+
+Phase 1 Placer Initialization
+
+Phase 1.1 Placer Initialization Netlist Sorting
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 2808.184 ; gain = 0.000 ; free physical = 43584 ; free virtual = 186632
+Phase 1.1 Placer Initialization Netlist Sorting | Checksum: fca01ed9
+
+Time (s): cpu = 00:00:00.03 ; elapsed = 00:00:00.04 . Memory (MB): peak = 2808.184 ; gain = 0.000 ; free physical = 43584 ; free virtual = 186632
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 2808.184 ; gain = 0.000 ; free physical = 43606 ; free virtual = 186654
+
+Phase 1.2 IO Placement/ Clock Placement/ Build Placer Device
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+Phase 1.2 IO Placement/ Clock Placement/ Build Placer Device | Checksum: 170226a59
+
+Time (s): cpu = 00:00:00.74 ; elapsed = 00:00:00.37 . Memory (MB): peak = 2840.199 ; gain = 32.016 ; free physical = 43570 ; free virtual = 186615
+
+Phase 1.3 Build Placer Netlist Model
+Phase 1.3 Build Placer Netlist Model | Checksum: 1b13d80f1
+
+Time (s): cpu = 00:00:02 ; elapsed = 00:00:00.92 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 43505 ; free virtual = 186554
+
+Phase 1.4 Constrain Clocks/Macros
+Phase 1.4 Constrain Clocks/Macros | Checksum: 1b13d80f1
+
+Time (s): cpu = 00:00:02 ; elapsed = 00:00:00.93 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 43503 ; free virtual = 186552
+Phase 1 Placer Initialization | Checksum: 1b13d80f1
+
+Time (s): cpu = 00:00:02 ; elapsed = 00:00:00.95 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 43499 ; free virtual = 186549
+
+Phase 2 Global Placement
+
+Phase 2.1 Floorplanning
+Phase 2.1 Floorplanning | Checksum: 218d9d740
+
+Time (s): cpu = 00:00:03 ; elapsed = 00:00:01 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 44047 ; free virtual = 187097
+
+Phase 2.2 Update Timing before SLR Path Opt
+Phase 2.2 Update Timing before SLR Path Opt | Checksum: 247c65af6
+
+Time (s): cpu = 00:00:03 ; elapsed = 00:00:01 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 44062 ; free virtual = 187113
+
+Phase 2.3 Post-Processing in Floorplanning
+Phase 2.3 Post-Processing in Floorplanning | Checksum: 247c65af6
+
+Time (s): cpu = 00:00:03 ; elapsed = 00:00:01 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 44054 ; free virtual = 187105
+
+Phase 2.4 Global Place Phase1
+Phase 2.4 Global Place Phase1 | Checksum: 249cde331
+
+Time (s): cpu = 00:00:08 ; elapsed = 00:00:03 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45770 ; free virtual = 188823
+
+Phase 2.5 Global Place Phase2
+
+Phase 2.5.1 UpdateTiming Before Physical Synthesis
+Phase 2.5.1 UpdateTiming Before Physical Synthesis | Checksum: 20f86f362
+
+Time (s): cpu = 00:00:09 ; elapsed = 00:00:03 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45837 ; free virtual = 188844
+
+Phase 2.5.2 Physical Synthesis In Placer
+INFO: [Physopt 32-1035] Found 5 LUTNM shape to break, 237 LUT instances to create LUTNM shape
+INFO: [Physopt 32-1044] Break lutnm for timing: one critical 5, two critical 0, total 5, new lutff created 0
+INFO: [Physopt 32-1138] End 1 Pass. Optimized 83 nets or LUTs. Breaked 5 LUTs, combined 78 existing LUTs and moved 0 existing LUT
+INFO: [Physopt 32-65] No nets found for high-fanout optimization.
+INFO: [Physopt 32-232] Optimized 0 net. Created 0 new instance.
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-456] No candidate cells for DSP register optimization found in the design.
+INFO: [Physopt 32-775] End 2 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-1123] No candidate cells found for Shift Register to Pipeline optimization
+INFO: [Physopt 32-775] End 2 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-1401] No candidate cells found for Shift Register optimization.
+INFO: [Physopt 32-677] No candidate cells for Shift Register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-526] No candidate cells for BRAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-846] No candidate cells for URAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-846] No candidate cells for URAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-949] No candidate nets found for dynamic/static region interface net replication
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.01 . Memory (MB): peak = 2879.242 ; gain = 0.000 ; free physical = 45837 ; free virtual = 188824
+
+Summary of Physical Synthesis Optimizations
+============================================
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+|  Optimization                                     |  Added Cells  |  Removed Cells  |  Optimized Cells/Nets  |  Dont Touch  |  Iterations  |  Elapsed   |
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+|  LUT Combining                                    |            5  |             78  |                    83  |           0  |           1  |  00:00:00  |
+|  Retime                                           |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Very High Fanout                                 |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  DSP Register                                     |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Shift Register to Pipeline                       |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Shift Register                                   |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  BRAM Register                                    |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  URAM Register                                    |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Dynamic/Static Region Interface Net Replication  |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Total                                            |            5  |             78  |                    83  |           0  |           9  |  00:00:00  |
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Phase 2.5.2 Physical Synthesis In Placer | Checksum: 1b23859ac
+
+Time (s): cpu = 00:00:10 ; elapsed = 00:00:04 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45814 ; free virtual = 188801
+Phase 2.5 Global Place Phase2 | Checksum: 219ed38a1
+
+Time (s): cpu = 00:00:10 ; elapsed = 00:00:04 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45811 ; free virtual = 188799
+Phase 2 Global Placement | Checksum: 219ed38a1
+
+Time (s): cpu = 00:00:10 ; elapsed = 00:00:04 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45811 ; free virtual = 188799
+
+Phase 3 Detail Placement
+
+Phase 3.1 Commit Multi Column Macros
+Phase 3.1 Commit Multi Column Macros | Checksum: 1e15a62fb
+
+Time (s): cpu = 00:00:11 ; elapsed = 00:00:04 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45811 ; free virtual = 188800
+
+Phase 3.2 Commit Most Macros & LUTRAMs
+Phase 3.2 Commit Most Macros & LUTRAMs | Checksum: 18d61ad13
+
+Time (s): cpu = 00:00:11 ; elapsed = 00:00:05 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45804 ; free virtual = 188793
+
+Phase 3.3 Area Swap Optimization
+Phase 3.3 Area Swap Optimization | Checksum: 1c1f893e6
+
+Time (s): cpu = 00:00:12 ; elapsed = 00:00:05 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45772 ; free virtual = 188762
+
+Phase 3.4 Pipeline Register Optimization
+Phase 3.4 Pipeline Register Optimization | Checksum: 24b46e509
+
+Time (s): cpu = 00:00:12 ; elapsed = 00:00:05 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45772 ; free virtual = 188762
+
+Phase 3.5 Fast Optimization
+Phase 3.5 Fast Optimization | Checksum: 252ab6014
+
+Time (s): cpu = 00:00:13 ; elapsed = 00:00:06 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46899 ; free virtual = 189319
+
+Phase 3.6 Small Shape Detail Placement
+Phase 3.6 Small Shape Detail Placement | Checksum: 235a622da
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:07 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46632 ; free virtual = 189130
+
+Phase 3.7 Re-assign LUT pins
+Phase 3.7 Re-assign LUT pins | Checksum: 2a0442b9c
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:07 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46630 ; free virtual = 189128
+
+Phase 3.8 Pipeline Register Optimization
+Phase 3.8 Pipeline Register Optimization | Checksum: 24f129e7f
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:07 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46630 ; free virtual = 189128
+Phase 3 Detail Placement | Checksum: 24f129e7f
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:07 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46630 ; free virtual = 189128
+
+Phase 4 Post Placement Optimization and Clean-Up
+
+Phase 4.1 Post Commit Optimization
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+
+Phase 4.1.1 Post Placement Optimization
+Post Placement Optimization Initialization | Checksum: 201a7a5b1
+
+Phase 4.1.1.1 BUFG Insertion
+
+Starting Physical Synthesis Task
+
+Phase 1 Physical Synthesis Initialization
+INFO: [Physopt 32-721] Multithreading enabled for phys_opt_design using a maximum of 8 CPUs
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.632 | TNS=-122.876 |
+Phase 1 Physical Synthesis Initialization | Checksum: 1bbc23671
+
+Time (s): cpu = 00:00:00.22 ; elapsed = 00:00:00.06 . Memory (MB): peak = 2879.242 ; gain = 0.000 ; free physical = 46531 ; free virtual = 189043
+INFO: [Place 46-56] BUFG insertion identified 0 candidate nets. Inserted BUFG: 0, Replicated BUFG Driver: 0, Skipped due to Placement/Routing Conflicts: 0, Skipped due to Timing Degradation: 0, Skipped due to netlist editing failed: 0.
+Ending Physical Synthesis Task | Checksum: 2d2b6e321
+
+Time (s): cpu = 00:00:00.26 ; elapsed = 00:00:00.07 . Memory (MB): peak = 2879.242 ; gain = 0.000 ; free physical = 46531 ; free virtual = 189043
+Phase 4.1.1.1 BUFG Insertion | Checksum: 201a7a5b1
+
+Time (s): cpu = 00:00:17 ; elapsed = 00:00:08 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 46531 ; free virtual = 189043
+
+Phase 4.1.1.2 Post Placement Timing Optimization
+INFO: [Place 30-746] Post Placement Timing Summary WNS=0.114. For the most accurate timing information please run report_timing.
+Phase 4.1.1.2 Post Placement Timing Optimization | Checksum: 2ac5141e9
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45454 ; free virtual = 188021
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45454 ; free virtual = 188021
+Phase 4.1 Post Commit Optimization | Checksum: 2ac5141e9
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45454 ; free virtual = 188021
+
+Phase 4.2 Post Placement Cleanup
+Phase 4.2 Post Placement Cleanup | Checksum: 2ac5141e9
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45439 ; free virtual = 188008
+
+Phase 4.3 Placer Reporting
+
+Phase 4.3.1 Print Estimated Congestion
+INFO: [Place 30-612] Post-Placement Estimated Congestion 
+ ____________________________________________________
+|           | Global Congestion | Short Congestion  |
+| Direction | Region Size       | Region Size       |
+|___________|___________________|___________________|
+|      North|                2x2|                4x4|
+|___________|___________________|___________________|
+|      South|                1x1|                4x4|
+|___________|___________________|___________________|
+|       East|                4x4|                8x8|
+|___________|___________________|___________________|
+|       West|                1x1|                1x1|
+|___________|___________________|___________________|
+
+Phase 4.3.1 Print Estimated Congestion | Checksum: 2ac5141e9
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45439 ; free virtual = 188008
+Phase 4.3 Placer Reporting | Checksum: 2ac5141e9
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45435 ; free virtual = 188004
+
+Phase 4.4 Final Placement Cleanup
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 2879.242 ; gain = 0.000 ; free physical = 45435 ; free virtual = 188004
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45435 ; free virtual = 188004
+Phase 4 Post Placement Optimization and Clean-Up | Checksum: 1ed226b6c
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45435 ; free virtual = 188004
+Ending Placer Task | Checksum: 17634ec7f
+
+Time (s): cpu = 00:00:27 ; elapsed = 00:00:16 . Memory (MB): peak = 2879.242 ; gain = 71.059 ; free physical = 45435 ; free virtual = 188004
+253 Infos, 113 Warnings, 0 Critical Warnings and 0 Errors encountered.
+place_design completed successfully
+place_design: Time (s): cpu = 00:00:29 ; elapsed = 00:00:17 . Memory (MB): peak = 2879.242 ; gain = 230.684 ; free physical = 45435 ; free virtual = 188004
+Command: route_design
+Attempting to get a license for feature 'Implementation' and/or device 'xc7k160t'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xc7k160t'
+
+
+Starting Routing Task
+INFO: [Route 35-254] Multithreading enabled for route_design using a maximum of 8 CPUs
+
+Phase 1 Build RT Design
+Checksum: PlaceDB: b61a66dc ConstDB: 0 ShapeSum: 1f163166 RouteDB: a104543d
+WARNING: [Route 35-197] Clock port "clk" does not have an associated HD.CLK_SRC. Without this constraint, timing analysis may not be accurate and upstream checks cannot be done to ensure correct clock placement.
+WARNING: [Route 35-198] Port "rst" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "rst". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[0]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[0]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[3]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[3]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[4]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[4]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[1]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[1]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[25]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[25]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[21]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[21]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[23]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[23]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[27]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[27]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[5]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[5]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[13]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[13]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[17]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[17]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[6]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[6]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[15]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[15]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[19]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[19]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[10]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[10]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[8]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[8]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[11]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[11]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[12]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[12]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[9]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[9]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[22]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[22]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "start_valid" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "start_valid". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[20]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[20]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "end_ready" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "end_ready". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_end_ready" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_end_ready". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_start_valid" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_start_valid". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[2]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[2]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[31]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[31]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[30]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[30]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[29]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[29]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[7]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[7]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_start_valid" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_start_valid". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_end_ready" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_end_ready". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[16]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[16]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[24]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[24]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[26]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[26]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[18]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[18]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[14]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[14]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "B_loadData[28]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "B_loadData[28]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[1]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[1]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[6]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[6]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[8]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[8]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[3]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[3]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[5]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[5]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[2]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[2]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[10]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[10]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[28]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[28]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[0]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[0]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[4]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[4]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[9]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[9]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[12]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[12]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[26]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[26]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[21]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[21]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[23]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[23]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[16]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[16]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[25]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[25]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[18]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[18]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[14]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[14]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[20]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[20]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[29]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[29]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[11]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[11]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[27]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[27]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[7]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[7]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[31]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[31]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[22]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[22]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[24]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[24]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[30]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[30]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[19]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[19]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[17]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[17]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[13]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[13]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "A_loadData[15]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "A_loadData[15]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Constraints 18-8777] Unable to split tiles. All required files are not available.
+Post Restoration Checksum: NetGraph: ca0d036 | NumContArr: 342a3071 | Constraints: c2a8fa9d | Timing: c2a8fa9d
+Phase 1 Build RT Design | Checksum: 1c61cf5e1
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:09 . Memory (MB): peak = 2977.000 ; gain = 97.758 ; free physical = 44053 ; free virtual = 186703
+
+Phase 2 Router Initialization
+
+Phase 2.1 Fix Topology Constraints
+Phase 2.1 Fix Topology Constraints | Checksum: 1c61cf5e1
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:09 . Memory (MB): peak = 2977.000 ; gain = 97.758 ; free physical = 44060 ; free virtual = 186710
+
+Phase 2.2 Pre Route Cleanup
+Phase 2.2 Pre Route Cleanup | Checksum: 1c61cf5e1
+
+Time (s): cpu = 00:00:15 ; elapsed = 00:00:09 . Memory (MB): peak = 2977.000 ; gain = 97.758 ; free physical = 44064 ; free virtual = 186714
+ Number of Nodes with overlaps = 0
+
+Phase 2.3 Update Timing
+Phase 2.3 Update Timing | Checksum: 304ea9dd6
+
+Time (s): cpu = 00:00:16 ; elapsed = 00:00:10 . Memory (MB): peak = 3026.102 ; gain = 146.859 ; free physical = 43977 ; free virtual = 186629
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=0.225  | TNS=0.000  | WHS=0.066  | THS=0.000  |
+
+
+Router Utilization Summary
+  Global Vertical Routing Utilization    = 0 %
+  Global Horizontal Routing Utilization  = 0 %
+  Routable Net Status*
+  *Does not include unroutable nets such as driverless and loadless.
+  Run report_route_status for detailed report.
+  Number of Failed Nets               = 6534
+    (Failed Nets is the sum of unrouted and partially routed nets)
+  Number of Unrouted Nets             = 6534
+  Number of Partially Routed Nets     = 0
+  Number of Node Overlaps             = 0
+
+Phase 2 Router Initialization | Checksum: 2c1e62504
+
+Time (s): cpu = 00:00:18 ; elapsed = 00:00:10 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 44004 ; free virtual = 186662
+
+Phase 3 Global Routing
+Phase 3 Global Routing | Checksum: 2c1e62504
+
+Time (s): cpu = 00:00:18 ; elapsed = 00:00:10 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 44004 ; free virtual = 186662
+
+Phase 4 Initial Routing
+
+Phase 4.1 Initial Net Routing Pass
+Phase 4.1 Initial Net Routing Pass | Checksum: 1e1b6d783
+
+Time (s): cpu = 00:00:19 ; elapsed = 00:00:10 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 44017 ; free virtual = 186674
+Phase 4 Initial Routing | Checksum: 1e1b6d783
+
+Time (s): cpu = 00:00:19 ; elapsed = 00:00:10 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 44017 ; free virtual = 186674
+
+Phase 5 Rip-up And Reroute
+
+Phase 5.1 Global Iteration 0
+ Number of Nodes with overlaps = 3660
+ Number of Nodes with overlaps = 994
+ Number of Nodes with overlaps = 319
+ Number of Nodes with overlaps = 105
+ Number of Nodes with overlaps = 48
+ Number of Nodes with overlaps = 10
+ Number of Nodes with overlaps = 2
+ Number of Nodes with overlaps = 0
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=-0.182 | TNS=-1.952 | WHS=N/A    | THS=N/A    |
+
+Phase 5.1 Global Iteration 0 | Checksum: 28cc7e9c5
+
+Time (s): cpu = 00:00:35 ; elapsed = 00:00:15 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45823 ; free virtual = 188360
+
+Phase 5.2 Global Iteration 1
+ Number of Nodes with overlaps = 441
+ Number of Nodes with overlaps = 92
+ Number of Nodes with overlaps = 39
+ Number of Nodes with overlaps = 30
+ Number of Nodes with overlaps = 21
+ Number of Nodes with overlaps = 7
+ Number of Nodes with overlaps = 6
+ Number of Nodes with overlaps = 4
+ Number of Nodes with overlaps = 2
+ Number of Nodes with overlaps = 2
+ Number of Nodes with overlaps = 2
+ Number of Nodes with overlaps = 0
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=-0.009 | TNS=-0.027 | WHS=N/A    | THS=N/A    |
+
+Phase 5.2 Global Iteration 1 | Checksum: 1c1a0d73d
+
+Time (s): cpu = 00:00:40 ; elapsed = 00:00:18 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45506 ; free virtual = 188079
+
+Phase 5.3 Global Iteration 2
+ Number of Nodes with overlaps = 375
+ Number of Nodes with overlaps = 131
+ Number of Nodes with overlaps = 26
+ Number of Nodes with overlaps = 31
+ Number of Nodes with overlaps = 7
+ Number of Nodes with overlaps = 8
+ Number of Nodes with overlaps = 2
+ Number of Nodes with overlaps = 0
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=-0.173 | TNS=-4.065 | WHS=N/A    | THS=N/A    |
+
+Phase 5.3 Global Iteration 2 | Checksum: 31f7f00e4
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:00:19 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45525 ; free virtual = 188031
+Phase 5 Rip-up And Reroute | Checksum: 31f7f00e4
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:00:19 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45525 ; free virtual = 188031
+
+Phase 6 Delay and Skew Optimization
+
+Phase 6.1 Delay CleanUp
+
+Phase 6.1.1 Update Timing
+Phase 6.1.1 Update Timing | Checksum: 2e2ddd100
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:00:19 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45524 ; free virtual = 188030
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=-0.009 | TNS=-0.027 | WHS=N/A    | THS=N/A    |
+
+ Number of Nodes with overlaps = 0
+Phase 6.1 Delay CleanUp | Checksum: 1b24c829d
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45524 ; free virtual = 188030
+
+Phase 6.2 Clock Skew Optimization
+Phase 6.2 Clock Skew Optimization | Checksum: 1b24c829d
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45523 ; free virtual = 188029
+Phase 6 Delay and Skew Optimization | Checksum: 1b24c829d
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45523 ; free virtual = 188029
+
+Phase 7 Post Hold Fix
+
+Phase 7.1 Hold Fix Iter
+INFO: [Route 35-416] Intermediate Timing Summary | WNS=0.012  | TNS=0.000  | WHS=0.102  | THS=0.000  |
+
+Phase 7.1 Hold Fix Iter | Checksum: 196ca0ca9
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45516 ; free virtual = 188023
+Phase 7 Post Hold Fix | Checksum: 196ca0ca9
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45516 ; free virtual = 188023
+
+Phase 8 Route finalize
+
+Router Utilization Summary
+  Global Vertical Routing Utilization    = 1.46157 %
+  Global Horizontal Routing Utilization  = 1.71807 %
+  Routable Net Status*
+  *Does not include unroutable nets such as driverless and loadless.
+  Run report_route_status for detailed report.
+  Number of Failed Nets               = 0
+    (Failed Nets is the sum of unrouted and partially routed nets)
+  Number of Unrouted Nets             = 0
+  Number of Partially Routed Nets     = 0
+  Number of Node Overlaps             = 0
+
+Phase 8 Route finalize | Checksum: 196ca0ca9
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45515 ; free virtual = 188022
+
+Phase 9 Verifying routed nets
+
+ Verification completed successfully
+Phase 9 Verifying routed nets | Checksum: 196ca0ca9
+
+Time (s): cpu = 00:00:44 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45515 ; free virtual = 188022
+
+Phase 10 Depositing Routes
+Phase 10 Depositing Routes | Checksum: 135a90317
+
+Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45483 ; free virtual = 187992
+
+Phase 11 Post Process Routing
+Phase 11 Post Process Routing | Checksum: 135a90317
+
+Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45483 ; free virtual = 187992
+
+Phase 12 Post Router Timing
+INFO: [Route 35-57] Estimated Timing Summary | WNS=0.012  | TNS=0.000  | WHS=0.102  | THS=0.000  |
+
+INFO: [Route 35-327] The final timing numbers are based on the router estimated timing analysis. For a complete and accurate timing signoff, please run report_timing_summary.
+Phase 12 Post Router Timing | Checksum: 135a90317
+
+Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45475 ; free virtual = 187984
+Total Elapsed time in route_design: 19.94 secs
+
+Phase 13 Post-Route Event Processing
+Phase 13 Post-Route Event Processing | Checksum: bf554bb8
+
+Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45473 ; free virtual = 187982
+INFO: [Route 35-16] Router Completed Successfully
+Ending Routing Task | Checksum: bf554bb8
+
+Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45458 ; free virtual = 187968
+
+Routing Is Done.
+INFO: [Common 17-83] Releasing license: Implementation
+265 Infos, 186 Warnings, 0 Critical Warnings and 0 Errors encountered.
+route_design completed successfully
+route_design: Time (s): cpu = 00:00:45 ; elapsed = 00:00:20 . Memory (MB): peak = 3028.750 ; gain = 149.508 ; free physical = 45442 ; free virtual = 187951
+INFO: [Common 17-206] Exiting Vivado at Tue Dec 16 15:25:03 2025...

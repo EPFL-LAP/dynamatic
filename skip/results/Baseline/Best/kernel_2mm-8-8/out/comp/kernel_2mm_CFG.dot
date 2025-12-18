@@ -1,0 +1,32 @@
+digraph "kernel_2mm" {
+  node [shape=box];
+  "^bb0" [label="^bb0", shape="oval"];
+  "^bb0" -> "^bb1"[color="black"];
+  "^bb1" [label="^bb1", shape="oval"];
+  "^bb1" -> "^bb2"[color="black"];
+  "^bb2" [label="^bb2", shape="oval"];
+  "^bb2" -> "^bb3"[color="black"];
+  "^bb3" [label="^bb3", shape="oval"];
+  "^bb3" -> "^bb3"[label="true", color="red"];
+  "^bb3" -> "^bb4"[label="false", color="black"];
+  "^bb4" [label="^bb4", shape="oval"];
+  "^bb4" -> "^bb2"[label="true", color="red"];
+  "^bb4" -> "^bb5"[label="false", color="black"];
+  "^bb5" [label="^bb5", shape="oval"];
+  "^bb5" -> "^bb1"[label="true", color="red"];
+  "^bb5" -> "^bb6"[label="false", color="black"];
+  "^bb6" [label="^bb6", shape="oval"];
+  "^bb6" -> "^bb7"[color="black"];
+  "^bb7" [label="^bb7", shape="oval"];
+  "^bb7" -> "^bb8"[color="black"];
+  "^bb8" [label="^bb8", shape="oval"];
+  "^bb8" -> "^bb8"[label="true", color="red"];
+  "^bb8" -> "^bb9"[label="false", color="black"];
+  "^bb9" [label="^bb9", shape="oval"];
+  "^bb9" -> "^bb7"[label="true", color="red"];
+  "^bb9" -> "^bb10"[label="false", color="black"];
+  "^bb10" [label="^bb10", shape="oval"];
+  "^bb10" -> "^bb6"[label="true", color="red"];
+  "^bb10" -> "^bb11"[label="false", color="black"];
+  "^bb11" [label="^bb11", shape="oval"];
+}

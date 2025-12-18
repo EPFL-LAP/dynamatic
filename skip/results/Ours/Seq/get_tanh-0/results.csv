@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+get_tanh,0,6.5,6.63,3197,859,1399,4,2542

@@ -1,0 +1,124 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 16:44:39 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : histogram
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -1.312ns  (required time - arrival time)
+  Source:                 lsq1/handshake_lsq_lsq1_core/ldq_head_q_reg[1]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.600ns period=5.200ns})
+  Destination:            addf0/operator/RightShifterComponent/level4_c1_reg[12]/R
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.600ns period=5.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.200ns  (clk rise@5.200ns - clk rise@0.000ns)
+  Data Path Delay:        6.156ns  (logic 2.198ns (35.704%)  route 3.958ns (64.296%))
+  Logic Levels:           23  (CARRY4=11 LUT3=3 LUT4=3 LUT5=2 LUT6=4)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 5.683 - 5.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=1553, unset)         0.508     0.508    lsq1/handshake_lsq_lsq1_core/clk
+    SLICE_X13Y92         FDCE                                         r  lsq1/handshake_lsq_lsq1_core/ldq_head_q_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X13Y92         FDCE (Prop_fdce_C_Q)         0.216     0.724 r  lsq1/handshake_lsq_lsq1_core/ldq_head_q_reg[1]/Q
+                         net (fo=25, routed)          0.474     1.198    lsq1/handshake_lsq_lsq1_core/ldq_head_q[1]
+    SLICE_X12Y92         LUT4 (Prop_lut4_I1_O)        0.043     1.241 r  lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_i_5/O
+                         net (fo=1, routed)           0.000     1.241    lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_i_5_n_0
+    SLICE_X12Y92         CARRY4 (Prop_carry4_S[3]_CO[3])
+                                                      0.173     1.414 r  lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_reg_i_3/CO[3]
+                         net (fo=1, routed)           0.000     1.414    lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_reg_i_3_n_0
+    SLICE_X12Y93         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     1.464 r  lsq1/handshake_lsq_lsq1_core/ldq_alloc_7_q_reg_i_3/CO[3]
+                         net (fo=1, routed)           0.000     1.464    lsq1/handshake_lsq_lsq1_core/ldq_alloc_7_q_reg_i_3_n_0
+    SLICE_X12Y94         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.050     1.514 r  lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_reg_i_4/CO[3]
+                         net (fo=1, routed)           0.000     1.514    lsq1/handshake_lsq_lsq1_core/ldq_alloc_3_q_reg_i_4_n_0
+    SLICE_X12Y95         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.108     1.622 r  lsq1/handshake_lsq_lsq1_core/ldq_alloc_7_q_reg_i_4/O[2]
+                         net (fo=10, routed)          0.252     1.874    lsq1/handshake_lsq_lsq1_core/ldq_alloc_7_q_reg_i_4_n_5
+    SLICE_X14Y94         LUT3 (Prop_lut3_I0_O)        0.126     2.000 f  lsq1/handshake_lsq_lsq1_core/ldq_head_q[2]_i_11/O
+                         net (fo=34, routed)          0.432     2.432    lsq1/handshake_lsq_lsq1_core/ldq_head_q[2]_i_11_n_0
+    SLICE_X15Y94         LUT6 (Prop_lut6_I2_O)        0.043     2.475 f  lsq1/handshake_lsq_lsq1_core/dataReg[26]_i_2/O
+                         net (fo=3, routed)           0.420     2.895    lsq1/handshake_lsq_lsq1_core/dataReg[26]_i_2_n_0
+    SLICE_X11Y93         LUT5 (Prop_lut5_I3_O)        0.043     2.938 f  lsq1/handshake_lsq_lsq1_core/ltOp_carry__2_i_20/O
+                         net (fo=7, routed)           0.293     3.231    lsq1/handshake_lsq_lsq1_core/dataReg_reg[26]
+    SLICE_X11Y94         LUT4 (Prop_lut4_I1_O)        0.043     3.274 f  lsq1/handshake_lsq_lsq1_core/level4_c1[24]_i_9/O
+                         net (fo=12, routed)          0.177     3.451    lsq1/handshake_lsq_lsq1_core/level4_c1[24]_i_9_n_0
+    SLICE_X11Y95         LUT6 (Prop_lut6_I0_O)        0.043     3.494 r  lsq1/handshake_lsq_lsq1_core/level4_c1[15]_i_3/O
+                         net (fo=46, routed)          0.332     3.826    lsq1/handshake_lsq_lsq1_core/level4_c1[15]_i_3_n_0
+    SLICE_X10Y96         LUT3 (Prop_lut3_I1_O)        0.043     3.869 r  lsq1/handshake_lsq_lsq1_core/level4_c1[9]_i_2/O
+                         net (fo=4, routed)           0.317     4.185    load1/data_tehb/control/ltOp_carry
+    SLICE_X11Y96         LUT6 (Prop_lut6_I3_O)        0.043     4.228 r  load1/data_tehb/control/ltOp_carry_i_5/O
+                         net (fo=1, routed)           0.000     4.228    addf0/operator/S[3]
+    SLICE_X11Y96         CARRY4 (Prop_carry4_S[3]_CO[3])
+                                                      0.187     4.415 r  addf0/operator/ltOp_carry/CO[3]
+                         net (fo=1, routed)           0.000     4.415    addf0/operator/ltOp_carry_n_0
+    SLICE_X11Y97         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     4.464 r  addf0/operator/ltOp_carry__0/CO[3]
+                         net (fo=1, routed)           0.000     4.464    addf0/operator/ltOp_carry__0_n_0
+    SLICE_X11Y98         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     4.513 r  addf0/operator/ltOp_carry__1/CO[3]
+                         net (fo=1, routed)           0.000     4.513    addf0/operator/ltOp_carry__1_n_0
+    SLICE_X11Y99         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.049     4.562 r  addf0/operator/ltOp_carry__2/CO[3]
+                         net (fo=1, routed)           0.001     4.563    addf0/operator/ltOp_carry__2_n_0
+    SLICE_X11Y100        CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.127     4.690 r  addf0/operator/ltOp_carry__3/CO[0]
+                         net (fo=89, routed)          0.213     4.903    lsq1/handshake_lsq_lsq1_core/CO[0]
+    SLICE_X13Y100        LUT6 (Prop_lut6_I5_O)        0.130     5.033 r  lsq1/handshake_lsq_lsq1_core/i__carry_i_4/O
+                         net (fo=1, routed)           0.183     5.217    addf0/operator/p_1_in[0]
+    SLICE_X12Y98         CARRY4 (Prop_carry4_DI[0]_CO[3])
+                                                      0.276     5.493 r  addf0/operator/_inferred__1/i__carry/CO[3]
+                         net (fo=1, routed)           0.000     5.493    addf0/operator/_inferred__1/i__carry_n_0
+    SLICE_X12Y99         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.102     5.595 r  addf0/operator/_inferred__1/i__carry__0/O[0]
+                         net (fo=4, routed)           0.295     5.889    addf0/operator/RightShifterComponent/level4_c1_reg[25]_0[0]
+    SLICE_X15Y99         LUT4 (Prop_lut4_I2_O)        0.119     6.008 r  addf0/operator/RightShifterComponent/level4_c1[25]_i_2/O
+                         net (fo=7, routed)           0.185     6.193    lsq1/handshake_lsq_lsq1_core/level4_c1_reg[25]
+    SLICE_X15Y101        LUT5 (Prop_lut5_I0_O)        0.043     6.236 f  lsq1/handshake_lsq_lsq1_core/level4_c1[24]_i_6/O
+                         net (fo=12, routed)          0.185     6.421    lsq1/handshake_lsq_lsq1_core/level4_c1[24]_i_6_n_0
+    SLICE_X15Y102        LUT3 (Prop_lut3_I1_O)        0.043     6.464 r  lsq1/handshake_lsq_lsq1_core/level4_c1[23]_i_1/O
+                         net (fo=14, routed)          0.200     6.664    addf0/operator/RightShifterComponent/level4_c1_reg[23]_0
+    SLICE_X17Y102        FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[12]/R
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.200     5.200 r  
+                                                      0.000     5.200 r  clk (IN)
+                         net (fo=1553, unset)         0.483     5.683    addf0/operator/RightShifterComponent/clk
+    SLICE_X17Y102        FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[12]/C
+                         clock pessimism              0.000     5.683    
+                         clock uncertainty           -0.035     5.647    
+    SLICE_X17Y102        FDRE (Setup_fdre_C_R)       -0.295     5.352    addf0/operator/RightShifterComponent/level4_c1_reg[12]
+  -------------------------------------------------------------------
+                         required time                          5.352    
+                         arrival time                          -6.664    
+  -------------------------------------------------------------------
+                         slack                                 -1.312    
+
+
+
+

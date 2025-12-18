@@ -1,0 +1,107 @@
+INFO: [Timing 38-91] UpdateTimingParams: Speed grade: -3, Delay Type: max.
+INFO: [Timing 38-191] Multithreading enabled for timing update using a maximum of 8 CPUs
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+Resolution: Set the HD.CLK_SRC property of the out-of-context port to the location of the clock buffer instance in the top-level design
+INFO: [Timing 38-78] ReportTimingParams: -max_paths 1 -nworst 1 -delay_type max -sort_by slack.
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (lin64) Build 5239630 Fri Nov 08 22:34:34 MST 2024
+| Date         : Tue Dec 16 06:10:26 2025
+| Host         : lap-inf133 running 64-bit Ubuntu 24.04.3 LTS
+| Command      : report_timing
+| Design       : atax
+| Device       : 7k160t-fbg484
+| Speed File   : -3  PRODUCTION 1.12 2017-02-17
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -0.457ns  (required time - arrival time)
+  Source:                 buffer20/dataReg_reg[2]/C
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@4.600ns period=9.200ns})
+  Destination:            addf0/operator/RightShifterComponent/level4_c1_reg[10]/R
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@4.600ns period=9.200ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            9.200ns  (clk rise@9.200ns - clk rise@0.000ns)
+  Data Path Delay:        9.302ns  (logic 1.722ns (18.512%)  route 7.580ns (81.488%))
+  Logic Levels:           18  (CARRY4=3 LUT3=2 LUT4=2 LUT5=1 LUT6=10)
+  Clock Path Skew:        -0.025ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.483ns = ( 9.683 - 9.200 ) 
+    Source Clock Delay      (SCD):    0.508ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk (IN)
+                         net (fo=2880, unset)         0.508     0.508    buffer20/clk
+                         FDRE                                         r  buffer20/dataReg_reg[2]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.226     0.734 r  buffer20/dataReg_reg[2]/Q
+                         net (fo=6, unplaced)         0.420     1.154    buffer20/control/Q[2]
+                         LUT3 (Prop_lut3_I0_O)        0.119     1.273 r  buffer20/control/Memory[0][2]_i_1__4/O
+                         net (fo=57, unplaced)        0.791     2.064    buffer20/control/dataReg_reg[2]
+                         LUT6 (Prop_lut6_I1_O)        0.043     2.107 f  buffer20/control/Memory[0][0]_i_2__24/O
+                         net (fo=142, unplaced)       0.352     2.459    buffer88/fifo/Memory_reg[0][0]_2
+                         LUT6 (Prop_lut6_I5_O)        0.043     2.502 f  buffer88/fifo/minusOp_carry_i_6__1/O
+                         net (fo=9, unplaced)         0.285     2.787    control_merge0/tehb/control/transmitValue_reg_14
+                         LUT6 (Prop_lut6_I4_O)        0.043     2.830 f  control_merge0/tehb/control/fullReg_i_2__11/O
+                         net (fo=8, unplaced)         0.282     3.112    control_merge0/tehb/control/fullReg_reg_2
+                         LUT5 (Prop_lut5_I0_O)        0.043     3.155 f  control_merge0/tehb/control/fullReg_i_3__21/O
+                         net (fo=4, unplaced)         0.268     3.423    control_merge0/tehb/control/transmitValue_reg_8
+                         LUT3 (Prop_lut3_I0_O)        0.043     3.466 r  control_merge0/tehb/control/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1[2]_i_3/O
+                         net (fo=1, unplaced)         0.244     3.710    control_merge0/tehb/control/fork14_outs_2_valid
+                         LUT6 (Prop_lut6_I1_O)        0.043     3.753 r  control_merge0/tehb/control/Compressor_23_3_Freq300_testDifferentiator_uid156_bh7_uid317_Out0_copy318_c1[2]_i_2/O
+                         net (fo=62, unplaced)        0.332     4.085    control_merge0/tehb/control/outputValid_reg
+                         LUT6 (Prop_lut6_I2_O)        0.043     4.128 f  control_merge0/tehb/control/level5_c1[15]_i_3/O
+                         net (fo=7, unplaced)         0.740     4.868    control_merge0/tehb/control/buffer10_outs[12]
+                         LUT6 (Prop_lut6_I1_O)        0.043     4.911 f  control_merge0/tehb/control/ltOp_carry__2_i_27/O
+                         net (fo=1, unplaced)         0.705     5.616    control_merge0/tehb/control/ltOp_carry__2_i_27_n_0
+                         LUT6 (Prop_lut6_I0_O)        0.043     5.659 r  control_merge0/tehb/control/ltOp_carry__2_i_24/O
+                         net (fo=1, unplaced)         0.377     6.036    buffer10/control/eqOp__21
+                         LUT6 (Prop_lut6_I3_O)        0.043     6.079 f  buffer10/control/ltOp_carry__2_i_10__0/O
+                         net (fo=8, unplaced)         0.415     6.494    buffer10/control/dataReg_reg[22]_2
+                         LUT6 (Prop_lut6_I4_O)        0.043     6.537 r  buffer10/control/ltOp_carry__2_i_1__0/O
+                         net (fo=1, unplaced)         0.248     6.785    addf0/operator/ltOp_carry__3_0[3]
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.187     6.972 r  addf0/operator/ltOp_carry__2/CO[3]
+                         net (fo=1, unplaced)         0.000     6.972    addf0/operator/ltOp_carry__2_n_0
+                         CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.135     7.107 r  addf0/operator/ltOp_carry__3/CO[0]
+                         net (fo=94, unplaced)        0.270     7.377    buffer10/control/CO[0]
+                         LUT4 (Prop_lut4_I3_O)        0.127     7.504 r  buffer10/control/i__carry_i_3__0/O
+                         net (fo=1, unplaced)         0.459     7.963    addf0/operator/p_1_in[1]
+                         CARRY4 (Prop_carry4_DI[1]_O[3])
+                                                      0.292     8.255 r  addf0/operator/_inferred__1/i__carry/O[3]
+                         net (fo=2, unplaced)         0.515     8.770    addf0/operator/RightShifterComponent/O[3]
+                         LUT6 (Prop_lut6_I0_O)        0.120     8.890 r  addf0/operator/RightShifterComponent/level4_c1[25]_i_2/O
+                         net (fo=7, unplaced)         0.279     9.169    mulf0/operator/RoundingAdder/ps_c1_reg[4]
+                         LUT4 (Prop_lut4_I0_O)        0.043     9.212 r  mulf0/operator/RoundingAdder/level4_c1[24]_i_1/O
+                         net (fo=15, unplaced)        0.598     9.810    addf0/operator/RightShifterComponent/level4_c1_reg[24]_0
+                         FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[10]/R
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        9.200     9.200 r  
+                                                      0.000     9.200 r  clk (IN)
+                         net (fo=2880, unset)         0.483     9.683    addf0/operator/RightShifterComponent/clk
+                         FDRE                                         r  addf0/operator/RightShifterComponent/level4_c1_reg[10]/C
+                         clock pessimism              0.000     9.683    
+                         clock uncertainty           -0.035     9.647    
+                         FDRE (Setup_fdre_C_R)       -0.294     9.353    addf0/operator/RightShifterComponent/level4_c1_reg[10]
+  -------------------------------------------------------------------
+                         required time                          9.353    
+                         arrival time                          -9.810    
+  -------------------------------------------------------------------
+                         slack                                 -0.457    
+
+
+
+

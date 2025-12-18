@@ -1,0 +1,2415 @@
+[INFO] Compiled source to affine
+[INFO] Ran memory analysis
+[INFO] Compiled affine to scf
+[INFO] Compiled scf to cf
+[INFO] Applied standard transformations to cf
+[INFO] Applied Dynamatic transformations to cf
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[INFO] Compiled cf to handshake
+[INFO][SKIP] Created Skip Conditions
+[INFO][SKIP] Created Waiting Signals
+[INFO][SKIP] Gated Successor Accesses
+[INFO][SKIP] Dependency graph written to /beta/rouzbeh/hope/dynamatic/skip/runs/run_2025-12-16_11-46-45/histogram-4/out/comp/histogram_DEP_G.dot
+[INFO][SKIP] Inserted Out with LSQs circuit successfully! 
+[INFO] Applied transformations to handshake with skippable sequentializer
+[INFO] Applied transformations to handshake
+[INFO] Built kernel for profiling
+[INFO] Ran kernel for profiling
+[INFO] Profiled cf-level
+[INFO] Running smart buffer placement with CP = 15.000 and algorithm = 'cpbuf'
+[INFO] Placed smart buffers
+[INFO] Canonicalized handshake
+[INFO] Created histogram DOT
+[INFO] Converted histogram DOT to PNG
+[INFO] Created histogram_CFG DOT
+[INFO] Converted histogram_CFG DOT to PNG
+[INFO] Lowered to HW
+[INFO] Compilation succeeded
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> set-clock-period 15   
+dynamatic> compile --skippable-seq-n 4 --buffer-algorithm cpbuf --fork-fifo-size 15
+dynamatic> write-hdl
+dynamatic> exit
+
+Goodbye!
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Initial BASELINE Cycles: None
+buffer2 ----> 1
+buffer2      max_len = 1
+buffer3 ----> 1
+buffer3      max_len = 1
+buffer4 ----> 1
+buffer4      max_len = 1
+buffer5 ----> 1
+buffer5      max_len = 1
+buffer6 ----> 14
+buffer6      max_len = 14
+buffer7 ----> 14
+buffer7      max_len = 14
+buffer8 ----> 14
+buffer8      max_len = 14
+buffer9 ----> 14
+buffer9      max_len = 14
+buffer10 ----> 14
+buffer10     max_len = 14
+buffer11 ----> 14
+buffer11     max_len = 14
+buffer12 ----> 14
+buffer12     max_len = 14
+buffer13 ----> 14
+buffer13     max_len = 14
+buffer14 ----> 14
+buffer14     max_len = 14
+buffer15 ----> 15
+buffer15     max_len = 15
+buffer16 ----> 14
+buffer16     max_len = 14
+buffer17 ----> 15
+buffer17     max_len = 15
+buffer18 ----> 6
+buffer18     max_len = 6
+buffer19 ----> 0
+buffer19     max_len = 0
+buffer20 ----> 1
+buffer20     max_len = 1
+buffer21 ----> 7
+buffer21     max_len = 7
+buffer22 ----> 7
+buffer22     max_len = 7
+buffer23 ----> 0
+buffer23     max_len = 0
+buffer24 ----> 6
+buffer24     max_len = 6
+buffer25 ----> 0
+buffer25     max_len = 0
+buffer26 ----> 6
+buffer26     max_len = 6
+buffer27 ----> 1
+buffer27     max_len = 1
+buffer28 ----> 14
+buffer28     max_len = 14
+buffer29 ----> 14
+buffer29     max_len = 14
+buffer30 ----> 15
+buffer30     max_len = 15
+buffer31 ----> 14
+buffer31     max_len = 14
+buffer32 ----> 14
+buffer32     max_len = 14
+buffer33 ----> 15
+buffer33     max_len = 15
+buffer34 ----> 14
+buffer34     max_len = 14
+buffer35 ----> 14
+buffer35     max_len = 14
+buffer36 ----> 14
+buffer36     max_len = 14
+buffer37 ----> 14
+buffer37     max_len = 14
+buffer38 ----> 0
+buffer38     max_len = 0
+buffer39 ----> 15
+buffer39     max_len = 15
+buffer40 ----> 14
+buffer40     max_len = 14
+buffer41 ----> 0
+buffer41     max_len = 0
+buffer42 ----> 0
+buffer42     max_len = 0
+buffer43 ----> 0
+buffer43     max_len = 0
+buffer44 ----> 0
+buffer44     max_len = 0
+buffer45 ----> 9
+buffer45     max_len = 9
+buffer46 ----> 8
+buffer46     max_len = 8
+buffer47 ----> 7
+buffer47     max_len = 7
+buffer48 ----> 6
+buffer48     max_len = 6
+buffer49 ----> 6
+buffer49     max_len = 6
+buffer50 ----> 6
+buffer50     max_len = 6
+buffer51 ----> 6
+buffer51     max_len = 6
+buffer52 ----> 6
+buffer52     max_len = 6
+buffer53 ----> 14
+buffer53     max_len = 14
+buffer54 ----> 0
+buffer54     max_len = 0
+buffer55 ----> 0
+buffer55     max_len = 0
+buffer56 ----> 1
+buffer56     max_len = 1
+buffer57 ----> 15
+buffer57     max_len = 15
+buffer58 ----> 0
+buffer58     max_len = 0
+
+=== Applying MLIR modifications (remove) ===
+[REMOVE] buffer19 (max_len=0)
+[REMOVE] buffer23 (max_len=0)
+[REMOVE] buffer25 (max_len=0)
+[REMOVE] buffer38 (max_len=0)
+[REMOVE] buffer41 (max_len=0)
+[REMOVE] buffer42 (max_len=0)
+[REMOVE] buffer43 (max_len=0)
+[REMOVE] buffer44 (max_len=0)
+[REMOVE] buffer54 (max_len=0)
+[REMOVE] buffer55 (max_len=0)
+[REMOVE] buffer58 (max_len=0)
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== Running BASELINE simulation after initial resize ===
+BASELINE Cycles: 1635
+
+=== Applying Buffer Removal Optimization ===
+MLIR file backed up to: skip/runs/run_2025-12-16_11-46-45/histogram-4/out/comp/handshake_transformed.mlir.bak
+
+=== Applying Buffer Resize Optimization to size 0 ===
+Processed 0/46 until now
+[TRY REMOVE] buffer2
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer4
+[TRY REMOVE] buffer5
+[TRY REMOVE] buffer6
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+[TRY REMOVE] buffer13
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+[TRY REMOVE] buffer16
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+[TRY REMOVE] buffer20
+[TRY REMOVE] buffer21
+[TRY REMOVE] buffer22
+[TRY REMOVE] buffer24
+[TRY REMOVE] buffer26
+[TRY REMOVE] buffer27
+[TRY REMOVE] buffer28
+[TRY REMOVE] buffer29
+[TRY REMOVE] buffer30
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+[TRY REMOVE] buffer33
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+[TRY REMOVE] buffer36
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+[TRY REMOVE] buffer40
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+[TRY REMOVE] buffer47
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+[TRY REMOVE] buffer50
+[TRY REMOVE] buffer51
+[TRY REMOVE] buffer52
+[TRY REMOVE] buffer53
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 9008
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 46 buffers.
+Processed 0/46 until now
+[TRY REMOVE] buffer2
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer4
+[TRY REMOVE] buffer5
+[TRY REMOVE] buffer6
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+[TRY REMOVE] buffer13
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+[TRY REMOVE] buffer16
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+[TRY REMOVE] buffer20
+[TRY REMOVE] buffer21
+[TRY REMOVE] buffer22
+[TRY REMOVE] buffer24
+[TRY REMOVE] buffer26
+[TRY REMOVE] buffer27
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 5514
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 23 buffers.
+Processed 0/46 until now
+[TRY REMOVE] buffer2
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer4
+[TRY REMOVE] buffer5
+[TRY REMOVE] buffer6
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2026
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 11 buffers.
+Processed 0/46 until now
+[TRY REMOVE] buffer2
+[TRY REMOVE] buffer3
+[TRY REMOVE] buffer4
+[TRY REMOVE] buffer5
+[TRY REMOVE] buffer6
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 5 buffers to 0: ['buffer2', 'buffer3', 'buffer4', 'buffer5', 'buffer6']
+Processed 5/46 until now
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 5/46 until now
+[TRY REMOVE] buffer7
+[TRY REMOVE] buffer8
+[TRY REMOVE] buffer9
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 3 buffers to 0: ['buffer7', 'buffer8', 'buffer9']
+Processed 8/46 until now
+[TRY REMOVE] buffer10
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 8/46 until now
+[TRY REMOVE] buffer10
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer10']
+Processed 9/46 until now
+[TRY REMOVE] buffer11
+[TRY REMOVE] buffer12
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 9/46 until now
+[TRY REMOVE] buffer11
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2026
+Processed 10/46 until now
+[TRY REMOVE] buffer12
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer12']
+Processed 11/46 until now
+[TRY REMOVE] buffer13
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+[TRY REMOVE] buffer16
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+[TRY REMOVE] buffer20
+[TRY REMOVE] buffer21
+[TRY REMOVE] buffer22
+[TRY REMOVE] buffer24
+[TRY REMOVE] buffer26
+[TRY REMOVE] buffer27
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 5514
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 12 buffers.
+Processed 11/46 until now
+[TRY REMOVE] buffer13
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+[TRY REMOVE] buffer16
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 5514
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 11/46 until now
+[TRY REMOVE] buffer13
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4516
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 11/46 until now
+[TRY REMOVE] buffer13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer13']
+Processed 12/46 until now
+[TRY REMOVE] buffer14
+[TRY REMOVE] buffer15
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 12/46 until now
+[TRY REMOVE] buffer14
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2278
+Processed 13/46 until now
+[TRY REMOVE] buffer15
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4516
+Processed 14/46 until now
+[TRY REMOVE] buffer16
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3688
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 14/46 until now
+[TRY REMOVE] buffer16
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+Processed 15/46 until now
+[TRY REMOVE] buffer17
+[TRY REMOVE] buffer18
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3688
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 15/46 until now
+[TRY REMOVE] buffer17
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3025
+Processed 16/46 until now
+[TRY REMOVE] buffer18
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3014
+Processed 17/46 until now
+[TRY REMOVE] buffer20
+[TRY REMOVE] buffer21
+[TRY REMOVE] buffer22
+[TRY REMOVE] buffer24
+[TRY REMOVE] buffer26
+[TRY REMOVE] buffer27
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 6 buffers to 0: ['buffer20', 'buffer21', 'buffer22', 'buffer24', 'buffer26', 'buffer27']
+Processed 23/46 until now
+[TRY REMOVE] buffer28
+[TRY REMOVE] buffer29
+[TRY REMOVE] buffer30
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+[TRY REMOVE] buffer33
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+[TRY REMOVE] buffer36
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+[TRY REMOVE] buffer40
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+[TRY REMOVE] buffer47
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+[TRY REMOVE] buffer50
+[TRY REMOVE] buffer51
+[TRY REMOVE] buffer52
+[TRY REMOVE] buffer53
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 9008
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 23 buffers.
+Processed 23/46 until now
+[TRY REMOVE] buffer28
+[TRY REMOVE] buffer29
+[TRY REMOVE] buffer30
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+[TRY REMOVE] buffer33
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+[TRY REMOVE] buffer36
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 9008
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 11 buffers.
+Processed 23/46 until now
+[TRY REMOVE] buffer28
+[TRY REMOVE] buffer29
+[TRY REMOVE] buffer30
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3355
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 5 buffers.
+Processed 23/46 until now
+[TRY REMOVE] buffer28
+[TRY REMOVE] buffer29
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 23/46 until now
+[TRY REMOVE] buffer28
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+Processed 24/46 until now
+[TRY REMOVE] buffer29
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+Processed 25/46 until now
+[TRY REMOVE] buffer30
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3355
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 25/46 until now
+[TRY REMOVE] buffer30
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3355
+Processed 26/46 until now
+[TRY REMOVE] buffer31
+[TRY REMOVE] buffer32
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 26/46 until now
+[TRY REMOVE] buffer31
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+Processed 27/46 until now
+[TRY REMOVE] buffer32
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+Processed 28/46 until now
+[TRY REMOVE] buffer33
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+[TRY REMOVE] buffer36
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 9008
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 28/46 until now
+[TRY REMOVE] buffer33
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 5015
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 28/46 until now
+[TRY REMOVE] buffer33
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 5015
+Processed 29/46 until now
+[TRY REMOVE] buffer34
+[TRY REMOVE] buffer35
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 29/46 until now
+[TRY REMOVE] buffer34
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+Processed 30/46 until now
+[TRY REMOVE] buffer35
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2027
+Processed 31/46 until now
+[TRY REMOVE] buffer36
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 9008
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 31/46 until now
+[TRY REMOVE] buffer36
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2527
+Processed 32/46 until now
+[TRY REMOVE] buffer37
+[TRY REMOVE] buffer39
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 8009
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 32/46 until now
+[TRY REMOVE] buffer37
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer37']
+Processed 33/46 until now
+[TRY REMOVE] buffer39
+Processed 34/46 until now
+[TRY REMOVE] buffer40
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+[TRY REMOVE] buffer47
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+[TRY REMOVE] buffer50
+[TRY REMOVE] buffer51
+[TRY REMOVE] buffer52
+[TRY REMOVE] buffer53
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4519
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 12 buffers.
+Processed 34/46 until now
+[TRY REMOVE] buffer40
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+[TRY REMOVE] buffer47
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4516
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 34/46 until now
+[TRY REMOVE] buffer40
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4516
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 34/46 until now
+[TRY REMOVE] buffer40
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer40']
+Processed 35/46 until now
+[TRY REMOVE] buffer45
+[TRY REMOVE] buffer46
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 35/46 until now
+[TRY REMOVE] buffer45
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4516
+Processed 36/46 until now
+[TRY REMOVE] buffer46
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3025
+Processed 37/46 until now
+[TRY REMOVE] buffer47
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2278
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 37/46 until now
+[TRY REMOVE] buffer47
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2280
+Processed 38/46 until now
+[TRY REMOVE] buffer48
+[TRY REMOVE] buffer49
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 38/46 until now
+[TRY REMOVE] buffer48
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+Processed 39/46 until now
+[TRY REMOVE] buffer49
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1635 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer49']
+Processed 40/46 until now
+[TRY REMOVE] buffer50
+[TRY REMOVE] buffer51
+[TRY REMOVE] buffer52
+[TRY REMOVE] buffer53
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4012
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 40/46 until now
+[TRY REMOVE] buffer50
+[TRY REMOVE] buffer51
+[TRY REMOVE] buffer52
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 3 buffers to 0: ['buffer50', 'buffer51', 'buffer52']
+Processed 43/46 until now
+[TRY REMOVE] buffer53
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 43/46 until now
+[TRY REMOVE] buffer53
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 0: ['buffer53']
+Processed 44/46 until now
+[TRY REMOVE] buffer56
+[TRY REMOVE] buffer57
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 44/46 until now
+[TRY REMOVE] buffer56
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3018
+Processed 45/46 until now
+[TRY REMOVE] buffer57
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1705
+
+Optimization complete. Successfully resized 24 buffers to 0
+
+=== Applying Buffer Resize Optimization to size 1 ===
+Processed 0/22 until now
+[TRY RESZIZE] buffer11 to 1
+[TRY RESZIZE] buffer14 to 1
+[TRY RESZIZE] buffer15 to 1
+[TRY RESZIZE] buffer16 to 1
+[TRY RESZIZE] buffer17 to 1
+[TRY RESZIZE] buffer18 to 1
+[TRY RESZIZE] buffer28 to 1
+[TRY RESZIZE] buffer29 to 1
+[TRY RESZIZE] buffer30 to 1
+[TRY RESZIZE] buffer31 to 1
+[TRY RESZIZE] buffer32 to 1
+[TRY RESZIZE] buffer33 to 1
+[TRY RESZIZE] buffer34 to 1
+[TRY RESZIZE] buffer35 to 1
+[TRY RESZIZE] buffer36 to 1
+[TRY RESZIZE] buffer39 to 1
+[TRY RESZIZE] buffer45 to 1
+[TRY RESZIZE] buffer46 to 1
+[TRY RESZIZE] buffer47 to 1
+[TRY RESZIZE] buffer48 to 1
+[TRY RESZIZE] buffer56 to 1
+[TRY RESZIZE] buffer57 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4512
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 22 buffers.
+Processed 0/22 until now
+[TRY RESZIZE] buffer11 to 1
+[TRY RESZIZE] buffer14 to 1
+[TRY RESZIZE] buffer15 to 1
+[TRY RESZIZE] buffer16 to 1
+[TRY RESZIZE] buffer17 to 1
+[TRY RESZIZE] buffer18 to 1
+[TRY RESZIZE] buffer28 to 1
+[TRY RESZIZE] buffer29 to 1
+[TRY RESZIZE] buffer30 to 1
+[TRY RESZIZE] buffer31 to 1
+[TRY RESZIZE] buffer32 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3024
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 11 buffers.
+Processed 0/22 until now
+[TRY RESZIZE] buffer11 to 1
+[TRY RESZIZE] buffer14 to 1
+[TRY RESZIZE] buffer15 to 1
+[TRY RESZIZE] buffer16 to 1
+[TRY RESZIZE] buffer17 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3023
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 5 buffers.
+Processed 0/22 until now
+[TRY RESZIZE] buffer11 to 1
+[TRY RESZIZE] buffer14 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1833
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 0/22 until now
+[TRY RESZIZE] buffer11 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer11']
+Processed 1/22 until now
+[TRY RESZIZE] buffer14 to 1
+Processed 2/22 until now
+[TRY RESZIZE] buffer15 to 1
+[TRY RESZIZE] buffer16 to 1
+[TRY RESZIZE] buffer17 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3023
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 2/22 until now
+[TRY RESZIZE] buffer15 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3023
+Processed 3/22 until now
+[TRY RESZIZE] buffer16 to 1
+[TRY RESZIZE] buffer17 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2276
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 3/22 until now
+[TRY RESZIZE] buffer16 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer16']
+Processed 4/22 until now
+[TRY RESZIZE] buffer17 to 1
+Processed 5/22 until now
+[TRY RESZIZE] buffer18 to 1
+[TRY RESZIZE] buffer28 to 1
+[TRY RESZIZE] buffer29 to 1
+[TRY RESZIZE] buffer30 to 1
+[TRY RESZIZE] buffer31 to 1
+[TRY RESZIZE] buffer32 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2522
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 5/22 until now
+[TRY RESZIZE] buffer18 to 1
+[TRY RESZIZE] buffer28 to 1
+[TRY RESZIZE] buffer29 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1704
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 5/22 until now
+[TRY RESZIZE] buffer18 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1705
+Processed 6/22 until now
+[TRY RESZIZE] buffer28 to 1
+[TRY RESZIZE] buffer29 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1704
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 6/22 until now
+[TRY RESZIZE] buffer28 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1704
+Processed 7/22 until now
+[TRY RESZIZE] buffer29 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer29']
+Processed 8/22 until now
+[TRY RESZIZE] buffer30 to 1
+[TRY RESZIZE] buffer31 to 1
+[TRY RESZIZE] buffer32 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2521
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 8/22 until now
+[TRY RESZIZE] buffer30 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2521
+Processed 9/22 until now
+[TRY RESZIZE] buffer31 to 1
+[TRY RESZIZE] buffer32 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 2 buffers to 1: ['buffer31', 'buffer32']
+Processed 11/22 until now
+[TRY RESZIZE] buffer33 to 1
+[TRY RESZIZE] buffer34 to 1
+[TRY RESZIZE] buffer35 to 1
+[TRY RESZIZE] buffer36 to 1
+[TRY RESZIZE] buffer39 to 1
+[TRY RESZIZE] buffer45 to 1
+[TRY RESZIZE] buffer46 to 1
+[TRY RESZIZE] buffer47 to 1
+[TRY RESZIZE] buffer48 to 1
+[TRY RESZIZE] buffer56 to 1
+[TRY RESZIZE] buffer57 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4506
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 11 buffers.
+Processed 11/22 until now
+[TRY RESZIZE] buffer33 to 1
+[TRY RESZIZE] buffer34 to 1
+[TRY RESZIZE] buffer35 to 1
+[TRY RESZIZE] buffer36 to 1
+[TRY RESZIZE] buffer39 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4506
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 5 buffers.
+Processed 11/22 until now
+[TRY RESZIZE] buffer33 to 1
+[TRY RESZIZE] buffer34 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3353
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 11/22 until now
+[TRY RESZIZE] buffer33 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3353
+Processed 12/22 until now
+[TRY RESZIZE] buffer34 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer34']
+Processed 13/22 until now
+[TRY RESZIZE] buffer35 to 1
+[TRY RESZIZE] buffer36 to 1
+[TRY RESZIZE] buffer39 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4018
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 13/22 until now
+[TRY RESZIZE] buffer35 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1637 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 1: ['buffer35']
+Processed 14/22 until now
+[TRY RESZIZE] buffer36 to 1
+[TRY RESZIZE] buffer39 to 1
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 14/22 until now
+[TRY RESZIZE] buffer36 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2032
+Processed 15/22 until now
+[TRY RESZIZE] buffer39 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 4018
+Processed 16/22 until now
+[TRY RESZIZE] buffer45 to 1
+[TRY RESZIZE] buffer46 to 1
+[TRY RESZIZE] buffer47 to 1
+[TRY RESZIZE] buffer48 to 1
+[TRY RESZIZE] buffer56 to 1
+[TRY RESZIZE] buffer57 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3318
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 16/22 until now
+[TRY RESZIZE] buffer45 to 1
+[TRY RESZIZE] buffer46 to 1
+[TRY RESZIZE] buffer47 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3317
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 16/22 until now
+[TRY RESZIZE] buffer45 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 3317
+Processed 17/22 until now
+[TRY RESZIZE] buffer46 to 1
+[TRY RESZIZE] buffer47 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2282
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 17/22 until now
+[TRY RESZIZE] buffer46 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2282
+Processed 18/22 until now
+[TRY RESZIZE] buffer47 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1842
+Processed 19/22 until now
+[TRY RESZIZE] buffer48 to 1
+[TRY RESZIZE] buffer56 to 1
+[TRY RESZIZE] buffer57 to 1
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 3 buffers to 1: ['buffer48', 'buffer56', 'buffer57']
+
+Optimization complete. Successfully resized 10 buffers to 1
+
+=== Applying Buffer Resize Optimization to size 2 ===
+Processed 0/12 until now
+[TRY RESZIZE] buffer14 to 2
+[TRY RESZIZE] buffer15 to 2
+[TRY RESZIZE] buffer17 to 2
+[TRY RESZIZE] buffer18 to 2
+[TRY RESZIZE] buffer28 to 2
+[TRY RESZIZE] buffer30 to 2
+[TRY RESZIZE] buffer33 to 2
+[TRY RESZIZE] buffer36 to 2
+[TRY RESZIZE] buffer39 to 2
+[TRY RESZIZE] buffer45 to 2
+[TRY RESZIZE] buffer46 to 2
+[TRY RESZIZE] buffer47 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2858
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 12 buffers.
+Processed 0/12 until now
+[TRY RESZIZE] buffer14 to 2
+[TRY RESZIZE] buffer15 to 2
+[TRY RESZIZE] buffer17 to 2
+[TRY RESZIZE] buffer18 to 2
+[TRY RESZIZE] buffer28 to 2
+[TRY RESZIZE] buffer30 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2279
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 0/12 until now
+[TRY RESZIZE] buffer14 to 2
+[TRY RESZIZE] buffer15 to 2
+[TRY RESZIZE] buffer17 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2275
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 0/12 until now
+[TRY RESZIZE] buffer14 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 2: ['buffer14']
+Processed 1/12 until now
+[TRY RESZIZE] buffer15 to 2
+[TRY RESZIZE] buffer17 to 2
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 1/12 until now
+[TRY RESZIZE] buffer15 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2275
+Processed 2/12 until now
+[TRY RESZIZE] buffer17 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+Processed 3/12 until now
+[TRY RESZIZE] buffer18 to 2
+[TRY RESZIZE] buffer28 to 2
+[TRY RESZIZE] buffer30 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 3/12 until now
+[TRY RESZIZE] buffer18 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 2: ['buffer18']
+Processed 4/12 until now
+[TRY RESZIZE] buffer28 to 2
+[TRY RESZIZE] buffer30 to 2
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 4/12 until now
+[TRY RESZIZE] buffer28 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 2: ['buffer28']
+Processed 5/12 until now
+[TRY RESZIZE] buffer30 to 2
+Processed 6/12 until now
+[TRY RESZIZE] buffer33 to 2
+[TRY RESZIZE] buffer36 to 2
+[TRY RESZIZE] buffer39 to 2
+[TRY RESZIZE] buffer45 to 2
+[TRY RESZIZE] buffer46 to 2
+[TRY RESZIZE] buffer47 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2858
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 6 buffers.
+Processed 6/12 until now
+[TRY RESZIZE] buffer33 to 2
+[TRY RESZIZE] buffer36 to 2
+[TRY RESZIZE] buffer39 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2858
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 6/12 until now
+[TRY RESZIZE] buffer33 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2523
+Processed 7/12 until now
+[TRY RESZIZE] buffer36 to 2
+[TRY RESZIZE] buffer39 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2692
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 7/12 until now
+[TRY RESZIZE] buffer36 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1863
+Processed 8/12 until now
+[TRY RESZIZE] buffer39 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2692
+Processed 9/12 until now
+[TRY RESZIZE] buffer45 to 2
+[TRY RESZIZE] buffer46 to 2
+[TRY RESZIZE] buffer47 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2278
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 9/12 until now
+[TRY RESZIZE] buffer45 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2278
+Processed 10/12 until now
+[TRY RESZIZE] buffer46 to 2
+[TRY RESZIZE] buffer47 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1839
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 10/12 until now
+[TRY RESZIZE] buffer46 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1839
+Processed 11/12 until now
+[TRY RESZIZE] buffer47 to 2
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 2: ['buffer47']
+
+Optimization complete. Successfully resized 4 buffers to 2
+
+=== Applying Buffer Resize Optimization to size 3 ===
+Processed 0/8 until now
+[TRY RESZIZE] buffer15 to 3
+[TRY RESZIZE] buffer17 to 3
+[TRY RESZIZE] buffer30 to 3
+[TRY RESZIZE] buffer33 to 3
+[TRY RESZIZE] buffer36 to 3
+[TRY RESZIZE] buffer39 to 3
+[TRY RESZIZE] buffer45 to 3
+[TRY RESZIZE] buffer46 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2249
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 8 buffers.
+Processed 0/8 until now
+[TRY RESZIZE] buffer15 to 3
+[TRY RESZIZE] buffer17 to 3
+[TRY RESZIZE] buffer30 to 3
+[TRY RESZIZE] buffer33 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 4 buffers.
+Processed 0/8 until now
+[TRY RESZIZE] buffer15 to 3
+[TRY RESZIZE] buffer17 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 0/8 until now
+[TRY RESZIZE] buffer15 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1834
+Processed 1/8 until now
+[TRY RESZIZE] buffer17 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 3: ['buffer17']
+Processed 2/8 until now
+[TRY RESZIZE] buffer30 to 3
+[TRY RESZIZE] buffer33 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 2/8 until now
+[TRY RESZIZE] buffer30 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1863
+Processed 3/8 until now
+[TRY RESZIZE] buffer33 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2035
+Processed 4/8 until now
+[TRY RESZIZE] buffer36 to 3
+[TRY RESZIZE] buffer39 to 3
+[TRY RESZIZE] buffer45 to 3
+[TRY RESZIZE] buffer46 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2029
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 4 buffers.
+Processed 4/8 until now
+[TRY RESZIZE] buffer36 to 3
+[TRY RESZIZE] buffer39 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 2029
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 4/8 until now
+[TRY RESZIZE] buffer36 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 3: ['buffer36']
+Processed 5/8 until now
+[TRY RESZIZE] buffer39 to 3
+Processed 6/8 until now
+[TRY RESZIZE] buffer45 to 3
+[TRY RESZIZE] buffer46 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1839
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 2 buffers.
+Processed 6/8 until now
+[TRY RESZIZE] buffer45 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1839
+Processed 7/8 until now
+[TRY RESZIZE] buffer46 to 3
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 3: ['buffer46']
+
+Optimization complete. Successfully resized 3 buffers to 3
+
+=== Applying Buffer Resize Optimization to size 4 ===
+Processed 0/5 until now
+[TRY RESZIZE] buffer15 to 4
+[TRY RESZIZE] buffer30 to 4
+[TRY RESZIZE] buffer33 to 4
+[TRY RESZIZE] buffer39 to 4
+[TRY RESZIZE] buffer45 to 4
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1863
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 5 buffers.
+Processed 0/5 until now
+[TRY RESZIZE] buffer15 to 4
+[TRY RESZIZE] buffer30 to 4
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 2 buffers to 4: ['buffer15', 'buffer30']
+Processed 2/5 until now
+[TRY RESZIZE] buffer33 to 4
+[TRY RESZIZE] buffer39 to 4
+[TRY RESZIZE] buffer45 to 4
+[TRIAL FAILED] Performance hurt. Reverting and recursing on 3 buffers.
+Processed 2/5 until now
+[TRY RESZIZE] buffer33 to 4
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF FAIL] Cycles increased: 1635 -> 1863
+Processed 3/5 until now
+[TRY RESZIZE] buffer39 to 4
+[TRY RESZIZE] buffer45 to 4
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 2 buffers to 4: ['buffer39', 'buffer45']
+
+Optimization complete. Successfully resized 4 buffers to 4
+
+=== Applying Buffer Resize Optimization to size 5 ===
+Processed 0/1 until now
+[TRY RESZIZE] buffer33 to 5
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[PERF OK] Cycles: 1639 (Baseline: 1635)
+[OPTIMIZE] Success: Resized 1 buffers to 5: ['buffer33']
+
+Optimization complete. Successfully resized 1 buffers to 5
+
+=== Applying Buffer Resize Optimization to size 6 ===
+
+Optimization complete. Successfully resized 0 buffers to 6
+
+=== Applying Buffer Resize Optimization to size 7 ===
+
+Optimization complete. Successfully resized 0 buffers to 7
+
+=== Applying Buffer Resize Optimization to size 8 ===
+
+Optimization complete. Successfully resized 0 buffers to 8
+
+=== Applying Buffer Resize Optimization to size 9 ===
+
+Optimization complete. Successfully resized 0 buffers to 9
+
+=== Applying Buffer Resize Optimization to size 10 ===
+
+Optimization complete. Successfully resized 0 buffers to 10
+
+=== Applying Buffer Resize Optimization to size 11 ===
+
+Optimization complete. Successfully resized 0 buffers to 11
+
+=== Applying Buffer Resize Optimization to size 12 ===
+
+Optimization complete. Successfully resized 0 buffers to 12
+
+=== Applying Buffer Resize Optimization to size 13 ===
+
+Optimization complete. Successfully resized 0 buffers to 13
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+
+=== After buffering ===
+BASELINE Cycles: 1639
+
+===== Target CP tuning =====
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+Baseline latency = 1639 cycles at 15 ns
+
+--- Trying CP = 14.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 14.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 13.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 13.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 12.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 12.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 11.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 11.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 10.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 10.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 9.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 9.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 8.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 8.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 7.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 7.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 6.5 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 1639 cycles
+
+--- Trying CP = 6.0 ns ---
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+→ Latency = 2034 cycles
+Latency degraded, stopping search.
+
+ Best CP: 6.5 ns (latency = 1639 cycles)
+Starting from 6.5 ns
+
+=== Testing target CP = 6.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.114
+
+Slack < 0 (-1.114), increasing CP to 7.31 and retrying.
+
+[Iteration 1] Slack = 0.056
+
+Slack >= 0 (0.056)
+
+$$$ Target CP: 6.5 ns
+$$$ Cycles: 1639
+$$$ Real CP: 7.31 ns
+$$$ Performance metric: 11981.09
+
+=== Testing target CP = 6.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.828
+
+Slack < 0 (-0.828), increasing CP to 6.53 and retrying.
+
+[Iteration 1] Slack = 0.014
+
+Slack >= 0 (0.014)
+
+$$$ Target CP: 6.0 ns
+$$$ Cycles: 2034
+$$$ Real CP: 6.53 ns
+$$$ Performance metric: 13282.02
+
+=== Testing target CP = 5.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.332
+
+Slack < 0 (-0.332), increasing CP to 5.53 and retrying.
+
+[Iteration 1] Slack = 0.099
+
+Slack >= 0 (0.099)
+
+$$$ Target CP: 5.5 ns
+$$$ Cycles: 3020
+$$$ Real CP: 5.53 ns
+$$$ Performance metric: 16700.60
+
+=== Testing target CP = 5.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.909
+
+Slack < 0 (-0.909), increasing CP to 5.61 and retrying.
+
+[Iteration 1] Slack = 0.007
+
+Slack >= 0 (0.007)
+
+$$$ Target CP: 5.0 ns
+$$$ Cycles: 3019
+$$$ Real CP: 5.61 ns
+$$$ Performance metric: 16936.59
+
+=== Testing target CP = 4.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.12
+
+Slack < 0 (-1.12), increasing CP to 5.32 and retrying.
+
+[Iteration 1] Slack = -0.127
+
+Slack < 0 (-0.127), increasing CP to 5.45 and retrying.
+
+[Iteration 2] Slack = -0.045
+
+Slack < 0 (-0.045), increasing CP to 5.49 and retrying.
+
+[Iteration 3] Slack = 0.133
+
+Slack >= 0 (0.133)
+
+$$$ Target CP: 4.5 ns
+$$$ Cycles: 3019
+$$$ Real CP: 5.49 ns
+$$$ Performance metric: 16574.31
+
+=== Testing target CP = 4.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -1.648
+
+Slack < 0 (-1.648), increasing CP to 5.35 and retrying.
+
+[Iteration 1] Slack = 0.141
+
+Slack >= 0 (0.141)
+
+$$$ Target CP: 4.0 ns
+$$$ Cycles: 3021
+$$$ Real CP: 5.35 ns
+$$$ Performance metric: 16162.35
+
+=== Testing target CP = 3.5 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -0.963
+
+Slack < 0 (-0.963), increasing CP to 4.16 and retrying.
+
+[Iteration 1] Slack = 0.165
+
+Slack >= 0 (0.165)
+
+$$$ Target CP: 3.5 ns
+$$$ Cycles: 3047
+$$$ Real CP: 4.16 ns
+$$$ Performance metric: 12675.52
+
+=== Testing target CP = 3.0 ns ===
+Running Handshake canonicalization...
+Canonicalized Handshake.
+Lowering Handshake to HW...
+Lowered Handshake to HW.
+[INFO] Exported RTL (vhdl)
+[INFO] HDL generation succeeded
+[INFO] Built kernel for IO gen.
+[INFO] Ran kernel for IO gen.
+[INFO] Launching Modelsim simulation
+[INFO] Simulation succeeded
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-src skip/runs/run_2025-12-16_11-46-45/histogram-4/histogram.c
+dynamatic> write-hdl
+dynamatic> simulate
+dynamatic> exit
+
+Goodbye!
+[Iteration 0] Slack = -2.022
+
+Slack < 0 (-2.022), increasing CP to 4.72 and retrying.
+
+[Iteration 1] Slack = 0.172
+
+Slack >= 0 (0.172)
+
+$$$ Target CP: 3.0 ns
+$$$ Cycles: 3038
+$$$ Real CP: 4.72 ns
+$$$ Performance metric: 14339.36
+
+===  Best Configuration Found ===
+Target CP : 6.50 ns
+Real   CP : 7.31 ns
+Cycles    : 1639
+Performance metric : 11981.09

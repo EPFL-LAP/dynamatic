@@ -1,0 +1,2 @@
+Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
+gaussian,1,3.5,3.91,12336,550,1256,3,1744
