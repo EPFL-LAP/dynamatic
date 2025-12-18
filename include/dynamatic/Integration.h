@@ -154,7 +154,7 @@ std::string formatElement(const T &element) {
     oss << static_cast<int>(element);
   } else if constexpr (std::is_same_v<T, char>) {
     // A char can be directly printed as a integer (i.e., its ASCII code)
-    oss << int(element);
+    oss << static_cast<unsigned int>(static_cast<unsigned char>(element));
   } else if constexpr (__is_integral(T) && !std::is_same_v<T, bool>) {
     // This is for the bit-precise integer type "_BitInt(N)" introduced in C23
     // standard. We can use it to represent integer with arbitrary precisions
@@ -263,7 +263,8 @@ template <>
 void scalarPrinter<char>(const char &arg, OS &os) {
   // Print the char as a 2-digit hexadecimal number.
   os << "0x" << std::hex << std::setfill('0') << std::setw(2)
-     << (static_cast<int>(arg)) << std::endl;
+     << (static_cast<unsigned int>(static_cast<unsigned char>(arg)))
+     << std::endl;
 }
 
 /// Specialization of the scalar printer for int8_t.
