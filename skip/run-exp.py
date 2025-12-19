@@ -247,16 +247,11 @@ def run_pipeline(test_name: str, n: int, seed, run_root: Path):
     log_file = test_out_dir / RUN_LOG_NAME
     basename = test_name
 
-    # best_fifo = find_best_fork_fifo_size(test_out_dir, basename, cp, n, fifo_start, log_file)
-
-    # # compile again with the best size
-    # compile(test_out_dir, basename, cp, n, best_fifo, log_file)
 
     compile(test_out_dir, basename, MAX_CP, n, MAX_FIFO_SIZE, log_file)
 
     resize_fifo(test_out_dir, basename, MAX_FIFO_SIZE, seed)
 
-    # achieved = find_cp_by_adding_slack(test_out_dir, basename, n, log_file)
 
     best_target_cp = find_best_target_cp(test_out_dir, basename, log_file)
 
@@ -267,10 +262,6 @@ def run_pipeline(test_name: str, n: int, seed, run_root: Path):
 
     find_best_timing(test_out_dir, basename, start_cp, n, log_file)
 
-
-    # best_target_cp = find_best_target_cp(test_out_dir, basename, log_file)
-
-    # find_real_cp(test_out_dir, basename, best_target_cp, log_file)
 
 
     print(f" Finished {test_name}-{n}")

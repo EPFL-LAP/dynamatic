@@ -1,0 +1,11 @@
+bicg 0
+gaussian 1
+matrix_power 4
+get_tanh 0
+histogram	7
+atax 3
+jacobi_1d_imper	2
+triangular 3
+mvt_float	1
+kernel_2mm 0
+kernel_3mm 0
