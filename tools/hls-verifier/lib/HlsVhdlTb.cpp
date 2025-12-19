@@ -602,7 +602,9 @@ void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
   // @Jiahui17: I assume that the results only contain handshake channels.
 
   Instance joinInst("tb_join", "join_valids");
+
   if (ctx.simLanguage == VHDL) {
+    unsigned idx = 0;
     for (auto &[type, argName] :
          getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
       joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
