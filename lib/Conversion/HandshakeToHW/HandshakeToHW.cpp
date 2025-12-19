@@ -55,6 +55,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+#define DEBUG_TYPE "handshake-to-hw"
+
 /// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
@@ -1259,6 +1261,15 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
       if (auto memInterface = dyn_cast<MemoryOpInterface>(userOp)) {
         InternalMemLoweringState memLoweringState(ramOp, memInterface);
         state.internalMemInterfaces.insert({memInterface, memLoweringState});
+
+        // Also add the LSQs connected to this interface:
+        for (auto *user : memInterface->getUsers()) {
+          if (auto slaveInterface = dyn_cast<MemoryOpInterface>(user)) {
+            InternalMemLoweringState slaveLoweringState(ramOp, slaveInterface);
+            state.internalMemInterfaces.insert(
+                {slaveInterface, slaveLoweringState});
+          }
+        }
       }
     }
   }
@@ -1382,7 +1393,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     // The memory interface is not in the set of memInterfaces, this means:
     // - The memory interface is connected to an internal array (assert below).
     // - The IR is malformed.
-
+    LLVM_DEBUG(memOp.dump(););
     assert(modState.internalMemInterfaces.contains(memOp) &&
            "The memory interface op is not registered as an internal one nor "
            "external one!");
@@ -1563,7 +1574,10 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   memInterfaceConverter.convertToInstance(memState, rewriter,
                                           memInterfaceToBRAMChannels);
 
-  rewriter.eraseOp(memState.ramOp);
+  // Avoid erasing the ramOp twice.
+  if (memOp.isMasterInterface()) {
+    rewriter.eraseOp(memState.ramOp);
+  }
   return success();
 }
 
