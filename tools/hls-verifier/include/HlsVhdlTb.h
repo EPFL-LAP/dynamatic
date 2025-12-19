@@ -12,6 +12,9 @@
 #include "VerificationContext.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/FormatVariadic.h"
 #include <boost/dynamic_bitset.hpp>
 #include <optional>
 #include <string>
@@ -309,7 +312,7 @@ end
 
 enum TypeConstant { INTEGER, STRING, TIME };
 
-enum SpecialSignal { CONST_ZERO, CONST_ONE, OPEN };
+// enum SpecialSignal { CONST_ZERO, CONST_ONE, OPEN };
 
 enum SimulatorSignalType { REGISTER, WIRE };
 
@@ -378,7 +381,33 @@ static const string END_READY = "end_ready";
 // else as the D_IN0_PORT (i.e., the first port of the dual-port RAM).
 static const string RET_VALUE_NAME = "out0";
 
-using ConnectedValueType = std::variant<std::string, SpecialSignal>;
+// using ConnectedValueType = std::variant<std::string, SpecialSignal>;
+
+struct SignalAssignment {
+  enum AssignmentType { SIGNAL, CONST_ZERO, CONST_ONE, OPEN };
+  std::string name = "DEFAULT";
+  AssignmentType type = SIGNAL;
+  SignalAssignment(const std::string &name) : name(name) {};
+
+  SignalAssignment(AssignmentType type) : name("DEFAULT"), type(type) {};
+
+  std::string emit(VerificationContext &ctx) {
+    switch (type) {
+    case SignalAssignment::CONST_ZERO:
+      return ctx.simLanguage == VHDL ? "'0'" : "1'b0";
+      break;
+    case SignalAssignment::CONST_ONE:
+      return ctx.simLanguage == VHDL ? "'1'" : "1'b1";
+      break;
+    case SignalAssignment::OPEN:
+      return ctx.simLanguage == VHDL ? "open" : "";
+      break;
+    case SignalAssignment::SIGNAL:
+      return name;
+      break;
+    }
+  }
+};
 
 // This is a helper class to generete a HDL instance
 // Example:
@@ -401,8 +430,72 @@ using ConnectedValueType = std::variant<std::string, SpecialSignal>;
 class Instance {
   std::string moduleName;
   std::string instanceName;
-  std::vector<std::pair<std::string, ConnectedValueType>> connections;
+  std::vector<std::pair<std::string, SignalAssignment>> connections;
   std::vector<std::pair<std::string, std::string>> params;
+
+  void emitVhdl(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
+    os << instanceName << ": entity work." << moduleName << "\n";
+
+    if (!params.empty()) {
+      os << "generic map(\n";
+      os.indent();
+
+      llvm::SmallVector<std::string> portmappings;
+
+      for (auto &[port, value] : params) {
+        portmappings.push_back(llvm::formatv("{0} => {1}", port, value));
+      }
+
+      os << llvm::join(portmappings, ",\n") << "\n";
+
+      os.unindent();
+      os << ")\n";
+    }
+    os << "port map(\n";
+    os.indent();
+
+    llvm::SmallVector<std::string> connectionmappings;
+    for (auto &[port, sig] : connections) {
+      connectionmappings.push_back(
+          llvm::formatv("{0} => {1}", port, sig.emit(ctx)));
+    }
+    os << llvm::join(connectionmappings, ",\n") << "\n";
+
+    os.unindent();
+    os << ");\n\n";
+  }
+
+  void emitVerilog(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
+    os << moduleName;
+
+    if (!params.empty()) {
+      os << " #(\n";
+      os.indent();
+
+      llvm::SmallVector<std::string> portmappings;
+
+      for (auto &[port, value] : params) {
+        portmappings.push_back(llvm::formatv(".{0}({1})", port, value));
+      }
+      os << llvm::join(portmappings, ",\n") << "\n";
+
+      os.unindent();
+      os << ")";
+    }
+
+    os << " " << instanceName << " (\n";
+    os.indent();
+
+    llvm::SmallVector<std::string> connectionmappings;
+    for (auto &[port, sig] : connections) {
+      connectionmappings.push_back(
+          llvm::formatv(".{0}({1})", port, sig.emit(ctx)));
+    }
+    os << llvm::join(connectionmappings, ",\n") << "\n";
+
+    os.unindent();
+    os << ");\n\n";
+  }
 
 public:
   Instance(std::string module, std::string inst,
@@ -415,207 +508,47 @@ public:
   }
 
   Instance &connect(const std::string &port, const std::string &signal) {
-    connections.emplace_back(port, signal);
+    connections.emplace_back(port, SignalAssignment(signal));
     return *this;
   }
 
-  Instance &connect(const std::string &port, SpecialSignal value) {
-    connections.emplace_back(port, value);
+  Instance &connect(const std::string &port,
+                    SignalAssignment::AssignmentType value) {
+    connections.emplace_back(port, SignalAssignment(value));
     return *this;
   }
 
-  void emitVhdl(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
+  void emit(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
 
     // VHDL port map needs a continuous assignment
     std::sort(connections.begin(), connections.end(),
               [](const auto &a, const auto &b) { return a.first < b.first; });
 
     if (ctx.simLanguage == VHDL) {
-      os << instanceName << ": entity work." << moduleName << "\n";
-
-      if (!params.empty()) {
-        os << "generic map(\n";
-        os.indent();
-        for (size_t i = 0; i < params.size(); ++i) {
-          os << params[i].first << " => " << params[i].second;
-          if (i != params.size() - 1)
-            os << ",";
-          os << "\n";
-        }
-        os.unindent();
-        os << ")\n";
-      }
-      os << "port map(\n";
-      os.indent();
-      for (size_t i = 0; i < connections.size(); ++i) {
-        const auto &[port, sig] = connections[i];
-        os << port << " => ";
-
-        std::visit(
-            [&](auto &&v) {
-              using T = std::decay_t<decltype(v)>;
-              if constexpr (std::is_same_v<T, SpecialSignal>) {
-                switch (v) {
-                case CONST_ZERO:
-                  os << "'0'";
-                  break;
-                case CONST_ONE:
-                  os << "'1'";
-                  break;
-                case OPEN:
-                  os << "open";
-                  break;
-                }
-              } else {
-                os << v;
-              }
-            },
-            sig);
-
-        if (i != connections.size() - 1)
-          os << ",";
-        os << "\n";
-      }
+      emitVhdl(os, ctx);
     }
 
     if (ctx.simLanguage == VERILOG) {
-      os << moduleName;
-
-      if (!params.empty()) {
-        os << " #(\n";
-        os.indent();
-
-        for (size_t i = 0; i < params.size(); ++i) {
-          os << "." << params[i].first << "(" << params[i].second << ")";
-          if (i != params.size() - 1)
-            os << ",";
-          os << "\n";
-        }
-
-        os.unindent();
-        os << ")";
-      }
-
-      os << " " << instanceName << " (\n";
-      os.indent();
-
-      for (size_t i = 0; i < connections.size(); ++i) {
-        const auto &[port, sig] = connections[i];
-        os << "." << port;
-
-        std::visit(
-            [&](auto &&v) {
-              using T = std::decay_t<decltype(v)>;
-              if constexpr (std::is_same_v<T, SpecialSignal>) {
-                switch (v) {
-                case CONST_ZERO:
-                  os << "(1'b0)";
-                  break;
-                case CONST_ONE:
-                  os << "(1'b1)";
-                  break;
-                case OPEN:
-                  os << "()";
-                  break;
-                }
-              } else {
-                os << "(" << v << ")";
-              }
-            },
-            sig);
-        if (i != connections.size() - 1)
-          os << ",";
-        os << "\n";
-      }
+      emitVerilog(os, ctx);
     }
-    os.unindent();
-    os << ");\n\n";
   }
 };
 
 void vhdlTbCodegen(VerificationContext &ctx);
 
-inline void
-verilogSignalDeclaration(mlir::raw_indented_ostream &os, const string &name,
-                         std::optional<unsigned int> size = std::nullopt,
-                         std::optional<int> initialValue = std::nullopt) {
-  if (size)
-    os << "[" << *size << "-1 : 0] ";
-  os << name;
-  if (initialValue) {
-    unsigned int bitwidth = size ? *size : 1;
-    if (bitwidth > 1) {
-      std::string binaryString = toBinaryString(*initialValue, bitwidth);
-      os << " = " << bitwidth << "'b" << binaryString;
-    } else {
-      os << " = " << initialValue;
-    }
-  }
-  os << ";\n";
-}
-
 // Declare a signal. Usage:
-// - declareSTL(os, "signal_name"); declares a std_logic signal
-// - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
-inline void declareSTL(VerificationContext &ctx, mlir::raw_indented_ostream &os,
-                       const string &name,
-                       std::optional<unsigned int> size = std::nullopt,
-                       std::optional<int> initialValue = std::nullopt) {
-  if (ctx.simLanguage == VHDL) {
-    os << "signal " << name << " : std_logic";
-    if (size)
-      os << "_vector(" << *size << " - 1 downto 0)";
-    if (initialValue) {
-      // initialValue can be of type std::string or int
-      // int is formatted with ' '. Example: signal name : std_logic := '0';
-      // std::string is formatted without ' '. Example:
-      // signal a_din1 : std_logic_vector(32 - 1 downto 0) :=  (others => '0');
-      // bitwidth is size, if it exists, else 1
+// - declareWire(ctx, os, "signal_name"); declares a std_logic signal
+// - declareWire(ctx, os, "signal_name", SIGNAL_WIDTH); declares a
+// std_logic_vector
+void declareWire(VerificationContext &ctx, mlir::raw_indented_ostream &os,
+                 const string &name,
+                 std::optional<unsigned int> size = std::nullopt,
+                 std::optional<int> initialValue = std::nullopt);
 
-      unsigned int bitwidth = size ? *size : 1;
-      if (bitwidth > 1) {
-        std::string binaryString = toBinaryString(*initialValue, bitwidth);
-        os << " :=  \"" << binaryString << "\"";
-      } else {
-        os << " := '" << *initialValue << "'";
-      }
-    }
-    os << ";\n";
-  }
-  if (ctx.simLanguage == VERILOG) {
-    os << "wire ";
-    verilogSignalDeclaration(os, name, size, initialValue);
-    /*
-    if (size)
-      os << "[" << *size << "-1 : 0] ";
-    os << name;
-    if (initialValue) {
-      unsigned int bitwidth = size ? *size : 1;
-      if (bitwidth > 1) {
-        std::string binaryString = toBinaryString(*initialValue, bitwidth);
-        os << " = " << bitwidth << "'b" << binaryString;
-      } else {
-        os << " = " << initialValue;
-      }
-    }
-    os << ";\n";
-    */
-  }
-}
-
-inline void declareReg(VerificationContext &ctx, mlir::raw_indented_ostream &os,
-                       const string &name,
-                       std::optional<unsigned int> size = std::nullopt,
-                       std::optional<int> initialValue = std::nullopt) {
-
-  if (ctx.simLanguage == VHDL) {
-    declareSTL(ctx, os, name, size, initialValue);
-  }
-  if (ctx.simLanguage == VERILOG) {
-    os << "reg ";
-    verilogSignalDeclaration(os, name, size, initialValue);
-  }
-}
+void declareReg(VerificationContext &ctx, mlir::raw_indented_ostream &os,
+                const string &name,
+                std::optional<unsigned int> size = std::nullopt,
+                std::optional<int> initialValue = std::nullopt);
 
 inline void declareConstant(VerificationContext &ctx,
                             mlir::raw_indented_ostream &os, const string &name,
