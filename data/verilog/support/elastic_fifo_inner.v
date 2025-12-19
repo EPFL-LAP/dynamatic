@@ -13,9 +13,15 @@ module elastic_fifo_inner #(
   output outs_valid,
   output ins_ready
 );
+
+  // Special case: When NUM_SLOTS = 1, there is just one memory location so
+  // the head and tail can be technically omitted. For syntax consistency, we
+  // still keep one bit.
+  localparam PTR_WIDTH = (NUM_SLOTS > 1) ? $clog2(NUM_SLOTS) : 1;
+
   // Internal Signal Definition
   wire ReadEn, WriteEn;
-  reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
+  reg [PTR_WIDTH - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 1;
   reg [DATA_TYPE - 1 : 0] Memory[0 : NUM_SLOTS - 1];
   integer i;
