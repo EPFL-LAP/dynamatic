@@ -16,7 +16,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Support/DataflowGraph.h"
+#include "dynamatic/Support/DataflowGraph/ReconvergentPathFinder.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/TransitionCFDFC.h"
 #include "mlir/IR/Value.h"
@@ -166,28 +166,26 @@ void FPGA24Buffers::setup() {
     llvm::errs() << transition.srcBB << "->" << transition.dstBB << "\n";
   }
 
-  // --- START INSERTION ---
-  // Convert SmallVector to std::vector
+  // --- Reconvergent Path Analysis ---
+  // Convert SmallVector to std::vector for the enumeration function
   std::vector<experimental::ArchBB> transitions(funcInfo.archs.begin(),
                                                 funcInfo.archs.end());
 
   unsigned sequenceLength = 2;
-  auto allSequences =
-      DataflowGraph::enumerateSequences(transitions, sequenceLength);
+  auto allSequences = enumerateTransitionSequences(transitions, sequenceLength);
 
-  std::vector<DataflowGraph> allGraphs;
-  std::vector<std::pair<size_t, std::pair<const DataflowGraph *,
-                                          std::vector<ReconvergentPath>>>>
-      allReconvergentPaths;
-
-  for (size_t seqIdx = 0; seqIdx < allSequences.size(); ++seqIdx) {
-    const auto &sequence = allSequences[seqIdx];
-
+  // Build graphs for all sequences
+  std::vector<ReconvergentPathFinderGraph> allGraphs;
+  for (const auto & sequence : allSequences) {
     allGraphs.emplace_back();
     allGraphs.back().buildGraphFromSequence(funcInfo.funcOp, sequence);
   }
 
   // Find reconvergent paths for each graph (after all graphs are built)
+  std::vector<std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
+                                          std::vector<ReconvergentPath>>>>
+      allReconvergentPaths;
+
   for (size_t seqIdx = 0; seqIdx < allGraphs.size(); ++seqIdx) {
     std::vector<ReconvergentPath> reconvergentPaths =
         allGraphs[seqIdx].findReconvergentPaths();
@@ -199,14 +197,14 @@ void FPGA24Buffers::setup() {
   }
 
   // Dump all graphs to a single file
-  DataflowGraph::dumpAllGraphsToFile(allGraphs, "dataflow_graphs.dot");
+  ReconvergentPathFinderGraph::dumpAllGraphs(allGraphs, "dataflow_graphs.dot");
 
   // Dump all reconvergent paths to a single file
   if (!allReconvergentPaths.empty()) {
-    DataflowGraph::dumpAllReconvergentPathsToFile(allReconvergentPaths,
-                                                  "reconvergent_paths.dot");
+    ReconvergentPathFinderGraph::dumpAllReconvergentPaths(allReconvergentPaths,
+                                                         "reconvergent_paths.dot");
   }
-  // --- END INSERTION ---
+  // --- End Reconvergent Path Analysis ---
 
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
