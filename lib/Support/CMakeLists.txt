@@ -7,9 +7,10 @@ add_dynamatic_library(DynamaticSupport
   MILP.cpp
   System.cpp
   TimingModels.cpp
-  DataflowGraph.cpp
+  DataflowGraph.cpp # TODO: Remove before release, this implementation is deprecated.
 
   LINK_LIBS PUBLIC
+  DynamaticSupportDataflowGraph
   DynamaticSupportJSON
   DynamaticHandshake
   DynamaticHW
@@ -22,4 +23,4 @@ add_subdirectory(Espresso)
 add_subdirectory(JSON)
 add_subdirectory(RTL)
 add_subdirectory(Utils)
-add_subdirectory(ConstraintProgramming)
+add_subdirectory(DataflowGraph)
