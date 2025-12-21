@@ -18,7 +18,6 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Support/DataflowGraph/ReconvergentPathFinder.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/TransitionCFDFC.h"
 #include "mlir/IR/Value.h"
 
 using namespace llvm::sys;

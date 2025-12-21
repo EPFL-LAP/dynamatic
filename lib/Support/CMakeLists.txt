@@ -7,7 +7,6 @@ add_dynamatic_library(DynamaticSupport
   MILP.cpp
   System.cpp
   TimingModels.cpp
-  DataflowGraph.cpp # TODO: Remove before release, this implementation is deprecated.
 
   LINK_LIBS PUBLIC
   DynamaticSupportDataflowGraph
