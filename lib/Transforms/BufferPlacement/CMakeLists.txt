@@ -2,7 +2,6 @@ add_dynamatic_library(DynamaticBufferPlacement
   BufferingSupport.cpp
   BufferPlacementMILP.cpp
   CFDFC.cpp
-  TransitionCFDFC.cpp
   FPGA20Buffers.cpp
   FPGA24Buffers.cpp
   FPL22Buffers.cpp
