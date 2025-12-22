@@ -62,13 +62,13 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   };
 
   // Add to the list of operands of the new gate all the values which were not
-  // already used. 
+  // already used.
   // Since in STQ one block can't be producer of more than one phi operand,
   // sender logic is not needed.
-  
+
   // Handle self-dependent merges: if the merge uses its own result as an input,
   // record that operand so it can be reconnected to the generated phi later.
-  SmallVector<GateInput*> selfInputs;
+  SmallVector<GateInput *> selfInputs;
 
   for (Value v : mergeOp.getOperands()) {
     if (!isAlreadyPresent(v)) {
@@ -85,14 +85,13 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   Gate *newPhi = nullptr;
   if (!operands.empty()) {
     newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
-                            ++uniqueGateIndex);
+                      ++uniqueGateIndex);
     gatesPerBlock[block].push_back(newPhi);
   }
 
   // Reconnect self-dependent operands to the newly created Phi
   for (GateInput *gi : selfInputs)
     gi->input = newPhi;
-
 
   convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
