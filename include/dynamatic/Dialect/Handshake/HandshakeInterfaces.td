@@ -50,6 +50,39 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
   ];
 }
 
+def HasSlotsOpInterface : OpInterface<"HasSlotsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations have slots in which tokens can
+     be stored. This interface shows how many slots are present,
+     which is useful for the annotation of formal properties.
+  }];
+  let methods = [
+   InterfaceMethod<[{
+       Get the number of slots.
+     }],
+     "int", "getNumSlots", (ins)
+   >,
+  ];
+}
+
+def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations eagerly fork an input token into
+     mutltiple different output channels, keeping track which
+     channels have been sent.
+  }];
+ 
+  let methods = [
+   InterfaceMethod<[{
+       Get the number of fork outputs.
+     }],
+     "int", "getNumOutputs", (ins)
+   >,
+  ];
+}
+
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
