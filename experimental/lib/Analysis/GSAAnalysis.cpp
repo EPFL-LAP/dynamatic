@@ -413,8 +413,9 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
+  auto gatesSnapshot = gatesPerBlock;
   // For each block
-  for (auto const &[phiBlock, phis] : gatesPerBlock) {
+  for (auto const &[phiBlock, phis] : gatesSnapshot) {
 
     // For each phi
     for (Gate *phi : phis) {
