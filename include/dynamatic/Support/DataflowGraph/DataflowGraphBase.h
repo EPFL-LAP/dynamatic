@@ -13,8 +13,8 @@
 #ifndef DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWGRAPHBASE_H
 #define DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWGRAPHBASE_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "llvm/ADT/SmallVector.h"
 
 #include <cstddef>
 

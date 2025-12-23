@@ -108,9 +108,10 @@ public:
   void buildGraphFromSequence(handshake::FuncOp funcOp,
                               const std::vector<ArchBB> &sequence);
 
-  /// Within the transition sequence, we may have transitions that look like Step
-  /// 0: BB1 -> Step 1: BB1 -> Step 2: BB2. Steps are the way to distinguish
-  /// between specific operations of the same BB accross different transitions.
+  /// Within the transition sequence, we may have transitions that look like
+  /// Step 0: BB1 -> Step 1: BB1 -> Step 2: BB2. Steps are the way to
+  /// distinguish between specific operations of the same BB accross different
+  /// transitions.
   unsigned getNodeStep(size_t nodeId) const { return nodeIdToStep.at(nodeId); };
 
   /// Get the BB id for a given step. Returns -1 if step not found.
@@ -121,25 +122,25 @@ public:
 
   // Debugging Methods //
 
-  void dumpReconvergentPaths(
-    const std::vector<ReconvergentPath> &paths, llvm::StringRef filename) const;
+  void dumpReconvergentPaths(const std::vector<ReconvergentPath> &paths,
+                             llvm::StringRef filename) const;
 
   void dumpTransitionGraph(llvm::StringRef filename) const;
 
   /// Dump multiple graphs to a single GraphViz file.
   /// Each graph is placed in its own cluster subgraph.
-  static void dumpAllGraphs(
-      const std::vector<ReconvergentPathFinderGraph> &graphs,
-      llvm::StringRef filename);
+  static void
+  dumpAllGraphs(const std::vector<ReconvergentPathFinderGraph> &graphs,
+                llvm::StringRef filename);
 
-  /// Dump all reconvergent paths from multiple graphs to a single GraphViz file.
-  /// Each path is placed in its own cluster subgraph with a graph index prefix.
-  /// The input is a vector of (sequenceIndex, (graph, paths)) pairs.
+  /// Dump all reconvergent paths from multiple graphs to a single GraphViz
+  /// file. Each path is placed in its own cluster subgraph with a graph index
+  /// prefix. The input is a vector of (sequenceIndex, (graph, paths)) pairs.
   static void dumpAllReconvergentPaths(
-      const std::vector<std::pair<
-          size_t,
-          std::pair<const ReconvergentPathFinderGraph *,
-                    std::vector<ReconvergentPath>>>> &graphPaths,
+      const std::vector<
+          std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
+                                      std::vector<ReconvergentPath>>>>
+          &graphPaths,
       llvm::StringRef filename);
 
 private:
