@@ -617,7 +617,6 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "placement", placement, solverKind, timeout, info, timingDB,
         targetCP);
   }
-
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
     SmallVector<CFDFC *, 8> cfdfcs;

@@ -25,11 +25,13 @@
 namespace dynamatic {
 
 bool ReconvergentPathFinderGraph::isForkNode(size_t nodeId) const {
-  return isa<handshake::ForkOp>(nodes[nodeId].op) || isa<handshake::LazyForkOp>(nodes[nodeId].op);
+  return isa<handshake::ForkOp>(nodes[nodeId].op) ||
+         isa<handshake::LazyForkOp>(nodes[nodeId].op);
 }
 
 bool ReconvergentPathFinderGraph::isJoinNode(size_t nodeId) const {
-  return isa<handshake::MuxOp>(nodes[nodeId].op) || isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
+  return isa<handshake::MuxOp>(nodes[nodeId].op) ||
+         isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
 }
 
 std::string ReconvergentPathFinderGraph::getNodeLabel(size_t nodeId) const {
@@ -95,7 +97,8 @@ void ReconvergentPathFinderGraph::buildGraphFromSequence(
       for (Operation *user : result.getUsers()) {
         // Check if user exists at the same step
         if (nodeMap.count({user, step})) {
-          addEdge(node.id, nodeMap[{user, step}], result, DataflowGraphEdgeType::INTRA_BB);
+          addEdge(node.id, nodeMap[{user, step}], result,
+                  DataflowGraphEdgeType::INTRA_BB);
         }
       }
     }
@@ -125,7 +128,8 @@ void ReconvergentPathFinderGraph::buildGraphFromSequence(
         for (Operation *user : result.getUsers()) {
           // Check if user exists at the destination step of this arch
           if (nodeMap.count({user, dstStep})) {
-            addEdge(node.id, nodeMap[{user, dstStep}], result, DataflowGraphEdgeType::INTER_BB);
+            addEdge(node.id, nodeMap[{user, dstStep}], result,
+                    DataflowGraphEdgeType::INTER_BB);
           }
         }
       }
@@ -133,7 +137,8 @@ void ReconvergentPathFinderGraph::buildGraphFromSequence(
   }
 }
 
-std::vector<ReconvergentPath> ReconvergentPathFinderGraph::findReconvergentPaths() const {
+std::vector<ReconvergentPath>
+ReconvergentPathFinderGraph::findReconvergentPaths() const {
   std::vector<size_t> forks;
   std::vector<size_t> joins;
 
@@ -183,7 +188,7 @@ std::vector<ReconvergentPath> ReconvergentPathFinderGraph::findReconvergentPaths
         size_t u = bwdQueue.front();
         bwdQueue.pop();
         for (size_t edgeId : revAdjList[u]) {
-          size_t v = edges[edgeId].srcId; 
+          size_t v = edges[edgeId].srcId;
           if (!canReachJoin[v]) {
             canReachJoin[v] = true;
             bwdQueue.push(v);
@@ -192,7 +197,8 @@ std::vector<ReconvergentPath> ReconvergentPathFinderGraph::findReconvergentPaths
       }
 
       // The fork must have >=2 direct successors that can reach the join.
-      // Otherwise it's just a linear chain, not actual divergence/reconvergence.
+      // Otherwise it's just a linear chain, not actual
+      // divergence/reconvergence.
       unsigned numDivergingPaths = 0;
       for (size_t edgeId : adjList[forkId]) {
         size_t successor = edges[edgeId].dstId;
@@ -226,7 +232,8 @@ std::vector<ReconvergentPath> ReconvergentPathFinderGraph::findReconvergentPaths
 }
 
 void ReconvergentPathFinderGraph::dumpReconvergentPaths(
-    const std::vector<ReconvergentPath> &paths, llvm::StringRef filename) const {
+    const std::vector<ReconvergentPath> &paths,
+    llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
     fullPath = filename;
@@ -255,25 +262,25 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
     const ReconvergentPath &path = paths[pathIdx];
 
     file << "  subgraph cluster_path_" << pathIdx << " {\n";
-    file << "    label=\"Path " << pathIdx << " (Fork: "
-         << getNodeLabel(path.forkNodeId) << " -> Join: "
-         << getNodeLabel(path.joinNodeId) << ")\";\n";
+    file << "    label=\"Path " << pathIdx
+         << " (Fork: " << getNodeLabel(path.forkNodeId)
+         << " -> Join: " << getNodeLabel(path.joinNodeId) << ")\";\n";
     file << "    style=rounded;\n";
     file << "    color=blue;\n";
     file << "    bgcolor=\"#e8f4fc\";\n\n";
 
     // Emit nodes with unique IDs per path to avoid conflicts
     for (size_t nodeId : path.nodeIds) {
-      std::string uniqueId = "p" + std::to_string(pathIdx) + "_" +
-                             getNodeDotId(nodeId);
+      std::string uniqueId =
+          "p" + std::to_string(pathIdx) + "_" + getNodeDotId(nodeId);
       std::string color = "";
       if (nodeId == path.forkNodeId)
         color = ", style=filled, fillcolor=\"#90EE90\""; // Green for fork
       else if (nodeId == path.joinNodeId)
         color = ", style=filled, fillcolor=\"#FFB6C1\""; // Pink for join
 
-      file << "    " << uniqueId << " [label=\"" << getNodeLabel(nodeId)
-           << "\"" << color << "];\n";
+      file << "    " << uniqueId << " [label=\"" << getNodeLabel(nodeId) << "\""
+           << color << "];\n";
     }
 
     file << "\n";
@@ -284,12 +291,15 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
         auto &edge = edges[edgeId];
         size_t dstId = edge.dstId;
         if (path.nodeIds.count(dstId)) {
-          std::string srcUniqueId = "p" + std::to_string(pathIdx) + "_" +
-                                    getNodeDotId(srcId);
-          std::string dstUniqueId = "p" + std::to_string(pathIdx) + "_" +
-                                    getNodeDotId(dstId);
-          std::string style = (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "solid" : "dashed";
-          std::string color = (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black" : "blue";
+          std::string srcUniqueId =
+              "p" + std::to_string(pathIdx) + "_" + getNodeDotId(srcId);
+          std::string dstUniqueId =
+              "p" + std::to_string(pathIdx) + "_" + getNodeDotId(dstId);
+          std::string style = (edge.type == DataflowGraphEdgeType::INTRA_BB)
+                                  ? "solid"
+                                  : "dashed";
+          std::string color =
+              (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black" : "blue";
           file << "    " << srcUniqueId << " -> " << dstUniqueId
                << " [style=" << style << ", color=" << color << "];\n";
         }
@@ -305,7 +315,8 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
                << fullPath << "\n";
 }
 
-void ReconvergentPathFinderGraph::dumpTransitionGraph(llvm::StringRef filename) const {
+void ReconvergentPathFinderGraph::dumpTransitionGraph(
+    llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
     fullPath = filename;
@@ -330,7 +341,8 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(llvm::StringRef filename) 
   file << "  compound=true;\n\n";
 
   // Group nodes by step to create clusters
-  std::map<unsigned, std::vector<const DataflowGraphNode<Operation *> *>> nodesByStep;
+  std::map<unsigned, std::vector<const DataflowGraphNode<Operation *> *>>
+      nodesByStep;
   for (const auto &node : nodes) {
     nodesByStep[getNodeStep(node.id)].push_back(&node);
   }
@@ -346,16 +358,18 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(llvm::StringRef filename) 
     file << "    bgcolor=\"#f0f0f0\";\n";
 
     for (const auto *node : stepNodes) {
-      file << "    " << getNodeDotId(node->id) << " [label=\"" << getNodeLabel(node->id)
-           << "\"];\n";
+      file << "    " << getNodeDotId(node->id) << " [label=\""
+           << getNodeLabel(node->id) << "\"];\n";
     }
     file << "  }\n\n";
   }
 
   // Emit edges with different styles
   for (const auto &edge : edges) {
-    std::string style = (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "solid" : "dashed";
-    std::string color = (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black" : "blue";
+    std::string style =
+        (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "solid" : "dashed";
+    std::string color =
+        (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black" : "blue";
 
     file << "  " << getNodeDotId(edge.srcId) << " -> "
          << getNodeDotId(edge.dstId) << " [style=" << style
@@ -412,7 +426,8 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
     // Emit nodes grouped by step in subgraph clusters
     for (const auto &[step, stepNodeIds] : nodesByStep) {
       unsigned bbID = graph.getStepBB(step);
-      file << "    subgraph cluster_" << graphPrefix << "step_" << step << " {\n";
+      file << "    subgraph cluster_" << graphPrefix << "step_" << step
+           << " {\n";
       file << "      label=\"Step " << step << " (BB " << bbID << ")\";\n";
       file << "      style=solid;\n";
       file << "      color=black;\n";
@@ -433,8 +448,8 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
           (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black" : "blue";
 
       file << "    " << graphPrefix << graph.getNodeDotId(edge.srcId) << " -> "
-           << graphPrefix << graph.getNodeDotId(edge.dstId) << " [style="
-           << style << ", color=" << color << "];\n";
+           << graphPrefix << graph.getNodeDotId(edge.dstId)
+           << " [style=" << style << ", color=" << color << "];\n";
     }
 
     file << "  }\n\n";
@@ -449,7 +464,8 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
     const std::vector<
         std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
-                                    std::vector<ReconvergentPath>>>> &graphPaths,
+                                    std::vector<ReconvergentPath>>>>
+        &graphPaths,
     llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -515,9 +531,9 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
           if (path.nodeIds.count(dstId)) {
             std::string srcUniqueId = uniquePrefix + graph->getNodeDotId(srcId);
             std::string dstUniqueId = uniquePrefix + graph->getNodeDotId(dstId);
-            std::string style =
-                (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "solid"
-                                                               : "dashed";
+            std::string style = (edge.type == DataflowGraphEdgeType::INTRA_BB)
+                                    ? "solid"
+                                    : "dashed";
             std::string edgeColor =
                 (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "black"
                                                                : "blue";
