@@ -50,7 +50,7 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
   ];
 }
 
-def HasSlotsOpInterface : OpInterface<"HasSlotsOpInterface"> {
+def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
      Some handshake operations have slots in which tokens can
