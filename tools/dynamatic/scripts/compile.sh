@@ -300,7 +300,7 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga24 solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
