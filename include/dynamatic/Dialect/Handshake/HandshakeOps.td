@@ -217,7 +217,7 @@ def InstanceOp : Handshake_Op<"instance", [
 
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType,
-  HasSlotsOpInterface 
+  BufferLikeOpInterface 
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -457,7 +457,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
-  HasSlotsOpInterface,
+  BufferLikeOpInterface,
   EagerForkLikeOpInterface,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -895,7 +895,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
   IsSimpleHandshake<"data">,
-  HasSlotsOpInterface,
+  BufferLikeOpInterface,
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
