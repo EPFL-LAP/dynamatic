@@ -62,7 +62,14 @@ public:
 };
 
 /// Checks if the source and destination are in a loop
+/// (including any of their ancestor loops).
 bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
+
+/// Checks whether the loop of `source` is the same as, or nested inside,
+/// the loop of `dest`. Returns true if `source` lives in
+/// `dest`'s loop or in any inner loop of it.
+bool isSameOrInnerLoopBlocks(Block *source, Block *dest,
+                             const mlir::CFGLoopInfo &li);
 
 /// Gets all the paths from block `start` to block `end` using a DFS search.
 /// If `blockToTraverse` is non null, then we want the paths having
