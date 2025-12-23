@@ -78,7 +78,7 @@ def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
    InterfaceMethod<[{
        Get the number of fork outputs.
      }],
-     "int", "getNumOutputs", (ins)
+     "int", "getNumEagerOutputs", (ins)
    >,
   ];
 }

@@ -361,7 +361,7 @@ def ForkOp : Handshake_ForkOp<"fork", [
     ```
   }];
   let extraClassDeclaration = [{
-    int getNumOutputs() {
+    int getNumEagerOutputs() {
       return getNumResults();
     }
   }];
@@ -480,7 +480,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     int getNumSlots() {
       return 1;
     }
-    int getNumOutputs() {
+    int getNumEagerOutputs() {
       return 2;
     }
   }];
