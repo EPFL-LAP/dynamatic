@@ -216,7 +216,8 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType
+  HasClock, SameOperandsAndResultType,
+  HasSlotsOpInterface 
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -345,7 +346,9 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   }];
 }
 
-def ForkOp : Handshake_ForkOp<"fork"> {
+def ForkOp : Handshake_ForkOp<"fork", [
+  EagerForkLikeOpInterface 
+]> {
   let summary = "eager fork operation";
   let description = [{
     A single input is replicated to N outputs and distributed to each
@@ -356,6 +359,11 @@ def ForkOp : Handshake_ForkOp<"fork"> {
     ```mlir
     %1:2 = fork [2] %0 : !handshake.channel<i32>
     ```
+  }];
+  let extraClassDeclaration = [{
+    int getNumOutputs() {
+      return getNumResults();
+    }
   }];
 }
 
@@ -449,6 +457,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
+  HasSlotsOpInterface,
+  EagerForkLikeOpInterface,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -465,6 +475,14 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     %res, %idx = control_merge %a, %b, %c :
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
+  }];
+  let extraClassDeclaration = [{
+    int getNumSlots() {
+      return 1;
+    }
+    int getNumOutputs() {
+      return 2;
+    }
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
@@ -876,7 +894,8 @@ def LoadOp : Handshake_MemPortOp<"load", [
   AllExtraSignalsMatch<["address", "dataResult"]>,
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"data">
+  IsSimpleHandshake<"data">,
+  HasSlotsOpInterface,
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
@@ -924,6 +943,13 @@ def LoadOp : Handshake_MemPortOp<"load", [
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
+
+  let extraClassDeclaration = [{
+    int getNumSlots() {
+      return 2;
+    }
+  }];
+
 }
 
 def StoreOp : Handshake_MemPortOp<"store", [
