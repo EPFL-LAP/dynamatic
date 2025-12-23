@@ -29,11 +29,7 @@ bool ReconvergentPathFinderGraph::isForkNode(size_t nodeId) const {
 }
 
 bool ReconvergentPathFinderGraph::isJoinNode(size_t nodeId) const {
-  // TODO: we've established that control merge is not a join with Jiahui, verify that the sheer amount of paths created from treating a branch as a join is okay.
-  // return isa<handshake::MuxOp>(nodes[nodeId].op) || isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
-  return isa<handshake::MergeOp>(nodes[nodeId].op) ||
-               isa<handshake::ControlMergeOp>(nodes[nodeId].op) ||
-               isa<handshake::MuxOp>(nodes[nodeId].op);
+  return isa<handshake::MuxOp>(nodes[nodeId].op) || isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
 }
 
 std::string ReconvergentPathFinderGraph::getNodeLabel(size_t nodeId) const {
