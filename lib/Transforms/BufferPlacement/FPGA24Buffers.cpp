@@ -168,65 +168,43 @@ void FPGA24Buffers::setup() {
 
   // --- Reconvergent Path Analysis ---
   // Convert SmallVector to std::vector for the enumeration function
-  // std::vector<experimental::ArchBB> transitions(funcInfo.archs.begin(),
-  //                                               funcInfo.archs.end());
+  std::vector<experimental::ArchBB> transitions(funcInfo.archs.begin(),
+                                                funcInfo.archs.end());
 
-  // unsigned sequenceLength = 2;
-  // auto allSequences = enumerateTransitionSequences(transitions, sequenceLength);
+  unsigned sequenceLength = 2;
+  auto allSequences = enumerateTransitionSequences(transitions, sequenceLength);
 
-  // // Build graphs for all sequences
-  // std::vector<ReconvergentPathFinderGraph> allGraphs;
-  // for (const auto & sequence : allSequences) {
-  //   allGraphs.emplace_back();
-  //   allGraphs.back().buildGraphFromSequence(funcInfo.funcOp, sequence);
-  // }
+  // Build graphs for all sequences
+  std::vector<ReconvergentPathFinderGraph> allGraphs;
+  for (const auto & sequence : allSequences) {
+    allGraphs.emplace_back();
+    allGraphs.back().buildGraphFromSequence(funcInfo.funcOp, sequence);
+  }
 
-  // // Find reconvergent paths for each graph (after all graphs are built)
-  // std::vector<std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
-  //                                         std::vector<ReconvergentPath>>>>
-  //     allReconvergentPaths;
+  // Find reconvergent paths for each graph (after all graphs are built)
+  std::vector<std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
+                                          std::vector<ReconvergentPath>>>>
+      allReconvergentPaths;
 
-  // for (size_t seqIdx = 0; seqIdx < allGraphs.size(); ++seqIdx) {
-  //   std::vector<ReconvergentPath> reconvergentPaths =
-  //       allGraphs[seqIdx].findReconvergentPaths();
-  //   if (!reconvergentPaths.empty()) {
-  //     allReconvergentPaths.emplace_back(
-  //         seqIdx,
-  //         std::make_pair(&allGraphs[seqIdx], std::move(reconvergentPaths)));
-  //   }
-  // }
-
-  // // Dump all graphs to a single file
-  // ReconvergentPathFinderGraph::dumpAllGraphs(allGraphs, "dataflow_graphs.dot");
-
-  // // Dump all reconvergent paths to a single file
-  // if (!allReconvergentPaths.empty()) {
-  //   ReconvergentPathFinderGraph::dumpAllReconvergentPaths(allReconvergentPaths,
-  //                                                        "reconvergent_paths.dot");
-  // }
-  // --- End Reconvergent Path Analysis ---
-
-  // --- Synchronizing Cycles Analysis ---
-
-  for (auto &[cfdfc, _] : funcInfo.cfdfcs) {
-
-    SynchronizingCyclesFinderGraph graph;
-    graph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
-
-    auto pairs = graph.findSynchronizingCyclePairs();
-    
-    llvm::errs() << "Found " << pairs.size() 
-                 << " synchronizing cycle pairs in CFDFC\n";
-    
-    for (const auto &pair : pairs) {
-      llvm::errs() << " Pair: cycle with " << pair.cycleOne.nodes.size()
-                   << " nodes <-> cycle with " << pair.cycleTwo.nodes.size()
-                   << " nodes, " << pair.commonJoins.size() 
-                   << " common joins\n";
+  for (size_t seqIdx = 0; seqIdx < allGraphs.size(); ++seqIdx) {
+    std::vector<ReconvergentPath> reconvergentPaths =
+        allGraphs[seqIdx].findReconvergentPaths();
+    if (!reconvergentPaths.empty()) {
+      allReconvergentPaths.emplace_back(
+          seqIdx,
+          std::make_pair(&allGraphs[seqIdx], std::move(reconvergentPaths)));
     }
   }
 
-  // --- End Synchronizing Cycles Analysis ---
+  // Dump all graphs to a single file
+  ReconvergentPathFinderGraph::dumpAllGraphs(allGraphs, "dataflow_graphs.dot");
+
+  // Dump all reconvergent paths to a single file
+  if (!allReconvergentPaths.empty()) {
+    ReconvergentPathFinderGraph::dumpAllReconvergentPaths(allReconvergentPaths,
+                                                         "reconvergent_paths.dot");
+  }
+  // --- End Reconvergent Path Analysis ---
 
   // Signals for which we have variables
   SmallVector<SignalType, 1> signalTypes;
