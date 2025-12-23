@@ -50,8 +50,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
                     "type is not currently supported\n";
     return mlir::FloatType::getF80(context);
   }
-  LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";
-             llvmType->dump(););
+  LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
   llvm::report_fatal_error("Unhandled scalar type");
 }
@@ -816,13 +815,6 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
     memref = getInstToMemRefMap[callInst->getArgOperand(0)];
     offset = valueMap[callInst->getArgOperand(0)];
   } else {
-    // clang-format off
-    LLVM_DEBUG(
-        llvm::errs() << "Cannot determine the base ptr of memset!\n";
-        llvm::errs() << "llvm value:\n";
-        callInst->getArgOperand(0)->dump();
-    );
-    // clang-format on
     llvm::report_fatal_error(
         "Cannot determine the base ptr of the memset intrinsic!");
   }
@@ -989,7 +981,7 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
              calledFunc->getIntrinsicID() == Intrinsic::fshr) {
     this->translateFunnelShiftIntrinsic(callInst);
   } else {
-    LLVM_DEBUG(llvm::errs() << "Unhandled intrinsic:"; callInst->dump(););
+    LLVM_DEBUG(llvm::errs() << "Unhandled intrinsic:";);
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
   }
