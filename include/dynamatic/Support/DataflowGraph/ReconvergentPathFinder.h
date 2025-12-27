@@ -42,7 +42,7 @@ struct ReconvergentPath {
 /// 1 -> 1 (self-loop)
 /// enumerateTransitionSequences(transitions, 3);
 /// Output: [1, 2, 3], [1, 1, 2], [1, 1, 1]
-static std::vector<std::vector<ArchBB>>
+std::vector<std::vector<ArchBB>>
 enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
                              size_t sequenceLength) {
   // 'sequenceLength' is the number of steps to visit.
