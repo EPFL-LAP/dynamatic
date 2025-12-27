@@ -94,7 +94,7 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
 /// A dataflow graph specialized for reconvergent path analysis.
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
 class ReconvergentPathFinderGraph
-    : public DataflowSubgraphBase<mlir::Operation *, mlir::Value> {
+    : public DataflowSubgraphBase {
 public:
   bool isForkNode(size_t nodeId) const override;
   bool isJoinNode(size_t nodeId) const override;

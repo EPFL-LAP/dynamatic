@@ -346,7 +346,7 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
   file << "  compound=true;\n\n";
 
   // Group nodes by step to create clusters
-  std::map<unsigned, std::vector<const DataflowGraphNode<Operation *> *>>
+  std::map<unsigned, std::vector<const DataflowGraphNode *>>
       nodesByStep;
   for (const auto &node : nodes) {
     nodesByStep[getNodeStep(node.id)].push_back(&node);
