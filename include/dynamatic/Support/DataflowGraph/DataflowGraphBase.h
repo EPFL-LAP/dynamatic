@@ -27,24 +27,22 @@ enum class DataflowGraphEdgeType {
   INTER_BB, // <-- Edge between different basic blocks.
 };
 
-template <typename T>
 struct DataflowGraphNode {
-  T op;      // <-- The underlying Operation.
+  mlir::Operation *op;      // <-- The underlying Operation.
   size_t id; // <-- Unique id in the nodes vector to help with traversal.
 
-  DataflowGraphNode(T op, size_t id) : op(op), id(id) {}
+  DataflowGraphNode(mlir::Operation *op, size_t id) : op(op), id(id) {}
 };
 
-template <typename T>
 struct DataflowGraphEdge {
   size_t srcId;
   size_t dstId;
 
-  T channel;
+  mlir::Value channel;
   DataflowGraphEdgeType type;
 
   DataflowGraphEdge(
-      size_t srcId, size_t dstId, T channel,
+      size_t srcId, size_t dstId, mlir::Value channel,
       DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB)
       : srcId(srcId), dstId(dstId), channel(channel), type(type) {}
 };
@@ -57,7 +55,6 @@ struct DataflowGraphEdge {
 ///     - Reconvergent paths from acyclic graphs
 ///     - Synchronizing paths from Choice-Free-Circuits (CFCs)
 
-template <typename NodeType, typename EdgeType>
 struct DataflowSubgraphBase {
   virtual ~DataflowSubgraphBase() = default;
 
@@ -75,22 +72,22 @@ struct DataflowSubgraphBase {
 
   handshake::FuncOp funcOp;
 
-  std::vector<DataflowGraphNode<NodeType>> nodes;
-  std::vector<DataflowGraphEdge<EdgeType>> edges;
+  std::vector<DataflowGraphNode> nodes;
+  std::vector<DataflowGraphEdge> edges;
 
   /// NOTE: Uses node ID to index the nodes.
   std::vector<llvm::SmallVector<size_t, 4>> adjList;
   std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
 
-  size_t addNode(NodeType op) {
+  size_t addNode(mlir::Operation *op) {
     size_t id = nodes.size();
     nodes.emplace_back(op, id);
     adjList.emplace_back();
     revAdjList.emplace_back();
-    return id;
+    return nodes.size() - 1;
   }
 
-  void addEdge(size_t srcId, size_t dstId, EdgeType channel,
+  void addEdge(size_t srcId, size_t dstId, mlir::Value channel,
                DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB) {
     edges.emplace_back(srcId, dstId, channel, type);
     adjList[srcId].push_back(edges.size() - 1);
