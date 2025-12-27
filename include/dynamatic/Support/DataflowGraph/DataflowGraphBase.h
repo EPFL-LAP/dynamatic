@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWGRAPHBASE_H
-#define DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWGRAPHBASE_H
+#ifndef DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWSUBGRAPHBASE_H
+#define DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWSUBGRAPHBASE_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -58,9 +58,9 @@ struct DataflowGraphEdge {
 ///     - Synchronizing paths from Choice-Free-Circuits (CFCs)
 
 template <typename NodeType, typename EdgeType>
-class DataflowGraphBase {
+class DataflowSubgraphBase {
 public:
-  virtual ~DataflowGraphBase() = default;
+  virtual ~DataflowSubgraphBase() = default;
 
   /// Virtual Methods ///
 
@@ -116,4 +116,4 @@ protected:
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWGRAPHBASE_H
+#endif // DYNAMATIC_SUPPORT_DATAFLOWGRAPH_DATAFLOWSUBGRAPHBASE_H
