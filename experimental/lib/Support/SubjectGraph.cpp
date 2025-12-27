@@ -1126,7 +1126,7 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
             [&](auto) { subjectGraphs.push_back(new ArithSubjectGraph(op)); })
         .Case<handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
               handshake::MulFOp, handshake::SubFOp>([&](auto) {
-          subjectGraphs.push_back(new FloatingPointSubjectGraph(op));
+          subjectGraphs.push_back(new BlackBoxSubjectGraph(op));
         })
         .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
           subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
