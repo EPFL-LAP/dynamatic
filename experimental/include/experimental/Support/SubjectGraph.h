@@ -234,6 +234,7 @@ private:
   unsigned int dataWidth = 0;
   unsigned int addrType = 0;
   ChannelSignals addrInSignals;
+  ChannelSignals dataFromMemSignals;
   ChannelSignals addrOutSignals;
   ChannelSignals dataOutSignals;
 
@@ -249,6 +250,7 @@ private:
   unsigned int addrType = 0;
   ChannelSignals dataInSignals;
   ChannelSignals addrInSignals;
+  ChannelSignals dataToMemSignals;
   ChannelSignals addrOutSignals;
 
 public:
@@ -333,6 +335,21 @@ public:
   BranchSinkSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
+};
+
+class BlackBoxSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int numInputs = 0;
+  unsigned int numOutputs = 0;
+  std::vector<ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> outputNodes;
+  std::vector<unsigned int> skippingInputIndices;
+  std::vector<unsigned int> skippingOutputIndices;
+
+public:
+  BlackBoxSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
 class BufferSubjectGraph : public BaseSubjectGraph {
