@@ -419,7 +419,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 
     // Group nodes by step to create nested clusters
     std::map<unsigned, std::vector<size_t>> nodesByStep;
-    for (const auto &node : graph.getNodes()) {
+    for (const auto &node : graph.nodes) {
       nodesByStep[graph.getNodeStep(node.id)].push_back(node.id);
     }
 
@@ -441,7 +441,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
     }
 
     // Emit edges with different styles
-    for (const auto &edge : graph.getEdges()) {
+    for (const auto &edge : graph.edges) {
       std::string style =
           (edge.type == DataflowGraphEdgeType::INTRA_BB) ? "solid" : "dashed";
       std::string color =
@@ -525,8 +525,8 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
       // Emit edges within this path
       for (size_t srcId : path.nodeIds) {
-        for (size_t edgeId : graph->getAdjList()[srcId]) {
-          const auto &edge = graph->getEdges()[edgeId];
+        for (size_t edgeId : graph->adjList[srcId]) {
+          const auto &edge = graph->edges[edgeId];
           size_t dstId = edge.dstId;
           if (path.nodeIds.count(dstId)) {
             std::string srcUniqueId = uniquePrefix + graph->getNodeDotId(srcId);
