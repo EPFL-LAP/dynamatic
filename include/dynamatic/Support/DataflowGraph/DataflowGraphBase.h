@@ -78,6 +78,7 @@ struct DataflowSubgraphBase {
   std::vector<DataflowGraphNode<NodeType>> nodes;
   std::vector<DataflowGraphEdge<EdgeType>> edges;
 
+  /// NOTE: Uses node ID to index the nodes.
   std::vector<llvm::SmallVector<size_t, 4>> adjList;
   std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
 
