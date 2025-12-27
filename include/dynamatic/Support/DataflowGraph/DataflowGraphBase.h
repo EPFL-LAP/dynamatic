@@ -28,7 +28,7 @@ enum class DataflowGraphEdgeType {
 };
 
 struct DataflowGraphNode {
-  mlir::Operation *op;      // <-- The underlying Operation.
+  mlir::Operation *op; // <-- The underlying Operation.
   size_t id; // <-- Unique id in the nodes vector to help with traversal.
 
   DataflowGraphNode(mlir::Operation *op, size_t id) : op(op), id(id) {}
