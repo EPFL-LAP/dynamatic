@@ -58,8 +58,7 @@ struct DataflowGraphEdge {
 ///     - Synchronizing paths from Choice-Free-Circuits (CFCs)
 
 template <typename NodeType, typename EdgeType>
-class DataflowSubgraphBase {
-public:
+struct DataflowSubgraphBase {
   virtual ~DataflowSubgraphBase() = default;
 
   /// Virtual Methods ///
@@ -74,22 +73,6 @@ public:
 
   handshake::FuncOp getFuncOp() const { return funcOp; }
 
-  const std::vector<DataflowGraphNode<NodeType>> &getNodes() const {
-    return nodes;
-  }
-  const std::vector<DataflowGraphEdge<EdgeType>> &getEdges() const {
-    return edges;
-  }
-
-  const std::vector<llvm::SmallVector<size_t, 4>> &getAdjList() const {
-    return adjList;
-  }
-
-  const std::vector<llvm::SmallVector<size_t, 4>> &getRevAdjList() const {
-    return revAdjList;
-  }
-
-protected:
   handshake::FuncOp funcOp;
 
   std::vector<DataflowGraphNode<NodeType>> nodes;
