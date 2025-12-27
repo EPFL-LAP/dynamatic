@@ -17,6 +17,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DataflowGraph/DataflowGraphBase.h"
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include <fstream>
@@ -225,8 +226,10 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
     }
   }
 
-  llvm::errs() << "Found " << paths.size() << " reconvergent paths from "
-               << forks.size() << " forks and " << joins.size() << " joins.\n";
+  LLVM_DEBUG(
+    llvm::errs() << "Found " << paths.size() << " reconvergent paths from "
+                 << forks.size() << " forks and " << joins.size() << " joins.\n";
+  );
 
   return paths;
 }
@@ -311,8 +314,10 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
 
   file << "}\n";
   file.close();
-  llvm::errs() << "Dumped " << paths.size() << " reconvergent paths to "
-               << fullPath << "\n";
+  LLVM_DEBUG(
+    llvm::errs() << "Dumped " << paths.size() << " reconvergent paths to "
+                 << fullPath << "\n";
+  );
 }
 
 void ReconvergentPathFinderGraph::dumpTransitionGraph(
@@ -378,7 +383,9 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
 
   file << "}\n";
   file.close();
-  llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";
+  LLVM_DEBUG(
+    llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";
+  );
 }
 
 void ReconvergentPathFinderGraph::dumpAllGraphs(
@@ -457,8 +464,10 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 
   file << "}\n";
   file.close();
-  llvm::errs() << "Dumped " << graphs.size() << " dataflow graphs to "
-               << fullPath << "\n";
+  LLVM_DEBUG(
+    llvm::errs() << "Dumped " << graphs.size() << " dataflow graphs to "
+                 << fullPath << "\n";
+  );
 }
 
 void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
@@ -550,8 +559,10 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
-  llvm::errs() << "Dumped " << totalPaths << " reconvergent paths from "
-               << graphPaths.size() << " graphs to " << fullPath << "\n";
+  LLVM_DEBUG(
+    llvm::errs() << "Dumped " << totalPaths << " reconvergent paths from "
+                 << graphPaths.size() << " graphs to " << fullPath << "\n";
+  );
 }
 
 } // namespace dynamatic
