@@ -55,9 +55,9 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
   unsigned numTransitions = sequenceLength - 1;
 
   // Maps BB -> list of transitions starting from that BB.
-  std::map<unsigned, std::vector<const ArchBB *>> transitionsFrom;
+  std::map<unsigned, std::vector<const ArchBB *>> adjList;
   for (const auto &t : transitions) {
-    transitionsFrom[t.srcBB].push_back(&t);
+    adjList[t.srcBB].push_back(&t);
   }
 
   std::vector<std::vector<ArchBB>> result;
@@ -71,8 +71,8 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
         }
 
         unsigned lastDstBB = current.back().dstBB;
-        auto it = transitionsFrom.find(lastDstBB);
-        if (it == transitionsFrom.end())
+        auto it = adjList.find(lastDstBB);
+        if (!adjList.count(lastDstBB))
           return;
 
         for (const auto *next : it->second) {
