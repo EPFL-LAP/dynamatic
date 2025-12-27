@@ -9,6 +9,7 @@ add_dynamatic_library(DynamaticSupport
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
+  DynamaticSupportDataflowGraph
   DynamaticSupportJSON
   DynamaticHandshake
   DynamaticHW
@@ -21,3 +22,4 @@ add_subdirectory(Espresso)
 add_subdirectory(JSON)
 add_subdirectory(RTL)
 add_subdirectory(Utils)
+add_subdirectory(DataflowGraph)
