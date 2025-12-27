@@ -226,10 +226,9 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
     }
   }
 
-  LLVM_DEBUG(
-    llvm::errs() << "Found " << paths.size() << " reconvergent paths from "
-                 << forks.size() << " forks and " << joins.size() << " joins.\n";
-  );
+  LLVM_DEBUG(llvm::errs() << "Found " << paths.size()
+                          << " reconvergent paths from " << forks.size()
+                          << " forks and " << joins.size() << " joins.\n";);
 
   return paths;
 }
@@ -314,10 +313,8 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(
-    llvm::errs() << "Dumped " << paths.size() << " reconvergent paths to "
-                 << fullPath << "\n";
-  );
+  LLVM_DEBUG(llvm::errs() << "Dumped " << paths.size()
+                          << " reconvergent paths to " << fullPath << "\n";);
 }
 
 void ReconvergentPathFinderGraph::dumpTransitionGraph(
@@ -346,8 +343,7 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
   file << "  compound=true;\n\n";
 
   // Group nodes by step to create clusters
-  std::map<unsigned, std::vector<const DataflowGraphNode *>>
-      nodesByStep;
+  std::map<unsigned, std::vector<const DataflowGraphNode *>> nodesByStep;
   for (const auto &node : nodes) {
     nodesByStep[getNodeStep(node.id)].push_back(&node);
   }
@@ -383,9 +379,7 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(
-    llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";
-  );
+  LLVM_DEBUG(llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";);
 }
 
 void ReconvergentPathFinderGraph::dumpAllGraphs(
@@ -464,10 +458,8 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(
-    llvm::errs() << "Dumped " << graphs.size() << " dataflow graphs to "
-                 << fullPath << "\n";
-  );
+  LLVM_DEBUG(llvm::errs() << "Dumped " << graphs.size()
+                          << " dataflow graphs to " << fullPath << "\n";);
 }
 
 void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
@@ -559,10 +551,9 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(
-    llvm::errs() << "Dumped " << totalPaths << " reconvergent paths from "
-                 << graphPaths.size() << " graphs to " << fullPath << "\n";
-  );
+  LLVM_DEBUG(llvm::errs() << "Dumped " << totalPaths
+                          << " reconvergent paths from " << graphPaths.size()
+                          << " graphs to " << fullPath << "\n";);
 }
 
 } // namespace dynamatic
