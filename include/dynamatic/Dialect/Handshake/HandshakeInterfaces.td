@@ -34,6 +34,8 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
      Some handshake operations can have predecessors in other
      blocks. This is primarily useful for verification purposes during
      lowering from other dialect, such as the standard CDFG dialect.
+     Implementations can be found in:
+     lib/Dialect/Handshake/HandshakeInterfaces.cpp
   }];
 
   let methods = [
