@@ -363,29 +363,20 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
-
 //===----------------------------------------------------------------------===//
 // EagerForkLikeOpInterface
 //===----------------------------------------------------------------------===//
 
-int ForkOp::getNumEagerOutputs() {
-  return getNumResults();
-}
+int ForkOp::getNumEagerOutputs() { return getNumResults(); }
 
-int ControlMergeOp::getNumEagerOutputs() {
-  return 2;
-}
+int ControlMergeOp::getNumEagerOutputs() { return 2; }
 
 //===----------------------------------------------------------------------===//
 // BufferLikeOpInterface
 //===----------------------------------------------------------------------===//
 
-int ControlMergeOp::getNumSlots() {
-  return 1;
-}
+int ControlMergeOp::getNumSlots() { return 1; }
 
-int LoadOp::getNumSlots() {
-  return 2;
-}
+int LoadOp::getNumSlots() { return 2; }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"
