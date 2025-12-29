@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include <memory>
 #include <optional>
 
@@ -160,16 +160,18 @@ public:
 
   llvm::json::Value extraInfoToJSON() const override;
 
-  static std::unique_ptr<Invariant1>
-  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  static std::unique_ptr<Invariant1> fromJSON(const llvm::json::Value &value,
+                                              llvm::json::Path path);
 
   Invariant1() = default;
-  Invariant1(unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &op);
+  Invariant1(unsigned long id, TAG tag,
+             handshake::EagerForkLikeOpInterface &op);
   ~Invariant1() = default;
 
   static bool classof(const FormalProperty *fp) {
-     return fp->getType() == TYPE::INV1;
+    return fp->getType() == TYPE::INV1;
   }
+
 private:
   std::string ownerOp;
   unsigned numEagerForkOutputs;

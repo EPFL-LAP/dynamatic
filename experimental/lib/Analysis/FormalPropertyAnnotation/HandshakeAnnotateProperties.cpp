@@ -139,17 +139,17 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateInvariant1(ModuleOp modOp) {
-   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-      for (Operation &op : funcOp.getOps()) {
-         if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-            Invariant1 p(uid, FormalProperty::TAG::INVAR, forkOp);
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        Invariant1 p(uid, FormalProperty::TAG::INVAR, forkOp);
 
-            propertyTable.push_back(p.toJSON());
-            uid++;
-         }
+        propertyTable.push_back(p.toJSON());
+        uid++;
       }
-   }
-   return success();
+    }
+  }
+  return success();
 }
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
