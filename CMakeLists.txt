@@ -207,6 +207,19 @@ link_directories(dynamatic-opt PRIVATE
 )
 
 #-------------------------------------------------------------------------------
+# Python (Virtual Environment)
+#-------------------------------------------------------------------------------
+
+find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
+
+set(VENV_DIR "${CMAKE_BINARY_DIR}/python3-venv")
+
+add_custom_target(python-venv ALL
+    COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR}
+    COMMENT "Creating Python virtual environment (Python ${Python3_VERSION})"
+)
+
+#-------------------------------------------------------------------------------
 # XLS Integration (experimental)
 #-------------------------------------------------------------------------------
 
@@ -285,3 +298,4 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
+

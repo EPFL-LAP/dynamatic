@@ -16,6 +16,9 @@ HDL=$4
 HDL_DIR="$OUTPUT_DIR/hdl"
 COMP_DIR="$OUTPUT_DIR/comp"
 
+# We need python (version>=3.12) for the RTL codegen (this environment is installed via CMake).
+source "$DYNAMATIC_DIR/build/python3-venv/bin/activate"
+
 # ============================================================================ #
 # HDL writing flow
 # ============================================================================ #
