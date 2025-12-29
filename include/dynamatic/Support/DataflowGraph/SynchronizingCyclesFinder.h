@@ -27,8 +27,8 @@
 #include "dynamatic/Support/DataflowGraph/DataflowGraphBase.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/ADT/StringRef.h"
 
-#include <set>
 #include <vector>
 
 #include <boost/graph/adjacency_list.hpp>
@@ -45,14 +45,25 @@ struct SimpleCycle {
   bool isDisjointFrom(const SimpleCycle &other) const;
 };
 
+struct PathToJoin {
+  size_t joinId;
+
+  std::vector<size_t> pathFromCycleOne;
+  std::vector<size_t> pathFromCycleTwo;
+
+  PathToJoin(size_t join) : joinId(join) {}
+};
+
 struct SynchronizingCyclePair {
   const SimpleCycle cycleOne;
   const SimpleCycle cycleTwo;
 
-  std::set<size_t> commonJoins; 
+  std::vector<PathToJoin> pathsToJoins;
 
-  SynchronizingCyclePair(SimpleCycle one, SimpleCycle two, std::set<size_t> commonJoins)
-      : cycleOne(std::move(one)), cycleTwo(std::move(two)), commonJoins(std::move(commonJoins)) {}
+  SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
+                         std::vector<PathToJoin> paths)
+      : cycleOne(std::move(one)), cycleTwo(std::move(two)),
+        pathsToJoins(std::move(paths)) {}
 };
 
 class SynchronizingCyclesFinderGraph
@@ -65,23 +76,41 @@ public:
   std::vector<SimpleCycle> findAllCycles() const;
 
   /// Find all pairs of synchronizing cylces.
-  std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs() const;
+  std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
   bool isForkNode(size_t nodeId) const override;
   bool isJoinNode(size_t nodeId) const override;
 
   std::string getNodeLabel(size_t nodeId) const override;
   std::string getNodeDotId(size_t nodeId) const override;
+
+  /// Dump a single synchronizing cycle pair to a GraphViz file.
+  void dumpSynchronizingCyclePair(const SynchronizingCyclePair &pair,
+                                  llvm::StringRef filename) const;
+
+  /// Dump all synchronizing cycle pairs to a single GraphViz file.
+  void dumpAllSynchronizingCyclePairs(
+      const std::vector<SynchronizingCyclePair> &pairs,
+      llvm::StringRef filename) const;
+
 private:
   std::map<mlir::Operation *, size_t> opToNodeId;
 
+  /// SCC ID for each node.
+  std::vector<size_t> nodeSccId;
+
+  /// Adjacency list for the non-cyclic subgraph.
+  std::vector<std::vector<size_t>> nonCyclicAdjList;
+
   size_t getOrAddNode(mlir::Operation *op);
 
-  /// BFS to find all nodes reachable from a set of starting nodes.
-  std::set<size_t> getReachableNodes(const std::set<size_t> &startNodes) const;
+  void computeSccsAndBuildNonCyclicSubgraph();
 
-  /// Find join nodes reachable from a cycle (excluding cycle edges).
-  std::set<size_t> findReachableJoins(const SimpleCycle &cycle) const;
+  /// Find path from a cycle to a join using BFS on non-cyclic subgraph.
+  std::vector<size_t> findPathToJoin(const SimpleCycle &cycle, size_t joinId) const;
+
+  /// Get all join node IDs in the graph.
+  std::vector<size_t> getAllJoins() const;
 };
 
 struct CycleCollector {

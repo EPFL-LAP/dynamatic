@@ -208,6 +208,7 @@ void FPGA24Buffers::setup() {
 
   // --- Synchronizing Cycles Analysis ---
 
+  size_t cfdfcIdx = 0;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs) {
 
     SynchronizingCyclesFinderGraph graph;
@@ -216,14 +217,22 @@ void FPGA24Buffers::setup() {
     auto pairs = graph.findSynchronizingCyclePairs();
     
     llvm::errs() << "Found " << pairs.size() 
-                 << " synchronizing cycle pairs in CFDFC\n";
+                 << " synchronizing cycle pairs in CFDFC " << cfdfcIdx << "\n";
     
     for (const auto &pair : pairs) {
-      llvm::errs() << " Pair: cycle with " << pair.cycleOne.nodes.size()
+      llvm::errs() << "  Pair: cycle with " << pair.cycleOne.nodes.size()
                    << " nodes <-> cycle with " << pair.cycleTwo.nodes.size()
-                   << " nodes, " << pair.commonJoins.size() 
+                   << " nodes, " << pair.pathsToJoins.size() 
                    << " common joins\n";
     }
+
+    // Dump to GraphViz for visualization
+    if (!pairs.empty()) {
+      std::string filename = "synchronizing_cycle_pairs_cfdfc" + 
+                             std::to_string(cfdfcIdx) + ".dot";
+      graph.dumpAllSynchronizingCyclePairs(pairs, filename);
+    }
+    ++cfdfcIdx;
   }
 
   // --- End Synchronizing Cycles Analysis ---
