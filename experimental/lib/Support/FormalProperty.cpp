@@ -27,6 +27,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::AOB;
   if (s == "VEQ")
     return FormalProperty::TYPE::VEQ;
+  if (s == "INV1")
+    return FormalProperty::TYPE::INV1;
 
   return std::nullopt;
 }
@@ -37,6 +39,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "AOB";
   case TYPE::VEQ:
     return "VEQ";
+  case TYPE::INV1:
+    return "INV1";
   }
 }
 
@@ -89,6 +93,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return AbsenceOfBackpressure::fromJSON(value, path.field(INFO_LIT));
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::INV1:
+    return Invariant1::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -221,6 +227,34 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
       !mapper.map(TARGET_INDEX_LIT, prop->targetChannel.channelIndex) ||
       !mapper.map(OWNER_CHANNEL_LIT, prop->ownerChannel.channelName) ||
       !mapper.map(TARGET_CHANNEL_LIT, prop->targetChannel.channelName))
+    return nullptr;
+
+  return prop;
+}
+
+// Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
+
+Invariant1::Invariant1(unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
+    : FormalProperty(id, tag, TYPE::INV1) {
+  ownerOp = getUniqueName(forkOp).str();
+  numEagerForkOutputs = forkOp.getNumEagerOutputs();
+}
+
+llvm::json::Value Invariant1::extraInfoToJSON() const {
+  return llvm::json::Object({{OWNER_OP_LIT, ownerOp},
+                             {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs}});
+}
+
+std::unique_ptr<Invariant1>
+Invariant1::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<Invariant1>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerOp) ||
+      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs))
     return nullptr;
 
   return prop;

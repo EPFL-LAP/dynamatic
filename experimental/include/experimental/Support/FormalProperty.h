@@ -14,6 +14,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include <memory>
 #include <optional>
 
@@ -25,7 +26,8 @@ public:
   enum class TAG { OPT, INVAR, ERROR };
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
-    VEQ /* Valid EQuivalence */
+    VEQ /* Valid EQuivalence */,
+    INV1 /* Invariant 1 */,
   };
 
   TAG getTag() const { return tag; }
@@ -149,6 +151,30 @@ private:
   inline static const StringLiteral TARGET_CHANNEL_LIT = "target_channel";
   inline static const StringLiteral OWNER_INDEX_LIT = "owner_index";
   inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
+};
+
+class Invariant1 : public FormalProperty {
+public:
+  std::string getOwner() { return ownerOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<Invariant1>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  Invariant1() = default;
+  Invariant1(unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &op);
+  ~Invariant1() = default;
+
+  static bool classof(const FormalProperty *fp) {
+     return fp->getType() == TYPE::INV1;
+  }
+private:
+  std::string ownerOp;
+  unsigned numEagerForkOutputs;
+  inline static const StringLiteral OWNER_OP_LIT = "owner_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
 };
 
 class FormalPropertyTable {

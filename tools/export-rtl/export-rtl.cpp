@@ -1254,6 +1254,20 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
+    } else if (auto *p = llvm::dyn_cast<Invariant1>(property.get())) {
+      unsigned numOut = p->getNumEagerForkOutputs();
+      std::string opName = p->getOwner();
+      std::string propString = "count( ";
+      for (unsigned i = 0; i < numOut; ++i) {
+        if (i > 0) {
+          propString += ", ";
+        }
+        std::string outName = opName + "." + "sent_" + std::to_string(i);
+        propString += outName;
+      }
+      propString += " ) < " + std::to_string(numOut);
+      data.properties[p->getId()] = {propString,
+                                     propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
@@ -1374,6 +1388,10 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)
       os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+    else if (tag == FormalProperty::TAG::INVAR) {
+      os << "-- " << id << "\n";
+      os << "INVAR " << property << ";\n";
+    }
   });
 
   return success();
