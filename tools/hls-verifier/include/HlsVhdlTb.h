@@ -36,13 +36,24 @@ begin
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
-  assert false
-  report "Simulation done! Latency = " & integer'image((now - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)) & " cycles"
-  severity note;
+  -- NOTE (@Jiahui17): The report latency logic was here;
+  -- this measurement was inaccurate (somehow we wasted 3 cycles for no reason).
+  -- This logic is moved to `gen_sim_latency_proc` (see below).
   assert false
   report "NORMAL EXIT (note: failure is to force the simulator to stop)"
   severity failure;
   wait;
+end process;
+
+gen_sim_latency_proc : process(tb_clk)
+begin
+  if (rising_edge(tb_clk)) then
+    if (tb_global_valid = '1') and (tb_global_ready = '1') then
+      assert false
+      report "Simulation done! Latency = " & integer'image((now - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)) & " cycles"
+      severity note;
+    end if;
+  end if;
 end process;
 
 gen_clock_proc : process
