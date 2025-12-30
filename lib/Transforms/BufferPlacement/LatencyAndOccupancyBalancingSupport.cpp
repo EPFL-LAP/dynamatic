@@ -6,16 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A class that enumerates reconvergent paths in a dataflow graph
-// from a transition sequence of length n. Implementation is basef on:
+// Implementation for latency and occupancy balancing support.
+// Implementation is based on the following paper:
 // [Xu, Josipović, FPGA'24 (https://dl.acm.org/doi/10.1145/3626202.36375)]
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/DataflowGraph/ReconvergentPathFinder.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DataflowGraph/DataflowGraphBase.h"
+#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -25,11 +24,15 @@
 
 namespace dynamatic {
 
+///=== RECONVERGENT PATH FINDER ===///
+
 bool ReconvergentPathFinderGraph::isForkNode(size_t nodeId) const {
   return isa<handshake::ForkOp>(nodes[nodeId].op) ||
          isa<handshake::LazyForkOp>(nodes[nodeId].op);
 }
 
+// Those two nodes are the only nodes with two inputs that allow for both inputs to be active at the same time.
+// Unlike: ControlMergeOp and MergeOp.
 bool ReconvergentPathFinderGraph::isJoinNode(size_t nodeId) const {
   return isa<handshake::MuxOp>(nodes[nodeId].op) ||
          isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
@@ -232,6 +235,8 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
 
   return paths;
 }
+
+// [START AI-generated code]
 
 void ReconvergentPathFinderGraph::dumpReconvergentPaths(
     const std::vector<ReconvergentPath> &paths,
@@ -491,7 +496,6 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
 
-  size_t totalPaths = 0;
   for (const auto &[graphIdx, graphAndPaths] : graphPaths) {
     const ReconvergentPathFinderGraph *graph = graphAndPaths.first;
     const std::vector<ReconvergentPath> &paths = graphAndPaths.second;
@@ -545,7 +549,6 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
       }
 
       file << "  }\n\n";
-      totalPaths++;
     }
   }
 
@@ -555,5 +558,7 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
                           << " reconvergent paths from " << graphPaths.size()
                           << " graphs to " << fullPath << "\n";);
 }
+
+// [END AI-generated code]
 
 } // namespace dynamatic

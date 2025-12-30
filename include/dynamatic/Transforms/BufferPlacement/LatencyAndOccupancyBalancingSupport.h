@@ -4,23 +4,104 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-//===----------------------------------------------------------------------===//
+//===-----------------------------------------------------------------------------===//
 //
-// A class for finding reconvergent paths in a dataflow graph.
+// Graph-based enumeration tools to latency and occupancy balance dataflow circuits.
 //
-//===----------------------------------------------------------------------===//
+//===-----------------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_DATAFLOWGRAPH_RECONVERGENTPATHFINDER_H
-#define DYNAMATIC_SUPPORT_DATAFLOWGRAPH_RECONVERGENTPATHFINDER_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
 
-#include "dynamatic/Support/DataflowGraph/DataflowGraphBase.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
 #include <set>
 
 using namespace dynamatic::experimental;
 
+#include <cstddef>
+
 namespace dynamatic {
+
+///=== DATAFLOWSUBGRAPHBASE ===///
+
+/// NOTE: No current implementation differentiates between intra-BB and inter-BB
+/// edges. Right now, it's quite useful for visualizing the graph in GraphViz.
+enum class DataflowGraphEdgeType {
+  INTRA_BB, // <-- Edge within the same basic block.
+  INTER_BB, // <-- Edge between different basic blocks.
+};
+
+struct DataflowGraphNode {
+  mlir::Operation *op; // <-- The underlying Operation.
+  size_t id; // <-- Unique id in the nodes vector to help with traversal.
+
+  DataflowGraphNode(mlir::Operation *op, size_t id) : op(op), id(id) {}
+};
+
+struct DataflowGraphEdge {
+  size_t srcId;
+  size_t dstId;
+
+  mlir::Value channel;
+  DataflowGraphEdgeType type;
+
+  DataflowGraphEdge(
+      size_t srcId, size_t dstId, mlir::Value channel,
+      DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB)
+      : srcId(srcId), dstId(dstId), channel(channel), type(type) {}
+};
+
+/// Abstract base class for dataflow graphs used in circuit analysis &
+/// optimization. It does the heavy lifting of managing the graph structure and
+/// traversal. Inheriting classes need to implement type-specific methods to
+/// determine what constitutes a fork and join. They then can add custom logic
+/// to enumerate:
+///     - Reconvergent paths from acyclic graphs
+///     - Synchronizing paths from Choice-Free-Circuits (CFCs)
+
+struct DataflowSubgraphBase {
+  virtual ~DataflowSubgraphBase() = default;
+
+  /// Virtual Methods ///
+
+  virtual bool isForkNode(size_t nodeId) const = 0;
+  virtual bool isJoinNode(size_t nodeId) const = 0;
+
+  virtual std::string getNodeLabel(size_t nodeId) const = 0;
+  virtual std::string getNodeDotId(size_t nodeId) const = 0;
+
+  /// Getters ///
+
+  handshake::FuncOp getFuncOp() const { return funcOp; }
+
+  handshake::FuncOp funcOp;
+
+  std::vector<DataflowGraphNode> nodes;
+  std::vector<DataflowGraphEdge> edges;
+
+  /// NOTE: Uses node ID to index the nodes.
+  std::vector<llvm::SmallVector<size_t, 4>> adjList;
+  std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
+
+  size_t addNode(mlir::Operation *op) {
+    size_t id = nodes.size();
+    nodes.emplace_back(op, id);
+    adjList.emplace_back();
+    revAdjList.emplace_back();
+    return nodes.size() - 1;
+  }
+
+  void addEdge(size_t srcId, size_t dstId, mlir::Value channel,
+               DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB) {
+    edges.emplace_back(srcId, dstId, channel, type);
+    adjList[srcId].push_back(edges.size() - 1);
+    revAdjList[dstId].push_back(edges.size() - 1);
+  }
+};
+
+///=== DATAFLOWSUBGRAPHBASE ===///
 
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
@@ -70,16 +151,17 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
           return;
         }
 
-        unsigned lastDstBB = current.back().dstBB;
-        auto it = adjList.find(lastDstBB);
-        if (!adjList.count(lastDstBB))
+        unsigned currentBB = current.back().dstBB;
+        auto nextTransitionsIt = adjList.find(currentBB);
+        if (nextTransitionsIt == adjList.end())
           return;
 
-        for (const auto *next : it->second) {
-          current.push_back(*next);
+        for (const auto *nextTransition : nextTransitionsIt->second) {
+          current.push_back(*nextTransition);
           dfs(current);
           current.pop_back();
         }
+
       };
 
   // Start from each transition
@@ -166,4 +248,4 @@ private:
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_DATAFLOWGRAPH_RECONVERGENTPATHFINDER_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
