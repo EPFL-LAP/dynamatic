@@ -85,6 +85,40 @@ For each LLVM function, Dynamatic performs the following translation:
 > [!NOTE]
 > The syntax of the GEP instruction in LLVM is often simplified/shortened. This requires a sophisticated conversion rule for GEP. Check out the LLVM documentation on [caveats of GEP syntax](https://llvm.org/docs/GetElementPtr.html) for more details.
 
-## Memory Dependency Analysis
+## Memory Dependency Analysis (LLVM IR)
+
+Source: `lib/Transforms/LLVMIR/MemDepAnalysis.cpp`
 
 TODO
+
+## Array Paritioning Pass (LLVM IR)
+
+Source: `lib/Transforms/LLVMIR/ArrayPartition.cpp`
+
+This pass groups memory accesses that have overlapping, and create smaller
+memory banks if the index calculation are simple increment functions (start,
+step, elems).
+
+Usage:
+
+```
+# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
+$LLVM_BINS/opt -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
+  -polly-process-unprofitable \
+  -passes="array-partition" \
+  -debug -debug-only="array-partition" \
+  "$F_CLANG_OPTIMIZED_DEPENDENCY" \
+  > "$F_CLANG_OPTIMIZED_DEPENDENCY_PARTITIONED"
+
+$LLVM_BINS/opt -S \
+  -passes="instcombine" \
+  "$F_CLANG_OPTIMIZED_DEPENDENCY_PARTITIONED" \
+  > "$F_CLANG_EXPORT"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_EXPORT" ...
+```
+
+This pass assumes that previous calls to instcombine will combine a chain of
+GEPs (no longer true in the newest LLVM version).
