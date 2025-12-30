@@ -1254,7 +1254,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
-    } else if (auto *p = llvm::dyn_cast<Invariant1>(property.get())) {
+    } else if (auto *p =
+                   llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
       unsigned numOut = p->getNumEagerForkOutputs();
       std::string opName = p->getOwner();
       std::string propString = "count( ";

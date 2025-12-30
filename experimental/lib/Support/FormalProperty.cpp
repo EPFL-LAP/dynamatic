@@ -94,7 +94,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::INV1:
-    return Invariant1::fromJSON(value, path.field(INFO_LIT));
+    return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -234,21 +234,22 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 
 // Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
 
-Invariant1::Invariant1(unsigned long id, TAG tag,
-                       handshake::EagerForkLikeOpInterface &forkOp)
+EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
+    unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::INV1) {
   ownerOp = getUniqueName(forkOp).str();
   numEagerForkOutputs = forkOp.getNumEagerOutputs();
 }
 
-llvm::json::Value Invariant1::extraInfoToJSON() const {
+llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   return llvm::json::Object(
       {{OWNER_OP_LIT, ownerOp}, {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs}});
 }
 
-std::unique_ptr<Invariant1> Invariant1::fromJSON(const llvm::json::Value &value,
-                                                 llvm::json::Path path) {
-  auto prop = std::make_unique<Invariant1>();
+std::unique_ptr<EagerForkNotAllOutputSent>
+EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
+                                    llvm::json::Path path) {
+  auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);

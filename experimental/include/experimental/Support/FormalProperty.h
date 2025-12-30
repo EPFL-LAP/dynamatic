@@ -27,7 +27,7 @@ public:
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
-    INV1 /* Invariant 1 */,
+    INV1 /* Eager Fork Not All Output sent */,
   };
 
   TAG getTag() const { return tag; }
@@ -153,20 +153,21 @@ private:
   inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
 };
 
-class Invariant1 : public FormalProperty {
+// Invariant 1 of https://ieeexplore.ieee.org/document/10323796
+class EagerForkNotAllOutputSent : public FormalProperty {
 public:
   std::string getOwner() { return ownerOp; }
   unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
-  static std::unique_ptr<Invariant1> fromJSON(const llvm::json::Value &value,
-                                              llvm::json::Path path);
+  static std::unique_ptr<EagerForkNotAllOutputSent>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
-  Invariant1() = default;
-  Invariant1(unsigned long id, TAG tag,
-             handshake::EagerForkLikeOpInterface &op);
-  ~Invariant1() = default;
+  EagerForkNotAllOutputSent() = default;
+  EagerForkNotAllOutputSent(unsigned long id, TAG tag,
+                            handshake::EagerForkLikeOpInterface &op);
+  ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
     return fp->getType() == TYPE::INV1;
