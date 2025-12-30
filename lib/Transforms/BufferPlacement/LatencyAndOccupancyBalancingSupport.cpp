@@ -12,9 +12,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -31,8 +31,8 @@ bool ReconvergentPathFinderGraph::isForkNode(size_t nodeId) const {
          isa<handshake::LazyForkOp>(nodes[nodeId].op);
 }
 
-// Those two nodes are the only nodes with two inputs that allow for both inputs to be active at the same time.
-// Unlike: ControlMergeOp and MergeOp.
+// Those two nodes are the only nodes with two inputs that allow for both inputs
+// to be active at the same time. Unlike: ControlMergeOp and MergeOp.
 bool ReconvergentPathFinderGraph::isJoinNode(size_t nodeId) const {
   return isa<handshake::MuxOp>(nodes[nodeId].op) ||
          isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
