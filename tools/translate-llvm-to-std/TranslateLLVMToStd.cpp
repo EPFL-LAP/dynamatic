@@ -211,7 +211,7 @@ void TranslateLLVMToStd::translateGlobalVars() {
 
     auto *globalVar = dyn_cast<llvm::GlobalVariable>(&constant);
 
-    if (!globalVar)
+    if (!globalVar || /* e.g., stderr */ globalVar->isDeclaration())
       continue;
 
     auto *baseElemType = globalVar->getValueType();
@@ -220,6 +220,7 @@ void TranslateLLVMToStd::translateGlobalVars() {
       numElements *= baseElemType->getArrayNumElements();
       baseElemType = baseElemType->getArrayElementType();
     }
+
     auto baseMLIRElemType = getMLIRType(baseElemType, ctx);
     auto memrefType =
         MemRefType::get(/* shape = */ {numElements}, baseMLIRElemType);
@@ -308,7 +309,15 @@ TranslateLLVMToStd::getBranchOperandsForCFGEdge(BasicBlock *currBB,
   SmallVector<mlir::Value> operands;
   for (PHINode &phi : nextBB->phis()) {
     mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
-    operands.push_back(argument);
+
+    if (argument)
+      operands.push_back(argument);
+    else {
+      // The value is an undef (usually they can be canonicalized away)
+      mlir::Value undefarg = builder.create<LLVM::UndefOp>(
+          UnknownLoc::get(ctx), valueMap[&phi].getType());
+      operands.push_back(undefarg);
+    }
   }
   return operands;
 }
@@ -680,11 +689,14 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
     assert(nextLLVMBB &&
            "The unconditional branch doesn't have a BB as operand!");
+
+    auto branchOprds = getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB);
+
     builder.create<cf::BranchOp>(
         // clang-format off
         loc,
         blockMap[nextLLVMBB],
-        getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB)
+        branchOprds
         // clang-format on
     );
   } else {
@@ -971,6 +983,11 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::smin) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MinSIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fabs) {
     mlir::Value arg = valueMap[callInst->getArgOperand(0)];
     auto retType = getMLIRType(callInst->getType(), ctx);
@@ -981,7 +998,6 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
              calledFunc->getIntrinsicID() == Intrinsic::fshr) {
     this->translateFunnelShiftIntrinsic(callInst);
   } else {
-    LLVM_DEBUG(llvm::errs() << "Unhandled intrinsic:";);
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
   }

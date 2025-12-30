@@ -526,6 +526,22 @@ LogicalResult StdExecuter::execute(mlir::arith::MaxUIOp, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::MinSIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.sle(in1) ? in0 : in1;
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::MinUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  APInt in0 = any_cast<APInt>(in[0]);
+  APInt in1 = any_cast<APInt>(in[1]);
+  out[0] = in0.ule(in1) ? in0 : in1;
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::memref::LoadOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -766,6 +782,8 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                 arith::XOrIOp,
                 arith::MaxUIOp,
                 arith::MaxSIOp,
+                arith::MinUIOp,
+                arith::MinSIOp,
                 math::SqrtOp,
                 math::CosOp,
                 math::ExpOp,

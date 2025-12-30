@@ -299,6 +299,14 @@ def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
   let summary = "Outputs the maximum between two input unsigned integers";
 }
 
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+  let summary = "Outputs the minimum between two input signed integers";
+}
+
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+  let summary = "Outputs the minimum between two input unsigned integers";
+}
+
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
