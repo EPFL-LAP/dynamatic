@@ -66,6 +66,9 @@ private:
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
   LogicalResult annotateEagerForkNotAllOutputSent(ModuleOp modOp);
+  LogicalResult annotateCopiedSlots(handshake::EagerForkLikeOpInterface &forkOp,
+                                    Operation &op);
+  LogicalResult annotateInvariant2(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -153,6 +156,35 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
   return success();
 }
 
+LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
+    handshake::EagerForkLikeOpInterface &originFork, Operation &curOp) {
+  if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
+    Invariant2 p(uid, FormalProperty::TAG::INVAR, bufferOp, originFork);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+  }
+
+  if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
+    // TODO: Which of the previous paths should be followed?
+    return failure();
+  }
+
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateInvariant2(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        if (failed(annotateCopiedSlots(forkOp, op)))
+          return failure();
+      }
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -162,6 +194,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     return signalPassFailure();
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
+      return signalPassFailure();
+    if (failed(annotateInvariant2(modOp)))
       return signalPassFailure();
   }
 

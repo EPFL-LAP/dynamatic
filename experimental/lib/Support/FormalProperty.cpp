@@ -29,6 +29,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::VEQ;
   if (s == "EFNAO")
     return FormalProperty::TYPE::EFNAO;
+  if (s == "INV2")
+    return FormalProperty::TYPE::INV2;
 
   return std::nullopt;
 }
@@ -41,6 +43,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "VEQ";
   case TYPE::EFNAO:
     return "EFNAO";
+  case TYPE::INV2:
+    return "INV2";
   }
 }
 
@@ -95,6 +99,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EFNAO:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::INV2:
+    return Invariant2::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -256,6 +262,41 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 
   if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerOp) ||
       !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs))
+    return nullptr;
+
+  return prop;
+}
+
+// Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
+
+Invariant2::Invariant2(unsigned long id, TAG tag,
+                       handshake::BufferLikeOpInterface &bufferOpI,
+                       handshake::EagerForkLikeOpInterface &forkOpI)
+    : FormalProperty(id, tag, TYPE::INV2) {
+  forkOp = getUniqueName(forkOpI).str();
+  numEagerForkOutputs = forkOpI.getNumEagerOutputs();
+  bufferOp = getUniqueName(bufferOpI).str();
+  bufferSlot = bufferOpI.getNumSlots() - 1;
+}
+
+llvm::json::Value Invariant2::extraInfoToJSON() const {
+  return llvm::json::Object({{FORK_OP_LIT, forkOp},
+                             {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs},
+                             {BUFFER_OP_LIT, bufferOp},
+                             {BUFFER_SLOT_LIT, bufferSlot}});
+}
+
+std::unique_ptr<Invariant2> Invariant2::fromJSON(const llvm::json::Value &value,
+                                                 llvm::json::Path path) {
+  auto prop = std::make_unique<Invariant2>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(FORK_OP_LIT, prop->forkOp) ||
+      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
+      !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
+      !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
     return nullptr;
 
   return prop;
