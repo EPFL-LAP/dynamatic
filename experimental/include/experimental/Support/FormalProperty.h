@@ -27,7 +27,7 @@ public:
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
-    INV1 /* Eager Fork Not All Output sent */,
+    EFNAO /* Eager Fork Not All Output sent */,
   };
 
   TAG getTag() const { return tag; }
@@ -170,7 +170,7 @@ public:
   ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::INV1;
+    return fp->getType() == TYPE::EFNAO;
   }
 
 private:

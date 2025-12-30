@@ -27,8 +27,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::AOB;
   if (s == "VEQ")
     return FormalProperty::TYPE::VEQ;
-  if (s == "INV1")
-    return FormalProperty::TYPE::INV1;
+  if (s == "EFNAO")
+    return FormalProperty::TYPE::EFNAO;
 
   return std::nullopt;
 }
@@ -39,8 +39,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "AOB";
   case TYPE::VEQ:
     return "VEQ";
-  case TYPE::INV1:
-    return "INV1";
+  case TYPE::EFNAO:
+    return "EFNAO";
   }
 }
 
@@ -93,7 +93,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return AbsenceOfBackpressure::fromJSON(value, path.field(INFO_LIT));
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::INV1:
+  case TYPE::EFNAO:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
   }
 }
@@ -236,7 +236,7 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
-    : FormalProperty(id, tag, TYPE::INV1) {
+    : FormalProperty(id, tag, TYPE::EFNAO) {
   ownerOp = getUniqueName(forkOp).str();
   numEagerForkOutputs = forkOp.getNumEagerOutputs();
 }
