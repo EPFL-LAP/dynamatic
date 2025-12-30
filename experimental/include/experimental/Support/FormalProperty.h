@@ -28,6 +28,7 @@ public:
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
+    INV2,
   };
 
   TAG getTag() const { return tag; }
@@ -185,6 +186,39 @@ private:
   unsigned numEagerForkOutputs;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
   inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+};
+
+class Invariant2 : public FormalProperty {
+public:
+  std::string getForkOp() { return forkOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::string getBufferOp() { return bufferOp; }
+  unsigned getBufferSlot() { return bufferSlot; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<Invariant2> fromJSON(const llvm::json::Value &value,
+                                              llvm::json::Path path);
+
+  Invariant2() = default;
+  Invariant2(unsigned long id, TAG tag,
+             handshake::BufferLikeOpInterface &bufferOp,
+             handshake::EagerForkLikeOpInterface &forkOp);
+  ~Invariant2() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::INV2;
+  }
+
+private:
+  std::string forkOp;
+  unsigned numEagerForkOutputs;
+  std::string bufferOp;
+  unsigned bufferSlot;
+  inline static const StringLiteral FORK_OP_LIT = "fork_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
+  inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
 
 class FormalPropertyTable {
