@@ -6,7 +6,8 @@
 //
 //===-----------------------------------------------------------------------------===//
 //
-// Graph-based enumeration tools to latency and occupancy balance dataflow circuits.
+// Graph-based enumeration tools to latency and occupancy balance dataflow
+// circuits.
 //
 //===-----------------------------------------------------------------------------===//
 
@@ -161,7 +162,6 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
           dfs(current);
           current.pop_back();
         }
-
       };
 
   // Start from each transition
