@@ -137,7 +137,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath) {};
+      : modOp(modOp), config(config), outputPath(outputPath){};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -160,7 +160,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath) {};
+      : table(table), outputPath(outputPath){};
 };
 } // namespace
 
@@ -333,7 +333,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -1266,8 +1266,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
         propString += outName;
       }
       propString += " ) < " + std::to_string(numOut);
-      data.properties[p->getId()] = {propString,
-                                     propertyTag};
+      data.properties[p->getId()] = {propString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
