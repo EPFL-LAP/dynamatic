@@ -125,6 +125,8 @@ if __name__ == "__main__":
     generators.add("handshake", "blocker")
     generators.add("handshake", "uitofp")
     generators.add("handshake", "sitofp")
+    generators.add("handshake", "maxsi")
+    generators.add("handshake", "maxui")
     generators.add("handshake", "fptosi")
     generators.add("handshake", "ready_remover")
     generators.add("handshake", "valid_merger")

@@ -5,7 +5,7 @@ def generate_shrui(name, params):
     bitwidth = params["bitwidth"]
 
     body = f"""
-  result <= std_logic_vector(shift_right(unsigned(lhs), to_integer(unsigned('0' & rhs(DATA_TYPE - 2 downto 0)))));
+  result <= std_logic_vector(shift_right(unsigned(lhs), to_integer(unsigned('0' & rhs({bitwidth} - 2 downto 0)))));
     """
 
     return generate_arith_binary(
