@@ -11,8 +11,7 @@
 //
 //===-----------------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
+#pragma once
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/StdProfiler.h"
@@ -25,11 +24,9 @@ using namespace dynamatic::experimental;
 
 namespace dynamatic {
 
-///=== DATAFLOWSUBGRAPHBASE ===///
-
 /// NOTE: No current implementation differentiates between intra-BB and inter-BB
 /// edges. Right now, it's quite useful for visualizing the graph in GraphViz.
-enum class DataflowGraphEdgeType {
+enum DataflowGraphEdgeType {
   INTRA_BB, // <-- Edge within the same basic block.
   INTER_BB, // <-- Edge between different basic blocks.
 };
@@ -101,8 +98,6 @@ struct DataflowSubgraphBase {
     revAdjList[dstId].push_back(edges.size() - 1);
   }
 };
-
-///=== DATAFLOWSUBGRAPHBASE ===///
 
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
@@ -247,5 +242,3 @@ private:
 };
 
 } // namespace dynamatic
-
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_LATENCYANDOCCUPANCYBALANCINGSUPPORT_H
