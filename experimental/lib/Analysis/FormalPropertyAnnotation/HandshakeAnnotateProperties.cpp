@@ -67,7 +67,7 @@ private:
                                                    Operation &op2);
   LogicalResult annotateEagerForkNotAllOutputSent(ModuleOp modOp);
   LogicalResult annotateCopiedSlots(handshake::EagerForkLikeOpInterface &forkOp,
-                                    Operation &op);
+                                    Operation &curOp);
   LogicalResult annotateInvariant2(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
@@ -158,6 +158,8 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
     handshake::EagerForkLikeOpInterface &originFork, Operation &curOp) {
+  // TODO: avoid loops by checking if curOp has been visited already
+
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
     Invariant2 p(uid, FormalProperty::TAG::INVAR, bufferOp, originFork);
     propertyTable.push_back(p.toJSON());
@@ -167,6 +169,20 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
   if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
     // TODO: Which of the previous paths should be followed?
     return failure();
+  }
+
+  // Only JoinLikeOps or single-operand ops are remaining, but ideally a
+  // dyn_cast would happen for either case
+  for (auto value : curOp.getOperands()) {
+    Operation *prevOpPtr = value.getDefiningOp();
+    if (prevOpPtr == nullptr)
+      // if there is no defining op, the value must be a constant, and does not
+      // need to be annotated
+      continue;
+    Operation &prevOp = *prevOpPtr;
+    if (failed(annotateCopiedSlots(originFork, prevOp))) {
+      return failure();
+    }
   }
 
   return success();
