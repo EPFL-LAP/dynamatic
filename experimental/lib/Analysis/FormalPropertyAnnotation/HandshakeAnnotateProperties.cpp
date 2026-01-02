@@ -35,6 +35,7 @@
 #include "llvm/Support/JSON.h"
 #include <fstream>
 #include <ostream>
+#include <unordered_set>
 
 using namespace llvm;
 using namespace mlir;
@@ -66,9 +67,12 @@ private:
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
   LogicalResult annotateEagerForkNotAllOutputSent(ModuleOp modOp);
-  LogicalResult annotateCopiedSlots(handshake::EagerForkLikeOpInterface &forkOp,
-                                    Operation &curOp);
-  LogicalResult annotateInvariant2(ModuleOp modOp);
+  LogicalResult
+  annotateCopiedSlotsRec(std::unordered_set<std::string> &visitedSet,
+                         handshake::EagerForkLikeOpInterface &originFork,
+                         Operation &curOp);
+  LogicalResult annotateCopiedSlots(Operation &op);
+  LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -156,19 +160,29 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
   return success();
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
+LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
+    std::unordered_set<std::string> &visitedSet,
     handshake::EagerForkLikeOpInterface &originFork, Operation &curOp) {
-  // TODO: avoid loops by checking if curOp has been visited already
 
+  // If this operation has been visited, there is nothing to do
+  std::string id = getUniqueName(&curOp).str();
+  if (auto iter = visitedSet.find(id); iter != visitedSet.end()) {
+    return success();
+  }
+  visitedSet.insert(id);
+
+  // If this operation contains a slot, the copied slot has been found and can
+  // be annotated
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
     Invariant2 p(uid, FormalProperty::TAG::INVAR, bufferOp, originFork);
     propertyTable.push_back(p.toJSON());
     uid++;
+    return success();
   }
 
   if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
     // TODO: Which of the previous paths should be followed?
-    return failure();
+    return success();
   }
 
   // Only JoinLikeOps or single-operand ops are remaining, but ideally a
@@ -180,7 +194,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
       // need to be annotated
       continue;
     Operation &prevOp = *prevOpPtr;
-    if (failed(annotateCopiedSlots(originFork, prevOp))) {
+    if (failed(annotateCopiedSlotsRec(visitedSet, originFork, prevOp))) {
       return failure();
     }
   }
@@ -189,13 +203,20 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlots(
 }
 
 LogicalResult
-HandshakeAnnotatePropertiesPass::annotateInvariant2(ModuleOp modOp) {
+HandshakeAnnotatePropertiesPass::annotateCopiedSlots(Operation &op) {
+  std::unordered_set<std::string> visitedSet = {};
+  if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+    return annotateCopiedSlotsRec(visitedSet, forkOp, op);
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-        if (failed(annotateCopiedSlots(forkOp, op)))
-          return failure();
-      }
+      if (failed(annotateCopiedSlots(op)))
+        return failure();
     }
   }
   return success();
@@ -211,7 +232,7 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
-    if (failed(annotateInvariant2(modOp)))
+    if (failed(annotateCopiedSlotsOfAllForks(modOp)))
       return signalPassFailure();
   }
 
