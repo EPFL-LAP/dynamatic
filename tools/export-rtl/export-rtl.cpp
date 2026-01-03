@@ -1260,7 +1260,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       std::string opName = p->getOwner();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = opName + "." + "sent_" + std::to_string(i);
+        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
