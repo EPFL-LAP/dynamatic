@@ -36,6 +36,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
   outs_valid := inner_fork.outs_0_valid;
   index_valid := inner_fork.outs_1_valid;
   index := inner_one_slot_break_r.outs;
+  full_0 := inner_one_slot_break_r.full_0;
 
 {generate_merge(f"{name}__merge_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
 {generate_one_slot_break_r(f"{name}__one_slot_break_r", {ATTR_BITWIDTH: index_type.bitwidth})}
@@ -62,6 +63,7 @@ def _generate_control_merge(name, size, index_type, data_type):
   index_valid := inner_control_merge.index_valid;
   outs := data;
   index := inner_control_merge.index;
+  full_0 := inner_control_merge.full_0;
 
 {_generate_control_merge_dataless(f"{name}__control_merge_dataless", size, index_type)}
 """
