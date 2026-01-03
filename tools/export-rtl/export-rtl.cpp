@@ -1258,16 +1258,14 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
       unsigned numOut = p->getNumEagerForkOutputs();
       std::string opName = p->getOwner();
-      std::string propString = "count( ";
+      std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        if (i > 0) {
-          propString += ", ";
-        }
-        std::string outName = opName + "." + "sent_" + std::to_string(i);
-        propString += outName;
+        outNames[i] = opName + "." + "sent_" + std::to_string(i);
       }
-      propString += " ) < " + std::to_string(numOut);
-      data.properties[p->getId()] = {propString, propertyTag};
+      std::string propertyString =
+          llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
+              .str();
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
