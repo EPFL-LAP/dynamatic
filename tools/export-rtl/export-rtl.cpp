@@ -1265,6 +1265,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
               .str();
+      // e.g. count(fork0.sent_0, fork0.sent_1) < 2
+      // for operation "fork0" with 2 eager outputs
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";

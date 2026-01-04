@@ -153,7 +153,14 @@ private:
   inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
 };
 
-// Invariant 1 of https://ieeexplore.ieee.org/document/10323796
+// An eager fork propagates an incoming token to each output as soon as the
+// output is ready, and keeps track of which outputs already have a token sent
+// across them through the `sent` state. When the token has been sent to all
+// outputs, the token at the input is consumed and the states of the fork are
+// reset. The state where all outputs are in the `sent` state simultaneously is
+// unreachable, as the fork resets as soon as this state would be reached. See
+// invariant 1 of https://ieeexplore.ieee.org/document/10323796 for more
+// details.
 class EagerForkNotAllOutputSent : public FormalProperty {
 public:
   std::string getOwner() { return ownerOp; }
