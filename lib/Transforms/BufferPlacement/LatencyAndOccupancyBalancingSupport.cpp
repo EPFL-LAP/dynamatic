@@ -22,6 +22,8 @@
 #include <fstream>
 #include <queue>
 
+#define DEBUG_TYPE "latency-and-occupancy-balancing-support"
+
 namespace dynamatic {
 
 ///=== RECONVERGENT PATH FINDER ===///
@@ -554,9 +556,6 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(llvm::errs() << "Dumped " << totalPaths
-                          << " reconvergent paths from " << graphPaths.size()
-                          << " graphs to " << fullPath << "\n";);
 }
 
 // [END AI-generated code]
