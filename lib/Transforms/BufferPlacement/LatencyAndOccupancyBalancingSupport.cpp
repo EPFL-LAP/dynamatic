@@ -636,10 +636,10 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   if (n == 0)
     return;
 
-  // Kosaraju's algorithm for SCCs
+  /// Kosaraju's algorithm for SCCs
   /// NOTE: Similar SCC code exists in
   /// experimental/Transforms/ResourceSharing/SharingSupport.cpp
-  //  Kept separate because we need the non-cyclic adjacency list.
+  ///  Kept separate because we need the non-cyclic adjacency list.
 
   // DFS to compute finishing order
   std::vector<bool> visited(n, false);
@@ -775,6 +775,25 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
   return {};
 }
 
+// From:
+// [Xu, Josipović, FPGA'24 (https://dl.acm.org/doi/10.1145/3626202.36375)]
+//
+// Definition 3: Two cycles are a pair of synchronizing cycles in a
+// dataflow circuit if the following properties hold: (1) The two cycles
+// are disjoint (i.e. they do not have any common units) and belong to
+// the same CFC (defined in Section 3.2). (2) There exists at least one
+// join that is reachable from both cycles without crossing any edge
+// on the cycle in the CFC they belong to.
+//
+// Algorithm:
+// 1. Compute the SCCs of the CFDFC so we can build the non-cyclic subgraph
+// required to find paths to joins.
+// 2. Find all cycles in the CFDFC.
+// 3. For each cycle pair, check if they're disjoint and both can reach a join
+// via non-cyclic paths.
+// 4. If the criteria are met, get the paths to the joins and add the pair to
+// the list of synchronizing cycle pairs.
+//
 std::vector<SynchronizingCyclePair>
 SynchronizingCyclesFinderGraph::findSynchronizingCyclePairs() {
   computeSccsAndBuildNonCyclicSubgraph();
