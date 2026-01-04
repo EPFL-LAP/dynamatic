@@ -1435,11 +1435,12 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
 /// file named like the module inside the output directory. Fails if the
 /// output file cannot be created or if the module cannot be converted to
 /// RTL; succeeds otherwise.
-static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
+static LogicalResult writeModule(std::unique_ptr<RTLWriter> &writer,
+                                 hw::HWModuleOp modOp) {
   // Open the file in which we will create the module, it is named like the
   // module itself
   std::string filepath =
-      writer.exportInfo.outputPath.str() + sys::path::get_separator().str() +
+      writer->exportInfo.outputPath.str() + sys::path::get_separator().str() +
       modOp.getSymName().str() + "." + getHDLExtension(hdl).str();
 
   std::error_code ec;
@@ -1449,7 +1450,7 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
                                 << filepath << "\": " << ec.message();
   }
   raw_indented_ostream os(fileStream);
-  return writer.write(modOp, os);
+  return writer->write(modOp, os);
 }
 
 int main(int argc, char **argv) {
@@ -1510,27 +1511,25 @@ int main(int argc, char **argv) {
   FormalPropertyInfo propertyInfo(table, outputPath);
 
   // Create an RTL writer
-  RTLWriter *writer;
+  std::unique_ptr<RTLWriter> writer;
   switch (hdl) {
   case HDL::VHDL:
-    writer = new VHDLWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VHDLWriter>(info, propertyInfo, hdl);
     break;
   case HDL::VERILOG:
-    writer = new VerilogWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VerilogWriter>(info, propertyInfo, hdl);
     break;
   case HDL::SMV:
-    writer = new SMVWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<SMVWriter>(info, propertyInfo, hdl);
     break;
   }
 
   // Write each module's RTL implementation to a separate file
   for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
-    if (failed(writeModule(*writer, hwModOp))) {
-      delete writer;
+    if (failed(writeModule(writer, hwModOp))) {
       return 1;
     }
   }
 
-  delete writer;
   return 0;
 }
