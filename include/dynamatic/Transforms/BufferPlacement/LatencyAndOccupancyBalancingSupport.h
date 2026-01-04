@@ -14,6 +14,7 @@
 #pragma once
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
 #include <set>
@@ -238,6 +239,95 @@ private:
     nodeMap[key] = id;
     nodeIdToStep[id] = step;
     return id;
+  }
+};
+
+struct SimpleCycle {
+  std::vector<size_t> nodes; // <-- The node IDs of the cycle.
+  SimpleCycle(std::vector<size_t> nodes) : nodes(std::move(nodes)) {}
+
+  /// Check if this cycle shares any nodes with another cycle.
+  bool isDisjointFrom(const SimpleCycle &other) const;
+};
+
+struct PathToJoin {
+  size_t joinId;
+
+  std::vector<size_t> pathFromCycleOne;
+  std::vector<size_t> pathFromCycleTwo;
+
+  PathToJoin(size_t join) : joinId(join) {}
+};
+
+struct SynchronizingCyclePair {
+  const SimpleCycle cycleOne;
+  const SimpleCycle cycleTwo;
+
+  std::vector<PathToJoin> pathsToJoins;
+
+  SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
+                         std::vector<PathToJoin> paths)
+      : cycleOne(std::move(one)), cycleTwo(std::move(two)),
+        pathsToJoins(std::move(paths)) {}
+};
+
+class SynchronizingCyclesFinderGraph : public DataflowSubgraphBase {
+public:
+  /// Build the graph from a CFDFC.
+  void buildFromCFDFC(handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc);
+
+  /// Find all simple cycles in the graph.
+  std::vector<SimpleCycle> findAllCycles() const;
+
+  /// Find all pairs of synchronizing cylces.
+  std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
+
+  bool isForkNode(size_t nodeId) const override;
+  bool isJoinNode(size_t nodeId) const override;
+
+  std::string getNodeLabel(size_t nodeId) const override;
+  std::string getNodeDotId(size_t nodeId) const override;
+
+  /// Dump a single synchronizing cycle pair to a GraphViz file.
+  void dumpSynchronizingCyclePair(const SynchronizingCyclePair &pair,
+                                  llvm::StringRef filename) const;
+
+  /// Dump all synchronizing cycle pairs to a single GraphViz file.
+  void dumpAllSynchronizingCyclePairs(
+      const std::vector<SynchronizingCyclePair> &pairs,
+      llvm::StringRef filename) const;
+
+private:
+  std::map<mlir::Operation *, size_t> opToNodeId;
+
+  /// SCC ID for each node.
+  std::vector<size_t> nodeSccId;
+
+  /// Adjacency list for the non-cyclic subgraph.
+  std::vector<std::vector<size_t>> nonCyclicAdjList;
+
+  size_t getOrAddNode(mlir::Operation *op);
+
+  void computeSccsAndBuildNonCyclicSubgraph();
+
+  /// Find path from a cycle to a join using BFS on non-cyclic subgraph.
+  std::vector<size_t> findPathToJoin(const SimpleCycle &cycle,
+                                     size_t joinId) const;
+
+  /// Get all join node IDs in the graph.
+  std::vector<size_t> getAllJoins() const;
+};
+
+struct CycleCollector {
+  std::vector<SimpleCycle> &cycles;
+
+  template <typename Path, typename Graph>
+  void cycle(const Path &p, const Graph &) {
+    std::vector<size_t> nodeIds;
+    for (auto v : p) {
+      nodeIds.push_back(v);
+    }
+    cycles.emplace_back(std::move(nodeIds));
   }
 };
 
