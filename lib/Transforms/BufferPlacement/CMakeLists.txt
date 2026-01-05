@@ -7,6 +7,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   FPL22Buffers.cpp
   CostAwareBuffers.cpp
   HandshakePlaceBuffers.cpp
+  LatencyAndOccupancyBalancingSupport.cpp
   HandshakeSetBufferingProperties.cpp
   MAPBUFBuffers.cpp
 

@@ -16,9 +16,8 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Support/DataflowGraph/ReconvergentPathFinder.h"
-#include "dynamatic/Support/DataflowGraph/SynchronizingCyclesFinder.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "mlir/IR/Value.h"
 
 using namespace llvm::sys;
@@ -222,8 +221,15 @@ void FPGA24Buffers::setup() {
     for (const auto &pair : pairs) {
       llvm::errs() << "  Pair: cycle with " << pair.cycleOne.nodes.size()
                    << " nodes <-> cycle with " << pair.cycleTwo.nodes.size()
-                   << " nodes, " << pair.pathsToJoins.size() 
+                   << " nodes, " << pair.edgesToJoins.size() 
                    << " common joins\n";
+      
+      // Print edge counts for each join
+      for (const auto &edgeInfo : pair.edgesToJoins) {
+        llvm::errs() << "    Join " << edgeInfo.joinId << ": "
+                     << edgeInfo.edgesFromCycleOne.size() << " edges from cycle one, "
+                     << edgeInfo.edgesFromCycleTwo.size() << " edges from cycle two\n";
+      }
     }
 
     // Dump to GraphViz for visualization
