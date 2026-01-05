@@ -130,7 +130,6 @@ end
 always @ (posedge clk) begin
     if((we0 == 1) && (ce0 == 1)) begin
         mem <= din0;
-        $display("din0: %b",din0);
     end
 end
 
@@ -170,7 +169,6 @@ initial begin : write_file_proc
                 $finish;
             end
             $fdisplay(fp, "[[transaction]] %d", transaction_num);
-            $display("mem: %b", mem);
             $fdisplay(fp,"0x%x",mem);
             $fdisplay(fp, "[[/transaction]]");
             transaction_num = transaction_num + 1;

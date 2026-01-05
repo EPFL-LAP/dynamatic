@@ -70,6 +70,9 @@ static cl::opt<bool> exitOnFailure(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
 
+static constexpr llvm::StringLiteral VHDL("vhdl");
+static constexpr llvm::StringLiteral VERILOG("verilog");
+
 namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
@@ -92,6 +95,7 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  llvm::StringLiteral hdl = VHDL;
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
@@ -733,6 +737,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+      state.hdl = VERILOG;
     } else if (it->second == "verilog-beta") {
       hdl = "verilog-beta";
     } else if (it->second == "smv") {
@@ -769,10 +774,23 @@ CommandResult Simulate::execute(CommandArguments &args) {
     }
   }
 
+  if (simulator == "ghdl" && state.hdl != VHDL) {
+    llvm::errs() << "Simulator 'ghdl' is not compatible with this HDL. Use "
+                    "'vsim', 'xsim' or 'verilator'. \n";
+    return CommandResult::FAIL;
+  }
+
+  if (simulator == "verilator" && state.hdl != VERILOG) {
+    llvm::errs()
+        << "Simulator 'verilator' is not compatible with this HDL. Use "
+           "'vsim', 'xsim' or 'ghdl'. \n";
+    return CommandResult::FAIL;
+  }
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, state.hdl);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
