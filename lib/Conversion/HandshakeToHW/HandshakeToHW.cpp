@@ -23,8 +23,10 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -1622,6 +1624,12 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     converter.addOutput(portNames.getOutputName(idx), lowerType(type));
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
+
+  // Tagging the hardware instance the BB id of the original operation.
+  if (auto bbId = getLogicBB(op.getOperation()); bbId.has_value()) {
+    instOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bbId.value()));
+  }
+
   return instOp ? success() : failure();
 }
 
