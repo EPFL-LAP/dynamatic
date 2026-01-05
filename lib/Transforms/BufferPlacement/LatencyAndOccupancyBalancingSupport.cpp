@@ -620,18 +620,18 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   ///  Kept separate because we need the non-cyclic adjacency list.
 
   // DFS to compute finishing order
-  std::vector<bool> visited(/*count=*/n, /*initialValue*/false);
+  std::vector<bool> visited(/*count=*/n, /*initialValue*/ false);
   std::stack<size_t> finishOrder;
 
-  std::function<void(size_t)> dfs1 = [&](size_t u) {
-    visited[u] = true;
-    for (size_t edgeIdx : adjList[u]) {
-      size_t v = edges[edgeIdx].dstId;
-      if (!visited[v]) {
-        dfs1(v);
+  std::function<void(size_t)> dfs1 = [&](size_t currentNode) {
+    visited[currentNode] = true;
+    for (size_t edgeIdx : adjList[currentNode]) {
+      size_t successorNode = edges[edgeIdx].dstId;
+      if (!visited[successorNode]) {
+        dfs1(successorNode);
       }
     }
-    finishOrder.push(u);
+    finishOrder.push(currentNode);
   };
 
   for (size_t i = 0; i < n; ++i) {
@@ -651,21 +651,22 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   std::fill(visited.begin(), visited.end(), false);
   size_t sccCount = 0;
 
-  std::function<void(size_t, size_t)> dfs2 = [&](size_t u, size_t sccId) {
-    visited[u] = true;
-    nodeSccId[u] = sccId;
-    for (size_t v : revAdj[u]) {
-      if (!visited[v]) {
-        dfs2(v, sccId);
+  std::function<void(size_t, size_t)> dfs2 = [&](size_t currentNode,
+                                                 size_t sccId) {
+    visited[currentNode] = true;
+    nodeSccId[currentNode] = sccId;
+    for (size_t successorNode : revAdj[currentNode]) {
+      if (!visited[successorNode]) {
+        dfs2(successorNode, sccId);
       }
     }
   };
 
   while (!finishOrder.empty()) {
-    size_t u = finishOrder.top();
+    size_t currentNode = finishOrder.top();
     finishOrder.pop();
-    if (!visited[u]) {
-      dfs2(u, sccCount);
+    if (!visited[currentNode]) {
+      dfs2(currentNode, sccCount);
       sccCount++;
     }
   }
