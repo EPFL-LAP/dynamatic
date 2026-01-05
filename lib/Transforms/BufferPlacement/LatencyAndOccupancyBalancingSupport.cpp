@@ -673,13 +673,10 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   // Build non-cyclic adjacency list (only edges between different SCCs)
   nonCyclicAdjList.resize(n);
-  for (size_t u = 0; u < n; ++u) {
-    for (size_t edgeIdx : adjList[u]) {
-      size_t v = edges[edgeIdx].dstId;
-      // Only include edge if src and dst are in different SCCs
-      if (nodeSccId[u] != nodeSccId[v]) {
-        nonCyclicAdjList[u].push_back(edgeIdx);
-      }
+  for (size_t edgeIdx = 0; edgeIdx < edges.size(); ++edgeIdx) {
+    const auto &edge = edges[edgeIdx];
+    if (nodeSccId[edge.srcId] != nodeSccId[edge.dstId]) {
+      nonCyclicAdjList[edge.srcId].push_back(edgeIdx);
     }
   }
 
