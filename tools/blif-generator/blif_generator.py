@@ -16,6 +16,15 @@ JSON_FILE_PATH = os.path.join(DATA_FOLDER, 'rtl-config-verilog.json')
 BLIF_FILES_PATH = os.path.join(DATA_FOLDER, 'blif')
 BLACKBOX_COMPONENTS = ['addi', 'cmpi', 'subi', 'muli', 'divsi', 'divui']
 
+# Default parameter ranges
+ranges = {
+    'NUM_SLOTS': (1, 10),
+    'SIZE': (1, 15),
+    'INDEX_TYPE': (1, 4),
+    'SELECT_TYPE': (1, 4),
+    'DEFAULT': (1, 33)
+}
+
 def create_yosys_script(component: str, params: str, output_dir: str, output_name: str, verilog_files: List[str]) -> str:
     """Create a Yosys script with the given parameters."""
     verilog_reads = '\n        '.join([f'read_verilog -defer {path}' for path in verilog_files])
@@ -52,13 +61,6 @@ def get_range_for_param(param_type: str) -> Tuple[int, int]:
     Get the range for a given parameter type.
     Range of iteration for each parameter.
     """
-    ranges = {
-        'NUM_SLOTS': (1, 10),
-        'SIZE': (1, 15),
-        'INDEX_TYPE': (1, 4),
-        'SELECT_TYPE': (1, 4),
-        'DEFAULT': (1, 33)
-    }
     start, end = ranges.get(param_type, ranges['DEFAULT'])
     return start, end
 
@@ -128,6 +130,7 @@ def get_parameter_ranges(module_config: Dict[str, Any]) -> Dict[str, List[Any]]:
         if param.get('generic', True): 
             if param_type == 'string':
                 if 'eq' in param:
+                    continue # Fixed value, skip range generation
                     param_ranges[param_name] = [param['eq']]
                 else:
                     # Do not add to list
@@ -135,8 +138,10 @@ def get_parameter_ranges(module_config: Dict[str, Any]) -> Dict[str, List[Any]]:
             elif param_type in ['unsigned', 'dataflow']:
                 # Check for fixed values first
                 if 'eq' in param:
+                    continue # Fixed value, skip range generation
                     param_ranges[param_name] = [param['eq']]
                 elif 'data-eq' in param:
+                    continue # Fixed value, skip range generation
                     param_ranges[param_name] = [param['data-eq']]
                 else:
                     # Get range from get_range_for_param function
@@ -389,6 +394,7 @@ def process_module(module_config: Dict[str, Any], all_modules: List[Dict[str, An
 
 def main():
     parser = argparse.ArgumentParser(description='Generate AIGs for modules using JSON configuration')
+    parser.add_argument('--parameter', '-p', action='append', help='Parameter in the form NAME=MIN_VALUE,MAX_VALUE (can be used multiple times) where NAME is the parameter name, MIN_VALUE is the minimum value (inclusive) and MAX_VALUE is the maximum value (inclusive)')
     parser.add_argument('module', nargs='?', help='Specific module name to generate (optional)')
 
     args = parser.parse_args()
@@ -406,12 +412,33 @@ def main():
     # Create a lookup dict for modules
     modules_dict = {config['name']: config for config in modules_config if 'name' in config}
 
+    # Copy parameter ranges from command line arguments
+    if args.parameter:
+        for param in args.parameter:
+            try:
+                name, range_str = param.split('=')
+                min_val, max_val = map(int, range_str.split(','))
+                max_val += 1  # Make max_val exclusive
+                ranges[name] = (min_val, max_val)
+            except ValueError:
+                print(f"Error: Invalid parameter format '{param}'. Expected format is NAME=MIN_VALUE,MAX_VALUE")
+                sys.exit(1)
+
     if args.module:
+        config_module = None
         if args.module not in modules_dict:
-            print(f"Error: Module '{args.module}' not found!")
-            sys.exit(1)
+            # Check if module-name matches
+            for config in modules_config:
+                if 'module-name' in config and (config['module-name'] == args.module or config['module-name'] == args.module.replace('handshake.', '')):
+                    config_module = config
+                    break
+            if config_module is None:
+                print(f"Error: Module '{args.module}' not found!")
+                sys.exit(1)
+        else:
+            config_module = modules_dict[args.module]
         print(f"Processing module: {args.module}")
-        process_module(modules_dict[args.module], modules_config)
+        process_module(config_module, modules_config)
     else:
         print("Processing all modules...")
         for module_config in modules_config:
