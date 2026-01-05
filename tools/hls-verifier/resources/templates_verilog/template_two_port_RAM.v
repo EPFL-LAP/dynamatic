@@ -47,7 +47,7 @@ event write_process_done;
 //------------------------Task and function--------------
 task read_token;
     input integer fp;
-    output reg [127 :0] token;
+    output string token;
     integer ret;
     begin
         token = "";
@@ -63,7 +63,7 @@ initial begin : read_file_process
     integer fp;
     integer err;
     integer ret;
-    reg [127 : 0] token;
+    string token;
     reg [ 8*5 : 1] str;
     reg [ DATA_WIDTH - 1 : 0 ] mem_tmp;
     integer transaction_idx;
