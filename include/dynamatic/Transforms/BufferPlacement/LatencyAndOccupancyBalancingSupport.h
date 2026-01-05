@@ -25,6 +25,8 @@ using namespace dynamatic::experimental;
 
 namespace dynamatic {
 
+using NodeIdType = size_t;
+
 /// NOTE: No current implementation differentiates between intra-BB and inter-BB
 /// edges. Right now, it's quite useful for visualizing the graph in GraphViz.
 enum DataflowGraphEdgeType {
@@ -34,20 +36,20 @@ enum DataflowGraphEdgeType {
 
 struct DataflowGraphNode {
   mlir::Operation *op; // <-- The underlying Operation.
-  size_t id; // <-- Unique id in the nodes vector to help with traversal.
+  NodeIdType id; // <-- Unique id in the nodes vector to help with traversal.
 
-  DataflowGraphNode(mlir::Operation *op, size_t id) : op(op), id(id) {}
+  DataflowGraphNode(mlir::Operation *op, NodeIdType id) : op(op), id(id) {}
 };
 
 struct DataflowGraphEdge {
-  size_t srcId;
-  size_t dstId;
+  NodeIdType srcId;
+  NodeIdType dstId;
 
   mlir::Value channel;
   DataflowGraphEdgeType type;
 
   DataflowGraphEdge(
-      size_t srcId, size_t dstId, mlir::Value channel,
+      NodeIdType srcId, NodeIdType dstId, mlir::Value channel,
       DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB)
       : srcId(srcId), dstId(dstId), channel(channel), type(type) {}
 };
@@ -65,11 +67,11 @@ struct DataflowSubgraphBase {
 
   /// Virtual Methods ///
 
-  virtual bool isForkNode(size_t nodeId) const = 0;
-  virtual bool isJoinNode(size_t nodeId) const = 0;
+  virtual bool isForkNode(NodeIdType nodeId) const = 0;
+  virtual bool isJoinNode(NodeIdType nodeId) const = 0;
 
-  virtual std::string getNodeLabel(size_t nodeId) const = 0;
-  virtual std::string getNodeDotId(size_t nodeId) const = 0;
+  virtual std::string getNodeLabel(NodeIdType nodeId) const = 0;
+  virtual std::string getNodeDotId(NodeIdType nodeId) const = 0;
 
   /// Getters ///
 
@@ -84,15 +86,15 @@ struct DataflowSubgraphBase {
   std::vector<llvm::SmallVector<size_t, 4>> adjList;
   std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
 
-  size_t addNode(mlir::Operation *op) {
-    size_t id = nodes.size();
+  NodeIdType addNode(mlir::Operation *op) {
+    NodeIdType id = nodes.size();
     nodes.emplace_back(op, id);
     adjList.emplace_back();
     revAdjList.emplace_back();
     return nodes.size() - 1;
   }
 
-  void addEdge(size_t srcId, size_t dstId, mlir::Value channel,
+  void addEdge(NodeIdType srcId, NodeIdType dstId, mlir::Value channel,
                DataflowGraphEdgeType type = DataflowGraphEdgeType::INTRA_BB) {
     edges.emplace_back(srcId, dstId, channel, type);
     adjList[srcId].push_back(edges.size() - 1);
@@ -103,11 +105,11 @@ struct DataflowSubgraphBase {
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
 struct ReconvergentPath {
-  size_t forkNodeId;        // The divergence point
-  size_t joinNodeId;        // The convergence point
-  std::set<size_t> nodeIds; // All nodes on paths from fork to join.
+  NodeIdType forkNodeId;        // The divergence point
+  NodeIdType joinNodeId;        // The convergence point
+  std::set<NodeIdType> nodeIds; // All nodes on paths from fork to join.
 
-  ReconvergentPath(size_t fork, size_t join, std::set<size_t> nodes)
+  ReconvergentPath(NodeIdType fork, NodeIdType join, std::set<NodeIdType> nodes)
       : forkNodeId(fork), joinNodeId(join), nodeIds(std::move(nodes)) {}
 };
 
@@ -173,20 +175,20 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
 class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
 public:
-  bool isForkNode(size_t nodeId) const override {
+  bool isForkNode(NodeIdType nodeId) const override {
     return isa<handshake::ForkOp>(nodes[nodeId].op) ||
            isa<handshake::LazyForkOp>(nodes[nodeId].op);
   }
 
   // Those two nodes are the only nodes with two inputs that allow for both
   // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
-  bool isJoinNode(size_t nodeId) const override {
+  bool isJoinNode(NodeIdType nodeId) const override {
     return isa<handshake::MuxOp>(nodes[nodeId].op) ||
            isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
 
-  std::string getNodeLabel(size_t nodeId) const override;
-  std::string getNodeDotId(size_t nodeId) const override;
+  std::string getNodeLabel(NodeIdType nodeId) const override;
+  std::string getNodeDotId(NodeIdType nodeId) const override;
 
   std::vector<ReconvergentPath> findReconvergentPaths() const;
 
@@ -198,7 +200,9 @@ public:
   /// Step 0: BB1 -> Step 1: BB1 -> Step 2: BB2. Steps are the way to
   /// distinguish between specific operations of the same BB accross different
   /// transitions.
-  unsigned getNodeStep(size_t nodeId) const { return nodeIdToStep.at(nodeId); };
+  unsigned getNodeStep(NodeIdType nodeId) const {
+    return nodeIdToStep.at(nodeId);
+  };
 
   /// Get the BB id for a given step. Returns -1 if step not found.
   unsigned getStepBB(unsigned step) const {
@@ -241,15 +245,15 @@ private:
   std::map<unsigned, unsigned> nodeIdToStep;
 
   /// Maps (Operation*, step) to node ID for O(1) lookup.
-  std::map<std::pair<mlir::Operation *, unsigned>, size_t> nodeMap;
+  std::map<std::pair<mlir::Operation *, unsigned>, NodeIdType> nodeMap;
 
   /// Get the node ID for an operation at a given step, creating it if needed.
-  size_t getOrAddNode(mlir::Operation *op, unsigned step) {
+  NodeIdType getOrAddNode(mlir::Operation *op, unsigned step) {
     auto key = std::make_pair(op, step);
     if (auto it = nodeMap.find(key); it != nodeMap.end())
       return it->second;
 
-    size_t id = addNode(op);
+    NodeIdType id = addNode(op);
     nodeMap[key] = id;
     nodeIdToStep[id] = step;
     return id;
@@ -257,20 +261,20 @@ private:
 };
 
 struct SimpleCycle {
-  llvm::SmallVector<size_t> nodes; // <-- The node IDs of the cycle.
-  SimpleCycle(llvm::SmallVector<size_t> nodes) : nodes(std::move(nodes)) {}
+  llvm::SmallVector<NodeIdType> nodes; // <-- The node IDs of the cycle.
+  SimpleCycle(llvm::SmallVector<NodeIdType> nodes) : nodes(std::move(nodes)) {}
 
   /// Check if this cycle shares any nodes with another cycle.
   bool isDisjointFrom(const SimpleCycle &other) const;
 };
 
 struct PathToJoin {
-  size_t joinId;
+  NodeIdType joinId;
 
-  std::vector<size_t> pathFromCycleOne;
-  std::vector<size_t> pathFromCycleTwo;
+  std::vector<NodeIdType> pathFromCycleOne;
+  std::vector<NodeIdType> pathFromCycleTwo;
 
-  PathToJoin(size_t join) : joinId(join) {}
+  PathToJoin(NodeIdType join) : joinId(join) {}
 };
 
 struct SynchronizingCyclePair {
@@ -296,12 +300,12 @@ public:
   /// Find all pairs of synchronizing cylces.
   std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
-  bool isForkNode(size_t nodeId) const override {
+  bool isForkNode(NodeIdType nodeId) const override {
     return isa<handshake::ForkOp>(nodes[nodeId].op) ||
            isa<handshake::LazyForkOp>(nodes[nodeId].op);
   }
 
-  bool isJoinNode(size_t nodeId) const override {
+  bool isJoinNode(NodeIdType nodeId) const override {
     return isa<handshake::MuxOp>(nodes[nodeId].op) ||
            isa<handshake::ConditionalBranchOp>(nodes[nodeId].op) ||
            isa<handshake::AddFOp>(nodes[nodeId].op) ||
@@ -310,8 +314,8 @@ public:
            isa<handshake::StoreOp>(nodes[nodeId].op);
   }
 
-  std::string getNodeLabel(size_t nodeId) const override;
-  std::string getNodeDotId(size_t nodeId) const override;
+  std::string getNodeLabel(NodeIdType nodeId) const override;
+  std::string getNodeDotId(NodeIdType nodeId) const override;
 
   /// Dump a single synchronizing cycle pair to a GraphViz file.
   void dumpSynchronizingCyclePair(const SynchronizingCyclePair &pair,
@@ -323,24 +327,24 @@ public:
       llvm::StringRef filename) const;
 
 private:
-  std::map<mlir::Operation *, size_t> opToNodeId;
+  std::map<mlir::Operation *, NodeIdType> opToNodeId;
 
-  /// SCC ID for each node.
+  /// SCC ID for each node (indexed by node ID).
   std::vector<size_t> nodeSccId;
 
-  /// Adjacency list for the non-cyclic subgraph.
+  /// Adjacency list for the non-cyclic subgraph (stores edge indices).
   std::vector<std::vector<size_t>> nonCyclicAdjList;
 
-  size_t getOrAddNode(mlir::Operation *op);
+  NodeIdType getOrAddNode(mlir::Operation *op);
 
   void computeSccsAndBuildNonCyclicSubgraph();
 
   /// Find path from a cycle to a join using BFS on non-cyclic subgraph.
-  std::vector<size_t> findPathToJoin(const SimpleCycle &cycle,
-                                     size_t joinId) const;
+  std::vector<NodeIdType> findPathToJoin(const SimpleCycle &cycle,
+                                         NodeIdType joinId) const;
 
   /// Get all join node IDs in the graph.
-  std::vector<size_t> getAllJoins() const;
+  std::vector<NodeIdType> getAllJoins() const;
 };
 
 // Helper struct needed for Boost's tiernan_all_cycles algorithm.
@@ -351,7 +355,7 @@ struct CycleCollector {
 
   template <typename Path, typename Graph>
   void cycle(const Path &p, const Graph &) {
-    std::vector<size_t> nodeIds;
+    std::vector<NodeIdType> nodeIds;
     for (auto v : p) {
       nodeIds.push_back(v);
     }

@@ -40,12 +40,12 @@ namespace dynamatic {
 
 ///=== RECONVERGENT PATH FINDER ===///
 
-std::string ReconvergentPathFinderGraph::getNodeLabel(size_t nodeId) const {
+std::string ReconvergentPathFinderGraph::getNodeLabel(NodeIdType nodeId) const {
   std::string opName = nodes[nodeId].op->getName().getStringRef().str();
   return opName + "\\nStep: " + std::to_string(getNodeStep(nodeId));
 }
 
-std::string ReconvergentPathFinderGraph::getNodeDotId(size_t nodeId) const {
+std::string ReconvergentPathFinderGraph::getNodeDotId(NodeIdType nodeId) const {
   return "node_" + std::to_string(nodeId);
 }
 
@@ -145,10 +145,10 @@ void ReconvergentPathFinderGraph::buildGraphFromSequence(
 
 std::vector<ReconvergentPath>
 ReconvergentPathFinderGraph::findReconvergentPaths() const {
-  std::vector<size_t> forks;
-  std::vector<size_t> joins;
+  std::vector<NodeIdType> forks;
+  std::vector<NodeIdType> joins;
 
-  for (size_t i = 0; i < nodes.size(); ++i) {
+  for (NodeIdType i = 0; i < nodes.size(); ++i) {
     if (isForkNode(i)) {
       forks.push_back(i);
     } else if (isJoinNode(i)) {
@@ -157,21 +157,21 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
   }
 
   // Track unique node sets we've seen
-  std::set<std::set<size_t>> seenNodeSets;
+  std::set<std::set<NodeIdType>> seenNodeSets;
   std::vector<ReconvergentPath> paths;
 
-  for (size_t forkId : forks) {
+  for (NodeIdType forkId : forks) {
     // BFS forward from fork to find all reachable nodes
     std::vector<bool> reachableFromFork(nodes.size(), false);
-    std::queue<size_t> fwdQueue;
+    std::queue<NodeIdType> fwdQueue;
     fwdQueue.push(forkId);
     reachableFromFork[forkId] = true;
 
     while (!fwdQueue.empty()) {
-      size_t u = fwdQueue.front();
+      NodeIdType u = fwdQueue.front();
       fwdQueue.pop();
       for (size_t edgeId : adjList[u]) {
-        size_t v = edges[edgeId].dstId;
+        NodeIdType v = edges[edgeId].dstId;
         if (!reachableFromFork[v]) {
           reachableFromFork[v] = true;
           fwdQueue.push(v);
@@ -179,22 +179,22 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
       }
     }
 
-    for (size_t joinId : joins) {
+    for (NodeIdType joinId : joins) {
       // Skip if join is not reachable from fork
       if (!reachableFromFork[joinId])
         continue;
 
       // BFS backward from join to find all nodes that can reach it
       std::vector<bool> canReachJoin(nodes.size(), false);
-      std::queue<size_t> bwdQueue;
+      std::queue<NodeIdType> bwdQueue;
       bwdQueue.push(joinId);
       canReachJoin[joinId] = true;
 
       while (!bwdQueue.empty()) {
-        size_t u = bwdQueue.front();
+        NodeIdType u = bwdQueue.front();
         bwdQueue.pop();
         for (size_t edgeId : revAdjList[u]) {
-          size_t v = edges[edgeId].srcId;
+          NodeIdType v = edges[edgeId].srcId;
           if (!canReachJoin[v]) {
             canReachJoin[v] = true;
             bwdQueue.push(v);
@@ -207,7 +207,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
       // divergence/reconvergence.
       unsigned numDivergingPaths = 0;
       for (size_t edgeId : adjList[forkId]) {
-        size_t successor = edges[edgeId].dstId;
+        NodeIdType successor = edges[edgeId].dstId;
         if (canReachJoin[successor])
           numDivergingPaths++;
       }
@@ -217,8 +217,8 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
         continue;
 
       // Nodes reachable from fork AND can reach join
-      std::set<size_t> intersection;
-      for (size_t i = 0; i < nodes.size(); ++i) {
+      std::set<NodeIdType> intersection;
+      for (NodeIdType i = 0; i < nodes.size(); ++i) {
         if (reachableFromFork[i] && canReachJoin[i])
           intersection.insert(i);
       }
@@ -279,7 +279,7 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
     file << "    bgcolor=\"#e8f4fc\";\n\n";
 
     // Emit nodes with unique IDs per path to avoid conflicts
-    for (size_t nodeId : path.nodeIds) {
+    for (NodeIdType nodeId : path.nodeIds) {
       std::string uniqueId =
           "p" + std::to_string(pathIdx) + "_" + getNodeDotId(nodeId);
       std::string color = "";
@@ -295,10 +295,10 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
     file << "\n";
 
     // Emit edges within this path (different styles for intra/inter-BB)
-    for (size_t srcId : path.nodeIds) {
+    for (NodeIdType srcId : path.nodeIds) {
       for (size_t edgeId : adjList[srcId]) {
         auto &edge = edges[edgeId];
-        size_t dstId = edge.dstId;
+        NodeIdType dstId = edge.dstId;
         if (path.nodeIds.count(dstId)) {
           std::string srcUniqueId =
               "p" + std::to_string(pathIdx) + "_" + getNodeDotId(srcId);
@@ -426,7 +426,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
     file << "    bgcolor=\"#f8f8ff\";\n\n";
 
     // Group nodes by step to create nested clusters
-    std::map<unsigned, std::vector<size_t>> nodesByStep;
+    std::map<unsigned, std::vector<NodeIdType>> nodesByStep;
     for (const auto &node : graph.nodes) {
       nodesByStep[graph.getNodeStep(node.id)].push_back(node.id);
     }
@@ -441,7 +441,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
       file << "      color=black;\n";
       file << "      bgcolor=\"#f0f0f0\";\n";
 
-      for (size_t nodeId : stepNodeIds) {
+      for (NodeIdType nodeId : stepNodeIds) {
         file << "      " << graphPrefix << graph.getNodeDotId(nodeId)
              << " [label=\"" << graph.getNodeLabel(nodeId) << "\"];\n";
       }
@@ -516,7 +516,7 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
       file << "    bgcolor=\"#e8f4fc\";\n\n";
 
       // Emit nodes with unique IDs
-      for (size_t nodeId : path.nodeIds) {
+      for (NodeIdType nodeId : path.nodeIds) {
         std::string uniqueId = uniquePrefix + graph->getNodeDotId(nodeId);
         std::string color = "";
         if (nodeId == path.forkNodeId)
@@ -531,10 +531,10 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
       file << "\n";
 
       // Emit edges within this path
-      for (size_t srcId : path.nodeIds) {
+      for (NodeIdType srcId : path.nodeIds) {
         for (size_t edgeId : graph->adjList[srcId]) {
           const auto &edge = graph->edges[edgeId];
-          size_t dstId = edge.dstId;
+          NodeIdType dstId = edge.dstId;
           if (path.nodeIds.count(dstId)) {
             std::string srcUniqueId = uniquePrefix + graph->getNodeDotId(srcId);
             std::string dstUniqueId = uniquePrefix + graph->getNodeDotId(dstId);
@@ -564,15 +564,15 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 // [END AI-generated code]
 
 bool SimpleCycle::isDisjointFrom(const SimpleCycle &other) const {
-  std::set<size_t> thisNodes(nodes.begin(), nodes.end());
+  std::set<NodeIdType> thisNodes(nodes.begin(), nodes.end());
   return std::all_of(other.nodes.begin(), other.nodes.end(),
-                     [&](size_t id) { return !thisNodes.count(id); });
+                     [&](NodeIdType id) { return !thisNodes.count(id); });
 }
 
-size_t SynchronizingCyclesFinderGraph::getOrAddNode(mlir::Operation *op) {
+NodeIdType SynchronizingCyclesFinderGraph::getOrAddNode(mlir::Operation *op) {
   if (auto it = opToNodeId.find(op); it != opToNodeId.end())
     return it->second;
-  size_t id = addNode(op);
+  NodeIdType id = addNode(op);
   opToNodeId[op] = id;
   return id;
 }
@@ -594,18 +594,20 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
              "CFDFC channel producer must be in CFDFC units");
       assert(opToNodeId.count(consumer) &&
              "CFDFC channel consumer must be in CFDFC units");
-      size_t srcId = opToNodeId[producer];
-      size_t dstId = opToNodeId[consumer];
+      NodeIdType srcId = opToNodeId[producer];
+      NodeIdType dstId = opToNodeId[consumer];
       addEdge(srcId, dstId, channel);
     }
   }
 }
 
-std::string SynchronizingCyclesFinderGraph::getNodeLabel(size_t nodeId) const {
+std::string
+SynchronizingCyclesFinderGraph::getNodeLabel(NodeIdType nodeId) const {
   return nodes[nodeId].op->getName().getStringRef().str();
 }
 
-std::string SynchronizingCyclesFinderGraph::getNodeDotId(size_t nodeId) const {
+std::string
+SynchronizingCyclesFinderGraph::getNodeDotId(NodeIdType nodeId) const {
   return "node_" + std::to_string(nodeId);
 }
 
@@ -621,12 +623,12 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   // DFS to compute finishing order
   std::vector<bool> visited(/*count=*/n, /*initialValue*/ false);
-  std::stack<size_t> finishOrder;
+  std::stack<NodeIdType> finishOrder;
 
-  std::function<void(size_t)> dfs1 = [&](size_t currentNode) {
+  std::function<void(NodeIdType)> dfs1 = [&](NodeIdType currentNode) {
     visited[currentNode] = true;
     for (size_t edgeIdx : adjList[currentNode]) {
-      size_t successorNode = edges[edgeIdx].dstId;
+      NodeIdType successorNode = edges[edgeIdx].dstId;
       if (!visited[successorNode]) {
         dfs1(successorNode);
       }
@@ -634,14 +636,14 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
     finishOrder.push(currentNode);
   };
 
-  for (size_t i = 0; i < n; ++i) {
+  for (NodeIdType i = 0; i < n; ++i) {
     if (!visited[i]) {
       dfs1(i);
     }
   }
 
   // Build reverse adjacency list
-  std::vector<std::vector<size_t>> revAdj(n);
+  std::vector<std::vector<NodeIdType>> revAdj(n);
   for (const auto &edge : edges) {
     revAdj[edge.dstId].push_back(edge.srcId);
   }
@@ -651,11 +653,11 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   std::fill(visited.begin(), visited.end(), false);
   size_t sccCount = 0;
 
-  std::function<void(size_t, size_t)> dfs2 = [&](size_t currentNode,
-                                                 size_t sccId) {
+  std::function<void(NodeIdType, size_t)> dfs2 = [&](NodeIdType currentNode,
+                                                     size_t sccId) {
     visited[currentNode] = true;
     nodeSccId[currentNode] = sccId;
-    for (size_t successorNode : revAdj[currentNode]) {
+    for (NodeIdType successorNode : revAdj[currentNode]) {
       if (!visited[successorNode]) {
         dfs2(successorNode, sccId);
       }
@@ -663,7 +665,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   };
 
   while (!finishOrder.empty()) {
-    size_t currentNode = finishOrder.top();
+    NodeIdType currentNode = finishOrder.top();
     finishOrder.pop();
     if (!visited[currentNode]) {
       dfs2(currentNode, sccCount);
@@ -690,9 +692,9 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
                           << " edges.\n");
 }
 
-std::vector<size_t> SynchronizingCyclesFinderGraph::getAllJoins() const {
-  std::vector<size_t> joins;
-  for (size_t i = 0; i < nodes.size(); ++i) {
+std::vector<NodeIdType> SynchronizingCyclesFinderGraph::getAllJoins() const {
+  std::vector<NodeIdType> joins;
+  for (NodeIdType i = 0; i < nodes.size(); ++i) {
     if (isJoinNode(i)) {
       joins.push_back(i);
     }
@@ -700,23 +702,23 @@ std::vector<size_t> SynchronizingCyclesFinderGraph::getAllJoins() const {
   return joins;
 }
 
-std::vector<size_t>
+std::vector<NodeIdType>
 SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
-                                               size_t joinId) const {
+                                               NodeIdType joinId) const {
 
-  std::set<size_t> cycleNodes(cycle.nodes.begin(), cycle.nodes.end());
+  std::set<NodeIdType> cycleNodes(cycle.nodes.begin(), cycle.nodes.end());
 
   // BFS to find shortest path from cycle to join via non-cyclic edges.
   // Queue is seeded with nodes just outside the cycle; predecessor map tracks
   // the path for reconstruction once joinId is reached.
-  std::map<size_t, size_t> predecessor;
-  std::queue<size_t> bfs;
+  std::map<NodeIdType, NodeIdType> predecessor;
+  std::queue<NodeIdType> bfs;
 
   // exit nodes are pretty much cycle nodes that are neighbors of nodes not in
   // the cycle.
-  for (size_t nodeId : cycleNodes) {
+  for (NodeIdType nodeId : cycleNodes) {
     for (size_t edgeIdx : nonCyclicAdjList[nodeId]) {
-      size_t neighbor = edges[edgeIdx].dstId;
+      NodeIdType neighbor = edges[edgeIdx].dstId;
       if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
         predecessor[neighbor] = nodeId;
         bfs.push(neighbor);
@@ -725,13 +727,13 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
   }
 
   while (!bfs.empty()) {
-    size_t current = bfs.front();
+    NodeIdType current = bfs.front();
     bfs.pop();
 
     if (current == joinId) {
       // get path from cycle exit to join
-      std::vector<size_t> path;
-      size_t node = joinId;
+      std::vector<NodeIdType> path;
+      NodeIdType node = joinId;
       while (!cycleNodes.count(node)) {
         path.push_back(node);
         node = predecessor[node];
@@ -742,7 +744,7 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
 
     // continue BFS using non-cyclic edges
     for (size_t edgeIdx : nonCyclicAdjList[current]) {
-      size_t neighbor = edges[edgeIdx].dstId;
+      NodeIdType neighbor = edges[edgeIdx].dstId;
       if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
         predecessor[neighbor] = current;
         bfs.push(neighbor);
@@ -780,7 +782,7 @@ SynchronizingCyclesFinderGraph::findSynchronizingCyclePairs() {
   LLVM_DEBUG(llvm::errs() << "Found " << allCycles.size()
                           << " cycles in CFDFC.\n");
 
-  std::vector<size_t> allJoins = getAllJoins();
+  std::vector<NodeIdType> allJoins = getAllJoins();
   LLVM_DEBUG(llvm::errs() << "Found " << allJoins.size()
                           << " joins in CFDFC.\n");
 
@@ -799,7 +801,7 @@ SynchronizingCyclesFinderGraph::findSynchronizingCyclePairs() {
       // Criteria 2: Find joins reachable from BOTH cycles via non-cyclic paths
       std::vector<PathToJoin> pathsToJoins;
 
-      for (size_t joinId : allJoins) {
+      for (NodeIdType joinId : allJoins) {
         auto pathOne = findPathToJoin(cycleOne, joinId);
         auto pathTwo = findPathToJoin(cycleTwo, joinId);
 
@@ -866,13 +868,13 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
     return;
   }
 
-  std::set<size_t> cycleOneNodes(pair.cycleOne.nodes.begin(),
-                                 pair.cycleOne.nodes.end());
-  std::set<size_t> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
-                                 pair.cycleTwo.nodes.end());
+  std::set<NodeIdType> cycleOneNodes(pair.cycleOne.nodes.begin(),
+                                     pair.cycleOne.nodes.end());
+  std::set<NodeIdType> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
+                                     pair.cycleTwo.nodes.end());
 
   // Collect all path nodes (excluding the join itself)
-  std::set<size_t> pathOneNodes, pathTwoNodes;
+  std::set<NodeIdType> pathOneNodes, pathTwoNodes;
   for (const auto &pathInfo : pair.pathsToJoins) {
     for (size_t i = 0; i + 1 < pathInfo.pathFromCycleOne.size(); ++i)
       pathOneNodes.insert(pathInfo.pathFromCycleOne[i]);
@@ -895,15 +897,15 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   file << "    fontcolor=\"#1b5e20\";\n";
   file << "    fontsize=12;\n\n";
 
-  for (size_t nodeId : cycleOneNodes) {
+  for (NodeIdType nodeId : cycleOneNodes) {
     file << "    c1_" << getNodeDotId(nodeId) << " [label=\""
          << getNodeLabel(nodeId)
          << "\", style=filled, fillcolor=\"#a5d6a7\", color=\"#2e7d32\"];\n";
   }
   file << "\n";
   for (size_t i = 0; i < pair.cycleOne.nodes.size(); ++i) {
-    size_t src = pair.cycleOne.nodes[i];
-    size_t dst = pair.cycleOne.nodes[(i + 1) % pair.cycleOne.nodes.size()];
+    NodeIdType src = pair.cycleOne.nodes[i];
+    NodeIdType dst = pair.cycleOne.nodes[(i + 1) % pair.cycleOne.nodes.size()];
     file << "    c1_" << getNodeDotId(src) << " -> c1_" << getNodeDotId(dst)
          << " [color=\"#2e7d32\", penwidth=2];\n";
   }
@@ -918,15 +920,15 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   file << "    fontcolor=\"#0d47a1\";\n";
   file << "    fontsize=12;\n\n";
 
-  for (size_t nodeId : cycleTwoNodes) {
+  for (NodeIdType nodeId : cycleTwoNodes) {
     file << "    c2_" << getNodeDotId(nodeId) << " [label=\""
          << getNodeLabel(nodeId)
          << "\", style=filled, fillcolor=\"#90caf9\", color=\"#1565c0\"];\n";
   }
   file << "\n";
   for (size_t i = 0; i < pair.cycleTwo.nodes.size(); ++i) {
-    size_t src = pair.cycleTwo.nodes[i];
-    size_t dst = pair.cycleTwo.nodes[(i + 1) % pair.cycleTwo.nodes.size()];
+    NodeIdType src = pair.cycleTwo.nodes[i];
+    NodeIdType dst = pair.cycleTwo.nodes[(i + 1) % pair.cycleTwo.nodes.size()];
     file << "    c2_" << getNodeDotId(src) << " -> c2_" << getNodeDotId(dst)
          << " [color=\"#1565c0\", penwidth=2];\n";
   }
@@ -935,7 +937,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   // Path nodes from Cycle One (light green)
   if (!pathOneNodes.empty()) {
     file << "  // Path nodes from Cycle One to joins\n";
-    for (size_t nodeId : pathOneNodes) {
+    for (NodeIdType nodeId : pathOneNodes) {
       file << "  path1_" << getNodeDotId(nodeId) << " [label=\""
            << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#c8e6c9\", color=\"#66bb6a\"];\n";
@@ -946,7 +948,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   // Path nodes from Cycle Two (light blue)
   if (!pathTwoNodes.empty()) {
     file << "  // Path nodes from Cycle Two to joins\n";
-    for (size_t nodeId : pathTwoNodes) {
+    for (NodeIdType nodeId : pathTwoNodes) {
       file << "  path2_" << getNodeDotId(nodeId) << " [label=\""
            << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#bbdefb\", color=\"#42a5f5\"];\n";
@@ -984,7 +986,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
       // Path from Cycle One
       if (!path1.empty()) {
         // Find which cycle node connects to first path node
-        for (size_t cycleNode : cycleOneNodes) {
+        for (NodeIdType cycleNode : cycleOneNodes) {
           for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
             if (edges[edgeIdx].dstId == path1[0]) {
               std::string src = "c1_" + getNodeDotId(cycleNode);
@@ -1013,7 +1015,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
 
       // Path from Cycle Two
       if (!path2.empty()) {
-        for (size_t cycleNode : cycleTwoNodes) {
+        for (NodeIdType cycleNode : cycleTwoNodes) {
           for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
             if (edges[edgeIdx].dstId == path2[0]) {
               std::string src = "c2_" + getNodeDotId(cycleNode);
@@ -1068,13 +1070,13 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     const SynchronizingCyclePair &pair = pairs[pairIdx];
     std::string prefix = "p" + std::to_string(pairIdx) + "_";
 
-    std::set<size_t> cycleOneNodes(pair.cycleOne.nodes.begin(),
-                                   pair.cycleOne.nodes.end());
-    std::set<size_t> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
-                                   pair.cycleTwo.nodes.end());
+    std::set<NodeIdType> cycleOneNodes(pair.cycleOne.nodes.begin(),
+                                       pair.cycleOne.nodes.end());
+    std::set<NodeIdType> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
+                                       pair.cycleTwo.nodes.end());
 
     // Collect path nodes
-    std::set<size_t> pathOneNodes, pathTwoNodes;
+    std::set<NodeIdType> pathOneNodes, pathTwoNodes;
     for (const auto &pathInfo : pair.pathsToJoins) {
       for (size_t i = 0; i + 1 < pathInfo.pathFromCycleOne.size(); ++i)
         pathOneNodes.insert(pathInfo.pathFromCycleOne[i]);
@@ -1099,15 +1101,16 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     file << "      fillcolor=\"#e8f5e9\";\n";
     file << "      fontcolor=\"#1b5e20\";\n\n";
 
-    for (size_t nodeId : cycleOneNodes) {
+    for (NodeIdType nodeId : cycleOneNodes) {
       file << "      " << prefix << "c1_" << getNodeDotId(nodeId)
            << " [label=\"" << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#a5d6a7\", color=\"#2e7d32\"];\n";
     }
     file << "\n";
     for (size_t i = 0; i < pair.cycleOne.nodes.size(); ++i) {
-      size_t src = pair.cycleOne.nodes[i];
-      size_t dst = pair.cycleOne.nodes[(i + 1) % pair.cycleOne.nodes.size()];
+      NodeIdType src = pair.cycleOne.nodes[i];
+      NodeIdType dst =
+          pair.cycleOne.nodes[(i + 1) % pair.cycleOne.nodes.size()];
       file << "      " << prefix << "c1_" << getNodeDotId(src) << " -> "
            << prefix << "c1_" << getNodeDotId(dst)
            << " [color=\"#2e7d32\", penwidth=2];\n";
@@ -1123,15 +1126,16 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     file << "      fillcolor=\"#e3f2fd\";\n";
     file << "      fontcolor=\"#0d47a1\";\n\n";
 
-    for (size_t nodeId : cycleTwoNodes) {
+    for (NodeIdType nodeId : cycleTwoNodes) {
       file << "      " << prefix << "c2_" << getNodeDotId(nodeId)
            << " [label=\"" << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#90caf9\", color=\"#1565c0\"];\n";
     }
     file << "\n";
     for (size_t i = 0; i < pair.cycleTwo.nodes.size(); ++i) {
-      size_t src = pair.cycleTwo.nodes[i];
-      size_t dst = pair.cycleTwo.nodes[(i + 1) % pair.cycleTwo.nodes.size()];
+      NodeIdType src = pair.cycleTwo.nodes[i];
+      NodeIdType dst =
+          pair.cycleTwo.nodes[(i + 1) % pair.cycleTwo.nodes.size()];
       file << "      " << prefix << "c2_" << getNodeDotId(src) << " -> "
            << prefix << "c2_" << getNodeDotId(dst)
            << " [color=\"#1565c0\", penwidth=2];\n";
@@ -1141,7 +1145,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     // Path nodes from Cycle One
     if (!pathOneNodes.empty()) {
       file << "    // Path nodes from Cycle One\n";
-      for (size_t nodeId : pathOneNodes) {
+      for (NodeIdType nodeId : pathOneNodes) {
         file
             << "    " << prefix << "path1_" << getNodeDotId(nodeId)
             << " [label=\"" << getNodeLabel(nodeId)
@@ -1153,7 +1157,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     // Path nodes from Cycle Two
     if (!pathTwoNodes.empty()) {
       file << "    // Path nodes from Cycle Two\n";
-      for (size_t nodeId : pathTwoNodes) {
+      for (NodeIdType nodeId : pathTwoNodes) {
         file
             << "    " << prefix << "path2_" << getNodeDotId(nodeId)
             << " [label=\"" << getNodeLabel(nodeId)
@@ -1188,7 +1192,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
 
         // Path from Cycle One
         if (!path1.empty()) {
-          for (size_t cycleNode : cycleOneNodes) {
+          for (NodeIdType cycleNode : cycleOneNodes) {
             for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
               if (edges[edgeIdx].dstId == path1[0]) {
                 std::string src = prefix + "c1_" + getNodeDotId(cycleNode);
@@ -1218,7 +1222,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
 
         // Path from Cycle Two
         if (!path2.empty()) {
-          for (size_t cycleNode : cycleTwoNodes) {
+          for (NodeIdType cycleNode : cycleTwoNodes) {
             for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
               if (edges[edgeIdx].dstId == path2[0]) {
                 std::string src = prefix + "c2_" + getNodeDotId(cycleNode);
