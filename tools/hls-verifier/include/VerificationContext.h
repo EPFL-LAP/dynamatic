@@ -31,14 +31,12 @@ static const std::string GHDL_SCRIPT_FILE = "simulation_ghdl.sh";
 static const std::string XSIM_SCRIPT_FILE = "simulation_xsim.prj";
 static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 
-enum HdlType { VHDL, VERILOG };
-
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp, bool vivadoFPU, HdlType hdl)
+                      handshake::FuncOp *funcOp, bool vivadoFPU)
       : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
-        vivadoFPU(vivadoFPU), simLanguage(hdl) {}
+        vivadoFPU(vivadoFPU) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -54,17 +52,10 @@ struct VerificationContext {
   // Whether to use Vivado FPU for floating-point operations
   bool vivadoFPU;
 
-  // Wheter to use VHDL or VERILOG for the testbench
-  HdlType simLanguage;
-
   bool useVivadoFPU() const { return vivadoFPU; }
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
-  }
-
-  std::string getVerilogTestbenchPath() const {
-    return getHdlSrcDir() + SEP + "tb_" + kernelName + ".v";
   }
 
   std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }

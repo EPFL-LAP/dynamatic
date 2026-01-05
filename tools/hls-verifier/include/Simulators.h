@@ -44,8 +44,8 @@ public:
   XSimSimulator(VerificationContext *context) : Simulator(context) {}
 
   void execSimulation() const override {
-    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "--timescale",
-         "1ns/1ps", "-s", "tb", "-R");
+    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "-s", "tb",
+         "-R");
   }
 
   mlir::LogicalResult generateScripts() const override {
