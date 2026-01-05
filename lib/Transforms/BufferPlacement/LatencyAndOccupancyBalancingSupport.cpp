@@ -642,12 +642,6 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
     }
   }
 
-  // Build reverse adjacency list
-  std::vector<std::vector<NodeIdType>> revAdj(n);
-  for (const auto &edge : edges) {
-    revAdj[edge.dstId].push_back(edge.srcId);
-  }
-
   // DFS on reverse graph in finish order to find SCCs
   nodeSccId.assign(n, 0);
   std::fill(visited.begin(), visited.end(), false);
@@ -657,7 +651,8 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
                                                      size_t sccId) {
     visited[currentNode] = true;
     nodeSccId[currentNode] = sccId;
-    for (NodeIdType successorNode : revAdj[currentNode]) {
+    for (size_t edgeIdx : revAdjList[currentNode]) {
+      NodeIdType successorNode = edges[edgeIdx].srcId;
       if (!visited[successorNode]) {
         dfs2(successorNode, sccId);
       }
