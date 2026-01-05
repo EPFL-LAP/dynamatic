@@ -140,14 +140,9 @@ int main(int argc, char **argv) {
       cl::value_desc("vivado-fpu"), cl::init(false));
 
   cl::opt<std::string> simulatorType(
-      "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
+      "simulator",
+      cl::desc("Simulator of choice (options: xsim, ghdl, vsim, verilator)"),
       cl::value_desc("Simulator of choice"), cl::init("vsim"));
-
-  cl::opt<std::string> hdlType("hdl",
-                               cl::desc("HDL used for simulation. Can either "
-                                        "be 'vhdl' (default) or 'verilog'"),
-                               cl::value_desc("HDL for simulation"),
-                               cl::init("vhdl"));
 
   cl::opt<std::string> hdlType("hdl",
                                cl::desc("HDL used for simulation. Can either "
@@ -205,6 +200,8 @@ int main(int argc, char **argv) {
     simulator = std::make_unique<VSimSimulator>(&ctx);
   } else if (simulatorType == "xsim") {
     simulator = std::make_unique<XSimSimulator>(&ctx);
+  } else if (simulatorType == "verilator") {
+    simulator = std::make_unique<Verilator>(&ctx);
   } else {
     logErr(LOG_TAG, "Wrong Simulator (use vsim, xsim, ghdl, verilator)");
     return 1;

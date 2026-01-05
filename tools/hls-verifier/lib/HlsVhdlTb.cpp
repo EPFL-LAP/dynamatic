@@ -296,7 +296,7 @@ struct StartToChannelConnector {
     commonSingleArgumentDeclaration(argInst, argName);
     argInst.connect(CE0_PORT, SignalAssignment::CONST_ONE)
         .connect(WE0_PORT, SignalAssignment::CONST_ZERO)
-        .connect(D_IN0_PORT, "(others => '0')");
+        .connect(D_IN0_PORT, SignalAssignment::CONST_ZERO);
     argInst.emit(os, ctx);
   }
 
