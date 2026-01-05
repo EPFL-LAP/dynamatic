@@ -151,14 +151,20 @@ initial begin
 
   repeat(3)@(posedge tb_clk);
 
-  $display("Simulation done! Latency = %0d cycles",
-           ($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD));
-
   $display("NORMAL EXIT (note: failure is to force the simulator to stop)");
   $finish;
 
   forever @(posedge tb_clk);
 end
+
+// Equivalent of VHDL gen_sim_latency_proc
+always @(posedge tb_clk) begin
+    if (tb_global_valid && tb_global_ready) begin
+        $display("Simulation done! Latency = %0d cycles",
+                 ($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD));
+    end
+end
+  
 
 // Equivalent of VHDL gen_clock_proc
 initial begin
