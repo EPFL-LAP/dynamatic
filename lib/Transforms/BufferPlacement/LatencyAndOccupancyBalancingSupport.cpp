@@ -599,16 +599,16 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
 
   for (mlir::Value channel : cfdfc.channels) {
     mlir::Operation *producer = channel.getDefiningOp();
-    if (!producer)
-      continue;
+    assert(producer && "CFDFC channel must have a defining operation");
 
     for (mlir::Operation *consumer : channel.getUsers()) {
-      // Only add edge if both producer and consumer are in the CFDFC
-      if (opToNodeId.count(producer) && opToNodeId.count(consumer)) {
-        size_t srcId = opToNodeId[producer];
-        size_t dstId = opToNodeId[consumer];
-        addEdge(srcId, dstId, channel);
-      }
+      assert(opToNodeId.count(producer) &&
+             "CFDFC channel producer must be in CFDFC units");
+      assert(opToNodeId.count(consumer) &&
+             "CFDFC channel consumer must be in CFDFC units");
+      size_t srcId = opToNodeId[producer];
+      size_t dstId = opToNodeId[consumer];
+      addEdge(srcId, dstId, channel);
     }
   }
 }
