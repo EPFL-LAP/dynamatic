@@ -318,6 +318,9 @@ private:
   std::vector<size_t> getAllJoins() const;
 };
 
+// Helper struct needed for Boost's tiernan_all_cycles algorithm.
+// As opposed to just returning cycles directly, it calls a method on a
+// user-provided visitor object each time a cycle is found.
 struct CycleCollector {
   std::vector<SimpleCycle> &cycles;
 
