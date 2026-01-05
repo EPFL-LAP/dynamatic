@@ -612,8 +612,7 @@ SynchronizingCyclesFinderGraph::getNodeDotId(NodeIdType nodeId) const {
 }
 
 void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
-  size_t n = nodes.size();
-  if (n == 0)
+  if (nodes.size() == 0)
     return;
 
   /// Kosaraju's algorithm for SCCs
@@ -622,7 +621,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   ///  Kept separate because we need the non-cyclic adjacency list.
 
   // DFS to compute finishing order
-  std::vector<bool> visited(/*count=*/n, /*initialValue*/ false);
+  std::vector<bool> visited(/*count=*/nodes.size(), /*initialValue*/ false);
   std::stack<NodeIdType> finishOrder;
 
   std::function<void(NodeIdType)> dfs1 = [&](NodeIdType currentNode) {
@@ -636,14 +635,14 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
     finishOrder.push(currentNode);
   };
 
-  for (NodeIdType i = 0; i < n; ++i) {
+  for (NodeIdType i = 0; i < nodes.size(); ++i) {
     if (!visited[i]) {
       dfs1(i);
     }
   }
 
   // DFS on reverse graph in finish order to find SCCs
-  nodeSccId.assign(n, 0);
+  std::vector<size_t> nodeSccId(nodes.size(), 0);
   std::fill(visited.begin(), visited.end(), false);
   size_t sccCount = 0;
 
@@ -669,7 +668,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   }
 
   // Build non-cyclic adjacency list (only edges between different SCCs)
-  nonCyclicAdjList.resize(n);
+  nonCyclicAdjList.resize(nodes.size());
   for (size_t edgeIdx = 0; edgeIdx < edges.size(); ++edgeIdx) {
     const auto &edge = edges[edgeIdx];
     if (nodeSccId[edge.srcId] != nodeSccId[edge.dstId]) {
@@ -678,7 +677,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   }
 
   LLVM_DEBUG(llvm::errs() << "Computed " << sccCount << " SCCs in CFDFC with "
-                          << n << " nodes. Non-cyclic subgraph has "
+                          << nodes.size() << " nodes. Non-cyclic subgraph has "
                           << std::accumulate(nonCyclicAdjList.begin(),
                                              nonCyclicAdjList.end(), 0UL,
                                              [](size_t sum, const auto &v) {
