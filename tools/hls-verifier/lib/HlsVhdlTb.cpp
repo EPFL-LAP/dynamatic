@@ -322,8 +322,10 @@ struct StartToControlConnector {
       // the function is strictly executed only once).
       //
       // [HACK] We hardcode the name "start" for the function start signal.
-      duvInst.connect(argName + "_valid", "tb_start_valid")
-          .connect(argName + "_ready", "tb_start_ready");
+      if (ctx.isSeparateHandshake) {
+        duvInst.connect(argName + "_valid", "tb_start_valid")
+            .connect(argName + "_ready", "tb_start_ready");
+      }
     } else {
       // Memory arguments: they are driven by valid = "constant_1", their
       // ready signals are ignored.
