@@ -213,6 +213,11 @@ public:
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
   /// prefix. The input is a vector of (sequenceIndex, (graph, paths)) pairs.
+  /// @param graphPaths Vector of (seqIdx, (graph*, paths)) tuples. 
+  /// Each element corresponds to a transition sequence and contains:
+  /// - seqIdx: Index of the transition sequence.
+  /// - graph*: Pointer to the ReconvergentPathFinderGraph for this sequence.
+  /// - paths: Vector of ReconvergentPath objects for this sequence.
   static void dumpAllReconvergentPaths(
       const std::vector<
           std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
