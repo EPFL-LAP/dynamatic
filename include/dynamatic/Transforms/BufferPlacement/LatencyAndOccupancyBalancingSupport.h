@@ -173,8 +173,17 @@ enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
 class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
 public:
-  bool isForkNode(size_t nodeId) const override;
-  bool isJoinNode(size_t nodeId) const override;
+  bool isForkNode(size_t nodeId) const override {
+    return isa<handshake::ForkOp>(nodes[nodeId].op) ||
+           isa<handshake::LazyForkOp>(nodes[nodeId].op);
+  }
+
+  // Those two nodes are the only nodes with two inputs that allow for both
+  // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
+  bool isJoinNode(size_t nodeId) const override {
+    return isa<handshake::MuxOp>(nodes[nodeId].op) ||
+           isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
+  }
 
   std::string getNodeLabel(size_t nodeId) const override;
   std::string getNodeDotId(size_t nodeId) const override;
@@ -287,8 +296,19 @@ public:
   /// Find all pairs of synchronizing cylces.
   std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
-  bool isForkNode(size_t nodeId) const override;
-  bool isJoinNode(size_t nodeId) const override;
+  bool isForkNode(size_t nodeId) const override {
+    return isa<handshake::ForkOp>(nodes[nodeId].op) ||
+           isa<handshake::LazyForkOp>(nodes[nodeId].op);
+  }
+
+  bool isJoinNode(size_t nodeId) const override {
+    return isa<handshake::MuxOp>(nodes[nodeId].op) ||
+           isa<handshake::ConditionalBranchOp>(nodes[nodeId].op) ||
+           isa<handshake::AddFOp>(nodes[nodeId].op) ||
+           isa<handshake::SubFOp>(nodes[nodeId].op) ||
+           isa<handshake::MulFOp>(nodes[nodeId].op) ||
+           isa<handshake::StoreOp>(nodes[nodeId].op);
+  }
 
   std::string getNodeLabel(size_t nodeId) const override;
   std::string getNodeDotId(size_t nodeId) const override;
