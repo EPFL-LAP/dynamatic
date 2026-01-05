@@ -329,9 +329,6 @@ public:
 private:
   std::map<mlir::Operation *, NodeIdType> opToNodeId;
 
-  /// SCC ID for each node (indexed by node ID).
-  std::vector<size_t> nodeSccId;
-
   /// Adjacency list for the non-cyclic subgraph (stores edge indices).
   std::vector<std::vector<size_t>> nonCyclicAdjList;
 
