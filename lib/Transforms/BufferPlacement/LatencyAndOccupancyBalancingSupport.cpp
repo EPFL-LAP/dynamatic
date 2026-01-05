@@ -40,18 +40,6 @@ namespace dynamatic {
 
 ///=== RECONVERGENT PATH FINDER ===///
 
-bool ReconvergentPathFinderGraph::isForkNode(size_t nodeId) const {
-  return isa<handshake::ForkOp>(nodes[nodeId].op) ||
-         isa<handshake::LazyForkOp>(nodes[nodeId].op);
-}
-
-// Those two nodes are the only nodes with two inputs that allow for both inputs
-// to be active at the same time. Unlike: ControlMergeOp and MergeOp.
-bool ReconvergentPathFinderGraph::isJoinNode(size_t nodeId) const {
-  return isa<handshake::MuxOp>(nodes[nodeId].op) ||
-         isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
-}
-
 std::string ReconvergentPathFinderGraph::getNodeLabel(size_t nodeId) const {
   std::string opName = nodes[nodeId].op->getName().getStringRef().str();
   return opName + "\\nStep: " + std::to_string(getNodeStep(nodeId));
@@ -611,16 +599,6 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
       addEdge(srcId, dstId, channel);
     }
   }
-}
-
-bool SynchronizingCyclesFinderGraph::isForkNode(size_t nodeId) const {
-  return isa<handshake::ForkOp>(nodes[nodeId].op) ||
-         isa<handshake::LazyForkOp>(nodes[nodeId].op);
-}
-
-bool SynchronizingCyclesFinderGraph::isJoinNode(size_t nodeId) const {
-  return isa<handshake::MuxOp>(nodes[nodeId].op) ||
-         isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
 }
 
 std::string SynchronizingCyclesFinderGraph::getNodeLabel(size_t nodeId) const {
