@@ -707,9 +707,9 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
   std::set<size_t> cycleNodes(cycle.nodes.begin(), cycle.nodes.end());
 
   // BFS to find shortest path from cycle to join via non-cyclic edges.
-  // Queue is seeded with nodes just outside the cycle; parent map tracks
+  // Queue is seeded with nodes just outside the cycle; predecessor map tracks
   // the path for reconstruction once joinId is reached.
-  std::map<size_t, size_t> parent;
+  std::map<size_t, size_t> predecessor;
   std::queue<size_t> bfs;
 
   // exit nodes are pretty much cycle nodes that are neighbors of nodes not in
@@ -717,8 +717,8 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
   for (size_t nodeId : cycleNodes) {
     for (size_t edgeIdx : nonCyclicAdjList[nodeId]) {
       size_t neighbor = edges[edgeIdx].dstId;
-      if (!cycleNodes.count(neighbor) && !parent.count(neighbor)) {
-        parent[neighbor] = nodeId;
+      if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
+        predecessor[neighbor] = nodeId;
         bfs.push(neighbor);
       }
     }
@@ -734,7 +734,7 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
       size_t node = joinId;
       while (!cycleNodes.count(node)) {
         path.push_back(node);
-        node = parent[node];
+        node = predecessor[node];
       }
       std::reverse(path.begin(), path.end());
       return path;
@@ -743,8 +743,8 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
     // continue BFS using non-cyclic edges
     for (size_t edgeIdx : nonCyclicAdjList[current]) {
       size_t neighbor = edges[edgeIdx].dstId;
-      if (!cycleNodes.count(neighbor) && !parent.count(neighbor)) {
-        parent[neighbor] = current;
+      if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
+        predecessor[neighbor] = current;
         bfs.push(neighbor);
       }
     }

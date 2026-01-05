@@ -257,8 +257,8 @@ private:
 };
 
 struct SimpleCycle {
-  std::vector<size_t> nodes; // <-- The node IDs of the cycle.
-  SimpleCycle(std::vector<size_t> nodes) : nodes(std::move(nodes)) {}
+  llvm::SmallVector<size_t> nodes; // <-- The node IDs of the cycle.
+  SimpleCycle(llvm::SmallVector<size_t> nodes) : nodes(std::move(nodes)) {}
 
   /// Check if this cycle shares any nodes with another cycle.
   bool isDisjointFrom(const SimpleCycle &other) const;
