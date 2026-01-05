@@ -620,7 +620,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   ///  Kept separate because we need the non-cyclic adjacency list.
 
   // DFS to compute finishing order
-  std::vector<bool> visited(n, false);
+  std::vector<bool> visited(/*count=*/n, /*initialValue*/false);
   std::stack<size_t> finishOrder;
 
   std::function<void(size_t)> dfs1 = [&](size_t u) {
