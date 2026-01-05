@@ -706,7 +706,9 @@ SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
 
   std::set<size_t> cycleNodes(cycle.nodes.begin(), cycle.nodes.end());
 
-  // BFS from cycle exit nodes
+  // BFS to find shortest path from cycle to join via non-cyclic edges.
+  // Queue is seeded with nodes just outside the cycle; parent map tracks
+  // the path for reconstruction once joinId is reached.
   std::map<size_t, size_t> parent;
   std::queue<size_t> bfs;
 
