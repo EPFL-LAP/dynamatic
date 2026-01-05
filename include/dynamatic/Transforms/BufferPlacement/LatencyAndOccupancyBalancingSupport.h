@@ -260,8 +260,8 @@ struct PathToJoin {
 };
 
 struct SynchronizingCyclePair {
-  const SimpleCycle cycleOne;
-  const SimpleCycle cycleTwo;
+  SimpleCycle cycleOne;
+  SimpleCycle cycleTwo;
 
   std::vector<PathToJoin> pathsToJoins;
 
