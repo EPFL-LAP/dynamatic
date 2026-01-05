@@ -99,6 +99,25 @@ Dynamatic uses a resource sharing strategy based on [ASPLOS'25](https://dl.acm.o
 compile <...> --sharing
 ```
 
+### Handshake Logic Optimization via Rigidification
+
+Dynamatic uses formal verification to prove handshake logic redundancy (described in [FPGA'23](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/03/Xu_FPGA23_EliminatingExcessiveDynamism.pdf)), the proven redundancy can be safely removed without penalizing the performance.
+
+To enable this feature in Dynamatic, we need to pass an additional argument to `build.sh`.
+
+```sh
+# Downloads the model checker and enable test cases in CI/CD pipeline.
+bash build.sh --enable-leq-binaries
+```
+
+This makes the rigidification optimization feature available in the CLI tool `bin/dynamatic`. To enable this feature in an HLS flow, we can pass an additional argument to the `compile` CLI command:
+
+```sh
+# Generate formal model in the nuXmv input language (.smv), prove logic redundancy properties, and produce a
+# circuit with simplified handshake logic.
+compile <...> --rigidification
+```
+
 ## Custom Compilation Flows  
 Some other transformations also optimize the circuit, but they are not included in the normal compilation flow.
 In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.  

@@ -18,8 +18,10 @@
 #include <set>
 #include <string>
 
+#ifdef DYNAMATIC_ENABLE_CBC
 #include "coin/CbcModel.hpp"
 #include "coin/OsiClpSolverInterface.hpp"
+#endif // DYNAMATIC_ENABLE_CBC
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -377,7 +379,10 @@ public:
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
     GUROBI,
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#ifdef DYNAMATIC_ENABLE_CBC
     CBC,
+#endif // DYNAMATIC_ENABLE_CBC
+    DEFAULT // Dummy option
   };
   SolverKind solverKind;
   SolverKind getKind() const { return solverKind; }
@@ -387,7 +392,11 @@ public:
   // Solver timeout in second.
   // If timeout <= 0, then this option is ignored.
   int timeout;
-  CPSolver(int t, SolverKind k) : solverKind(k), timeout(t) {}
+
+  // Maximum number of threads used in MILP solving
+  int maxThreads;
+  CPSolver(int timeout, SolverKind k, int maxThreads)
+      : solverKind(k), timeout(timeout), maxThreads(maxThreads) {}
 
   virtual ~CPSolver() = default;
   // Virtual class methods: they provide a unified interface for all available
@@ -436,8 +445,9 @@ class GurobiSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  GurobiSolver(int timeout = -1 /* default = no timeout*/)
-      : CPSolver(timeout, GUROBI) {
+  GurobiSolver(int timeout = -1 /* default = no timeout*/,
+               int maxThreads = 4 /* default = maximum 4 threads */)
+      : CPSolver(timeout, GUROBI, maxThreads) {
     env = std::make_unique<GRBEnv>(true);
 
     // Suppress outputs to stdout (clashes with the MLIR output file).
@@ -448,6 +458,10 @@ public:
 
     if (timeout > 0) {
       env->set(GRB_DoubleParam_TimeLimit, timeout);
+    }
+
+    if (maxThreads > 0) {
+      env->set(GRB_IntParam_Threads, maxThreads);
     }
 
     env->start();
@@ -611,6 +625,8 @@ public:
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+#ifdef DYNAMATIC_ENABLE_CBC
+
 class CbcSolver : public CPSolver {
 
   OsiClpSolverInterface solver;
@@ -618,8 +634,9 @@ class CbcSolver : public CPSolver {
   std::set<std::string> names;
 
 public:
-  CbcSolver(int timeout = -1 /* default = no timeout */)
-      : CPSolver(timeout, CBC) {
+  CbcSolver(int timeout = -1 /* default = no timeout */,
+            int maxThreads = -1 /* note: currently this option has no effect */)
+      : CPSolver(timeout, CBC, maxThreads) {
     // Suppress the solver's output
     solver.messageHandler()->setLogLevel(-1);
     solver.getModelPtr()->messageHandler()->setLogLevel(-1);
@@ -790,5 +807,7 @@ public:
   static bool classof(const CPSolver *b) { return b->getKind() == CBC; }
   // [END LLVM RTTI prerequisites]
 };
+
+#endif // DYNAMATIC_ENABLE_CBC
 
 } // namespace dynamatic

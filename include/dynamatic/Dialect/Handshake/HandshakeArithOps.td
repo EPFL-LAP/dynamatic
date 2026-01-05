@@ -270,9 +270,6 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 }
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
   LatencyInterface
 ]>{
     let summary = "Signed integer division.";
@@ -288,9 +285,6 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
 }
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
   LatencyInterface
 ]>
 {
@@ -303,6 +297,14 @@ def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi"> {
 
 def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
   let summary = "Outputs the maximum between two input unsigned integers";
+}
+
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+  let summary = "Outputs the minimum between two input signed integers";
+}
+
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+  let summary = "Outputs the minimum between two input unsigned integers";
 }
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
@@ -416,7 +418,8 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
 }
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
-  IsFloatSizedChannel<32, "out">
+  IsFloatSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   // NOTE:
   // - This operation always translates an unsigned integer of any size into an
@@ -434,7 +437,8 @@ def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp",[
   IsIntSizedChannel<32, "in">,
-  IsFloatSizedChannel<32, "out">
+  IsFloatSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   let summary = "Converts a signed integer to float.";
 }

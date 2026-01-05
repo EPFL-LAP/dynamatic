@@ -17,7 +17,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -33,7 +32,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -42,6 +40,8 @@ using namespace dynamatic;
 static const char SEP = std::filesystem::path::preferred_separator;
 
 static const string LOG_TAG = "HLS_VERIFIER";
+
+namespace {
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
@@ -81,7 +81,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
     }
   }
 
-  for (auto [argName, type] : argAndTypeMap) {
+  for (const auto &[argName, type] : argAndTypeMap) {
     std::string vhdlOutFile =
         ctx.getHdlOutDir() + SEP + "output_" + argName + ".dat";
 
@@ -116,6 +116,8 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   return mlir::success();
 }
 
+} // namespace
+
 int main(int argc, char **argv) {
 
   cl::opt<std::string> simPathName(
@@ -139,7 +141,7 @@ int main(int argc, char **argv) {
 
   cl::opt<std::string> simulatorType(
       "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
-      cl::value_desc("Simulator of choice"), cl::init("ghdl"));
+      cl::value_desc("Simulator of choice"), cl::init("vsim"));
 
   cl::opt<std::string> hdlType("hdl",
                                cl::desc("HDL used for simulation. Can either "

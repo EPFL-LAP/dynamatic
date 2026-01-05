@@ -99,6 +99,8 @@ struct FrontendState {
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
+  std::string outputDir = "out";
+
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
@@ -123,7 +125,7 @@ struct FrontendState {
   }
 
   inline std::string getOutputDir() const {
-    return getKernelDir() + getSeparator() + "out";
+    return getKernelDir() + getSeparator() + outputDir;
   }
 
   std::string makeAbsolutePath(StringRef path);
@@ -266,6 +268,17 @@ public:
   }
   CommandResult execute(CommandArguments &args) override;
 };
+
+class SetOutputDir : public Command {
+public:
+  SetOutputDir(FrontendState &state)
+      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+    addPositionalArg({"out_dir", "out dir name"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 
 class Compile : public Command {
 public:
@@ -628,6 +641,26 @@ CommandResult SetSrc::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetOutputDir::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty output dir\n";
+    return CommandResult::FAIL;
+  }
+
+  llvm::StringRef outputDir = args.positionals.front();
+
+  // reject trivial bad cases
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+    return CommandResult::FAIL;
+
+  // reject illegal chars
+  if (outputDir.find_first_of("*?<>|\"") != llvm::StringRef::npos)
+    return CommandResult::FAIL;
+
+  state.outputDir = outputDir.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetCP::execute(CommandArguments &args) {
   if (args.positionals.empty()) {
     llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
@@ -705,13 +738,13 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     if (it->second == "verilog") {
       hdl = "verilog";
       state.hdl = VERILOG;
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
     } else if (it->second == "smv") {
       hdl = "smv";
-    } else if (it->second == "vhdl-beta") {
-      hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', 'vhdl-beta',"
+                   << "', possible options are 'vhdl',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
@@ -828,7 +861,17 @@ static void help(FrontendCommands &commands) {
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
+
+  // Only show our own arguments in the help message
+  cl::HideUnrelatedOptions(mainCategory);
+
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Dynamatic Frontend. \nThis is our external help message, for arguments "
+      "which are passed directly to the binary. \nYou may find our internal "
+      "help message more helpful, which describes the arguments which are "
+      "passed to our custom shell. \nThe internal help message can be accessed "
+      "by running this binary with no arguments, and then writing 'help'.\n");
 
   // Get current working directory
   SmallString<128> cwd;
@@ -845,6 +888,7 @@ int main(int argc, char **argv) {
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
+  commands.add<SetOutputDir>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);

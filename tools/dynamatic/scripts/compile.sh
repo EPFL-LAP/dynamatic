@@ -21,7 +21,7 @@ FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 
 LLVM=$DYNAMATIC_DIR/polygeist/llvm-project
-LLVM_BINS=$LLVM/build/bin
+LLVM_BINS=$DYNAMATIC_DIR/bin
 export PATH=$PATH:$LLVM_BINS
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
@@ -71,7 +71,7 @@ export_dot() {
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" "--label-type=uname" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
@@ -157,7 +157,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_BINS/opt -S \
-  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion,loop-unroll-full)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg" \
+  -passes="inline,mem2reg,consthoist,instcombine,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -204,16 +204,18 @@ exit_on_fail "Failed to convert to std dialect" \
   "Converted to std dialect"
 
 # cf transformations (dynamatic)
-# - drop-unlist-functions: Dropping the functions that are not needed in HLS
-# compilation
+# - "drop-unlist-functions": Dropping the functions that are not needed in HLS
+# compilation.
+# - "arith-reduce-strength": Convert muls to adds. "max-adder-depth-mul" limits
+# the maximum length of the adder chain created via this pass.
 $DYNAMATIC_OPT_BIN \
   "$F_CF" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
   --flatten-memref-row-major \
   --canonicalize \
+  --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --mark-memory-interfaces \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -319,8 +321,7 @@ export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash $RIGIDIFICATION_SH $DYNAMATIC_DIR $OUTPUT_DIR $KERNEL_NAME $F_HANDSHAKE_EXPORT \
-    > "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level

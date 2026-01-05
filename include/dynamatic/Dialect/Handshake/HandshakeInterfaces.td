@@ -34,6 +34,8 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
      Some handshake operations can have predecessors in other
      blocks. This is primarily useful for verification purposes during
      lowering from other dialect, such as the standard CDFG dialect.
+     Implementations can be found in:
+     lib/Dialect/Handshake/HandshakeInterfaces.cpp
   }];
 
   let methods = [
@@ -47,6 +49,39 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
+  ];
+}
+
+def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations have slots in which tokens can
+     be stored. This interface shows how many slots are present,
+     which is useful for the annotation of formal properties.
+  }];
+  let methods = [
+   InterfaceMethod<[{
+       Get the number of slots.
+     }],
+     "int", "getNumSlots", (ins)
+   >,
+  ];
+}
+
+def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations eagerly fork an input token into
+     mutltiple different output channels, keeping track which
+     channels have been sent.
+  }];
+ 
+  let methods = [
+   InterfaceMethod<[{
+       Get the number of fork outputs.
+     }],
+     "int", "getNumEagerOutputs", (ins)
+   >,
   ];
 }
 
