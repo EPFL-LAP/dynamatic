@@ -17,6 +17,7 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/System.h"
@@ -1043,6 +1044,11 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
+
+    if (auto bbAttr = instOp->getAttrOfType<IntegerAttr>(BB_ATTR_NAME)) {
+      os << llvm::formatv("(* BB_ID = \"{0}\" *)", bbAttr.getUInt()) << "\n";
+    }
+
     if (archName != "" && archName != "arch") {
       // HACK: Verilog does not have the concept of architectures. Therefore, we
       // use this parameter to specify an alternative module name when
