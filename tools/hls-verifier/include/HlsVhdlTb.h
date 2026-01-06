@@ -10,8 +10,16 @@
 #define HLS_VERIFIER_HLS_VHDL_TB_H
 
 #include "VerificationContext.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/FormatVariadic.h"
+#include <boost/dynamic_bitset.hpp>
+#include <optional>
 #include <string>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 using namespace std;
@@ -24,9 +32,20 @@ use ieee.std_logic_textio.all;
 use ieee.numeric_std.all;
 use std.textio.all;
 use work.sim_package.all;
+entity tb is
+end entity tb;
+
+architecture behavior of tb is
+
 )DELIM";
 
-static const string COMMON_TB_BODY = R"DELIM(
+static const string VERILOG_LIBRARY_HEADER = R"DELIM(
+`timescale 1ns/1ps
+module tb;
+
+)DELIM";
+
+static const string VHDL_COMMON_TB_BODY = R"DELIM(
 
 generate_sim_done_proc : process
 begin
@@ -134,7 +153,112 @@ begin
 end process;
 )DELIM";
 
-static const string PROC_WRITE_TRANSACTIONS = R"DELIM(
+static const string VERILOG_COMMON_TB_BODY = R"DELIM(
+// Equivalent of VHDL generate_sim_done_proc
+initial begin
+  while (transaction_idx != TRANSACTION_NUM) begin
+      @(posedge tb_clk);
+  end
+
+  repeat(3)@(posedge tb_clk);
+
+  $display("NORMAL EXIT (note: failure is to force the simulator to stop)");
+  $finish;
+
+  forever @(posedge tb_clk);
+end
+
+// Equivalent of VHDL gen_sim_latency_proc
+always @(posedge tb_clk) begin
+    if (tb_global_valid && tb_global_ready) begin
+        $display("Simulation done! Latency = %0d cycles",
+                 ($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD));
+    end
+end
+  
+
+// Equivalent of VHDL gen_clock_proc
+initial begin
+    tb_clk = 1'b0;
+    forever begin
+        #HALF_CLK_PERIOD tb_clk = ~tb_clk;
+    end
+end
+
+// Equivalent of VHDL gen_reset_proc
+initial begin
+    tb_rst = 1'b1;
+    #RESET_LATENCY;
+    tb_rst = 1'b0;
+end
+
+// Equivalent of VHDL acknowledge_tb_end
+always @(posedge tb_clk or posedge tb_rst) begin
+    if (tb_rst) begin
+        tb_global_ready <= 1'b1;
+        tb_stop <= 1'b0;
+    end else begin
+        if (tb_global_valid) begin
+            tb_global_ready <= 1'b0;
+            tb_stop <= 1'b1;
+        end
+    end
+end
+
+// Equivalent of VHDL generate_idle_signal
+always @(posedge tb_clk or posedge tb_rst) begin
+    if (tb_rst) begin
+        tb_temp_idle <= 1'b1;
+    end else begin
+        // Default keep
+        tb_temp_idle <= tb_temp_idle;
+
+        if (tb_start_valid)
+            tb_temp_idle <= 1'b0;
+
+        if (tb_stop)
+            tb_temp_idle <= 1'b1;
+    end
+end
+
+// Equivalent of VHDL generate_start_signal
+always @(posedge tb_clk or posedge tb_rst) begin
+    if (tb_rst) begin
+        tb_start_valid <= 1'b0;
+        tb_started <= 1'b0;
+    end else begin
+        if (!tb_started) begin
+            tb_start_valid <= 1'b1;
+            tb_started <= 1'b1;
+        end else begin
+            tb_start_valid <= tb_start_valid & (~tb_start_ready);
+        end
+    end
+end
+
+// Equivalent of transaction_increment
+initial begin
+    wait (tb_rst == 1'b0);
+
+    while (tb_temp_idle != 1'b1)
+        @(posedge tb_clk);
+
+    // Wait until first non-idle
+    wait (tb_temp_idle == 1'b0);
+
+    forever begin
+        while (tb_temp_idle != 1'b1)
+            @(posedge tb_clk);
+
+        transaction_idx = transaction_idx + 1;
+
+        wait (tb_temp_idle == 1'b0);
+    end
+end
+
+)DELIM";
+
+static const string VHDL_PROC_WRITE_TRANSACTIONS = R"DELIM(
 write_output_transactor_{0}_runtime_proc : process
   file fp             : TEXT;
   variable fstatus    : FILE_OPEN_STATUS;
@@ -165,6 +289,49 @@ begin
   wait;
 end process;
 )DELIM";
+
+static const string VERILOG_PROC_WRITE_TRANSACTIONS = R"DELIM(
+// Equivalent of VHDL write_output_transactor_{0}_runtime_proc
+integer fp_{0};
+
+initial begin
+    fp_{0} = $fopen(OUTPUT_{0}, "w");
+    if (fp_{0} == 0) begin
+        $display("Open file %0s failed!!!", OUTPUT_{0});
+        $display("ERROR: Simulation using HLS TB failed.");
+        $finish;
+    end
+
+    // Write header
+    $fdisplay(fp_{0}, "[[[runtime]]]");
+    $fclose(fp_{0});
+
+    while (transaction_idx != TRANSACTION_NUM) begin
+        @(posedge tb_clk);
+    end
+
+    @(posedge tb_clk);
+    @(posedge tb_clk);
+
+    fp_{0} = $fopen(OUTPUT_{0}, "a");  // append mode
+    if (fp_{0} == 0) begin
+        $display("Open file %0s failed!!!", OUTPUT_{0});
+        $display("ERROR: Simulation using HLS TB failed.");
+        $finish;
+    end
+
+    $fdisplay(fp_{0}, "[[[/runtime]]]");
+    $fclose(fp_{0});
+
+    forever @(posedge tb_clk);
+end
+)DELIM";
+
+enum TypeConstant { INTEGER, STRING, TIME };
+
+enum SimulatorSignalType { REGISTER, WIRE };
+
+std::string toBinaryString(int initialValue, unsigned int bitwidth);
 
 // Get input argument of type Ty and their associated names
 template <typename Ty>
@@ -229,6 +396,37 @@ static const string END_READY = "end_ready";
 // else as the D_IN0_PORT (i.e., the first port of the dual-port RAM).
 static const string RET_VALUE_NAME = "out0";
 
+// using ConnectedValueType = std::variant<std::string, SpecialSignal>;
+
+struct SignalAssignment {
+  enum AssignmentType { SIGNAL, CONST_ZERO, CONST_ONE, CONST_VEC_ZERO, OPEN };
+  std::string name = "DEFAULT";
+  AssignmentType type = SIGNAL;
+  SignalAssignment(const std::string &name) : name(name) {};
+
+  SignalAssignment(AssignmentType type) : name("DEFAULT"), type(type) {};
+
+  std::string emit(VerificationContext &ctx) {
+    switch (type) {
+    case SignalAssignment::CONST_ZERO:
+      return ctx.simLanguage == VHDL ? "'0'" : "1'b0";
+      break;
+    case SignalAssignment::CONST_ONE:
+      return ctx.simLanguage == VHDL ? "'1'" : "1'b1";
+      break;
+    case SignalAssignment::OPEN:
+      return ctx.simLanguage == VHDL ? "open" : "";
+      break;
+    case SignalAssignment::CONST_VEC_ZERO:
+      return ctx.simLanguage == VHDL ? "(others => '0')" : "0";
+      break;
+    case SignalAssignment::SIGNAL:
+      return name;
+      break;
+    }
+  }
+};
+
 // This is a helper class to generete a HDL instance
 // Example:
 //   Instance("my_module", "my_instance")
@@ -250,8 +448,72 @@ static const string RET_VALUE_NAME = "out0";
 class Instance {
   std::string moduleName;
   std::string instanceName;
-  std::vector<std::pair<std::string, std::string>> connections;
+  std::vector<std::pair<std::string, SignalAssignment>> connections;
   std::vector<std::pair<std::string, std::string>> params;
+
+  void emitVhdl(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
+    os << instanceName << ": entity work." << moduleName << "\n";
+
+    if (!params.empty()) {
+      os << "generic map(\n";
+      os.indent();
+
+      llvm::SmallVector<std::string> portmappings;
+
+      for (auto &[port, value] : params) {
+        portmappings.push_back(llvm::formatv("{0} => {1}", port, value));
+      }
+
+      os << llvm::join(portmappings, ",\n") << "\n";
+
+      os.unindent();
+      os << ")\n";
+    }
+    os << "port map(\n";
+    os.indent();
+
+    llvm::SmallVector<std::string> connectionmappings;
+    for (auto &[port, sig] : connections) {
+      connectionmappings.push_back(
+          llvm::formatv("{0} => {1}", port, sig.emit(ctx)));
+    }
+    os << llvm::join(connectionmappings, ",\n") << "\n";
+
+    os.unindent();
+    os << ");\n\n";
+  }
+
+  void emitVerilog(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
+    os << moduleName;
+
+    if (!params.empty()) {
+      os << " #(\n";
+      os.indent();
+
+      llvm::SmallVector<std::string> portmappings;
+
+      for (auto &[port, value] : params) {
+        portmappings.push_back(llvm::formatv(".{0}({1})", port, value));
+      }
+      os << llvm::join(portmappings, ",\n") << "\n";
+
+      os.unindent();
+      os << ")";
+    }
+
+    os << " " << instanceName << " (\n";
+    os.indent();
+
+    llvm::SmallVector<std::string> connectionmappings;
+    for (auto &[port, sig] : connections) {
+      connectionmappings.push_back(
+          llvm::formatv(".{0}({1})", port, sig.emit(ctx)));
+    }
+    os << llvm::join(connectionmappings, ",\n") << "\n";
+
+    os.unindent();
+    os << ");\n\n";
+  }
 
 public:
   Instance(std::string module, std::string inst,
@@ -264,62 +526,70 @@ public:
   }
 
   Instance &connect(const std::string &port, const std::string &signal) {
-    connections.emplace_back(port, signal);
+    connections.emplace_back(port, SignalAssignment(signal));
     return *this;
   }
 
-  void emitVhdl(mlir::raw_indented_ostream &os) {
-    os << instanceName << ": entity work." << moduleName << "\n";
+  Instance &connect(const std::string &port,
+                    SignalAssignment::AssignmentType value) {
+    connections.emplace_back(port, SignalAssignment(value));
+    return *this;
+  }
+
+  void emit(mlir::raw_indented_ostream &os, VerificationContext &ctx) {
 
     // VHDL port map needs a continuous assignment
     std::sort(connections.begin(), connections.end(),
               [](const auto &a, const auto &b) { return a.first < b.first; });
 
-    if (!params.empty()) {
-      os << "generic map(\n";
-      os.indent();
-      for (size_t i = 0; i < params.size(); ++i) {
-        os << params[i].first << " => " << params[i].second;
-        if (i != params.size() - 1)
-          os << ",";
-        os << "\n";
-      }
-      os.unindent();
-      os << ")\n";
+    if (ctx.simLanguage == VHDL) {
+      emitVhdl(os, ctx);
     }
-    os << "port map(\n";
-    os.indent();
-    for (size_t i = 0; i < connections.size(); ++i) {
-      const auto &[port, sig] = connections[i];
-      os << port << " => " << sig;
-      if (i != connections.size() - 1)
-        os << ",";
-      os << "\n";
+
+    if (ctx.simLanguage == VERILOG) {
+      emitVerilog(os, ctx);
     }
-    os.unindent();
-    os << ");\n\n";
   }
 };
 
 void vhdlTbCodegen(VerificationContext &ctx);
 
 // Declare a signal. Usage:
-// - declareSTL(os, "signal_name"); declares a std_logic signal
-// - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
-inline void declareSTL(mlir::raw_indented_ostream &os, const string &name,
-                       std::optional<std::string> size = std::nullopt,
-                       std::optional<std::string> initialValue = std::nullopt) {
-  os << "signal " << name << " : std_logic";
-  if (size)
-    os << "_vector(" << *size << " - 1 downto 0)";
-  if (initialValue)
-    os << " := " << *initialValue;
-  os << ";\n";
-}
+// - declareWire(ctx, os, "signal_name"); declares a std_logic signal
+// - declareWire(ctx, os, "signal_name", SIGNAL_WIDTH); declares a
+// std_logic_vector
+void declareWire(VerificationContext &ctx, mlir::raw_indented_ostream &os,
+                 const string &name,
+                 std::optional<unsigned int> size = std::nullopt,
+                 std::optional<int> initialValue = std::nullopt);
 
-inline void declareConstant(mlir::raw_indented_ostream &os, const string &name,
-                            const string &type, const string &value) {
-  os << "constant " << name << " : " << type << " := " << value << ";\n";
+void declareReg(VerificationContext &ctx, mlir::raw_indented_ostream &os,
+                const string &name,
+                std::optional<unsigned int> size = std::nullopt,
+                std::optional<int> initialValue = std::nullopt);
+
+inline void declareConstant(VerificationContext &ctx,
+                            mlir::raw_indented_ostream &os, const string &name,
+                            TypeConstant type, const string &value) {
+  if (ctx.simLanguage == VHDL) {
+    os << "constant " << name << " : ";
+    switch (type) {
+    case INTEGER:
+      os << "INTEGER := " << value;
+      break;
+
+    case STRING:
+      os << "STRING := " << value;
+      break;
+
+    case TIME:
+      os << "TIME := " << value << " ns";
+    }
+    os << ";\n";
+  }
+  if (ctx.simLanguage == VERILOG) {
+    os << "parameter " << name << " = " << value << ";\n";
+  }
 }
 
 #endif // HLS_VERIFIER_HLS_VHDL_TB_H

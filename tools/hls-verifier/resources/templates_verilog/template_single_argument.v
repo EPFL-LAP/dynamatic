@@ -1,6 +1,3 @@
-
-`timescale 1 ns / 1 ps
-
 module single_argument (
     clk,
     rst,
@@ -17,7 +14,7 @@ module single_argument (
 //------------------------Local signal-------------------
 parameter TV_IN = "";
 parameter TV_OUT = "";
-parameter DATA_WIDTH = 32'd 32;
+parameter DATA_WIDTH = 32;
 
 // Input and Output
 input clk;
@@ -30,17 +27,20 @@ input dout0_ready;
 output reg dout0_valid;
 input done;
 
-
 // Inner signals
-reg [DATA_WIDTH - 1 : 0] mem;
 reg tokenEmitted;
+reg [DATA_WIDTH-1:0] mem;
+reg memReady;
 
-reg writed_flag;
-event write_process_done;
+initial begin
+    mem = '0;
+    memReady = 1'b0;
+end
+
 //------------------------Task and function--------------
 task read_token;
     input integer fp;
-    output reg [127 :0] token;
+    output string token;
     integer ret;
     begin
         token = "";
@@ -49,61 +49,76 @@ task read_token;
     end
 endtask
 
+
 //------------------------Read array-------------------
-
-// Read data form file to array
-initial begin : read_file_process
+initial begin : file_to_mem
     integer fp;
-    integer err;
+    string token;
     integer ret;
-    reg [127 : 0] token;
-    reg [ 8*5 : 1] str;
     reg [ DATA_WIDTH - 1 : 0 ] mem_tmp;
-    integer transaction_idx;
-    integer i;
-    transaction_idx = 0;
+    int transaction_num;
 
-    if(TV_IN != "")begin
+    if (TV_IN != "") begin
+        wait (!rst);
+        transaction_num = 0;
 
-        wait(rst === 0);
-        @(write_process_done);
-        fp = $fopen(TV_IN,"r");
-        if(fp == 0) begin       // Failed to open file
-            $display("Failed to open file \"%s\"!", TV_IN);
-            $finish;
+        fp = $fopen(TV_IN, "r");
+        if (fp == 0) begin
+            $fatal("ERROR: Could not open file %s", TV_IN);
         end
+
+        // [[[runtime]]]
         read_token(fp, token);
-        if (token != "[[[runtime]]]") begin             // Illegal format
-            $display("ERROR: Simulation using HLS TB failed.");
-            $finish;
+        if (token != "[[[runtime]]]") begin
+          $fatal("ERROR: Simulation failed.");
         end
+
+        // Parse transactions
         read_token(fp, token);
-        while (token != "[[[/runtime]]]") begin
+          while (token != "[[[/runtime]]]") begin
             if (token != "[[transaction]]") begin
-                $display("ERROR: Simulation using HLS TB failed.");
-            $finish;
+              $display("ERROR: Simulation using HLS TB failed.");
+              $finish;
             end
-            read_token(fp, token);              // skip transaction number
-            read_token(fp,token);
-            ret = $sscanf(token, "0x%x", mem_tmp);
-            mem = mem_tmp;
-            if (ret != 1) begin
-                $display("Failed to parse token!");
-                $finish;
-            end
-            @(write_process_done);
-            read_token(fp, token);
-            if(token != "[[/transaction]]") begin
-                $display("ERROR: Simulation using HLS TB failed.");
-                $finish;
-            end
-            read_token(fp, token);
-            transaction_idx = transaction_idx + 1;
-        end
-        $fclose(fp);
 
+            // discard transaction number
+            read_token(fp, token);
+
+            // wait for done
+            @(posedge clk);
+            wait (done);
+
+            // read data
+            read_token(fp, token);
+            ret = $sscanf(token, "%x", mem_tmp);
+        
+            
+            mem = mem_tmp;
+            memReady = 1'b1;
+
+            if (ret != 1) begin
+              $display("Failed to parse token!");
+              $finish;
+            end
+
+            read_token(fp,token);
+            wait (!done);
+
+            // [[/transaction]]
+            if(token != "[[/transaction]]") begin
+              $display("ERROR: Simulation using HLS TB failed.");
+              $finish;
+            end
+            read_token(fp, token);
+
+            wait (!done);
+            transaction_num++;
+        end
+
+        $fclose(fp);
     end
 end
+
 
 // Read data from array to RTL
 always @ (posedge clk or posedge rst) begin
@@ -111,76 +126,55 @@ always @ (posedge clk or posedge rst) begin
         tokenEmitted <= 1'b0;
         dout0 <= {DATA_WIDTH{1'b0}};
         dout0_valid <= 1'b0;
-    end else  begin
-	    if(!(tokenEmitted)) begin
+    end else begin
+	    if(!tokenEmitted && memReady) begin
             tokenEmitted <= 1'b1;
 	        dout0 <= mem;
             dout0_valid <= 1'b1;
         end else begin
-            if (dout0_ready)
-                dout0_valid <=1'b0;
+            dout0_valid <= dout0_valid & ~dout0_ready;
         end
     end
 end
-
 
 //------------------------Write array-------------------
 
 // Write data from RTL to array
-always @ (posedge clk) begin
-    if((we0 == 1) && (ce0 == 1)) begin
+always @(posedge clk) begin
+    if ((we0 == 1) && (ce0 == 1)) begin
         mem <= din0;
-        $display("din0: %b",din0);
     end
 end
-
 
 // Write data from array to file
-initial begin : write_file_proc
+initial begin : mem_to_file
     integer fp;
-    integer transaction_num;
-    reg [ 8*5 : 1] str;
-    integer i;
-    transaction_num = 0;
-    writed_flag = 1;
+    int transaction_num;
+    string token;
 
-    if(TV_OUT !="") begin
-        wait(rst === 0);
+    if (TV_OUT != "") begin
+        wait (!rst);
+        transaction_num = 0;
+        // skip first done
+        while (!done) @(posedge clk);
+        wait (!done);
 
-        // To read the input files properly 'done' is set to '1' 
-        // at initialization. We skip this first 'done === 1' and 
-        // start writing the output the second time 'done' is 
-        // equal to '1'.
-        while(done == 0) begin
-                -> write_process_done;
-                @(negedge clk);
-        end
-
-        wait(done === 0);
-
-        @(negedge clk);
         while(1) begin
-            while(done == 0) begin
-                -> write_process_done;
-                @(negedge clk);
-            end
+            while (!done) @(posedge clk);
+
             fp = $fopen(TV_OUT, "a");
-            if(fp == 0) begin       // Failed to open file
-                $display("Failed to open file \"%s\"!", TV_OUT);
-                $finish;
+            if (fp == 0) begin
+                $fatal("ERROR: Could not open file %s", TV_OUT);
             end
             $fdisplay(fp, "[[transaction]] %d", transaction_num);
-            $display("mem: %b", mem);
             $fdisplay(fp,"0x%x",mem);
             $fdisplay(fp, "[[/transaction]]");
-            transaction_num = transaction_num + 1;
+            transaction_num++;
             $fclose(fp);
-            writed_flag = 1;
-            -> write_process_done;
-            @(negedge clk);
+            
+            wait (!done);
         end
     end
 end
-
 
 endmodule
