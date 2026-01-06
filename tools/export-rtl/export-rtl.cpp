@@ -1268,7 +1268,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       // e.g. count(fork0.sent_0, fork0.sent_1) < 2
       // for operation "fork0" with 2 eager outputs
       data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<Invariant2>(property.get())) {
+    } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
+                   property.get())) {
       unsigned numOut = p->getNumEagerForkOutputs();
       std::string forkName = p->getForkOp();
       std::string bufferName = p->getBufferOp();

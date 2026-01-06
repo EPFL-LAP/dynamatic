@@ -174,7 +174,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
   // If this operation contains a slot, the copied slot has been found and can
   // be annotated
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
-    Invariant2 p(uid, FormalProperty::TAG::INVAR, bufferOp, originFork);
+    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, bufferOp,
+                                     originFork);
     propertyTable.push_back(p.toJSON());
     uid++;
     return success();
