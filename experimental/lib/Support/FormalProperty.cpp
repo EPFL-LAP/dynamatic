@@ -29,8 +29,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::VEQ;
   if (s == "EFNAO")
     return FormalProperty::TYPE::EFNAO;
-  if (s == "INV2")
-    return FormalProperty::TYPE::INV2;
+  if (s == "CSOAFAF")
+    return FormalProperty::TYPE::CSOAFAF;
 
   return std::nullopt;
 }
@@ -43,8 +43,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "VEQ";
   case TYPE::EFNAO:
     return "EFNAO";
-  case TYPE::INV2:
-    return "INV2";
+  case TYPE::CSOAFAF:
+    return "CSOAFAF";
   }
 }
 
@@ -99,8 +99,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EFNAO:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::INV2:
-    return Invariant2::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::CSOAFAF:
+    return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
+                                                    path.field(INFO_LIT));
   }
 }
 
@@ -269,26 +270,27 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 
 // Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
 
-Invariant2::Invariant2(unsigned long id, TAG tag,
-                       handshake::BufferLikeOpInterface &bufferOpI,
-                       handshake::EagerForkLikeOpInterface &forkOpI)
-    : FormalProperty(id, tag, TYPE::INV2) {
+CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
+    unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
+    handshake::EagerForkLikeOpInterface &forkOpI)
+    : FormalProperty(id, tag, TYPE::CSOAFAF) {
   forkOp = getUniqueName(forkOpI).str();
   numEagerForkOutputs = forkOpI.getNumEagerOutputs();
   bufferOp = getUniqueName(bufferOpI).str();
   bufferSlot = bufferOpI.getNumSlots() - 1;
 }
 
-llvm::json::Value Invariant2::extraInfoToJSON() const {
+llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
   return llvm::json::Object({{FORK_OP_LIT, forkOp},
                              {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs},
                              {BUFFER_OP_LIT, bufferOp},
                              {BUFFER_SLOT_LIT, bufferSlot}});
 }
 
-std::unique_ptr<Invariant2> Invariant2::fromJSON(const llvm::json::Value &value,
-                                                 llvm::json::Path path) {
-  auto prop = std::make_unique<Invariant2>();
+std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
+CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
+                                         llvm::json::Path path) {
+  auto prop = std::make_unique<CopiedSlotsOfActiveForkAreFull>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);

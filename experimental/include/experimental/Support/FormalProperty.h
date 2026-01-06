@@ -28,7 +28,7 @@ public:
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
-    INV2,
+    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
   };
 
   TAG getTag() const { return tag; }
@@ -188,7 +188,7 @@ private:
   inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
 };
 
-class Invariant2 : public FormalProperty {
+class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
   std::string getForkOp() { return forkOp; }
   unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
@@ -197,17 +197,17 @@ public:
 
   llvm::json::Value extraInfoToJSON() const override;
 
-  static std::unique_ptr<Invariant2> fromJSON(const llvm::json::Value &value,
-                                              llvm::json::Path path);
+  static std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
-  Invariant2() = default;
-  Invariant2(unsigned long id, TAG tag,
-             handshake::BufferLikeOpInterface &bufferOp,
-             handshake::EagerForkLikeOpInterface &forkOp);
-  ~Invariant2() = default;
+  CopiedSlotsOfActiveForkAreFull() = default;
+  CopiedSlotsOfActiveForkAreFull(unsigned long id, TAG tag,
+                                 handshake::BufferLikeOpInterface &bufferOp,
+                                 handshake::EagerForkLikeOpInterface &forkOp);
+  ~CopiedSlotsOfActiveForkAreFull() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::INV2;
+    return fp->getType() == TYPE::CSOAFAF;
   }
 
 private:
