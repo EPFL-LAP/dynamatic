@@ -17,6 +17,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <set>
 
 using namespace dynamatic::experimental;
@@ -123,7 +124,7 @@ struct ReconvergentPath {
 /// enumerateTransitionSequences(transitions, 3);
 /// Output: [1, 2, 3], [1, 1, 2], [1, 1, 1]
 inline std::vector<std::vector<ArchBB>>
-enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
+enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
                              size_t sequenceLength) {
   // 'sequenceLength' is the number of steps to visit.
   // Number of transitions needed = sequenceLength - 1.
@@ -194,7 +195,7 @@ public:
 
   /// Build the graph from a given transition sequence.
   void buildGraphFromSequence(handshake::FuncOp funcOp,
-                              const std::vector<ArchBB> &sequence);
+                              llvm::ArrayRef<ArchBB> sequence);
 
   /// Within the transition sequence, we may have transitions that look like
   /// Step 0: BB1 -> Step 1: BB1 -> Step 2: BB2. Steps are the way to
@@ -212,16 +213,15 @@ public:
 
   // Debugging Methods //
 
-  void dumpReconvergentPaths(const std::vector<ReconvergentPath> &paths,
+  void dumpReconvergentPaths(llvm::ArrayRef<ReconvergentPath> paths,
                              llvm::StringRef filename) const;
 
   void dumpTransitionGraph(llvm::StringRef filename) const;
 
   /// Dump multiple graphs to a single GraphViz file.
   /// Each graph is placed in its own cluster subgraph.
-  static void
-  dumpAllGraphs(const std::vector<ReconvergentPathFinderGraph> &graphs,
-                llvm::StringRef filename);
+  static void dumpAllGraphs(llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
+                            llvm::StringRef filename);
 
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
@@ -232,10 +232,10 @@ public:
   /// - graph*: Pointer to the ReconvergentPathFinderGraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
   static void dumpAllReconvergentPaths(
-      const std::vector<
+      llvm::ArrayRef<
           std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
                                       std::vector<ReconvergentPath>>>>
-          &graphPaths,
+          graphPaths,
       llvm::StringRef filename);
 
 private:
@@ -262,7 +262,7 @@ private:
 
 struct SimpleCycle {
   llvm::SmallVector<NodeIdType> nodes; // <-- The node IDs of the cycle.
-  SimpleCycle(llvm::SmallVector<NodeIdType> nodes) : nodes(std::move(nodes)) {}
+  SimpleCycle(llvm::ArrayRef<NodeIdType> nodes) : nodes(nodes) {}
 
   /// Check if this cycle shares any nodes with another cycle.
   bool isDisjointFrom(const SimpleCycle &other) const;
@@ -323,9 +323,9 @@ public:
                                   llvm::StringRef filename) const;
 
   /// Dump all synchronizing cycle pairs to a single GraphViz file.
-  void dumpAllSynchronizingCyclePairs(
-      const std::vector<SynchronizingCyclePair> &pairs,
-      llvm::StringRef filename) const;
+  void
+  dumpAllSynchronizingCyclePairs(llvm::ArrayRef<SynchronizingCyclePair> pairs,
+                                 llvm::StringRef filename) const;
 
 private:
   std::map<mlir::Operation *, NodeIdType> opToNodeId;

@@ -50,7 +50,7 @@ std::string ReconvergentPathFinderGraph::getNodeDotId(NodeIdType nodeId) const {
 }
 
 void ReconvergentPathFinderGraph::buildGraphFromSequence(
-    handshake::FuncOp funcOp, const std::vector<ArchBB> &sequence) {
+    handshake::FuncOp funcOp, llvm::ArrayRef<ArchBB> sequence) {
   if (sequence.empty()) {
     return;
   }
@@ -241,8 +241,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
 // [START AI-generated code]
 
 void ReconvergentPathFinderGraph::dumpReconvergentPaths(
-    const std::vector<ReconvergentPath> &paths,
-    llvm::StringRef filename) const {
+    llvm::ArrayRef<ReconvergentPath> paths, llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
     fullPath = filename;
@@ -390,7 +389,7 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
 }
 
 void ReconvergentPathFinderGraph::dumpAllGraphs(
-    const std::vector<ReconvergentPathFinderGraph> &graphs,
+    llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
     llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -470,10 +469,10 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 }
 
 void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
-    const std::vector<
+    llvm::ArrayRef<
         std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
                                     std::vector<ReconvergentPath>>>>
-        &graphPaths,
+        graphPaths,
     llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -1046,7 +1045,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
 }
 
 void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
-    const std::vector<SynchronizingCyclePair> &pairs,
+    llvm::ArrayRef<SynchronizingCyclePair> pairs,
     llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath = resolveFullPath(filename);
 
