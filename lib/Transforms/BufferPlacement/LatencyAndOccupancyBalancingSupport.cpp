@@ -696,57 +696,78 @@ std::vector<NodeIdType> SynchronizingCyclesFinderGraph::getAllJoins() const {
   return joins;
 }
 
-std::vector<NodeIdType>
-SynchronizingCyclesFinderGraph::findPathToJoin(const SimpleCycle &cycle,
-                                               NodeIdType joinId) const {
-
+std::vector<size_t>
+SynchronizingCyclesFinderGraph::findEdgesToJoin(const SimpleCycle &cycle,
+                                                NodeIdType joinId) const {
   std::set<NodeIdType> cycleNodes(cycle.nodes.begin(), cycle.nodes.end());
 
-  // BFS to find shortest path from cycle to join via non-cyclic edges.
-  // Queue is seeded with nodes just outside the cycle; predecessor map tracks
-  // the path for reconstruction once joinId is reached.
-  std::map<NodeIdType, NodeIdType> predecessor;
-  std::queue<NodeIdType> bfs;
+  // Step 1: Find all nodes reachable from cycle via non-cyclic edges (forward)
+  std::vector<bool> reachableFromCycle(nodes.size(), false);
+  std::queue<NodeIdType> fwdQueue;
 
-  // exit nodes are pretty much cycle nodes that are neighbors of nodes not in
-  // the cycle.
+  // Seed with cycle nodes
   for (NodeIdType nodeId : cycleNodes) {
-    for (size_t edgeIdx : nonCyclicAdjList[nodeId]) {
-      NodeIdType neighbor = edges[edgeIdx].dstId;
-      if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
-        predecessor[neighbor] = nodeId;
-        bfs.push(neighbor);
-      }
-    }
+    reachableFromCycle[nodeId] = true;
+    fwdQueue.push(nodeId);
   }
 
-  while (!bfs.empty()) {
-    NodeIdType current = bfs.front();
-    bfs.pop();
-
-    if (current == joinId) {
-      // get path from cycle exit to join
-      std::vector<NodeIdType> path;
-      NodeIdType node = joinId;
-      while (!cycleNodes.count(node)) {
-        path.push_back(node);
-        node = predecessor[node];
-      }
-      std::reverse(path.begin(), path.end());
-      return path;
-    }
-
-    // continue BFS using non-cyclic edges
+  while (!fwdQueue.empty()) {
+    NodeIdType current = fwdQueue.front();
+    fwdQueue.pop();
     for (size_t edgeIdx : nonCyclicAdjList[current]) {
       NodeIdType neighbor = edges[edgeIdx].dstId;
-      if (!cycleNodes.count(neighbor) && !predecessor.count(neighbor)) {
-        predecessor[neighbor] = current;
-        bfs.push(neighbor);
+      if (!reachableFromCycle[neighbor]) {
+        reachableFromCycle[neighbor] = true;
+        fwdQueue.push(neighbor);
       }
     }
   }
 
-  return {};
+  // Early exit if join is not reachable from cycle
+  if (!reachableFromCycle[joinId])
+    return {};
+
+  // Step 2: Find all nodes that can reach join via non-cyclic edges (backward)
+  std::vector<bool> canReachJoin(nodes.size(), false);
+  std::queue<NodeIdType> bwdQueue;
+  canReachJoin[joinId] = true;
+  bwdQueue.push(joinId);
+
+  while (!bwdQueue.empty()) {
+    NodeIdType current = bwdQueue.front();
+    bwdQueue.pop();
+    for (size_t edgeIdx : revAdjList[current]) {
+      NodeIdType predecessor = edges[edgeIdx].srcId;
+      // Only follow non-cyclic edges
+      // Check if this edge is in nonCyclicAdjList by checking SCC membership
+      if (!canReachJoin[predecessor]) {
+        // Check if edge is non-cyclic by seeing if it's in nonCyclicAdjList
+        for (size_t ncEdgeIdx : nonCyclicAdjList[predecessor]) {
+          if (edges[ncEdgeIdx].dstId == current) {
+            canReachJoin[predecessor] = true;
+            bwdQueue.push(predecessor);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Step 3: Collect all non-cyclic edges where src is reachable from cycle
+  // AND dst can reach join
+  std::vector<size_t> edgesOnPath;
+  for (NodeIdType nodeId = 0; nodeId < nodes.size(); ++nodeId) {
+    if (!reachableFromCycle[nodeId])
+      continue;
+    for (size_t edgeIdx : nonCyclicAdjList[nodeId]) {
+      NodeIdType dst = edges[edgeIdx].dstId;
+      if (canReachJoin[dst]) {
+        edgesOnPath.push_back(edgeIdx);
+      }
+    }
+  }
+
+  return edgesOnPath;
 }
 
 // From:
@@ -792,24 +813,24 @@ SynchronizingCyclesFinderGraph::findSynchronizingCyclePairs() {
         continue;
       }
 
-      // Criteria 2: Find joins reachable from BOTH cycles via non-cyclic paths
-      std::vector<PathToJoin> pathsToJoins;
+      // Criteria 2: Find joins reachable from BOTH cycles via non-cyclic edges
+      std::vector<EdgesToJoin> edgesToJoins;
 
       for (NodeIdType joinId : allJoins) {
-        auto pathOne = findPathToJoin(cycleOne, joinId);
-        auto pathTwo = findPathToJoin(cycleTwo, joinId);
+        auto edgesOne = findEdgesToJoin(cycleOne, joinId);
+        auto edgesTwo = findEdgesToJoin(cycleTwo, joinId);
 
         // Both cycles must be able to reach this join
-        if (!pathOne.empty() && !pathTwo.empty()) {
-          PathToJoin pathInfo(joinId);
-          pathInfo.pathFromCycleOne = std::move(pathOne);
-          pathInfo.pathFromCycleTwo = std::move(pathTwo);
-          pathsToJoins.push_back(std::move(pathInfo));
+        if (!edgesOne.empty() && !edgesTwo.empty()) {
+          EdgesToJoin edgeInfo(joinId);
+          edgeInfo.edgesFromCycleOne = std::move(edgesOne);
+          edgeInfo.edgesFromCycleTwo = std::move(edgesTwo);
+          edgesToJoins.push_back(std::move(edgeInfo));
         }
       }
 
-      if (!pathsToJoins.empty()) {
-        pairs.emplace_back(cycleOne, cycleTwo, std::move(pathsToJoins));
+      if (!edgesToJoins.empty()) {
+        pairs.emplace_back(cycleOne, cycleTwo, std::move(edgesToJoins));
       }
     }
   }
@@ -867,13 +888,24 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   std::set<NodeIdType> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
                                      pair.cycleTwo.nodes.end());
 
-  // Collect all path nodes (excluding the join itself)
-  std::set<NodeIdType> pathOneNodes, pathTwoNodes;
-  for (const auto &pathInfo : pair.pathsToJoins) {
-    for (size_t i = 0; i + 1 < pathInfo.pathFromCycleOne.size(); ++i)
-      pathOneNodes.insert(pathInfo.pathFromCycleOne[i]);
-    for (size_t i = 0; i + 1 < pathInfo.pathFromCycleTwo.size(); ++i)
-      pathTwoNodes.insert(pathInfo.pathFromCycleTwo[i]);
+  std::set<NodeIdType> intermediateNodesOne, intermediateNodesTwo;
+  for (const auto &edgeInfo : pair.edgesToJoins) {
+    for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+      NodeIdType src = edges[edgeIdx].srcId;
+      NodeIdType dst = edges[edgeIdx].dstId;
+      if (!cycleOneNodes.count(src) && src != edgeInfo.joinId)
+        intermediateNodesOne.insert(src);
+      if (!cycleOneNodes.count(dst) && dst != edgeInfo.joinId)
+        intermediateNodesOne.insert(dst);
+    }
+    for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+      NodeIdType src = edges[edgeIdx].srcId;
+      NodeIdType dst = edges[edgeIdx].dstId;
+      if (!cycleTwoNodes.count(src) && src != edgeInfo.joinId)
+        intermediateNodesTwo.insert(src);
+      if (!cycleTwoNodes.count(dst) && dst != edgeInfo.joinId)
+        intermediateNodesTwo.insert(dst);
+    }
   }
 
   file << "digraph SynchronizingCyclePair {\n";
@@ -928,22 +960,22 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   }
   file << "  }\n\n";
 
-  // Path nodes from Cycle One (light green)
-  if (!pathOneNodes.empty()) {
-    file << "  // Path nodes from Cycle One to joins\n";
-    for (NodeIdType nodeId : pathOneNodes) {
-      file << "  path1_" << getNodeDotId(nodeId) << " [label=\""
+  // Intermediate nodes from Cycle One paths (light green)
+  if (!intermediateNodesOne.empty()) {
+    file << "  // Intermediate nodes from Cycle One to joins\n";
+    for (NodeIdType nodeId : intermediateNodesOne) {
+      file << "  int1_" << getNodeDotId(nodeId) << " [label=\""
            << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#c8e6c9\", color=\"#66bb6a\"];\n";
     }
     file << "\n";
   }
 
-  // Path nodes from Cycle Two (light blue)
-  if (!pathTwoNodes.empty()) {
-    file << "  // Path nodes from Cycle Two to joins\n";
-    for (NodeIdType nodeId : pathTwoNodes) {
-      file << "  path2_" << getNodeDotId(nodeId) << " [label=\""
+  // Intermediate nodes from Cycle Two paths (light blue)
+  if (!intermediateNodesTwo.empty()) {
+    file << "  // Intermediate nodes from Cycle Two to joins\n";
+    for (NodeIdType nodeId : intermediateNodesTwo) {
+      file << "  int2_" << getNodeDotId(nodeId) << " [label=\""
            << getNodeLabel(nodeId)
            << "\", style=filled, fillcolor=\"#bbdefb\", color=\"#42a5f5\"];\n";
     }
@@ -951,9 +983,9 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
   }
 
   // Common Joins cluster (orange)
-  if (!pair.pathsToJoins.empty()) {
+  if (!pair.edgesToJoins.empty()) {
     file << "  subgraph cluster_common_joins {\n";
-    file << "    label=\"Common Joins (" << pair.pathsToJoins.size()
+    file << "    label=\"Common Joins (" << pair.edgesToJoins.size()
          << ")\";\n";
     file << "    style=filled;\n";
     file << "    color=\"#e65100\";\n";
@@ -961,77 +993,48 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
     file << "    fontcolor=\"#bf360c\";\n";
     file << "    fontsize=12;\n\n";
 
-    for (const auto &pathInfo : pair.pathsToJoins) {
-      file << "    join_" << getNodeDotId(pathInfo.joinId) << " [label=\""
-           << getNodeLabel(pathInfo.joinId)
+    for (const auto &edgeInfo : pair.edgesToJoins) {
+      file << "    join_" << getNodeDotId(edgeInfo.joinId) << " [label=\""
+           << getNodeLabel(edgeInfo.joinId)
            << "\", style=filled, fillcolor=\"#ffcc80\", color=\"#e65100\", "
               "penwidth=2];\n";
     }
     file << "  }\n\n";
 
-    // Draw path edges (deduplicated)
-    file << "  // Paths from cycles to joins (via non-cyclic subgraph)\n";
+    // Draw edges from cycles to joins
+    file << "  // Edges from cycles to joins (via non-cyclic subgraph)\n";
     std::set<std::pair<std::string, std::string>> drawnEdges;
 
-    for (const auto &pathInfo : pair.pathsToJoins) {
-      const auto &path1 = pathInfo.pathFromCycleOne;
-      const auto &path2 = pathInfo.pathFromCycleTwo;
-
-      // Path from Cycle One
-      if (!path1.empty()) {
-        // Find which cycle node connects to first path node
-        for (NodeIdType cycleNode : cycleOneNodes) {
-          for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
-            if (edges[edgeIdx].dstId == path1[0]) {
-              std::string src = "c1_" + getNodeDotId(cycleNode);
-              std::string dst = (path1.size() == 1)
-                                    ? "join_" + getNodeDotId(path1[0])
-                                    : "path1_" + getNodeDotId(path1[0]);
-              if (drawnEdges.insert({src, dst}).second) {
-                file << "  " << src << " -> " << dst
-                     << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
-              }
-            }
-          }
-        }
-        // Path edges
-        for (size_t i = 0; i + 1 < path1.size(); ++i) {
-          std::string src = "path1_" + getNodeDotId(path1[i]);
-          std::string dst = (i + 2 == path1.size())
-                                ? "join_" + getNodeDotId(path1[i + 1])
-                                : "path1_" + getNodeDotId(path1[i + 1]);
-          if (drawnEdges.insert({src, dst}).second) {
-            file << "  " << src << " -> " << dst
-                 << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
-          }
+    for (const auto &edgeInfo : pair.edgesToJoins) {
+      // Edges from Cycle One
+      for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+        NodeIdType src = edges[edgeIdx].srcId;
+        NodeIdType dst = edges[edgeIdx].dstId;
+        std::string srcId = cycleOneNodes.count(src)
+                                ? "c1_" + getNodeDotId(src)
+                                : "int1_" + getNodeDotId(src);
+        std::string dstId = (dst == edgeInfo.joinId)
+                                ? "join_" + getNodeDotId(dst)
+                                : "int1_" + getNodeDotId(dst);
+        if (drawnEdges.insert({srcId, dstId}).second) {
+          file << "  " << srcId << " -> " << dstId
+               << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
         }
       }
 
-      // Path from Cycle Two
-      if (!path2.empty()) {
-        for (NodeIdType cycleNode : cycleTwoNodes) {
-          for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
-            if (edges[edgeIdx].dstId == path2[0]) {
-              std::string src = "c2_" + getNodeDotId(cycleNode);
-              std::string dst = (path2.size() == 1)
-                                    ? "join_" + getNodeDotId(path2[0])
-                                    : "path2_" + getNodeDotId(path2[0]);
-              if (drawnEdges.insert({src, dst}).second) {
-                file << "  " << src << " -> " << dst
-                     << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
-              }
-            }
-          }
-        }
-        for (size_t i = 0; i + 1 < path2.size(); ++i) {
-          std::string src = "path2_" + getNodeDotId(path2[i]);
-          std::string dst = (i + 2 == path2.size())
-                                ? "join_" + getNodeDotId(path2[i + 1])
-                                : "path2_" + getNodeDotId(path2[i + 1]);
-          if (drawnEdges.insert({src, dst}).second) {
-            file << "  " << src << " -> " << dst
-                 << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
-          }
+      // Edges from Cycle Two
+      for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+        NodeIdType src = edges[edgeIdx].srcId;
+        NodeIdType dst = edges[edgeIdx].dstId;
+        std::string srcId = cycleTwoNodes.count(src)
+                                ? "c2_" + getNodeDotId(src)
+                                : "int2_" + getNodeDotId(src);
+        std::string dstId = (dst == edgeInfo.joinId)
+                                ? "join_" + getNodeDotId(dst)
+                                : "int2_" + getNodeDotId(dst);
+        if (drawnEdges.insert({srcId, dstId}).second) {
+          file << "  " << srcId << " -> " << dstId
+               << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
         }
       }
     }
@@ -1069,17 +1072,29 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     std::set<NodeIdType> cycleTwoNodes(pair.cycleTwo.nodes.begin(),
                                        pair.cycleTwo.nodes.end());
 
-    // Collect path nodes
-    std::set<NodeIdType> pathOneNodes, pathTwoNodes;
-    for (const auto &pathInfo : pair.pathsToJoins) {
-      for (size_t i = 0; i + 1 < pathInfo.pathFromCycleOne.size(); ++i)
-        pathOneNodes.insert(pathInfo.pathFromCycleOne[i]);
-      for (size_t i = 0; i + 1 < pathInfo.pathFromCycleTwo.size(); ++i)
-        pathTwoNodes.insert(pathInfo.pathFromCycleTwo[i]);
+    // Collect intermediate nodes from edges
+    std::set<NodeIdType> intermediateNodesOne, intermediateNodesTwo;
+    for (const auto &edgeInfo : pair.edgesToJoins) {
+      for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+        NodeIdType src = edges[edgeIdx].srcId;
+        NodeIdType dst = edges[edgeIdx].dstId;
+        if (!cycleOneNodes.count(src) && src != edgeInfo.joinId)
+          intermediateNodesOne.insert(src);
+        if (!cycleOneNodes.count(dst) && dst != edgeInfo.joinId)
+          intermediateNodesOne.insert(dst);
+      }
+      for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+        NodeIdType src = edges[edgeIdx].srcId;
+        NodeIdType dst = edges[edgeIdx].dstId;
+        if (!cycleTwoNodes.count(src) && src != edgeInfo.joinId)
+          intermediateNodesTwo.insert(src);
+        if (!cycleTwoNodes.count(dst) && dst != edgeInfo.joinId)
+          intermediateNodesTwo.insert(dst);
+      }
     }
 
     file << "  subgraph cluster_pair_" << pairIdx << " {\n";
-    file << "    label=\"Pair " << pairIdx << " (" << pair.pathsToJoins.size()
+    file << "    label=\"Pair " << pairIdx << " (" << pair.edgesToJoins.size()
          << " common joins)\";\n";
     file << "    style=rounded;\n";
     file << "    color=\"#424242\";\n";
@@ -1136,24 +1151,24 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     }
     file << "    }\n\n";
 
-    // Path nodes from Cycle One
-    if (!pathOneNodes.empty()) {
-      file << "    // Path nodes from Cycle One\n";
-      for (NodeIdType nodeId : pathOneNodes) {
+    // Intermediate nodes from Cycle One
+    if (!intermediateNodesOne.empty()) {
+      file << "    // Intermediate nodes from Cycle One\n";
+      for (NodeIdType nodeId : intermediateNodesOne) {
         file
-            << "    " << prefix << "path1_" << getNodeDotId(nodeId)
+            << "    " << prefix << "int1_" << getNodeDotId(nodeId)
             << " [label=\"" << getNodeLabel(nodeId)
             << "\", style=filled, fillcolor=\"#c8e6c9\", color=\"#66bb6a\"];\n";
       }
       file << "\n";
     }
 
-    // Path nodes from Cycle Two
-    if (!pathTwoNodes.empty()) {
-      file << "    // Path nodes from Cycle Two\n";
-      for (NodeIdType nodeId : pathTwoNodes) {
+    // Intermediate nodes from Cycle Two
+    if (!intermediateNodesTwo.empty()) {
+      file << "    // Intermediate nodes from Cycle Two\n";
+      for (NodeIdType nodeId : intermediateNodesTwo) {
         file
-            << "    " << prefix << "path2_" << getNodeDotId(nodeId)
+            << "    " << prefix << "int2_" << getNodeDotId(nodeId)
             << " [label=\"" << getNodeLabel(nodeId)
             << "\", style=filled, fillcolor=\"#bbdefb\", color=\"#42a5f5\"];\n";
       }
@@ -1161,7 +1176,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     }
 
     // Common Joins
-    if (!pair.pathsToJoins.empty()) {
+    if (!pair.edgesToJoins.empty()) {
       file << "    subgraph cluster_" << prefix << "joins {\n";
       file << "      label=\"Common Joins\";\n";
       file << "      style=filled;\n";
@@ -1169,78 +1184,47 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
       file << "      fillcolor=\"#fff3e0\";\n";
       file << "      fontcolor=\"#bf360c\";\n\n";
 
-      for (const auto &pathInfo : pair.pathsToJoins) {
-        file << "      " << prefix << "join_" << getNodeDotId(pathInfo.joinId)
-             << " [label=\"" << getNodeLabel(pathInfo.joinId)
+      for (const auto &edgeInfo : pair.edgesToJoins) {
+        file << "      " << prefix << "join_" << getNodeDotId(edgeInfo.joinId)
+             << " [label=\"" << getNodeLabel(edgeInfo.joinId)
              << "\", style=filled, fillcolor=\"#ffcc80\", color=\"#e65100\", "
                 "penwidth=2];\n";
       }
       file << "    }\n\n";
 
-      // Draw path edges (deduplicated)
+      // Draw edges (deduplicated)
       std::set<std::pair<std::string, std::string>> drawnEdges;
 
-      for (const auto &pathInfo : pair.pathsToJoins) {
-        const auto &path1 = pathInfo.pathFromCycleOne;
-        const auto &path2 = pathInfo.pathFromCycleTwo;
-
-        // Path from Cycle One
-        if (!path1.empty()) {
-          for (NodeIdType cycleNode : cycleOneNodes) {
-            for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
-              if (edges[edgeIdx].dstId == path1[0]) {
-                std::string src = prefix + "c1_" + getNodeDotId(cycleNode);
-                std::string dst =
-                    (path1.size() == 1)
-                        ? prefix + "join_" + getNodeDotId(path1[0])
-                        : prefix + "path1_" + getNodeDotId(path1[0]);
-                if (drawnEdges.insert({src, dst}).second) {
-                  file << "    " << src << " -> " << dst
-                       << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
-                }
-              }
-            }
-          }
-          for (size_t i = 0; i + 1 < path1.size(); ++i) {
-            std::string src = prefix + "path1_" + getNodeDotId(path1[i]);
-            std::string dst =
-                (i + 2 == path1.size())
-                    ? prefix + "join_" + getNodeDotId(path1[i + 1])
-                    : prefix + "path1_" + getNodeDotId(path1[i + 1]);
-            if (drawnEdges.insert({src, dst}).second) {
-              file << "    " << src << " -> " << dst
-                   << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
-            }
+      for (const auto &edgeInfo : pair.edgesToJoins) {
+        // Edges from Cycle One
+        for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+          NodeIdType src = edges[edgeIdx].srcId;
+          NodeIdType dst = edges[edgeIdx].dstId;
+          std::string srcId = cycleOneNodes.count(src)
+                                  ? prefix + "c1_" + getNodeDotId(src)
+                                  : prefix + "int1_" + getNodeDotId(src);
+          std::string dstId = (dst == edgeInfo.joinId)
+                                  ? prefix + "join_" + getNodeDotId(dst)
+                                  : prefix + "int1_" + getNodeDotId(dst);
+          if (drawnEdges.insert({srcId, dstId}).second) {
+            file << "    " << srcId << " -> " << dstId
+                 << " [color=\"#2e7d32\", style=dashed, penwidth=1.5];\n";
           }
         }
 
-        // Path from Cycle Two
-        if (!path2.empty()) {
-          for (NodeIdType cycleNode : cycleTwoNodes) {
-            for (size_t edgeIdx : nonCyclicAdjList[cycleNode]) {
-              if (edges[edgeIdx].dstId == path2[0]) {
-                std::string src = prefix + "c2_" + getNodeDotId(cycleNode);
-                std::string dst =
-                    (path2.size() == 1)
-                        ? prefix + "join_" + getNodeDotId(path2[0])
-                        : prefix + "path2_" + getNodeDotId(path2[0]);
-                if (drawnEdges.insert({src, dst}).second) {
-                  file << "    " << src << " -> " << dst
-                       << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
-                }
-              }
-            }
-          }
-          for (size_t i = 0; i + 1 < path2.size(); ++i) {
-            std::string src = prefix + "path2_" + getNodeDotId(path2[i]);
-            std::string dst =
-                (i + 2 == path2.size())
-                    ? prefix + "join_" + getNodeDotId(path2[i + 1])
-                    : prefix + "path2_" + getNodeDotId(path2[i + 1]);
-            if (drawnEdges.insert({src, dst}).second) {
-              file << "    " << src << " -> " << dst
-                   << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
-            }
+        // Edges from Cycle Two
+        for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+          NodeIdType src = edges[edgeIdx].srcId;
+          NodeIdType dst = edges[edgeIdx].dstId;
+          std::string srcId = cycleTwoNodes.count(src)
+                                  ? prefix + "c2_" + getNodeDotId(src)
+                                  : prefix + "int2_" + getNodeDotId(src);
+          std::string dstId = (dst == edgeInfo.joinId)
+                                  ? prefix + "join_" + getNodeDotId(dst)
+                                  : prefix + "int2_" + getNodeDotId(dst);
+          if (drawnEdges.insert({srcId, dstId}).second) {
+            file << "    " << srcId << " -> " << dstId
+                 << " [color=\"#1565c0\", style=dashed, penwidth=1.5];\n";
           }
         }
       }

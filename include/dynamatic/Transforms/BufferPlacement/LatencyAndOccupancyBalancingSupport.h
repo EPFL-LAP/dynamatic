@@ -122,7 +122,7 @@ struct ReconvergentPath {
 /// 1 -> 1 (self-loop)
 /// enumerateTransitionSequences(transitions, 3);
 /// Output: [1, 2, 3], [1, 1, 2], [1, 1, 1]
-std::vector<std::vector<ArchBB>>
+inline std::vector<std::vector<ArchBB>>
 enumerateTransitionSequences(const std::vector<ArchBB> &transitions,
                              size_t sequenceLength) {
   // 'sequenceLength' is the number of steps to visit.
@@ -268,25 +268,26 @@ struct SimpleCycle {
   bool isDisjointFrom(const SimpleCycle &other) const;
 };
 
-struct PathToJoin {
+struct EdgesToJoin {
   NodeIdType joinId;
 
-  std::vector<NodeIdType> pathFromCycleOne;
-  std::vector<NodeIdType> pathFromCycleTwo;
+  /// Edge indices (into nonCyclicAdjList) on any path from cycle to join.
+  std::vector<size_t> edgesFromCycleOne;
+  std::vector<size_t> edgesFromCycleTwo;
 
-  PathToJoin(NodeIdType join) : joinId(join) {}
+  EdgesToJoin(NodeIdType join) : joinId(join) {}
 };
 
 struct SynchronizingCyclePair {
   SimpleCycle cycleOne;
   SimpleCycle cycleTwo;
 
-  std::vector<PathToJoin> pathsToJoins;
+  std::vector<EdgesToJoin> edgesToJoins;
 
   SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
-                         std::vector<PathToJoin> paths)
+                         std::vector<EdgesToJoin> edges)
       : cycleOne(std::move(one)), cycleTwo(std::move(two)),
-        pathsToJoins(std::move(paths)) {}
+        edgesToJoins(std::move(edges)) {}
 };
 
 class SynchronizingCyclesFinderGraph : public DataflowSubgraphBase {
@@ -336,9 +337,11 @@ private:
 
   void computeSccsAndBuildNonCyclicSubgraph();
 
-  /// Find path from a cycle to a join using BFS on non-cyclic subgraph.
-  std::vector<NodeIdType> findPathToJoin(const SimpleCycle &cycle,
-                                         NodeIdType joinId) const;
+  /// Find all edges (from nonCyclicAdjList) on any path from cycle to join.
+  /// An edge is included if its source is reachable from the cycle and its
+  /// destination can reach the join.
+  std::vector<size_t> findEdgesToJoin(const SimpleCycle &cycle,
+                                      NodeIdType joinId) const;
 
   /// Get all join node IDs in the graph.
   std::vector<NodeIdType> getAllJoins() const;
@@ -352,7 +355,7 @@ struct CycleCollector {
 
   template <typename Path, typename Graph>
   void cycle(const Path &p, const Graph &) {
-    std::vector<NodeIdType> nodeIds;
+    llvm::SmallVector<NodeIdType> nodeIds;
     for (auto v : p) {
       nodeIds.push_back(v);
     }
