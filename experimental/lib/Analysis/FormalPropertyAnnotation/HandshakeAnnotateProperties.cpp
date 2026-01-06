@@ -160,8 +160,10 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
-  if (failed(annotateEagerForkNotAllOutputSent(modOp)))
-    return signalPassFailure();
+  if (annotateInvariants) {
+    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
+      return signalPassFailure();
+  }
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 
