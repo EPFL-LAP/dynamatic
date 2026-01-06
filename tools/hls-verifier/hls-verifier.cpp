@@ -143,12 +143,6 @@ int main(int argc, char **argv) {
       "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
       cl::value_desc("Simulator of choice"), cl::init("vsim"));
 
-  cl::opt<std::string> hdlType("hdl",
-                               cl::desc("HDL used for simulation. Can either "
-                                        "be 'vhdl' (default) or 'verilog'"),
-                               cl::value_desc("HDL for simulation"),
-                               cl::init("vhdl"));
-
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
 
@@ -184,9 +178,7 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  HdlType hdl = (hdlType == "verilog") ? VERILOG : VHDL;
-
-  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU, hdl);
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
