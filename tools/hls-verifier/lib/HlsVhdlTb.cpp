@@ -296,7 +296,7 @@ struct StartToChannelConnector {
     commonSingleArgumentDeclaration(argInst, argName);
     argInst.connect(CE0_PORT, SignalAssignment::CONST_ONE)
         .connect(WE0_PORT, SignalAssignment::CONST_ZERO)
-        .connect(D_IN0_PORT, SignalAssignment::CONST_ZERO);
+        .connect(D_IN0_PORT, SignalAssignment::CONST_VEC_ZERO);
     argInst.emit(os, ctx);
   }
 
@@ -613,131 +613,120 @@ void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
                        argName + "_ready");
     }
 
-    if (ctx.simLanguage == VHDL) {
-      unsigned idx = 0;
-      for (auto &[type, argName] :
-           getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
-        joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                         argName + "_valid");
-        joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                         argName + "_ready");
-      }
-
-      for (auto &[type, argName] :
-           getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
-
-        joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                         argName + "_valid");
-        joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                         argName + "_ready");
-      }
-
-      joinInst.parameter("SIZE",
-                         std::to_string(/* Size = last index + 1 */ idx));
-    }
-
-    if (ctx.simLanguage == VERILOG) {
-      llvm::SmallVector<std::string> insValids;
-      llvm::SmallVector<std::string> insReadys;
-
-      for (auto &[type, argName] :
-           getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
-        insValids.push_back(llvm::formatv("{0}_valid", argName));
-        insReadys.push_back(llvm::formatv("{0}_ready", argName));
-      }
-
-      for (auto &[type, argName] :
-           getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
-        insValids.push_back(llvm::formatv("{0}_valid", argName));
-        insReadys.push_back(llvm::formatv("{0}_ready", argName));
-      }
-      joinInst.connect("ins_valid", "{" + llvm::join(insValids, ", ") + "}");
-      joinInst.connect("ins_ready", "{" + llvm::join(insReadys, ", ") + "}");
-
-      joinInst.parameter(
-          "SIZE", std::to_string(/* Size = last index + 1 */ insValids.size()));
-    }
-
-    joinInst.connect("outs_valid", "tb_global_valid");
-    joinInst.connect("outs_ready", "tb_global_ready");
-
-    joinInst.emit(os, ctx);
-  }
-
-  void getOutputTagGeneration(mlir::raw_indented_ostream & os,
-                              VerificationContext & ctx) {
-    handshake::FuncOp *funcOp = ctx.funcOp;
-
-    auto template_write_transaction = (ctx.simLanguage == VHDL)
-                                          ? VHDL_PROC_WRITE_TRANSACTIONS
-                                          : VERILOG_PROC_WRITE_TRANSACTIONS;
-
-    // Reading / Dumping the content of the memory into the file
-    for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-      os << llvm::formatv(template_write_transaction.c_str(), argName);
-    }
-
-    // Reading / Dumping the content of the memory into the file
     for (auto &[type, argName] :
-         getInputArguments<handshake::ChannelType>(funcOp)) {
-      os << llvm::formatv(template_write_transaction.c_str(), argName);
+         getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
+
+      joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                       argName + "_valid");
+      joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                       argName + "_ready");
     }
 
-    // Reading / Dumping the content of the memory into the file
+    joinInst.parameter("SIZE", std::to_string(/* Size = last index + 1 */ idx));
+  }
+
+  if (ctx.simLanguage == VERILOG) {
+    llvm::SmallVector<std::string> insValids;
+    llvm::SmallVector<std::string> insReadys;
+
     for (auto &[type, argName] :
-         getOutputArguments<handshake::ChannelType>(funcOp)) {
-      os << llvm::formatv(template_write_transaction.c_str(), argName);
+         getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
+      insValids.push_back(llvm::formatv("{0}_valid", argName));
+      insReadys.push_back(llvm::formatv("{0}_ready", argName));
     }
+
+    for (auto &[type, argName] :
+         getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
+      insValids.push_back(llvm::formatv("{0}_valid", argName));
+      insReadys.push_back(llvm::formatv("{0}_ready", argName));
+    }
+    joinInst.connect("ins_valid", "{" + llvm::join(insValids, ", ") + "}");
+    joinInst.connect("ins_ready", "{" + llvm::join(insReadys, ", ") + "}");
+
+    joinInst.parameter(
+        "SIZE", std::to_string(/* Size = last index + 1 */ insValids.size()));
   }
 
-  void vhdlTbCodegen(VerificationContext & ctx) {
+  joinInst.connect("outs_valid", "tb_global_valid");
+  joinInst.connect("outs_ready", "tb_global_ready");
 
-    std::error_code ec;
-    std::string filename;
-    if (ctx.simLanguage == VHDL) {
-      filename = ctx.getVhdlTestbenchPath();
-    }
-    if (ctx.simLanguage == VERILOG) {
-      filename = ctx.getVerilogTestbenchPath();
-    }
-    llvm::raw_fd_ostream fileStream(filename, ec);
+  joinInst.emit(os, ctx);
+}
 
-    if (ec) {
-      llvm::errs() << "Error opening file: " << ec.message() << "\n";
-      // Handle error appropriately, e.g., return, exit, etc.
-      assert(false);
-    }
-    mlir::raw_indented_ostream os(fileStream);
+void getOutputTagGeneration(mlir::raw_indented_ostream &os,
+                            VerificationContext &ctx) {
+  handshake::FuncOp *funcOp = ctx.funcOp;
 
-    if (ctx.simLanguage == VHDL) {
-      os << VHDL_LIBRARY_HEADER;
-      os.indent();
-      getConstantDeclaration(os, ctx);
-      getSignalDeclaration(os, ctx);
-      os.unindent();
-      os << "begin\n\n";
-      os.indent();
-      getDuvInstanceGeneration(os, ctx);
-      getMemoryInstanceGeneration(os, ctx);
-      deriveGlobalCompletionSignal(os, ctx);
-      getOutputTagGeneration(os, ctx);
-      os << VHDL_COMMON_TB_BODY;
-      os.unindent();
-      os << "end architecture behavior;\n";
-      os.flush();
-    }
+  auto template_write_transaction = (ctx.simLanguage == VHDL)
+                                        ? VHDL_PROC_WRITE_TRANSACTIONS
+                                        : VERILOG_PROC_WRITE_TRANSACTIONS;
 
-    if (ctx.simLanguage == VERILOG) {
-      os << VERILOG_LIBRARY_HEADER;
-      getConstantDeclaration(os, ctx);
-      getSignalDeclaration(os, ctx);
-      getDuvInstanceGeneration(os, ctx);
-      getMemoryInstanceGeneration(os, ctx);
-      deriveGlobalCompletionSignal(os, ctx);
-      getOutputTagGeneration(os, ctx);
-      os << VERILOG_COMMON_TB_BODY;
-      os.unindent();
-      os << "endmodule\n";
-      os.flush();
-    }
+  // Reading / Dumping the content of the memory into the file
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+    os << llvm::formatv(template_write_transaction.c_str(), argName);
   }
+
+  // Reading / Dumping the content of the memory into the file
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ChannelType>(funcOp)) {
+    os << llvm::formatv(template_write_transaction.c_str(), argName);
+  }
+
+  // Reading / Dumping the content of the memory into the file
+  for (auto &[type, argName] :
+       getOutputArguments<handshake::ChannelType>(funcOp)) {
+    os << llvm::formatv(template_write_transaction.c_str(), argName);
+  }
+}
+
+void vhdlTbCodegen(VerificationContext &ctx) {
+
+  std::error_code ec;
+  std::string filename;
+  if (ctx.simLanguage == VHDL) {
+    filename = ctx.getVhdlTestbenchPath();
+  }
+  if (ctx.simLanguage == VERILOG) {
+    filename = ctx.getVerilogTestbenchPath();
+  }
+  llvm::raw_fd_ostream fileStream(filename, ec);
+
+  if (ec) {
+    llvm::errs() << "Error opening file: " << ec.message() << "\n";
+    // Handle error appropriately, e.g., return, exit, etc.
+    assert(false);
+  }
+  mlir::raw_indented_ostream os(fileStream);
+
+  if (ctx.simLanguage == VHDL) {
+    os << VHDL_LIBRARY_HEADER;
+    os.indent();
+    getConstantDeclaration(os, ctx);
+    getSignalDeclaration(os, ctx);
+    os.unindent();
+    os << "begin\n\n";
+    os.indent();
+    getDuvInstanceGeneration(os, ctx);
+    getMemoryInstanceGeneration(os, ctx);
+    deriveGlobalCompletionSignal(os, ctx);
+    getOutputTagGeneration(os, ctx);
+    os << VHDL_COMMON_TB_BODY;
+    os.unindent();
+    os << "end architecture behavior;\n";
+    os.flush();
+  }
+
+  if (ctx.simLanguage == VERILOG) {
+    os << VERILOG_LIBRARY_HEADER;
+    getConstantDeclaration(os, ctx);
+    getSignalDeclaration(os, ctx);
+    getDuvInstanceGeneration(os, ctx);
+    getMemoryInstanceGeneration(os, ctx);
+    deriveGlobalCompletionSignal(os, ctx);
+    getOutputTagGeneration(os, ctx);
+    os << VERILOG_COMMON_TB_BODY;
+    os.unindent();
+    os << "endmodule\n";
+    os.flush();
+  }
+}

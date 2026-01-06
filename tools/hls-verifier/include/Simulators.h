@@ -222,14 +222,15 @@ public:
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getVerilatorShFilePath(), ec);
 
-    os << "verilator -Mdir ./verilator -cc ";
+    os << "verilator --trace -Mdir ./verilator -cc ";
 
     for (auto &it : filelistVerilog)
       os << it << " ";
     for (auto &it : fileListSystemVerilog)
       os << it << " ";
 
-    os << "--exe verilator_main.cpp --top-module tb --timing -Wno-REALCVT\n";
+    os << "--exe verilator_main.cpp --trace-underscore --Wno-UNOPTFLAT "
+          "--top-module tb --timing -Wno-REALCVT\n";
 
     os << "make -j -C ./verilator/ -f Vtb.mk Vtb\n";
 

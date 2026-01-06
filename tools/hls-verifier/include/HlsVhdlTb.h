@@ -401,7 +401,7 @@ static const string RET_VALUE_NAME = "out0";
 // using ConnectedValueType = std::variant<std::string, SpecialSignal>;
 
 struct SignalAssignment {
-  enum AssignmentType { SIGNAL, CONST_ZERO, CONST_ONE, OPEN };
+  enum AssignmentType { SIGNAL, CONST_ZERO, CONST_ONE, CONST_VEC_ZERO, OPEN };
   std::string name = "DEFAULT";
   AssignmentType type = SIGNAL;
   SignalAssignment(const std::string &name) : name(name) {};
@@ -418,6 +418,9 @@ struct SignalAssignment {
       break;
     case SignalAssignment::OPEN:
       return ctx.simLanguage == VHDL ? "open" : "";
+      break;
+    case SignalAssignment::CONST_VEC_ZERO:
+      return ctx.simLanguage == VHDL ? "(others => '0')" : "0";
       break;
     case SignalAssignment::SIGNAL:
       return name;
