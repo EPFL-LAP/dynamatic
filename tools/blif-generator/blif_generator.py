@@ -25,9 +25,11 @@ ranges = {
     'DEFAULT': (1, 33)
 }
 
+
 def create_yosys_script(component: str, params: str, output_dir: str, output_name: str, verilog_files: List[str]) -> str:
     """Create a Yosys script with the given parameters."""
-    verilog_reads = '\n        '.join([f'read_verilog -defer {path}' for path in verilog_files])
+    verilog_reads = '\n        '.join(
+        [f'read_verilog -defer {path}' for path in verilog_files])
 
     content = f"""#!/bin/bash
 yosys -p "{verilog_reads}
@@ -42,6 +44,7 @@ yosys -p "{verilog_reads}
         write_blif {output_dir}/{output_name}" > /dev/null
 """
     return content
+
 
 def create_abc_script(input_file: str, output_dir: str, output_name: str) -> str:
     """Create an ABC script with optimization commands."""
@@ -64,16 +67,18 @@ def get_range_for_param(param_type: str) -> Tuple[int, int]:
     start, end = ranges.get(param_type, ranges['DEFAULT'])
     return start, end
 
+
 def load_json_config(config_path: str) -> List[Dict[str, Any]]:
     """Load the JSON configuration file."""
     with open(config_path, 'r') as f:
         return json.load(f)
 
+
 def get_verilog_dependencies(module_config: Dict[str, Any], all_modules: List[Dict[str, Any]]) -> List[str]:
     """Get list of Verilog dependency files for a module by looking up in JSON config, including recursive dependencies."""
     verilog_paths = []
     visited_dependencies = set()  # To avoid circular dependencies
-    
+
     # Create a lookup dict for module-name to config mapping
     module_name_lookup = {}
     for config in all_modules:
@@ -89,48 +94,51 @@ def get_verilog_dependencies(module_config: Dict[str, Any], all_modules: List[Di
             generic_path = config['generic']
             filename = os.path.basename(generic_path).replace('.v', '')
             module_name_lookup[filename] = config
-    
+
     def collect_dependencies_recursive(config: Dict[str, Any]) -> None:
         """Recursively collect all dependencies for a given config."""
         # Add the main generic file if it exists
         if 'generic' in config:
-            generic_path = config['generic'].replace('$DYNAMATIC', str(DYNAMATIC_ROOT))
+            generic_path = config['generic'].replace(
+                '$DYNAMATIC', str(DYNAMATIC_ROOT))
             if os.path.exists(generic_path) and generic_path not in verilog_paths:
                 verilog_paths.append(generic_path)
-        
+
         # Process dependencies
         dependencies = config.get('dependencies', [])
         for dep in dependencies:
             if dep in visited_dependencies:
                 continue  # Skip already processed dependencies to avoid circular references
-            
+
             visited_dependencies.add(dep)
-            
+
             if dep in module_name_lookup:
                 dep_config = module_name_lookup[dep]
                 # Recursively collect dependencies of this dependency
                 collect_dependencies_recursive(dep_config)
             else:
-                print(f"Warning: Dependency '{dep}' not found in JSON configuration")
-    
+                print(
+                    f"Warning: Dependency '{dep}' not found in JSON configuration")
+
     # Start recursive collection from the main module
     collect_dependencies_recursive(module_config)
-    
+
     return verilog_paths
+
 
 def get_parameter_ranges(module_config: Dict[str, Any]) -> Dict[str, List[Any]]:
     """Get parameter ranges for a module based on its configuration."""
     parameters = module_config.get('parameters', [])
     param_ranges = {}
-    
+
     for param in parameters:
         param_name = param['name']
         param_type = param['type']
 
-        if param.get('generic', True): 
+        if param.get('generic', True):
             if param_type == 'string':
                 if 'eq' in param:
-                    continue # Fixed value, skip range generation
+                    continue  # Fixed value, skip range generation
                     param_ranges[param_name] = [param['eq']]
                 else:
                     # Do not add to list
@@ -138,21 +146,21 @@ def get_parameter_ranges(module_config: Dict[str, Any]) -> Dict[str, List[Any]]:
             elif param_type in ['unsigned', 'dataflow']:
                 # Check for fixed values first
                 if 'eq' in param:
-                    continue # Fixed value, skip range generation
+                    continue  # Fixed value, skip range generation
                     param_ranges[param_name] = [param['eq']]
                 elif 'data-eq' in param:
-                    continue # Fixed value, skip range generation
+                    continue  # Fixed value, skip range generation
                     param_ranges[param_name] = [param['data-eq']]
                 else:
                     # Get range from get_range_for_param function
                     start, end = get_range_for_param(param_name)
-                    
+
                     # Apply lower bound if specified
                     if 'lb' in param:
                         start = max(start, param['lb'])
                     if 'data-lb' in param:
                         start = max(start, param['data-lb'])
-                    
+
                     param_ranges[param_name] = list(range(start, end))
             elif param_type == 'timing':
                 # Check for fixed timing values
@@ -166,8 +174,9 @@ def get_parameter_ranges(module_config: Dict[str, Any]) -> Dict[str, List[Any]]:
                     param_ranges[param_name] = [param['ready-lat-eq']]
                 # Skip timing parameters that don't have fixed values
                 continue
-    
+
     return param_ranges
+
 
 def execute_generator(generator_cmd: str, module_name: str, output_dir: str, **kwargs) -> str:
     """Execute a generator command and return the generated Verilog file path."""
@@ -175,20 +184,20 @@ def execute_generator(generator_cmd: str, module_name: str, output_dir: str, **k
     cmd = generator_cmd.replace('$DYNAMATIC', str(DYNAMATIC_ROOT))
     cmd = cmd.replace('$OUTPUT_DIR', output_dir)
     cmd = cmd.replace('$MODULE_NAME', module_name)
-    
+
     if (module_name == "constant"):
         cmd = cmd.replace('$VALUE', '1')
-    
+
     if (module_name == "cmpi"):
         cmd = cmd.replace('$PREDICATE', 'ult')
 
     # Replace any additional parameters
     for key, value in kwargs.items():
         cmd = cmd.replace(f'${key}', str(value))
-    
+
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Execute generator
     try:
         subprocess.run(cmd, shell=True, check=True)
@@ -197,6 +206,7 @@ def execute_generator(generator_cmd: str, module_name: str, output_dir: str, **k
     except subprocess.CalledProcessError as e:
         print(f"Generator failed for {module_name}: {e}")
         return None
+
 
 def process_blackbox_components(file_path: str, component: str, data_type: int = None) -> None:
     """Filter BLIF file based on component-specific rules."""
@@ -218,8 +228,8 @@ def process_blackbox_components(file_path: str, component: str, data_type: int =
         should_skip_next = False
 
         # Remove .names lines for these modules, as they are blackboxes
-        if (component in ['addi', 'cmpi', 'subi'] and 
-            data_type is not None and data_type > 4):
+        if (component in ['addi', 'cmpi', 'subi'] and
+                data_type is not None and data_type > 4):
             if '.names' in line and 'ready' not in line and 'valid' not in line:
                 should_keep = False
                 should_skip_next = True  # Skip the line after .names
@@ -246,10 +256,13 @@ def process_blackbox_components(file_path: str, component: str, data_type: int =
         copy_and_rename_blif('muli', 'divsi', data_type)
         copy_and_rename_blif('muli', 'divui', data_type)
 
+
 def copy_and_rename_blif(source_component: str, target_component: str, data_type: int) -> None:
     """Copy BLIF file from source component to target component with name updates."""
-    source_dir = os.path.join(BLIF_FILES_PATH, source_component, str(data_type))
-    target_dir = os.path.join(BLIF_FILES_PATH, target_component, str(data_type))
+    source_dir = os.path.join(
+        BLIF_FILES_PATH, source_component, str(data_type))
+    target_dir = os.path.join(
+        BLIF_FILES_PATH, target_component, str(data_type))
 
     source_file = os.path.join(source_dir, f'{source_component}.blif')
     target_file = os.path.join(target_dir, f'{target_component}.blif')
@@ -272,18 +285,20 @@ def copy_and_rename_blif(source_component: str, target_component: str, data_type
     with open(target_file, 'w') as f:
         f.write(updated_content)
 
+
 def create_and_run_scripts(component: str, folder_path: str, param_command: str = '',
-                          name_suffix: str = '', verilog_files: List[str] = None, data_type: int = None) -> None:
+                           name_suffix: str = '', verilog_files: List[str] = None, data_type: int = None) -> None:
     """Create and execute Yosys and ABC scripts for a component."""
     if not verilog_files:
         verilog_files = []
-    
+
     os.makedirs(folder_path, exist_ok=True)
 
     # Yosys script
     yosys_output = f'{component}{name_suffix}_yosys.blif'
     yosys_script_path = os.path.join(folder_path, 'run_yosys.sh')
-    yosys_content = create_yosys_script(component, param_command, folder_path, yosys_output, verilog_files)
+    yosys_content = create_yosys_script(
+        component, param_command, folder_path, yosys_output, verilog_files)
 
     with open(yosys_script_path, 'w') as f:
         f.write(yosys_content)
@@ -302,24 +317,25 @@ def create_and_run_scripts(component: str, folder_path: str, param_command: str 
     subprocess.run(['bash', abc_script_path])
 
     abc_output_path = os.path.join(folder_path, abc_output)
-    
+
     # Process blackbox components after ABC
     if component in BLACKBOX_COMPONENTS:
         process_blackbox_components(abc_output_path, component, data_type)
 
+
 def process_module(module_config: Dict[str, Any], all_modules: List[Dict[str, Any]]) -> None:
     """Process a single module based on its JSON configuration."""
     module_name = module_config['name']
-    
+
     # Get module name override if specified
     if 'module-name' in module_config:
         component = module_config['module-name']
     else:
         # Extract component name (remove handshake. prefix if present)
         component = module_name.replace('handshake.', '')
-    
+
     print(f"Processing module: {module_name} (component: {component})")
-    
+
     # Get parameter ranges and generic parameters
     param_ranges = get_parameter_ranges(module_config)
 
@@ -335,67 +351,74 @@ def process_module(module_config: Dict[str, Any], all_modules: List[Dict[str, An
     verilog_files = get_verilog_dependencies(module_config, all_modules)
 
     base_folder_path = os.path.join(BLIF_FILES_PATH, component)
-    
+
     # If no parameters, process once
     if not param_ranges:
-        create_and_run_scripts(component, base_folder_path, '', '', verilog_files)
+        create_and_run_scripts(
+            component, base_folder_path, '', '', verilog_files)
         return
-    
+
     # Generate all parameter combinations
     param_names = list(param_ranges.keys())
     param_values = list(param_ranges.values())
-    
+
     for combo in product(*param_values):
         # Handle generator case
         if 'generator' in module_config:
             # Create folder for this parameter combination
             folder_path = os.path.join(base_folder_path, *map(str, combo))
-            
+
             # Create parameter dict for generator
             param_dict = dict(zip(param_names, combo))
-            
+
             # Execute generator
             generated_file = execute_generator(
-                module_config['generator'], 
-                component, 
+                module_config['generator'],
+                component,
                 folder_path,
                 **param_dict
             )
-            
+
             if generated_file:
                 verilog_files_with_generated = verilog_files + [generated_file]
             else:
-                print(f"Failed to generate file for {component} with params {combo}")
+                print(
+                    f"Failed to generate file for {component} with params {combo}")
                 continue
         else:
             folder_path = os.path.join(base_folder_path, *map(str, combo))
             verilog_files_with_generated = verilog_files
-        
+
         # Create parameter command for Yosys - only include generic parameters
         generic_param_commands = []
         for i, param_name in enumerate(param_names):
             if param_name in generic_params:
                 generic_param_commands.append(f'-set {param_name} {combo[i]}')
-        
+
         if generic_param_commands:
             param_command = f"chparam {' '.join(generic_param_commands)} {component}"
         else:
             param_command = ''
-        
+
         name_suffix = '_' + '_'.join(str(val) for val in combo)
-        
+
         # Get data_type for blackbox processing
         data_type = None
         if 'DATA_TYPE' in param_names:
             data_type_index = param_names.index('DATA_TYPE')
             data_type = combo[data_type_index]
-        
-        create_and_run_scripts(component, folder_path, param_command, name_suffix, verilog_files_with_generated, data_type)
+
+        create_and_run_scripts(component, folder_path, param_command,
+                               name_suffix, verilog_files_with_generated, data_type)
+
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate AIGs for modules using JSON configuration')
-    parser.add_argument('--parameter', '-p', action='append', help='Parameter in the form NAME=MIN_VALUE,MAX_VALUE (can be used multiple times) where NAME is the parameter name, MIN_VALUE is the minimum value (inclusive) and MAX_VALUE is the maximum value (inclusive)')
-    parser.add_argument('module', nargs='?', help='Specific module name to generate (optional)')
+    parser = argparse.ArgumentParser(
+        description='Generate AIGs for modules using JSON configuration')
+    parser.add_argument('--parameter', '-p', action='append',
+                        help='Parameter in the form NAME=MIN_VALUE,MAX_VALUE (can be used multiple times) where NAME is the parameter name, MIN_VALUE is the minimum value (inclusive) and MAX_VALUE is the maximum value (inclusive)')
+    parser.add_argument('module', nargs='?',
+                        help='Specific module name to generate (optional)')
 
     args = parser.parse_args()
 
@@ -410,7 +433,8 @@ def main():
         sys.exit(1)
 
     # Create a lookup dict for modules
-    modules_dict = {config['name']: config for config in modules_config if 'name' in config}
+    modules_dict = {
+        config['name']: config for config in modules_config if 'name' in config}
 
     # Copy parameter ranges from command line arguments
     if args.parameter:
@@ -421,7 +445,8 @@ def main():
                 max_val += 1  # Make max_val exclusive
                 ranges[name] = (min_val, max_val)
             except ValueError:
-                print(f"Error: Invalid parameter format '{param}'. Expected format is NAME=MIN_VALUE,MAX_VALUE")
+                print(
+                    f"Error: Invalid parameter format '{param}'. Expected format is NAME=MIN_VALUE,MAX_VALUE")
                 sys.exit(1)
 
     if args.module:
@@ -443,10 +468,12 @@ def main():
         print("Processing all modules...")
         for module_config in modules_config:
             if 'name' in module_config:  # Only process modules with names
-                if not re.search(r'[^/]*f$', module_config['name']): # Skip floating point units
+                # Skip floating point units
+                if not re.search(r'[^/]*f$', module_config['name']):
                     process_module(module_config, modules_config)
 
     print("Processed modules")
+
 
 if __name__ == "__main__":
     main()
