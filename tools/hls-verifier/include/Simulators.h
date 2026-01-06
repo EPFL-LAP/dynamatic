@@ -10,6 +10,7 @@
 #ifndef HLS_VERIFIER_SIMULATORS_H
 #define HLS_VERIFIER_SIMULATORS_H
 
+#include "Utilities.h"
 #include "VerificationContext.h"
 #include "dynamatic/Support/System.h"
 #include "mlir/Support/LogicalResult.h"
@@ -44,8 +45,8 @@ public:
   XSimSimulator(VerificationContext *context) : Simulator(context) {}
 
   void execSimulation() const override {
-    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "-s", "tb",
-         "-R");
+    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "--timescale",
+         "1ns/1ps", "-s", "tb", "-R");
   }
 
   mlir::LogicalResult generateScripts() const override {
@@ -53,6 +54,8 @@ public:
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".vhd");
     vector<string> filelistVerilog =
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
 
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getXsimPrjFilePath(), ec);
@@ -62,6 +65,9 @@ public:
 
     for (auto &it : filelistVerilog)
       os << "verilog work " << it << "\n";
+
+    for (auto &it : fileListSystemVerilog)
+      os << "sv work " << it << "\n";
 
     return mlir::success();
   }
@@ -158,6 +164,8 @@ public:
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".vhd");
     vector<string> filelistVerilog =
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
 
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getModelsimDoFilePath(), ec);
@@ -175,6 +183,9 @@ public:
     for (auto &it : filelistVerilog)
       os << "project addfile " << it << "\n";
 
+    for (auto &it : fileListSystemVerilog)
+      os << "project addfile " << it << "\n";
+
     os << "project calculateorder\n";
     os << "project compileall\n";
     if (ctx->useVivadoFPU()) {
@@ -185,6 +196,47 @@ public:
     os << "log -r *\n";
     os << "run -all\n";
     os << "exit\n";
+
+    return mlir::success();
+  }
+};
+
+class Verilator : public Simulator {
+
+public:
+  Verilator(VerificationContext *context) : Simulator(context) {}
+
+  void execSimulation() const override {
+    exec("bash", ctx->getVerilatorShFilePath());
+  }
+
+  mlir::LogicalResult generateScripts() const override {
+
+    vector<string> filelistVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
+
+    if (filelistVerilog.empty()) {
+      return mlir::failure();
+    }
+
+    std::error_code ec;
+    llvm::raw_fd_ostream os(ctx->getVerilatorShFilePath(), ec);
+
+    os << "verilator --trace -Mdir ./verilator -cc ";
+
+    for (auto &it : filelistVerilog)
+      os << it << " ";
+    for (auto &it : fileListSystemVerilog)
+      os << it << " ";
+
+    os << "--exe verilator_main.cpp --trace-underscore --Wno-UNOPTFLAT "
+          "--top-module tb --timing -Wno-REALCVT\n";
+
+    os << "make -j -C ./verilator/ -f Vtb.mk Vtb\n";
+
+    os << "./verilator/Vtb\n";
 
     return mlir::success();
   }
