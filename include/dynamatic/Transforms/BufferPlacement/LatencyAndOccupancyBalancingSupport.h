@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
@@ -177,15 +178,16 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
 class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
 public:
   bool isForkNode(NodeIdType nodeId) const override {
-    return isa<handshake::ForkOp>(nodes[nodeId].op) ||
-           isa<handshake::LazyForkOp>(nodes[nodeId].op);
+    return isa<handshake::ForkOp, handshake::LazyForkOp,
+               handshake::EagerForkLikeOpInterface>(nodes[nodeId].op);
   }
 
-  // Those two nodes are the only nodes with two inputs that allow for both
+  // The only nodes with two inputs that allow for both
   // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
+  /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
-    return isa<handshake::MuxOp>(nodes[nodeId].op) ||
-           isa<handshake::ConditionalBranchOp>(nodes[nodeId].op);
+    return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
+               handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
 
   std::string getNodeLabel(NodeIdType nodeId) const override;
@@ -302,17 +304,14 @@ public:
   std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
   bool isForkNode(NodeIdType nodeId) const override {
-    return isa<handshake::ForkOp>(nodes[nodeId].op) ||
-           isa<handshake::LazyForkOp>(nodes[nodeId].op);
+    return isa<handshake::ForkOp, handshake::LazyForkOp,
+               handshake::EagerForkLikeOpInterface>(nodes[nodeId].op);
   }
 
+  /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
-    return isa<handshake::MuxOp>(nodes[nodeId].op) ||
-           isa<handshake::ConditionalBranchOp>(nodes[nodeId].op) ||
-           isa<handshake::AddFOp>(nodes[nodeId].op) ||
-           isa<handshake::SubFOp>(nodes[nodeId].op) ||
-           isa<handshake::MulFOp>(nodes[nodeId].op) ||
-           isa<handshake::StoreOp>(nodes[nodeId].op);
+    return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
+               handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
 
   std::string getNodeLabel(NodeIdType nodeId) const override;

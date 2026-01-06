@@ -52,6 +52,13 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
   ];
 }
 
+def JoinLikeOpInterface : OpInterface<"JoinLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    A two-input handshake operation that contains a join.
+  }];
+}
+
 def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
