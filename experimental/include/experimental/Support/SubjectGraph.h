@@ -57,6 +57,7 @@ protected:
   bool isBlackbox = false;
 
   void loadBlifFile(std::initializer_list<unsigned int> inputs,
+                    std::map<std::string, unsigned int> parameters,
                     std::string toAppend = "");
 
   // Helper function to connect the input nodes of the current module
