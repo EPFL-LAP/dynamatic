@@ -32,7 +32,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
   -- output
   DEFINE
   {"\n  ".join([f"ins_{n}_ready := inner_merge.ins_{n}_ready;" for n in range(size)])}
-  {"\n  ".join([f"sent_{n} := inner_fork.sent_{n};" for n in range(size)])}
+  {"\n  ".join([f"sent_{n} := inner_fork.sent_{n};" for n in range(2)])}
   outs_valid := inner_fork.outs_0_valid;
   index_valid := inner_fork.outs_1_valid;
   index := inner_one_slot_break_r.outs;
