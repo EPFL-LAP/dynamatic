@@ -10,9 +10,14 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
@@ -21,6 +26,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -35,6 +41,103 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
+
+struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
+  using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
+
+  // Construct a dense element attribute with everything zeroes.
+  DenseElementsAttr getZeroAttr(ShapedType type) const {
+    auto elemType = type.getElementType();
+    if (auto intTy = dyn_cast<IntegerType>(elemType)) {
+      return DenseElementsAttr::get(type, APInt(intTy.getWidth(), 0));
+    }
+    if (auto floatTy = dyn_cast<FloatType>(type)) {
+      if (floatTy.isF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEhalf(), /*negative=*/false));
+      if (floatTy.isBF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::BFloat(), /*negative=*/false));
+      if (floatTy.isF32())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEsingle(), /*negative=*/false));
+      if (floatTy.isF64())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEdouble(), /*negative=*/false));
+      llvm::report_fatal_error("Unhandled float element type!");
+    }
+    llvm::report_fatal_error("Unknown base element type!");
+  }
+
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // HACK: By default, we initialize the memory with all zeros. According to
+    // the C standard, this only happens for arrays.
+    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                  getZeroAttr(op.getType()));
+    return success();
+  }
+};
+
+struct GetGlobalOpConversion
+    : public DynOpConversionPattern<memref::GetGlobalOp> {
+  using DynOpConversionPattern<memref::GetGlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // clang-format off
+    // Example:
+    //  memref.global "external" constant @internal_array : memref<...> = dense<...>
+    //  ....
+    //  %4 = memref.get_global @internal_array : memref<...>
+    //
+    // In this case, we remove the global constant and rewrite the addressof
+    // node into a RAMOp (and we put an attribute to describe its constant
+    // value).
+    // clang-format on
+    SymbolTableCollection symbolTableCollection;
+
+    auto symNameOfGetGlobal = op.getNameAttr();
+
+    memref::GlobalOp global;
+    auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
+    moduleOp.walk([&global, symNameOfGetGlobal](memref::GlobalOp gbl) {
+      if (gbl.getSymName() == symNameOfGetGlobal.getValue()) {
+        global = gbl;
+      }
+    });
+
+    if (!global) {
+      // No corresponding Global (maybe emit pass failure is better)
+      return failure();
+    }
+
+    /// The initial value doesn't have any type constraints. Therefore we need
+    /// to check if it is stored as dense elements.
+    mlir::Attribute initValueAttr = global.getInitialValueAttr();
+    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+      rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                    denseAttr);
+    } else {
+      llvm::report_fatal_error(
+          "The initial value must be denoted in DenseElementsAttr.");
+    }
+    return success();
+  }
+};
+
+// TODO: Here we simply erase all the global variables and attach the initial
+// values to the RAMOps inside the handshake function.
+struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
+  using DynOpConversionPattern<memref::GlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
 
 namespace {
 
@@ -55,7 +158,14 @@ struct FtdCfToHandshakePass
         ctx);
 
     patterns
-        .add<ConvertCalls,
+        .add<
+             LowerFuncToHandshake,
+             ConvertConstants,
+             AllocaOpConversion,
+             ConvertCalls,
+             ConvertUndefinedValues,
+             GetGlobalOpConversion,
+             GlobalOpConversion,
              FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
              FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
              FtdOneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -66,10 +176,12 @@ struct FtdCfToHandshakePass
              FtdOneToOneConversion<arith::DivFOp, handshake::DivFOp>,
              FtdOneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
              FtdOneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+             FtdOneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
              FtdOneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
              FtdOneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
              FtdOneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
              FtdOneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+             FtdOneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
              FtdOneToOneConversion<arith::MulFOp, handshake::MulFOp>,
              FtdOneToOneConversion<arith::MulIOp, handshake::MulIOp>,
              FtdOneToOneConversion<arith::NegFOp, handshake::NegFOp>,
@@ -84,6 +196,7 @@ struct FtdCfToHandshakePass
              FtdOneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
              FtdOneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
              FtdOneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+             FtdOneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
              FtdOneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
              FtdOneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
              FtdOneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
@@ -97,8 +210,36 @@ struct FtdCfToHandshakePass
                              arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();
 
+    target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
+      // If the call is to __init, consider it legal for now.
+      // This allows the pass to continue so that __placeholder conversion can
+      // later erase these __init calls.
+      // All other func.CallOp (not calling __init) remain illegal due to the
+      // addIllegalDialect rule above and must be converted by a pattern.
+      if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
+              SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
+        return calledFn.getSymName().startswith("__init");
+      }
+      // If symbol lookup fails or it's not a func::FuncOp, treat as default
+      // (illegal)
+      return false;
+    });
+    target.addDynamicallyLegalOp<func::FuncOp>(
+        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // Clean up: Remove the definition of each __init* function, but only if it
+    // has no remaining uses. This is safe because all valid calls to __init*
+    // were tracked and deleted earlier.
+    for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
+      if (func.getSymName().startswith("__init")) {
+        assert(func.use_empty() &&
+               "__init function should not have users after transformation");
+        func.erase();
+      }
+    }
   }
 };
 } // namespace
