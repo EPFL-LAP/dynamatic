@@ -1396,12 +1396,12 @@ void Simulator::associateModel(Operation *op) {
       .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
         registerModel<MuxModel, handshake::MuxOp>(muxOp);
       })
-      .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
+      .Case<handshake::NotIOp>([&](handshake::NotIOp notIOp) {
         UnaryCompFunc callback = [](const Data &lhs, unsigned outWidth) {
           auto temp = dataCast<APInt>(lhs);
           return ~temp;
         };
-        registerModel<GenericUnaryOpModel<handshake::NotOp>>(notOp, callback);
+        registerModel<GenericUnaryOpModel<handshake::NotIOp>>(notIOp, callback);
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Does this simulator support FIFOs?

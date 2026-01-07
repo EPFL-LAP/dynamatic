@@ -635,7 +635,12 @@ def BlockerOp : Handshake_Op<"blocker", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotIOp : Handshake_Op<"noti", [
+  Pure,
+  SameOperandsAndResultType,
+  IsIntChannel<"operand">,
+  IsIntChannel<"result">
+]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -643,7 +648,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
     Example:
 
     ```mlir
-    %neg = not %value : !handshake.channel<i32>
+    %neg = noti %value : !handshake.channel<i32>
     ```
   }];
   let arguments = (ins ChannelType:$operand);

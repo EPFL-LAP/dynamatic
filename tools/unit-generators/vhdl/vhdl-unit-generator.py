@@ -103,7 +103,7 @@ if __name__ == "__main__":
     generators.add("handshake", "ndwire")
     generators.add("handshake", "ori")
     generators.add("handshake", "xori")
-    generators.add("handshake", "logical_not")
+    generators.add("handshake", "noti")
     generators.add("handshake", "select")
     generators.add("handshake", "sink")
     generators.add("handshake", "source")
