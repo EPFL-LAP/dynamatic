@@ -1,92 +1,86 @@
 `timescale 1ns/1ps
-module antitokens (
-  // inputs
-  input  clk,
-  input  reset,
-  input  pvalid1,
-  input  pvalid0,
-  input  generate_at1,
-  input  generate_at0,
-  // outputs
-  output  kill1,
-  output  kill0,
-  output  stop_valid
-);
-
-  wire reg_in0;
-  wire reg_in1;
-  reg reg_out0 = 1'b0;
-  reg reg_out1 = 1'b0;
-
-  always @(posedge clk) begin
-    if (reset) begin
-      reg_out0 <= 1'b0;
-      reg_out1 <= 1'b0;
-    end else begin
-      reg_out0 <= reg_in0;
-      reg_out1 <= reg_in1;
-    end
-  end
-
-  assign reg_in0 = !pvalid0 & (generate_at0 | reg_out0);
-  assign reg_in1 = !pvalid1 & (generate_at1 | reg_out1);
-
-  assign stop_valid = reg_out0 | reg_out1;
-
-  assign kill0 = generate_at0 | reg_out0;
-  assign kill1 = generate_at1 | reg_out1;
-
-endmodule
-
 
 module selector #(
-  parameter DATA_TYPE = 32
+    parameter DATA_TYPE = 8
 )(
-  // inputs
-  input  clk,
-  input  rst,
-  input  condition,
-  input  condition_valid,
-  input  [DATA_TYPE-1 : 0] trueValue,
-  input  trueValue_valid,
-  input  [DATA_TYPE-1 : 0] falseValue,
-  input  falseValue_valid,
-  input  result_ready,
-  // outputs
-  output  [DATA_TYPE-1 : 0] result,
-  output  result_valid,
-  output  condition_ready,
-  output  trueValue_ready,
-  output  falseValue_ready
+    // Inputs
+    input  wire                     clk,
+    input  wire                     rst,
+    input  wire [0:0]               condition,
+    input  wire                     condition_valid,
+    input  wire [DATA_TYPE-1:0]     trueValue,
+    input  wire                     trueValue_valid,
+    input  wire [DATA_TYPE-1:0]     falseValue,
+    input  wire                     falseValue_valid,
+    input  wire                     result_ready,
+    // Outputs
+    output wire [DATA_TYPE-1:0]     result,
+    output wire                     result_valid,
+    output wire                     condition_ready,
+    output wire                     trueValue_ready,
+    output wire                     falseValue_ready
 );
 
-  wire ee, validInternal, kill0, kill1, antitokenStop, g0, g1;
+    // Parameters
+    localparam discard_depth = 4;
+    localparam counter_width = $clog2(discard_depth);
 
-  // condition and one input
-  assign ee = condition_valid & ( ( !condition & falseValue_valid) | (condition & trueValue_valid) );
-  // propagate ee if not stopped antitoken
-  assign validInternal = ee & !antitokenStop;
+    // Internal signals
+    reg [counter_width-1:0] num_token_to_discard_true  = 0;
+    reg [counter_width-1:0] num_token_to_discard_false = 0;
 
-  assign g0 = !trueValue_valid & validInternal & result_ready;
-  assign g1 = !falseValue_valid & validInternal & result_ready;
+    wire can_propagate_true;
+    wire can_propagate_false;
+    wire can_discard_true;
+    wire can_discard_false;
+    wire still_need_to_discard_true;
+    wire still_need_to_discard_false;
 
-  assign result_valid = validInternal;
-  assign trueValue_ready = !trueValue_valid | (validInternal & result_ready) | kill0; // normal join or antitoken
-  assign falseValue_ready = !falseValue_valid | (validInternal & result_ready) | kill1; // normal join or antitoken
-  assign condition_ready = !condition_valid | (validInternal & result_ready); // normal join
+    // ----------------------
+    // Internal signal logic
+    // ----------------------
+    assign can_discard_true  = (trueValue_valid || (num_token_to_discard_true < discard_depth)) ? 1'b1 : 1'b0;
+    assign can_discard_false = (falseValue_valid || (num_token_to_discard_false < discard_depth)) ? 1'b1 : 1'b0;
 
-  assign result = condition ? trueValue : falseValue;
+    assign can_propagate_true  = (condition_valid && condition[0] && trueValue_valid &&
+                                 (num_token_to_discard_true == 0) && can_discard_false) ? 1'b1 : 1'b0;
 
-  antitokens antitokens (
-    .clk(clk),
-    .reset(rst),
-    .pvalid0(trueValue_valid),
-    .pvalid1(falseValue_valid),
-    .generate_at0(g0),
-    .generate_at1(g1),
-    .kill0(kill0),
-    .kill1(kill1),
-    .stop_valid(antitokenStop)
-  );
+    assign can_propagate_false = (condition_valid && !condition[0] && falseValue_valid &&
+                                 (num_token_to_discard_false == 0) && can_discard_true) ? 1'b1 : 1'b0;
+
+    assign still_need_to_discard_true  = (num_token_to_discard_true > 0) ? 1'b1 : 1'b0;
+    assign still_need_to_discard_false = (num_token_to_discard_false > 0) ? 1'b1 : 1'b0;
+
+    // ----------------------
+    // Handshake signals
+    // ----------------------
+    assign result_valid     = can_propagate_true || can_propagate_false;
+    assign result           = condition[0] ? trueValue : falseValue;
+
+    assign trueValue_ready  = (~trueValue_valid) || (result_valid && result_ready) || still_need_to_discard_true;
+    assign falseValue_ready = (~falseValue_valid) || (result_valid && result_ready) || still_need_to_discard_false;
+    assign condition_ready  = (~condition_valid) || (result_valid && result_ready);
+
+    // ----------------------
+    // Discard counters
+    // ----------------------
+    always @(posedge clk) begin
+        if (rst) begin
+            num_token_to_discard_true  <= 0;
+            num_token_to_discard_false <= 0;
+        end else begin
+            // True counter update
+            if (result_valid && result_ready && !trueValue_valid)
+                num_token_to_discard_true <= num_token_to_discard_true + 1;
+            else if (still_need_to_discard_true && trueValue_valid)
+                num_token_to_discard_true <= num_token_to_discard_true - 1;
+
+            // False counter update
+            if (result_valid && result_ready && !falseValue_valid)
+                num_token_to_discard_false <= num_token_to_discard_false + 1;
+            else if (still_need_to_discard_false && falseValue_valid)
+                num_token_to_discard_false <= num_token_to_discard_false - 1;
+        end
+    end
 
 endmodule
