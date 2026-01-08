@@ -418,6 +418,9 @@ instantiateSynthOpInHWModule(Operation *op, hw::HWModuleOp hwModule,
 }
 
 // Function to convert an handshake operation into an hw module operation
+// It is divided into two parts: first, create the hw module definition if it
+// does not already exist, then instantiate the hw instance of the module and
+// replace the original operation with it
 hw::HWModuleOp convertOpToHWModule(Operation *op,
                                    ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = op->getContext();
@@ -441,13 +444,15 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
     hwModule =
         rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
     // Instantiate the corresponding synth operation inside the hw module
+    // definition
     if (failed(instantiateSynthOpInHWModule(op, hwModule, hwInputPorts,
                                             hwOutputPorts, rewriter)))
       return nullptr;
   }
 
-  // Create the hw instance
+  // Create the hw instance and replace the original operation with it
   rewriter.setInsertionPointAfter(op);
+  // First, collect the operands for the hw instance
   SmallVector<Value> operandValues;
   for (auto operand : op->getOperands()) {
     auto definingOp = operand.getDefiningOp();
@@ -459,14 +464,16 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
              handshake::HandshakeDialect::getDialectNamespace()) ||
         isBlockArg) {
       // If so, create an unrealized conversion cast to unbundle the operand
-      // into its components for the hw instance
+      // into its components to connect it to the input ports of the hw instance
       auto cast = createCastBundledToUnbundled(operand, op->getLoc(), rewriter);
       // Append all cast results to the operand values
       operandValues.append(cast.getResults().begin(), cast.getResults().end());
       continue;
     }
+    // If the operand is already unbundled, just use it directly
     operandValues.push_back(operand);
   }
+  // Then, create the hw instance operation
   hw::InstanceOp hwInstOp = rewriter.create<hw::InstanceOp>(
       op->getLoc(), hwModule,
       StringAttr::get(ctx, uniqueOpName.str() + "_inst"), operandValues);
@@ -474,6 +481,7 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
   SmallVector<UnrealizedConversionCastOp> castsOpResults =
       createCastResultsUnbundledOp(op->getResultTypes(), hwInstOp->getResults(),
                                    op->getLoc(), rewriter);
+  // Collect the results of the casts
   SmallVector<Value> castsResults;
   for (auto castOp : castsOpResults) {
     // Assert that each cast has only one result
@@ -481,7 +489,8 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
            "each cast operation must have only one result");
     castsResults.push_back(castOp.getResult(0));
   }
-
+  // Assert that the number of cast results matches the number of original
+  // operation results
   assert(castsResults.size() == op->getNumResults());
 
   //  Replace all uses of the original operation with the new hw module
