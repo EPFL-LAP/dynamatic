@@ -505,8 +505,102 @@ ConvertFuncToHWMod::matchAndRewrite(handshake::FuncOp op, OpAdaptor adaptor,
   return success();
 }
 
+// Function to remove unrealized conversion casts after conversion
+LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
+  SmallVector<UnrealizedConversionCastOp> castsToErase;
+  // Walk through all unrealized conversion casts in the module
+  modOp.walk([&](UnrealizedConversionCastOp castOp1) {
+    // Consider only the following pattern op/arg -> cast (1) -> cast (2)
+    // -> op where there could be multiple cast2
+    // Check if the input of the cast is another unrealized
+    // conversion cast
+    auto inputCastOp =
+        castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>();
+    if (inputCastOp) {
+      // Skip this cast since it will be handled when processing the
+      // input cast but first assert that it is not followed by any other cast.
+      // If this is the case, there is a issue in the code since there are 3
+      // casts in chain and this break the assumption of the code
+      assert(llvm::none_of(castOp1->getUsers(),
+                           [](Operation *user) {
+                             return isa<UnrealizedConversionCastOp>(user);
+                           }) &&
+             "unrealized conversion cast removal failed due to chained casts");
+      return;
+    }
+    // Check that the output/s of the cast are used by only unrealized
+    // conversion casts
+    bool allUsersAreCasts = true;
+    SmallVector<UnrealizedConversionCastOp> vecCastOps2;
+    for (auto result : castOp1.getResults()) {
+      for (auto &use : result.getUses()) {
+        if (!isa<UnrealizedConversionCastOp>(use.getOwner())) {
+          allUsersAreCasts = false;
+        } else {
+          vecCastOps2.push_back(
+              cast<UnrealizedConversionCastOp>(use.getOwner()));
+        }
+      }
+      if (!allUsersAreCasts)
+        break;
+    }
+    if (!allUsersAreCasts) {
+      // This breaks assumption that casts are chained in pairs
+      castOp1.emitError()
+          << "unrealized conversion cast removal failed due to complex "
+             "usage pattern";
+      return;
+    }
+    // Replace all uses of the user cast op results with the original
+    // cast op inputs
+    // Assert that the number of inputs and outputs match
+    for (auto castOp2 : vecCastOps2) {
+      if (castOp1->getNumOperands() != castOp2->getNumResults()) {
+        castOp1.emitError()
+            << "unrealized conversion cast removal failed due to "
+               "mismatched number of operands and results";
+        return;
+      }
+      for (auto [idx, result] : llvm::enumerate(castOp2.getResults())) {
+        result.replaceAllUsesWith(castOp1->getOperand(idx));
+      }
+      // Add the cast to the list of casts to remove
+      castsToErase.push_back(castOp2);
+    }
+    // Add the cast to the list of casts to remove
+    castsToErase.push_back(castOp1);
+  });
+  // Erase all collected casts
+  for (auto castOp : castsToErase) {
+    castOp.erase();
+  }
+
+  // Check that there are no more unrealized conversion casts
+  bool hasCasts = false;
+  modOp.walk([&](UnrealizedConversionCastOp castOp) {
+    hasCasts = true;
+    llvm::errs() << "Remaining unrealized conversion cast: " << castOp << "\n";
+  });
+
+  if (hasCasts) {
+    modOp.emitError()
+        << "unrealized conversion cast removal failed due to remaining "
+           "casts";
+    return failure();
+  }
+  return success();
+}
+
 namespace {
 
+// The following pass converts handshake operations into synth operations
+// It executes in multiple steps:
+// 1) Convert all handshake operations (except for function and end ops)
+//    into hw module operations connecting them with unrealized conversion
+//    casts
+// 2) Convert the handshake function operation into an hw module operation
+// 3) Remove all unrealized conversion casts by connecting directly the
+//    inputs and outputs
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
@@ -530,8 +624,8 @@ public:
     // If there is no function, nothing to do
     if (!funcOp)
       return;
-    // Apply conversion patterns to convert each handshake operation into
-    // an hw module operation
+    // Step 1: Apply conversion patterns to convert each handshake operation
+    // into an hw module operation
     RewritePatternSet patterns(ctx);
     ChannelUnbundlingTypeConverter typeConverter;
     ConversionTarget target(*ctx);
@@ -541,8 +635,8 @@ public:
     target.addLegalOp<UnrealizedConversionCastOp>();
     target.addIllegalDialect<handshake::HandshakeDialect>();
     // In the first step, we convert all handshake operations into hw module
-    // operations, except for the function and end operations which are kept
-    // for the next step
+    // operations, except for the function and end operations which are kept to
+    // convert in the next step
     target.addLegalOp<handshake::FuncOp>();
     target.addLegalOp<handshake::EndOp>();
     patterns.insert<
@@ -594,8 +688,9 @@ public:
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
 
-    // In the second step, we convert the handshake function operation into
-    // an hw module operation
+    // Step 2: Convert the handshake function operation into
+    // an hw module operation and the corresponding terminator into an hw
+    // terminator
     RewritePatternSet funcPatterns(ctx);
     ConversionTarget funcTarget(*ctx);
     funcTarget.addLegalDialect<synth::SynthDialect>();
@@ -608,80 +703,10 @@ public:
             applyPartialConversion(modOp, funcTarget, std::move(funcPatterns))))
       return signalPassFailure();
 
-    // Third and final step: remove all unrealized conversion casts
+    // Step 3: remove all unrealized conversion casts
     // Execute without conversion function but walking the module
-    // Get the rewriter object
-    ConversionPatternRewriter rewriter(ctx);
-    SmallVector<UnrealizedConversionCastOp> castsToErase;
-    modOp.walk([&](UnrealizedConversionCastOp castOp1) {
-      // Consider only the following pattern op/arg -> cast (1) -> cast (2)
-      // -> op where there could be multiple cast2
-      // Check if the input of the cast is another unrealized
-      // conversion cast
-      auto inputCastOp =
-          castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>();
-      if (inputCastOp)
-        return;
-      // Check that the output/s of the cast are used by only one unrealized
-      // conversion cast
-      bool allUsersAreCasts = true;
-      SmallVector<UnrealizedConversionCastOp> vecCastOps2;
-      for (auto result : castOp1.getResults()) {
-        for (auto &use : result.getUses()) {
-          if (!isa<UnrealizedConversionCastOp>(use.getOwner())) {
-            allUsersAreCasts = false;
-          } else {
-            vecCastOps2.push_back(
-                cast<UnrealizedConversionCastOp>(use.getOwner()));
-          }
-        }
-        if (!allUsersAreCasts)
-          break;
-      }
-      if (!allUsersAreCasts) {
-        // This breaks assumptions, so we emit an error for now
-        castOp1.emitError()
-            << "unrealized conversion cast removal failed due to complex "
-               "usage pattern";
-        return signalPassFailure();
-      }
-      // Replace all uses of the user cast op results with the original
-      // cast op inputs
-      // Assert that the number of inputs and outputs match
-      for (auto castOp2 : vecCastOps2) {
-        if (castOp1->getNumOperands() != castOp2->getNumResults()) {
-          castOp1.emitError()
-              << "unrealized conversion cast removal failed due to "
-                 "mismatched number of operands and results";
-          return signalPassFailure();
-        }
-        for (auto [idx, result] : llvm::enumerate(castOp2.getResults())) {
-          result.replaceAllUsesWith(castOp1->getOperand(idx));
-        }
-        // Erase both cast operations
-        castsToErase.push_back(castOp2);
-      }
-      castsToErase.push_back(castOp1);
-    });
-    // Erase all collected casts
-    for (auto castOp : castsToErase) {
-      castOp.erase();
-    }
-
-    // Check that there are no more unrealized conversion casts
-    bool hasCasts = false;
-    modOp.walk([&](UnrealizedConversionCastOp castOp) {
-      hasCasts = true;
-      llvm::errs() << "Remaining unrealized conversion cast: " << castOp
-                   << "\n";
-    });
-
-    if (hasCasts) {
-      modOp.emitError()
-          << "unrealized conversion cast removal failed due to remaining "
-             "casts";
+    if (failed(removeUnrealizedConversionCasts(modOp)))
       return signalPassFailure();
-    }
   }
 };
 
