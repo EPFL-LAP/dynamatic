@@ -156,10 +156,12 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  if (failed(annotateAbsenceOfBackpressure(modOp)))
-    return signalPassFailure();
-  if (failed(annotateValidEquivalence(modOp)))
-    return signalPassFailure();
+  if (!skipAnnotateProperties) {
+    if (failed(annotateAbsenceOfBackpressure(modOp)))
+      return signalPassFailure();
+    if (failed(annotateValidEquivalence(modOp)))
+      return signalPassFailure();
+  }
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();

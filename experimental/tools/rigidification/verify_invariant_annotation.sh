@@ -1,12 +1,12 @@
 #!/bin/bash
 
+echo "bas"
+
 DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 F_HANDSHAKE_EXPORT=$4
 F_HANDSHAKE_RIGIDIFIED=$5
-bash "$DYNAMATIC_DIR/experimental/tools/rigidification/verify_invariant_annotation.sh" $1 $2 $3 $4 $5
-exit $?
 
 source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
 
@@ -36,7 +36,7 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-annotate-properties=json-path=$F_FORMAL_PROP \
+  --handshake-annotate-properties="json-path=$F_FORMAL_PROP annotate-invariants skip-annotate-properties" \
   > /dev/null
 
 # handshake level -> hw level
@@ -72,12 +72,8 @@ set bdd_static_order_heuristics basic;
 set cone_of_influence;
 set use_coi_size_sorting 1;
 read_model -i $MODEL_DIR/main.smv;
-flatten_hierarchy;
-encode_variables;
-build_flat_model;
-build_model -f;
-check_invar -s forward;
-check_ctlspec;
+go_bmc;
+check_invar_bmc -a classic;
 show_property -o $F_NUXMV_PROP;
 time;
 quit" > $F_NUXMV_CMD
@@ -89,13 +85,3 @@ echo "[INFO] Running nuXmv" >&2
 $NUXMV_BINARY -source $F_NUXMV_CMD 
 exit_on_fail "Performed model checking to verify the formal property" \
   "Failed to check formal properties"
-
-# parse the results
-printf "\n[INFO] Saving formal verification results\n" >&2
-python "$SMV_RESULT_PARSER" "$F_FORMAL_PROP" "$F_NUXMV_PROP"
-
-# apply rigidification
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --handshake-rigidification=json-path=$F_FORMAL_PROP > "$F_HANDSHAKE_RIGIDIFIED"
-exit_on_fail "Applied formal properties to simplify the circuit" \
-  "Failed to apply formal properties to simplify the circuit"
-
