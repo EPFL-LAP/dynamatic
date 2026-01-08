@@ -220,7 +220,7 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   }
 }
 
-// Function to create a cast operation between an bundled type to a unbundled
+// Function to create a cast operation between a bundled type to an unbundled
 // type
 UnrealizedConversionCastOp
 createCastBundledToUnbundled(Value input, Location loc,
@@ -235,6 +235,43 @@ createCastBundledToUnbundled(Value input, Location loc,
   auto cast = rewriter.create<UnrealizedConversionCastOp>(
       loc, unbundledTypeRange, input);
   return cast;
+}
+
+// Function to create a cast operation for each result of an unbundled operation
+// when converting an original bundled operation to an unbundled one. This cast
+// is essential to connect the unbundled operation back to the rest of the
+// circuit which is potentially still bundled
+SmallVector<UnrealizedConversionCastOp>
+createCastResultsUnbundledOp(TypeRange originalOpResultType,
+                             SmallVector<Value> unbundledValues, Location loc,
+                             PatternRewriter &rewriter) {
+  // Assert the number of results of unbundled op is larger or equal to the
+  // number of results in original operation
+  assert(unbundledValues.size() >= originalOpResultType.size() &&
+         "the number of results of the unbundled operation must be larger or "
+         "equal to the original operation");
+  SmallVector<UnrealizedConversionCastOp> castsOps;
+  unsigned resultIdx = 0;
+  // Iterate over each result of the original operation
+  for (unsigned i = 0; i < originalOpResultType.size(); ++i) {
+    unsigned numUnbundledTypes = 0;
+    // Identify how many unbundled types correspond to this result
+    SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
+        unbundleType(originalOpResultType[i]);
+    numUnbundledTypes = unbundledTypes.size();
+    // Get a slice of the unbundled values corresponding to this result from the
+    // unbundled operation
+    SmallVector<Value> unbundledValuesSlice(unbundledValues.begin() + resultIdx,
+                                            unbundledValues.begin() +
+                                                resultIdx + numUnbundledTypes);
+    // Create the cast from unbundled values to the original bundled type
+    auto cast = rewriter.create<UnrealizedConversionCastOp>(
+        loc, TypeRange{originalOpResultType[i]}, unbundledValuesSlice);
+    // Collect the created cast
+    castsOps.push_back(cast);
+    resultIdx += numUnbundledTypes;
+  }
+  return castsOps;
 }
 
 // Function to convert a handshake function operation into an hw module
@@ -272,25 +309,15 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
     rewriter.setInsertionPointToStart(modBlock);
     // Create a cast for each argument in modBlockArgs
     SmallVector<Value> castedArgs;
-    unsigned modBlockArgIdx = 0;
-    for (auto arg : funcOp.getArguments()) {
-      SmallVector<std::pair<SignalKind, Type>> unbundledArgTypes =
-          unbundleType(arg.getType());
-      unsigned numUnbundled = unbundledArgTypes.size();
-      SmallVector<Value> argComponents;
-      for (unsigned i = 0; i < numUnbundled; ++i) {
-        argComponents.push_back(modBlockArgs[modBlockArgIdx + i]);
-      }
-      TypeRange unbundledTypeRange;
-      SmallVector<Type> unbundledTypes;
-      for (auto &pair : unbundledArgTypes) {
-        unbundledTypes.push_back(pair.second);
-      }
-      unbundledTypeRange = TypeRange(unbundledTypes);
-      auto cast = rewriter.create<UnrealizedConversionCastOp>(
-          termOp->getLoc(), arg.getType(), argComponents);
-      castedArgs.push_back(cast->getResult(0));
-      modBlockArgIdx += numUnbundled;
+    TypeRange funcArgTypes = funcOp.getArgumentTypes();
+    SmallVector<UnrealizedConversionCastOp> castsArgs =
+        createCastResultsUnbundledOp(funcArgTypes, modBlockArgs,
+                                     funcOp.getLoc(), rewriter);
+    for (auto castOp : castsArgs) {
+      // Assert that each cast has only one result
+      assert(castOp.getNumResults() == 1 &&
+             "each cast operation must have only one result");
+      castedArgs.push_back(castOp.getResult(0));
     }
 
     rewriter.inlineBlockBefore(funcBlock, termOp, castedArgs);
@@ -426,20 +453,16 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
   hw::InstanceOp hwInstOp = rewriter.create<hw::InstanceOp>(
       op->getLoc(), hwModule,
       StringAttr::get(ctx, uniqueOpName.str() + "_inst"), operandValues);
-  // Create a cast for each result
+  // Create a cast for each group of unbundled results
+  SmallVector<UnrealizedConversionCastOp> castsOpResults =
+      createCastResultsUnbundledOp(op->getResultTypes(), hwInstOp->getResults(),
+                                   op->getLoc(), rewriter);
   SmallVector<Value> castsResults;
-  unsigned resultIdx = 0;
-  for (unsigned i = 0; i < op->getNumResults(); ++i) {
-    unsigned numUnbundledTypes = 0;
-    SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
-        unbundleType(op->getResult(i).getType());
-    numUnbundledTypes = unbundledTypes.size();
-    SmallVector<Value> hwInstResults =
-        hwInstOp.getResults().slice(resultIdx, numUnbundledTypes);
-    auto cast = rewriter.create<UnrealizedConversionCastOp>(
-        op->getLoc(), TypeRange{op->getResult(i).getType()}, hwInstResults);
-    castsResults.push_back(cast.getResult(0));
-    resultIdx += numUnbundledTypes;
+  for (auto castOp : castsOpResults) {
+    // Assert that each cast has only one result
+    assert(castOp.getNumResults() == 1 &&
+           "each cast operation must have only one result");
+    castsResults.push_back(castOp.getResult(0));
   }
 
   assert(castsResults.size() == op->getNumResults());
