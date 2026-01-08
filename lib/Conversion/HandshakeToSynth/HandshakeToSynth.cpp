@@ -36,6 +36,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
@@ -219,6 +220,23 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   }
 }
 
+// Function to create a cast operation between an bundled type to a unbundled
+// type
+UnrealizedConversionCastOp
+createCastBundledToUnbundled(Value input, Location loc,
+                             PatternRewriter &rewriter) {
+  SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
+      unbundleType(input.getType());
+  SmallVector<Type> unbundledTypeList;
+  for (auto &pair : unbundledTypes) {
+    unbundledTypeList.push_back(pair.second);
+  }
+  TypeRange unbundledTypeRange(unbundledTypeList);
+  auto cast = rewriter.create<UnrealizedConversionCastOp>(
+      loc, unbundledTypeRange, input);
+  return cast;
+}
+
 // Function to convert a handshake function operation into an hw module
 // operation
 // Function to convert an handshake operation into an hw module operation
@@ -275,12 +293,6 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
       modBlockArgIdx += numUnbundled;
     }
 
-    // Region &srcRegion = funcOp.getBody();
-    // Region &dstRegion = hwModule.getBody();
-    // srcRegion.cloneInto(&dstRegion, mapping);
-    //  for (Operation &op : funcBlock->without_terminator()) {
-    //    rewriter.clone(op, mapping);
-    //  }
     rewriter.inlineBlockBefore(funcBlock, termOp, castedArgs);
     handshake::EndOp endOp;
 
@@ -298,15 +310,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
     for (Value operand : endOp.getOperands()) {
       // Unbundle the operand type depending on its actual type
       // by creating a cast from the original type to the unbundled types
-      SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
-          unbundleType(operand.getType());
-      SmallVector<Type> unbundledTypeList;
-      for (auto &pair : unbundledTypes) {
-        unbundledTypeList.push_back(pair.second);
-      }
-      TypeRange unbundledTypeRange(unbundledTypeList);
-      auto cast = rewriter.create<UnrealizedConversionCastOp>(
-          endOp.getLoc(), unbundledTypeRange, operand);
+      auto cast =
+          createCastBundledToUnbundled(operand, endOp->getLoc(), rewriter);
       hwOutputs.append(cast.getResults().begin(), cast.getResults().end());
     }
     rewriter.setInsertionPointToEnd(endOp->getBlock());
@@ -411,15 +416,7 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
         isBlockArg) {
       // If so, create an unrealized conversion cast to unbundle the operand
       // into its components for the hw instance
-      SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
-          unbundleType(operand.getType());
-      SmallVector<Type> unbundledTypeList;
-      for (auto &pair : unbundledTypes) {
-        unbundledTypeList.push_back(pair.second);
-      }
-      TypeRange unbundledTypeRange(unbundledTypeList);
-      auto cast = rewriter.create<UnrealizedConversionCastOp>(
-          op->getLoc(), unbundledTypeRange, operand);
+      auto cast = createCastBundledToUnbundled(operand, op->getLoc(), rewriter);
       // Append all cast results to the operand values
       operandValues.append(cast.getResults().begin(), cast.getResults().end());
       continue;
