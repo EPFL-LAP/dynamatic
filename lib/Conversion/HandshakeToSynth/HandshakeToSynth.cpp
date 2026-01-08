@@ -286,15 +286,15 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
   getHWModulePortInfo(funcOp, hwInputPorts, hwOutputPorts);
   hw::ModulePortInfo portInfo(hwInputPorts, hwOutputPorts);
   // Create the hw module operation
-  auto parentModule = funcOp->getParentOfType<mlir::ModuleOp>();
-  SymbolTable symbolTable(parentModule);
+  auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
+  SymbolTable symbolTable(modOp);
   StringRef uniqueOpName = getUniqueName(funcOp);
   StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
   hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
 
   if (!hwModule) {
     // IMPORTANT: modules must be created at module scope
-    rewriter.setInsertionPointToStart(parentModule.getBody());
+    rewriter.setInsertionPointToStart(modOp.getBody());
 
     hwModule =
         rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), moduleName, portInfo);
@@ -388,6 +388,35 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
   return hwModule;
 }
 
+// Function to instantiate synth or hw operations inside an hw module describing
+// the behavior of the original handshake operation
+LogicalResult
+instantiateSynthOpInHWModule(Operation *op, hw::HWModuleOp hwModule,
+                             SmallVector<hw::PortInfo> &hwInputPorts,
+                             SmallVector<hw::PortInfo> &hwOutputPorts,
+                             ConversionPatternRewriter &rewriter) {
+  // Set insertion point to the start of the hw module body
+  rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
+  // Collect inputs values of the hw module
+  SmallVector<Value> synthInputs;
+  for (auto arg : hwModule.getBodyBlock()->getArguments()) {
+    synthInputs.push_back(arg);
+  }
+  // Collect the types of the hardware modules outputs
+  SmallVector<Type> synthOutputTypes;
+  for (auto &outputPort : hwOutputPorts) {
+    synthOutputTypes.push_back(outputPort.type);
+  }
+  TypeRange synthOutputsTypeRange(synthOutputTypes);
+  // Create the synth subcircuit operation inside the hw module
+  synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
+      op->getLoc(), synthOutputsTypeRange, synthInputs, "synth_subckt");
+  // Connect the outputs of the synth operation to the outputs of the hw module
+  Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
+  synthTerminator->setOperands(synthInstOp.getResults());
+  return success();
+}
+
 // Function to convert an handshake operation into an hw module operation
 hw::HWModuleOp convertOpToHWModule(Operation *op,
                                    ConversionPatternRewriter &rewriter) {
@@ -397,36 +426,24 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
   SmallVector<hw::PortInfo> hwOutputPorts;
   getHWModulePortInfo(op, hwInputPorts, hwOutputPorts);
   hw::ModulePortInfo portInfo(hwInputPorts, hwOutputPorts);
-  // Create the hw module operation
-  auto parentModule = op->getParentOfType<mlir::ModuleOp>();
-  SymbolTable symbolTable(parentModule);
+  // Create the hw module operation if it does not already exist
+  auto modOp = op->getParentOfType<mlir::ModuleOp>();
+  SymbolTable symbolTable(modOp);
   StringRef uniqueOpName = getUniqueName(op);
   StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
   hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
 
+  // If it does not exist, create it
   if (!hwModule) {
     // IMPORTANT: modules must be created at module scope
-    rewriter.setInsertionPointToStart(parentModule.getBody());
+    rewriter.setInsertionPointToStart(modOp.getBody());
 
     hwModule =
         rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
-
-    // Fill in the body of the hw module a synth subckt instance
-    rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
-    SmallVector<Value> synthInputs;
-    for (auto arg : hwModule.getBodyBlock()->getArguments()) {
-      synthInputs.push_back(arg);
-    }
-    // Outputs types
-    SmallVector<Type> synthOutputTypes;
-    for (auto &outputPort : hwOutputPorts) {
-      synthOutputTypes.push_back(outputPort.type);
-    }
-    TypeRange synthOutputsTypeRange(synthOutputTypes);
-    synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
-        op->getLoc(), synthOutputsTypeRange, synthInputs, "synth_subckt");
-    Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
-    synthTerminator->setOperands(synthInstOp.getResults());
+    // Instantiate the corresponding synth operation inside the hw module
+    if (failed(instantiateSynthOpInHWModule(op, hwModule, hwInputPorts,
+                                            hwOutputPorts, rewriter)))
+      return nullptr;
   }
 
   // Create the hw instance
