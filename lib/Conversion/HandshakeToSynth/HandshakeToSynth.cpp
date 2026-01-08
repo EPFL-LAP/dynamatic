@@ -276,7 +276,9 @@ createCastResultsUnbundledOp(TypeRange originalOpResultType,
 
 // Function to convert a handshake function operation into an hw module
 // operation
-// Function to convert an handshake operation into an hw module operation
+// It is divided into three parts: first, create the hw module definition if it
+// does not already exist, then move the function body of the handshake function
+// into the hw module, and finally create the output operation for the hw module
 hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
                                        ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = funcOp.getContext();
@@ -285,13 +287,14 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
   SmallVector<hw::PortInfo> hwOutputPorts;
   getHWModulePortInfo(funcOp, hwInputPorts, hwOutputPorts);
   hw::ModulePortInfo portInfo(hwInputPorts, hwOutputPorts);
-  // Create the hw module operation
+  // Create the hw module operation if it does not already exist
   auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
   SymbolTable symbolTable(modOp);
   StringRef uniqueOpName = getUniqueName(funcOp);
   StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
   hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
 
+  // If it does not exist, create it
   if (!hwModule) {
     // IMPORTANT: modules must be created at module scope
     rewriter.setInsertionPointToStart(modOp.getBody());
@@ -299,30 +302,41 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
     hwModule =
         rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), moduleName, portInfo);
 
-    // Move the block from the Handshake function to the new HW module, after
-    // which the Handshake function becomes empty and can be deleted
+    // Inline the function body of the handshake function into the hw module
+    // body
     Block *funcBlock = funcOp.getBodyBlock();
     Block *modBlock = hwModule.getBodyBlock();
     Operation *termOp = modBlock->getTerminator();
     ValueRange modBlockArgs = modBlock->getArguments();
-    // Set insertion point for the casts as inside the module body
+    // Set insertion point inside the module body
     rewriter.setInsertionPointToStart(modBlock);
-    // Create a cast for each argument in modBlockArgs
+    // There must be a match between the arguments of the hw module and the
+    // handshake function to be able to inline the function body of the
+    // handshake function in the hw module. However, the arguments of the
+    // handshake function are bundled and the ones of the hw module are
+    // unbundled. For this reason, create a cast for each argument of the hw
+    // module. The output of the casts will be used to inline the function body
+    // First create casts for each argument of the hw module
     SmallVector<Value> castedArgs;
     TypeRange funcArgTypes = funcOp.getArgumentTypes();
     SmallVector<UnrealizedConversionCastOp> castsArgs =
         createCastResultsUnbundledOp(funcArgTypes, modBlockArgs,
                                      funcOp.getLoc(), rewriter);
+    // Collect the results of the casts
     for (auto castOp : castsArgs) {
       // Assert that each cast has only one result
       assert(castOp.getNumResults() == 1 &&
              "each cast operation must have only one result");
       castedArgs.push_back(castOp.getResult(0));
     }
-
+    // Inline the function body before the terminator of the hw module using the
+    // casted arguments
     rewriter.inlineBlockBefore(funcBlock, termOp, castedArgs);
-    handshake::EndOp endOp;
 
+    // Finally, create the output operation for the hw module
+    // Find the handshake.end operation in the inlined body which is the
+    // terminator for handshake functions
+    handshake::EndOp endOp;
     for (Operation &op : *hwModule.getBodyBlock()) {
       if (auto e = dyn_cast<handshake::EndOp>(op)) {
         endOp = e;
@@ -332,17 +346,21 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
 
     assert(endOp && "Expected handshake.end after inlining");
 
+    // Create a cast for each operand of the end operation to unbundle the types
+    // which were previously handshake bundled types
     SmallVector<Value> hwOutputs;
-
     for (Value operand : endOp.getOperands()) {
-      // Unbundle the operand type depending on its actual type
-      // by creating a cast from the original type to the unbundled types
+      // Unbundle the operand type depending by creating a cast from the
+      // original type to the unbundled types
       auto cast =
           createCastBundledToUnbundled(operand, endOp->getLoc(), rewriter);
       hwOutputs.append(cast.getResults().begin(), cast.getResults().end());
     }
+    // Create the output operation for the hw module
     rewriter.setInsertionPointToEnd(endOp->getBlock());
     rewriter.replaceOpWithNewOp<hw::OutputOp>(endOp, hwOutputs);
+    // Remove any old output operation if present (should not be the case after
+    // replacing the end op)
     Operation *oldOutput = nullptr;
     for (Operation &op : *hwModule.getBodyBlock()) {
       if (auto out = dyn_cast<hw::OutputOp>(op)) {
@@ -352,37 +370,9 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
         }
       }
     }
-
     if (oldOutput)
       rewriter.eraseOp(oldOutput);
-
-    rewriter.eraseOp(funcOp);
-    return hwModule;
-    //  // Print previous terminator for debugging
-    // Create terminator for the hw module
-    SmallVector<Value> retOperands;
-    for (auto operand : funcBlock->getTerminator()->getOperands()) {
-      SmallVector<std::pair<SignalKind, Type>> unbundledResultTypes =
-          unbundleType(operand.getType());
-      // Create a temporary cast to connect the operand to the unbundled
-      // module outputs
-      SmallVector<Type> unbundledTypes;
-      for (auto &pair : unbundledResultTypes) {
-        unbundledTypes.push_back(pair.second);
-      }
-      TypeRange unbundledTypeRange(unbundledTypes);
-      auto cast = rewriter.create<UnrealizedConversionCastOp>(
-          termOp->getLoc(), unbundledTypeRange, operand);
-
-      retOperands.append(cast->getResults().begin(), cast->getResults().end());
-    }
-    // rewriter.create<hw::OutputOp>(funcOp.getLoc(), retOperands);
-    rewriter.setInsertionPoint(termOp);
-    // Add the output operation
-    rewriter.replaceOpWithNewOp<hw::OutputOp>(termOp, retOperands);
-    // Update terminator pointer
-    termOp = hwModule.getBodyBlock()->getTerminator();
-    // Print termOp for debugging
+    // Remove the original handshake function operation
     rewriter.eraseOp(funcOp);
   }
   return hwModule;
