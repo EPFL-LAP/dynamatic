@@ -690,7 +690,8 @@ CommandResult VerifyInvariants::execute(CommandArguments &args) {
       state.dynamaticPath + getSeparator() +
       "experimental/tools/rigidification/verify_invariant_annotation.sh";
 
-  return execCmd(script, state.dynamaticPath, state.getOutputDir(), state.getKernelName());
+  return execCmd(script, state.dynamaticPath, state.getOutputDir(),
+                 state.getKernelName());
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
