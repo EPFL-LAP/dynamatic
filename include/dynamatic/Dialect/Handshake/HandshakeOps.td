@@ -516,6 +516,7 @@ def BranchOp : Handshake_Op<"br", [
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
+  JoinLikeOpInterface,
   AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
   IsIntSizedChannel<1, "conditionOperand">,
