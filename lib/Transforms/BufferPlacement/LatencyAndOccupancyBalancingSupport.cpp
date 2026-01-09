@@ -645,17 +645,17 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   std::fill(visited.begin(), visited.end(), false);
   size_t sccCount = 0;
 
-  std::function<void(NodeIdType, size_t)> reverseDfs = [&](NodeIdType currentNode,
-                                                     size_t sccId) {
-    visited[currentNode] = true;
-    nodeSccId[currentNode] = sccId;
-    for (size_t edgeIdx : revAdjList[currentNode]) {
-      NodeIdType successorNode = edges[edgeIdx].srcId;
-      if (!visited[successorNode]) {
-        reverseDfs(successorNode, sccId);
-      }
-    }
-  };
+  std::function<void(NodeIdType, size_t)> reverseDfs =
+      [&](NodeIdType currentNode, size_t sccId) {
+        visited[currentNode] = true;
+        nodeSccId[currentNode] = sccId;
+        for (size_t edgeIdx : revAdjList[currentNode]) {
+          NodeIdType successorNode = edges[edgeIdx].srcId;
+          if (!visited[successorNode]) {
+            reverseDfs(successorNode, sccId);
+          }
+        }
+      };
 
   while (!finishOrder.empty()) {
     NodeIdType currentNode = finishOrder.top();
