@@ -303,6 +303,29 @@ static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
   return sop->boolMinimizeSop();
 }
 
+/// Get a boolean expression representing the exit condition of the current
+/// loop block.
+static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                                 CFGLoopInfo &li,
+                                                 const ftd::BlockIndexing &bi) {
+
+  // Get the boolean expression associated to the block exit
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
+  auto *terminatorOperation = loopExit->getTerminator();
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+
+  // If the destination of the false outcome is not the block, then the
+  // condition must be negated
+  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
+    blockCond->boolNegate();
+
+  return blockCond;
+}
+
 /// Run the Cytron algorithm to determine, give a set of values, in which blocks
 /// should we add a merge in order for those values to be merged
 static DenseSet<Block *>
@@ -596,119 +619,6 @@ getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
   return fLoopExit;
 }
 
-void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
-                                  handshake::FuncOp &funcOp,
-                                  Operation *consumerOp, Value operand) {
-
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
-  BlockIndexing bi(funcOp.getBody());
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // Skip if the consumer was added by this function, if it is an init merge, if
-  // it comes from the explicit gsa gate insertion process or if it is a generic
-  // operation to skip
-  if (consumerOp->hasAttr(FTD_REGEN) ||
-      consumerOp->hasAttr(FTD_EXPLICIT_GAMMA) ||
-      consumerOp->hasAttr(FTD_EXPLICIT_MU) ||
-      consumerOp->hasAttr(FTD_INIT_MERGE) ||
-      consumerOp->hasAttr(FTD_OP_TO_SKIP))
-    return;
-
-  // Skip if the consumer has to do with memory operations, cmerge networks or
-  // if it is a conditional branch.
-  if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp))
-    return;
-
-  mlir::Operation *producerOp = operand.getDefiningOp();
-
-  // Skip if the producer was added by this function or if it is an op to skip
-  if (producerOp &&
-      (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
-    return;
-
-  // Skip if the producer has to do with memory operations
-  if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
-      llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-    return;
-
-  // Last regenerated value
-  Value regeneratedValue = operand;
-
-  // Get all the loops for which we need to regenerate the
-  // corresponding value
-  SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
-      consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
-  unsigned numberOfLoops = loops.size();
-
-  auto cstType = rewriter.getIntegerType(1);
-  auto cstAttr = IntegerAttr::get(cstType, 0);
-
-  auto createRegenMux = [&](CFGLoop *loop) -> handshake::MuxOp {
-    rewriter.setInsertionPointToStart(loop->getHeader());
-    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
-
-    // Determine the loop exit condition:
-    // - If the condition spans multiple cofactors, build a BDD and
-    //   translate it into a circuit.
-    // - Otherwise, use the simple terminating condition of the exiting block
-    Value conditionValue;
-    std::vector<std::string> cofactorList;
-    BoolExpression *exitCondition =
-        getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
-    if (size(cofactorList) > 1) {
-      BDD *bdd = buildBDD(exitCondition, cofactorList);
-      conditionValue =
-          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
-    } else
-      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
-
-    // Create the false constant to feed `init`
-    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
-    // Create the `init` operation
-    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
-    // The multiplexer is to be fed by the init block, and takes as inputs the
-    // regenerated value and the result itself (to be set after) it was created.
-    auto selectSignal = initMergeOp.getResult();
-    selectSignal.setType(channelifyType(selectSignal.getType()));
-
-    SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
-    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                   regeneratedValue.getType(),
-                                                   selectSignal, muxOperands);
-
-    muxOp->setOperand(2, muxOp->getResult(0));
-    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
-
-    return muxOp;
-  };
-
-  // For each of the loop, from the outermost to the innermost
-  for (unsigned i = 0; i < numberOfLoops; i++) {
-
-    // If we are in the innermost loop (thus the iterator is at its end)
-    // and the consumer is a loop merge, stop
-    if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
-      break;
-
-    auto muxOp = createRegenMux(loops[i]);
-    regeneratedValue = muxOp.getResult();
-  }
-
-  // Final replace the usage of the operand in the consumer with the output of
-  // the last regen multiplexer created.
-  consumerOp->replaceUsesOfWith(operand, regeneratedValue);
-}
-
 /// Starting from a boolean expression which is a single variable (either
 /// direct or complement) return its corresponding circuit equivalent. This
 /// means, either we obtain the output of the operation determining the
@@ -797,6 +707,119 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return muxOp.getResult();
+}
+
+void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
+                                  handshake::FuncOp &funcOp,
+                                  Operation *consumerOp, Value operand) {
+
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  BlockIndexing bi(funcOp.getBody());
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // Skip if the consumer was added by this function, if it is an init merge, if
+  // it comes from the explicit gsa gate insertion process or if it is a generic
+  // operation to skip
+  if (consumerOp->hasAttr(FTD_REGEN) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_GAMMA) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_MU) ||
+      consumerOp->hasAttr(FTD_INIT_MERGE) ||
+      consumerOp->hasAttr(FTD_OP_TO_SKIP))
+    return;
+
+  // Skip if the consumer has to do with memory operations, cmerge networks or
+  // if it is a conditional branch.
+  if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
+      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
+      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp))
+    return;
+
+  mlir::Operation *producerOp = operand.getDefiningOp();
+
+  // Skip if the producer was added by this function or if it is an op to skip
+  if (producerOp &&
+      (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
+    return;
+
+  // Skip if the producer has to do with memory operations
+  if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
+      llvm::isa_and_nonnull<MemRefType>(operand.getType()))
+    return;
+
+  // Last regenerated value
+  Value regeneratedValue = operand;
+
+  // Get all the loops for which we need to regenerate the
+  // corresponding value
+  SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
+      consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
+  unsigned numberOfLoops = loops.size();
+
+  auto cstType = rewriter.getIntegerType(1);
+  auto cstAttr = IntegerAttr::get(cstType, 0);
+
+  auto createRegenMux = [&](CFGLoop *loop) -> handshake::MuxOp {
+    rewriter.setInsertionPointToStart(loop->getHeader());
+    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
+
+    // Determine the loop exit condition:
+    // - If the condition spans multiple cofactors, build a BDD and
+    //   translate it into a circuit.
+    // - Otherwise, use the simple terminating condition of the exiting block
+    Value conditionValue;
+    std::vector<std::string> cofactorList;
+    BoolExpression *exitCondition =
+        getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
+    if (size(cofactorList) > 1) {
+      BDD *bdd = buildBDD(exitCondition, cofactorList);
+      conditionValue =
+          bddToCircuit(rewriter, bdd, loop->getHeader(), bi);
+    } else
+      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
+
+    // Create the false constant to feed `init`
+    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
+                                                          cstAttr, startValue);
+    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+    // Create the `init` operation
+    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
+    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+                                                           mergeOperands);
+    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+    // The multiplexer is to be fed by the init block, and takes as inputs the
+    // regenerated value and the result itself (to be set after) it was created.
+    auto selectSignal = initMergeOp.getResult();
+    selectSignal.setType(channelifyType(selectSignal.getType()));
+
+    SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
+    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
+                                                   regeneratedValue.getType(),
+                                                   selectSignal, muxOperands);
+
+    muxOp->setOperand(2, muxOp->getResult(0));
+    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
+
+    return muxOp;
+  };
+
+  // For each of the loop, from the outermost to the innermost
+  for (unsigned i = 0; i < numberOfLoops; i++) {
+
+    // If we are in the innermost loop (thus the iterator is at its end)
+    // and the consumer is a loop merge, stop
+    if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
+      break;
+
+    auto muxOp = createRegenMux(loops[i]);
+    regeneratedValue = muxOp.getResult();
+  }
+
+  // Final replace the usage of the operand in the consumer with the output of
+  // the last regen multiplexer created.
+  consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
 
 /// Build a local control-flow subgraph (LocalCFG) between a producer and
@@ -1507,7 +1530,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
         // Convert the boolean expression obtained through BDD to a circuit
         conditionValue =
-            bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
+            bddToCircuit(rewriter, bdd, gate->getBlock(), bi);
       } else
         conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
 
