@@ -57,8 +57,8 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   -i $MODEL_DIR \
   --name $KERNEL_NAME \
   --mlir $F_FORMAL_HW
-exit_on_fail "Created formal testbench" \
-  "Failed to create formal testbench"
+exit_on_fail "Failed to create formal testbench" \
+  "Created formal testbench"
 
 # use the modelcheker
 echo "set verbose_level 0;
@@ -81,14 +81,14 @@ check_ctlspec;
 show_property -o $F_NUXMV_PROP;
 time;
 quit" > $F_NUXMV_CMD
-exit_on_fail "Created SMV script" \
-  "Failed to create SMV script"
+exit_on_fail "Failed to create SMV script" \
+  "Created SMV script"
 
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
 $NUXMV_BINARY -source $F_NUXMV_CMD 
-exit_on_fail "Performed model checking to verify the formal property" \
-  "Failed to check formal properties"
+exit_on_fail "Failed to check formal properties" \
+  "Performed model checking to verify the formal property"
 
 # parse the results
 printf "\n[INFO] Saving formal verification results\n" >&2

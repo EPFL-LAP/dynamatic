@@ -97,7 +97,6 @@ struct FrontendState {
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
 
-
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
@@ -268,13 +267,24 @@ public:
 class SetOutputDir : public Command {
 public:
   SetOutputDir(FrontendState &state)
-      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
     addPositionalArg({"out_dir", "out dir name"});
   }
 
   CommandResult execute(CommandArguments &args) override;
 };
 
+class VerifyInvariants : public Command {
+public:
+  VerifyInvariants(FrontendState &state)
+      : Command("verify-invariants",
+                "Verifies the correctness of invariants generated", state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
 
 class Compile : public Command {
 public:
@@ -646,7 +656,8 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
   llvm::StringRef outputDir = args.positionals.front();
 
   // reject trivial bad cases
-  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
@@ -669,6 +680,17 @@ CommandResult SetCP::execute(CommandArguments &args) {
   llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
                << " is illegal.\n";
   return CommandResult::FAIL;
+}
+
+CommandResult VerifyInvariants::execute(CommandArguments &args) {
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script =
+      state.dynamaticPath + getSeparator() +
+      "experimental/tools/rigidification/verify_invariant_annotation.sh";
+
+  return execCmd(script, state.dynamaticPath, state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
@@ -871,6 +893,7 @@ int main(int argc, char **argv) {
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<SetOutputDir>(state);
+  commands.add<VerifyInvariants>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);

@@ -1136,8 +1136,6 @@ private:
   /// For example if val is mux0.outs and it is connected to buffer0 thorugh
   /// the ins port getUserSignal will return buffer0.ins.
   std::optional<std::string> getUserSignal(Value val) const;
-
-  bool verifyInvariants = true;
 };
 
 } // namespace
@@ -1393,7 +1391,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << "\n-- properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
-    if (true) {
+    if (verifyInvariants) {
       if (tag == FormalProperty::TAG::INVAR) {
         os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
       }

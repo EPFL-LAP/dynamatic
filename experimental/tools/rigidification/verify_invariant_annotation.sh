@@ -1,12 +1,10 @@
 #!/bin/bash
 
-echo "bas"
-
 DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
-F_HANDSHAKE_EXPORT=$4
-F_HANDSHAKE_RIGIDIFIED=$5
+# F_HANDSHAKE_EXPORT=$4
+F_HANDSHAKE_EXPORT="$OUTPUT_DIR/comp/handshake_export.mlir"
 
 source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
 
@@ -50,6 +48,7 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   "$RTL_CONFIG_SMV" \
   --hdl smv \
   --property-database "$F_FORMAL_PROP" \
+  --verify-invariants \
   --dynamatic-path "$DYNAMATIC_DIR"
 
 # create the testbench
@@ -57,8 +56,8 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   -i $MODEL_DIR \
   --name $KERNEL_NAME \
   --mlir $F_FORMAL_HW
-exit_on_fail "Created formal testbench" \
-  "Failed to create formal testbench"
+exit_on_fail "Failed to create formal testbench" \
+  "Created formal testbench"
 
 # use the modelcheker
 echo "set verbose_level 0;
@@ -77,11 +76,18 @@ check_invar_bmc -a classic;
 show_property -o $F_NUXMV_PROP;
 time;
 quit" > $F_NUXMV_CMD
-exit_on_fail "Created SMV script" \
-  "Failed to create SMV script"
+exit_on_fail "Failed to create SMV script" \
+  "Created SMV script"
 
+NUXMV_OUT="$FORMAL_DIR/nuxmv.txt"
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
-$NUXMV_BINARY -source $F_NUXMV_CMD 
-exit_on_fail "Performed model checking to verify the formal property" \
-  "Failed to check formal properties"
+$NUXMV_BINARY -source $F_NUXMV_CMD > $NUXMV_OUT
+exit_on_fail "Failed to check formal properties" \
+  "Performed model checking to verify the invariants" \
+
+# parse the results
+NUM_FAILED=$(cat $NUXMV_OUT | grep -c "^-- .*the induction fails$")
+test $NUM_FAILED == 0
+exit_on_fail "At least one invariant was not verifiable" \
+  "All properties provable by 1-induction" 
