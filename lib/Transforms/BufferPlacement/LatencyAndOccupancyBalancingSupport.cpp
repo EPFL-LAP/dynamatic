@@ -623,12 +623,12 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   std::vector<bool> visited(/*count=*/nodes.size(), /*initialValue*/ false);
   std::stack<NodeIdType> finishOrder;
 
-  std::function<void(NodeIdType)> dfs1 = [&](NodeIdType currentNode) {
+  std::function<void(NodeIdType)> forwardDfs = [&](NodeIdType currentNode) {
     visited[currentNode] = true;
     for (size_t edgeIdx : adjList[currentNode]) {
       NodeIdType successorNode = edges[edgeIdx].dstId;
       if (!visited[successorNode]) {
-        dfs1(successorNode);
+        forwardDfs(successorNode);
       }
     }
     finishOrder.push(currentNode);
@@ -636,7 +636,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   for (NodeIdType i = 0; i < nodes.size(); ++i) {
     if (!visited[i]) {
-      dfs1(i);
+      forwardDfs(i);
     }
   }
 
@@ -645,14 +645,14 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
   std::fill(visited.begin(), visited.end(), false);
   size_t sccCount = 0;
 
-  std::function<void(NodeIdType, size_t)> dfs2 = [&](NodeIdType currentNode,
+  std::function<void(NodeIdType, size_t)> reverseDfs = [&](NodeIdType currentNode,
                                                      size_t sccId) {
     visited[currentNode] = true;
     nodeSccId[currentNode] = sccId;
     for (size_t edgeIdx : revAdjList[currentNode]) {
       NodeIdType successorNode = edges[edgeIdx].srcId;
       if (!visited[successorNode]) {
-        dfs2(successorNode, sccId);
+        reverseDfs(successorNode, sccId);
       }
     }
   };
@@ -661,7 +661,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
     NodeIdType currentNode = finishOrder.top();
     finishOrder.pop();
     if (!visited[currentNode]) {
-      dfs2(currentNode, sccCount);
+      reverseDfs(currentNode, sccCount);
       sccCount++;
     }
   }
