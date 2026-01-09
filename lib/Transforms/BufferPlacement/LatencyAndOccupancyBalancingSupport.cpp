@@ -469,11 +469,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
 }
 
 void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
-    llvm::ArrayRef<
-        std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
-                                    std::vector<ReconvergentPath>>>>
-        graphPaths,
-    llvm::StringRef filename) {
+    llvm::ArrayRef<GraphPathsForDumping> graphPaths, llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
     fullPath = filename;
@@ -497,9 +493,10 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
 
-  for (const auto &[graphIdx, graphAndPaths] : graphPaths) {
-    const ReconvergentPathFinderGraph *graph = graphAndPaths.first;
-    const std::vector<ReconvergentPath> &paths = graphAndPaths.second;
+  for (const auto &entry : graphPaths) {
+    const ReconvergentPathFinderGraph *graph = entry.graph;
+    const std::vector<ReconvergentPath> &paths = entry.paths;
+    size_t graphIdx = entry.graphIndex;
 
     for (size_t pathIdx = 0; pathIdx < paths.size(); ++pathIdx) {
       const ReconvergentPath &path = paths[pathIdx];

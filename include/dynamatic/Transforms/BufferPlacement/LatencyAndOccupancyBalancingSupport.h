@@ -227,18 +227,21 @@ public:
 
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
-  /// prefix. The input is a vector of (sequenceIndex, (graph, paths)) pairs.
-  /// @param graphPaths Vector of (seqIdx, (graph*, paths)) tuples.
-  /// Each element corresponds to a transition sequence and contains:
-  /// - seqIdx: Index of the transition sequence.
-  /// - graph*: Pointer to the ReconvergentPathFinderGraph for this sequence.
+  /// prefix. The input is a vector of GraphPathsForDumping objects. Each object
+  /// contains:
+  /// - graphIndex: Index of the graph. (used for naming the cluster subgraphs)
+  /// - graph: Pointer to the ReconvergentPathFinderGraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
-  static void dumpAllReconvergentPaths(
-      llvm::ArrayRef<
-          std::pair<size_t, std::pair<const ReconvergentPathFinderGraph *,
-                                      std::vector<ReconvergentPath>>>>
-          graphPaths,
-      llvm::StringRef filename);
+
+  struct GraphPathsForDumping {
+    size_t graphIndex;
+    const ReconvergentPathFinderGraph *graph;
+    std::vector<ReconvergentPath> paths;
+  };
+
+  static void
+  dumpAllReconvergentPaths(llvm::ArrayRef<GraphPathsForDumping> graphPaths,
+                           llvm::StringRef filename);
 
 private:
   std::map<unsigned, unsigned> stepToBB;
