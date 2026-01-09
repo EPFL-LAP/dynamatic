@@ -79,6 +79,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::DivFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::NegFOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemFOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::RemSIOp, std::vector<Any> &,
@@ -114,6 +116,10 @@ private:
   LogicalResult execute(mlir::arith::MaxUIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::MaxSIOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::MinSIOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::MinUIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(memref::LoadOp, std::vector<Any> &, std::vector<Any> &);
   LogicalResult execute(memref::StoreOp, std::vector<Any> &,

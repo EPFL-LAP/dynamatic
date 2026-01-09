@@ -15,12 +15,11 @@
 #ifndef DYNAMATIC_SUPPORT_MILP_H
 #define DYNAMATIC_SUPPORT_MILP_H
 
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
 namespace dynamatic {
 
 /// Returns a string describing the meaning of the passed Gurobi optimization
@@ -54,11 +53,24 @@ public:
   /// non-empty twine is provided, the `MILP::optimize` method will store the
   /// MILP model and its solution at `writeTo`_model.lp and
   /// `writeTo`_solution.json, respectively.
-  MILP(GRBEnv &env, const llvm::Twine &writeTo = "")
-      : model(GRBModel(env)), writeTo(writeTo.str()) {
-    model.set(GRB_IntParam::GRB_IntParam_Seed, 0);
-    model.set(GRB_IntParam_LogToConsole, 0);
-    model.set(GRB_IntParam_OutputFlag, 1);
+  MILP(CPSolver::SolverKind solverKind, int timeout,
+       const llvm::Twine &writeTo = "")
+      : writeTo(writeTo.str()) {
+    switch (solverKind) {
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+    case CPSolver::GUROBI:
+      model = std::make_unique<GurobiSolver>(timeout);
+      break;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#ifdef DYNAMATIC_ENABLE_CBC
+    case CPSolver::CBC:
+      model = std::make_unique<CbcSolver>(timeout);
+      break;
+#endif // DYNAMATIC_ENABLE_CBC
+    case CPSolver::DEFAULT:
+      llvm_unreachable("Default option should not be used! Check if you have "
+                       "correctly installed one of CBC or GUROBI milp solver!");
+    }
   };
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP
@@ -72,21 +84,39 @@ public:
       return failure();
     }
 
-    // Optimize the model, possibly logging the MILP model and its solution
+    // Optimize the model
     if (!writeTo.empty()) {
-      model.write(writeTo + "_model.lp");
-      model.set(GRB_StringParam_LogFile, writeTo + "_runtime.log");
-      model.optimize();
-      model.write(writeTo + "_solution.json");
-    } else {
-      model.optimize();
+      // Logging the MILP model
+      model->write(writeTo + "_model.lp");
+    }
+    model->optimize();
+
+    switch (model->status) {
+    case CPSolver::INFEASIBLE:
+      llvm::errs() << "The model is infeasible!\n";
+      return failure();
+    case CPSolver::UNBOUNDED:
+      llvm::errs() << "The model is unbounded!\n";
+      return failure();
+    case CPSolver::UNKNOWN:
+      llvm::errs() << "The model has an unknown state!\n";
+      return failure();
+    case CPSolver::ERROR:
+      llvm::errs() << "There is an error during the model solving!\n";
+      return failure();
+    }
+
+    // Optimize the model
+    if (!writeTo.empty()) {
+      // Logging the MILP model
+      model->writeSol(writeTo + "_sol.log");
     }
 
     // Check whether we found an optimal solution or reached the time limit
-    int stat = model.get(GRB_IntAttr_Status);
+    int stat = model->status;
     if (milpStatus)
       *milpStatus = stat;
-    if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
+    if (stat != CPSolver::OPTIMAL && stat != CPSolver::NONOPTIMAL) {
       state = State::FAILED_TO_OPTIMIZE;
       llvm::errs() << "Buffer placement MILP failed with status " << stat
                    << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
@@ -143,7 +173,7 @@ public:
 
 protected:
   /// Gurobi model holding the MILP's state.
-  GRBModel model;
+  std::unique_ptr<CPSolver> model;
 
   /// Fills in the argument with the desired results extract from the MILP's
   /// solution. Called by `MILP::getResult` after checking that the underlying
@@ -202,6 +232,5 @@ LogicalResult solveMILP(MILPRes &milpResult, Args &&...args) {
 }
 
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_SUPPORT_MILP_H

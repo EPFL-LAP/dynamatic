@@ -60,8 +60,8 @@ static Block *returnMuxConditionBlock(Value muxCondition) {
       break;
     }
   }
-  assert(muxConditionBlock &&
-         "Mux condition must be feeding any block terminator.");
+  if (!muxConditionBlock)
+    muxConditionBlock = muxCondition.getParentBlock();
   return muxConditionBlock;
 }
 
@@ -572,12 +572,37 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
+static BoolExpression *
+getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
+                     mlir::CFGLoopInfo &li, const ftd::BlockIndexing &bi) {
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+
+  // Sort the cofactors alphabetically
+  std::sort(cofactorList->begin(), cofactorList->end());
+
+  return fLoopExit;
+}
+
 void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumerOp, Value operand) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  BlockIndexing bi(funcOp.getBody());
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
@@ -625,9 +650,20 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(loop->getHeader());
     regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
-    // Get the condition for the block exiting
-    Value conditionValue =
-        loop->getExitingBlock()->getTerminator()->getOperand(0);
+    // Determine the loop exit condition:
+    // - If the condition spans multiple cofactors, build a BDD and
+    //   translate it into a circuit.
+    // - Otherwise, use the simple terminating condition of the exiting block
+    Value conditionValue;
+    std::vector<std::string> cofactorList;
+    BoolExpression *exitCondition =
+        getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
+    if (size(cofactorList) > 1) {
+      BDD *bdd = buildBDD(exitCondition, cofactorList);
+      conditionValue =
+          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
+    } else
+      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
     // Create the false constant to feed `init`
     auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
@@ -1292,7 +1328,8 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     return;
 
   // Do not take into account conditional branch
-  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp))
+  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
+      consumerOp->getOperand(0) != operand)
     return;
 
   // The consumer block is the block which contains the consumer
@@ -1384,6 +1421,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
                                              bool removeTerminators) {
 
   using namespace experimental::gsa;
+  BlockIndexing bi(region);
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplexer driven by
@@ -1457,9 +1495,21 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         operandIndex++;
       }
 
-      // The condition value is provided by the `condition` field of the phi
-      Value conditionValue =
-          gate->conditionBlock->getTerminator()->getOperand(0);
+      // Get the condition for the block exiting
+      // Determine the gate exit condition:
+      // - If the condition spans multiple cofactors, build a BDD and
+      //   translate it into a circuit.
+      // - Otherwise, use the simple terminating condition of the block
+      Value conditionValue;
+      if (size(gate->cofactorList) > 1) {
+        // Apply a BDD expansion to the loop exit expression and the list of
+        // cofactors
+        BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+        // Convert the boolean expression obtained through BDD to a circuit
+        conditionValue =
+            bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
+      } else
+        conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
 
       // If the function is MU, then we create a merge
       // and use its result as condition

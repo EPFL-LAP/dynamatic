@@ -236,6 +236,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
     cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
         -DLLVM_TARGETS_TO_BUILD="host" \
+        -DLLVM_ENABLE_RTTI=ON \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
@@ -413,6 +414,8 @@ cd "$SCRIPT_CWD" && mkdir -p bin/generators
 create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
 create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
 create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
+create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/opt
+create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang
 create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
@@ -424,6 +427,7 @@ create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/log2csv
+create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator

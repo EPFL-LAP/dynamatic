@@ -14,10 +14,9 @@
 #ifndef EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 #define EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 
 #include "BlifReader.h"
-#include "gurobi_c++.h"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -36,10 +35,10 @@ class Cut {
 public:
   // Constructor for trivial cuts, which only have itself as a leaf.
   Cut(Node *root, Node *leaf, int depth = 0)
-      : depth(depth), root(root), leaves({leaf}){};
+      : depth(depth), root(root), leaves({leaf}) {};
   // Constructor for non-trivial cuts
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
-      : depth(depth), root(root), leaves({leaves}){};
+      : depth(depth), root(root), leaves({leaves}) {};
 
   // Returns the depth of a cut, which is the number of wavy lines below the
   // root node
@@ -47,7 +46,7 @@ public:
 
   // Returns the cut selection variable, which is a Gurobi variable used for
   // MapBuf formulation. This variable is unique for each cut.
-  GRBVar &getCutSelectionVariable() { return cutSelection; }
+  CPVar &getCutSelectionVariable() { return cutSelection; }
 
   // Returns the root node of the cut.
   Node *getNode() { return root; }
@@ -57,7 +56,7 @@ public:
 
 private:
   int depth;               // Depth of the cut
-  GRBVar cutSelection;     // Cut selection variable for MILP of MapBuf
+  CPVar cutSelection;      // Cut selection variable for MILP of MapBuf
   Node *root;              // Root node of the cut
   std::set<Node *> leaves; // Set of leaves in the cut
 };
@@ -76,5 +75,4 @@ void printCuts(NodeToCuts cuts, std::string &filename);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_CUT_ENUMERATION_H

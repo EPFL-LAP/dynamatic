@@ -95,8 +95,10 @@ struct FrontendState {
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
+  std::string outputDir = "out";
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -119,7 +121,7 @@ struct FrontendState {
   }
 
   inline std::string getOutputDir() const {
-    return getKernelDir() + getSeparator() + "out";
+    return getKernelDir() + getSeparator() + outputDir;
   }
 
   std::string makeAbsolutePath(StringRef path);
@@ -131,7 +133,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -196,7 +198,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -204,7 +206,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -263,11 +265,23 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
+class SetOutputDir : public Command {
+public:
+  SetOutputDir(FrontendState &state)
+      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+    addPositionalArg({"out_dir", "out dir name"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
+  static constexpr llvm::StringLiteral MILP_SOLVER = "milp-solver";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
@@ -285,6 +299,11 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addOption({MILP_SOLVER,
+               "The MILP solvers to use. Values are 'gurobi' (Dynamatic "
+               "needs to be built with Gurobi support) and 'cbc'. The default "
+               "option is gurobi and it will fall back to cbc if gurobi is not "
+               "available."});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -315,12 +334,18 @@ public:
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral SIMULATOR = "simulator";
+
   Simulate(FrontendState &state)
       : Command("simulate",
-                "Simulates the VHDL produced during HDL writing using Modelsim "
+                "Simulates the VHDL produced during HDL writing using a "
+                "simulator of choice "
                 "and the hls-verifier tool",
-                state) {}
-
+                state) {
+    addOption({SIMULATOR, "The simulator to use for verification, options are "
+                          "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
+                          "'xsim' (Vivado), 'verilator' (Verilator)"});
+  }
   CommandResult execute(CommandArguments &args) override;
 };
 
@@ -612,6 +637,26 @@ CommandResult SetSrc::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetOutputDir::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty output dir\n";
+    return CommandResult::FAIL;
+  }
+
+  llvm::StringRef outputDir = args.positionals.front();
+
+  // reject trivial bad cases
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+    return CommandResult::FAIL;
+
+  // reject illegal chars
+  if (outputDir.find_first_of("*?<>|\"") != llvm::StringRef::npos)
+    return CommandResult::FAIL;
+
+  state.outputDir = outputDir.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetCP::execute(CommandArguments &args) {
   if (args.positionals.empty()) {
     llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
@@ -635,6 +680,13 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  std::string milpSolver = "gurobi";
+#else
+  std::string milpSolver = "cbc";
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
@@ -655,14 +707,19 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
+    milpSolver = it->second;
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, disableLSQ,
+                 fastTokenDelivery, milpSolver);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -676,13 +733,13 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
     } else if (it->second == "smv") {
       hdl = "smv";
-    } else if (it->second == "vhdl-beta") {
-      hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', "
+                   << "', possible options are 'vhdl',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
@@ -697,10 +754,25 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
+
+  if (auto it = args.options.find(SIMULATOR); it != args.options.end()) {
+    if (it->second == "vsim" || it->second == "xsim" || it->second == "ghdl" ||
+        it->second == "verilator") {
+      simulator = it->second;
+    } else {
+      llvm::errs() << "Unknow Simulator '" << it->second
+                   << "', possible options are 'ghdl', "
+                      "'xsim', and 'vsim'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
-                 state.fpUnitsGenerator == "vivado" ? "true" : "false");
+                 state.fpUnitsGenerator == "vivado" ? "true" : "false",
+                 simulator);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -771,7 +843,17 @@ static void help(FrontendCommands &commands) {
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
+
+  // Only show our own arguments in the help message
+  cl::HideUnrelatedOptions(mainCategory);
+
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Dynamatic Frontend. \nThis is our external help message, for arguments "
+      "which are passed directly to the binary. \nYou may find our internal "
+      "help message more helpful, which describes the arguments which are "
+      "passed to our custom shell. \nThe internal help message can be accessed "
+      "by running this binary with no arguments, and then writing 'help'.\n");
 
   // Get current working directory
   SmallString<128> cwd;
@@ -788,6 +870,7 @@ int main(int argc, char **argv) {
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
+  commands.add<SetOutputDir>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);

@@ -25,9 +25,6 @@
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace mapbuf {
@@ -45,14 +42,16 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
+  MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod, StringRef blifFiles, double lutDelay,
                 int lutSize, bool acyclicType);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
+  MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod, StringRef blifFiles, double lutDelay,
                 int lutSize, bool acyclicType, Logger &logger,
                 StringRef milpName = "placement");
@@ -90,6 +89,5 @@ private:
 } // namespace mapbuf
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_MAPBUFBUFFERS_H

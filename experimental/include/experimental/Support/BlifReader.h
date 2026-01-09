@@ -14,9 +14,7 @@
 #ifndef EXPERIMENTAL_SUPPORT_BLIF_READER_H
 #define EXPERIMENTAL_SUPPORT_BLIF_READER_H
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
@@ -33,9 +31,9 @@ namespace experimental {
 class LogicNetwork;
 
 struct MILPVarsSubjectGraph {
-  GRBVar tIn;
-  GRBVar tOut;
-  GRBVar bufferVar;
+  CPVar tIn;
+  CPVar tOut;
+  CPVar bufferVar;
 };
 
 /// Represents a node in an And-Inverter Graph (AIG) circuit representation.
@@ -65,7 +63,7 @@ public:
   bool isLatchOutput = false;
   Value nodeMLIRValue; // MLIR Value associated with the node, if any
 
-  MILPVarsSubjectGraph *gurobiVars;
+  MILPVarsSubjectGraph *subjectGraphVars;
   std::set<Node *> fanins = {};
   std::set<Node *> fanouts = {};
   std::string function;
@@ -73,7 +71,7 @@ public:
 
   Node() = default;
   Node(const std::string &name, LogicNetwork *parent)
-      : gurobiVars(new MILPVarsSubjectGraph()), name(name) {}
+      : subjectGraphVars(new MILPVarsSubjectGraph()), name(name) {}
 
   // Adds a fanin node to the current node.
   void addFanin(Node *node) { fanins.insert(node); }
@@ -146,7 +144,7 @@ public:
   std::string str() const { return name; }
 
   ~Node() {
-    delete gurobiVars;
+    delete subjectGraphVars;
     fanins.clear();
     fanouts.clear();
   }
@@ -199,7 +197,7 @@ public:
 
   // Add input/output nodes to the circuit. Calls configureIONode on the Node
   // to set I/O type.
-  void addIONode(const std::string &name, const std::string &type);
+  Node *addIONode(const std::string &name, const std::string &type);
 
   // Add latch nodes to the circuit. Calls configureLatch on the Node to set
   // I/O type.
@@ -288,5 +286,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
