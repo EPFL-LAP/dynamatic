@@ -159,11 +159,10 @@ struct FtdCfToHandshakePass
 
     patterns
         .add<
-             LowerFuncToHandshake,
-             ConvertConstants,
+             //ConvertConstants,
              AllocaOpConversion,
              ConvertCalls,
-             ConvertUndefinedValues,
+             //ConvertUndefinedValues,
              GetGlobalOpConversion,
              GlobalOpConversion,
              FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
