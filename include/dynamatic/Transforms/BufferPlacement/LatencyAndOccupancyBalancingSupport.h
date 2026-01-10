@@ -340,7 +340,7 @@ private:
   /// Find all edges (from nonCyclicAdjList) on any path from cycle to join.
   /// An edge is included if its source is reachable from the cycle and its
   /// destination can reach the join.
-  /// @returns A vector indices into the edges vector.
+  /// @returns A vector of indices into the edges vector.
   std::vector<size_t> findEdgesToJoin(const SimpleCycle &cycle,
                                       NodeIdType joinId) const;
 
