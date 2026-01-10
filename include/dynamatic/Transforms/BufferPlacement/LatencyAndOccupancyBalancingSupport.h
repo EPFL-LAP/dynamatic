@@ -28,6 +28,7 @@ using namespace dynamatic::experimental;
 namespace dynamatic {
 
 using NodeIdType = size_t;
+using EdgeIdType = size_t;
 
 /// NOTE: No current implementation differentiates between intra-BB and inter-BB
 /// edges. Right now, it's quite useful for visualizing the graph in GraphViz.
@@ -85,8 +86,8 @@ struct DataflowSubgraphBase {
   std::vector<DataflowGraphEdge> edges;
 
   /// NOTE: Uses node ID to index the nodes.
-  std::vector<llvm::SmallVector<size_t, 4>> adjList;
-  std::vector<llvm::SmallVector<size_t, 4>> revAdjList;
+  std::vector<llvm::SmallVector<EdgeIdType, 4>> adjList;
+  std::vector<llvm::SmallVector<EdgeIdType, 4>> revAdjList;
 
   NodeIdType addNode(mlir::Operation *op) {
     NodeIdType id = nodes.size();
@@ -275,8 +276,8 @@ struct EdgesToJoin {
   NodeIdType joinId;
 
   /// Edge indices (into nonCyclicAdjList) on any path from cycle to join.
-  std::vector<size_t> edgesFromCycleOne;
-  std::vector<size_t> edgesFromCycleTwo;
+  std::vector<EdgeIdType> edgesFromCycleOne;
+  std::vector<EdgeIdType> edgesFromCycleTwo;
 
   EdgesToJoin(NodeIdType join) : joinId(join) {}
 };
@@ -331,7 +332,7 @@ private:
   std::map<mlir::Operation *, NodeIdType> opToNodeId;
 
   /// Adjacency list for the non-cyclic subgraph (stores edge indices).
-  std::vector<std::vector<size_t>> nonCyclicAdjList;
+  std::vector<std::vector<EdgeIdType>> nonCyclicAdjList;
 
   NodeIdType getOrAddNode(mlir::Operation *op);
 
@@ -341,7 +342,7 @@ private:
   /// An edge is included if its source is reachable from the cycle and its
   /// destination can reach the join.
   /// @returns A vector of indices into the edges vector.
-  std::vector<size_t> findEdgesToJoin(const SimpleCycle &cycle,
+  std::vector<EdgeIdType> findEdgesToJoin(const SimpleCycle &cycle,
                                       NodeIdType joinId) const;
 
   /// Get all join node IDs in the graph.
