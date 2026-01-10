@@ -1318,7 +1318,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1351,7 +1351,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1468,9 +1469,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1506,7 +1507,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1962,6 +1963,34 @@ LogicalResult TruncIOp::verify() {
                        << srcType.getDataType();
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MulIOp
+//===----------------------------------------------------------------------===//
+
+std::pair<unsigned, unsigned> MulIOp::analyzeUsefulInputBitwidths() {
+
+  std::function<Value(Value)> backwardSearch = [&](Value v) {
+    auto *defOp = v.getDefiningOp();
+    if (!defOp)
+      return v;
+    if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp,
+            handshake::BufferOp>(defOp)) {
+      return backwardSearch(defOp->getOperand(0));
+    }
+    return v;
+  };
+
+  auto lhs = backwardSearch(this->getOperand(0));
+  auto rhs = backwardSearch(this->getOperand(1));
+
+  unsigned lhsWidth =
+      dyn_cast<handshake::ChannelType>(lhs.getType()).getDataBitWidth();
+  unsigned rhsWidth =
+      dyn_cast<handshake::ChannelType>(rhs.getType()).getDataBitWidth();
+
+  return std::make_pair(lhsWidth, rhsWidth);
 }
 
 #define GET_OP_CLASSES

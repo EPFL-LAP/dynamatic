@@ -344,6 +344,8 @@ struct ReplicateSourceIntoConstant : OpRewritePattern<handshake::ForkOp> {
                 handshake::TruncIOp,
                 handshake::ExtSIOp,
                 handshake::ExtUIOp,
+                handshake::ExtFOp,
+                handshake::TruncFOp,
                 handshake::ConstantOp
                   // clang-format on
                   >(op)) {

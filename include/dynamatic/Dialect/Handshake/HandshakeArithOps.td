@@ -349,6 +349,13 @@ def Handshake_MulIOp : Handshake_Arith_IntBinaryOp<"muli", [
   LatencyInterface
 ]> {
   let summary = "Integer multiplication.";
+  let extraClassDeclaration = [{
+    // HACK: we currently enforce the multiplication to have the same bitwidth
+    // for input and outputs. The input has to be extended/truncated to fulfil
+    // this. This class method attach attribute to direct the bitwidth that
+    // actually goes into the HDL multiplication
+    std::pair<unsigned, unsigned> analyzeUsefulInputBitwidths();
+  }];
 }
 
 def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf"> {

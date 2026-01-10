@@ -135,6 +135,15 @@ LogicalResult TimingDatabase::getLatency(
     return success();
   }
 
+  // HACK: when the actual input width < 16, use DSP with zero cycle latency.
+  if (auto mulOp = dyn_cast<handshake::MulIOp>(op)) {
+    auto [lhsW, rhsW] = mulOp.analyzeUsefulInputBitwidths();
+    if (std::max(lhsW, rhsW) <= 16) {
+      latency = 0.0;
+      return success();
+    }
+  }
+
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();

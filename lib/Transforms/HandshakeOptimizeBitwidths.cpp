@@ -389,7 +389,7 @@ class OptDataConfig {
 public:
   /// Constructs the configuration from the specific operation being
   /// transformed.
-  OptDataConfig(Op op) : op(op){};
+  OptDataConfig(Op op) : op(op) {};
 
   /// Returns the list of operands that carry data. The method must return at
   /// least one operand. If multiple operands are returned, they must all have
@@ -461,7 +461,7 @@ protected:
 /// result which does not carry data.
 class CMergeDataConfig : public OptDataConfig<handshake::ControlMergeOp> {
 public:
-  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op){};
+  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataResults() override {
     return SmallVector<Value>{op.getResult()};
@@ -487,7 +487,7 @@ public:
 /// which does not carry data.
 class MuxDataConfig : public OptDataConfig<handshake::MuxOp> {
 public:
-  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op){};
+  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
@@ -507,7 +507,7 @@ public:
 /// condition operand which does not carry data.
 class CBranchDataConfig : public OptDataConfig<handshake::ConditionalBranchOp> {
 public:
-  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op){};
+  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{op.getDataOperand()};
@@ -528,7 +528,7 @@ public:
 class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
 public:
   BufferDataConfig(handshake::BufferOp op)
-      : OptDataConfig<handshake::BufferOp>(op){};
+      : OptDataConfig<handshake::BufferOp>(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
@@ -1518,6 +1518,87 @@ bool ArithBoundOpt::optBranchIfPossible(ChannelVal optBranch, unsigned optWidth,
 }
 
 //===----------------------------------------------------------------------===//
+// Fold ExtOps (ExtSI, ExtUI, etc) with arithmetic operations
+//===----------------------------------------------------------------------===//
+
+struct FoldExtOpsIntoMulIOp : OpRewritePattern<handshake::MulIOp> {
+  using OpRewritePattern<handshake::MulIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MulIOp op,
+                                PatternRewriter &rewriter) const override {
+
+    bool suppressedInputExt = false;
+    // Set lhs, rhs, and result to the one before any extension
+    std::function<Value(Value)> backwardSearch = [&](Value v) {
+      auto *defOp = v.getDefiningOp();
+      if (!defOp)
+        return v;
+      if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+              defOp)) {
+        suppressedInputExt = true;
+        return backwardSearch(defOp->getOperand(0));
+      }
+      return v;
+    };
+
+    bool unsignedOutputExt = false;
+
+    std::function<Value(Value)> forwardSearch = [&](Value v) {
+      auto *user = *(v.getUsers().begin());
+      if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+              user)) {
+        if (isa<handshake::ExtUIOp>(user)) {
+          unsignedOutputExt = true;
+        }
+        return forwardSearch(user->getResult(0));
+      }
+      return v;
+    };
+
+    auto lhs = backwardSearch(op.getOperand(0));
+    auto rhs = backwardSearch(op.getOperand(1));
+    auto result = forwardSearch(op.getResult());
+
+    if (not suppressedInputExt)
+      return failure();
+
+    unsigned lhsWidth =
+        dyn_cast<handshake::ChannelType>(lhs.getType()).getDataBitWidth();
+    unsigned rhsWidth =
+        dyn_cast<handshake::ChannelType>(rhs.getType()).getDataBitWidth();
+    unsigned resultWidth =
+        dyn_cast<handshake::ChannelType>(result.getType()).getDataBitWidth();
+
+    unsigned mulOutputWidth = std::min(resultWidth, lhsWidth + rhsWidth);
+
+    auto resType =
+        handshake::ChannelType::get(rewriter.getIntegerType(mulOutputWidth));
+
+    auto newMulOp =
+        rewriter.create<handshake::MulIOp>(op.getLoc(), resType, lhs, rhs);
+
+    if (mulOutputWidth < resultWidth) {
+      if (unsignedOutputExt) {
+        auto newExtOp =
+            rewriter.create<handshake::ExtUIOp>(newMulOp.getLoc(),
+                                                /*type=*/result.getType(),
+                                                /*in=*/newMulOp);
+        rewriter.replaceAllUsesWith(result, newExtOp.getResult());
+      } else {
+        auto newExtOp =
+            rewriter.create<handshake::ExtSIOp>(newMulOp.getLoc(),
+                                                /*type = */ result.getType(),
+                                                /*in=*/newMulOp);
+        rewriter.replaceAllUsesWith(result, newExtOp.getResult());
+      }
+    } else {
+      rewriter.replaceAllUsesWith(result, newMulOp.getResult());
+    }
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass driver
 //===----------------------------------------------------------------------===//
 
@@ -1547,8 +1628,15 @@ struct HandshakeOptimizeBitwidthsPass
     // correct) because it is not this pass's job to perform this kind of
     // optimization, which down-the-line passes may be sensitive to.
     RewritePatternSet patterns(ctx);
-    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
-                 MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
+    // patterns.add<FoldExtOpsIntoMulIOp>(ctx);
+    patterns.add<
+        // clang-format off
+        HandshakeMuxSelect,
+        HandshakeCMergeIndex,
+        MemInterfaceAddrOpt,
+        MemPortAddrOpt
+        // clang-format on
+        >(getAnalysis<NameAnalysis>(), ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();

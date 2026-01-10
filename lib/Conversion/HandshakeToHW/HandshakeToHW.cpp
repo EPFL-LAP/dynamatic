@@ -694,7 +694,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::MaximumFOp,
           handshake::MinimumFOp,
           handshake::MulFOp,
-          handshake::MulIOp,
           handshake::NegFOp,
           handshake::NotOp,
           handshake::OrIOp,
@@ -716,6 +715,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           >([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
+      })
+      .Case<handshake::MulIOp>([&](handshake::MulIOp mulOp) {
+        addType("DATA_TYPE", op->getOperand(0));
+        auto [lhsWidth, rhsWidth] = mulOp.analyzeUsefulInputBitwidths();
+        addUnsigned("LHS_ACTUAL_WIDTH", lhsWidth);
+        addUnsigned("RHS_ACTUAL_WIDTH", rhsWidth);
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
