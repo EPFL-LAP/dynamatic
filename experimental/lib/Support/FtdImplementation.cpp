@@ -162,7 +162,8 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
 
 /// A lightweight DFS to check if 'end' is reachable from 'start'.
 static bool isReachable(Block *start, Block *end) {
-  if (start == end) return true;
+  if (start == end)
+    return true;
 
   DenseSet<Block *> visited;
   SmallVector<Block *, 8> stack;
@@ -171,8 +172,9 @@ static bool isReachable(Block *start, Block *end) {
 
   while (!stack.empty()) {
     Block *curr = stack.pop_back_val();
-    
-    if (curr == end) return true;
+
+    if (curr == end)
+      return true;
 
     for (Block *succ : curr->getSuccessors()) {
       if (!visited.count(succ)) {
@@ -213,10 +215,10 @@ struct LocalCFG {
 static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
                                       const ftd::BlockIndexing &bi,
                                       const DenseSet<Block *> &controlDeps) {
-  
+
   // 1. Path Finding using Iterative DFS
   std::vector<std::vector<Block *>> allPaths;
-  
+
   struct StackFrame {
     Block *u;
     unsigned currIdx;
@@ -230,7 +232,7 @@ static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
     Block *root = lcfg.newProd;
     auto *term = root->getTerminator();
     unsigned n = term ? term->getNumSuccessors() : 0;
-    
+
     dfsStack.push_back({root, 0, n});
     currentLocalPath.push_back(root);
   } else {
@@ -244,17 +246,21 @@ static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
     if (frame.u == lcfg.newCons) {
       std::vector<Block *> origPath;
       bool validMapping = true;
-      
+
       for (Block *lb : currentLocalPath) {
         Block *ob = lcfg.origMap.lookup(lb);
         if (!ob && lb == lcfg.secondVisitBB) {
-            ob = lcfg.origMap.lookup(lcfg.newProd);
+          ob = lcfg.origMap.lookup(lcfg.newProd);
         }
-        if (!ob) { validMapping = false; break; }
+        if (!ob) {
+          validMapping = false;
+          break;
+        }
         origPath.push_back(ob);
       }
 
-      if (validMapping) allPaths.push_back(origPath);
+      if (validMapping)
+        allPaths.push_back(origPath);
 
       currentLocalPath.pop_back();
       dfsStack.pop_back();
@@ -270,16 +276,17 @@ static BoolExpression *enumeratePaths(const LocalCFG &lcfg,
       // 1. Skip Sink (Suppression)
       // 2. [CRITICAL FIX] Skip Cycle: Check if succ is already in current path
       // This prevents infinite loops while allowing the structure to exist.
-      bool isCycle = std::find(currentLocalPath.begin(), currentLocalPath.end(), succ) != currentLocalPath.end();
+      bool isCycle = std::find(currentLocalPath.begin(), currentLocalPath.end(),
+                               succ) != currentLocalPath.end();
 
       if (succ != lcfg.sinkBB && !isCycle) {
         auto *succTerm = succ->getTerminator();
         unsigned succN = succTerm ? succTerm->getNumSuccessors() : 0;
-        
+
         dfsStack.push_back({succ, 0, succN});
         currentLocalPath.push_back(succ);
       }
-    } 
+    }
     // --- Case C: Backtrack ---
     else {
       currentLocalPath.pop_back();
@@ -773,8 +780,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
         getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
     if (size(cofactorList) > 1) {
       BDD *bdd = buildBDD(exitCondition, cofactorList);
-      conditionValue =
-          bddToCircuit(rewriter, bdd, loop->getHeader(), bi);
+      conditionValue = bddToCircuit(rewriter, bdd, loop->getHeader(), bi);
     } else
       conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
@@ -856,11 +862,12 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
   cloned[origProd] = entry;
 
   // DFS Function
-  std::function<void(Block *, Block *)> dfs = [&](Block *currOrig, Block *currNew) {
+  std::function<void(Block *, Block *)> dfs = [&](Block *currOrig,
+                                                  Block *currNew) {
     visited.insert(currOrig);
 
     auto *term = currOrig->getTerminator();
-    
+
     // Dead End: Implicit flow to Sink.
     if (!term || term->getNumSuccessors() == 0) {
       builder.setInsertionPointToEnd(currNew);
@@ -868,49 +875,50 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
       return;
     }
 
-    // LIST 1: The distinct successors in the NEW Local CFG for the current block.
-    // Used to construct the BranchOp/CondBranchOp.
+    // LIST 1: The distinct successors in the NEW Local CFG for the current
+    // block. Used to construct the BranchOp/CondBranchOp.
     SmallVector<Block *, 2> localSuccessors;
 
-    // LIST 2: The successors that are valid and new, requiring further DFS traversal.
-    // Stored as pairs: {Original Successor, New Local Block}.
-    SmallVector<std::pair<Block*, Block*>, 2> successorsToVisit;
+    // LIST 2: The successors that are valid and new, requiring further DFS
+    // traversal. Stored as pairs: {Original Successor, New Local Block}.
+    SmallVector<std::pair<Block *, Block *>, 2> successorsToVisit;
 
-    for (auto it = term->successor_begin(), e = term->successor_end(); it != e; ++it) {
+    for (auto it = term->successor_begin(), e = term->successor_end(); it != e;
+         ++it) {
       Block *succOrig = *it;
-      Block *nextBlockInLocalCFG = nullptr; // Where the edge points to in the new graph
+      Block *nextBlockInLocalCFG =
+          nullptr; // Where the edge points to in the new graph
 
       // --- LOGIC: Determine the edge destination based on rules ---
 
       // Case 1: Consumer Reached (Valid Delivery)
       if (succOrig == origCons) {
         if (succOrig == origProd) {
-            // Self-loop delivery
-            if (!L->secondVisitBB) {
-                L->secondVisitBB = new Block();
-                R.push_back(L->secondVisitBB);
-                L->origMap[L->secondVisitBB] = nullptr; 
-                // Terminate SecondVisit immediately to Sink
-                OpBuilder::InsertionGuard g(builder);
-                builder.setInsertionPointToEnd(L->secondVisitBB);
-                builder.create<cf::BranchOp>(loc, L->sinkBB);
-            }
-            nextBlockInLocalCFG = L->secondVisitBB;
-            L->newCons = L->secondVisitBB;
-        } 
-        else {
-            // Standard delivery
-            if (!L->newCons || L->newCons == L->secondVisitBB) {
-                 Block *proxy = new Block();
-                 R.push_back(proxy);
-                 L->origMap[proxy] = succOrig;
-                 L->newCons = proxy;
-                 // Terminate Proxy immediately to Sink
-                 OpBuilder::InsertionGuard g(builder);
-                 builder.setInsertionPointToEnd(proxy);
-                 builder.create<cf::BranchOp>(loc, L->sinkBB);
-            }
-            nextBlockInLocalCFG = L->newCons;
+          // Self-loop delivery
+          if (!L->secondVisitBB) {
+            L->secondVisitBB = new Block();
+            R.push_back(L->secondVisitBB);
+            L->origMap[L->secondVisitBB] = nullptr;
+            // Terminate SecondVisit immediately to Sink
+            OpBuilder::InsertionGuard g(builder);
+            builder.setInsertionPointToEnd(L->secondVisitBB);
+            builder.create<cf::BranchOp>(loc, L->sinkBB);
+          }
+          nextBlockInLocalCFG = L->secondVisitBB;
+          L->newCons = L->secondVisitBB;
+        } else {
+          // Standard delivery
+          if (!L->newCons || L->newCons == L->secondVisitBB) {
+            Block *proxy = new Block();
+            R.push_back(proxy);
+            L->origMap[proxy] = succOrig;
+            L->newCons = proxy;
+            // Terminate Proxy immediately to Sink
+            OpBuilder::InsertionGuard g(builder);
+            builder.setInsertionPointToEnd(proxy);
+            builder.create<cf::BranchOp>(loc, L->sinkBB);
+          }
+          nextBlockInLocalCFG = L->newCons;
         }
       }
       // Case 2: Producer revisited, consumer not reached (Invalid)
@@ -920,9 +928,9 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
       // Case 3: Visited
       else if (visited.count(succOrig)) {
         if (cloned.count(succOrig)) {
-            nextBlockInLocalCFG = cloned[succOrig];
+          nextBlockInLocalCFG = cloned[succOrig];
         } else {
-            nextBlockInLocalCFG = L->sinkBB;
+          nextBlockInLocalCFG = L->sinkBB;
         }
       }
       // Case 4: Invalid Back-edge
@@ -946,14 +954,15 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
     }
 
     // --- CONSTRUCTION: Create the branch instruction ---
-    
+
     builder.setInsertionPointToEnd(currNew);
     if (localSuccessors.size() == 1) {
       builder.create<cf::BranchOp>(loc, localSuccessors[0]);
     } else if (localSuccessors.size() == 2) {
       // Placeholder condition for 2-way branches
       Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-      builder.create<cf::CondBranchOp>(loc, cond, localSuccessors[0], localSuccessors[1]);
+      builder.create<cf::CondBranchOp>(loc, cond, localSuccessors[0],
+                                       localSuccessors[1]);
     } else {
       // Default fall-through for complex control flow
       builder.create<cf::BranchOp>(loc, L->sinkBB);
@@ -961,7 +970,7 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 
     // --- TRAVERSAL: Continue DFS ---
     for (auto &pair : successorsToVisit) {
-        dfs(pair.first, pair.second);
+      dfs(pair.first, pair.second);
     }
   };
 
@@ -972,16 +981,19 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
   builder.setInsertionPointToEnd(L->sinkBB);
   builder.create<func::ReturnOp>(loc);
 
-  if (!L->newCons) L->newCons = L->sinkBB;
+  if (!L->newCons)
+    L->newCons = L->sinkBB;
 
   // 4. Compute Topological Order
   DenseSet<Block *> visitedTopo;
   SmallVector<Block *> order;
   std::function<void(Block *)> topo = [&](Block *u) {
-    if (!u || visitedTopo.contains(u)) return;
+    if (!u || visitedTopo.contains(u))
+      return;
     visitedTopo.insert(u);
     if (auto *term = u->getTerminator())
-      for (auto it = term->successor_begin(), e = term->successor_end(); it != e; ++it)
+      for (auto it = term->successor_begin(), e = term->successor_end();
+           it != e; ++it)
         topo(*it);
     order.push_back(u);
   };
@@ -992,10 +1004,11 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 
   // 5. Physical Reordering
   // Reorder blocks in the region list to match the topological order.
-  // This does not change the graph structure (pointers), only the memory layout/print order.
+  // This does not change the graph structure (pointers), only the memory
+  // layout/print order.
   for (Block *b : L->topoOrder) {
     if (b != L->sinkBB) {
-        b->moveBefore(L->sinkBB);
+      b->moveBefore(L->sinkBB);
     }
   }
 
@@ -1013,7 +1026,7 @@ static void insertDirectSuppression(
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
-  
+
   bool debuglog = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuaqin/new/dynamatic-scripts/TempOutputs/";
@@ -1021,7 +1034,7 @@ static void insertDirectSuppression(
   std::string logFile = dir + funcName + "_debuglog.txt";
   std::error_code EC_log;
   llvm::raw_fd_ostream log(logFile, EC_log,
-                          static_cast<llvm::sys::fs::OpenFlags>(0x0004));
+                           static_cast<llvm::sys::fs::OpenFlags>(0x0004));
   llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
 
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
@@ -1058,7 +1071,7 @@ static void insertDirectSuppression(
       auto &depsEntry = cdAnalysis[consumerBlock];
 
       auto printBlockSet = [&](llvm::StringRef label,
-                              const DenseSet<Block *> &S) {
+                               const DenseSet<Block *> &S) {
         out << label << " = { ";
         bool first = true;
         for (Block *b : S) {
@@ -1096,7 +1109,7 @@ static void insertDirectSuppression(
   eliminateCommonBlocks(prodControlDeps, consControlDeps);
   // If producer is unreachable, the suppression is not needed.
   if (!isReachable(entryBlock, producerBlock)) {
-      return; 
+    return;
   }
 
   auto locGraph =
@@ -1112,8 +1125,7 @@ static void insertDirectSuppression(
       locConsControlDeps.insert(orig);
   }
 
-  BoolExpression *fCons = 
-      enumeratePaths(*locGraph, bi, locConsControlDeps);
+  BoolExpression *fCons = enumeratePaths(*locGraph, bi, locConsControlDeps);
 
   if (debuglog) {
     std::error_code EC;
@@ -1264,7 +1276,8 @@ static void insertDirectSuppression(
               << (selectOperandCondition->boolNegate())->toString() << "\n";
           selectOperandCondition->boolNegate();
         }
-        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition->boolNegate());
+        fCons = BoolExpression::boolAnd(fCons,
+                                        selectOperandCondition->boolNegate());
       } else {
         if (debuglog) {
           out << "MuxCond  = " << selectOperandCondition->toString() << "\n";
@@ -1280,7 +1293,7 @@ static void insertDirectSuppression(
   // f_supp = f_prod and not f_cons
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
-  if (debuglog){
+  if (debuglog) {
     out << "fSupmin  = " << fSup->toString() << "\n";
   }
 
@@ -1529,8 +1542,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // cofactors
         BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
         // Convert the boolean expression obtained through BDD to a circuit
-        conditionValue =
-            bddToCircuit(rewriter, bdd, gate->getBlock(), bi);
+        conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(), bi);
       } else
         conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
 
