@@ -343,7 +343,7 @@ private:
   /// destination can reach the join.
   /// @returns A vector of indices into the edges vector.
   std::vector<EdgeIdType> findEdgesToJoin(const SimpleCycle &cycle,
-                                      NodeIdType joinId) const;
+                                          NodeIdType joinId) const;
 
   /// Get all join node IDs in the graph.
   std::vector<NodeIdType> getAllJoins() const;
