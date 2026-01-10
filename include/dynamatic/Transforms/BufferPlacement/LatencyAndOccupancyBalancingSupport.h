@@ -229,12 +229,10 @@ public:
   /// file. Each path is placed in its own cluster subgraph with a graph index
   /// prefix. The input is a vector of GraphPathsForDumping objects. Each object
   /// contains:
-  /// - graphIndex: Index of the graph. (used for naming the cluster subgraphs)
   /// - graph: Pointer to the ReconvergentPathFinderGraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
 
   struct GraphPathsForDumping {
-    size_t graphIndex;
     const ReconvergentPathFinderGraph *graph;
     std::vector<ReconvergentPath> paths;
   };
