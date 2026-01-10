@@ -377,15 +377,21 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   }];
 }
 
-def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli"> {
+def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical left shift.";
 }
 
-def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi"> {
+def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Arithmetic right shift.";
 }
 
-def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
+def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical right shift.";
 }
 
