@@ -493,10 +493,9 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
 
-  for (const auto &entry : graphPaths) {
+  for (const auto &[graphIdx, entry] : llvm::enumerate(graphPaths)) {
     const ReconvergentPathFinderGraph *graph = entry.graph;
     const std::vector<ReconvergentPath> &paths = entry.paths;
-    size_t graphIdx = entry.graphIndex;
 
     for (size_t pathIdx = 0; pathIdx < paths.size(); ++pathIdx) {
       const ReconvergentPath &path = paths[pathIdx];
