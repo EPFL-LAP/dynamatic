@@ -170,7 +170,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
     while (!fwdQueue.empty()) {
       NodeIdType u = fwdQueue.front();
       fwdQueue.pop();
-      for (size_t edgeId : adjList[u]) {
+      for (EdgeIdType edgeId : adjList[u]) {
         NodeIdType v = edges[edgeId].dstId;
         if (!reachableFromFork[v]) {
           reachableFromFork[v] = true;
@@ -193,7 +193,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
       while (!bwdQueue.empty()) {
         NodeIdType u = bwdQueue.front();
         bwdQueue.pop();
-        for (size_t edgeId : revAdjList[u]) {
+        for (EdgeIdType edgeId : revAdjList[u]) {
           NodeIdType v = edges[edgeId].srcId;
           if (!canReachJoin[v]) {
             canReachJoin[v] = true;
@@ -206,7 +206,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
       // Otherwise it's just a linear chain, not actual
       // divergence/reconvergence.
       unsigned numDivergingPaths = 0;
-      for (size_t edgeId : adjList[forkId]) {
+      for (EdgeIdType edgeId : adjList[forkId]) {
         NodeIdType successor = edges[edgeId].dstId;
         if (canReachJoin[successor])
           numDivergingPaths++;
@@ -295,7 +295,7 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
 
     // Emit edges within this path (different styles for intra/inter-BB)
     for (NodeIdType srcId : path.nodeIds) {
-      for (size_t edgeId : adjList[srcId]) {
+      for (EdgeIdType edgeId : adjList[srcId]) {
         auto &edge = edges[edgeId];
         NodeIdType dstId = edge.dstId;
         if (path.nodeIds.count(dstId)) {
@@ -527,7 +527,7 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
       // Emit edges within this path
       for (NodeIdType srcId : path.nodeIds) {
-        for (size_t edgeId : graph->adjList[srcId]) {
+        for (EdgeIdType edgeId : graph->adjList[srcId]) {
           const auto &edge = graph->edges[edgeId];
           NodeIdType dstId = edge.dstId;
           if (path.nodeIds.count(dstId)) {
@@ -621,7 +621,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   std::function<void(NodeIdType)> forwardDfs = [&](NodeIdType currentNode) {
     visited[currentNode] = true;
-    for (size_t edgeIdx : adjList[currentNode]) {
+    for (EdgeIdType edgeIdx : adjList[currentNode]) {
       NodeIdType successorNode = edges[edgeIdx].dstId;
       if (!visited[successorNode]) {
         forwardDfs(successorNode);
@@ -645,7 +645,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
       [&](NodeIdType currentNode, size_t sccId) {
         visited[currentNode] = true;
         nodeSccId[currentNode] = sccId;
-        for (size_t edgeIdx : revAdjList[currentNode]) {
+        for (EdgeIdType edgeIdx : revAdjList[currentNode]) {
           NodeIdType successorNode = edges[edgeIdx].srcId;
           if (!visited[successorNode]) {
             reverseDfs(successorNode, sccId);
@@ -664,7 +664,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   // Build non-cyclic adjacency list (only edges between different SCCs)
   nonCyclicAdjList.resize(nodes.size());
-  for (size_t edgeIdx = 0; edgeIdx < edges.size(); ++edgeIdx) {
+  for (EdgeIdType edgeIdx = 0; edgeIdx < edges.size(); ++edgeIdx) {
     const auto &edge = edges[edgeIdx];
     if (nodeSccId[edge.srcId] != nodeSccId[edge.dstId]) {
       nonCyclicAdjList[edge.srcId].push_back(edgeIdx);
@@ -709,7 +709,7 @@ SynchronizingCyclesFinderGraph::findEdgesToJoin(const SimpleCycle &cycle,
   while (!fwdQueue.empty()) {
     NodeIdType current = fwdQueue.front();
     fwdQueue.pop();
-    for (size_t edgeIdx : nonCyclicAdjList[current]) {
+    for (EdgeIdType edgeIdx : nonCyclicAdjList[current]) {
       NodeIdType neighbor = edges[edgeIdx].dstId;
       if (!reachableFromCycle[neighbor]) {
         reachableFromCycle[neighbor] = true;
@@ -731,13 +731,13 @@ SynchronizingCyclesFinderGraph::findEdgesToJoin(const SimpleCycle &cycle,
   while (!bwdQueue.empty()) {
     NodeIdType current = bwdQueue.front();
     bwdQueue.pop();
-    for (size_t edgeIdx : revAdjList[current]) {
+    for (EdgeIdType edgeIdx : revAdjList[current]) {
       NodeIdType predecessor = edges[edgeIdx].srcId;
       // Only follow non-cyclic edges
       // Check if this edge is in nonCyclicAdjList by checking SCC membership
       if (!canReachJoin[predecessor]) {
         // Check if edge is non-cyclic by seeing if it's in nonCyclicAdjList
-        for (size_t ncEdgeIdx : nonCyclicAdjList[predecessor]) {
+        for (EdgeIdType ncEdgeIdx : nonCyclicAdjList[predecessor]) {
           if (edges[ncEdgeIdx].dstId == current) {
             canReachJoin[predecessor] = true;
             bwdQueue.push(predecessor);
@@ -750,11 +750,11 @@ SynchronizingCyclesFinderGraph::findEdgesToJoin(const SimpleCycle &cycle,
 
   // Step 3: Collect all non-cyclic edges where src is reachable from cycle
   // AND dst can reach join
-  std::vector<size_t> edgesOnPath;
+  std::vector<EdgeIdType> edgesOnPath;
   for (NodeIdType nodeId = 0; nodeId < nodes.size(); ++nodeId) {
     if (!reachableFromCycle[nodeId])
       continue;
-    for (size_t edgeIdx : nonCyclicAdjList[nodeId]) {
+    for (EdgeIdType edgeIdx : nonCyclicAdjList[nodeId]) {
       NodeIdType dst = edges[edgeIdx].dstId;
       if (canReachJoin[dst]) {
         edgesOnPath.push_back(edgeIdx);
@@ -885,7 +885,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
 
   std::set<NodeIdType> intermediateNodesOne, intermediateNodesTwo;
   for (const auto &edgeInfo : pair.edgesToJoins) {
-    for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+    for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleOne) {
       NodeIdType src = edges[edgeIdx].srcId;
       NodeIdType dst = edges[edgeIdx].dstId;
       if (!cycleOneNodes.count(src) && src != edgeInfo.joinId)
@@ -893,7 +893,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
       if (!cycleOneNodes.count(dst) && dst != edgeInfo.joinId)
         intermediateNodesOne.insert(dst);
     }
-    for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+    for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleTwo) {
       NodeIdType src = edges[edgeIdx].srcId;
       NodeIdType dst = edges[edgeIdx].dstId;
       if (!cycleTwoNodes.count(src) && src != edgeInfo.joinId)
@@ -1002,7 +1002,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
 
     for (const auto &edgeInfo : pair.edgesToJoins) {
       // Edges from Cycle One
-      for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+      for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleOne) {
         NodeIdType src = edges[edgeIdx].srcId;
         NodeIdType dst = edges[edgeIdx].dstId;
         std::string srcId = cycleOneNodes.count(src)
@@ -1018,7 +1018,7 @@ void SynchronizingCyclesFinderGraph::dumpSynchronizingCyclePair(
       }
 
       // Edges from Cycle Two
-      for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+      for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleTwo) {
         NodeIdType src = edges[edgeIdx].srcId;
         NodeIdType dst = edges[edgeIdx].dstId;
         std::string srcId = cycleTwoNodes.count(src)
@@ -1070,7 +1070,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
     // Collect intermediate nodes from edges
     std::set<NodeIdType> intermediateNodesOne, intermediateNodesTwo;
     for (const auto &edgeInfo : pair.edgesToJoins) {
-      for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+      for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleOne) {
         NodeIdType src = edges[edgeIdx].srcId;
         NodeIdType dst = edges[edgeIdx].dstId;
         if (!cycleOneNodes.count(src) && src != edgeInfo.joinId)
@@ -1078,7 +1078,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
         if (!cycleOneNodes.count(dst) && dst != edgeInfo.joinId)
           intermediateNodesOne.insert(dst);
       }
-      for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+      for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleTwo) {
         NodeIdType src = edges[edgeIdx].srcId;
         NodeIdType dst = edges[edgeIdx].dstId;
         if (!cycleTwoNodes.count(src) && src != edgeInfo.joinId)
@@ -1192,7 +1192,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
 
       for (const auto &edgeInfo : pair.edgesToJoins) {
         // Edges from Cycle One
-        for (size_t edgeIdx : edgeInfo.edgesFromCycleOne) {
+        for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleOne) {
           NodeIdType src = edges[edgeIdx].srcId;
           NodeIdType dst = edges[edgeIdx].dstId;
           std::string srcId = cycleOneNodes.count(src)
@@ -1208,7 +1208,7 @@ void SynchronizingCyclesFinderGraph::dumpAllSynchronizingCyclePairs(
         }
 
         // Edges from Cycle Two
-        for (size_t edgeIdx : edgeInfo.edgesFromCycleTwo) {
+        for (EdgeIdType edgeIdx : edgeInfo.edgesFromCycleTwo) {
           NodeIdType src = edges[edgeIdx].srcId;
           NodeIdType dst = edges[edgeIdx].dstId;
           std::string srcId = cycleTwoNodes.count(src)
