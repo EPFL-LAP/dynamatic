@@ -684,6 +684,102 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
   return success();
 }
 
+// Function to unbundle all handshake type in a handshake function operation
+LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
+
+  // This function executes the unbundling conversion in three steps:
+  // 1) Convert all handshake operations (except for function and end ops)
+  //    into hw module operations connecting them with unrealized conversion
+  //    casts
+  // 2) Convert the handshake function operation into an hw module operation
+  // 3) Remove all unrealized conversion casts by connecting directly the
+  //    inputs and outputs of the hw module instances
+
+  // Step 1: Apply conversion patterns to convert each handshake operation
+  // into an hw module operation
+  RewritePatternSet patterns(ctx);
+  ChannelUnbundlingTypeConverter typeConverter;
+  ConversionTarget target(*ctx);
+  target.addLegalDialect<synth::SynthDialect>();
+  target.addLegalDialect<hw::HWDialect>();
+  // Add casting as legal
+  target.addLegalOp<UnrealizedConversionCastOp>();
+  target.addIllegalDialect<handshake::HandshakeDialect>();
+  // In the first step, we convert all handshake operations into hw module
+  // operations, except for the function and end operations which are kept
+  // to convert in the next step
+  target.addLegalOp<handshake::FuncOp>();
+  target.addLegalOp<handshake::EndOp>();
+  patterns.insert<
+      ConvertToHWMod<handshake::BufferOp>, ConvertToHWMod<handshake::NDWireOp>,
+      ConvertToHWMod<handshake::ConditionalBranchOp>,
+      ConvertToHWMod<handshake::BranchOp>, ConvertToHWMod<handshake::MergeOp>,
+      ConvertToHWMod<handshake::ControlMergeOp>,
+      ConvertToHWMod<handshake::MuxOp>, ConvertToHWMod<handshake::JoinOp>,
+      ConvertToHWMod<handshake::BlockerOp>, ConvertToHWMod<handshake::SourceOp>,
+      ConvertToHWMod<handshake::ConstantOp>, ConvertToHWMod<handshake::SinkOp>,
+      ConvertToHWMod<handshake::ForkOp>, ConvertToHWMod<handshake::LazyForkOp>,
+      ConvertToHWMod<handshake::LoadOp>, ConvertToHWMod<handshake::StoreOp>,
+      ConvertToHWMod<handshake::NotOp>,
+      ConvertToHWMod<handshake::ReadyRemoverOp>,
+      ConvertToHWMod<handshake::ValidMergerOp>,
+      ConvertToHWMod<handshake::SharingWrapperOp>,
+      ConvertToHWMod<handshake::MemoryControllerOp>,
+
+      // Arith operations
+      ConvertToHWMod<handshake::AddFOp>, ConvertToHWMod<handshake::AddIOp>,
+      ConvertToHWMod<handshake::AndIOp>, ConvertToHWMod<handshake::CmpFOp>,
+      ConvertToHWMod<handshake::CmpIOp>, ConvertToHWMod<handshake::DivFOp>,
+      ConvertToHWMod<handshake::DivSIOp>, ConvertToHWMod<handshake::DivUIOp>,
+      ConvertToHWMod<handshake::RemSIOp>, ConvertToHWMod<handshake::ExtSIOp>,
+      ConvertToHWMod<handshake::ExtUIOp>, ConvertToHWMod<handshake::MulFOp>,
+      ConvertToHWMod<handshake::MulIOp>, ConvertToHWMod<handshake::NegFOp>,
+      ConvertToHWMod<handshake::OrIOp>, ConvertToHWMod<handshake::SelectOp>,
+      ConvertToHWMod<handshake::ShLIOp>, ConvertToHWMod<handshake::ShRSIOp>,
+      ConvertToHWMod<handshake::ShRUIOp>, ConvertToHWMod<handshake::SubFOp>,
+      ConvertToHWMod<handshake::SubIOp>, ConvertToHWMod<handshake::TruncIOp>,
+      ConvertToHWMod<handshake::TruncFOp>, ConvertToHWMod<handshake::XOrIOp>,
+      ConvertToHWMod<handshake::SIToFPOp>, ConvertToHWMod<handshake::UIToFPOp>,
+      ConvertToHWMod<handshake::FPToSIOp>, ConvertToHWMod<handshake::ExtFOp>,
+      ConvertToHWMod<handshake::AbsFOp>, ConvertToHWMod<handshake::MaxSIOp>,
+      ConvertToHWMod<handshake::MaxUIOp>, ConvertToHWMod<handshake::MinSIOp>,
+      ConvertToHWMod<handshake::MinUIOp>,
+
+      // Speculative operations
+      ConvertToHWMod<handshake::SpecCommitOp>,
+      ConvertToHWMod<handshake::SpecSaveOp>,
+      ConvertToHWMod<handshake::SpecSaveCommitOp>,
+      ConvertToHWMod<handshake::SpeculatorOp>,
+      ConvertToHWMod<handshake::SpeculatingBranchOp>,
+      ConvertToHWMod<handshake::NonSpecOp>>(typeConverter, ctx);
+  if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
+    return failure();
+
+  // Step 2: Convert the handshake function operation into
+  // an hw module operation and the corresponding terminator into an hw
+  // terminator
+  RewritePatternSet funcPatterns(ctx);
+  ConversionTarget funcTarget(*ctx);
+  funcTarget.addLegalDialect<synth::SynthDialect>();
+  funcTarget.addLegalDialect<hw::HWDialect>();
+  // Add casting as legal
+  funcTarget.addLegalOp<UnrealizedConversionCastOp>();
+  funcTarget.addIllegalDialect<handshake::HandshakeDialect>();
+  funcPatterns.insert<ConvertFuncToHWMod>(typeConverter, ctx);
+  if (failed(
+          applyPartialConversion(modOp, funcTarget, std::move(funcPatterns))))
+    return failure();
+
+  // Step 3: remove all unrealized conversion casts
+  // Execute without conversion function but walking the module
+  if (failed(removeUnrealizedConversionCasts(modOp)))
+    return failure();
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Definition of functions of ReadySignalInverter class
+// ------------------------------------------------------------------
 // Function to get a new module name for the rewritten hw module
 mlir::StringAttr ReadySignalInverter::getNewModuleName(hw::HWModuleOp oldMod,
                                                        mlir::MLIRContext *ctx) {
@@ -1051,17 +1147,16 @@ LogicalResult ReadySignalInverter::invertAllReadySignals(mlir::ModuleOp modOp) {
   return success();
 }
 
+// ------------------------------------------------------------------
+// Main pass definition
+// ------------------------------------------------------------------
+
 namespace {
 
 // The following pass converts handshake operations into synth operations
 // It executes in multiple steps:
-// 1) Convert all handshake operations (except for function and end ops)
-//    into hw module operations connecting them with unrealized conversion
-//    casts
-// 2) Convert the handshake function operation into an hw module operation
-// 3) Remove all unrealized conversion casts by connecting directly the
-//    inputs and outputs of the hw module instances
-// 4) Invert the direction of ready signals in all hw modules and hw instances
+// 1) Unbundle all handshake types used in the handshake function
+// 2) Invert the direction of ready signals in all hw modules and hw instances
 //    to follow the standard handshake protocol where ready signals go in the
 //    opposite direction with respect to data and valid signals
 class HandshakeToSynthPass
@@ -1087,91 +1182,12 @@ public:
     // If there is no function, nothing to do
     if (!funcOp)
       return;
-    // Step 1: Apply conversion patterns to convert each handshake operation
-    // into an hw module operation
-    RewritePatternSet patterns(ctx);
-    ChannelUnbundlingTypeConverter typeConverter;
-    ConversionTarget target(*ctx);
-    target.addLegalDialect<synth::SynthDialect>();
-    target.addLegalDialect<hw::HWDialect>();
-    // Add casting as legal
-    target.addLegalOp<UnrealizedConversionCastOp>();
-    target.addIllegalDialect<handshake::HandshakeDialect>();
-    // In the first step, we convert all handshake operations into hw module
-    // operations, except for the function and end operations which are kept
-    // to convert in the next step
-    target.addLegalOp<handshake::FuncOp>();
-    target.addLegalOp<handshake::EndOp>();
-    patterns.insert<
-        ConvertToHWMod<handshake::BufferOp>,
-        ConvertToHWMod<handshake::NDWireOp>,
-        ConvertToHWMod<handshake::ConditionalBranchOp>,
-        ConvertToHWMod<handshake::BranchOp>, ConvertToHWMod<handshake::MergeOp>,
-        ConvertToHWMod<handshake::ControlMergeOp>,
-        ConvertToHWMod<handshake::MuxOp>, ConvertToHWMod<handshake::JoinOp>,
-        ConvertToHWMod<handshake::BlockerOp>,
-        ConvertToHWMod<handshake::SourceOp>,
-        ConvertToHWMod<handshake::ConstantOp>,
-        ConvertToHWMod<handshake::SinkOp>, ConvertToHWMod<handshake::ForkOp>,
-        ConvertToHWMod<handshake::LazyForkOp>,
-        ConvertToHWMod<handshake::LoadOp>, ConvertToHWMod<handshake::StoreOp>,
-        ConvertToHWMod<handshake::NotOp>,
-        ConvertToHWMod<handshake::ReadyRemoverOp>,
-        ConvertToHWMod<handshake::ValidMergerOp>,
-        ConvertToHWMod<handshake::SharingWrapperOp>,
-        ConvertToHWMod<handshake::MemoryControllerOp>,
 
-        // Arith operations
-        ConvertToHWMod<handshake::AddFOp>, ConvertToHWMod<handshake::AddIOp>,
-        ConvertToHWMod<handshake::AndIOp>, ConvertToHWMod<handshake::CmpFOp>,
-        ConvertToHWMod<handshake::CmpIOp>, ConvertToHWMod<handshake::DivFOp>,
-        ConvertToHWMod<handshake::DivSIOp>, ConvertToHWMod<handshake::DivUIOp>,
-        ConvertToHWMod<handshake::RemSIOp>, ConvertToHWMod<handshake::ExtSIOp>,
-        ConvertToHWMod<handshake::ExtUIOp>, ConvertToHWMod<handshake::MulFOp>,
-        ConvertToHWMod<handshake::MulIOp>, ConvertToHWMod<handshake::NegFOp>,
-        ConvertToHWMod<handshake::OrIOp>, ConvertToHWMod<handshake::SelectOp>,
-        ConvertToHWMod<handshake::ShLIOp>, ConvertToHWMod<handshake::ShRSIOp>,
-        ConvertToHWMod<handshake::ShRUIOp>, ConvertToHWMod<handshake::SubFOp>,
-        ConvertToHWMod<handshake::SubIOp>, ConvertToHWMod<handshake::TruncIOp>,
-        ConvertToHWMod<handshake::TruncFOp>, ConvertToHWMod<handshake::XOrIOp>,
-        ConvertToHWMod<handshake::SIToFPOp>,
-        ConvertToHWMod<handshake::UIToFPOp>,
-        ConvertToHWMod<handshake::FPToSIOp>, ConvertToHWMod<handshake::ExtFOp>,
-        ConvertToHWMod<handshake::AbsFOp>, ConvertToHWMod<handshake::MaxSIOp>,
-        ConvertToHWMod<handshake::MaxUIOp>, ConvertToHWMod<handshake::MinSIOp>,
-        ConvertToHWMod<handshake::MinUIOp>,
-
-        // Speculative operations
-        ConvertToHWMod<handshake::SpecCommitOp>,
-        ConvertToHWMod<handshake::SpecSaveOp>,
-        ConvertToHWMod<handshake::SpecSaveCommitOp>,
-        ConvertToHWMod<handshake::SpeculatorOp>,
-        ConvertToHWMod<handshake::SpeculatingBranchOp>,
-        ConvertToHWMod<handshake::NonSpecOp>>(typeConverter, ctx);
-    if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
+    // Step 1: unbundle all handshake types in the handshake function
+    if (failed(unbundleAllHandshakeTypes(modOp, ctx)))
       return signalPassFailure();
 
-    // Step 2: Convert the handshake function operation into
-    // an hw module operation and the corresponding terminator into an hw
-    // terminator
-    RewritePatternSet funcPatterns(ctx);
-    ConversionTarget funcTarget(*ctx);
-    funcTarget.addLegalDialect<synth::SynthDialect>();
-    funcTarget.addLegalDialect<hw::HWDialect>();
-    // Add casting as legal
-    funcTarget.addLegalOp<UnrealizedConversionCastOp>();
-    funcTarget.addIllegalDialect<handshake::HandshakeDialect>();
-    funcPatterns.insert<ConvertFuncToHWMod>(typeConverter, ctx);
-    if (failed(
-            applyPartialConversion(modOp, funcTarget, std::move(funcPatterns))))
-      return signalPassFailure();
-
-    // Step 3: remove all unrealized conversion casts
-    // Execute without conversion function but walking the module
-    if (failed(removeUnrealizedConversionCasts(modOp)))
-      return signalPassFailure();
-
-    // Step 4: invert the direction of all ready signals in the hw modules
+    // Step 2: invert the direction of all ready signals in the hw modules
     // created from handshake operations
     // Create on object of the ReadySignalInverter class to manage the
     // inversion
