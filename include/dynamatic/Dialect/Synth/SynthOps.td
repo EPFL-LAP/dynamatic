@@ -1,11 +1,4 @@
 //===----------------------------------------------------------------------===//
-// All the files related to the description of the Synth dialect
-// have been modified from the original version present in the
-// circt project at the following link:
-// https://github.com/llvm/circt/tree/main/
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,7 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the operations of the Synth dialect.
+// This file originates from the CIRCT project (https://github.com/llvm/circt).
+// It includes modifications made as part of Dynamatic.
+//
+//===----------------------------------------------------------------------===//
+//
+// This is the top level file for the Synth dialect.
 //
 //===----------------------------------------------------------------------===//
 

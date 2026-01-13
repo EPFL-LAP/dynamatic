@@ -1,12 +1,6 @@
 # Synth dialect
 
 
-> **NOTE**  
-> The Synth dialect in Dynamatic is adapted from the original Synth dialect in the CIRCT project.
-> As stated in the the header comment in `Synth.td`, “all the files related to the description of the Synth dialect have been modified from the original version present in the CIRCT project at the following link: https://github.com/llvm/circt/tree/main/”.
-> This origin explains the focus on AIG/MIG and pipeline infrastructure, which align with broader logic synthesis research and tooling beyond Dynamatic itself.
-
-
 The **Synth** dialect is a low-level synthesis-oriented dialect that provides a common in-MLIR interface for logic synthesis operations and data structures. It is intended as an intermediate representation between higher-level hardware IR (e.g., Handshake or HW) and concrete synthesis backends, capturing both logic networks (such as AIGs and MIGs) and meta-operations that steer synthesis decisions.
 
 In Dynamatic, the Synth dialect is the target of the [Handshake-to-Synth lowering pass](ConversionHandshakeToSynth.md): each Handshake operation is wrapped in a `synth.subckt` (or similar Synth operation) inside an `hw.module`, and later passes are free to refine these subcircuits into more detailed networks and optimization steps.
