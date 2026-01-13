@@ -68,56 +68,57 @@ using namespace dynamatic::handshake;
 
 #define DEBUG_TYPE "handshake-to-synth"
 
-// TODO: Potentially change the name of this class since it now also
-// performs unbundling of data signals into single-bit signals
-class ReadySignalInverter {
+class SignalRewriter {
 public:
-  // Function to invert the ready signals of an hw module operation
-  void
-  invertReadySignalHWModule(hw::HWModuleOp oldMod, ModuleOp parent,
-                            SymbolTable &symTable,
-                            DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
-                            DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules);
+  /// Rewrite a HW module interface and body to apply signal-direction and
+  /// bit-level rewrites (e.g., ready inversion and bit unbundling).
+  void rewriteHWModule(hw::HWModuleOp oldMod, ModuleOp parent,
+                       SymbolTable &symTable,
+                       DenseMap<StringRef, hw::HWModuleOp> &newHWModules,
+                       DenseMap<StringRef, hw::HWModuleOp> &oldHWModules);
 
-  // Function to invert the ready signals of an hw instance operation
-  void invertReadySignalHWInstance(
-      hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable,
-      DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
-      DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules);
+  /// Rewrite a HW instance to use a rewritten module and updated operands.
+  void rewriteHWInstance(hw::InstanceOp oldInst, ModuleOp parent,
+                         SymbolTable &symTable,
+                         DenseMap<StringRef, hw::HWModuleOp> &newHWModules,
+                         DenseMap<StringRef, hw::HWModuleOp> &oldHWModules);
 
-  // Function to get the name of the new hw module with inverted ready signals
-  mlir::StringAttr getNewModuleName(hw::HWModuleOp oldMod,
-                                    mlir::MLIRContext *ctx);
+  /// Get the name of the rewritten HW module (e.g., by appending a suffix).
+  mlir::StringAttr getRewrittenModuleName(hw::HWModuleOp oldMod,
+                                          mlir::MLIRContext *ctx);
 
-  // Function to get the mapping of an input signal
+  /// Get the mapping of an old input signal to its rewritten signals.
   SmallVector<Value> getInputSignalMapping(Value oldInputSignal,
                                            OpBuilder builder, Location loc);
 
-  // Function to update the mapping of an output signal
+  /// Update the mapping for an output signal group after a new instance is
+  /// created.
   void updateOutputSignalMapping(Value oldResult, StringRef outputName,
                                  hw::HWModuleOp newMod, hw::InstanceOp newInst);
 
-  // Function to invert all ready signals in a module operation
-  LogicalResult invertAllReadySignals(mlir::ModuleOp modOp);
+  /// Rewrite all HW modules in the given MLIR module to apply signal
+  /// restructuring (direction changes, bit unbundling, etc.).
+  LogicalResult rewriteAllSignals(mlir::ModuleOp modOp);
 
 private:
-  // IMPORTANT: A fundamental assumption for this map values to work is that
-  // each
+  // IMPORTANT: A fundamental assumption for these maps to work is that each
   // handshake channel connects uniquely one handshake unit to another one. If
-  // this assumption is broken, the map will not work correctly since one key
+  // this assumption is broken, the maps will not work correctly since one key
   // could correspond to multiple values.
   //
-  // Maps to keep track of signal connections during instance rewriting
-  // Old refers to the original hw instance with wrong ready signal directions
-  // and hw types with a potential bitwidth larger than 1.
-  // New refers to the rewritten hw instance with correct ready signal
-  // directions and with hw types strictly 1 bit wide for each signal.
+  // Maps to keep track of signal connections during instance rewriting.
+  //
+  // "Old" refers to the original HW instance, with potentially incorrect
+  // signal directions and HW types that may have bitwidths larger than 1.
+  // "New" refers to the rewritten HW instance, with corrected signal
+  // directions and HW types normalized to 1-bit signals for each component.
   DenseMap<Value, SmallVector<Value>> oldModuleSignalToNewModuleSignalsMap;
-  // Since the hw instances are rewritten in a recursive manner, it might be
-  // possible that we need the result of an instance that has not been created
-  // yet. To handle this case, we create temporary hw constant operations
-  // to hold the place of these values. This map keeps track of these temporary
-  // values
+
+  // Since the HW instances are rewritten in a recursive manner, it might be
+  // possible that we need results of an instance that has not been created
+  // yet. To handle this case, we create temporary HW constant operations
+  // to hold places for these values. This map keeps track of these temporary
+  // values grouped per original signal.
   DenseMap<Value, SmallVector<Value>> oldModuleSignalToTempValuesMap;
 };
 
@@ -781,19 +782,20 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 }
 
 // ------------------------------------------------------------------
-// Definition of functions of ReadySignalInverter class
+// Definition of functions of SignalRewriter class
 // ------------------------------------------------------------------
 // Function to get a new module name for the rewritten hw module
-mlir::StringAttr ReadySignalInverter::getNewModuleName(hw::HWModuleOp oldMod,
-                                                       mlir::MLIRContext *ctx) {
+mlir::StringAttr
+SignalRewriter::getRewrittenModuleName(hw::HWModuleOp oldMod,
+                                       mlir::MLIRContext *ctx) {
   return mlir::StringAttr::get(ctx, oldMod.getName() + "_rewritten");
 }
 
 // Function to get the mapping of an input signal from the old module to the
 // new module
-SmallVector<Value>
-ReadySignalInverter::getInputSignalMapping(Value oldInputSignal,
-                                           OpBuilder builder, Location loc) {
+SmallVector<Value> SignalRewriter::getInputSignalMapping(Value oldInputSignal,
+                                                         OpBuilder builder,
+                                                         Location loc) {
   auto it = oldModuleSignalToNewModuleSignalsMap.find(oldInputSignal);
   if (it != oldModuleSignalToNewModuleSignalsMap.end()) {
     return it->second;
@@ -828,10 +830,10 @@ ReadySignalInverter::getInputSignalMapping(Value oldInputSignal,
 
 // Function to update the mapping between old module signals and new module
 // signals after getting a new result value
-void ReadySignalInverter::updateOutputSignalMapping(Value oldResult,
-                                                    StringRef outputName,
-                                                    hw::HWModuleOp newMod,
-                                                    hw::InstanceOp newInst) {
+void SignalRewriter::updateOutputSignalMapping(Value oldResult,
+                                               StringRef outputName,
+                                               hw::HWModuleOp newMod,
+                                               hw::InstanceOp newInst) {
   // Find the corresponding output index of the output in the new module
   SmallVector<int> outputIdxsNewInst;
   for (auto &p : newMod.getPortList()) {
@@ -868,8 +870,10 @@ void ReadySignalInverter::updateOutputSignalMapping(Value oldResult,
   }
 }
 
-// Function to rewrite an hw instance operation to fix ready signal directions
-void ReadySignalInverter::invertReadySignalHWInstance(
+/// Rewrite an HW instance to use the rewritten module interface and operands.
+/// This updates operand connections, reconstructs result groups, and updates
+/// internal mapping structures used by the module-level rewriting.
+void SignalRewriter::rewriteHWInstance(
     hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable,
     DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
     DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules) {
@@ -889,8 +893,7 @@ void ReadySignalInverter::invertReadySignalHWInstance(
   if (!newHWmodules.count(moduleName)) {
     hw::HWModuleOp oldMod = symTable.lookup<hw::HWModuleOp>(moduleName);
     if (oldMod) {
-      invertReadySignalHWModule(oldMod, parent, symTable, newHWmodules,
-                                oldHWmodules);
+      rewriteHWModule(oldMod, parent, symTable, newHWmodules, oldHWmodules);
     }
   }
 
@@ -974,8 +977,10 @@ void ReadySignalInverter::invertReadySignalHWInstance(
   }
 }
 
-// Function to rewrite an hw module to fix ready signal directions
-void ReadySignalInverter::invertReadySignalHWModule(
+/// Rewrite a HW module to normalize signal directions (e.g., ready going
+/// opposite to data/valid) and unbundle multi-bit signals into single-bit
+/// signals according to the chosen convention.
+void SignalRewriter::rewriteHWModule(
     hw::HWModuleOp oldMod, ModuleOp parent, SymbolTable &symTable,
     DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
     DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules) {
@@ -1085,7 +1090,7 @@ void ReadySignalInverter::invertReadySignalHWModule(
 
   // Create new hw module
   builder.setInsertionPointAfter(oldMod);
-  mlir::StringAttr newModuleName = getNewModuleName(oldMod, ctx);
+  mlir::StringAttr newModuleName = getRewrittenModuleName(oldMod, ctx);
   auto newMod = builder.create<hw::HWModuleOp>(oldMod.getLoc(), newModuleName,
                                                newPortInfo);
   // Save it in the list of new module using the same name as the old module as
@@ -1114,8 +1119,7 @@ void ReadySignalInverter::invertReadySignalHWModule(
     if (auto instOp = dyn_cast<hw::InstanceOp>(op)) {
       // Step 3a: If the operation is an hw instance, rewrite it to fix ready
       // signal directions.
-      invertReadySignalHWInstance(instOp, parent, symTable, newHWmodules,
-                                  oldHWmodules);
+      rewriteHWInstance(instOp, parent, symTable, newHWmodules, oldHWmodules);
     } else if (!isa<hw::OutputOp>(op)) {
       hasHwInstances = false;
     }
@@ -1158,8 +1162,9 @@ void ReadySignalInverter::invertReadySignalHWModule(
   newTerminator->setOperands(newTerminatorOperands);
 }
 
-// Function to invert the direction of ready signals in all hw modules
-LogicalResult ReadySignalInverter::invertAllReadySignals(mlir::ModuleOp modOp) {
+/// Function to apply signal-direction and bit-level rewrites to all HW
+/// modules in the MLIR module.
+LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
 
   // The following function iterates through all hw modules in the module
   // and rewrites them to invert the direction of ready signals to follow
@@ -1169,7 +1174,8 @@ LogicalResult ReadySignalInverter::invertAllReadySignals(mlir::ModuleOp modOp) {
   // It does so by creating new hw modules with the rewritten ready signal
   // directions and then connecting them following the same graph structure of
   // the old modules. Finally, it removes the old hw modules and renames the new
-  // hw modules to the original names.
+  // hw modules to the original names. Additionally, during the ready signal
+  // inversion, it also unbundles multi-bit signals into single-bit signals.
 
   // Maps to keep track of old and new hw modules
   // The old hw modules have the wrong ready signal directions where ready
@@ -1184,8 +1190,7 @@ LogicalResult ReadySignalInverter::invertAllReadySignals(mlir::ModuleOp modOp) {
   modOp.walk([&](hw::HWModuleOp m) { oldHWModules.insert({m.getName(), m}); });
   // Iterate through all hw modules and rewrite them
   for (auto [name, hwMod] : oldHWModules)
-    invertReadySignalHWModule(hwMod, modOp, symTable, newHWModules,
-                              oldHWModules);
+    rewriteHWModule(hwMod, modOp, symTable, newHWModules, oldHWModules);
   // Erase old hw modules
   for (auto [modName, oldMod] : oldHWModules) {
     oldMod.erase();
@@ -1253,10 +1258,10 @@ public:
     // Step 2: invert the direction of all ready signals in the hw modules
     // created from handshake operations. Additionally, unbundle data signals
     // into single-bit signals.
-    // Create on object of the ReadySignalInverter class to manage the
+    // Create on object of the SignalRewriter class to manage the
     // inversion
-    ReadySignalInverter inverter;
-    if (failed(inverter.invertAllReadySignals(modOp)))
+    SignalRewriter signalRewriter;
+    if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
 
     // Step 3: (not implemented yet) Convert synth subckt operations into other
