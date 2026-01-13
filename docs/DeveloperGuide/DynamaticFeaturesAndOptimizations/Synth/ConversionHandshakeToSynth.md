@@ -7,7 +7,7 @@ There are three main sections in this document.
 
 1. Main pass and usage: Overall structure and rationale of the pass.
 2. Unbundling conversion: Lowering Handshake channel types to flat HW ports and `synth.subckt`.
-3. Ready inversion: Fixing the direction of ready signals to follow the standard handshake protocol.
+3. Ready inversion: Fixing the direction of ready signals to follow the standard handshake protocol and unbundling multi-bit data signals into multiple single bit signals.
 
 
 The pass is called [`HandshakeToSynthPass`](HandshakeToSynth.cpp).
@@ -315,7 +315,7 @@ The pattern `class ConvertFuncToHWMod : public OpConversionPattern<handshake::Fu
 
 ## Ready signal inversion
 
-After unbundling, the generated HW modules use a raw mapping of Handshake channels to `{data, valid, ready}` signals. All hw modules represent ready in the same direction as data/valid, while standard handshake protocols require ready to travel against data/valid. The second major phase of the pass fixes this.
+After unbundling, the generated HW modules use a raw mapping of Handshake channels to `{data, valid, ready}` signals. All hw modules represent ready in the same direction as data/valid, while standard handshake protocols require ready to travel against data/valid. The second major phase of the pass fixes this. Additionally, **all data multi-bit signals are split into multiple single-bit signals**.
 
 This phase is implemented in the `ReadySignalInverter` helper class and its methods.
 

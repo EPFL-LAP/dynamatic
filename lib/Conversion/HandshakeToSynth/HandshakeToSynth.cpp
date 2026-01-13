@@ -68,6 +68,8 @@ using namespace dynamatic::handshake;
 
 #define DEBUG_TYPE "handshake-to-synth"
 
+// TODO: Potentially change the name of this class since it now also
+// performs unbundling of data signals into single-bit signals
 class ReadySignalInverter {
 public:
   // Function to invert the ready signals of an hw module operation
