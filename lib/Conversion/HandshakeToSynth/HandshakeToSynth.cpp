@@ -88,8 +88,8 @@ public:
                                     mlir::MLIRContext *ctx);
 
   // Function to get the mapping of an input signal
-  Value getInputSignalMapping(Value oldInputSignal, OpBuilder builder,
-                              Location loc);
+  SmallVector<Value> getInputSignalMapping(Value oldInputSignal,
+                                           OpBuilder builder, Location loc);
 
   // Function to update the mapping of an output signal
   void updateOutputSignalMapping(Value oldResult, StringRef outputName,
@@ -107,15 +107,16 @@ private:
   //
   // Maps to keep track of signal connections during instance rewriting
   // Old refers to the original hw instance with wrong ready signal directions
+  // and hw types with a potential bitwidth larger than 1.
   // New refers to the rewritten hw instance with correct ready signal
-  // directions
-  DenseMap<Value, Value> oldModuleSignalToNewModuleSignalMap;
+  // directions and with hw types strictly 1 bit wide for each signal.
+  DenseMap<Value, SmallVector<Value>> oldModuleSignalToNewModuleSignalsMap;
   // Since the hw instances are rewritten in a recursive manner, it might be
   // possible that we need the result of an instance that has not been created
   // yet. To handle this case, we create temporary hw constant operations
   // to hold the place of these values. This map keeps track of these temporary
   // values
-  DenseMap<Value, Value> oldModuleSignalToTempValueMap;
+  DenseMap<Value, SmallVector<Value>> oldModuleSignalToTempValuesMap;
 };
 
 // Function to unbundle a single handshake type into its subcomponents
@@ -788,29 +789,39 @@ mlir::StringAttr ReadySignalInverter::getNewModuleName(hw::HWModuleOp oldMod,
 
 // Function to get the mapping of an input signal from the old module to the
 // new module
-Value ReadySignalInverter::getInputSignalMapping(Value oldInputSignal,
-                                                 OpBuilder builder,
-                                                 Location loc) {
-  auto it = oldModuleSignalToNewModuleSignalMap.find(oldInputSignal);
-  if (it != oldModuleSignalToNewModuleSignalMap.end()) {
+SmallVector<Value>
+ReadySignalInverter::getInputSignalMapping(Value oldInputSignal,
+                                           OpBuilder builder, Location loc) {
+  auto it = oldModuleSignalToNewModuleSignalsMap.find(oldInputSignal);
+  if (it != oldModuleSignalToNewModuleSignalsMap.end()) {
     return it->second;
   }
   // If there is no mapping, it means that the value is not yet
   // available since the instance that produces it has not been
   // rewritten yet. In this case, check if we already created a
   // temporary value for this ready signal
-  auto tempIt = oldModuleSignalToTempValueMap.find(oldInputSignal);
-  if (tempIt != oldModuleSignalToTempValueMap.end()) {
+  auto tempIt = oldModuleSignalToTempValuesMap.find(oldInputSignal);
+  if (tempIt != oldModuleSignalToTempValuesMap.end()) {
     return tempIt->second;
   }
-  // Else, create a new temporary hw constant to hold the connection
-  auto tempConst = builder.create<hw::ConstantOp>(
-      loc, oldInputSignal.getType(),
-      builder.getIntegerAttr(oldInputSignal.getType(), 0));
+  // Else, create a new temporary hw constant to hold the connection for each
+  // bit
+  SmallVector<Value> tempValues;
+  Type signalType = oldInputSignal.getType();
+  assert(signalType.isa<IntegerType>() &&
+         "only integer types are supported for signals for now");
+  unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+  assert(bitWidth > 0 && "signal must have positive bit width");
+  for (unsigned i = 0; i < bitWidth; ++i) {
+    auto tempConst = builder.create<hw::ConstantOp>(
+        loc, oldInputSignal.getType(),
+        builder.getIntegerAttr(oldInputSignal.getType(), 0));
+    tempValues.push_back(tempConst.getResult());
+  }
   // Store the temporary value in the map
-  oldModuleSignalToTempValueMap[oldInputSignal] = tempConst;
+  oldModuleSignalToTempValuesMap[oldInputSignal] = tempValues;
   // Use the result of the constant as the operand
-  return tempConst->getResult(0);
+  return tempValues;
 }
 
 // Function to update the mapping between old module signals and new module
@@ -820,28 +831,38 @@ void ReadySignalInverter::updateOutputSignalMapping(Value oldResult,
                                                     hw::HWModuleOp newMod,
                                                     hw::InstanceOp newInst) {
   // Find the corresponding output index of the output in the new module
-  int outputIdxNewInst = -1;
+  SmallVector<int> outputIdxsNewInst;
   for (auto &p : newMod.getPortList()) {
-    if (p.name.getValue() == outputName) {
-      outputIdxNewInst = p.argNum;
-      break;
+    StringRef portName = p.name.getValue();
+    if (portName.starts_with(outputName)) {
+      outputIdxsNewInst.push_back(p.argNum);
     }
   }
-  assert(outputIdxNewInst != -1 && "could not find output port in new module");
-  Value newResult = newInst.getResult(outputIdxNewInst);
-  //  Add mapping between old non-ready signal and new non-ready signal
-  oldModuleSignalToNewModuleSignalMap[oldResult] = newResult;
+  assert(!outputIdxsNewInst.empty() &&
+         "could not find output port in new module");
+  SmallVector<Value> newResults;
+  for (int idx : outputIdxsNewInst) {
+    newResults.push_back(newInst->getResult(idx));
+  }
+  // Add mapping between old non-ready signal and new non-ready signal
+  oldModuleSignalToNewModuleSignalsMap[oldResult] = newResults;
   // Check if any temporary value has been created for the new result
   // value by seeing if the old output value is in the map of temporary
   // values
-  auto tempIt = oldModuleSignalToTempValueMap.find(oldResult);
-  if (tempIt != oldModuleSignalToTempValueMap.end()) {
-    // Replace all uses of the temporary value with the new result value
-    tempIt->second.replaceAllUsesWith(newResult);
+  auto tempIt = oldModuleSignalToTempValuesMap.find(oldResult);
+  if (tempIt != oldModuleSignalToTempValuesMap.end()) {
+    assert(newResults.size() == tempIt->second.size() &&
+           "mismatched number of bits between temporary value and new result");
+    for (size_t i = 0; i < newResults.size(); ++i) {
+      // Replace all uses of the temporary value with the new result value
+      tempIt->second[i].replaceAllUsesWith(newResults[i]);
+    }
+    for (auto tempVal : tempIt->second) {
+      // Remove the operation creating the temporary value
+      tempVal.getDefiningOp()->erase();
+    }
     // Remove the temporary value from the map
-    oldModuleSignalToTempValueMap.erase(tempIt);
-    // Remove the operation creating the temporary value
-    tempIt->second.getDefiningOp()->erase();
+    oldModuleSignalToTempValuesMap.erase(tempIt);
   }
 }
 
@@ -913,15 +934,19 @@ void ReadySignalInverter::invertReadySignalHWInstance(
       // This is an output of the old module and should become an input of the
       // new module. Check if there is a mapping for this ready signal
       Value oldReadyOutput = oldInst->getResult(port.argNum);
-      Value newReadyInput =
+      SmallVector<Value> newReadyInputs =
           getInputSignalMapping(oldReadyOutput, builder, locNewOps);
+      assert(newReadyInputs.size() == 1 && "ready signal should be 1 bit wide");
+      Value newReadyInput = newReadyInputs[0];
       newOperands.push_back(newReadyInput);
     } else if (port.isInput()) {
       // Check if there is a mapping for this non-ready signal
       Value oldNonReadyInput = oldInst.getOperand(port.argNum);
-      Value newNonReadyInput =
+      SmallVector<Value> newNonReadyInputs =
           getInputSignalMapping(oldNonReadyInput, builder, locNewOps);
-      newOperands.push_back(newNonReadyInput);
+      // Append each bit separately of the non-ready signal to the new operands
+      for (auto newNonReadyInput : newNonReadyInputs)
+        newOperands.push_back(newNonReadyInput);
     } else {
       // Collect non-ready outputs to replace uses later
       nonReadyOutputs.push_back(
@@ -981,21 +1006,34 @@ void ReadySignalInverter::invertReadySignalHWModule(
   // Collect the new inputs and outputs with inverted ready signal directions
   unsigned inputIdx = 0;
   unsigned outputIdx = 0;
-  // Store mapping from new output idx to old signal
-  SmallVector<std::pair<unsigned, Value>> newModuleOutputIdxToOldSignal;
-  // Store mapping from new input idx to old signal
-  SmallVector<std::pair<unsigned, Value>> newModuleInputIdxToOldSignal;
+  // Store mapping from new output idx start and end to old signal
+  SmallVector<std::pair<std::pair<unsigned, unsigned>, Value>>
+      newModuleOutputIdxToOldSignal;
+  // Store mapping from new input idx start and end to old signal
+  SmallVector<std::pair<std::pair<unsigned, unsigned>, Value>>
+      newModuleInputIdxToOldSignal;
   // Iterate over the ports of the old hw module
   for (auto &p : oldMod.getPortList()) {
     bool isReady = p.name.getValue().contains("ready");
 
+    unsigned startOutputIdx = outputIdx;
+    unsigned startInputIdx = inputIdx;
     if ((p.isInput() && isReady) || (p.isOutput() && !isReady)) {
       // If the port is input and ready, it becomes output and ready in the new
       // module. If a port is output and not ready, it stays as such.
-      newOutputs.push_back(
-          {hw::ModulePort{StringAttr::get(ctx, StringRef{p.name}), p.type,
-                          hw::ModulePort::Direction::Output},
-           outputIdx});
+      Type signalType = p.type;
+      assert(signalType.isa<IntegerType>() &&
+             "only integer types are supported for signals for now");
+      unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+      for (unsigned i = 0; i < bitWidth; ++i) {
+        newOutputs.push_back(
+            {hw::ModulePort{StringAttr::get(ctx, p.name.getValue().str() + "_" +
+                                                     std::to_string(i)),
+                            builder.getIntegerType(1),
+                            hw::ModulePort::Direction::Output},
+             outputIdx});
+        outputIdx++;
+      }
       Value oldSignal;
       if (isReady) {
         // Record mapping from new ready output to old ready input
@@ -1005,16 +1043,25 @@ void ReadySignalInverter::invertReadySignalHWModule(
         oldSignal =
             oldMod.getBodyBlock()->getTerminator()->getOperand(p.argNum);
       }
-      newModuleOutputIdxToOldSignal.push_back(
-          std::make_pair(outputIdx, oldSignal));
-      outputIdx++;
+      unsigned endOutputIdx = outputIdx - 1;
+      newModuleOutputIdxToOldSignal.push_back(std::make_pair(
+          std::make_pair(startOutputIdx, endOutputIdx), oldSignal));
     } else if ((p.isOutput() && isReady) || (p.isInput() && !isReady)) {
       // If the port is output and ready, it becomes input and ready in the new
       // module. If a port is input and not ready, it stays as such.
-      newInputs.push_back(
-          {hw::ModulePort{StringAttr::get(ctx, StringRef{p.name}), p.type,
-                          hw::ModulePort::Direction::Input},
-           inputIdx});
+      Type signalType = p.type;
+      assert(signalType.isa<IntegerType>() &&
+             "only integer types are supported for signals for now");
+      unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+      for (unsigned i = 0; i < bitWidth; ++i) {
+        newInputs.push_back(
+            {hw::ModulePort{
+                 StringAttr::get(ctx, StringRef{p.name.getValue().str() + "_" +
+                                                std::to_string(i)}),
+                 builder.getIntegerType(1), hw::ModulePort::Direction::Input},
+             inputIdx});
+        inputIdx++;
+      }
       Value oldSignal;
       if (isReady) {
         // Record mapping from new ready input to old ready output
@@ -1024,9 +1071,9 @@ void ReadySignalInverter::invertReadySignalHWModule(
         // Record mapping from new non-ready input to old non-ready input
         oldSignal = oldMod.getBodyBlock()->getArgument(p.argNum);
       }
-      newModuleInputIdxToOldSignal.push_back(
-          std::make_pair(inputIdx, oldSignal));
-      inputIdx++;
+      unsigned endInputIdx = inputIdx - 1;
+      newModuleInputIdxToOldSignal.push_back(std::make_pair(
+          std::make_pair(startInputIdx, endInputIdx), oldSignal));
     } else {
       assert(false && "port is neither input nor output");
     }
@@ -1044,9 +1091,17 @@ void ReadySignalInverter::invertReadySignalHWModule(
   newHWmodules[oldMod.getName()] = newMod;
 
   // Add mapping between new inputs to old signals
-  for (auto [newModuleInputIdx, oldSignal] : newModuleInputIdxToOldSignal) {
-    Value newReadyInput = newMod.getBodyBlock()->getArgument(newModuleInputIdx);
-    oldModuleSignalToNewModuleSignalMap[oldSignal] = newReadyInput;
+  for (auto [newModuleInputIdxs, oldSignal] : newModuleInputIdxToOldSignal) {
+    unsigned newModuleInputIdxStart = newModuleInputIdxs.first;
+    unsigned newModuleInputIdxEnd = newModuleInputIdxs.second;
+    // For each bit of the input signal, get the corresponding argument
+    SmallVector<Value> newReadyInput;
+    for (unsigned idx = newModuleInputIdxStart; idx <= newModuleInputIdxEnd;
+         ++idx) {
+      newReadyInput.push_back(newMod.getBodyBlock()->getArgument(idx));
+    }
+    assert(newReadyInput.size() && "could not find mapping for input signal");
+    oldModuleSignalToNewModuleSignalsMap[oldSignal] = newReadyInput;
   }
 
   // Step 3: Iterate through the body operations of the old module
@@ -1087,10 +1142,13 @@ void ReadySignalInverter::invertReadySignalHWModule(
   // new module.
   builder.setInsertionPointToEnd(newMod.getBodyBlock());
   SmallVector<Value> newTerminatorOperands;
-  for (auto [newOutputIdx, oldSignal] : newModuleOutputIdxToOldSignal) {
-    Value newModuleOutput = oldModuleSignalToNewModuleSignalMap[oldSignal];
-    assert(newModuleOutput && "could not find mapping for output signal");
-    newTerminatorOperands.push_back(newModuleOutput);
+  for (auto [newOutputIdxs, oldSignal] : newModuleOutputIdxToOldSignal) {
+    SmallVector<Value> newModuleOutputs =
+        oldModuleSignalToNewModuleSignalsMap[oldSignal];
+    assert(newModuleOutputs.size() &&
+           "could not find mapping for output signal");
+    newTerminatorOperands.append(newModuleOutputs.begin(),
+                                 newModuleOutputs.end());
   }
 
   // Add operands to existing terminator
@@ -1158,7 +1216,8 @@ namespace {
 // 1) Unbundle all handshake types used in the handshake function
 // 2) Invert the direction of ready signals in all hw modules and hw instances
 //    to follow the standard handshake protocol where ready signals go in the
-//    opposite direction with respect to data and valid signals
+//    opposite direction with respect to data and valid signals. Additionally,
+//    data signals are unbundled into single-bit signals.
 // 3) (not implemented yet) Convert synth subckt operations into other synth
 //    operations like registers, combinational logic, etc. if possible
 class HandshakeToSynthPass
@@ -1190,7 +1249,8 @@ public:
       return signalPassFailure();
 
     // Step 2: invert the direction of all ready signals in the hw modules
-    // created from handshake operations
+    // created from handshake operations. Additionally, unbundle data signals
+    // into single-bit signals.
     // Create on object of the ReadySignalInverter class to manage the
     // inversion
     ReadySignalInverter inverter;
