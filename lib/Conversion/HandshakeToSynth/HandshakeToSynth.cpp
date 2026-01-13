@@ -1159,6 +1159,8 @@ namespace {
 // 2) Invert the direction of ready signals in all hw modules and hw instances
 //    to follow the standard handshake protocol where ready signals go in the
 //    opposite direction with respect to data and valid signals
+// 3) (not implemented yet) Convert synth subckt operations into other synth
+//    operations like registers, combinational logic, etc. if possible
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
@@ -1194,6 +1196,10 @@ public:
     ReadySignalInverter inverter;
     if (failed(inverter.invertAllReadySignals(modOp)))
       return signalPassFailure();
+
+    // Step 3: (not implemented yet) Convert synth subckt operations into other
+    // synth operations like registers, combinational logic, etc. if possible
+    // TODO
   }
 };
 
