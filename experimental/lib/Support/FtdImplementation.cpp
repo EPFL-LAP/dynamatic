@@ -1280,7 +1280,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
         // Replace the new condition value
         conditionValue = initMergeOp->getResult(0);
-        conditionValue.setType(channelifyType(conditionValue.getType()));
+        //conditionValue.setType(channelifyType(conditionValue.getType()));
 
         // Add the activation constant driven by the backedge value, which will
         // be then updated with the real start value, once available
@@ -1372,6 +1372,9 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
     }
   }
 
+    for (Block &block : region) {
+    block.print(llvm::errs());
+  }
   return success();
 }
 

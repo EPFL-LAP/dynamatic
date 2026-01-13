@@ -159,46 +159,47 @@ struct FtdCfToHandshakePass
 
     patterns
         .add<
-             //ConvertConstants,
+        //LowerFuncToHandshake,
+             ConvertConstants,
              AllocaOpConversion,
              ConvertCalls,
-             //ConvertUndefinedValues,
+             ConvertUndefinedValues,
              GetGlobalOpConversion,
              GlobalOpConversion,
-             FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-             FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-             FtdOneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-             FtdOneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-             FtdOneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-             FtdOneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-             FtdOneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-             FtdOneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-             FtdOneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-             FtdOneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-             FtdOneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
-             FtdOneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-             FtdOneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-             FtdOneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-             FtdOneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-             FtdOneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
-             FtdOneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-             FtdOneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-             FtdOneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-             FtdOneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-             FtdOneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-             FtdOneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-             FtdOneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-             FtdOneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-             FtdOneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-             FtdOneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-             FtdOneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-             FtdOneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-             FtdOneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-             FtdOneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-             FtdOneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
-             FtdOneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-             FtdOneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-             FtdOneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
+             ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+        OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+        OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+        OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+        OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+        OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+        OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+        OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+        OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+        OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+        OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+        OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+        OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
+        OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+        OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+        OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+        OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+        OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+        OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+        OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+        OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+        OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+        OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+        OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+        OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+        OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+        OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+        OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
+        OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+        OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
             getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
@@ -260,121 +261,121 @@ static void channelifyMuxes(handshake::FuncOp &funcOp) {
   }
 }
 
-/// Converts undefined operations (LLVM::UndefOp) with a default "0"
-/// constant triggered by the start signal of the corresponding function.
-/// This is usually associated to uninitialized variables in the code
-static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
-                                            handshake::FuncOp &funcOp,
-                                            NameAnalysis &namer) {
+// /// Converts undefined operations (LLVM::UndefOp) with a default "0"
+// /// constant triggered by the start signal of the corresponding function.
+// /// This is usually associated to uninitialized variables in the code
+// static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
+//                                             handshake::FuncOp &funcOp,
+//                                             NameAnalysis &namer) {
 
-  // Get the start value of the current function
-  auto startValue = (Value)funcOp.getArguments().back();
+//   // Get the start value of the current function
+//   auto startValue = (Value)funcOp.getArguments().back();
 
-  // For each undefined value
-  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
+//   // For each undefined value
+//   auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
 
-  for (auto undefOp : undefinedValues) {
-    // Create an attribute of the appropriate type for the constant
-    auto resType = undefOp.getRes().getType();
-    TypedAttr cstAttr;
-    if (isa<IndexType>(resType)) {
-      auto intType = rewriter.getIntegerType(32);
-      cstAttr = rewriter.getIntegerAttr(intType, 0);
-    } else if (isa<IntegerType>(resType)) {
-      cstAttr = rewriter.getIntegerAttr(resType, 0);
-    } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
-      cstAttr = rewriter.getFloatAttr(floatType, 0.0);
-    } else {
-      auto intType = rewriter.getIntegerType(32);
-      cstAttr = rewriter.getIntegerAttr(intType, 0);
-    }
+//   for (auto undefOp : undefinedValues) {
+//     // Create an attribute of the appropriate type for the constant
+//     auto resType = undefOp.getRes().getType();
+//     TypedAttr cstAttr;
+//     if (isa<IndexType>(resType)) {
+//       auto intType = rewriter.getIntegerType(32);
+//       cstAttr = rewriter.getIntegerAttr(intType, 0);
+//     } else if (isa<IntegerType>(resType)) {
+//       cstAttr = rewriter.getIntegerAttr(resType, 0);
+//     } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
+//       cstAttr = rewriter.getFloatAttr(floatType, 0.0);
+//     } else {
+//       auto intType = rewriter.getIntegerType(32);
+//       cstAttr = rewriter.getIntegerAttr(intType, 0);
+//     }
 
-    // Create a constant with a default value and replace the undefined value
-    rewriter.setInsertionPoint(undefOp);
-    auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
-                                                        cstAttr, startValue);
-    cstOp->setDialectAttrs(undefOp->getAttrDictionary());
-    undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
-    namer.replaceOp(cstOp, cstOp);
-    rewriter.replaceOp(undefOp, cstOp.getResult());
-  }
+//     // Create a constant with a default value and replace the undefined value
+//     rewriter.setInsertionPoint(undefOp);
+//     auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
+//                                                         cstAttr, startValue);
+//     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
+//     undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
+//     namer.replaceOp(cstOp, cstOp);
+//     rewriter.replaceOp(undefOp, cstOp.getResult());
+//   }
 
-  return success();
-}
+//   return success();
+// }
 
-/// Convers arith-level constants to handshake-level constants. Constants are
-/// triggered by the start value of the corresponding function. The FTD
-/// algorithm is then in charge of connecting the constants to the rest of the
-/// network, in order for them to be re-generated
-static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
-                                      handshake::FuncOp &funcOp,
-                                      NameAnalysis &namer) {
+// /// Convers arith-level constants to handshake-level constants. Constants are
+// /// triggered by the start value of the corresponding function. The FTD
+// /// algorithm is then in charge of connecting the constants to the rest of the
+// /// network, in order for them to be re-generated
+// static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
+//                                       handshake::FuncOp &funcOp,
+//                                       NameAnalysis &namer) {
 
-  // Get the start value of the current function
-  auto startValue = (Value)funcOp.getArguments().back();
-  llvm::DenseMap<Block *, Value> sourcesPerBlock;
+//   // Get the start value of the current function
+//   auto startValue = (Value)funcOp.getArguments().back();
+//   llvm::DenseMap<Block *, Value> sourcesPerBlock;
 
-  // For each constant
-  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
-  for (auto cstOp : constants) {
+//   // For each constant
+//   auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
+//   for (auto cstOp : constants) {
 
-    rewriter.setInsertionPoint(cstOp);
+//     rewriter.setInsertionPoint(cstOp);
 
-    // This variable will work as activation value for the constant. If the
-    // constant is considered as sourcable, this will be the output of a source
-    // component, otherwise it remains startValue
-    auto controlValue = startValue;
+//     // This variable will work as activation value for the constant. If the
+//     // constant is considered as sourcable, this will be the output of a source
+//     // component, otherwise it remains startValue
+//     auto controlValue = startValue;
 
-    // Continue the conversion by obtaining the size of the constnat
-    TypedAttr valueAttr = cstOp.getValue();
+//     // Continue the conversion by obtaining the size of the constnat
+//     TypedAttr valueAttr = cstOp.getValue();
 
-    if (isa<IndexType>(valueAttr.getType())) {
-      auto intType = rewriter.getIntegerType(32);
-      valueAttr = IntegerAttr::get(
-          intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
-    }
+//     if (isa<IndexType>(valueAttr.getType())) {
+//       auto intType = rewriter.getIntegerType(32);
+//       valueAttr = IntegerAttr::get(
+//           intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
+//     }
 
-    auto newCstOp = rewriter.create<handshake::ConstantOp>(
-        cstOp.getLoc(), valueAttr, controlValue);
+//     auto newCstOp = rewriter.create<handshake::ConstantOp>(
+//         cstOp.getLoc(), valueAttr, controlValue);
 
-    newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
+//     newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
 
-    // Replace the constant and the usage of its result
-    namer.replaceOp(cstOp, newCstOp);
-    cstOp.getResult().replaceAllUsesWith(newCstOp.getResult());
-    rewriter.replaceOp(cstOp, newCstOp->getResults());
-  }
-  return success();
-}
+//     // Replace the constant and the usage of its result
+//     namer.replaceOp(cstOp, newCstOp);
+//     cstOp.getResult().replaceAllUsesWith(newCstOp.getResult());
+//     rewriter.replaceOp(cstOp, newCstOp->getResults());
+//   }
+//   return success();
+// }
 
-template <typename SrcOp, typename DstOp>
-LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
-    SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
-  rewriter.setInsertionPoint(srcOp);
-  SmallVector<Type> newTypes;
-  for (Type resType : srcOp->getResultTypes())
-    newTypes.push_back(channelifyType(resType));
-  auto newOp =
-      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
-                             srcOp->getAttrDictionary().getValue());
+// template <typename SrcOp, typename DstOp>
+// LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
+//     SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
+//   rewriter.setInsertionPoint(srcOp);
+//   SmallVector<Type> newTypes;
+//   for (Type resType : srcOp->getResultTypes())
+//     newTypes.push_back(channelifyType(resType));
+//   auto newOp =
+//       rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
+//                              srcOp->getAttrDictionary().getValue());
 
-  // /!\ This is the main difference from the base function. Without such
-  // replacement, a "null operand found" error is present at the end of the
-  // transformation pass in almost any test. This is due to the way FTD tweaks
-  // the coexistence of `cf` and `handshake` dialect to obtain a final circuit:
-  // without such explicit replacement, deleted operations still provide values
-  // to new operations. However, this should be fixed by understanding what is
-  // causing MLIR to complain.
-  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
-    from.replaceAllUsesWith(to);
+//   // /!\ This is the main difference from the base function. Without such
+//   // replacement, a "null operand found" error is present at the end of the
+//   // transformation pass in almost any test. This is due to the way FTD tweaks
+//   // the coexistence of `cf` and `handshake` dialect to obtain a final circuit:
+//   // without such explicit replacement, deleted operations still provide values
+//   // to new operations. However, this should be fixed by understanding what is
+//   // causing MLIR to complain.
+//   for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
+//     from.replaceAllUsesWith(to);
 
-  this->namer.replaceOp(srcOp, newOp);
-  rewriter.replaceOp(srcOp, newOp);
-  return success();
-}
+//   this->namer.replaceOp(srcOp, newOp);
+//   rewriter.replaceOp(srcOp, newOp);
+//   return success();
+// }
 
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
-    func::FuncOp lowerFuncOp, OpAdaptor adaptor,
+    func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
@@ -427,7 +428,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo, true)))
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports
@@ -444,18 +445,18 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
   // control value
-  if (failed(::convertConstants(rewriter, funcOp, namer)) ||
-      failed(::convertUndefinedValues(rewriter, funcOp, namer)))
-    return failure();
+  //if (failed(::convertConstants(rewriter, funcOp, namer)) ||
+    //  failed(::convertUndefinedValues(rewriter, funcOp, namer)))
+    //return failure();
 
   if (funcOp.getBlocks().size() != 1) {
 
     // Add muxes for regeneration of values in loop
-    addRegen(funcOp, rewriter);
-    channelifyMuxes(funcOp);
+    // addRegen(funcOp, rewriter);
+    // channelifyMuxes(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    addSupp(funcOp, rewriter);
+    //addSupp(funcOp, rewriter);
   }
 
   // id basic block
@@ -470,49 +471,53 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   return success();
 }
 
-template <typename CastOp, typename ExtOp>
-LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
-    CastOp castOp, OpAdaptor adaptor,
-    ConversionPatternRewriter &rewriter) const {
+// template <typename CastOp, typename ExtOp>
+// LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
+//     CastOp castOp, OpAdaptor adaptor,
+//     ConversionPatternRewriter &rewriter) const {
+//       llvm::errs()<< "\n\n\nentering castop \n\n\n\n\n\n\n\n\n\n";
 
-  auto getWidth = [](Type type) -> unsigned {
-    // In Fast Token Delivery the type of the element might be already a
-    // channel, rather than a simple type. In this case, the type should be
-    // extracted. We also make sure that no extra bits are present at this
-    // compilation stage.
-    if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
-      assert(dataType.getNumExtraSignals() == 0 &&
-             "expected type to have no extra signals");
-      type = dataType.getDataType();
-    }
-    if (isa<IndexType>(type))
-      return 32;
-    return type.getIntOrFloatBitWidth();
-  };
+//   auto getWidth = [](Type type) -> unsigned {
+//     // In Fast Token Delivery the type of the element might be already a
+//     // channel, rather than a simple type. In this case, the type should be
+//     // extracted. We also make sure that no extra bits are present at this
+//     // compilation stage.
+//     if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
+//       llvm::errs()<< "\n\n\nftd\n\n\n";
+//       assert(dataType.getNumExtraSignals() == 0 &&
+//              "expected type to have no extra signals");
+//       type = dataType.getDataType();
+//     }
+//     if (isa<IndexType>(type))
+//       return 32;
+//     return type.getIntOrFloatBitWidth();
+//   };
 
-  unsigned srcWidth = getWidth(castOp.getOperand().getType());
-  unsigned dstWidth = getWidth(castOp.getResult().getType());
-  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
-  Operation *newOp;
-  if (srcWidth < dstWidth) {
-    // This is an extension
-    newOp =
-        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
-                               castOp->getAttrDictionary().getValue());
-  } else {
-    // This is a truncation
-    newOp = rewriter.create<handshake::TruncIOp>(
-        castOp.getLoc(), dstType, adaptor.getOperands(),
-        castOp->getAttrDictionary().getValue());
-  }
-  this->namer.replaceOp(castOp, newOp);
-  rewriter.replaceOp(castOp, newOp);
+//   unsigned srcWidth = getWidth(castOp.getOperand().getType());
+//     llvm::errs()<< "srcWidth: " << srcWidth <<"\n\n";
+//   unsigned dstWidth = getWidth(castOp.getResult().getType());
+//   llvm::errs()<< "srcWidth: " << srcWidth << "\tdstWidth: " <<dstWidth<<"\n\n";
+//   Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
+//   Operation *newOp;
+//   if (srcWidth < dstWidth) {
+//     // This is an extension
+//     newOp =
+//         rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
+//                                castOp->getAttrDictionary().getValue());
+//   } else {
+//     // This is a truncation
+//     newOp = rewriter.create<handshake::TruncIOp>(
+//         castOp.getLoc(), dstType, adaptor.getOperands(),
+//         castOp->getAttrDictionary().getValue());
+//   }
+//   this->namer.replaceOp(castOp, newOp);
+//   rewriter.replaceOp(castOp, newOp);
 
-  // /!\ This is again the main difference from the normal flow. See the comment
-  // in FtdOneToOneConversion.
-  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
-  return success();
-}
+//   // /!\ This is again the main difference from the normal flow. See the comment
+//   // in FtdOneToOneConversion.
+//   castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
+//   return success();
+// }
 
 std::unique_ptr<dynamatic::DynamaticPass> ftd::createFtdCfToHandshake() {
   return std::make_unique<FtdCfToHandshakePass>();
