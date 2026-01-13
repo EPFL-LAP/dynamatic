@@ -85,6 +85,26 @@ def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
   ];
 }
 
+def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Shift operations' often have delays and latency that depend on its context.
+    For example, if the shift value is a constant, then it has a zero delay.
+
+    Unlike in LLVM, where an instruction operand can be an immediate value,
+    MLIR materializes the constants (also, in a suboptimal IR, the constant
+    might be transformed before consumed by the shift op), so we need to have
+    special interface methods to check if the shift value is a constant.
+  }];
+  let methods = [
+   InterfaceMethod<[{
+       Returns true if the shift value (RHS) is a constant.
+     }],
+     "bool", "isShiftByConstant", (ins)
+   >,
+  ];
+}
+
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
