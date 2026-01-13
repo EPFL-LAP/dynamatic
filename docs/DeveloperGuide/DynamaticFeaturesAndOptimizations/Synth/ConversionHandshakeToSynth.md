@@ -7,7 +7,7 @@ There are three main sections in this document.
 
 1. Main pass and usage: Overall structure and rationale of the pass.
 2. Unbundling conversion: Lowering Handshake channel types to flat HW ports and `synth.subckt`.
-3. Ready inversion: Fixing the direction of ready signals to follow the standard handshake protocol and unbundling multi-bit data signals into multiple single bit signals.
+3. Signal rewriting: Inverting the direction of ready signals to follow the standard handshake protocol and unbundling multi-bit data signals into multiple single bit signals.
 
 
 The pass is called [`HandshakeToSynthPass`](HandshakeToSynth.cpp).
@@ -44,7 +44,7 @@ Its `runDynamaticPass()` method:
 - Retrieves the `mlir::ModuleOp` and `MLIRContext`.
 - Ensures that there is at most one non-external `handshake.func` in the module and that if none is found, the pass is a no-op.
 - Runs Phase 1 – Unbundling by calling `unbundleAllHandshakeTypes(modOp, ctx)`.
-- Runs Phase 2 – Ready inversion by instantiating a `ReadySignalInverter` and calling `invertAllReadySignals(modOp)`.
+- Runs Phase 2 – Signal rewriting by instantiating a `SignalRewriter` and calling `rewriteAllSignals(modOp)`.
 - Leaves a future Phase 3 – further refinement of `synth.subckt` into other synth operations (registers, combinational logic, etc.) as a TODO.
 
 In a typical flow, this pass is run after all Handshake-level optimizations and buffer insertion, and before a dedicated synth backend that will interpret or further lower the generated synth operations.
@@ -313,58 +313,53 @@ The pattern `class ConvertFuncToHWMod : public OpConversionPattern<handshake::Fu
 
 ---
 
-## Ready signal inversion
+## Signal rewriting
 
-After unbundling, the generated HW modules use a raw mapping of Handshake channels to `{data, valid, ready}` signals. All hw modules represent ready in the same direction as data/valid, while standard handshake protocols require ready to travel against data/valid. The second major phase of the pass fixes this. Additionally, **all data multi-bit signals are split into multiple single-bit signals**.
+After unbundling, all Handshake channels are expressed as `{data, valid, ready}` signals on HW modules, but the low-level HW representation still does not match the desired per-bit structure and signal-direction conventions. he second major phase of the pass rewrites the HW module hierarchy to enforce the standard handshake direction for ready signals and to normalize signal groups to the chosen bit-level representation (e.g., single-bit signals for each component), without changing the circuit’s observable behavior.
 
-This phase is implemented in the `ReadySignalInverter` helper class and its methods.
+
+This phase is implemented in the `SignalRewriter` helper class and its methods.
 
 Unlike the previous phase, this one does not rely on MLIR’s pattern-rewrite infrastructure. Because it introduces no type changes and does not modify operations, the full conversion machinery is unnecessary; instead, the phase is implemented using a simpler, ad-hoc approach.
 
 This phase is also intentionally kept separate from the earlier one. The existing cast logic assumes a clear boundary, with unbundled signals on one side and bundled signals on the other. Extending that logic here would break this assumption: the ready signal flows in the opposite direction of the data and valid signals, eliminating the clean separation and significantly complicating the implementation.
 
 
-The global entry point for ready inversion is:
+At a high level, this phase:
 
-- `LogicalResult ReadySignalInverter::invertAllReadySignals(mlir::ModuleOp modOp)`.
-
-It:
-
-- Builds a `SymbolTable` for the module.
-- Collects all `hw::HWModuleOp`s into `oldHWModules` keyed by name.
-- For each `(name, module)` pair in `oldHWModules`, calls `invertReadySignalHWModule` to create the rewritten module and populate `newHWModules`.
-- Erases all old modules.
-- Renames new modules back to their original names and updates all `hw.instance` operations so that they reference the restored module names rather than the temporary rewritten names.
-
+- Iterates over all HW modules in the IR.
+- Creates rewritten HW modules whose ports reflect:
+  - Correct ready direction (ready opposite to data/valid).
+  - Normalized bit-level structure for signals that have been unbundled.
+- Rewrites all `hw.instance` operations to use these rewritten modules and reconnects their operands/results consistently.
+- Propagates these changes recursively through the entire HW hierarchy.
+  
 At the end of this phase, the HW module hierarchy is structurally the same as after unbundling, but all ready signals follow the standard handshake direction.
 
 
 
 ### Goals and assumptions
 
-The ready inversion phase:
+The signal rewriting phase has three main goals:
 
-- Iterates over all HW modules.
-- Produces new HW modules with ports reorganized so that:
-  - Data and valid remain in their original directions.
-  - Ready signals are swapped from input to output or vice versa, to follow the opposite direction convention.
-- Rewrites `hw.instance` operations to use the new modules and reconnects all signals consistently.
-- Propagates changes recursively through the module hierarchy.
+- Enforce the standard handshake convention that ready flows in the opposite direction to data/valid on every channel.
+- Normalize the representation of signals to bit-level groups (e.g., 1-bit signals for each component) where required by the unbundling and downstream synthesis flow.
+- Preserve the original structural hierarchy as much as possible, changing only port directions, bit layout, and wiring.
 
 Two maps track signal equivalences during rewriting:
 
-- `DenseMap<Value, Value> oldModuleSignalToNewModuleSignalMap`: maps original signals to their new counterparts.
-- `DenseMap<Value, Value> oldModuleSignalToTempValueMap`: maps original signals to temporary placeholder constants when the final signal is not yet available.
+- `DenseMap<Value, SmallVector<Value>> oldModuleSignalToNewModuleSignalsMap`  
+  Maps an original signal (from old modules) to the vector of new signals that represent it in the rewritten hierarchy (e.g., a group of single-bit signals after unbundling).
+- `DenseMap<Value, SmallVector<Value>> oldModuleSignalToTempValuesMap`  
+  Maps an original signal to a vector of temporary placeholder values used when the final rewritten signals are not yet available (e.g., because the producing instance has not been rewritten yet).
 
 It assumes that each Handshake channel connects exactly one producer to exactly one consumer; otherwise, the signal-mapping logic based on `DenseMap<Value, Value>` may not be valid.
 
 ### Per-module rewriting
 
-The core of the inversion is:
+- `void SignalRewriter::rewriteHWModule(hw::HWModuleOp oldMod, ModuleOp parent, SymbolTable &symTable, DenseMap<StringRef, hw::HWModuleOp> &newHWModules, DenseMap<StringRef, hw::HWModuleOp> &oldHWModules)`.
 
-- `void ReadySignalInverter::invertReadySignalHWModule(hw::HWModuleOp oldMod, ModuleOp parent, SymbolTable &symTable, DenseMap<StringRef, hw::HWModuleOp> &newHWModules, DenseMap<StringRef, hw::HWModuleOp> &oldHWModules)`.
-
-It proceeds in four steps.
+This function rewrites one module in four conceptual steps: skip already processed modules, build a rewritten interface, transform the body, and wire the new terminator.
 
 #### Step 1 – Already processed check
 
@@ -372,83 +367,146 @@ If a module name already exists in `newHWModules`, the function returns immediat
 
 #### Step 2 – New module interface and creation
 
-The function:
+The rewriter first determines the interface of the new module.
 
-- Scans the old module’s `PortList` to construct new input and output port lists with inverted directions for ready signals.
-- For each port `p`:
-  - If `p` is an input and its name contains `ready`, it becomes a ready output in the new module.
-  - If `p` is an output and its name contains `ready`, it becomes a ready input in the new module.
-  - Non-ready inputs and outputs keep their direction but are re-mapped with appropriate index tracking.
+- It scans `oldMod.getPortList()` and, for each port `p`, decides:
+  - Whether the signal should keep its direction (e.g., data/valid).
+  - Whether the signal must have its direction flipped (e.g., ready-like signals, recognized by name).
+  - How multi-bit ports should be represented after unbundling (e.g., grouped single-bit ports), if applicable.
+  - 
 
-While doing so, it builds:
+While scanning, it builds two association tables:
 
-- `SmallVector<std::pair<unsigned, Value>> newModuleOutputIdxToOldSignal`:
-  - For each new output index, records the old signal (either a module argument or terminator operand) that semantically corresponds to it.
-- `SmallVector<std::pair<unsigned, Value>> newModuleInputIdxToOldSignal`:
-  - Similarly for new inputs.
+- `SmallVector<std::pair<unsigned, Value>> newModuleOutputIdxToOldSignal`  
+  For each new output index, records the old signal (either a module argument or terminator operand) that it logically corresponds to.
 
-It then:
+- `SmallVector<std::pair<unsigned, Value>> newModuleInputIdxToOldSignal`  
+  For each new input index, records the old signal or group of signals that feed it in the original module.
 
-- Creates a new `hw::HWModuleOp` after `oldMod` with name `<oldName>_rewritten` via `getNewModuleName` and ports `newInputs`, `newOutputs`.
-- Registers the new module in `newHWModules` under the original name.
-- For each new input index, maps its argument to the corresponding old signal in `oldModuleSignalToNewModuleSignalMap`.
 
-#### Step 3 – Body rewriting
+Using these port lists, `SignalRewriter` then:
 
-The body of the old module is processed to handle instances and non-instance modules.
+- Creates a new `hw::HWModuleOp` immediately after `oldMod`, with name returned by `getRewrittenModuleName(oldMod, ctx)` (e.g., `<oldName>_rewritten`) and ports `newInputs`, `newOutputs`.
+- Inserts this new module into `newHWModules` under the *original* module name, so that lookups by name see the rewritten version.
+- For each `(newInputIdx, oldSignal)` in `newModuleInputIdxToOldSignal`:
+  - Fetches the new module argument at index `newInputIdx`.
+  - Records a mapping from the old signal to the new argument in `oldModuleSignalToNewModuleSignalsMap`.
+  
+This step defines how the new interface maps back to the original signals, including direction changes and bit-level expansions.
 
-- The pass first scans the body:
-  - If it finds any `hw.instance`, `hasHwInstances` is set to true.
-- If instances exist:
-  - Each `hw.instance` is rewritten by calling `invertReadySignalHWInstance`.
-- If no instances exist:
-  - The module is expected to contain only `hw.output` and `synth.subckt` operations.
-  - Any deviation is treated as an error and causes an assertion.
-  - In this pure glue module case, a new `synth.subckt` is instantiated in the new module via `instantiateSynthOpInHWModule` to maintain the same connectivity under the new interface.
+#### Step 3 – Rewrite the body
 
-#### Step 4 – New terminator wiring
+The body of the old module is then transformed to match the rewritten interface.
 
-Finally, the new module’s terminator (`hw.output`) is updated.
+- The rewriter scans all operations in `oldMod`:
+  - If it encounters any `hw.instance`, it sets `hasHwInstances = true`.
 
-- For each `(newOutputIdx, oldSignal)` pair in `newModuleOutputIdxToOldSignal`, the builder:
-  - Looks up the mapped new signal from `oldModuleSignalToNewModuleSignalMap`.
-  - Asserts that the mapping exists.
-  - Collects the mapped values in order of new output index.
-- The terminator’s operands are replaced with this new operand list.
+If `hasHwInstances` is true:
+
+- Every `hw.instance` in `oldMod` is rewritten using `rewriteHWInstance`, which:
+  - Ensures the callee module has a rewritten version (recursively calling `rewriteHWModule` if needed).
+  - Creates a new instance of the rewritten module in the corresponding rewritten top module.
+  - Updates the mapping structures with the new instance’s results.
+
+If `hasHwInstances` is false:
+
+- The module is expected to contain only:
+  - `hw.output` operations, and
+  - `synth.subckt` operations.
+- Any additional operation is treated as an error because such modules are assumed to be pure “glue” between ports and a `synth.subckt`.
+- In this case, the rewriter invokes `instantiateSynthOpInHWModule` on the new module to recreate a `synth.subckt` that reflects the original behavior under the new interface.
+
+This step ensures that the internal logic of each module is re-expressed in terms of the new interface and the new per-bit signal representation.
+
+#### Step 4 – Wire the new terminator
+
+Finally, the rewriter wires the terminator of the new module.
+
+- For each `(newOutputIdx, oldSignal)` in `newModuleOutputIdxToOldSignal`, it:
+  - Looks up the group of new signals corresponding to `oldSignal` in `oldModuleSignalToNewModuleSignalsMap`, asserting that a mapping exists.
+  - Accumulates these new signals in order of `newOutputIdx` and per-bit position.
+- It then sets the operands of the new module’s `hw.output` terminator to this ordered list of values.
+
+After this step, the new module is self-consistent: its ports, body, and terminator all use the updated directions and bit-level structure.
+
+---
 
 ### Instance rewriting
 
-Instances are rewritten by:
+Rewriting instances of HW modules is handled by:
 
-- `void ReadySignalInverter::invertReadySignalHWInstance(hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable, DenseMap<StringRef, hw::HWModuleOp> &newHWModules, DenseMap<StringRef, hw::HWModuleOp> &oldHWModules)`.
+- `void SignalRewriter::rewriteHWInstance(hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable, DenseMap<StringRef, hw::HWModuleOp> &newHWModules, DenseMap<StringRef, hw::HWModuleOp> &oldHWModules)`.
 
-This function:
+This function replaces an instance of an old module with an instance of the corresponding rewritten module, reconnecting operands and results according to the new interface.
 
-- Ensures the instance’s callee module has been rewritten by checking `newHWModules` and calling `invertReadySignalHWModule` if needed.
-- Determines the rewritten callee module (`newMod`), the original callee module (`oldMod`), the top-level module containing the instance, and its corresponding rewritten module (`newTopMod`) where new operations will be inserted.
-- Prepares three lists:
-  - `nonReadyOutputs`: `(outputName, oldResultIdx)` pairs for outputs that are not ready and whose uses must be re-routed.
-  - `oldReadyInputs`: `(inputName, oldValue)` pairs for ready inputs that will become ready outputs in the new module.
-  - `newOperands`: operands for the new `hw.instance`.
-- Iterates over `oldMod`’s ports and classifies each:
-  - For ready inputs in the old module:
-    - The corresponding signal in the new module is an output; the old input value is stored in `oldReadyInputs`.
-  - For ready outputs in the old module:
-    - These become inputs in the new module.
-    - `getInputSignalMappingValue` is called on the old output to find or create the matching new input value, which is added to `newOperands`.
-  - For non-ready inputs:
-    - `getInputSignalMappingValue` is called similarly and added to `newOperands`.
-  - For non-ready outputs:
-    - They are recorded in `nonReadyOutputs` for later output mapping.
-- Creates a new instance of `newMod` in the rewritten top module with the original instance name and `newOperands` as operands.
-- Updates signal mappings:
-  - For each `(outputName, oldResultIdx)` in `nonReadyOutputs`, `updateOutputSignalMappingValue` binds the old non-ready result to the corresponding new result and replaces any temporary placeholders.
-  - For each `(inputName, oldReadyInput)` in `oldReadyInputs`, `updateOutputSignalMappingValue` maps the old ready input to the new ready output of the rewritten module.
+#### Step 1 – Ensure the callee is rewritten
 
-Helpers:
+From `oldInst.getModuleName()`, the rewriter:
 
-- `Value ReadySignalInverter::getInputSignalMappingValue(Value oldInputSignal, OpBuilder &builder, Location loc)`:
-  - Returns a mapped or temporary value for a given old input, creating a `hw.constant` placeholder if necessary and storing it in `oldModuleSignalToTempValueMap`.
-- `void ReadySignalInverter::updateOutputSignalMappingValue(Value oldResult, StringRef outputName, hw::HWModuleOp newMod, hw::InstanceOp newInst)`:
-  - Finds the output index of `outputName` in `newMod`, obtains the result from `newInst`, updates `oldModuleSignalToNewModuleSignalMap`, replaces any temporary uses, and erases the temporary constant op if present.
+- Checks whether the rewritten callee already exists in `newHWModules`.
+- If not, it looks up the original callee in `oldHWModules` and calls `rewriteHWModule` on it to create the rewritten version.
 
+This guarantees that each instance always has a rewritten callee to target.
+
+#### Step 2 – Find the rewritten context and insertion point
+
+The rewriter identifies:
+
+- `newMod`: the rewritten callee module from `newHWModules`.
+- `oldMod`: the original callee from `oldHWModules`.
+- `oldInstTopModule`: the HW module that contains `oldInst`.
+- `newTopMod`: the rewritten counterpart of `oldInstTopModule` in `newHWModules` where the new instance will be created.
+
+It sets the builder insertion point just before the terminator of `newTopMod`, so that new instances are appended at the end of its body.
+
+#### Step 3 – Classify ports and build operands
+
+The rewriter then constructs three lists:
+
+- A list of outputs whose structure/direction remains stable and whose uses will later be redirected (e.g., data/valid outputs).
+- A list of old signals whose direction or bit-level representation changes and that must be mapped to new outputs (e.g., ready-like signals or unbundled bits).
+- A list of operands to feed the new instance (`newOperands`).
+
+To do this, it iterates over `oldMod.getPortList()` and, for each port `p`:
+
+- For ports whose direction must be flipped in the new module (e.g., ready-like ports detected by name):
+  - Ready-like inputs in the old module become outputs in the new one; their old values are recorded for later mapping.
+  - Ready-like outputs in the old module become inputs in the new one; the rewriter calls `getInputSignalMapping` on the old result to obtain or create the new input signals, then appends those to `newOperands`.
+
+- For ports whose direction stays the same but whose bit representation may change:
+  - Non-ready inputs are handled by calling `getInputSignalMapping` on the old operand and appending the returned signals to `newOperands`.
+  - Non-ready outputs are recorded as “stable outputs” whose uses must later be redirected to groups of new signals.
+
+The helper `SmallVector<Value> SignalRewriter::getInputSignalMapping(Value oldInputSignal, OpBuilder builder, Location loc)` behaves as follows:
+
+- If `oldInputSignal` is already in `oldModuleSignalToNewModuleSignalsMap`, it returns the associated vector of new signals.
+- If it appears in `oldModuleSignalToTempValuesMap`, it returns the associated temporary vector.
+- Otherwise, it:
+  - Creates one or more `hw.constant` ops of the appropriate type(s), typically producing single-bit zero values.
+  - Stores these constants in `oldModuleSignalToTempValuesMap[oldInputSignal]`.
+  - Returns the vector of constant results.
+
+This mechanism enables instance rewriting even when the producers of some signals have not yet been rewritten.
+
+#### Step 4 – Create the new instance and update mappings
+
+Once `newOperands` is complete, the rewriter:
+
+- Creates a new `hw::InstanceOp` `newInst` in `newTopMod`, using:
+  - `newMod` as the callee.
+  - The same instance name attribute as `oldInst`.
+  - `newOperands` as operands.
+
+It then updates the mapping structures:
+
+- For each stable output `(outputName, oldResultIdx)`:
+  - Let `oldResult = oldInst.getResult(oldResultIdx)`.
+  - Invoke `updateOutputSignalMapping(oldResult, outputName, newMod, newInst)`, which:
+    - Finds all indexes in `newMod` that correspond to `outputName` (e.g., multiple bits).
+    - Gathers the corresponding `newInst` results into a vector.
+    - Registers `oldModuleSignalToNewModuleSignalsMap[oldResult] = newResults`.
+    - If `oldResult` appears in `oldModuleSignalToTempValuesMap`, checks that the temporary group has the same size as `newResults`, replaces all uses of each temporary by the corresponding new value, removes the temps’ defining ops, and erases the entry from the temp map.
+
+- For each signal whose direction or structure changed (e.g., old ready inputs now mapped to new ready outputs), `updateOutputSignalMapping` is used similarly, but the original value may be an operand instead of a result.
+
+After this step, any user that was wired to the old instance (or to its temporary proxies) can be redirected to the final new signals by consulting `oldModuleSignalToNewModuleSignalsMap`.
