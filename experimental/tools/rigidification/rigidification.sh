@@ -5,8 +5,6 @@ OUTPUT_DIR=$2
 KERNEL_NAME=$3
 F_HANDSHAKE_EXPORT=$4
 F_HANDSHAKE_RIGIDIFIED=$5
-bash "$DYNAMATIC_DIR/experimental/tools/rigidification/verify_invariant_annotation.sh" $1 $2 $3 $4 $5
-exit $?
 
 source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
 
