@@ -28,39 +28,12 @@ RTL_CONFIG_SMV="$DYNAMATIC_DIR/data/rtl-config-smv.json"
 
 SMV_RESULT_PARSER="$DYNAMATIC_DIR/experimental/tools/rigidification/parse_nuxmv_results.py"
 
+ONLY_VERIFY=true
 
-rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
-
-
-# Annotate properties
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-annotate-properties="json-path=$F_FORMAL_PROP annotate-invariants annotate-properties=false" \
-  > /dev/null
-
-# handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
-  > "$F_FORMAL_HW"
-
-# generate SMV
-"$DYNAMATIC_EXPORT_RTL_BIN" \
-  "$F_FORMAL_HW" \
-  "$MODEL_DIR" \
-  "$RTL_CONFIG_SMV" \
-  --hdl smv \
-  --property-database "$F_FORMAL_PROP" \
-  --verify-invariants \
-  --dynamatic-path "$DYNAMATIC_DIR"
-
-# create the testbench
-"$FORMAL_TESTBENCH_GEN" \
-  -i $MODEL_DIR \
-  --name $KERNEL_NAME \
-  --mlir $F_FORMAL_HW
-exit_on_fail "Failed to create formal testbench" \
-  "Created formal testbench"
-
-# use the modelcheker
-echo "set verbose_level 0;
+if $ONLY_VERIFY; then
+  SMV_GENERATION_FLAGS="--verify-invariants"
+  ANNOTATE_FLAGS="annotate-invariants annotate-properties=false"
+  NUXMV_SCRIPT="set verbose_level 0;
 set pp_list cpp;
 set counter_examples 0;
 set dynamic_reorder 1;
@@ -75,14 +48,68 @@ go_bmc;
 check_invar_bmc -a classic;
 show_property -o $F_NUXMV_PROP;
 time;
-quit" > $F_NUXMV_CMD
+quit"
+else
+  NUXMV_SCRIPT="set verbose_level 0;
+set pp_list cpp;
+set counter_examples 0;
+set dynamic_reorder 1;
+set on_failure_script_quits;
+set reorder_method sift;
+set enable_sexp2bdd_caching 0;
+set bdd_static_order_heuristics basic;
+set cone_of_influence;
+set use_coi_size_sorting 1;
+read_model -i $MODEL_DIR/main.smv;
+flatten_hierarchy;
+encode_variables;
+build_flat_model;
+build_model -f;
+check_invar -s forward;
+check_ctlspec;
+show_property -o $F_NUXMV_PROP;
+time;
+quit"
+fi
+
+rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
+
+
+# Annotate properties
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
+  --handshake-annotate-properties="json-path=$F_FORMAL_PROP $ANNOTATE_FLAGS" \
+  > /dev/null
+
+# handshake level -> hw level
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  > "$F_FORMAL_HW"
+
+# generate SMV
+"$DYNAMATIC_EXPORT_RTL_BIN" \
+  "$F_FORMAL_HW" \
+  "$MODEL_DIR" \
+  "$RTL_CONFIG_SMV" \
+  --hdl smv \
+  --property-database "$F_FORMAL_PROP" \
+  $SMV_GENERATION_FLAGS \
+  --dynamatic-path "$DYNAMATIC_DIR"
+
+# create the testbench
+"$FORMAL_TESTBENCH_GEN" \
+  -i $MODEL_DIR \
+  --name $KERNEL_NAME \
+  --mlir $F_FORMAL_HW
+exit_on_fail "Failed to create formal testbench" \
+  "Created formal testbench"
+
+# use the modelcheker
+echo "$NUXMV_SCRIPT" > $F_NUXMV_CMD
 exit_on_fail "Failed to create SMV script" \
   "Created SMV script"
 
-NUXMV_OUT="$FORMAL_DIR/nuxmv.txt"
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
-$NUXMV_BINARY -source $F_NUXMV_CMD > $NUXMV_OUT
+$NUXMV_BINARY -source $F_NUXMV_CMD > /dev/null
 exit_on_fail "Failed to check formal properties" \
   "Performed model checking to verify the invariants" \
 
