@@ -54,6 +54,8 @@ struct UnitVars {
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
   CPVar retOut;
+  /// Occupancy contribution of this unit (real).
+  CPVar occupancy;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -78,6 +80,18 @@ struct ChannelVars {
   CPVar dataLatency;
   /// Usage of a shift register on the channel (binary).
   CPVar shiftReg;
+
+  /// Extra latency to insert on this channel for balancing (integer).
+  CPVar extraLatency;
+  /// Whether the channel is stalled due to pattern imbalance (binary).
+  CPVar stalled;
+  /// Maximum token occupancy for this channel (real).
+  CPVar maxOccupancy;
+};
+
+struct SynchronizationPatternVars {
+  /// Whether the synchronization pattern is imbalanced (binary).
+  CPVar imbalanced;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -100,6 +114,10 @@ struct MILPVars {
   llvm::MapVector<CFDFC *, CFDFCVars> cfdfcVars;
   /// Mapping between channels and their related variables.
   llvm::MapVector<Value, ChannelVars> channelVars;
+  /// Balancing variables for reconvergent paths.
+  SmallVector<SynchronizationPatternVars> reconvergentPathVars;
+  /// Balancing variables for synchronizing cycles.
+  SmallVector<SynchronizationPatternVars> syncCycleVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
