@@ -50,6 +50,7 @@ class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
@@ -386,18 +387,19 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       ),
     [](const auto &info) { return "spec_" + info.param; });
 
-INSTANTIATE_TEST_SUITE_P(Tiny, RigidificationFixture,
-   testing::Values(
-     "fir",
-     "iir",
-     "matvec"
-     ),
-   [](const auto &info) { return info.param; });
+// Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
+// clang-format on
 
-TEST_P(RigidificationFixture, basic) {
+#ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
+
+INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
+                         testing::Values("fir", "iir", "matvec"),
+                         [](const auto &info) { return info.param; });
+
+TEST_P(VerifyInvariantsFixture, basic) {
   std::string name = GetParam();
   fs::path cSourcePath =
-    fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
   std::string tmpFilename = "tmp_" + GetParam() + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
@@ -413,9 +415,9 @@ TEST_P(RigidificationFixture, basic) {
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
   fs::path dynamaticOutPath =
-    cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
+      cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
   fs::path dynamaticErrPath =
-    cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
+      cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
   std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
   cmd += tmpFilename;
   cmd += " 1> ";
@@ -426,11 +428,6 @@ TEST_P(RigidificationFixture, basic) {
   int status = system(cmd.c_str());
   EXPECT_EQ(status, 0);
 }
-
-// Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
-// clang-format on
-
-#ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
 
 TEST_P(RigidificationFixture, basic) {
   IntegrationTestData config{

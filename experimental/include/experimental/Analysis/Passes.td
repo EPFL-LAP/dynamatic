@@ -28,7 +28,7 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
     "Path to JSON-formatted file where the properties' information is stored.">,
     Option<"annotateInvariants", "annotate-invariants", "bool", "false",
     "Annotate invariants to assist k-inductive proofs">,
-    Option<"skipAnnotateProperties", "skip-annotate-properties", "bool", "false",
+    Option<"annotateProperties", "annotate-properties", "bool", "true",
     "Do not annotate properties for optimizations">
     ];
 }
