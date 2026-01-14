@@ -686,12 +686,14 @@ CommandResult VerifyInvariants::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::string script =
-      state.dynamaticPath + getSeparator() +
-      "experimental/tools/rigidification/verify_invariant_annotation.sh";
+  std::string script = state.dynamaticPath + getSeparator() +
+                       "experimental/tools/rigidification/rigidification.sh";
+
+  std::string handshakeExport = state.getOutputDir() + getSeparator() + "comp" +
+                                getSeparator() + "handshake_export.mlir";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName());
+                 state.getKernelName(), handshakeExport, "--verify-invariants");
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
