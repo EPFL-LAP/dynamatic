@@ -94,6 +94,9 @@ def HandshakeToSynth
     that focuses on logic synthesis constructs.
   }];
   let constructor = "dynamatic::createHandshakeToSynthPass()";
+  let options = 
+    [Option<"blifDirPath", "blif-dir-path", "std::string", "",
+            "Path to directory containing BLIF files for logic synthesis representations.">];
 }
 
 #endif // DYNAMATIC_CONVERSION_PASSES_TD
