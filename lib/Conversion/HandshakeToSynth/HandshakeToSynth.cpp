@@ -641,6 +641,10 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
     // definition
     if (failed(instantiateSynthOpInHWModule(hwModule, rewriter)))
       return nullptr;
+    // Copy attribute for blif data path
+    if (auto blifAttr = op->getAttrOfType<StringAttr>(blifPathAttrStr)) {
+      hwModule->setAttr(blifPathAttrStr, blifAttr);
+    }
   }
 
   // Create the hw instance and replace the original operation with it
@@ -1254,6 +1258,11 @@ void SignalRewriter::rewriteHWModule(
   // as key
   newHWmodules[oldMod.getName()] = newMod;
 
+  // Copy the blif path attribute
+  if (oldMod->hasAttr(blifPathAttrStr)) {
+    newMod->setAttr(blifPathAttrStr, oldMod->getAttr(blifPathAttrStr));
+  }
+
   // Add mapping between new inputs to old signals
   for (auto [newModuleInputIdxs, oldSignal] : newModuleInputIdxToOldSignal) {
     unsigned newModuleInputIdxStart = newModuleInputIdxs.first;
@@ -1557,7 +1566,7 @@ LogicalResult markHandshakeOpsWithBlifPath(handshake::FuncOp funcOp,
     mlir::StringAttr blifPathAttr =
         mlir::StringAttr::get(builder.getContext(), blifFilePath);
     // Set the blif path attribute on the operation
-    op->setAttr("blif_path", blifPathAttr);
+    op->setAttr(blifPathAttrStr, blifPathAttr);
   });
   return success();
 }
