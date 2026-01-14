@@ -53,12 +53,15 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <bitset>
 #include <cctype>
 #include <cstdint>
+#include <fstream>
 #include <iterator>
+#include <regex>
 #include <string>
 #include <utility>
 
@@ -233,11 +236,143 @@ public:
   }
 };
 
+// Utility function to insert a string before the first occurrence of '['
+std::string insertBeforeBracket(const std::string &s,
+                                const std::string &toInsert) {
+  std::string result = s;
+  std::size_t pos = result.find('[');
+  // Find first occurrence of '[' and insert the string before it
+  if (pos != std::string::npos) {
+    result.insert(pos, toInsert);
+  } else {
+    // If no '[', just append at the end
+    result += toInsert;
+  }
+  return result;
+}
+
+// Utility function to get the string formatted in the desired portname[idx]
+// format
+std::string formatPortName(const std::string &rootName,
+                           const std::optional<unsigned> &index) {
+  if (index.has_value()) {
+    return rootName + "[" + std::to_string(index.value()) + "]";
+  }
+  return rootName;
+}
+
+// Function to get the list of names of hardware ports using the format:
+// portname[idx] for each port part of an array or portname for single ports
+std::pair<SmallVector<std::string>, SmallVector<std::string>>
+getHWModulePortNames(Operation *op) {
+  SmallVector<std::string> inputPortNames;
+  SmallVector<std::string> outputPortNames;
+  // Check if the operation implements NamedIOInterface to get port names
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
+  if (!namedIO) {
+    // If the operation is the handshake function, just name it in a default way
+    if (auto funcOp = dyn_cast<handshake::FuncOp>(op)) {
+      for (auto [idx, _] : llvm::enumerate(funcOp.getArguments())) {
+        inputPortNames.push_back("in" + std::to_string(idx));
+      }
+      for (auto [idx, _] : llvm::enumerate(funcOp.getResultTypes())) {
+        outputPortNames.push_back("out" + std::to_string(idx));
+      }
+      return {inputPortNames, outputPortNames};
+    }
+    // It is essential to retrieve the port names to correctly connect signals
+    // during unbundling. If the operation does not implement this interface,
+    // we cannot proceed.
+    llvm::errs() << op->getName() << " does not implement NamedIOInterface\n";
+    assert(false && "Operation does not implement NamedIOInterface");
+  }
+  std::regex pattern(R"((\w+)_(\d+))");
+  // Elaborate the portname in case it contains the following format
+  // "portname_index" where index is an integer representing the index-th
+  // input. However, in order to respect the format of port names in the blif
+  // files, we have to change this format into "portname[index]".
+  // However, the pattern "portname_index" might indicate an index with size 0.
+  // For this reason we need to keep track of the size of each port.
+  // Iterate over input operands to get their names
+  for (auto [idx, _] : llvm::enumerate(op->getOperands())) {
+    std::string portNameStr = namedIO.getOperandName(idx).c_str();
+    // We use regex to identify this pattern
+    std::string elaboratedPortName;
+    std::smatch matches;
+    if (std::regex_match(portNameStr, matches, pattern)) {
+      // If the pattern matches, construct the new port name
+      std::string rootName = matches[1].str();
+      unsigned index = std::stoi(matches[2].str());
+      if (index == 0) {
+        // If index is 0, keep the original port name in case there is only
+        // one port
+        elaboratedPortName = rootName;
+      } else {
+        elaboratedPortName = formatPortName(rootName, index);
+      }
+      // If index == 1, fix the name of index 0 to follow the same format
+      if (index == 1) {
+        std::string firstPortName = rootName;
+        firstPortName = formatPortName(firstPortName, 0);
+        // Replace the port named only rootName with the new one
+        int idxToReplace = -1;
+        for (auto [i, name] : llvm::enumerate(inputPortNames)) {
+          if (name == rootName) {
+            idxToReplace = i;
+            break;
+          }
+        }
+        assert(idxToReplace != -1 && "Could not find the first port to rename");
+        inputPortNames[idxToReplace] = firstPortName;
+      }
+    } else {
+      // If the pattern does not match, keep the original port name
+      elaboratedPortName = portNameStr;
+    }
+    inputPortNames.push_back(elaboratedPortName);
+  }
+  // Iterate over outputs to replicate the same logic
+  for (auto [idx, _] : llvm::enumerate(op->getResults())) {
+    std::string portNameStr = namedIO.getResultName(idx).c_str();
+    std::string elaboratedPortName;
+    std::smatch matches;
+    if (std::regex_match(portNameStr, matches, pattern)) {
+      std::string rootName = matches[1].str();
+      unsigned index = std::stoi(matches[2].str());
+      if (index == 0) {
+        elaboratedPortName = rootName;
+      } else {
+        elaboratedPortName = formatPortName(rootName, index);
+      }
+      if (index == 1) {
+        std::string firstPortName = rootName;
+        firstPortName = formatPortName(firstPortName, 0);
+        int idxToReplace = -1;
+        for (auto [i, name] : llvm::enumerate(outputPortNames)) {
+          if (name == rootName) {
+            idxToReplace = i;
+            break;
+          }
+        }
+        assert(idxToReplace != -1 && "Could not find the first port to rename");
+        outputPortNames[idxToReplace] = firstPortName;
+      }
+    } else {
+      elaboratedPortName = portNameStr;
+    }
+    outputPortNames.push_back(elaboratedPortName);
+  }
+
+  return {inputPortNames, outputPortNames};
+}
+
 // Function to get the HW Module input and output port info from an handshake
 // operation
 void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
                          SmallVector<hw::PortInfo> &hwOutputPorts) {
   MLIRContext *ctx = op->getContext();
+  // Get the port names of the operation
+  auto [inputPortNames, outputPortNames] = getHWModulePortNames(op);
   // Unbundle the operation ports
   SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledInputPorts;
   SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledOutputPorts;
@@ -245,14 +380,16 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   // Iterate over each set of unbundled input ports and create hw port info from
   // them
   for (auto [idx, inputPortSet] : llvm::enumerate(unbundledInputPorts)) {
+    std::string portName = inputPortNames[idx];
     // Fill in the hw port info for inputs
     for (auto port : inputPortSet) {
       std::string name;
       Type type;
       // Unpack the port info as name and type
-      name = port.first == DATA_SIGNAL    ? "in_data_" + std::to_string(idx)
-             : port.first == VALID_SIGNAL ? "in_valid_" + std::to_string(idx)
-                                          : "in_ready_" + std::to_string(idx);
+      name = port.first == DATA_SIGNAL ? portName
+             : port.first == VALID_SIGNAL
+                 ? insertBeforeBracket(portName, "_valid")
+                 : insertBeforeBracket(portName, "_ready");
       type = port.second;
       // Create the hw port info and add it to the list
       hwInputPorts.push_back(
@@ -264,14 +401,16 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   // Iterate over each set of unbundled output ports and create hw port info
   // from them
   for (auto [idx, outputPortSet] : llvm::enumerate(unbundledOutputPorts)) {
+    std::string portName = outputPortNames[idx];
     // Fill in the hw port info for outputs
     for (auto port : outputPortSet) {
       std::string name;
       Type type;
       // Unpack the port info as name and type
-      name = port.first == DATA_SIGNAL    ? "out_data_" + std::to_string(idx)
-             : port.first == VALID_SIGNAL ? "out_valid_" + std::to_string(idx)
-                                          : "out_ready_" + std::to_string(idx);
+      name = port.first == DATA_SIGNAL ? portName
+             : port.first == VALID_SIGNAL
+                 ? insertBeforeBracket(portName, "_valid")
+                 : insertBeforeBracket(portName, "_ready");
       type = port.second;
       // Create the hw port info and add it to the list
       hwOutputPorts.push_back(
@@ -299,10 +438,10 @@ createCastBundledToUnbundled(Value input, Location loc,
   return cast;
 }
 
-// Function to create a cast operation for each result of an unbundled operation
-// when converting an original bundled operation to an unbundled one. This cast
-// is essential to connect the unbundled operation back to the rest of the
-// circuit which is potentially still bundled
+// Function to create a cast operation for each result of an unbundled
+// operation when converting an original bundled operation to an unbundled
+// one. This cast is essential to connect the unbundled operation back to the
+// rest of the circuit which is potentially still bundled
 SmallVector<UnrealizedConversionCastOp>
 createCastResultsUnbundledOp(TypeRange originalOpResultType,
                              SmallVector<Value> unbundledValues, Location loc,
@@ -321,8 +460,8 @@ createCastResultsUnbundledOp(TypeRange originalOpResultType,
     SmallVector<std::pair<SignalKind, Type>> unbundledTypes =
         unbundleType(originalOpResultType[i]);
     numUnbundledTypes = unbundledTypes.size();
-    // Get a slice of the unbundled values corresponding to this result from the
-    // unbundled operation
+    // Get a slice of the unbundled values corresponding to this result from
+    // the unbundled operation
     SmallVector<Value> unbundledValuesSlice(unbundledValues.begin() + resultIdx,
                                             unbundledValues.begin() +
                                                 resultIdx + numUnbundledTypes);
@@ -338,9 +477,10 @@ createCastResultsUnbundledOp(TypeRange originalOpResultType,
 
 // Function to convert a handshake function operation into an hw module
 // operation
-// It is divided into three parts: first, create the hw module definition if it
-// does not already exist, then move the function body of the handshake function
-// into the hw module, and finally create the output operation for the hw module
+// It is divided into three parts: first, create the hw module definition if
+// it does not already exist, then move the function body of the handshake
+// function into the hw module, and finally create the output operation for
+// the hw module
 hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
                                        ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = funcOp.getContext();
@@ -377,8 +517,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
     // handshake function in the hw module. However, the arguments of the
     // handshake function are bundled and the ones of the hw module are
     // unbundled. For this reason, create a cast for each argument of the hw
-    // module. The output of the casts will be used to inline the function body
-    // First create casts for each argument of the hw module
+    // module. The output of the casts will be used to inline the function
+    // body First create casts for each argument of the hw module
     SmallVector<Value> castedArgs;
     TypeRange funcArgTypes = funcOp.getArgumentTypes();
     SmallVector<UnrealizedConversionCastOp> castsArgs =
@@ -391,8 +531,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
              "each cast operation must have only one result");
       castedArgs.push_back(castOp.getResult(0));
     }
-    // Inline the function body before the terminator of the hw module using the
-    // casted arguments
+    // Inline the function body before the terminator of the hw module using
+    // the casted arguments
     rewriter.inlineBlockBefore(funcBlock, termOp, castedArgs);
 
     // Finally, create the output operation for the hw module
@@ -408,8 +548,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
 
     assert(endOp && "Expected handshake.end after inlining");
 
-    // Create a cast for each operand of the end operation to unbundle the types
-    // which were previously handshake bundled types
+    // Create a cast for each operand of the end operation to unbundle the
+    // types which were previously handshake bundled types
     SmallVector<Value> hwOutputs;
     for (Value operand : endOp.getOperands()) {
       // Unbundle the operand type depending by creating a cast from the
@@ -421,8 +561,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
     // Create the output operation for the hw module
     rewriter.setInsertionPointToEnd(endOp->getBlock());
     rewriter.replaceOpWithNewOp<hw::OutputOp>(endOp, hwOutputs);
-    // Remove any old output operation if present (should not be the case after
-    // replacing the end op)
+    // Remove any old output operation if present (should not be the case
+    // after replacing the end op)
     Operation *oldOutput = nullptr;
     for (Operation &op : *hwModule.getBodyBlock()) {
       if (auto out = dyn_cast<hw::OutputOp>(op)) {
@@ -440,8 +580,8 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
   return hwModule;
 }
 
-// Function to instantiate synth or hw operations inside an hw module describing
-// the behavior of the original handshake operation
+// Function to instantiate synth or hw operations inside an hw module
+// describing the behavior of the original handshake operation
 LogicalResult
 instantiateSynthOpInHWModule(hw::HWModuleOp hwModule,
                              ConversionPatternRewriter &rewriter) {
@@ -459,7 +599,8 @@ instantiateSynthOpInHWModule(hw::HWModuleOp hwModule,
       synthOutputTypes.push_back(outputPort.type);
   }
   TypeRange synthOutputsTypeRange(synthOutputTypes);
-  // Connect the outputs of the synth operation to the outputs of the hw module
+  // Connect the outputs of the synth operation to the outputs of the hw
+  // module
   Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
   // Create the synth subcircuit operation inside the hw module
   synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
@@ -515,7 +656,8 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
              handshake::HandshakeDialect::getDialectNamespace()) ||
         isBlockArg) {
       // If so, create an unrealized conversion cast to unbundle the operand
-      // into its components to connect it to the input ports of the hw instance
+      // into its components to connect it to the input ports of the hw
+      // instance
       auto cast = createCastBundledToUnbundled(operand, op->getLoc(), rewriter);
       // Append all cast results to the operand values
       operandValues.append(cast.getResults().begin(), cast.getResults().end());
@@ -615,9 +757,9 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
         castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>();
     if (inputCastOp) {
       // Skip this cast since it will be handled when processing the
-      // input cast but first assert that it is not followed by any other cast.
-      // If this is the case, there is a issue in the code since there are 3
-      // casts in chain and this break the assumption of the code
+      // input cast but first assert that it is not followed by any other
+      // cast. If this is the case, there is a issue in the code since there
+      // are 3 casts in chain and this break the assumption of the code
       assert(llvm::none_of(castOp1->getUsers(),
                            [](Operation *user) {
                              return isa<UnrealizedConversionCastOp>(user);
@@ -838,7 +980,12 @@ void SignalRewriter::updateOutputSignalMapping(Value oldResult,
   SmallVector<int> outputIdxsNewInst;
   for (auto &p : newMod.getPortList()) {
     StringRef portName = p.name.getValue();
-    if (portName.starts_with(outputName)) {
+    // Check the beginning of the port name to match the output name but it
+    // should not be followed by the character '_', to avoid matching
+    // similarly named ports like output and output_valid
+    if (portName.starts_with(outputName) &&
+        (portName.size() == outputName.size() ||
+         portName[outputName.size()] != '_')) {
       outputIdxsNewInst.push_back(p.argNum);
     }
   }
@@ -949,7 +1096,8 @@ void SignalRewriter::rewriteHWInstance(
       Value oldNonReadyInput = oldInst.getOperand(port.argNum);
       SmallVector<Value> newNonReadyInputs =
           getInputSignalMapping(oldNonReadyInput, builder, locNewOps);
-      // Append each bit separately of the non-ready signal to the new operands
+      // Append each bit separately of the non-ready signal to the new
+      // operands
       for (auto newNonReadyInput : newNonReadyInputs)
         newOperands.push_back(newNonReadyInput);
     } else {
@@ -993,9 +1141,10 @@ void SignalRewriter::rewriteHWModule(
   //       directions.
   //    b. If the operation is not an hw instance, check if it is only
   //       output operations and synth subckt operations. If so, create a
-  //       synth subckt operation to connect the module ports. If not, raise an
-  //       error.
-  // 4. Finally, connect the hw instances to the terminator operands of the new
+  //       synth subckt operation to connect the module ports. If not, raise
+  //       an error.
+  // 4. Finally, connect the hw instances to the terminator operands of the
+  // new
   //    module.
 
   // Step 1: Check if the module has already been rewritten
@@ -1026,19 +1175,22 @@ void SignalRewriter::rewriteHWModule(
     unsigned startOutputIdx = outputIdx;
     unsigned startInputIdx = inputIdx;
     if ((p.isInput() && isReady) || (p.isOutput() && !isReady)) {
-      // If the port is input and ready, it becomes output and ready in the new
-      // module. If a port is output and not ready, it stays as such.
+      // If the port is input and ready, it becomes output and ready in the
+      // new module. If a port is output and not ready, it stays as such.
       Type signalType = p.type;
       assert(signalType.isa<IntegerType>() &&
              "only integer types are supported for signals for now");
       unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
       for (unsigned i = 0; i < bitWidth; ++i) {
-        newOutputs.push_back(
-            {hw::ModulePort{StringAttr::get(ctx, p.name.getValue().str() + "_" +
-                                                     std::to_string(i)),
-                            builder.getIntegerType(1),
-                            hw::ModulePort::Direction::Output},
-             outputIdx});
+        // Update portname indexing the specific bit unless it is 1 bit wide
+        std::string portName = formatPortName(p.name.getValue().str(), i);
+        if (bitWidth == 1) {
+          portName = p.name.getValue().str();
+        }
+        newOutputs.push_back({hw::ModulePort{StringAttr::get(ctx, portName),
+                                             builder.getIntegerType(1),
+                                             hw::ModulePort::Direction::Output},
+                              outputIdx});
         outputIdx++;
       }
       Value oldSignal;
@@ -1054,18 +1206,22 @@ void SignalRewriter::rewriteHWModule(
       newModuleOutputIdxToOldSignal.push_back(std::make_pair(
           std::make_pair(startOutputIdx, endOutputIdx), oldSignal));
     } else if ((p.isOutput() && isReady) || (p.isInput() && !isReady)) {
-      // If the port is output and ready, it becomes input and ready in the new
-      // module. If a port is input and not ready, it stays as such.
+      // If the port is output and ready, it becomes input and ready in the
+      // new module. If a port is input and not ready, it stays as such.
       Type signalType = p.type;
       assert(signalType.isa<IntegerType>() &&
              "only integer types are supported for signals for now");
       unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
       for (unsigned i = 0; i < bitWidth; ++i) {
+        // Update portname indexing the specific bit unless it is 1 bit wide
+        std::string portName = formatPortName(p.name.getValue().str(), i);
+        if (bitWidth == 1) {
+          portName = p.name.getValue().str();
+        }
         newInputs.push_back(
-            {hw::ModulePort{
-                 StringAttr::get(ctx, StringRef{p.name.getValue().str() + "_" +
-                                                std::to_string(i)}),
-                 builder.getIntegerType(1), hw::ModulePort::Direction::Input},
+            {hw::ModulePort{StringAttr::get(ctx, StringRef{portName}),
+                            builder.getIntegerType(1),
+                            hw::ModulePort::Direction::Input},
              inputIdx});
         inputIdx++;
       }
@@ -1093,8 +1249,8 @@ void SignalRewriter::rewriteHWModule(
   mlir::StringAttr newModuleName = getRewrittenModuleName(oldMod, ctx);
   auto newMod = builder.create<hw::HWModuleOp>(oldMod.getLoc(), newModuleName,
                                                newPortInfo);
-  // Save it in the list of new module using the same name as the old module as
-  // key
+  // Save it in the list of new module using the same name as the old module
+  // as key
   newHWmodules[oldMod.getName()] = newMod;
 
   // Add mapping between new inputs to old signals
@@ -1144,8 +1300,8 @@ void SignalRewriter::rewriteHWModule(
     return;
   }
 
-  // Step 4: Finally, connect the hw instances to the terminator operands of the
-  // new module.
+  // Step 4: Finally, connect the hw instances to the terminator operands of
+  // the new module.
   builder.setInsertionPointToEnd(newMod.getBodyBlock());
   SmallVector<Value> newTerminatorOperands;
   for (auto [newOutputIdxs, oldSignal] : newModuleOutputIdxToOldSignal) {
@@ -1173,9 +1329,10 @@ LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
   // to all hw modules instantiated within other hw modules.
   // It does so by creating new hw modules with the rewritten ready signal
   // directions and then connecting them following the same graph structure of
-  // the old modules. Finally, it removes the old hw modules and renames the new
-  // hw modules to the original names. Additionally, during the ready signal
-  // inversion, it also unbundles multi-bit signals into single-bit signals.
+  // the old modules. Finally, it removes the old hw modules and renames the
+  // new hw modules to the original names. Additionally, during the ready
+  // signal inversion, it also unbundles multi-bit signals into single-bit
+  // signals.
 
   // Maps to keep track of old and new hw modules
   // The old hw modules have the wrong ready signal directions where ready
@@ -1264,8 +1421,9 @@ public:
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
 
-    // Step 3: (not implemented yet) Convert synth subckt operations into other
-    // synth operations like registers, combinational logic, etc. if possible
+    // Step 3: (not implemented yet) Convert synth subckt operations into
+    // other synth operations like registers, combinational logic, etc. if
+    // possible
     // TODO
   }
 };
