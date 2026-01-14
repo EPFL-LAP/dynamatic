@@ -34,7 +34,7 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-annotate-properties="json-path=$F_FORMAL_PROP annotate-invariants skip-annotate-properties" \
+  --handshake-annotate-properties="json-path=$F_FORMAL_PROP annotate-invariants annotate-properties=false" \
   > /dev/null
 
 # handshake level -> hw level
@@ -86,8 +86,8 @@ $NUXMV_BINARY -source $F_NUXMV_CMD > $NUXMV_OUT
 exit_on_fail "Failed to check formal properties" \
   "Performed model checking to verify the invariants" \
 
-# parse the results
-NUM_FAILED=$(cat $NUXMV_OUT | grep -c "^-- .*the induction fails$")
-test $NUM_FAILED == 0
+# parse and check the results
+printf "\n[INFO] Saving formal verification results\n" >&2
+python "$SMV_RESULT_PARSER" "$F_FORMAL_PROP" "$F_NUXMV_PROP"
 exit_on_fail "At least one invariant was not verifiable" \
-  "All properties provable by 1-induction" 
+  "All properties proven by 1-induction" 
