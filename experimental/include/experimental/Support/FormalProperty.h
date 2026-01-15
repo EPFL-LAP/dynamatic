@@ -188,6 +188,13 @@ private:
   inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
 };
 
+// When an eager fork is `sent` state for at least one of its outputs, it is
+// considered `active`. When transitioning to the `active` state, the `ready`
+// signal is false, and the incoming token is blocked. Because of this, all
+// slots immediately before the fork (i.e. copied slots) must be full. More
+// formally, a copied slot of a fork is defined as a slot that has a path
+// towards the fork without any other slots on it. See invariant 2 of
+// https://ieeexplore.ieee.org/document/10323796 for more details
 class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
   std::string getForkOp() { return forkOp; }
