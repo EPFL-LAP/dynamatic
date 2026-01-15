@@ -304,6 +304,32 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
+PathSingleSentForkOutput::PathSingleSentForkOutput(
+    unsigned long id, TAG tag, std::vector<std::string> &forkOps,
+    std::vector<unsigned> &outputIdxs)
+    : FormalProperty(id, tag, TYPE::CSOAFAF), forkOps{forkOps},
+      outputIdxs{outputIdxs} {}
+
+llvm::json::Value PathSingleSentForkOutput::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{FORK_OPS_LIT, forkOps}, {OUTPUT_IDXS_LIT, outputIdxs}});
+}
+
+std::unique_ptr<PathSingleSentForkOutput>
+PathSingleSentForkOutput::fromJSON(const llvm::json::Value &value,
+                                   llvm::json::Path path) {
+  auto prop = std::make_unique<PathSingleSentForkOutput>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(FORK_OPS_LIT, prop->forkOps) ||
+      !mapper.map(OUTPUT_IDXS_LIT, prop->outputIdxs))
+    return nullptr;
+
+  return prop;
+}
+
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database
   std::ifstream inputFile(filepath.str());

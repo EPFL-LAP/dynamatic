@@ -228,6 +228,33 @@ private:
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
 
+class PathSingleSentForkOutput : public FormalProperty {
+public:
+  std::vector<std::string> getForkOps() { return forkOps; }
+  std::vector<unsigned> getOutputIdxs() { return outputIdxs; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<PathSingleSentForkOutput>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  PathSingleSentForkOutput() = default;
+  PathSingleSentForkOutput(unsigned long id, TAG tag,
+                           std::vector<std::string> &forkOps,
+                           std::vector<unsigned> &outputIdxs);
+  ~PathSingleSentForkOutput() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::CSOAFAF;
+  }
+
+private:
+  std::vector<std::string> forkOps;
+  std::vector<unsigned> outputIdxs;
+  inline static const StringLiteral FORK_OPS_LIT = "fork_ops";
+  inline static const StringLiteral OUTPUT_IDXS_LIT = "output_idxs";
+};
+
 class FormalPropertyTable {
 public:
   FormalPropertyTable() = default;
