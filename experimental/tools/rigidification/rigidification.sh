@@ -34,7 +34,7 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-annotate-properties=json-path=$F_FORMAL_PROP \
+  --handshake-annotate-properties="json-path=$F_FORMAL_PROP annotate-invariants" \
   > /dev/null
 
 # handshake level -> hw level
