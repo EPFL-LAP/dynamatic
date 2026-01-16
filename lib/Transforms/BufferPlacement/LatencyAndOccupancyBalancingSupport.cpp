@@ -24,7 +24,10 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include <fstream>
+#include <numeric>
 #include <queue>
+
+#define DEBUG_TYPE "buffer-placement"
 
 // Make the graph boost analyzable.
 // NOTE: Moving this to the header file will cause linking errors.
@@ -492,6 +495,10 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  rankdir=TB;\n";
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
+
+  size_t totalPaths = 0;
+  for (const auto &entry : graphPaths)
+    totalPaths += entry.paths.size();
 
   for (const auto &[graphIdx, entry] : llvm::enumerate(graphPaths)) {
     const ReconvergentPathFinderGraph *graph = entry.graph;
