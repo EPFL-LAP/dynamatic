@@ -24,6 +24,8 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
 
+#define DEBUG_TYPE "buffer-milp"
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -244,6 +246,16 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     double delay;
     if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
       delay = 0.0;
+
+    if (auto shiftOp = dyn_cast<ShiftLikeArithOpInterface>(unit)) {
+      // Check if the operation is a shift operation with a constant shift value
+      // If yes, the operation has a zero delay.
+      if (signalType == SignalType::DATA && shiftOp.isShiftByConstant()) {
+        LLVM_DEBUG(llvm::errs() << "Shift" << getUniqueName(unit)
+                                << " has a constant delay\n");
+        delay = 0.0;
+      }
+    }
 
     // The delay of the unit must be positive.
     delay = std::max(delay, 0.001);
