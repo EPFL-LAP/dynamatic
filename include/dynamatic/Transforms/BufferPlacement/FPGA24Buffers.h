@@ -22,7 +22,7 @@
 
 namespace dynamatic {
 namespace buffer {
-namespace fpl24 {
+namespace fpga24 {
 
 /// Latency Balancing MILP ///
 
@@ -34,14 +34,26 @@ struct LatencyBalancingResult {
   double targetII;
 };
 
+/// Helper struct that pairs a reconvergent path with its corresponding
+/// transition graph. Since we're enumerating transition sequences, build graphs
+/// from those and then in turn build reconvergent paths from those graphs, it's
+/// better to pair them like this instead of playing around with indices.
+struct ReconvergentPathWithGraph {
+  ReconvergentPath path;
+  const ReconvergentPathFinderGraph *graph;
+
+  ReconvergentPathWithGraph(ReconvergentPath p,
+                            const ReconvergentPathFinderGraph *g)
+      : path(std::move(p)), graph(g) {}
+};
+
 class LatencyBalancingMILP : public BufferPlacementMILP {
 public:
   LatencyBalancingMILP(CPSolver::SolverKind solverKind, int timeout,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod,
-                       ArrayRef<ReconvergentPath> reconvergentPaths,
+                       ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
                        ArrayRef<SynchronizingCyclePair> syncCyclePairs,
-                       const ReconvergentPathFinderGraph &reconvergentGraph,
                        const SynchronizingCyclesFinderGraph &syncGraph,
                        ArrayRef<CFDFC *> cfdfcs);
 
@@ -53,11 +65,10 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  ArrayRef<ReconvergentPath> reconvergentPaths;
+  ArrayRef<ReconvergentPathWithGraph> reconvergentPaths;
   ArrayRef<SynchronizingCyclePair> syncCyclePairs;
 
-  /// References to the graphs for accessing node/edge information.
-  const ReconvergentPathFinderGraph &reconvergentGraph;
+  /// Reference to synchronizing cycles graph.
   const SynchronizingCyclesFinderGraph &syncGraph;
 
   /// CFDFCs needed for cylce constraints.
@@ -85,58 +96,42 @@ private:
   void setup();
 };
 
-/// Occupancy Balancing MILP ///
-
-class OccupancyBalancingMILP : public BufferPlacementMILP {
+class OccupancyBalancingLP : public BufferPlacementMILP {
 public:
-  OccupancyBalancingMILP(CPSolver::SolverKind solverKind, int timeout,
-                         FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                         double targetPeriod,
-                         const LatencyBalancingResult &latencyResult,
-                         ArrayRef<ReconvergentPath> reconvergentPaths,
-                         ArrayRef<SynchronizingCyclePair> syncCyclePairs,
-                         const ReconvergentPathFinderGraph &reconvergentGraph,
-                         const SynchronizingCyclesFinderGraph &syncGraph,
-                         ArrayRef<CFDFC *> cfdfcs);
+  OccupancyBalancingLP(CPSolver::SolverKind solverKind, int timeout,
+                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                       double targetPeriod,
+                       const LatencyBalancingResult &latencyResult,
+                       ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+                       ArrayRef<CFDFC *> cfdfcs);
 
-protected:
-  /// Extract buffer placement decisions from the solved MILP.
-  void extractResult(BufferPlacement &placement) override;
+  LogicalResult optimize();
+
+  bool isUnsatisfiable() const { return unsatisfiable; }
+
+  void extractResult(BufferPlacement &placement);
 
 private:
-  /// Results from LP1
+  std::unique_ptr<CPSolver> solver;
+
+  const TimingDatabase &timingDB;
+  double targetPeriod;
+
   const LatencyBalancingResult &latencyResult;
 
-  ArrayRef<ReconvergentPath> reconvergentPaths;
-  ArrayRef<SynchronizingCyclePair> syncCyclePairs;
-
-  /// References to the graphs for accessing node/edge information.
-  const ReconvergentPathFinderGraph &reconvergentGraph;
-  const SynchronizingCyclesFinderGraph &syncGraph;
-
-  /// CFDFCs
+  ArrayRef<ReconvergentPathWithGraph> reconvergentPaths;
   ArrayRef<CFDFC *> cfdfcs;
 
-  /// Setups the entire MILP, creating all variables, constraints, and setting
-  /// the system's objective. Called by the constructor in the absence of prior
-  /// failures, after which the MILP is ready to be optimized.
+  /// Whether setup failed.
+  bool unsatisfiable = false;
+
+  DenseMap<Value, CPVar> channelOccupancy;
+
   void setup();
-
-  void addOccupancyVariables();
-
-  void addMinimumOccupancyConstraints();
-
-  void addPathConsistencyConstraints();
-
-  void addCycleCapacityConstraints();
-
-  /// Minimize total buffer area.
-  void setOccupancyObjective();
 };
 
-class FPGA24Buffers : public BufferPlacementMILP {
-protected:
-  /// TODO: Explain
+class FPGA24Buffers {
+public:
   FPGA24Buffers(CPSolver::SolverKind solverKind, int timeout,
                 FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod);
@@ -152,7 +147,7 @@ private:
   const TimingDatabase &timingDB;
 };
 
-} // namespace fpl24
+} // namespace fpga24
 } // namespace buffer
 } // namespace dynamatic
 
