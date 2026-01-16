@@ -50,6 +50,7 @@ class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
@@ -390,6 +391,43 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
 // clang-format on
 
 #ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
+
+INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
+                         testing::Values("fir", "iir", "matvec"),
+                         [](const auto &info) { return info.param; });
+
+TEST_P(VerifyInvariantsFixture, basic) {
+  std::string name = GetParam();
+  fs::path cSourcePath =
+      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+  std::string tmpFilename = "tmp_" + GetParam() + ".dyn";
+  std::ofstream scriptFile(tmpFilename);
+  if (!scriptFile.is_open()) {
+    std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
+    EXPECT_EQ(0, -1);
+  }
+  scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
+             << "set-src " << cSourcePath.string() << std::endl
+             << "compile" << std::endl
+             << "verify-invariants" << std::endl
+             << "exit" << std::endl;
+  scriptFile.close();
+
+  fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
+  fs::path dynamaticOutPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
+  std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
+  cmd += tmpFilename;
+  cmd += " 1> ";
+  cmd += dynamaticOutPath;
+  cmd += " 2> ";
+  cmd += dynamaticErrPath;
+
+  int status = system(cmd.c_str());
+  EXPECT_EQ(status, 0);
+}
 
 TEST_P(RigidificationFixture, basic) {
   IntegrationTestData config{
