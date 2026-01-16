@@ -708,7 +708,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::UIToFPOp,
           handshake::FPToSIOp,
           handshake::AbsFOp,
-          handshake::MaxSIOp
+          handshake::MaxSIOp,
+          handshake::MaxUIOp,
+          handshake::MinSIOp,
+          handshake::MinUIOp
           // clang-format on
           >([&](auto) {
         // Bitwidth
@@ -2173,6 +2176,9 @@ public:
         ConvertToHWInstance<handshake::ExtFOp>,
         ConvertToHWInstance<handshake::AbsFOp>,
         ConvertToHWInstance<handshake::MaxSIOp>,
+        ConvertToHWInstance<handshake::MaxUIOp>,
+        ConvertToHWInstance<handshake::MinSIOp>,
+        ConvertToHWInstance<handshake::MinUIOp>,
 
         // Speculative operations
         ConvertToHWInstance<handshake::SpecCommitOp>,

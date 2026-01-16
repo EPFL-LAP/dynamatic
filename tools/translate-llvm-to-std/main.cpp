@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
       >();
   MLIRContext context(registry);
 
+  context.getOrLoadDialect<LLVM::LLVMDialect>();
   context.getOrLoadDialect<func::FuncDialect>();
   context.getOrLoadDialect<memref::MemRefDialect>();
   context.getOrLoadDialect<arith::ArithDialect>();

@@ -104,8 +104,14 @@ void BaseSubjectGraph::connectInputNodesHelper(ChannelSignals &currentSignals,
 
 // Constructs the file path based on Operation name and parameters, calls the
 // Blif parser to load the Blif file
-void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
-                                    std::string toAppend) {
+// Additionally, it uses the parameters map to print the parameters used in case
+// of failure to find the blif file.
+// IMPORTANT: The name of parameters is assumed to match the names used in the
+// HDL files.
+void BaseSubjectGraph::loadBlifFile(
+    std::initializer_list<unsigned int> inputs,
+    std::map<std::string, unsigned int> parameters, std::string toAppend) {
+
   std::string moduleType;
   std::string fullPath;
   moduleType = op->getName().getStringRef();
@@ -126,6 +132,22 @@ void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
   // Call the parser to load and parse the Blif file
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
+  if (blifData == nullptr) {
+    // Print the command that can be used to generate the BLIF file
+    std::string paramStr;
+    for (const auto &param : parameters) {
+      // Append each parameter --parameter NAME=MIN_VALUE,MAX_VALUE where
+      // MIN_VALUE is 1, and MAX_VALUE is the value from the map
+      paramStr +=
+          " --parameter " + param.first + "=1," + std::to_string(param.second);
+    }
+    llvm::errs() << "To generate the required BLIF file, run the following "
+                    "command from the root directory of dynamatic:\n";
+    llvm::errs() << "python tools/blif-generator/blif_generator.py " << paramStr
+                 << " handshake." << moduleType << " && rsync -av data/blif/"
+                 << moduleType << "/ data/aig/" << moduleType << "/\n";
+    llvm::report_fatal_error("BLIF file not found. Aborting...");
+  }
 }
 
 // Assigns signals to the variables in ChannelSignals struct
@@ -265,7 +287,7 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Get datawidth of the operation
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
-  loadBlifFile({dataWidth});
+  loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
 
   // Ops are mapped to DSP slices if the bitwidth is greater than 4
   if ((dataWidth > 4) &&
@@ -383,9 +405,10 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   outputNodes.resize(size);
 
   if (dataWidth == 0) {
-    loadBlifFile({size}, "_dataless");
+    loadBlifFile({size}, {{"SIZE", size}}, "_dataless");
   } else {
-    loadBlifFile({size, dataWidth}, "_type");
+    loadBlifFile({size, dataWidth}, {{"SIZE", size}, {"DATA_TYPE", dataWidth}},
+                 "_type");
   }
 
   // "outs" case does not obey the rules
@@ -445,7 +468,7 @@ FloatingPointSubjectGraph::FloatingPointSubjectGraph(Operation *op)
   // Get datawidth of the operation
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
-  loadBlifFile({dataWidth});
+  loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
   isBlackbox = true;
 
   // "result" case does not obey the rules
@@ -502,7 +525,9 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   inputNodes.resize(size);
 
-  loadBlifFile({size, dataWidth, selectType});
+  loadBlifFile(
+      {size, dataWidth, selectType},
+      {{"SIZE", size}, {"DATA_TYPE", dataWidth}, {"SELECT_TYPE", selectType}});
 
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
@@ -568,7 +593,8 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
   inputNodes.resize(size);
 
   if (dataWidth == 0) {
-    loadBlifFile({size, indexType}, "_dataless");
+    loadBlifFile({size, indexType}, {{"SIZE", size}, {"INDEX_TYPE", indexType}},
+                 "_dataless");
   } else {
     op->emitError("Operation Unsupported");
   }
@@ -605,9 +631,9 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
       handshake::getHandshakeTypeBitWidth(cbrOp.getDataOperand().getType());
 
   if (dataWidth == 0) {
-    loadBlifFile({}, "_dataless");
+    loadBlifFile({}, {}, "_dataless");
   } else {
-    loadBlifFile({dataWidth});
+    loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
   }
 
   std::vector<NodeProcessingRule> rules = {{"condition", conditionNodes, false},
@@ -636,7 +662,7 @@ ConditionalBranchSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 // SourceSubjectGraph implementation
 SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Source module has no attributes
-  loadBlifFile({});
+  loadBlifFile({}, {});
 
   std::vector<NodeProcessingRule> rules = {{"outs", outputNodes, true}};
 
@@ -660,7 +686,8 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(loadOp.getAddressInput().getType());
 
-  loadBlifFile({dataWidth, addrType});
+  loadBlifFile({dataWidth, addrType},
+               {{"DATA_TYPE", dataWidth}, {"ADDR_TYPE", addrType}});
 
   std::vector<NodeProcessingRule> rules = {
       {"addrIn", addrInSignals, false},
@@ -692,7 +719,8 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(storeOp.getAddressInput().getType());
 
-  loadBlifFile({dataWidth, addrType});
+  loadBlifFile({dataWidth, addrType},
+               {{"DATA_TYPE", dataWidth}, {"ADDR_TYPE", addrType}});
 
   std::vector<NodeProcessingRule> rules = {
       {"dataIn", dataInSignals, false},
@@ -835,7 +863,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
   // Get the data width of the constant operation
   dataWidth = cstType.getDataBitWidth();
 
-  loadBlifFile({dataWidth});
+  loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
 
   std::vector<NodeProcessingRule> rules = {{"ctrl", controlSignals, false},
                                            {"outs", outputNodes, true}};
@@ -866,7 +894,8 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
             extTruncOp.getResult().getType());
       });
 
-  loadBlifFile({inputWidth, outputWidth});
+  loadBlifFile({inputWidth, outputWidth},
+               {{"INPUT_TYPE", inputWidth}, {"OUTPUT_TYPE", outputWidth}});
 
   std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
                                            {"outs", outputNodes, true}};
@@ -892,7 +921,7 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       handshake::getHandshakeTypeBitWidth(selectOp->getOperand(1).getType());
 
   // Append "or" so "select" becomes "selector", as defined in HDL file
-  loadBlifFile({dataWidth}, "or");
+  loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}}, "or");
 
   std::vector<NodeProcessingRule> rules = {
       {"condition", condition, false},
@@ -923,7 +952,7 @@ SIFPSubjectGraph::SIFPSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Get datawidth of the operation
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
-  loadBlifFile({dataWidth});
+  loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
   isBlackbox = true;
 
   std::vector<NodeProcessingRule> rules = {{"in", inputNodes, false},
@@ -974,7 +1003,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   inputNodes.resize(size);
 
-  loadBlifFile({size, dataWidth});
+  loadBlifFile({size, dataWidth}, {{"SIZE", size}, {"DATA_TYPE", dataWidth}});
 
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
@@ -1004,9 +1033,9 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
   if (dataWidth == 0) {
-    loadBlifFile({}, "_dataless");
+    loadBlifFile({}, {}, "_dataless");
   } else {
-    loadBlifFile({dataWidth});
+    loadBlifFile({dataWidth}, {{"DATA_TYPE", dataWidth}});
   }
 
   std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
@@ -1048,6 +1077,19 @@ void BufferSubjectGraph::initBuffer() {
   // Parse the BLIF file
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
+  if (blifData == nullptr) {
+    // Print the command that can be used to generate the BLIF file
+    std::string paramStr = "";
+    if (dataWidth != 0) {
+      paramStr = "--parameter DATA_TYPE=1," + std::to_string(dataWidth);
+    }
+    llvm::errs() << "To generate the required BLIF file, run the following "
+                    "command from the root directory of dynamatic:\n";
+    llvm::errs() << "python tools/blif-generator/blif_generator.py " << paramStr
+                 << " handshake." << bufferType << " && rsync -av data/blif/"
+                 << bufferType << "/ data/aig/" << bufferType << "/\n";
+    llvm::report_fatal_error("BLIF file not found. Aborting...");
+  }
 
   std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
                                            {"outs", outputNodes, true}};

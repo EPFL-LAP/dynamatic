@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
@@ -25,7 +26,8 @@ public:
   enum class TAG { OPT, INVAR, ERROR };
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
-    VEQ /* Valid EQuivalence */
+    VEQ /* Valid EQuivalence */,
+    EFNAO /* Eager Fork Not All Output sent */,
   };
 
   TAG getTag() const { return tag; }
@@ -149,6 +151,40 @@ private:
   inline static const StringLiteral TARGET_CHANNEL_LIT = "target_channel";
   inline static const StringLiteral OWNER_INDEX_LIT = "owner_index";
   inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
+};
+
+// An eager fork propagates an incoming token to each output as soon as the
+// output is ready, and keeps track of which outputs already have a token sent
+// across them through the `sent` state. When the token has been sent to all
+// outputs, the token at the input is consumed and the states of the fork are
+// reset. The state where all outputs are in the `sent` state simultaneously is
+// unreachable, as the fork resets as soon as this state would be reached. See
+// invariant 1 of https://ieeexplore.ieee.org/document/10323796 for more
+// details.
+class EagerForkNotAllOutputSent : public FormalProperty {
+public:
+  std::string getOwner() { return ownerOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<EagerForkNotAllOutputSent>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  EagerForkNotAllOutputSent() = default;
+  EagerForkNotAllOutputSent(unsigned long id, TAG tag,
+                            handshake::EagerForkLikeOpInterface &op);
+  ~EagerForkNotAllOutputSent() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::EFNAO;
+  }
+
+private:
+  std::string ownerOp;
+  unsigned numEagerForkOutputs;
+  inline static const StringLiteral OWNER_OP_LIT = "owner_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
 };
 
 class FormalPropertyTable {
