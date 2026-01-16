@@ -36,6 +36,13 @@ enum SignalKind {
   READY_SIGNAL = 2,
 };
 
+// String of the blif path attribute
+static const std::string blifPathAttrStr = "blif_path";
+
+// Strings representing the name of the clock and reset signals
+static const std::string clockSignal = "clk";
+static const std::string resetSignal = "rst";
+
 #define GEN_PASS_DECL_HANDSHAKETOSYNTH
 #define GEN_PASS_DEF_HANDSHAKETOSYNTH
 #include "dynamatic/Conversion/Passes.h.inc"
