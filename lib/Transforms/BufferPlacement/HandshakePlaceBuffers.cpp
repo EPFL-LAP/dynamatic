@@ -26,6 +26,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
@@ -46,7 +47,7 @@ using namespace dynamatic::experimental;
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"), FPGA24("fpga24"),
     COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 namespace dynamatic {
@@ -190,6 +191,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[FPGA24] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 
@@ -643,6 +645,12 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "out_of_cycle", placement, solverKind, timeout, info, timingDB,
         targetCP);
   }
+
+  if (algorithm == FPGA24) {
+    fpga24::FPGA24Buffers solver(solverKind, timeout, info, timingDB, targetCP);
+    return solver.solve(placement);
+  }
+
   if (algorithm == COST_AWARE) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
