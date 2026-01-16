@@ -19,6 +19,7 @@ The pass is called [`HandshakeToSynthPass`](HandshakeToSynth.cpp).
 
 At a high level, the *HandshakeToSynth* pass performs the following transformations on a module containing a **single non-external** `handshake.func`:
 
+- Mark each handshake operation with the blif path which describes it AIG description. This information is propagated through each step as an attribute (`blif_path`) present in each hw module. This information will be useful in the last step.
 - Converts all Handshake-typed values (channels, control, memory) into flat HW-level ports by unbundling them into `{data, valid, ready}` signals.
 - Lowers each Handshake operation (including the function itself) to an `hw.module`/`hw.instance` plus an internal `synth.subckt` representing its behavior (except from the top handshake function).
 - Rewrites all generated HW modules to enforce the standard handshake convention where ready signals flow in the opposite direction from data and valid, and propagates this convention recursively through module instances. During this step, it also unbundles the multi-bit data signals into multiple single bit signals and adds reset and clock signals to each module.
@@ -45,11 +46,14 @@ Its `runDynamaticPass()` method:
 
 - Retrieves the `mlir::ModuleOp` and `MLIRContext`.
 - Ensures that there is at most one non-external `handshake.func` in the module and that if none is found, the pass is a no-op.
+- Runs Phase 0 – Mark each handshake unit with the blif path that describes its AIG beaviour using the function `getBlifFilePathForHandshakeOp(op, blifDirPath)`
 - Runs Phase 1 – Unbundling by calling `unbundleAllHandshakeTypes(modOp, ctx)`.
 - Runs Phase 2 – Signal rewriting by instantiating a `SignalRewriter` and calling `rewriteAllSignals(modOp)`.
 - Runs Phase 3 – Rewrite of hw instances into synth operations (registers, combinational logic, etc.).
 
 In a typical flow, this pass is run after all Handshake-level optimizations and buffer insertion, and before a dedicated synth backend that will interpret or further lower the generated synth operations.
+
+**IMPORTANT**: For now, the identification of the blif path heavily relies on the values of parameters of each handshake unit. Since there is still no unique database that correlates each handhshake unit with its parameter to instantiate its RTL, these information are hard-coded for each operation type in the `getBlifFilePathForHandshakeOp(op, blifDirPath)` function.
 
 ---
 
