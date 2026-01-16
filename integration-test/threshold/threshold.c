@@ -10,14 +10,25 @@
 
 void threshold(in_int_t th, inout_int_t red[N], inout_int_t green[N],
                inout_int_t blue[N]) {
-  for (unsigned i = 0; i < N; i++) {
+  //for (unsigned i = 0; i < N; i++) {
+  int i = red[2]+ th;
+  int j = red[3];
+  int x = 7;
     int sum = red[i] + green[i] + blue[i];
     if (sum <= th) {
       red[i] = 0;
       green[i] = 0;
-      blue[i] = 0;
+      blue[i] = j;
+      x +=5;
     }
-  }
+    else{
+      red[i] = 5;
+      green[i] = 7;
+      blue[i] = red[2];
+      x +=25;
+    }
+    red[0] =  x+1;
+  //}
 }
 
 int main(void) {
