@@ -26,6 +26,7 @@
 #include "dynamatic/Dialect/Synth/SynthOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -58,6 +59,7 @@
 #include <algorithm>
 #include <bitset>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -98,11 +100,27 @@ public:
   /// Update the mapping for an output signal group after a new instance is
   /// created.
   void updateOutputSignalMapping(Value oldResult, StringRef outputName,
+                                 int oldOutputIdx, hw::HWModuleOp oldMod,
                                  hw::HWModuleOp newMod, hw::InstanceOp newInst);
 
   /// Rewrite all HW modules in the given MLIR module to apply signal
   /// restructuring (direction changes, bit unbundling, etc.).
   LogicalResult rewriteAllSignals(mlir::ModuleOp modOp);
+
+  // Function to set the name of the top function
+  void setTopFunctionName(StringRef topFunctionName) {
+    assert(topFunctionName != "" &&
+           "top function name cannot be set to an empty string");
+    topFunction = topFunctionName;
+  }
+
+  // Function to get the name of the top function
+  StringRef getTopFunctionName() {
+    assert(
+        topFunction != "" &&
+        "top function name should be set before being able to get its value");
+    return topFunction;
+  }
 
 private:
   // IMPORTANT: A fundamental assumption for these maps to work is that each
@@ -124,6 +142,18 @@ private:
   // to hold places for these values. This map keeps track of these temporary
   // values grouped per original signal.
   DenseMap<Value, SmallVector<Value>> oldModuleSignalToTempValuesMap;
+
+  // Map to connect the idx of the old output signal to the idxs of the new
+  // output signals after rewriting.
+  DenseMap<StringAttr, SmallVector<std::pair<unsigned, SmallVector<unsigned>>>>
+      oldOutputIdxToNewOutputIdxMap;
+
+  // Name of the top function
+  StringRef topFunction = "";
+  // Signal of the top function that refers to the clock signal of the top func
+  Value clkSignalTop;
+  // Signal of the top function that refers to the reset signal of the top func
+  Value rstSignalTop;
 };
 
 // Function to unbundle a single handshake type into its subcomponents
@@ -254,10 +284,30 @@ std::string insertBeforeBracket(const std::string &s,
 
 // Utility function to get the string formatted in the desired portname[idx]
 // format
+// If the root name already contains an index, the old index is linearized and
+// added to the new one using the width input
 std::string formatPortName(const std::string &rootName,
-                           const std::optional<unsigned> &index) {
+                           const std::optional<unsigned> &index,
+                           unsigned width = 0) {
   if (index.has_value()) {
-    return rootName + "[" + std::to_string(index.value()) + "]";
+    unsigned newIndex = index.value();
+    std::string newRootName = rootName;
+    // Check if there is already present an index
+    std::regex pattern(R"((\w+)\[(\d+)\])");
+    // We use regex to identify this pattern
+    std::smatch matches;
+    if (std::regex_match(rootName, matches, pattern)) {
+      // If the pattern matches, assert the width is not 0
+      assert(width != 0 &&
+             "the width of the signal cannot be 0 if it is an array");
+      // Linearize old index
+      std::string oldIndex = matches[2].str();
+      unsigned oldIndexLinearized = std::stoi(oldIndex) * width;
+      // Add it to new one
+      newIndex += oldIndexLinearized;
+      newRootName = matches[1].str();
+    }
+    return newRootName + "[" + std::to_string(newIndex) + "]";
   }
   return rootName;
 }
@@ -271,7 +321,8 @@ getHWModulePortNames(Operation *op) {
   // Check if the operation implements NamedIOInterface to get port names
   auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
   if (!namedIO) {
-    // If the operation is the handshake function, just name it in a default way
+    // If the operation is the handshake function, just name it in a default
+    // way
     if (auto funcOp = dyn_cast<handshake::FuncOp>(op)) {
       for (auto [idx, _] : llvm::enumerate(funcOp.getArguments())) {
         inputPortNames.push_back("in" + std::to_string(idx));
@@ -292,8 +343,8 @@ getHWModulePortNames(Operation *op) {
   // "portname_index" where index is an integer representing the index-th
   // input. However, in order to respect the format of port names in the blif
   // files, we have to change this format into "portname[index]".
-  // However, the pattern "portname_index" might indicate an index with size 0.
-  // For this reason we need to keep track of the size of each port.
+  // However, the pattern "portname_index" might indicate an index with size
+  // 0. For this reason we need to keep track of the size of each port.
   // Iterate over input operands to get their names
   for (auto [idx, _] : llvm::enumerate(op->getOperands())) {
     std::string portNameStr = namedIO.getOperandName(idx).c_str();
@@ -378,8 +429,8 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledInputPorts;
   SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledOutputPorts;
   unbundleOpPorts(op, unbundledInputPorts, unbundledOutputPorts);
-  // Iterate over each set of unbundled input ports and create hw port info from
-  // them
+  // Iterate over each set of unbundled input ports and create hw port info
+  // from them
   for (auto [idx, inputPortSet] : llvm::enumerate(unbundledInputPorts)) {
     std::string portName = inputPortNames[idx];
     // Fill in the hw port info for inputs
@@ -977,27 +1028,40 @@ SmallVector<Value> SignalRewriter::getInputSignalMapping(Value oldInputSignal,
 
 // Function to update the mapping between old module signals and new module
 // signals after getting a new result value
-void SignalRewriter::updateOutputSignalMapping(Value oldResult,
-                                               StringRef outputName,
-                                               hw::HWModuleOp newMod,
-                                               hw::InstanceOp newInst) {
-  // Find the corresponding output index of the output in the new module
-  SmallVector<int> outputIdxsNewInst;
-  for (auto &p : newMod.getPortList()) {
-    StringRef portName = p.name.getValue();
-    // Check the beginning of the port name to match the output name but it
-    // should not be followed by the character '_', to avoid matching
-    // similarly named ports like output and output_valid
-    if (portName.starts_with(outputName) &&
-        (portName.size() == outputName.size() ||
-         portName[outputName.size()] != '_')) {
-      outputIdxsNewInst.push_back(p.argNum);
+void SignalRewriter::updateOutputSignalMapping(
+    Value oldResult, StringRef outputName, int oldOutputIdx,
+    hw::HWModuleOp oldMod, hw::HWModuleOp newMod, hw::InstanceOp newInst) {
+  // Check if you can find the output idx of the oldResult in the list
+  // oldOutputIdxToNewOutputIdxMap
+  OpBuilder builder(oldMod);
+  StringAttr oldModName = builder.getStringAttr(oldMod.getName());
+  SmallVector<std::pair<unsigned, SmallVector<unsigned>>>
+      oldOutIdxToNewOutIdxs = oldOutputIdxToNewOutputIdxMap[oldModName];
+  SmallVector<unsigned> outputIdxsNewInst = {};
+  for (auto &pair : oldOutIdxToNewOutIdxs) {
+    if (oldOutputIdx != -1 &&
+        pair.first == static_cast<unsigned>(oldOutputIdx)) {
+      outputIdxsNewInst = pair.second;
+      break;
+    }
+  }
+  // If you cannot find it, use the output name to find it
+  if (outputIdxsNewInst.empty()) {
+    // The only case in which this is possible is when it is a ready signal
+    assert(outputName.contains("_ready") &&
+           "could not find output index mapping for non-ready signal");
+    // Find the corresponding output index of the output in the new module
+    for (auto &p : newMod.getPortList()) {
+      StringRef portName = p.name.getValue();
+      if (portName == outputName) {
+        outputIdxsNewInst.push_back(p.argNum);
+      }
     }
   }
   assert(!outputIdxsNewInst.empty() &&
          "could not find output port in new module");
   SmallVector<Value> newResults;
-  for (int idx : outputIdxsNewInst) {
+  for (unsigned idx : outputIdxsNewInst) {
     newResults.push_back(newInst->getResult(idx));
   }
   // Add mapping between old non-ready signal and new non-ready signal
@@ -1112,6 +1176,10 @@ void SignalRewriter::rewriteHWInstance(
     }
   }
 
+  // Add new inputs for clk and rst from the top function
+  newOperands.push_back(oldModuleSignalToNewModuleSignalsMap[clkSignalTop][0]);
+  newOperands.push_back(oldModuleSignalToNewModuleSignalsMap[rstSignalTop][0]);
+
   // Create the new instance operation within the new hw module
   auto newInst = builder.create<hw::InstanceOp>(
       locNewOps, newMod, oldInst.getInstanceNameAttr(), newOperands);
@@ -1121,12 +1189,14 @@ void SignalRewriter::rewriteHWInstance(
   for (auto [outputName, outputIdxOldInst] : nonReadyOutputs) {
     // Find the output port in the old module
     Value oldResult = oldInst.getResult(outputIdxOldInst);
-    updateOutputSignalMapping(oldResult, outputName, newMod, newInst);
+    updateOutputSignalMapping(oldResult, outputName, outputIdxOldInst, oldMod,
+                              newMod, newInst);
   }
   // Update the mapping between old ready inputs and new ready outputs after
   // getting the new result values
   for (auto [inputName, oldReadyInput] : oldReadyInputs) {
-    updateOutputSignalMapping(oldReadyInput, inputName, newMod, newInst);
+    updateOutputSignalMapping(oldReadyInput, inputName, -1, oldMod, newMod,
+                              newInst);
   }
 }
 
@@ -1173,6 +1243,10 @@ void SignalRewriter::rewriteHWModule(
   // Store mapping from new input idx start and end to old signal
   SmallVector<std::pair<std::pair<unsigned, unsigned>, Value>>
       newModuleInputIdxToOldSignal;
+  // Store the mapping between old output signal idx and new output signal idxs.
+  // This should be applied only to non-ready signals.
+  SmallVector<std::pair<unsigned, SmallVector<unsigned>>>
+      oldOutputIdxToNewOutputIdxs;
   // Iterate over the ports of the old hw module
   for (auto &p : oldMod.getPortList()) {
     bool isReady = p.name.getValue().contains("ready");
@@ -1188,7 +1262,8 @@ void SignalRewriter::rewriteHWModule(
       unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
       for (unsigned i = 0; i < bitWidth; ++i) {
         // Update portname indexing the specific bit unless it is 1 bit wide
-        std::string portName = formatPortName(p.name.getValue().str(), i);
+        std::string portName =
+            formatPortName(p.name.getValue().str(), i, bitWidth);
         if (bitWidth == 1) {
           portName = p.name.getValue().str();
         }
@@ -1210,6 +1285,16 @@ void SignalRewriter::rewriteHWModule(
       unsigned endOutputIdx = outputIdx - 1;
       newModuleOutputIdxToOldSignal.push_back(std::make_pair(
           std::make_pair(startOutputIdx, endOutputIdx), oldSignal));
+      if (!isReady) {
+        // Store mapping from old output idx to new output idxs for
+        // non-ready outputs
+        SmallVector<unsigned> newOutputIdxs;
+        for (unsigned i = startOutputIdx; i <= endOutputIdx; ++i) {
+          newOutputIdxs.push_back(i);
+        }
+        oldOutputIdxToNewOutputIdxs.push_back(
+            std::make_pair(p.argNum, newOutputIdxs));
+      }
     } else if ((p.isOutput() && isReady) || (p.isInput() && !isReady)) {
       // If the port is output and ready, it becomes input and ready in the
       // new module. If a port is input and not ready, it stays as such.
@@ -1219,7 +1304,8 @@ void SignalRewriter::rewriteHWModule(
       unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
       for (unsigned i = 0; i < bitWidth; ++i) {
         // Update portname indexing the specific bit unless it is 1 bit wide
-        std::string portName = formatPortName(p.name.getValue().str(), i);
+        std::string portName =
+            formatPortName(p.name.getValue().str(), i, bitWidth);
         if (bitWidth == 1) {
           portName = p.name.getValue().str();
         }
@@ -1246,6 +1332,24 @@ void SignalRewriter::rewriteHWModule(
       assert(false && "port is neither input nor output");
     }
   }
+
+  // Record the old output idx to new output idxs mapping for non-ready outputs
+  oldOutputIdxToNewOutputIdxMap[builder.getStringAttr(oldMod.getName())] =
+      oldOutputIdxToNewOutputIdxs;
+
+  // Add clk and rst for all new inputs of hw modules
+  newInputs.push_back({hw::ModulePort{mlir::StringAttr::get(ctx, clockSignal),
+                                      builder.getIntegerType(1),
+                                      hw::ModulePort::Direction::Input},
+                       inputIdx});
+  unsigned clkInputIdx = inputIdx;
+  inputIdx++;
+  newInputs.push_back({hw::ModulePort{mlir::StringAttr::get(ctx, resetSignal),
+                                      builder.getIntegerType(1),
+                                      hw::ModulePort::Direction::Input},
+                       inputIdx});
+  unsigned rstInputIdx = inputIdx;
+  inputIdx++;
 
   hw::ModulePortInfo newPortInfo(newInputs, newOutputs);
 
@@ -1275,6 +1379,18 @@ void SignalRewriter::rewriteHWModule(
     }
     assert(newReadyInput.size() && "could not find mapping for input signal");
     oldModuleSignalToNewModuleSignalsMap[oldSignal] = newReadyInput;
+  }
+
+  // If the hw module represent the top function
+  if (oldMod.getName() == getTopFunctionName()) {
+    // Save the clock and reset signals
+    assert((clkSignalTop == nullptr && rstSignalTop == nullptr) &&
+           "reset and clock signals should be set only once for the top "
+           "function");
+    clkSignalTop = newMod.getBodyBlock()->getArgument(clkInputIdx);
+    rstSignalTop = newMod.getBodyBlock()->getArgument(rstInputIdx);
+    oldModuleSignalToNewModuleSignalsMap[clkSignalTop] = {clkSignalTop};
+    oldModuleSignalToNewModuleSignalsMap[rstSignalTop] = {rstSignalTop};
   }
 
   // Step 3: Iterate through the body operations of the old module
@@ -1572,6 +1688,444 @@ LogicalResult markHandshakeOpsWithBlifPath(handshake::FuncOp funcOp,
 }
 
 // ------------------------------------------------------------------
+// Functions to convert hw instances to synth operations
+// ------------------------------------------------------------------
+
+// Function to get the input mapping of a signal value
+Value getInputMappingSynthSignal(Location loc,
+                                 DenseMap<StringAttr, Value> &nodeValuesMap,
+                                 DenseMap<StringAttr, Value> &tmpValuesMap,
+                                 StringRef nodeName, OpBuilder &builder) {
+  assert(builder.getInsertionBlock() && "Builder has no insertion block!");
+  // Check if the signal is already in the map
+  if (nodeValuesMap.count(builder.getStringAttr(nodeName))) {
+    return nodeValuesMap[builder.getStringAttr(nodeName)];
+  }
+  // Check if the signal is in the tmp values map
+  if (tmpValuesMap.count(builder.getStringAttr(nodeName))) {
+    return tmpValuesMap[builder.getStringAttr(nodeName)];
+  }
+  // If not, create a temporary input signal (e.g., hw constant)
+  auto tempInput = builder.create<hw::ConstantOp>(
+      loc, builder.getIntegerType(1),
+      builder.getIntegerAttr(builder.getIntegerType(1), 0));
+
+  // Add the temporary input signal to the map
+  tmpValuesMap[builder.getStringAttr(nodeName)] = tempInput;
+  return tempInput;
+}
+
+// Function to update the output signal mapping after creating a new synth
+// operation
+void updateOutputSynthSignalMapping(Value newResult, StringRef nodeName,
+                                    DenseMap<StringAttr, Value> &nodeValuesMap,
+                                    DenseMap<StringAttr, Value> &tmpValuesMap,
+                                    OpBuilder &builder) {
+  // Check if the old result is in the tmp values map
+  if (tmpValuesMap.count(builder.getStringAttr(nodeName))) {
+    // Replace all uses of the temporary value with the new result value
+    tmpValuesMap[builder.getStringAttr(nodeName)].replaceAllUsesWith(newResult);
+    auto *constOp =
+        tmpValuesMap[builder.getStringAttr(nodeName)].getDefiningOp();
+    assert(constOp && "temporary value should have a defining operation");
+    assert(constOp->use_empty() && "temporary value should have no more uses");
+    // Erase the operation
+    constOp->erase();
+    // Remove the temporary value from the map
+    tmpValuesMap.erase(builder.getStringAttr(nodeName));
+  }
+  // Add the new result value to the node values map
+  nodeValuesMap[builder.getStringAttr(nodeName)] = newResult;
+}
+
+// Function to create a wire in function of synth logic gate operations based
+// on .names definition
+void createSynthWire(Location loc, std::vector<std::string> &ports,
+                     std::string &function,
+                     DenseMap<StringAttr, Value> &nodeValuesMap,
+                     DenseMap<StringAttr, Value> &tmpValuesMap,
+                     OpBuilder &builder) {
+  assert(builder.getInsertionBlock() && "Builder has no insertion block!");
+  unsigned numInputs = ports.size() - 1;
+  assert(numInputs == 1 && "wire should have only one input");
+  SmallVector<Value> inputValues;
+  // Get input values
+  for (unsigned i = 0; i < numInputs; ++i) {
+    StringRef inputNodeName = ports[i];
+    Value inputValue = getInputMappingSynthSignal(
+        loc, nodeValuesMap, tmpValuesMap, inputNodeName, builder);
+    inputValues.push_back(inputValue);
+  }
+  StringRef outputNodeName = ports.back();
+  // Elaborate function
+  assert(function.size() == 3 &&
+         "function string must be of size 3 for a wire");
+  char inputValueFunc = function[0];
+  char outputValueFunc = function[2];
+  assert((inputValueFunc == '0' || inputValueFunc == '1') &&
+         "input value must be 0 or 1");
+  assert((outputValueFunc == '0' || outputValueFunc == '1') &&
+         "output value must be 0 or 1");
+  int inputBit = (inputValueFunc == '1') ? 1 : 0;
+  int outputBit = (outputValueFunc == '1') ? 1 : 0;
+  Value inputValue = inputValues[0];
+  // If the input and output bits are identical, you can skip the creation
+  // of any node since they are identical
+  if (inputBit == outputBit) {
+    // We just need to update the output map function so that the output
+    // points to the same value as input
+    updateOutputSynthSignalMapping(inputValue, outputNodeName, nodeValuesMap,
+                                   tmpValuesMap, builder);
+    return;
+  }
+  // If this is not the case, we have to create a new aig node which inverts
+  // the value of the input and receives one as another input Create constant
+  // node 1
+  auto constOp = builder.create<hw::ConstantOp>(
+      loc, builder.getIntegerType(1),
+      builder.getIntegerAttr(builder.getIntegerType(1), 1));
+
+  // Create aig node
+  auto aigOp = builder.create<synth::aig::AndInverterOp>(
+      loc, inputValue, constOp.getResult(),
+      /*invertInput0=*/true, /*invertInput1=*/false);
+
+  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName,
+                                 nodeValuesMap, tmpValuesMap, builder);
+}
+
+// Function to create synth logic gate operations based on .names definition
+void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
+                          std::string &function,
+                          DenseMap<StringAttr, Value> &nodeValuesMap,
+                          DenseMap<StringAttr, Value> &tmpValuesMap,
+                          OpBuilder &builder) {
+  assert(builder.getInsertionBlock() && "Builder has no insertion block!");
+  unsigned numInputs = ports.size() - 1;
+  assert(numInputs > 1 && "logic gate must have at least two inputs");
+  assert(numInputs == 2 && "the following pass transforms the logic gates to "
+                           "aig nodes only");
+  SmallVector<Value> inputValues;
+  // Get input values
+  for (unsigned i = 0; i < numInputs; ++i) {
+    StringRef inputNodeName = ports[i];
+    Value inputValue = getInputMappingSynthSignal(
+        loc, nodeValuesMap, tmpValuesMap, inputNodeName, builder);
+    inputValues.push_back(inputValue);
+  }
+  StringRef outputNodeName = ports.back();
+
+  // Elaborate function to understand inversion of inputs/outputs
+  // Get the value of the first and second input and output
+  assert(function.size() == 4 &&
+         "function string must be of size 4 for 2-input logic gate");
+  char firstInputValue = function[0];
+  char secondInputValue = function[1];
+  char outputValue = function[3];
+  assert((firstInputValue == '0' || firstInputValue == '1') &&
+         "first input value must be 0 or 1");
+  assert((secondInputValue == '0' || secondInputValue == '1') &&
+         "second input value must be 0 or 1");
+  assert((outputValue == '0' || outputValue == '1') &&
+         "output value must be 0 or 1");
+  int firstInputBit = (firstInputValue == '1') ? 1 : 0;
+  int secondInputBit = (secondInputValue == '1') ? 1 : 0;
+  int outputBit = (outputValue == '1') ? 1 : 0;
+  // Invert inputs/outputs if output is 0
+  if (outputBit == 0) {
+    firstInputBit = 1 - firstInputBit;
+    secondInputBit = 1 - secondInputBit;
+  }
+  bool invertInput0 = (firstInputBit == 0) ? true : false;
+  bool invertInput1 = (secondInputBit == 0) ? true : false;
+
+  // Create aig node
+  auto aigOp = builder.create<synth::aig::AndInverterOp>(
+      loc, inputValues[0], inputValues[1],
+      /*invertInput0=*/invertInput0, /*invertInput1=*/invertInput1);
+
+  // Update output mapping
+  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName,
+                                 nodeValuesMap, tmpValuesMap, builder);
+}
+
+// Function to read a blif file and generate the synth circuit depending on the
+// blif description
+LogicalResult generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
+                                           hw::InstanceOp hwInst,
+                                           hw::HWModuleOp hwModule,
+                                           OpBuilder &builder) {
+  builder.setInsertionPoint(hwInst);
+  // The following function reads the blif file specified by blifFilePath
+  // and generates the synth circuit defined in it.
+
+  // Map to store the values of the nodes
+  DenseMap<StringAttr, Value> nodeValuesMap;
+  // Map to store temporary values for nodes not yet defined
+  DenseMap<StringAttr, Value> tmpValuesMap;
+  // Collect hw instance inputs and the corresponding naming in the hw module
+  DenseMap<StringAttr, Value> hwInstInputs;
+
+  // Check that the instance is fully connected
+  assert(hwInst.getOperands().size() == hwModule.getNumInputPorts() &&
+         "Cannot use positional operands on partially-connected instance");
+
+  for (auto &port : hwModule.getPortList()) {
+    if (port.isInput()) {
+      // Check the port is not already in the map
+      assert(!hwInstInputs.count(builder.getStringAttr(port.name.getValue())) &&
+             "port name already exists in the hw instance inputs map");
+      // Check bounds of argNum
+      unsigned argNum = port.argNum;
+      assert(argNum < hwInst.getNumOperands() &&
+             "Instance operand index out of bounds");
+      Value hwInstInput = hwInst.getOperand(argNum);
+      assert(hwInstInput && "hw instance input value should not be null");
+      StringAttr portNameAttr = builder.getStringAttr(port.name.getValue());
+      hwInstInputs[portNameAttr] = hwInstInput;
+      nodeValuesMap[portNameAttr] = hwInstInput;
+    }
+  }
+
+  // Collect hw instance outputs
+  SmallVector<StringRef> hwInstOutputs;
+  for (auto &port : hwModule.getPortList()) {
+    if (port.isOutput()) {
+      hwInstOutputs.push_back(port.name.getValue());
+    }
+  }
+
+  std::ifstream file(blifFilePath.str());
+
+  if (!file.is_open()) {
+    llvm::errs() << "The blif file '" << blifFilePath
+                 << "' has not been found or could not be opened." << "\n";
+    return failure();
+  }
+
+  std::string line;
+  // Loop over all the lines in .blif file.
+  while (std::getline(file, line)) {
+    // If comment or empty line, skip.
+    if (line.empty() || line.find("#") == 0) {
+      continue;
+    }
+
+    // If line ends with '\\', read the next line and append to the current
+    // line.
+    while (line.back() == '\\') {
+      line.pop_back();
+      std::string nextLine;
+      std::getline(file, nextLine);
+      line += nextLine;
+    }
+
+    std::istringstream iss(line);
+    std::string type;
+    iss >> type;
+
+    // Model name
+    if (type == ".model") {
+      std::string moduleName;
+      iss >> moduleName;
+    }
+
+    // Input/Output nodes. These are also Dataflow graph channels.
+    else if ((type == ".inputs") || (type == ".outputs")) {
+      std::string nodeName;
+      while (iss >> nodeName) {
+        if (type == ".inputs") {
+          // Check if the input node is in the hw instance inputs map
+          if (!hwInstInputs.count(builder.getStringAttr(nodeName))) {
+            llvm::errs() << "Input node '" << nodeName
+                         << "' not found in hw instance inputs." << "\n";
+            return failure();
+          }
+        } else {
+          // Check if the output node is in the hw instance outputs
+          if (std::find(hwInstOutputs.begin(), hwInstOutputs.end(), nodeName) ==
+              hwInstOutputs.end()) {
+            llvm::errs() << "Output node '" << nodeName
+                         << "' not found in hw instance outputs." << "\n";
+            return failure();
+          }
+        }
+      }
+    }
+
+    // Latches.
+    else if (type == ".latch") {
+      std::string regInput, regOutput;
+      iss >> regInput >> regOutput;
+      // Get the input signal for the register
+      Value inputSignal = getInputMappingSynthSignal(
+          loc, nodeValuesMap, tmpValuesMap, regInput, builder);
+      // Create synth register operation
+      auto regOp = builder.create<synth::LatchOp>(
+          loc, builder.getIntegerType(1), inputSignal);
+
+      // Map the output node to the register output
+      updateOutputSynthSignalMapping(regOp.getResult(), regOutput,
+                                     nodeValuesMap, tmpValuesMap, builder);
+
+    }
+
+    // .names stand for logic gates.
+    else if (type == ".names") {
+      std::vector<std::string> nodeNames;
+      std::string currentNode;
+
+      // Read node names from current line (e.g., "a b c")
+      while (iss >> currentNode) {
+        nodeNames.push_back(currentNode);
+      }
+
+      // Read logic function from next line (e.g., "11 1")
+      std::getline(file, line);
+      std::string function = line;
+
+      if (nodeNames.size() == 1) {
+        // Create hw constant
+        auto constOp = builder.create<hw::ConstantOp>(
+            loc, builder.getIntegerType(1),
+            builder.getIntegerAttr(builder.getIntegerType(1),
+                                   function == "1" ? 1 : 0));
+
+        // Map the output node to the constant output
+        updateOutputSynthSignalMapping(constOp.getResult(), nodeNames[0],
+                                       nodeValuesMap, tmpValuesMap, builder);
+      } else if (nodeNames.size() == 2) {
+        // Create wire as a function of other existing synth operations
+        createSynthWire(loc, nodeNames, function, nodeValuesMap, tmpValuesMap,
+                        builder);
+      } else {
+        // Create logic gate as a function of other existing synth operations
+        createSynthLogicGate(loc, nodeNames, function, nodeValuesMap,
+                             tmpValuesMap, builder);
+      }
+    }
+
+    // Subcircuits. not used for now.
+    else if (line.find(".subckt") == 0) {
+      llvm::errs() << "Subcircuits inside the blif file not supported " << "\n";
+      continue;
+    }
+
+    // Ends the file.
+    else if (line.find(".end") == 0) {
+      break;
+    }
+  }
+
+  SmallVector<Value> newOutputs;
+  // Map hw instance outputs to the corresponding synth signals
+  for (const auto &outputNodeName : hwInstOutputs) {
+    if (!nodeValuesMap.count(builder.getStringAttr(outputNodeName))) {
+      llvm::errs() << "Output node '" << outputNodeName
+                   << "' not found in synth circuit." << "\n";
+      return failure();
+    }
+    Value outputSignal = nodeValuesMap[builder.getStringAttr(outputNodeName)];
+    newOutputs.push_back(outputSignal);
+  }
+  // Close the file
+  file.close();
+  // Replace hw instance outputs with the corresponding synth signals
+  for (unsigned i = 0; i < hwInst.getNumResults(); ++i) {
+    hwInst.getResult(i).replaceAllUsesWith(newOutputs[i]);
+  }
+  // Erase the hw instance operation
+  hwInst.erase();
+  return success();
+}
+
+// Function to replace an instance with synth operations
+// It manages the replacement of a single hw instance operation
+LogicalResult convertHWInstanceToSynthOps(hw::InstanceOp op,
+                                          OpBuilder &builder) {
+
+  builder.setInsertionPoint(op);
+  // Ensure that the blif path is specified in the hw module of the hw
+  // instance operation
+  SymbolTable symTable = SymbolTable(op->getParentOfType<ModuleOp>());
+  hw::HWModuleOp hwModule = symTable.lookup<hw::HWModuleOp>(op.getModuleName());
+  if (!hwModule) {
+    llvm::errs() << "could not find hw module for instance: " << op << "\n";
+    return failure();
+  }
+  if (!hwModule->hasAttr(blifPathAttrStr)) {
+    llvm::errs() << "hw module for instance does not have blif path attribute: "
+                 << hwModule << "\n";
+    return failure();
+  }
+  // Get the blif path attribute
+  mlir::StringAttr blifPathAttr =
+      hwModule->getAttrOfType<mlir::StringAttr>(blifPathAttrStr);
+  StringRef blifFilePath = blifPathAttr.getValue();
+
+  // Check if blifFilePath is empty
+  if (blifFilePath == "") {
+    // If this is the case, there is no blif for this specific module and it
+    // should be replaced with a subckt operation
+    // Create the synth subcircuit operation inside the hw module
+    synth::SubcktOp synthInstOp = builder.create<synth::SubcktOp>(
+        op->getLoc(), op.getResultTypes(), op.getOperands(), "synth_subckt");
+    //  Collect results of the subckt operation
+    SmallVector<Value> synthResults = synthInstOp.getResults();
+    // For each output of the hw instance, replace with the corresponding
+    // output of the synth subckt operation
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
+      op.getResult(i).replaceAllUsesWith(synthResults[i]);
+    }
+    // Erase the hw instance operation
+    op.erase();
+    return success();
+  }
+
+  // Read the blif path and extract the synth circuit
+  if (failed(generateSynthCircuitFromBlif(blifFilePath, op.getLoc(), op,
+                                          hwModule, builder))) {
+    return failure();
+  }
+
+  return success();
+}
+
+// Function to convert hw instances into synth operations
+LogicalResult convertHWInstancesToSynthOps(mlir::ModuleOp modOp,
+                                           StringRef topModuleName,
+                                           MLIRContext *ctx) {
+  // The following function iterates through all the hw instances in the top
+  // module and convert them into synth operations like registers,
+  // combinational logic, etc. if possible. The description of the
+  // implementation is defined in the path specified by the attribute
+  // blifPathAttrStr on each hw module
+
+  // Get hw module corresponding to the top module
+  SymbolTable symTable(modOp);
+  hw::HWModuleOp topHWModule = symTable.lookup<hw::HWModuleOp>(topModuleName);
+  if (!topHWModule) {
+    llvm::errs() << "could not find hw module for top module: " << topModuleName
+                 << "\n";
+    return failure();
+  }
+
+  // Collect all hw instances in the top module
+  SmallVector<hw::InstanceOp> hwInstances;
+  topHWModule.walk([&](hw::InstanceOp op) { hwInstances.push_back(op); });
+  OpBuilder builder(ctx);
+  // Convert each hw instance into synth operations
+  for (hw::InstanceOp hwInst : hwInstances) {
+    if (failed(convertHWInstanceToSynthOps(hwInst, builder))) {
+      llvm::errs() << "Failed to convert hw instance to synth ops: " << hwInst
+                   << "\n";
+      return failure();
+    }
+  }
+  return success();
+}
+
+// ------------------------------------------------------------------
 // Main pass definition
 // ------------------------------------------------------------------
 
@@ -1585,8 +2139,10 @@ namespace {
 //    to follow the standard handshake protocol where ready signals go in the
 //    opposite direction with respect to data and valid signals. Additionally,
 //    data signals are unbundled into single-bit signals.
-// 3) (not implemented yet) Convert synth subckt operations into other synth
-//    operations like registers, combinational logic, etc. if possible
+// 3) Convert hw instances into other synth operations like registers,
+//    combinational logic, etc. if possible. The description of the
+//    implementation is defined in the path specified by the attribute
+//    blifPathAttrStr on each hw module
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
@@ -1613,6 +2169,8 @@ public:
     // If there is no function, nothing to do
     if (!funcOp)
       return;
+    // Save the name of the top module function
+    StringRef topModuleName = funcOp.getName();
 
     // Step 0: Mark each handshake operation with the path of the blif file
     // where its definition is located
@@ -1630,13 +2188,28 @@ public:
     // Create on object of the SignalRewriter class to manage the
     // inversion
     SignalRewriter signalRewriter;
+    // Set the name of the top function
+    signalRewriter.setTopFunctionName(topModuleName);
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
 
-    // Step 3: (not implemented yet) Convert synth subckt operations into
-    // other synth operations like registers, combinational logic, etc. if
-    // possible
-    // TODO
+    // Step 3: Convert hw instances into other synth operations like
+    // registers, combinational logic, etc. if possible. The description of
+    // the implementation is defined in the path specified by the attribute
+    // blifPathAttrStr on each hw module
+    if (failed(convertHWInstancesToSynthOps(modOp, topModuleName, ctx)))
+      return signalPassFailure();
+    // Remove all hw modules that are different from the top function hw
+    // module
+    SmallVector<hw::HWModuleOp> hwModuleToErase;
+    modOp.walk([&](hw::HWModuleOp op) {
+      if (op.getName() != topModuleName) {
+        hwModuleToErase.push_back(op);
+      }
+    });
+    for (Operation *hwMod : hwModuleToErase) {
+      hwMod->erase();
+    }
   }
 };
 
