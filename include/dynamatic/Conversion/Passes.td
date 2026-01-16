@@ -81,5 +81,22 @@ def HandshakeToHW
   }];
   let constructor = "dynamatic::createHandshakeToHWPass()";
 }
-  
+
+//===----------------------------------------------------------------------===//
+// HandshakeToSynth
+//===----------------------------------------------------------------------===//
+
+def HandshakeToSynth
+    : DynamaticPass<"lower-handshake-to-synth", ["dynamatic::synth::SynthDialect", "dynamatic::hw::HWDialect"]> {
+  let summary = "Lowers Handshake to Synth.";
+  let description = [{
+    Lowers Handshake IR into Synth IR, which is a hardware representation
+    that focuses on logic synthesis constructs.
+  }];
+  let constructor = "dynamatic::createHandshakeToSynthPass()";
+  let options = 
+    [Option<"blifDirPath", "blif-dir-path", "std::string", "",
+            "Path to directory containing BLIF files for logic synthesis representations.">];
+}
+
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

@@ -76,6 +76,9 @@
     - [Commit Unit Placement Algorithm](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/CommitUnitPlacementAlgorithm.md)
     - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md)
     - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/SaveCommitBehavior.md)
+  - [Synth]()
+    - [Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth.md)
+    - [Conversion Pass from Handshake to Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/ConversionHandshakeToSynth.md)
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)
