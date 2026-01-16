@@ -464,6 +464,14 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maxui -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.minsi",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minsi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
+    "name": "handshake.minui",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minui -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.sitofp",
     "parameters": [
       {

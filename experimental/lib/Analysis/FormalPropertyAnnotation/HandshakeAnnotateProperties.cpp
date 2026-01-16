@@ -65,6 +65,7 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
+  LogicalResult annotateEagerForkNotAllOutputSent(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -136,6 +137,22 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
   return success();
 }
 
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
+    ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        EagerForkNotAllOutputSent p(uid, FormalProperty::TAG::INVAR, forkOp);
+
+        propertyTable.push_back(p.toJSON());
+        uid++;
+      }
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -143,6 +160,10 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
+  if (annotateInvariants) {
+    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
+      return signalPassFailure();
+  }
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 

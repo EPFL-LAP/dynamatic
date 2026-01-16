@@ -773,6 +773,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/br.v",
+    "dependencies": ["br_dataless"],
     "hdl": "verilog"
   },
   {

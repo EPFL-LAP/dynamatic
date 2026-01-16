@@ -381,7 +381,7 @@ public:
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #ifdef DYNAMATIC_ENABLE_CBC
     CBC,
-#endif // DYNAMATIC_ENABLE_CBC
+#endif      // DYNAMATIC_ENABLE_CBC
     DEFAULT // Dummy option
   };
   SolverKind solverKind;
@@ -567,6 +567,7 @@ public:
       status = NONOPTIMAL;
       break;
     case GRB_UNBOUNDED:
+    case GRB_INF_OR_UNBD:
       status = UNBOUNDED;
       break;
     case GRB_INFEASIBLE:

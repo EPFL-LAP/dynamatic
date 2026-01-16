@@ -299,6 +299,14 @@ def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
   let summary = "Outputs the maximum between two input unsigned integers";
 }
 
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+  let summary = "Outputs the minimum between two input signed integers";
+}
+
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+  let summary = "Outputs the minimum between two input unsigned integers";
+}
+
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
   let hasCanonicalizer = 1;
@@ -369,15 +377,21 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   }];
 }
 
-def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli"> {
+def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical left shift.";
 }
 
-def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi"> {
+def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Arithmetic right shift.";
 }
 
-def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
+def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical right shift.";
 }
 

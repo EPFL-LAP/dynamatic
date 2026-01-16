@@ -236,9 +236,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
         << "The buffer placement algorithm MapBuf expects the BLIF file "
            "at location: '"
         << filename
-        << "' which has not been found. Please refer to the doc for "
-           "more information on how to generate it.\n";
-    assert(false && "Unable to open BLIF file");
+        << "' which has not been found. Unable to open BLIF file.\n";
+    return nullptr;
   }
 
   std::string line;
