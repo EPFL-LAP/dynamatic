@@ -30,9 +30,11 @@
 #include "experimental/Support/SubjectGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -118,6 +120,8 @@ struct MILPVars {
   SmallVector<SynchronizationPatternVars> reconvergentPathVars;
   /// Balancing variables for synchronizing cycles.
   SmallVector<SynchronizationPatternVars> syncCycleVars;
+  /// List of units in the function.
+  llvm::MapVector<Operation *, UnitVars> unitVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
