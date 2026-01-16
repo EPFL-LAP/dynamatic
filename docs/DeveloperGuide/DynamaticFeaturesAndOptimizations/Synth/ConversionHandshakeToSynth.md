@@ -7,7 +7,8 @@ There are three main sections in this document.
 
 1. Main pass and usage: Overall structure and rationale of the pass.
 2. Unbundling conversion: Lowering Handshake channel types to flat HW ports and `synth.subckt`.
-3. Signal rewriting: Inverting the direction of ready signals to follow the standard handshake protocol and unbundling multi-bit data signals into multiple single bit signals.
+3. Signal rewriting: Inverting the direction of ready signals to follow the standard handshake protocol, unbundling multi-bit data signals into multiple single bit signals and adding reset and clock signal to each module and connecting them to the top function ones.
+4. AIG construction: Convert all hw instances into AIG nodes.
 
 
 The pass is called [`HandshakeToSynthPass`](HandshakeToSynth.cpp).
@@ -20,7 +21,8 @@ At a high level, the *HandshakeToSynth* pass performs the following transformati
 
 - Converts all Handshake-typed values (channels, control, memory) into flat HW-level ports by unbundling them into `{data, valid, ready}` signals.
 - Lowers each Handshake operation (including the function itself) to an `hw.module`/`hw.instance` plus an internal `synth.subckt` representing its behavior (except from the top handshake function).
-- Rewrites all generated HW modules to enforce the standard handshake convention where ready signals flow in the opposite direction from data and valid, and propagates this convention recursively through module instances.
+- Rewrites all generated HW modules to enforce the standard handshake convention where ready signals flow in the opposite direction from data and valid, and propagates this convention recursively through module instances. During this step, it also unbundles the multi-bit data signals into multiple single bit signals and adds reset and clock signals to each module.
+- Rewrite all generated HW instances into synth operations (AIG nodes mainly) and connect them accordingly. The description of each hw instance is specified in the BLIF library. More information on how to generate this blif library are specified in the doc [BlifGenerator](../Buffering/MapBuf/BlifGenerator.md)
 
 The pass operates on:
 
@@ -31,7 +33,7 @@ and produces:
 
 - A pure HW/Synth module hierarchy:
   - The original `handshake.func` is replaced by a top-level `hw.module`.
-  - Each Handshake operation becomes an `hw.instance` of an `hw.module` that contains a `synth.subckt`.
+  - Each Handshake operation becomes a set of synth operations.
 - No remaining values of Handshake types and no remaining Handshake operations or functions.
 
 
@@ -45,7 +47,7 @@ Its `runDynamaticPass()` method:
 - Ensures that there is at most one non-external `handshake.func` in the module and that if none is found, the pass is a no-op.
 - Runs Phase 1 – Unbundling by calling `unbundleAllHandshakeTypes(modOp, ctx)`.
 - Runs Phase 2 – Signal rewriting by instantiating a `SignalRewriter` and calling `rewriteAllSignals(modOp)`.
-- Leaves a future Phase 3 – further refinement of `synth.subckt` into other synth operations (registers, combinational logic, etc.) as a TODO.
+- Runs Phase 3 – Rewrite of hw instances into synth operations (registers, combinational logic, etc.).
 
 In a typical flow, this pass is run after all Handshake-level optimizations and buffer insertion, and before a dedicated synth backend that will interpret or further lower the generated synth operations.
 
@@ -510,3 +512,130 @@ It then updates the mapping structures:
 - For each signal whose direction or structure changed (e.g., old ready inputs now mapped to new ready outputs), `updateOutputSignalMapping` is used similarly, but the original value may be an operand instead of a result.
 
 After this step, any user that was wired to the old instance (or to its temporary proxies) can be redirected to the final new signals by consulting `oldModuleSignalToNewModuleSignalsMap`.
+
+## AIG construction
+
+The final step of the pass refines the HW-level hierarchy into a purely Synth-level representation by replacing each HW instance with a network of Synth operations derived from its BLIF description. Conceptually, this phase interprets each BLIF model as an AIG-style circuit composed of 1-bit registers and AND-with-inverter gates, and re-expresses it directly in the Synth dialect while preserving the instance’s interface.
+
+### Goals and high-level behavior
+
+This phase has three main goals:
+
+- Eliminate HW instances by inlining their behavior as Synth operations, while keeping the top HW module as the structural shell.
+- Interpret each BLIF model as a combination of 1-bit latches and AIG-style combinational logic and reconstruct the same structure in the Synth dialect.
+- Maintain a one-to-one correspondence between BLIF inputs/outputs and the HW instance’s operands/results, so that external connectivity remains unchanged.
+
+The top-level driver is:
+
+- `LogicalResult convertHWInstancesToSynthOps(mlir::ModuleOp modOp, StringRef topModuleName, MLIRContext *ctx)`.
+
+It:
+
+- Looks up the top HW module corresponding to `topModuleName` and iterates over all `hw.instance` operations inside it.
+- For each instance, calls `convertHWInstanceToSynthOps(instOp, builder)` to build the corresponding Synth circuit.
+- After successful conversion of all instances, erases all non-top HW modules, leaving a representation where the top HW module’s body contains only Synth operations (and no nested HW modules).
+
+If a given HW module has no BLIF path attribute or if conversion is not supported, the phase falls back to replacing the instance with a single `synth.subckt` that preserves its flat interface.
+
+### Per-instance BLIF-based refinement
+
+The per-instance conversion is handled by:
+
+- `LogicalResult convertHWInstanceToSynthOps(hw::InstanceOp instOp, OpBuilder &builder)`.
+
+Its behavior is as follows:
+
+- Retrieves the callee `hw::HWModuleOp` via `instOp.getModuleName()` and checks that it carries the `blifPathAttrStr` attribute containing the BLIF file path.
+- Parses the BLIF file associated with that module and builds an internal mapping between BLIF node names and Synth `Value`s using two maps:
+  - `nodeValuesMap` – mapping from BLIF node name to final Synth value.
+  - `tmpValuesMap` – mapping from BLIF node name to temporary placeholder constants when a node is referenced before being defined.
+- Establishes a direct correspondence between BLIF `.inputs` / `.outputs` and HW instance operands/results, so that input node names map to `instOp` operands and output node names determine which Synth values will eventually replace `instOp` results.
+
+At the end of BLIF parsing, the conversion collects Synth values for all BLIF output nodes that correspond to the instance’s results and replaces `instOp` with these values; the HW instance operation is then erased.
+
+### Latch construction (`.latch` lines)
+
+BLIF `.latch` lines describe sequential elements, which the pass lowers to Synth latches:
+
+- For each `.latch` line, the parser extracts:
+  - The input node name (register data input).
+  - The output node name (register output).
+  - Optional additional fields (e.g., reset values), which are currently either checked or ignored depending on support.
+- The helper `getInputMappingSynthSignal(loc, nodeValuesMap, tmpValuesMap, inputName, builder)` is used to obtain the Synth value corresponding to the latch input node:
+  - If the node was already defined, its value is returned from `nodeValuesMap`.
+  - If it was only referenced previously, an existing temporary constant is retrieved from `tmpValuesMap`.
+  - Otherwise, a new 1-bit `hw.constant` zero is created, recorded in `tmpValuesMap`, and returned as a placeholder.
+- A `synth::LatchOp` is created with a 1-bit integer type (`i1`) and the chosen input value.
+- The result of the latch is registered with the output node name via `updateOutputSynthSignalMapping(latchResult, outputName, nodeValuesMap, tmpValuesMap, builder)`, which:
+  - Replaces any previous temporary values for that node by the latch’s result.
+  - Erases the defining ops of those temporaries.
+  - Records the latch output in `nodeValuesMap` as the final signal for that node.
+
+This process ensures that every sequential element in the BLIF model is represented by an explicit Synth latch in the reconstructed circuit.
+
+### Combinational AIG logic (`.names` lines)
+
+BLIF `.names` lines describe combinational logic using a simple truth-table syntax. The pass distinguishes between three structural cases depending on the number of node names that follow `.names`.
+
+#### Case 1 – Single-node `.names` (constants)
+
+If the `.names` line lists only one node name, it represents a constant node:
+
+- The associated truth table line (e.g., `1` or `0`) determines whether the constant is logical 1 or 0.
+- A 1-bit `hw.constant` of the appropriate value is created at the current insertion point.
+- `updateOutputSynthSignalMapping` is called to associate this constant with the node name and to remove any temporary values previously created for that node.
+
+#### Case 2 – Two-node `.names` (wire or inverter)
+
+If the `.names` line has exactly two node names (one input, one output), the block encodes either a direct wire or an inversion between them, which is implemented via the helper:
+
+- `LogicalResult createSynthWire(Location loc, ArrayRef<std::string> ports, StringRef function, DenseMap<StringAttr, Value> &nodeValuesMap, DenseMap<StringAttr, Value> &tmpValuesMap, OpBuilder &builder)`.
+
+The behavior is:
+
+- The single input node is resolved to a Synth value using `getInputMappingSynthSignal`.
+- The truth table (`function`) is inspected:
+  - If it indicates that the output equals the input (no inversion), no new operation is created; `updateOutputSynthSignalMapping` simply records that the output node name maps to the same Synth value as the input.
+  - If it indicates inversion, the pass creates a `synth::aigAndInverterOp` with:
+    - The original input as its sole data input.
+    - An implied AND with logical 1 and an inversion flag that effectively models a NOT gate.
+- In both cases, `updateOutputSynthSignalMapping` registers the final output node and replaces any temporaries for that name.
+
+This guarantees that identity and inversion edges in the BLIF graph are represented explicitly (or by aliasing) in the Synth-level AIG.
+
+#### Case 3 – Multi-input `.names` (logic gates)
+
+If the `.names` line has more than two node names, it represents a multi-input combinational gate described by its truth table and is implemented using:
+
+- `LogicalResult createSynthLogicGate(Location loc, ArrayRef<std::string> ports, StringRef function, DenseMap<StringAttr, Value> &nodeValuesMap, DenseMap<StringAttr, Value> &tmpValuesMap, OpBuilder &builder)`.
+
+This helper:
+
+- Asserts that there is at least one input and exactly one output node name.
+- Resolves all input node names to Synth values using `getInputMappingSynthSignal`.
+- Interprets the BLIF truth table as specifying the conditions under which the output is 1, and constructs an AIG network using only `synth::aigAndInverterOp` operations:
+  - Each product term (row of the BLIF table) is converted into a small tree of AND-with-inverter nodes, where literals may be inverted as required.
+  - Multiple product terms are combined using additional AND-with-inverter nodes and constant signals to emulate OR behavior in AIG form.
+- The final Synth value for the gate output node is registered via `updateOutputSynthSignalMapping`, which also resolves and eliminates any temporary placeholders created earlier for that node.
+
+By restricting the implementation to `synth::aigAndInverterOp`, the pass ensures that **all combinational logic** is normalized to an AIG representation consisting of AND gates and literal inversion flags only.
+
+### Temporary signal handling and final wiring
+
+Throughout BLIF parsing, the helpers `getInputMappingSynthSignal` and `updateOutputSynthSignalMapping` ensure that forward references and late definitions are handled robustly:
+
+- `getInputMappingSynthSignal`:
+  - Returns a previously defined Synth value if the node name is in `nodeValuesMap`.
+  - Returns an existing temporary constant if the node name is in `tmpValuesMap`.
+  - Otherwise, creates a new 1-bit zero `hw.constant`, records it in `tmpValuesMap`, and returns it as a placeholder.
+- `updateOutputSynthSignalMapping`:
+  - If the node name exists in `tmpValuesMap`, replaces all uses of the temporary constant with the new result value and erases the constant operation.
+  - Inserts the new result into `nodeValuesMap` as the canonical value for that node.
+
+After all `.latch` and `.names` sections of the BLIF model have been processed, the converter:
+
+- Gathers Synth values for all BLIF output node names that correspond to the HW instance’s outputs (using the `hwInstOutputs` mapping built from BLIF `.outputs`).
+- Replaces each result of the original `hw.instance` with the corresponding Synth value.
+- Erases the `hw.instance` from the IR.
+
+At this point, the behavior previously encapsulated in the HW instance and its referenced HW module has been fully re-expressed as an inlined AIG of `synth::LatchOp` and `synth::aigAndInverterOp` operations connected directly to the top module’s ports, which completes the last step of the Handshake-to-Synth conversion.
