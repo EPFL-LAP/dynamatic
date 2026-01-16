@@ -1286,6 +1286,23 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p =
+                   llvm::dyn_cast<PathSingleSentForkOutput>(property.get())) {
+      // e.g. count(fork0.sent_0, fork1.sent_1, fork2.sent_0) <= 2
+      auto names = p->getForkOps();
+      auto idxs = p->getOutputIdxs();
+      if (names.size() != idxs.size()) {
+        llvm::errs() << "Expected equal number of forks and fork outputs in "
+                        "PathSingleSentForkOutput invariant\n";
+        return failure();
+      }
+      std::vector<std::string> forkOutNames{names.size()};
+      for (size_t i = 0; i < names.size(); ++i) {
+        forkOutNames[i] = llvm::formatv("{0}.sent_{1}", names[i], idxs[i]);
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) <= 1", llvm::join(forkOutNames, ", "));
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();

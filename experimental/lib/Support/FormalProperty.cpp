@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EFNAO;
   if (s == "CSOAFAF")
     return FormalProperty::TYPE::CSOAFAF;
+  if (s == "PSSFO")
+    return FormalProperty::TYPE::PSSFO;
 
   return std::nullopt;
 }
@@ -45,6 +47,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EFNAO";
   case TYPE::CSOAFAF:
     return "CSOAFAF";
+  case TYPE::PSSFO:
+    return "PSSFO";
   }
 }
 
@@ -102,6 +106,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::PSSFO:
+    return PathSingleSentForkOutput::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -305,9 +311,9 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 }
 
 PathSingleSentForkOutput::PathSingleSentForkOutput(
-    unsigned long id, TAG tag, std::vector<std::string> &forkOps,
-    std::vector<unsigned> &outputIdxs)
-    : FormalProperty(id, tag, TYPE::CSOAFAF), forkOps{forkOps},
+    unsigned long id, TAG tag, const std::vector<std::string> &forkOps,
+    const std::vector<unsigned> &outputIdxs)
+    : FormalProperty(id, tag, TYPE::PSSFO), forkOps{forkOps},
       outputIdxs{outputIdxs} {}
 
 llvm::json::Value PathSingleSentForkOutput::extraInfoToJSON() const {

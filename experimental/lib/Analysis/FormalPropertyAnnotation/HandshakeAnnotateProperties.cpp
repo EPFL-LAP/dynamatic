@@ -73,6 +73,21 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
+
+  LogicalResult
+  annotatePathSingleForkSentFinal(const std::vector<std::string> &prevForks,
+                                  const std::vector<unsigned> &prevIdxs);
+  LogicalResult
+  annotatePathSingleForkSentRec(std::unordered_set<std::string> visitedSet,
+                                const std::vector<std::string> &prevForks,
+                                const std::vector<unsigned> &prevIdxs,
+                                Operation &curOp);
+  LogicalResult annotatePathSingleForkSentGoNext(
+      const std::unordered_set<std::string> &visitedSet,
+      const std::vector<std::string> &prevForks,
+      const std::vector<unsigned> &prevIdxs, Operation &curOp,
+      bool annotateIdxs);
+  LogicalResult annotatePathSingleForkSent(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -223,6 +238,98 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentFinal(
+    const std::vector<std::string> &prevForks,
+    const std::vector<unsigned> &prevIdxs) {
+  if (prevForks.size() != prevIdxs.size()) {
+    llvm::errs() << "Different Indexs size and forks size\n";
+    return failure();
+  }
+  // No need to annotate properties of length 1 or lower
+  if (prevForks.size() <= 1) {
+    return success();
+  }
+  PathSingleSentForkOutput p(uid, FormalProperty::TAG::INVAR, prevForks,
+                             prevIdxs);
+  propertyTable.push_back(p.toJSON());
+  uid++;
+  return success();
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
+    std::unordered_set<std::string> visitedSet,
+    const std::vector<std::string> &prevForks,
+    const std::vector<unsigned> &prevIdxs, Operation &curOp) {
+
+  // If this operation has been visited, there is nothing to do
+  std::string id = getUniqueName(&curOp).str();
+  if (auto iter = visitedSet.find(id); iter != visitedSet.end()) {
+    return success();
+  }
+  visitedSet.insert(id);
+
+  // Found a slot, which marks the end of this path
+  if (auto bufOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
+    return success();
+  }
+
+  if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(curOp)) {
+    auto nextForks = prevForks;
+    nextForks.push_back(id);
+    return annotatePathSingleForkSentGoNext(visitedSet, nextForks, prevIdxs,
+                                            curOp, true);
+  }
+  return annotatePathSingleForkSentGoNext(visitedSet, prevForks, prevIdxs,
+                                          curOp, false);
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentGoNext(
+    const std::unordered_set<std::string> &visitedSet,
+    const std::vector<std::string> &prevForks,
+    const std::vector<unsigned> &prevIdxs, Operation &curOp,
+    bool annotateIdxs) {
+  llvm::errs() << "visited: " << visitedSet.size() << "\n";
+  llvm::errs() << "forks: " << prevForks.size() << "  idxs: " << prevIdxs.size()
+               << "  annotateIdxs: " << annotateIdxs << "\n";
+  for (auto [i, res] : llvm::enumerate(curOp.getResults())) {
+    std::vector<unsigned> nextIdxs = prevIdxs;
+    if (annotateIdxs) {
+      nextIdxs.push_back(i);
+      if (failed(annotatePathSingleForkSentFinal(prevForks, nextIdxs))) {
+        return failure();
+      }
+    }
+    for (auto *op : res.getUsers()) {
+      llvm::errs() << "from " << getUniqueName(&curOp) << " to "
+                   << getUniqueName(op) << "\n";
+      if (failed(annotatePathSingleForkSentRec(visitedSet, prevForks, nextIdxs,
+                                               *op))) {
+        return failure();
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotatePathSingleForkSent(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        std::vector<std::string> names{};
+        std::vector<unsigned> outputs{};
+        std::unordered_set<std::string> visited{};
+        names.push_back(getUniqueName(&op).str());
+        if (failed(annotatePathSingleForkSentGoNext(visited, names, outputs, op,
+                                                    true))) {
+          return failure();
+        }
+      }
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -234,6 +341,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+    if (failed(annotatePathSingleForkSent(modOp)))
       return signalPassFailure();
   }
 

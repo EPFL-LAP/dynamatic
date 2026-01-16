@@ -29,6 +29,7 @@ public:
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
+    PSSFO,   /* Path Single Sent Fork Output */
   };
 
   TAG getTag() const { return tag; }
@@ -240,12 +241,12 @@ public:
 
   PathSingleSentForkOutput() = default;
   PathSingleSentForkOutput(unsigned long id, TAG tag,
-                           std::vector<std::string> &forkOps,
-                           std::vector<unsigned> &outputIdxs);
+                           const std::vector<std::string> &forkOps,
+                           const std::vector<unsigned> &outputIdxs);
   ~PathSingleSentForkOutput() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::CSOAFAF;
+    return fp->getType() == TYPE::PSSFO;
   }
 
 private:
