@@ -469,8 +469,8 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
       }
 
       // TODO(ziad): Uncomment for better II on circuits with high-latency
-      // components. This +1 margin is NOT in the paper but helps achieve 2000 cycles with fir.c for some reason..... 
-      // double maxBaseLat =
+      // components. This +1 margin is NOT in the paper but helps achieve 2000
+      // cycles with fir.c for some reason..... double maxBaseLat =
       //     *std::max_element(pathBaseLatencies.begin(),
       //     pathBaseLatencies.end());
       // double minBaseLat =
@@ -843,9 +843,11 @@ void OccupancyBalancingLP::setup() {
   /// TODO(ziad): Revisit path occupancy constraints. Equation 11
   /// says paths should have equal occupancy, but implementing this as a sum
   /// constraint allows the solver to concentrate occupancy arbitrarily.
-  /// I have no idea why this is happening, but adding it makes everything worse.
+  /// I have no idea why this is happening, but adding it makes everything
+  /// worse.
   LLVM_DEBUG(
-      llvm::errs() << "[LP2]   Skipping path sum constraints (relying on N_c >= L_c/II)\n");
+      llvm::errs()
+      << "[LP2]   Skipping path sum constraints (relying on N_c >= L_c/II)\n");
 
   /// Add cycle capacity constraints
   /// (Paper: Section 5, Equation 12): Occupancy(cycle) <= B
