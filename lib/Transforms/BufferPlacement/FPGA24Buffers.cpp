@@ -452,6 +452,9 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
     ///   L_i - L_j <= M * s_p.
     ///   L_j - L_i <= M * s_p.
     /// (Paper: Section 4, Equation 2)
+    if (pathBaseLatencies.empty())
+      continue;
+
     for (size_t i = 0; i < pathLatencies.size(); ++i) {
       for (size_t j = i + 1; j < pathLatencies.size(); ++j) {
         std::string baseName = "imbalance_rp_" + std::to_string(pathIdx) + "_" +
@@ -464,6 +467,21 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
                              BIG_M * patternImbalanced,
                          baseName + "_b");
       }
+
+      // TODO(ziad): Uncomment for better II on circuits with high-latency
+      // components. This +1 margin is NOT in the paper but helps achieve 2000 cycles with fir.c for some reason..... 
+      // double maxBaseLat =
+      //     *std::max_element(pathBaseLatencies.begin(),
+      //     pathBaseLatencies.end());
+      // double minBaseLat =
+      //     *std::min_element(pathBaseLatencies.begin(),
+      //     pathBaseLatencies.end());
+      // bool hasLatencyImbalance = (maxBaseLat - minBaseLat) > 0.5;
+      // if (hasLatencyImbalance) {
+      //   model->addConstr(pathLatencies[i] >= maxBaseLat + 1,
+      //                    "minLat_rp_" + std::to_string(pathIdx) + "_" +
+      //                        std::to_string(i));
+      // }
     }
   }
 }
@@ -741,7 +759,6 @@ OccupancyBalancingLP::OccupancyBalancingLP(
     ArrayRef<CFDFC *> cfdfcs)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
                           targetPeriod),
-      timingDB(timingDB), targetPeriod(targetPeriod),
       latencyResult(latencyResult), reconvergentPaths(reconvergentPaths),
       cfdfcs(cfdfcs) {
   setup();
@@ -749,6 +766,9 @@ OccupancyBalancingLP::OccupancyBalancingLP(
 
 void OccupancyBalancingLP::setup() {
   LLVM_DEBUG(llvm::errs() << "[LP2] Setting up Occupancy Balancing LP...\n");
+
+  if (unsatisfiable)
+    return;
 
   if (cfdfcs.empty()) {
     LLVM_DEBUG(llvm::errs() << "[LP2] WARNING: No CFDFCs provided\n");
@@ -785,7 +805,7 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Table 2)
   for (Value channel : allChannels) {
     std::string name = getUniqueName(*channel.getUses().begin());
-    CPVar var = solver->addVar("n_" + name, CPVar::REAL, 0.0, MAX_OCCUPANCY);
+    CPVar var = model->addVar("n_" + name, CPVar::REAL, 0.0, MAX_OCCUPANCY);
     channelOccupancy[channel] = var;
   }
   LLVM_DEBUG(llvm::errs() << "[LP2]   Created " << channelOccupancy.size()
@@ -801,97 +821,45 @@ void OccupancyBalancingLP::setup() {
     }
     double minOccupancy = static_cast<double>(latency) / targetII;
 
-    solver->addConstr(channelOccupancy[channel] >= minOccupancy,
-                      "n_c>=(L_c/II)" +
-                          getUniqueName(*channel.getUses().begin()));
+    model->addConstr(channelOccupancy[channel] >= minOccupancy,
+                     "n_c>=(L_c/II)" +
+                         getUniqueName(*channel.getUses().begin()));
     constraintCount++;
   }
   LLVM_DEBUG(llvm::errs() << "[LP2]   Added " << constraintCount
-                          << " Little's Law constraints\n");
+                          << " N_c >= L_c/II constraints\n");
 
-  /// Add path consistency constraints
-  /// Where N_u = D_u / II (unit occupancy from pipelining)
-  /// (Paper: Section 5, Equation 11): Occupancy(p) = sum(N_u for units) +
-  /// sum(N_c for channels)
-  size_t pathConstraints = 0;
-  for (size_t pathIdx = 0; pathIdx < reconvergentPaths.size(); ++pathIdx) {
-    const ReconvergentPathWithGraph &pathWithGraph = reconvergentPaths[pathIdx];
-    const ReconvergentPath &path = pathWithGraph.path;
-    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
-
-    /// Enumerate simple paths from fork to join
-    std::vector<SimplePath> allPaths;
-    enumerateSimplePaths(*graph, path.forkNodeId, path.joinNodeId, path.nodeIds,
-                         allPaths);
-
-    /// Compute unit occupancy (constant) and channel expressions (variables)
-    std::vector<LinExpr> pathChannelOcc;
-    std::vector<double> pathUnitOcc;
-    double maxUnitOcc = 0.0;
-
-    for (const auto &simplePath : allPaths) {
-      LinExpr channelOcc;
-      double unitOcc = 0.0;
-
-      /// Compute unit occupancies N_u = D_u / II
-      for (NodeIdType nodeId : simplePath.nodes) {
-        Operation *op = graph->nodes[nodeId].op;
-        double unitLat = getUnitLatency(op, timingDB, targetPeriod);
-        unitOcc += unitLat / targetII;
-      }
-
-      /// Collect channel occupancy variables
-      for (EdgeIdType edgeId : simplePath.edges) {
-        Value channel = graph->edges[edgeId].channel;
-        if (channelOccupancy.count(channel)) {
-          channelOcc += channelOccupancy[channel];
-        }
-      }
-
-      pathChannelOcc.push_back(channelOcc);
-      pathUnitOcc.push_back(unitOcc);
-      maxUnitOcc = std::max(maxUnitOcc, unitOcc);
-    }
-
-    /// Debug: log if paths have different unit occupancies
-    /// TODO(ziad): Remove this after making sure the LP is working correctly.
-    double minUnitOcc =
-        *std::min_element(pathUnitOcc.begin(), pathUnitOcc.end());
-    if (maxUnitOcc - minUnitOcc > 0.5) {
-      LLVM_DEBUG(llvm::errs()
-                 << "[LP2] Path " << pathIdx
-                 << ": unit occupancy diff = " << (maxUnitOcc - minUnitOcc)
-                 << " (min=" << minUnitOcc << ", max=" << maxUnitOcc << ")\n");
-    }
-
-    /// Each path's channel occupancy must compensate for its unit occupancy
-    /// deficit relative to max. channelOcc[i] >= maxUnitOcc - unitOcc[i] For
-    /// path i: channelOcc[i] >= maxUnitOcc - unitOcc[i]
-    /// TODO(ziad): There's an issue with this constraint, come back to this.
-    for (size_t i = 0; i < pathChannelOcc.size(); ++i) {
-      double deficit = maxUnitOcc - pathUnitOcc[i];
-      if (deficit > 0.01) {
-        solver->addConstr(pathChannelOcc[i] >= deficit,
-                          "pathOcc_" + std::to_string(pathIdx) + "_" +
-                              std::to_string(i));
-        pathConstraints++;
-      }
-    }
-  }
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Added " << pathConstraints
-                          << " path consistency constraints\n");
+  /// Path consistency constraints (Paper: Section 5, Equation 11)
+  /// NOTE: The per-channel constraint N_c >= L_c / II from above
+  /// should be sufficient when LP1 correctly balances latency. The path sum
+  /// constraint can cause occupancy to concentrate on channels where latency
+  /// wasn't added (e.g., on mux outputs instead of fork outputs), leading to
+  /// transparent FIFOs instead of registers.
+  ///
+  /// For now, we rely on N_c >= L_c / II to distribute occupancy
+  /// proportionally to where latency was added by LP1. This ensures DV buffers
+  /// are placed where needed.
+  ///
+  /// TODO(ziad): Revisit path occupancy constraints. Equation 11
+  /// says paths should have equal occupancy, but implementing this as a sum
+  /// constraint allows the solver to concentrate occupancy arbitrarily.
+  /// I have no idea why this is happening, but adding it makes everything worse.
+  LLVM_DEBUG(
+      llvm::errs() << "[LP2]   Skipping path sum constraints (relying on N_c >= L_c/II)\n");
 
   /// Add cycle capacity constraints
-  /// (Paper: Section 5, Equation 12): N_c >= 1 for backedges
-  /// For backedges, ensure capacity for at least 1 token
-  /// TODO(ziad): There's an issue with this constraint, come back to this.
+  /// (Paper: Section 5, Equation 12): Occupancy(cycle) <= B
+  /// For sequential programs, B=1 means at most 1 token per cycle.
+  /// We enforce N_c >= 1 for backedges to ensure each cycle has at least 1
+  /// token, which combined with the minimization objective effectively limits
+  /// to exactly 1 token for sequential execution.
   size_t cycleConstraints = 0;
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];
     for (Value channel : cfdfc->backedges) {
       if (channelOccupancy.count(channel)) {
-        solver->addConstr(channelOccupancy[channel] >= 1.0,
-                          "backedge_" + std::to_string(i));
+        model->addConstr(channelOccupancy[channel] >= 1.0,
+                         "backedge_" + std::to_string(i));
         cycleConstraints++;
       }
     }
@@ -906,36 +874,18 @@ void OccupancyBalancingLP::setup() {
     unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
     objective += bitwidth * channelOccupancy[channel];
   }
-  /// Agfain, as done above, we minimize by maximizing the negative.b
-  solver->setMaximizeObjective(-objective);
+  /// Again, as above, we minimize by maximizing the negative.
+  model->setMaximizeObjective(-objective);
 
+  markReadyToOptimize();
   LLVM_DEBUG(llvm::errs() << "[LP2] Setup complete.\n");
-}
-
-LogicalResult OccupancyBalancingLP::optimize() {
-  if (unsatisfiable)
-    return failure();
-
-  LLVM_DEBUG(llvm::errs() << "[LP2] Optimizing...\n");
-  solver->optimize();
-
-  if (solver->status != CPSolver::OPTIMAL &&
-      solver->status != CPSolver::NONOPTIMAL) {
-    LLVM_DEBUG(llvm::errs() << "[LP2] Optimization failed: "
-                            << solver->symbolizeStatus() << "\n");
-    return failure();
-  }
-
-  LLVM_DEBUG(llvm::errs() << "[LP2] Optimization complete: "
-                          << solver->symbolizeStatus() << "\n");
-  return success();
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
   LLVM_DEBUG(llvm::errs() << "[LP2] Extracting results...\n");
 
   for (auto &[channel, var] : channelOccupancy) {
-    double occupancy = solver->getValue(var);
+    double occupancy = model->getValue(var);
     unsigned numSlots = static_cast<unsigned>(std::ceil(occupancy));
 
     /// Get L_c (latency) from the latency balancing's results.
@@ -962,16 +912,21 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
     PlacementResult result;
 
     /// Buffer configuration (Paper: Section 6)
+    /// L_c = latencyCycles (extra latency to add)
+    /// N_c = numSlots (occupancy/capacity needed)
     if (latencyCycles == 0 && numSlots > 0) {
-      /// Case 1: No latency, just storage 
+      /// Case 1: L=0, N>0 - No latency, just storage
       result.numFifoNone = numSlots;
     } else if (numSlots > latencyCycles) {
-      /// Case 3: N > L - pipeline + transparent FIFO
+      /// Case 3: N > L - Need L pipeline stages + (N-L) transparent FIFO slots
       result.numOneSlotDV = latencyCycles;
       result.numFifoNone = numSlots - latencyCycles;
     } else {
-      /// Case 2: L >= N - standard pipeline with distributed latency
-      result.numOneSlotDV = numSlots;
+      /// Case 2: L >= N - Need L cycles of latency
+      /// Paper suggests ⌈L/N⌉ latency per slot, but our infrastructure
+      /// uses 1-cycle DV buffers. We use L DV buffers for correctness.
+      /// This provides L cycles latency and L capacity (>= N, so sufficient).
+      result.numOneSlotDV = latencyCycles;
     }
 
     /// For Mux/Merge/ControlMerge on cycles, add break_r for deadlock
@@ -990,8 +945,9 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
       placement[channel] = result;
       LLVM_DEBUG(llvm::errs()
                  << "  " << getUniqueName(*channel.getUses().begin())
-                 << ": L=" << latencyCycles << ", N=" << numSlots << " -> DV="
-                 << result.numOneSlotDV << ", FIFO=" << result.numFifoNone
+                 << ": L=" << latencyCycles << ", N=" << numSlots
+                 << ", occ=" << occupancy << " -> DV=" << result.numOneSlotDV
+                 << ", FIFO=" << result.numFifoNone
                  << ", R=" << result.numOneSlotR << "\n");
     }
   }

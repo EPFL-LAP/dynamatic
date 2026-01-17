@@ -105,25 +105,15 @@ public:
                        ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
                        ArrayRef<CFDFC *> cfdfcs);
 
-  LogicalResult optimize();
-
   bool isUnsatisfiable() const { return unsatisfiable; }
 
-  void extractResult(BufferPlacement &placement);
+  void extractResult(BufferPlacement &placement) override;
 
 private:
-  std::unique_ptr<CPSolver> solver;
-
-  const TimingDatabase &timingDB;
-  double targetPeriod;
-
   const LatencyBalancingResult &latencyResult;
 
   ArrayRef<ReconvergentPathWithGraph> reconvergentPaths;
   ArrayRef<CFDFC *> cfdfcs;
-
-  /// Whether setup failed.
-  bool unsatisfiable = false;
 
   DenseMap<Value, CPVar> channelOccupancy;
 
