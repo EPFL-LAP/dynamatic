@@ -25,8 +25,8 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
@@ -47,8 +47,8 @@ using namespace dynamatic::experimental;
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"), FPGA24("fpga24"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf");
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
+    FPGA24("fpga24"), COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 namespace dynamatic {
 namespace buffer {
@@ -572,7 +572,7 @@ static void logCFDFCUnions(FuncInfo &info, Logger &log,
 template <typename MILP, typename... Args>
 static inline LogicalResult
 checkLoggerAndSolve(Logger *logger, StringRef milpName,
-                    BufferPlacement &placement, Args &&...args) {
+                    BufferPlacement &placement, Args &&... args) {
   if (logger) {
     return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
                            milpName);
