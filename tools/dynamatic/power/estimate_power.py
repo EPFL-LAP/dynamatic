@@ -271,7 +271,7 @@ if __name__ == "__main__":
         ),
         default="pre"
     )
-    p.add_argument("--vivado_cmd", type=str, required=False, help="Vivado command", default="vivado-2019.1.1-bt vivado")
+    p.add_argument("--vivado_cmd", type=str, required=False, help="Vivado command", default="vivado")
     p.add_argument("--cp", type=float, required=True, help="Clock period for synthesis")
 
     args = p.parse_args()
