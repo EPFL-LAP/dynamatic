@@ -11,7 +11,7 @@ There are three main sections in this document.
 4. AIG construction: Convert all hw instances into AIG nodes.
 
 
-The pass is called [`HandshakeToSynthPass`](HandshakeToSynth.cpp).
+The pass is called [`HandshakeToSynthPass`](ConversionHandshakeToSynth.md).
 
 ---
 
