@@ -26,6 +26,32 @@ end package;
 package body sim_package is
 
 ---------------------------------------------------------------------------
+	-- Helper to convert a 4-bit nibble to a lowercase hex character
+	function nibble_to_hex_char(nibble : std_logic_vector(3 downto 0))
+			return character is
+	begin
+		case nibble is
+			when "0000" => return '0';
+			when "0001" => return '1';
+			when "0010" => return '2';
+			when "0011" => return '3';
+			when "0100" => return '4';
+			when "0101" => return '5';
+			when "0110" => return '6';
+			when "0111" => return '7';
+			when "1000" => return '8';
+			when "1001" => return '9';
+			when "1010" => return 'a';
+			when "1011" => return 'b';
+			when "1100" => return 'c';
+			when "1101" => return 'd';
+			when "1110" => return 'e';
+			when "1111" => return 'f';
+			when others => return 'x';
+		end case;
+	end function nibble_to_hex_char;
+
+---------------------------------------------------------------------------
 	-- Procedure to read tokens from input textfile
 	procedure read_token(file filename	: text;
 	                          line_num	: inout line;
@@ -157,25 +183,20 @@ package body sim_package is
 		-- Internal signals
 		constant inp_len : integer := logicVec'length;
 		constant str_len : integer := (inp_len + 3) / 4;
-		variable conv	 : string(1 to str_len); 
-		variable ret 	 : string (conv'range);
+		variable ret 	 : string(1 to str_len);
+		variable padded	 : std_logic_vector(str_len * 4 - 1 downto 0);
+		variable nibble  : std_logic_vector(3 downto 0);
 
 	begin
-		-- Use in-built function (won't report errors)
-		conv := to_hex_string(logicVec);	
+		-- Zero-pad on the MSB side to a full nibble width.
+		padded := (others => '0');
+		padded(inp_len - 1 downto 0) := logicVec;
 
-		-- Convert string to lower case (alternatively change token compare function)
-		for i in conv'range loop
-			case (conv(i)) is
-				when 'A' 	=> ret(i) := 'a';
-				when 'B' 	=> ret(i) := 'b';
-				when 'C' 	=> ret(i) := 'c';
-				when 'D' 	=> ret(i) := 'd';
-				when 'E' 	=> ret(i) := 'e';
-				when 'F' 	=> ret(i) := 'f';
-				when others => ret(i) := conv(i);
-			end case;
-     	end loop;
+		-- Convert to lower-case hex, MSB nibble first.
+		for i in 0 to str_len - 1 loop
+			nibble := padded((str_len * 4 - 1) - i * 4 downto (str_len * 4 - 4) - i * 4);
+			ret(i + 1) := nibble_to_hex_char(nibble);
+		end loop;
 
 		-- Return the converted string
 		return ret;
