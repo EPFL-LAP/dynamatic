@@ -229,6 +229,13 @@ private:
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
 
+// For any path that does not contain any slots, only at most a single fork
+// output along that path can be in the `sent` state. In other words, if there
+// is a path containing two fork outputs in the `sent` state, there has to be a
+// slot containing a token between them, as the earlier `sent` output duplicated
+// a token onto this path, and the later `sent` output blocks the token from
+// leaving the path. See invariant 3 of
+// https://ieeexplore.ieee.org/document/10323796 for more details
 class PathSingleSentForkOutput : public FormalProperty {
 public:
   std::vector<std::string> getForkOps() { return forkOps; }
