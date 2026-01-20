@@ -124,10 +124,6 @@ void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
       Block *leastCommonAnc =
           postDomInfo.findNearestCommonDominator(successor, &bb);
 
-      // Loop case
-      if (leastCommonAnc == &bb)
-        blocksControlDeps[&bb].allControlDeps.insert(&bb);
-
       // In the post dominator tree, all the nodes from `leastCommonAnc` to
       // `successor` should be control dependent on `block`
       blocksControlDeps[successor].allControlDeps.insert(&bb);
