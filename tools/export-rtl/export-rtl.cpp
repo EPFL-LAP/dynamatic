@@ -87,6 +87,11 @@ static cl::opt<HDL>
                    clEnumValN(HDL::SMV, "smv", "SMV")),
         cl::cat(mainCategory));
 
+static cl::opt<bool> verifyInvariants(
+    "verify-invariants", cl::Optional,
+    cl::desc("generate INVARs as INVARSPEC to verify if they are correct"),
+    cl::init(false), cl::cat(mainCategory));
+
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
                cl::desc("<RTL configuration files...>"), cl::cat(mainCategory));
@@ -1386,11 +1391,17 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << "\n-- properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
-    if (tag == FormalProperty::TAG::OPT)
-      os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
-    else if (tag == FormalProperty::TAG::INVAR) {
-      os << "-- " << id << "\n";
-      os << "INVAR " << property << ";\n";
+    if (verifyInvariants) {
+      if (tag == FormalProperty::TAG::INVAR) {
+        os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+      }
+    } else {
+      if (tag == FormalProperty::TAG::OPT)
+        os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+      else if (tag == FormalProperty::TAG::INVAR) {
+        os << "-- " << id << "\n";
+        os << "INVAR " << property << ";\n";
+      }
     }
   });
 

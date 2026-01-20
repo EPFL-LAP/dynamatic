@@ -28,6 +28,10 @@ The `--fast-token-delivery` flag enables the *Fast Token Delivery (FTD)* algorit
 > [!NOTE]  
 > Requires a Vivado installation! 
 
+- `verify-invariants`: Verify that automatically-generated invariants during rigidification are provably correct.
+> [!NOTE]  
+> Requires nuXmv installation!
+
 - `visualize`: Visualizes the execution of the circuit simulated by `ModelSim`/`Questa`. 
 > [!NOTE]  
 > Requires Godot Engine and [the visualizer component must be built!](AdvancedBuild.md#4-interactive-dataflow-circuit-visualizer)
