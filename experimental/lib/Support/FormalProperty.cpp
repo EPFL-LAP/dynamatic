@@ -29,6 +29,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::VEQ;
   if (s == "EFNAO")
     return FormalProperty::TYPE::EFNAO;
+  if (s == "CSOAFAF")
+    return FormalProperty::TYPE::CSOAFAF;
 
   return std::nullopt;
 }
@@ -41,6 +43,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "VEQ";
   case TYPE::EFNAO:
     return "EFNAO";
+  case TYPE::CSOAFAF:
+    return "CSOAFAF";
   }
 }
 
@@ -95,6 +99,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EFNAO:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::CSOAFAF:
+    return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
+                                                    path.field(INFO_LIT));
   }
 }
 
@@ -256,6 +263,42 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 
   if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerOp) ||
       !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs))
+    return nullptr;
+
+  return prop;
+}
+
+// Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
+
+CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
+    unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
+    handshake::EagerForkLikeOpInterface &forkOpI)
+    : FormalProperty(id, tag, TYPE::CSOAFAF) {
+  forkOp = getUniqueName(forkOpI).str();
+  numEagerForkOutputs = forkOpI.getNumEagerOutputs();
+  bufferOp = getUniqueName(bufferOpI).str();
+  bufferSlot = bufferOpI.getNumSlots() - 1;
+}
+
+llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
+  return llvm::json::Object({{FORK_OP_LIT, forkOp},
+                             {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs},
+                             {BUFFER_OP_LIT, bufferOp},
+                             {BUFFER_SLOT_LIT, bufferSlot}});
+}
+
+std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
+CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
+                                         llvm::json::Path path) {
+  auto prop = std::make_unique<CopiedSlotsOfActiveForkAreFull>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(FORK_OP_LIT, prop->forkOp) ||
+      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
+      !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
+      !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
     return nullptr;
 
   return prop;
