@@ -295,6 +295,7 @@ public:
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
+  static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -321,6 +322,8 @@ public:
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
                           "accesses, use with caution!"});
+    addFlag({STRAIGHT_TO_QUEUE,
+             "Use straight to queue to connect the circuit to the LSQ"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -375,6 +378,17 @@ public:
   Synthesize(FrontendState &state)
       : Command("synthesize",
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
+                state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class EstimatePower : public Command {
+public:
+  EstimatePower(FrontendState &state)
+      : Command("estimate-power",
+                "Estimate the power consumption of the design using switching "
+                "activity from simulation.",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
@@ -714,6 +728,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string straightToQueue =
+      args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -744,7 +760,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver);
+                 fastTokenDelivery, milpSolver, straightToQueue);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -829,6 +845,24 @@ CommandResult Synthesize::execute(CommandArguments &args) {
                  floatToString(state.targetCP / 2, 3));
 }
 
+CommandResult EstimatePower::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
+
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
+}
+
 static StringRef removeComment(StringRef input) {
   if (size_t cutAt = input.find('#'); cutAt != std::string::npos)
     return input.take_front(cutAt);
@@ -902,6 +936,7 @@ int main(int argc, char **argv) {
   commands.add<Simulate>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
+  commands.add<EstimatePower>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 

@@ -32,7 +32,7 @@ def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
             f'std_logic_vector(unsigned(\'0\' & {in_a.getNameRead()}) + unsigned(\'0\' & {in_b.getNameRead()}));\n'
         str_ret += ctx.get_current_indent() + f'{res.getNameWrite()} <= ' + \
             f'std_logic_vector(unsigned({sum.getNameRead()}) - {max}) ' + \
-            f'when {sum.getNameRead()} >= {max} else {sum.getNameRead()};\n'
+            f'when unsigned({sum.getNameRead()}) >= {max} else {sum.getNameRead()};\n'
         str_ret += ctx.get_current_indent() + f'{out.getNameWrite()} <= {res.getNameRead()}({out.size-1} downto 0);\n'
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
@@ -57,8 +57,8 @@ def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
     else:
         str_ret += ctx.get_current_indent() + f'{out.getNameWrite()} <= ' + \
             f'std_logic_vector(unsigned({in_a.getNameRead()}) - {max - const}) ' + \
-            f'when {in_a.getNameRead()} >= {max - const} else ' + \
-            f'std_logic_vector(unsigned({in_a.getNameRead()}) + {const}));\n'
+            f'when unsigned({in_a.getNameRead()}) >= {max - const} else ' + \
+            f'std_logic_vector(unsigned({in_a.getNameRead()}) + {const});\n'
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
 
