@@ -667,6 +667,9 @@ void LatencyBalancingMILP::addCycleTimeConstraints() {
     /// II_CFC = max(1, max base latency) - minimum feasible II
     double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
 
+    /// Track the maximum II across all CFDFCs
+    computedII = std::max(computedII, iiCFC);
+
     LLVM_DEBUG(llvm::errs()
                << "[LP1]   CFDFC " << cfdfcIdx << ": " << cycles.size()
                << " cycles, II_CFC = " << iiCFC
@@ -675,6 +678,24 @@ void LatencyBalancingMILP::addCycleTimeConstraints() {
     /// Add constraints for each cycle: Latency(l) == II_CFC
     for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
       const SimpleCycle &cycle = cycles[cycleIdx];
+
+      /// Debug: Show channels on this cycle
+      /// TODO(ziad): Remove this after making sure the LP is working correctly.
+      LLVM_DEBUG({
+        llvm::errs() << "[LP1]     Cycle " << cycleIdx << " channels: ";
+        for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+          NodeIdType src = cycle.nodes[i];
+          NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
+            if (cfdfcGraph.edges[edgeId].dstId == dst) {
+              Value channel = cfdfcGraph.edges[edgeId].channel;
+              llvm::errs() << getUniqueName(*channel.getUses().begin()) << " ";
+              break;
+            }
+          }
+        }
+        llvm::errs() << "\n";
+      });
 
       /// Compute cycle latency expression: sum(D_u) + sum(L_c)
       LinExpr cycleLatency =
@@ -744,8 +765,9 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
                << ", stalled=" << model->getValue(chVars.stalled) << "\n");
   }
 
-  /// Default target II = 1 for maximum throughput
-  result.targetII = 1.0;
+  result.targetII = computedII;
+  LLVM_DEBUG(llvm::errs() << "[LP1] Computed target II = " << computedII
+                          << "\n");
   return result;
 }
 
@@ -1067,6 +1089,48 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
   LLVM_DEBUG(llvm::errs() << "LP1 computed extra latencies for "
                           << latencyResult.channelExtraLatency.size()
                           << " channels\n");
+
+  /// Debug: Verify cycle latencies after LP1
+  /// TODO(ziad): Remove this after making sure the LP is working correctly.
+  LLVM_DEBUG({
+    llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
+    for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcPtrs.size(); ++cfdfcIdx) {
+      CFDFC *cfdfc = cfdfcPtrs[cfdfcIdx];
+      SynchronizingCyclesFinderGraph cfdfcGraph;
+      cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
+      std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
+
+      for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
+        const SimpleCycle &cycle = cycles[cycleIdx];
+        unsigned totalLatency = 0;
+        llvm::errs() << "  Cycle " << cycleIdx << ": ";
+        for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+          NodeIdType src = cycle.nodes[i];
+          NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
+            if (cfdfcGraph.edges[edgeId].dstId == dst) {
+              Value channel = cfdfcGraph.edges[edgeId].channel;
+              unsigned extraLat = 0;
+              if (latencyResult.channelExtraLatency.count(channel)) {
+                extraLat = latencyResult.channelExtraLatency.lookup(channel);
+              }
+              if (extraLat > 0) {
+                llvm::errs() << getUniqueName(*channel.getUses().begin())
+                             << "(L=" << extraLat << ") ";
+              }
+              totalLatency += extraLat;
+              break;
+            }
+          }
+        }
+        llvm::errs() << "-> Total cycle latency = " << totalLatency << "\n";
+        if (totalLatency > 1) {
+          llvm::errs() << "  WARNING: Cycle " << cycleIdx
+                       << " has latency > 1, will cause II > 1!\n";
+        }
+      }
+    }
+  });
 
   /// Solve Occupancy Balancing LP2
   LLVM_DEBUG(llvm::errs() << "=== Setting up LP2 (Occupancy Balancing) ===\n");

@@ -74,6 +74,9 @@ private:
   /// CFDFCs needed for cylce constraints.
   ArrayRef<CFDFC *> cfdfcs;
 
+  /// Computed minimum feasible Initiation Interval across all CFDFCs (set by addCycleTimeConstraints).
+  double computedII = 1.0;
+
   void addLatencyVariables();
 
   /// Add pattern imbalance constraints for reconvergent paths.
