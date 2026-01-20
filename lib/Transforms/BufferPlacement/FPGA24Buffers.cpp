@@ -799,10 +799,10 @@ void OccupancyBalancingLP::setup() {
   }
 
   /// Collect ALL channels from CFDFCs
-  DenseSet<Value> allChannels;
+  SmallVector<Value> allChannels;
   for (CFDFC *cfdfc : cfdfcs) {
     for (Value channel : cfdfc->channels) {
-      allChannels.insert(channel);
+      allChannels.push_back(channel);
     }
   }
 
@@ -843,6 +843,10 @@ void OccupancyBalancingLP::setup() {
     }
     double minOccupancy = static_cast<double>(latency) / targetII;
 
+    LLVM_DEBUG(llvm::errs()
+                   << "[LP2***] minOccupancy = " << minOccupancy
+                   << " channel = " << getUniqueName(*channel.getUses().begin())
+                   << "\n";);
     model->addConstr(channelOccupancy[channel] >= minOccupancy,
                      "n_c>=(L_c/II)" +
                          getUniqueName(*channel.getUses().begin()));
@@ -895,8 +899,12 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c*N_c)
   LinExpr objective;
   for (Value channel : allChannels) {
+    llvm::errs() << "[LP2 **--**] Channel in obj "
+                 << getUniqueName(*channel.getUses().begin()) << "\n";
     unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
-    objective += bitwidth * channelOccupancy[channel];
+    // Control channel might have a bitwidth of zero, in this case, we always
+    // weight it with 1.
+    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
   }
   /// Again, as above, we minimize by maximizing the negative.
   model->setMaximizeObjective(-objective);
@@ -1165,10 +1173,10 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
 
       if (isMergeLike) {
         PlacementResult &result = placement[channel];
-        if (result.numOneSlotDV == 0)
-          result.numOneSlotDV = 1;
+        // if (result.numOneSlotDV == 0)
+        //   result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
-        llvm::errs() << "  Adding DV+R for merge-like: "
+        llvm::errs() << "  Adding R for merge-like: "
                      << getUniqueName(*channel.getUses().begin()) << "\n";
       }
     }
