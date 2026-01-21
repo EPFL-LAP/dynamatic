@@ -24,7 +24,10 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include <fstream>
+#include <numeric>
 #include <queue>
+
+#define DEBUG_TYPE "latency-and-occupancy-balancing"
 
 // Make the graph boost analyzable.
 // NOTE: Moving this to the header file will cause linking errors.
@@ -551,9 +554,6 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
-  LLVM_DEBUG(llvm::errs() << "Dumped " << totalPaths
-                          << " reconvergent paths from " << graphPaths.size()
-                          << " graphs to " << fullPath << "\n";);
 }
 
 // [END AI-generated code]
