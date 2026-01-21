@@ -1285,6 +1285,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
           llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
                         bufferFull)
               .str();
+      // e.g. (fork6.sent_0 | fork6.sent_1) -> load1.full_1
+      // when the second slot of load1 is a copied slot of fork6
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<PathSingleSentForkOutput>(property.get())) {
