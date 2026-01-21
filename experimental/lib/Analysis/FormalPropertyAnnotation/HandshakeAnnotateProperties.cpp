@@ -288,9 +288,6 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentGoNext(
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs, Operation &curOp,
     bool annotateIdxs) {
-  llvm::errs() << "visited: " << visitedSet.size() << "\n";
-  llvm::errs() << "forks: " << prevForks.size() << "  idxs: " << prevIdxs.size()
-               << "  annotateIdxs: " << annotateIdxs << "\n";
   for (auto [i, res] : llvm::enumerate(curOp.getResults())) {
     std::vector<unsigned> nextIdxs = prevIdxs;
     if (annotateIdxs) {
@@ -300,8 +297,6 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentGoNext(
       }
     }
     for (auto *op : res.getUsers()) {
-      llvm::errs() << "from " << getUniqueName(&curOp) << " to "
-                   << getUniqueName(op) << "\n";
       if (failed(annotatePathSingleForkSentRec(visitedSet, prevForks, nextIdxs,
                                                *op))) {
         return failure();
