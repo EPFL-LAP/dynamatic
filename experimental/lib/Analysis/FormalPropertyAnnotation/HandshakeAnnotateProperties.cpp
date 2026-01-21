@@ -75,14 +75,14 @@ private:
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
 
   LogicalResult
-  annotatePathSingleForkSentFinal(const std::vector<std::string> &prevForks,
+  annotatePathSingleForkSentPushProperty(const std::vector<std::string> &prevForks,
                                   const std::vector<unsigned> &prevIdxs);
   LogicalResult
-  annotatePathSingleForkSentRec(std::unordered_set<std::string> visitedSet,
+  annotatePathSingleForkSentDecide(std::unordered_set<std::string> visitedSet,
                                 const std::vector<std::string> &prevForks,
                                 const std::vector<unsigned> &prevIdxs,
                                 Operation &curOp);
-  LogicalResult annotatePathSingleForkSentGoNext(
+  LogicalResult annotatePathSingleForkSentIterate(
       const std::unordered_set<std::string> &visitedSet,
       const std::vector<std::string> &prevForks,
       const std::vector<unsigned> &prevIdxs, Operation &curOp,
@@ -238,7 +238,7 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentFinal(
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentPushProperty(
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs) {
   if (prevForks.size() != prevIdxs.size()) {
@@ -256,7 +256,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentFinal(
   return success();
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentDecide(
     std::unordered_set<std::string> visitedSet,
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs, Operation &curOp) {
@@ -276,14 +276,14 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
   if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(curOp)) {
     auto nextForks = prevForks;
     nextForks.push_back(id);
-    return annotatePathSingleForkSentGoNext(visitedSet, nextForks, prevIdxs,
+    return annotatePathSingleForkSentIterate(visitedSet, nextForks, prevIdxs,
                                             curOp, true);
   }
-  return annotatePathSingleForkSentGoNext(visitedSet, prevForks, prevIdxs,
+  return annotatePathSingleForkSentIterate(visitedSet, prevForks, prevIdxs,
                                           curOp, false);
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentGoNext(
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentIterate(
     const std::unordered_set<std::string> &visitedSet,
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs, Operation &curOp,
@@ -292,12 +292,12 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentGoNext(
     std::vector<unsigned> nextIdxs = prevIdxs;
     if (annotateIdxs) {
       nextIdxs.push_back(i);
-      if (failed(annotatePathSingleForkSentFinal(prevForks, nextIdxs))) {
+      if (failed(annotatePathSingleForkSentPushProperty(prevForks, nextIdxs))) {
         return failure();
       }
     }
     for (auto *op : res.getUsers()) {
-      if (failed(annotatePathSingleForkSentRec(visitedSet, prevForks, nextIdxs,
+      if (failed(annotatePathSingleForkSentDecide(visitedSet, prevForks, nextIdxs,
                                                *op))) {
         return failure();
       }
@@ -315,7 +315,7 @@ HandshakeAnnotatePropertiesPass::annotatePathSingleForkSent(ModuleOp modOp) {
         std::vector<unsigned> outputs{};
         std::unordered_set<std::string> visited{};
         names.push_back(getUniqueName(&op).str());
-        if (failed(annotatePathSingleForkSentGoNext(visited, names, outputs, op,
+        if (failed(annotatePathSingleForkSentIterate(visited, names, outputs, op,
                                                     true))) {
           return failure();
         }
