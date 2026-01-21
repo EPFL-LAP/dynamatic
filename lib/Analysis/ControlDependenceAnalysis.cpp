@@ -159,14 +159,23 @@ void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
 
 void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(Region &region) {
 
-  // For each block, consider each of its dependencies (`oneDep`) and move each
-  // of its dependencies into block's
-  for (Block &block : region.getBlocks()) {
-    BlockControlDeps blockControlDeps = blocksControlDeps[&block];
-    for (auto &oneDep : blockControlDeps.allControlDeps) {
-      DenseSet<Block *> &oneDepDeps = blocksControlDeps[oneDep].allControlDeps;
-      for (auto &oneDepDep : oneDepDeps)
-        blocksControlDeps[&block].allControlDeps.insert(oneDepDep);
+  bool changed = true;
+  while (changed) {
+    changed = false;
+
+    // For each block, consider each of its dependencies and move each
+    // of its dependencies into block's
+    for (Block &block : region.getBlocks()) {
+      DenseSet<Block *> &blockDeps = blocksControlDeps[&block].allControlDeps;
+      SmallVector<Block *, 4> currentDeps(blockDeps.begin(), blockDeps.end());
+
+      for (Block *oneDep : currentDeps) {
+        DenseSet<Block *> &oneDepDeps = blocksControlDeps[oneDep].allControlDeps;
+        for (Block *oneDepDep : oneDepDeps) {
+          if (blockDeps.insert(oneDepDep).second)
+            changed = true; // Found a new dependency
+        }
+      }
     }
   }
 }
