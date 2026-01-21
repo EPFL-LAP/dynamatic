@@ -74,14 +74,14 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
 
-  LogicalResult
-  annotatePathSingleForkSentPushProperty(const std::vector<std::string> &prevForks,
-                                  const std::vector<unsigned> &prevIdxs);
+  LogicalResult annotatePathSingleForkSentPushProperty(
+      const std::vector<std::string> &prevForks,
+      const std::vector<unsigned> &prevIdxs);
   LogicalResult
   annotatePathSingleForkSentDecide(std::unordered_set<std::string> visitedSet,
-                                const std::vector<std::string> &prevForks,
-                                const std::vector<unsigned> &prevIdxs,
-                                Operation &curOp);
+                                   const std::vector<std::string> &prevForks,
+                                   const std::vector<unsigned> &prevIdxs,
+                                   Operation &curOp);
   LogicalResult annotatePathSingleForkSentIterate(
       const std::unordered_set<std::string> &visitedSet,
       const std::vector<std::string> &prevForks,
@@ -238,7 +238,8 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentPushProperty(
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentPushProperty(
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs) {
   if (prevForks.size() != prevIdxs.size()) {
@@ -277,13 +278,14 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentDecide(
     auto nextForks = prevForks;
     nextForks.push_back(id);
     return annotatePathSingleForkSentIterate(visitedSet, nextForks, prevIdxs,
-                                            curOp, true);
+                                             curOp, true);
   }
   return annotatePathSingleForkSentIterate(visitedSet, prevForks, prevIdxs,
-                                          curOp, false);
+                                           curOp, false);
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentIterate(
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentIterate(
     const std::unordered_set<std::string> &visitedSet,
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs, Operation &curOp,
@@ -297,8 +299,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentIterate
       }
     }
     for (auto *op : res.getUsers()) {
-      if (failed(annotatePathSingleForkSentDecide(visitedSet, prevForks, nextIdxs,
-                                               *op))) {
+      if (failed(annotatePathSingleForkSentDecide(visitedSet, prevForks,
+                                                  nextIdxs, *op))) {
         return failure();
       }
     }
@@ -315,8 +317,8 @@ HandshakeAnnotatePropertiesPass::annotatePathSingleForkSent(ModuleOp modOp) {
         std::vector<unsigned> outputs{};
         std::unordered_set<std::string> visited{};
         names.push_back(getUniqueName(&op).str());
-        if (failed(annotatePathSingleForkSentIterate(visited, names, outputs, op,
-                                                    true))) {
+        if (failed(annotatePathSingleForkSentIterate(visited, names, outputs,
+                                                     op, true))) {
           return failure();
         }
       }
