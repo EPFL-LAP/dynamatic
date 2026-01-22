@@ -187,16 +187,70 @@ static bool isReachable(Block *start, Block *end) {
   return false;
 }
 
-/// The boolean condition to either generate or suppress a token are computed
-/// by considering all the paths from the producer (`start`) to the consumer
-/// (`end`). "Each path identifies a Boolean product of elementary conditions
-/// expressing the reaching of the target BB from the corresponding member of
-/// the set; the product of all such paths are added".
+/// Helper function to generate expression combining Local Logic (True/False)
+/// with Original Variables (c2, c3...).
+/// Note: Input is Local Deps
+static boolean::BoolExpression *
+getHybridPathExpression(const std::vector<Block *> &localPath,
+                        const ftd::LocalCFG &lcfg, const ftd::BlockIndexing &bi,
+                        const DenseSet<Block *> &localDeps) {
+
+  // Start with 1
+  auto *exp = boolean::BoolExpression::boolOne();
+
+  unsigned pathSize = localPath.size();
+  for (unsigned i = 0; i < pathSize - 1; i++) {
+    // Local Block
+    Block *u = localPath[i];
+    // Local Block (Target)
+    Block *v = localPath[i + 1];
+
+    // 1. Check Dependency using LOCAL sets
+    if (localDeps.contains(u)) {
+      Operation *term = u->getTerminator();
+
+      if (isa<cf::CondBranchOp>(term)) {
+        // 2. Map to Original Block to get the Variable Index/Name
+        Block *origU = lcfg.origMap.lookup(u);
+
+        // Special handling for second visit if needed, though usually origMap
+        // covers it
+        if (!origU && u == lcfg.secondVisitBB) {
+          origU = lcfg.origMap.lookup(lcfg.newProd);
+        }
+
+        if (origU) {
+          // 3. Get Name from ORIGINAL CFG (e.g., "c2")
+          auto blockIndexOptional = bi.getIndexFromBlock(origU);
+          if (blockIndexOptional.has_value()) {
+            std::string blockCondition = bi.getBlockCondition(origU);
+            boolean::BoolExpression *cond =
+                boolean::BoolExpression::parseSop(blockCondition);
+
+            // 4. Get Polarity from LOCAL CFG (Structure)
+            // Does the path go to 'v' via the False branch in the Decision
+            // Graph?
+            auto condOp = dyn_cast<cf::CondBranchOp>(term);
+            if (condOp.getFalseDest() == v) {
+              // Add '~' if Local Graph says False
+              cond->boolNegate();
+            }
+
+            // Combine
+            exp = boolean::BoolExpression::boolAnd(exp, cond);
+          }
+        }
+      }
+    }
+  }
+  return exp;
+}
+
 static BoolExpression *enumeratePaths(const ftd::LocalCFG &lcfg,
                                       const ftd::BlockIndexing &bi,
                                       const DenseSet<Block *> &controlDeps) {
 
-  // 1. Path Finding using Iterative DFS
+  // 1. Path Finding using Iterative DFS (on Local CFG)
   std::vector<std::vector<Block *>> allPaths;
 
   struct StackFrame {
@@ -206,7 +260,7 @@ static BoolExpression *enumeratePaths(const ftd::LocalCFG &lcfg,
   };
 
   std::vector<StackFrame> dfsStack;
-  std::vector<Block *> currentLocalPath; // Acts as 'visited in current path'
+  std::vector<Block *> currentLocalPath;
 
   if (lcfg.newProd && lcfg.newCons) {
     Block *root = lcfg.newProd;
@@ -224,23 +278,9 @@ static BoolExpression *enumeratePaths(const ftd::LocalCFG &lcfg,
 
     // --- Case A: Reached Consumer ---
     if (frame.u == lcfg.newCons) {
-      std::vector<Block *> origPath;
-      bool validMapping = true;
-
-      for (Block *lb : currentLocalPath) {
-        Block *ob = lcfg.origMap.lookup(lb);
-        if (!ob && lb == lcfg.secondVisitBB) {
-          ob = lcfg.origMap.lookup(lcfg.newProd);
-        }
-        if (!ob) {
-          validMapping = false;
-          break;
-        }
-        origPath.push_back(ob);
-      }
-
-      if (validMapping)
-        allPaths.push_back(origPath);
+      // [CRITICAL] Store the LOCAL path exactly as traversed.
+      // Do NOT map to original blocks here.
+      allPaths.push_back(currentLocalPath);
 
       currentLocalPath.pop_back();
       dfsStack.pop_back();
@@ -253,9 +293,6 @@ static BoolExpression *enumeratePaths(const ftd::LocalCFG &lcfg,
       Block *succ = term->getSuccessor(frame.currIdx);
       frame.currIdx++;
 
-      // 1. Skip Sink (Suppression)
-      // 2. [CRITICAL FIX] Skip Cycle: Check if succ is already in current path
-      // This prevents infinite loops while allowing the structure to exist.
       bool isCycle = std::find(currentLocalPath.begin(), currentLocalPath.end(),
                                succ) != currentLocalPath.end();
 
@@ -281,9 +318,9 @@ static BoolExpression *enumeratePaths(const ftd::LocalCFG &lcfg,
   BoolExpression *sop = BoolExpression::boolZero();
 
   for (const std::vector<Block *> &path : allPaths) {
-    DenseSet<unsigned> tempCofactorSet;
+    // Use the hybrid helper to look up logic locally and names globally
     BoolExpression *minterm =
-        getPathExpression(path, tempCofactorSet, bi, controlDeps, false);
+        getHybridPathExpression(path, lcfg, bi, controlDeps);
 
     sop = BoolExpression::boolOr(sop, minterm);
   }
@@ -634,9 +671,7 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
                               Block *block, const ftd::BlockIndexing &bi) {
   StringRef lookupName = varName;
   if (lookupName.startswith("~")) {
-    llvm::errs()
-        << "[FTD Error] Negated variable '" << varName
-        << "'.\n";
+    llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
     lookupName = lookupName.drop_front();
   }
 
@@ -845,9 +880,8 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
     // Divergence found: We have both True and False branches.
     if (groups.size() > 1) {
       splitFound = true;
-      llvm::errs()
-          << "[FTD] Split Variable Found: " << splitVar
-          << " at Depth: " << scanDepth << "\n";
+      llvm::errs() << "[FTD] Split Variable Found: " << splitVar
+                   << " at Depth: " << scanDepth << "\n";
       break;
     }
   }
@@ -894,12 +928,11 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   // Step 2 (which are implicitly valid). The logic checks the entire future
   // path to ensure reachability.
   Value suppressCondition = generateReachabilityLogic(
-      rewriter, sourceVal.getParentBlock(), requirements, baseNextPath, registry,
-      bi, scanDepth);
+      rewriter, sourceVal.getParentBlock(), requirements, baseNextPath,
+      registry, bi, scanDepth);
 
   if (!suppressCondition.getType().isa<handshake::ChannelType>())
-    suppressCondition.setType(
-        ftd::channelifyType(suppressCondition.getType()));
+    suppressCondition.setType(ftd::channelifyType(suppressCondition.getType()));
 
   // [Suppression Branch]
   // Acts as a filter:
@@ -907,10 +940,9 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   // Token). If suppressCondition is FALSE (Valid Path)  -> Output to
   // 'activeSelectSignal' (Pass Token).
   SmallVector<Type> suppResultTypes = {conditionVal.getType(),
-                                        conditionVal.getType()};
+                                       conditionVal.getType()};
   auto suppBranch = rewriter.create<handshake::ConditionalBranchOp>(
-      conditionVal.getLoc(), suppResultTypes, suppressCondition,
-      conditionVal);
+      conditionVal.getLoc(), suppResultTypes, suppressCondition, conditionVal);
   suppBranch->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   // False Output -> Active Select (Pass to Main Branch)
@@ -1046,7 +1078,7 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 
   DenseMap<Block *, Block *> cloned;
   DenseSet<Block *> visited;
-   // Avoid scheduling the same orig block twice
+  // Avoid scheduling the same orig block twice
   DenseSet<Block *> enqueued;
   cloned[origProd] = entry;
 
@@ -1118,7 +1150,8 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
       // Reuse the existing clone to avoid duplicating blocks for the same orig.
       else if (cloned.count(succOrig)) {
         nextBlockInLocalCFG = cloned[succOrig];
-        // If this node hasn't been visited yet, ensure it will be traversed once.
+        // If this node hasn't been visited yet, ensure it will be traversed
+        // once.
         if (!visited.count(succOrig) && !enqueued.count(succOrig)) {
           enqueued.insert(succOrig);
           successorsToVisit.push_back({succOrig, nextBlockInLocalCFG});
@@ -1219,14 +1252,16 @@ static std::unique_ptr<ftd::LocalCFG>
 buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
   // 1. Analyze
   ControlDependenceAnalysis cda(*rawGraph.region);
-  
-  if (!rawGraph.newCons) return nullptr;
-  
-  // [CRASH FIX] getAllBlockDeps returns by value! Do not use auto& on the map result.
-  // Use the safe accessor provided by CDA which handles lookup safely.
+
+  if (!rawGraph.newCons)
+    return nullptr;
+
+  // [CRASH FIX] getAllBlockDeps returns by value! Do not use auto& on the map
+  // result. Use the safe accessor provided by CDA which handles lookup safely.
   auto depsOpt = cda.getBlockAllControlDeps(rawGraph.newCons);
-  if (!depsOpt.has_value()) return nullptr; 
-  
+  if (!depsOpt.has_value())
+    return nullptr;
+
   DenseSet<Block *> dependencies = depsOpt.value();
 
   // NodeSet: Consumer + Sink + Dependencies
@@ -1266,32 +1301,40 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
 
       // [CRITICAL] Set newProd to the first valid block (TopoOrder)
       if (newL->newProd == nullptr) {
-          newL->newProd = newBlock;
+        newL->newProd = newBlock;
       }
 
-      if (oldBlock == rawGraph.newCons) newL->newCons = newBlock;
-      if (oldBlock == rawGraph.sinkBB)  newL->sinkBB = newBlock;
-      if (oldBlock == rawGraph.secondVisitBB) newL->secondVisitBB = newBlock;
+      if (oldBlock == rawGraph.newCons)
+        newL->newCons = newBlock;
+      if (oldBlock == rawGraph.sinkBB)
+        newL->sinkBB = newBlock;
+      if (oldBlock == rawGraph.secondVisitBB)
+        newL->secondVisitBB = newBlock;
     }
   }
 
   // Fallback for newProd
   if (newL->newProd == nullptr && !newL->region->empty()) {
-      newL->newProd = &newL->region->front();
+    newL->newProd = &newL->region->front();
   }
 
   // --- 4. Helper: Find Nearest using DFS with Visited Set ---
   auto findNearest = [&](Block *start) -> Block * {
-    if (!start) return nullptr;
+    if (!start)
+      return nullptr;
     DenseSet<Block *> visited;
     std::function<Block *(Block *)> dfs = [&](Block *curr) -> Block * {
-        if (!curr) return nullptr;
-        if (nodeSet.contains(curr)) return curr;
-        if (!visited.insert(curr).second) return nullptr; // Cycle
-        for (Block *succ : curr->getSuccessors()) {
-            if (Block *res = dfs(succ)) return res;
-        }
+      if (!curr)
         return nullptr;
+      if (nodeSet.contains(curr))
+        return curr;
+      if (!visited.insert(curr).second)
+        return nullptr; // Cycle
+      for (Block *succ : curr->getSuccessors()) {
+        if (Block *res = dfs(succ))
+          return res;
+      }
+      return nullptr;
     };
     return dfs(start);
   };
@@ -1302,29 +1345,31 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
   for (auto [oldBlock, newBlock] : oldToNew) {
     // Sink Logic: Terminate
     if (oldBlock == rawGraph.sinkBB) {
-        builder.setInsertionPointToEnd(newBlock);
-        builder.create<func::ReturnOp>(loc);
-        continue;
+      builder.setInsertionPointToEnd(newBlock);
+      builder.create<func::ReturnOp>(loc);
+      continue;
     }
-    
-    // Consumer Logic: MUST Branch to Sink (Preserve buildLocalCFGRegion behavior)
+
+    // Consumer Logic: MUST Branch to Sink (Preserve buildLocalCFGRegion
+    // behavior)
     if (oldBlock == rawGraph.newCons) {
-        builder.setInsertionPointToEnd(newBlock);
-        // In LocalCFG, Consumer always branches to Sink.
-        // We replicate this connection in the new graph.
-        Block *newSink = newL->sinkBB; 
-        if (newSink) {
-            builder.create<cf::BranchOp>(loc, newSink);
-        } else {
-            // Should not happen if Sink is in nodeSet
-            builder.create<func::ReturnOp>(loc);
-        }
-        continue;
+      builder.setInsertionPointToEnd(newBlock);
+      // In LocalCFG, Consumer always branches to Sink.
+      // We replicate this connection in the new graph.
+      Block *newSink = newL->sinkBB;
+      if (newSink) {
+        builder.create<cf::BranchOp>(loc, newSink);
+      } else {
+        // Should not happen if Sink is in nodeSet
+        builder.create<func::ReturnOp>(loc);
+      }
+      continue;
     }
 
     // Decision Node Logic
     Operation *term = oldBlock->getTerminator();
-    if (!term) continue;
+    if (!term)
+      continue;
 
     builder.setInsertionPointToEnd(newBlock);
 
@@ -1336,17 +1381,20 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
       Block *newFalse = oldToNew.lookup(oldFalse);
 
       // [Safety Wiring] If a path is dead/looping, wire to Sink
-      if (!newTrue) newTrue = newL->sinkBB;
-      if (!newFalse) newFalse = newL->sinkBB;
+      if (!newTrue)
+        newTrue = newL->sinkBB;
+      if (!newFalse)
+        newFalse = newL->sinkBB;
 
-      builder.create<cf::CondBranchOp>(loc, condBr.getCondition(),
-                                       newTrue, newFalse);
+      builder.create<cf::CondBranchOp>(loc, condBr.getCondition(), newTrue,
+                                       newFalse);
     } else {
       // Non-CondBranch nodes in the decision set (rare)
       // Wire to nearest valid successor or Sink
       Block *oldTarget = findNearest(term->getSuccessor(0));
       Block *newTarget = oldToNew.lookup(oldTarget);
-      if (!newTarget) newTarget = newL->sinkBB;
+      if (!newTarget)
+        newTarget = newL->sinkBB;
       builder.create<cf::BranchOp>(loc, newTarget);
     }
   }
@@ -1355,7 +1403,8 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
   DenseSet<Block *> visited;
   SmallVector<Block *, 8> order;
   std::function<void(Block *)> topo = [&](Block *u) {
-    if (!u || visited.contains(u)) return;
+    if (!u || visited.contains(u))
+      return;
     visited.insert(u);
     if (auto *term = u->getTerminator())
       for (auto it = term->successor_begin(); it != term->successor_end(); ++it)
@@ -1482,49 +1531,88 @@ static void insertDirectSuppression(
                               static_cast<llvm::sys::fs::OpenFlags>(0x0004));
     if (!EC) {
       file << "\n>>> BEFORE TRANSFORM (Decision Graph) <<<\n";
-      file << "NewProd: "; 
-      if(locGraph->newProd) locGraph->newProd->printAsOperand(file); else file << "null";
+
+      file << "NewProd: ";
+      if (locGraph->newProd)
+        locGraph->newProd->printAsOperand(file);
+      else
+        file << "null";
+
+      file << "\nNewProd (orig): ";
+      if (locGraph->newProd && locGraph->origMap.count(locGraph->newProd)) {
+        if (Block *orig = locGraph->origMap[locGraph->newProd])
+          orig->printAsOperand(file);
+        else
+          file << "null";
+      } else {
+        file << "null";
+      }
+
       file << "\nNewCons: ";
-      if(locGraph->newCons) locGraph->newCons->printAsOperand(file); else file << "null";
+      if (locGraph->newCons)
+        locGraph->newCons->printAsOperand(file);
+      else
+        file << "null";
+
+      file << "\nNewCons (orig): ";
+      if (locGraph->newCons && locGraph->origMap.count(locGraph->newCons)) {
+        if (Block *orig = locGraph->origMap[locGraph->newCons])
+          orig->printAsOperand(file);
+        else
+          file << "null";
+      } else {
+        file << "null";
+      }
+
       file << "\nSink:    ";
-      if(locGraph->sinkBB) locGraph->sinkBB->printAsOperand(file); else file << "null";
+      if (locGraph->sinkBB)
+        locGraph->sinkBB->printAsOperand(file);
+      else
+        file << "null";
+
       file << "\n\nStructure:\n";
 
       for (Block &b : locGraph->region->getBlocks()) {
         file << "  ";
         b.printAsOperand(file);
-        
+
         if (locGraph->origMap.count(&b)) {
-            Block* orig = locGraph->origMap[&b];
-            if (orig) {
-                file << " (orig: "; orig->printAsOperand(file); file << ")";
-            }
+          Block *orig = locGraph->origMap[&b];
+          if (orig) {
+            file << " (orig: ";
+            orig->printAsOperand(file);
+            file << ")";
+          }
         }
-        
+
         file << " terminates with ";
         if (auto *term = b.getTerminator()) {
-            file << term->getName() << " -> { ";
-            for (auto it = term->successor_begin(); it != term->successor_end(); ++it) {
-                (*it)->printAsOperand(file); file << " ";
-            }
-            file << "}";
-            
-            if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-                file << " [T: "; condBr.getTrueDest()->printAsOperand(file);
-                file << ", F: "; condBr.getFalseDest()->printAsOperand(file);
-                file << "]";
-            }
+          file << term->getName() << " -> { ";
+          for (auto it = term->successor_begin(); it != term->successor_end();
+               ++it) {
+            (*it)->printAsOperand(file);
+            file << " ";
+          }
+          file << "}";
+
+          if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+            file << " [T: ";
+            condBr.getTrueDest()->printAsOperand(file);
+            file << ", F: ";
+            condBr.getFalseDest()->printAsOperand(file);
+            file << "]";
+          }
         } else {
-            file << "NO_TERMINATOR (Deadlock Risk!)";
+          file << "NO_TERMINATOR (Deadlock Risk!)";
         }
         file << "\n";
       }
+
       file << "\n-------------------------------------------------\n";
     }
   }
-  // Build DECISION Graph based on Local Graph
+  // Build Decision Graph based on Local Graph
   auto decisionGraph = buildDecisionGraph(*locGraph);
-  // --- Print AFTER Transform (SAFE VERSION) ---
   if (debuglog) {
     std::error_code EC;
     // Append to the same file
@@ -1532,40 +1620,55 @@ static void insertDirectSuppression(
                               static_cast<llvm::sys::fs::OpenFlags>(0x0004));
     if (!EC) {
       file << "\n>>> AFTER TRANSFORM (Decision Graph) <<<\n";
-      file << "NewProd: "; 
-      if(decisionGraph->newProd) decisionGraph->newProd->printAsOperand(file); else file << "null";
+      file << "NewProd: ";
+      if (decisionGraph->newProd)
+        decisionGraph->newProd->printAsOperand(file);
+      else
+        file << "null";
       file << "\nNewCons: ";
-      if(decisionGraph->newCons) decisionGraph->newCons->printAsOperand(file); else file << "null";
+      if (decisionGraph->newCons)
+        decisionGraph->newCons->printAsOperand(file);
+      else
+        file << "null";
       file << "\nSink:    ";
-      if(decisionGraph->sinkBB) decisionGraph->sinkBB->printAsOperand(file); else file << "null";
+      if (decisionGraph->sinkBB)
+        decisionGraph->sinkBB->printAsOperand(file);
+      else
+        file << "null";
       file << "\n\nStructure:\n";
 
       for (Block &b : decisionGraph->region->getBlocks()) {
         file << "  ";
         b.printAsOperand(file);
-        
+
         if (decisionGraph->origMap.count(&b)) {
-            Block* orig = decisionGraph->origMap[&b];
-            if (orig) {
-                file << " (orig: "; orig->printAsOperand(file); file << ")";
-            }
+          Block *orig = decisionGraph->origMap[&b];
+          if (orig) {
+            file << " (orig: ";
+            orig->printAsOperand(file);
+            file << ")";
+          }
         }
-        
+
         file << " terminates with ";
         if (auto *term = b.getTerminator()) {
-            file << term->getName() << " -> { ";
-            for (auto it = term->successor_begin(); it != term->successor_end(); ++it) {
-                (*it)->printAsOperand(file); file << " ";
-            }
-            file << "}";
-            
-            if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-                file << " [T: "; condBr.getTrueDest()->printAsOperand(file);
-                file << ", F: "; condBr.getFalseDest()->printAsOperand(file);
-                file << "]";
-            }
+          file << term->getName() << " -> { ";
+          for (auto it = term->successor_begin(); it != term->successor_end();
+               ++it) {
+            (*it)->printAsOperand(file);
+            file << " ";
+          }
+          file << "}";
+
+          if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+            file << " [T: ";
+            condBr.getTrueDest()->printAsOperand(file);
+            file << ", F: ";
+            condBr.getFalseDest()->printAsOperand(file);
+            file << "]";
+          }
         } else {
-            file << "NO_TERMINATOR (Deadlock Risk!)";
+          file << "NO_TERMINATOR (Deadlock Risk!)";
         }
         file << "\n";
       }
@@ -1574,7 +1677,10 @@ static void insertDirectSuppression(
   }
   ControlDependenceAnalysis locCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDepsTmp =
-      locCDA.getAllBlockDeps()[decisionGraph->newCons].forwardControlDeps;
+      locCDA.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
+
+  BoolExpression *fCons =
+      enumeratePaths(*decisionGraph, bi, locConsControlDepsTmp);
 
   DenseSet<Block *> locConsControlDeps;
   for (Block *nb : locConsControlDepsTmp) {
@@ -1582,8 +1688,6 @@ static void insertDirectSuppression(
     if (orig)
       locConsControlDeps.insert(orig);
   }
-
-  BoolExpression *fCons = enumeratePaths(*decisionGraph, bi, locConsControlDeps);
 
   if (debuglog) {
     auto printBlockSet = [&](llvm::StringRef label,
@@ -1704,7 +1808,7 @@ static void insertDirectSuppression(
       llvm::errs() << "\n";
     }
     BDD *bdd = buildBDD(fSup, cofactorList);
-    
+
     SignalRegistry registry;
     rewriter.setInsertionPointToStart(consumer->getBlock());
     // Build the distribution network
