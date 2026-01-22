@@ -87,7 +87,7 @@ struct CPVarImpl {
 /// the underlying memory.
 struct CPVar {
   std::shared_ptr<detail::CPVarImpl> impl;
-  explicit CPVar() { impl = std::make_shared<detail::CPVarImpl>(); };
+  CPVar() = default;
   explicit CPVar(llvm::StringRef name, VarType type,
                  std::optional<double> lowerBound = /* -inf */ std::nullopt,
                  std::optional<double> upperBound = /* +inf */ std::nullopt)
