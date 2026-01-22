@@ -94,7 +94,7 @@ struct CPVar {
       : impl(std::make_shared<detail::CPVarImpl>(name, type, lowerBound,
                                                  upperBound)) {};
   bool operator<(const CPVar &other) const noexcept;
-  std::string getName();
+  std::string getName() const;
 };
 
 inline std::pair<CPVar, CPVar> makeSortedPair(const CPVar &a, const CPVar &b) {

@@ -55,7 +55,7 @@ bool CPVar::operator<(const CPVar &other) const noexcept {
   return this->impl->name < other.impl->name;
 }
 
-std::string CPVar::getName() { return this->impl->name; }
+std::string CPVar::getName() const { return this->impl->name; }
 
 LinExpr operator+(const CPVar &left, double right) {
   return detail::addVarConstImpl(left, right);
