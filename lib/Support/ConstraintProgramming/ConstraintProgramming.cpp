@@ -267,6 +267,8 @@ TempConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
 // GurobiSolver method implementations
 // ------------------------------------------------------------
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+
 GurobiSolver::GurobiSolver(int timeout, int maxThreads)
     : CPSolver(timeout, GUROBI, maxThreads) {
   env = std::make_unique<GRBEnv>(true);
@@ -431,9 +433,13 @@ double GurobiSolver::getObjective() const {
   return model->get(GRB_DoubleAttr_ObjVal);
 }
 
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
 // -------------------------------------------------------------
 // CbcSolver method implementations
 // ------------------------------------------------------------
+
+#ifdef DYNAMATIC_ENABLE_CBC
 
 CPVar CbcSolver::addVar(const CPVar &var) {
   if (names.count(var.impl->name)) {
@@ -580,5 +586,6 @@ void CbcSolver::addConstr(const TempConstr &constraint,
 
   solver.addRow(row, rowLower, rowUpper, constrName.str());
 }
+#endif // DYNAMATIC_ENABLE_CBC
 
 } // namespace dynamatic
