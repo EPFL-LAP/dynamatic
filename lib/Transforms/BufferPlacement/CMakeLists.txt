@@ -22,6 +22,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+  DynamaticConstraintProgramming
 
   )
 

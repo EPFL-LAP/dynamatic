@@ -12,6 +12,7 @@ target_link_libraries(
   ${GUROBI_LIBRARY}
 
   LLVMSupport
+  DynamaticConstraintProgramming
 
   ${CBC_LIBRARIES}
   ${CLPCORE_LIBRARIES}
