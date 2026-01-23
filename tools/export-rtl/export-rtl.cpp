@@ -1289,6 +1289,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       assert(coefs.size() == names.size());
       for (unsigned i = 0; i < coefs.size(); ++i) {
         std::string t = llvm::formatv("(toint({0}) * {1})", names[i], coefs[i]);
+        terms.push_back(t);
       }
       std::string propertyString =
           llvm::formatv("({0}) = 0", llvm::join(terms, " + ")).str();

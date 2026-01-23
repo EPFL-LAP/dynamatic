@@ -479,9 +479,11 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
         names.push_back(idInfo[col].getName());
       }
     }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
-    propertyTable.push_back(p.toJSON());
-    uid++;
+    if (coefs.size() > 0) {
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
+      propertyTable.push_back(p.toJSON());
+      uid++;
+    }
   }
   /*
   for (auto &expr : equations) {

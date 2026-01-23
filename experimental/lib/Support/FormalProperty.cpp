@@ -107,7 +107,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
   case TYPE::RPF:
-    return nullptr;
+    return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
