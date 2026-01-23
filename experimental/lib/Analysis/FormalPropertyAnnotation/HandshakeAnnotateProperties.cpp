@@ -73,6 +73,7 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
+  LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -223,6 +224,111 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+CPVar resultVar(Operation &op, unsigned index) {
+  std::string name =
+      llvm::formatv("#out{0}{1}", index, getUniqueName(&op)).str();
+  return CPVar(name, CPVar::VarType::INTEGER);
+}
+
+CPVar inputVar(Operation &op, unsigned index) {
+  std::string name =
+      llvm::formatv("#in{0}{1}", index, getUniqueName(&op)).str();
+  return CPVar(name, CPVar::VarType::INTEGER);
+}
+
+CPVar sentVar(Operation &forkOp, unsigned index) {
+  std::string name = llvm::formatv("sent{0}{1}", index, getUniqueName(&forkOp));
+  return CPVar(name, CPVar::VarType::INTEGER);
+}
+
+CPVar slotVar(Operation &slotOp, unsigned index) {
+  std::string name = llvm::formatv("full{0}{1}", index, getUniqueName(&slotOp));
+  return CPVar(name, CPVar::VarType::INTEGER);
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  // all equations are equal to zero
+  std::vector<LinExpr> equations{};
+  // annotate equations from channels
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+    }
+  }
+  // annotate equations derived from operations
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      unsigned numIn = op.getOperands().size();
+      unsigned numOut = op.getResults().size();
+      CPVar i1 = CPVar(llvm::formatv("#x1{0}", getUniqueName(&op)).str(),
+                       CPVar::VarType::INTEGER);
+      CPVar i2 = CPVar(llvm::formatv("#x2{0}", getUniqueName(&op)).str(),
+                       CPVar::VarType::INTEGER);
+      if (numIn == 1) {
+        equations.push_back(inputVar(op, 0) - i1);
+      } else {
+        // Join operation, merge operation, or mux
+        if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
+          if (isa<handshake::MuxOp>(op)) {
+            // mux
+            // TODO: check if select is always input 0
+            equations.push_back(inputVar(op, 0) - i1);
+            LinExpr dataEq = 0 - i1;
+            for (unsigned i = 1; i < numIn; ++i) {
+              dataEq += inputVar(op, i);
+            }
+            equations.push_back(dataEq);
+          } else {
+            // merge
+            LinExpr mergeEq = 0 - i1;
+            for (unsigned i = 0; i < numIn; ++i) {
+              mergeEq += inputVar(op, i);
+            }
+            equations.push_back(mergeEq);
+          }
+        } else {
+          // join
+          for (unsigned i = 0; i < numIn; ++i) {
+            equations.push_back(inputVar(op, i) - i1);
+          }
+        }
+      }
+
+      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
+        // TODO: handle multiple slots
+        equations.push_back(i1 - slotVar(op, 0) - i2);
+      } else {
+        equations.push_back(i1 - i2);
+      }
+
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        for (unsigned i = 0; i < numOut; ++i) {
+          equations.push_back(i2 + sentVar(op, i) - resultVar(op, i));
+        }
+      } else {
+        for (unsigned i = 0; i < numOut; ++i) {
+          equations.push_back(i2 - resultVar(op, i));
+        }
+      }
+    }
+  }
+
+  for (auto expr : equations) {
+    std::vector<int> coefs{};
+    std::vector<std::string> names{};
+    for (auto [key, value] : expr.terms) {
+      coefs.push_back((int)value);
+      names.push_back(key.name);
+    }
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+  }
+
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -234,6 +340,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+    if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
   }
 

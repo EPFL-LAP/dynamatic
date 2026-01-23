@@ -30,6 +30,7 @@ public:
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
+    RPF,     /* Reconvergent Path Flow */
   };
 
   TAG getTag() const { return tag; }
@@ -226,6 +227,31 @@ private:
   inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
+};
+
+class ReconvergentPathFlow : public FormalProperty {
+public:
+  std::vector<int> getCoefficients() { return coefficients; }
+  std::vector<std::string> getNames() { return names; }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ReconvergentPathFlow>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  ReconvergentPathFlow() = default;
+  ReconvergentPathFlow(unsigned long id, TAG tag,
+                       const std::vector<int> &coefficients,
+                       const std::vector<std::string> &names);
+  ~ReconvergentPathFlow() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::RPF;
+  }
+
+private:
+  std::vector<int> coefficients;
+  std::vector<std::string> names;
+  inline static const StringLiteral COEFFICIENTS_LIT = "coefficients";
+  inline static const StringLiteral NAMES_LIT = "names";
 };
 
 class FormalPropertyTable {
