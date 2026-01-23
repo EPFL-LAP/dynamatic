@@ -225,46 +225,160 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 }
 
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+#include <boost/numeric/ublas/matrix.hpp>
 CPVar resultVar(Operation &op, unsigned index) {
   std::string name =
       llvm::formatv("#out{0}{1}", index, getUniqueName(&op)).str();
-  return CPVar(name, CPVar::VarType::INTEGER);
+  return CPVar(name, VarType::INTEGER);
 }
 
 CPVar inputVar(Operation &op, unsigned index) {
   std::string name =
       llvm::formatv("#in{0}{1}", index, getUniqueName(&op)).str();
-  return CPVar(name, CPVar::VarType::INTEGER);
+  return CPVar(name, VarType::INTEGER);
 }
 
 CPVar sentVar(Operation &forkOp, unsigned index) {
-  std::string name = llvm::formatv("sent{0}{1}", index, getUniqueName(&forkOp));
-  return CPVar(name, CPVar::VarType::INTEGER);
+  std::string name =
+      llvm::formatv("{1}.sent_{0}", index, getUniqueName(&forkOp));
+  return CPVar(name, VarType::INTEGER);
 }
 
 CPVar slotVar(Operation &slotOp, unsigned index) {
-  std::string name = llvm::formatv("full{0}{1}", index, getUniqueName(&slotOp));
-  return CPVar(name, CPVar::VarType::INTEGER);
+  std::string name =
+      llvm::formatv("{1}.full_{0}", index, getUniqueName(&slotOp));
+  return CPVar(name, VarType::INTEGER);
+}
+
+struct FlowVariableInfo {
+  enum TYPE { full, sent, lambda };
+  TYPE type;
+  Value channel;
+  Operation *op;
+  unsigned id;
+};
+
+void swapRows(boost::numeric::ublas::matrix<int> &m, size_t row1, size_t row2) {
+  size_t cols = m.size2();
+  for (size_t i = 0; i < cols; ++i) {
+    int t = m(row1, i);
+    m(row1, i) = m(row2, i);
+    m(row2, i) = t;
+  }
+}
+
+void gaussianElimination(boost::numeric::ublas::matrix<int> &m) {
+  size_t rows = m.size1();
+  size_t cols = m.size2();
+
+  // h: row index
+  // k: leading non-zero position
+  size_t h = 0, k = 0;
+  while (h < rows && k < cols) {
+    int pivotRow = -1;
+
+    int pivotValue = std::numeric_limits<int>::max();
+
+    // Find the row to pivot around
+    for (size_t i = h; i < rows; ++i) {
+      if (m(i, k) != 0) {
+        if (std::abs(m(i, k)) < std::abs(pivotValue)) {
+          pivotValue = m(i, k);
+          pivotRow = i;
+        }
+      }
+    }
+
+    // no row with non-zero index at k -> look at next column
+    if (pivotRow == -1) {
+      ++k;
+      continue;
+    }
+
+    swapRows(m, h, pivotRow);
+    if (pivotValue < 0) {
+      for (size_t i = k; i < cols; ++i) {
+        m(h, i) *= -1;
+      }
+    }
+
+    // eliminate other rows
+    for (size_t i = h + 1; i < rows; ++i) {
+      int factorPivot = m(h, k);
+      int factorRow = m(i, k);
+      for (size_t j = k; j < cols; ++j) {
+        m(i, j) *= factorPivot;
+        m(i, j) -= factorRow * m(h, j);
+      }
+    }
+    ++h;
+    ++k;
+  }
 }
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   // all equations are equal to zero
   std::vector<LinExpr> equations{};
+  std::map<CPVar, FlowVariableInfo> metaData{};
   // annotate equations from channels
+  unsigned id = 0;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
+      // channel metadata
+      CPVar i1 = CPVar(llvm::formatv("#x1{0}", getUniqueName(&op)).str(),
+                       VarType::INTEGER);
+      CPVar i2 = CPVar(llvm::formatv("#x2{0}", getUniqueName(&op)).str(),
+                       VarType::INTEGER);
+
+      metaData[i1] = (FlowVariableInfo){
+          FlowVariableInfo::TYPE::lambda,
+          nullptr,
+          &op,
+          id++,
+      };
+      metaData[i2] = (FlowVariableInfo){
+          FlowVariableInfo::TYPE::lambda,
+          nullptr,
+          &op,
+          id++,
+      };
+      for (auto [i, res] : llvm::enumerate(op.getOperands())) {
+        metaData[inputVar(op, i)] = (FlowVariableInfo){
+            FlowVariableInfo::TYPE::lambda,
+            res,
+            &op,
+            id++,
+        };
+      }
+      for (auto [i, res] : llvm::enumerate(op.getResults())) {
+        CPVar out = resultVar(op, i);
+        metaData[out] = (FlowVariableInfo){
+            FlowVariableInfo::TYPE::lambda,
+            res,
+            &op,
+            id++,
+        };
+        for (auto &use : res.getUses()) {
+          unsigned j = use.getOperandNumber();
+          Operation &nextOp = *use.getOwner();
+          CPVar in = inputVar(nextOp, j);
+          // lambda_out = lambda_in   as they represent the same channel
+          equations.push_back(out - in);
+        }
+      }
     }
   }
+  unsigned nLambda = id;
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       unsigned numIn = op.getOperands().size();
       unsigned numOut = op.getResults().size();
       CPVar i1 = CPVar(llvm::formatv("#x1{0}", getUniqueName(&op)).str(),
-                       CPVar::VarType::INTEGER);
+                       VarType::INTEGER);
       CPVar i2 = CPVar(llvm::formatv("#x2{0}", getUniqueName(&op)).str(),
-                       CPVar::VarType::INTEGER);
+                       VarType::INTEGER);
       if (numIn == 1) {
         equations.push_back(inputVar(op, 0) - i1);
       } else {
@@ -297,14 +411,29 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 
       if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
         // TODO: handle multiple slots
-        equations.push_back(i1 - slotVar(op, 0) - i2);
+        CPVar full = slotVar(op, 0);
+        equations.push_back(i1 - full - i2);
+        metaData[full] = (FlowVariableInfo){
+            FlowVariableInfo::TYPE::full,
+            nullptr,
+            &op,
+            id++,
+        };
       } else {
         equations.push_back(i1 - i2);
       }
 
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         for (unsigned i = 0; i < numOut; ++i) {
-          equations.push_back(i2 + sentVar(op, i) - resultVar(op, i));
+          CPVar sent = sentVar(op, i);
+          equations.push_back(i2 + sent - resultVar(op, i));
+
+          metaData[sent] = (FlowVariableInfo){
+              FlowVariableInfo::TYPE::sent,
+              nullptr,
+              &op,
+              id++,
+          };
         }
       } else {
         for (unsigned i = 0; i < numOut; ++i) {
@@ -314,17 +443,60 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     }
   }
 
-  for (auto expr : equations) {
+  boost::numeric::ublas::matrix<int> matrix(equations.size(), id);
+  std::map<unsigned, CPVar> idInfo;
+  for (auto [row, expr] : llvm::enumerate(equations)) {
+    for (auto [key, value] : expr.terms) {
+      unsigned index = metaData[key].id;
+      idInfo[index] = key;
+      matrix(row, index) = (int)value;
+    }
+  }
+  for (unsigned i = 0; i < matrix.size2(); ++i) {
+    assert(idInfo.count(i) == 1);
+  }
+  gaussianElimination(matrix);
+  size_t rows = matrix.size1();
+  size_t cols = matrix.size2();
+  for (size_t row = 0; row < rows; ++row) {
+    bool canAnnotate = true;
+    for (size_t col = 0; col < nLambda; ++col) {
+      if (matrix(row, col) != 0) {
+        canAnnotate = false;
+        break;
+      }
+    }
+
+    if (!canAnnotate)
+      continue;
+
     std::vector<int> coefs{};
     std::vector<std::string> names{};
-    for (auto [key, value] : expr.terms) {
-      coefs.push_back((int)value);
-      names.push_back(key.name);
+
+    for (size_t col = nLambda + 1; col < cols; ++col) {
+      if (matrix(row, col) != 0) {
+        coefs.push_back(matrix(row, col));
+        names.push_back(idInfo[col].getName());
+      }
     }
     ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
     propertyTable.push_back(p.toJSON());
     uid++;
   }
+  /*
+  for (auto &expr : equations) {
+    std::vector<int> coefs{};
+    std::vector<std::string> names{};
+    for (auto [key, value] : expr.terms) {
+      assert(metaData.count(key) == 1);
+      coefs.push_back((int)value);
+      names.push_back(key.getName());
+    }
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+  }
+  */
 
   return success();
 }
