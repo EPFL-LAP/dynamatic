@@ -798,16 +798,36 @@ void OccupancyBalancingLP::setup() {
     return;
   }
 
-  /// Collect ALL channels from CFDFCs
-  SmallVector<Value> allChannels;
+  /// Collect all channels from CFDFCs
+  mlir::DenseSet<Value> allChannelsSet;
   for (CFDFC *cfdfc : cfdfcs) {
     for (Value channel : cfdfc->channels) {
-      allChannels.push_back(channel);
+      allChannelsSet.insert(channel);
+    }
+  }
+  size_t cfdfcChannelCount = allChannelsSet.size();
+
+  /// Also include channels from reconvergent paths (including non-CFDFC edges)
+  /// This ensures LP2 handles entry/exit paths that LP1 balanced.
+  for (const auto &pathWithGraph : reconvergentPaths) {
+    const ReconvergentPath &path = pathWithGraph.path;
+    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
+    for (NodeIdType nodeId : path.nodeIds) {
+      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
+        const auto &edge = graph->edges[edgeId];
+        if (path.nodeIds.count(edge.dstId)) {
+          allChannelsSet.insert(edge.channel);
+        }
+      }
     }
   }
 
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Found " << allChannels.size()
-                          << " CFDFC channels\n");
+  SmallVector<Value> allChannels(allChannelsSet.begin(), allChannelsSet.end());
+  LLVM_DEBUG(llvm::errs() << "[LP2]   Found " << cfdfcChannelCount
+                          << " CFDFC channels + "
+                          << (allChannels.size() - cfdfcChannelCount)
+                          << " reconvergent path channels = "
+                          << allChannels.size() << " total\n");
 
   if (allChannels.empty()) {
     LLVM_DEBUG(llvm::errs() << "[LP2] WARNING: No channels found\n");
@@ -1178,6 +1198,66 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
         result.numOneSlotR = 1;
         llvm::errs() << "  Adding R for merge-like: "
                      << getUniqueName(*channel.getUses().begin()) << "\n";
+      }
+    }
+  }
+
+  /// Buffer forks connected to memory controllers.
+  /// These forks synchronize with 'di_end' and 'idx_end' signals
+  for (Operation &op : funcInfo.funcOp.getOps()) {
+    auto forkOp = dyn_cast<handshake::ForkOp>(op);
+    if (!forkOp)
+      continue;
+
+    // Check if this fork connects to any memory controller
+    bool connectsToMemCtrl = false;
+    for (Value res : forkOp.getResults()) {
+      for (Operation *user : res.getUsers()) {
+        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user)) {
+          connectsToMemCtrl = true;
+          break;
+        }
+      }
+      if (connectsToMemCtrl)
+        break;
+    }
+
+    if (!connectsToMemCtrl)
+      continue;
+
+    // Add transparent buffer to all outputs of this memory fork
+    for (Value res : forkOp.getResults()) {
+      if (!placement.count(res)) {
+        PlacementResult result;
+        result.numFifoNone = 1;
+        placement[res] = result;
+        LLVM_DEBUG(llvm::errs()
+                   << "  Adding memory fork buffer: "
+                   << getUniqueName(*res.getUses().begin()) << "\n");
+      }
+    }
+  }
+
+  /// Buffer memory controller end signals.
+  /// These need to synchronize with the function output (out0).
+  for (Operation &op : funcInfo.funcOp.getOps()) {
+    if (!isa<handshake::MemoryControllerOp, handshake::LSQOp>(op))
+      continue;
+
+    // Get the 'di_end' and 'idx_end' signals 
+    for (Value res : op.getResults()) {
+      // Check if this is a control-type output ('di_end' and 'idx_end' are
+      // control)
+      if (!isa<handshake::ControlType>(res.getType()))
+        continue;
+
+      if (!placement.count(res)) {
+        PlacementResult result;
+        result.numFifoNone = 1;
+        placement[res] = result;
+        LLVM_DEBUG(llvm::errs()
+                   << "  Adding memory controller end buffer: "
+                   << getUniqueName(*res.getUses().begin()) << "\n");
       }
     }
   }
