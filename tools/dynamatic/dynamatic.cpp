@@ -384,11 +384,33 @@ public:
                 "Estimate the power consumption of the design using switching "
                 "activity from simulation.",
                 state) {
-    addOption({HDL, "HDL to use for design's top-level"});
+    addOption({HDL, "HDL type, vhdl or verilog"});
     addOption({STAGE,
                "The netlist used for functional simulation (pre or post "
                "synthesis) in Modelsim to generate SAIF file, options are "
                "'pre' and 'post' (default : 'pre')"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class PowerEval : public Command {
+public:
+  static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral STAGE = "stage";
+
+  PowerEval(FrontendState &state)
+      : Command(
+            "power-eval",
+            "Runs the Vivado flow and vector-based power evaluation at "
+            "different design stages,"
+            "using switching activity from simulation based on XSIM in Vivado.",
+            state) {
+    addOption({HDL, "HDL type, vhdl or verilog"});
+    addOption({STAGE,
+               "Stage (synth or impl) to perform simuulation with xsim and "
+               "vector-based power "
+               "evaluation, synthesis or implementation, defaul : synth"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -799,7 +821,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, floatToString(state.targetCP, 2));
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -867,6 +889,55 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
 
   std::string script =
       state.dynamaticPath + "/tools/dynamatic/power/estimate_power.py";
+
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--hdl", hdl,
+    "--synth", stage,
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
+}
+
+CommandResult PowerEval::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  // Get the HDL configuration
+  std::string hdl = "vhdl";
+
+  if (auto it = args.options.find(HDL); it != args.options.end()) {
+    if (it->second == "verilog") {
+      hdl = "verilog";
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
+    } else if (it->second != "vhdl") {
+      llvm::errs() << "Unknow HDL '" << it->second
+                   << "', possible options are 'vhdl',"
+                      " and 'verilog'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  // Get simulation stage configuration
+  std::string stage = "synth";
+
+  if (auto it = args.options.find(STAGE); it != args.options.end()) {
+    if (it->second == "synth" || it->second == "impl") {
+      stage = it->second;
+    } else {
+      llvm::errs() << "Unknow stage '" << it->second
+                   << "', possible options are 'synth' and 'impl'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/power/power_eval.py";
 
   // clang-format off
   return execCmd(
@@ -953,6 +1024,7 @@ int main(int argc, char **argv) {
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
   commands.add<EstimatePower>(state);
+  commands.add<PowerEval>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 
