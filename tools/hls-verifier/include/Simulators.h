@@ -69,6 +69,8 @@ public:
 
 class GHDLSimulator : public Simulator {
 
+  const StringLiteral simulatorName = "ghdl";
+
 public:
   GHDLSimulator(VerificationContext *context) : Simulator(context) {}
 
@@ -114,7 +116,7 @@ public:
     //  - --std=08 : use the VHDL-2008 standard for compilation
     //  - -fsynopsys : allow the use of synopsys non-standard packages
     //    (e.g.std_logic_arith, std_logic_signed, etc.). These packages would
-    //    otherwise produce an error. -frelaxed : generates warining instead of
+    //    otherwise produce an error. -frelaxed : generates warnings instead of
     //    errors
     // [End Flag explanation]
 
@@ -124,16 +126,16 @@ public:
           "VHDL-2008 standard and allows the use of synopsys non-standard "
           "packages\n";
     for (auto &it : filelistVhdl)
-      os << "ghdl -i --std=08 -fsynopsys " << it << "\n";
+      os << simulatorName << " -i --std=08 -fsynopsys " << it << "\n";
 
     // -m compiles a design in the correct compilation order
     os << "# Compiles the design in the correct compilation order, and relaxes "
           "some rules to only cause warnings instead of errors\n";
-    os << "ghdl -m --std=08 -fsynopsys -frelaxed tb\n";
+    os << simulatorName << " -m --std=08 -fsynopsys -frelaxed tb\n";
 
     // -r runs the simulation
     os << "# Runs the Simulation with top-level unit tb\n";
-    os << "ghdl -r --std=08 -fsynopsys tb\n";
+    os << simulatorName << " -r --std=08 -fsynopsys -frelaxed tb\n";
 
     os << "# Exits the script\n";
     os << "exit 0";

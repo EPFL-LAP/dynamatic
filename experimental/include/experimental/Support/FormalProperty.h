@@ -28,6 +28,7 @@ public:
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
+    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
   };
 
   TAG getTag() const { return tag; }
@@ -185,6 +186,46 @@ private:
   unsigned numEagerForkOutputs;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
   inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+};
+
+// When an eager fork is `sent` state for at least one of its outputs, it is
+// considered `active`. When transitioning to the `active` state, the `ready`
+// signal is false, and the incoming token is blocked. Because of this, all
+// slots immediately before the fork (i.e. copied slots) must be full. More
+// formally, a copied slot of a fork is defined as a slot that has a path
+// towards the fork without any other slots on it. See invariant 2 of
+// https://ieeexplore.ieee.org/document/10323796 for more details
+class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
+public:
+  std::string getForkOp() { return forkOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::string getBufferOp() { return bufferOp; }
+  unsigned getBufferSlot() { return bufferSlot; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  CopiedSlotsOfActiveForkAreFull() = default;
+  CopiedSlotsOfActiveForkAreFull(unsigned long id, TAG tag,
+                                 handshake::BufferLikeOpInterface &bufferOp,
+                                 handshake::EagerForkLikeOpInterface &forkOp);
+  ~CopiedSlotsOfActiveForkAreFull() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::CSOAFAF;
+  }
+
+private:
+  std::string forkOp;
+  unsigned numEagerForkOutputs;
+  std::string bufferOp;
+  unsigned bufferSlot;
+  inline static const StringLiteral FORK_OP_LIT = "fork_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
+  inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
 
 class FormalPropertyTable {

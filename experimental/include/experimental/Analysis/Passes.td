@@ -26,7 +26,7 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
   let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">,
-    Option<"annotateInvariants", "annotate-invariants", "bool", "true",
+    Option<"annotateInvariants", "annotate-invariants", "bool", "false",
     "Annotate invariants to assist k-inductive proofs">];
 }
 

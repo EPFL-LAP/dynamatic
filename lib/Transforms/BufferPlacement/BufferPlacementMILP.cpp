@@ -120,7 +120,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
   // Create a CPVar variable of the given name and type for the channel
-  auto createVar = [&](const llvm::Twine &name, CPVar::VarType type) {
+  auto createVar = [&](const llvm::Twine &name, VarType type) {
     return model->addVar((name + suffix).str(), type, 0, std::nullopt);
   };
 
@@ -128,16 +128,16 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   for (SignalType sig : signalTypes) {
     ChannelSignalVars &signalVars = chVars.signalVars[sig];
     StringRef name = getSignalName(sig);
-    signalVars.path.tIn = createVar(name + "PathIn", CPVar::REAL);
-    signalVars.path.tOut = createVar(name + "PathOut", CPVar::REAL);
-    signalVars.bufPresent = createVar(name + "BufPresent", CPVar::BOOLEAN);
+    signalVars.path.tIn = createVar(name + "PathIn", REAL);
+    signalVars.path.tOut = createVar(name + "PathOut", REAL);
+    signalVars.bufPresent = createVar(name + "BufPresent", BOOLEAN);
   }
 
   // Variables for placement information
-  chVars.bufPresent = createVar("bufPresent", CPVar::BOOLEAN);
-  chVars.bufNumSlots = createVar("bufNumSlots", CPVar::INTEGER);
-  chVars.dataLatency = createVar("dataLatency", CPVar::INTEGER);
-  chVars.shiftReg = createVar("shiftReg", CPVar::BOOLEAN);
+  chVars.bufPresent = createVar("bufPresent", BOOLEAN);
+  chVars.bufNumSlots = createVar("bufNumSlots", INTEGER);
+  chVars.dataLatency = createVar("dataLatency", INTEGER);
+  chVars.shiftReg = createVar("shiftReg", BOOLEAN);
 }
 
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
@@ -147,7 +147,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a CPVar variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
-    return model->addVar((prefix + name).str(), CPVar::REAL, 0, std::nullopt);
+    return model->addVar((prefix + name).str(), REAL, 0, std::nullopt);
   };
 
   // Create a set of variables for each unit in the CFDFC
@@ -554,8 +554,8 @@ void BufferPlacementMILP::
     //
     // Create an intermediate variable to represent the extra bubbles
     // of the SHIFT_REG_BREAK_DV buffer.
-    CPVar shiftRegExtraBubbles = model->addVar(shiftRegExtraBubblesName,
-                                               CPVar::INTEGER, 0, std::nullopt);
+    CPVar shiftRegExtraBubbles =
+        model->addVar(shiftRegExtraBubblesName, INTEGER, 0, std::nullopt);
 
     // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
     // number (dataLatency) minus the ceiling of the product of data latency and
@@ -671,8 +671,8 @@ void BufferPlacementMILP::addCutSelectionConstraints(
     // Add cut selection variable to the CPVar model
     CPVar &cutSelection = cut.getCutSelectionVariable();
     cutSelection = model->addVar(
-        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)),
-        CPVar::BOOLEAN, 0, std::nullopt);
+        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)), BOOLEAN,
+        0, std::nullopt);
     cutSelectionSum += cutSelection;
   }
   // Cut Selection Constraint. Only a single cut of a node can be selected.
@@ -725,7 +725,7 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     } else {
       // Create the timing variable for Subject Graph Node. These Nodes need
       // only 1 timing variable, as no buffers can be placed between them.
-      nodeVarIn = model->addVar(node->str(), CPVar::REAL, 0, std::nullopt);
+      nodeVarIn = model->addVar(node->str(), REAL, 0, std::nullopt);
       nodeVarOut = nodeVarIn;
     }
   }
@@ -830,8 +830,8 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
     // Create a CPVar variable for each operation, which will hold the order of
     // the Operation in the topological ordering
     StringRef uniqueName = getUniqueName(op);
-    CPVar operationVariable = modelFeedback->addVar(
-        uniqueName.str(), CPVar::INTEGER, 0, std::nullopt);
+    CPVar operationVariable =
+        modelFeedback->addVar(uniqueName.str(), INTEGER, 0, std::nullopt);
     opToGRB[op] = operationVariable;
   });
 
@@ -850,7 +850,7 @@ std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
             (getUniqueName(op) + "_out_" + std::to_string(idxResult) + "_" +
              getUniqueName(user) + "_in_" + std::to_string(idxOperand))
                 .str();
-        CPVar edge = modelFeedback->addVar(edgeName, CPVar::BOOLEAN, 0, 1);
+        CPVar edge = modelFeedback->addVar(edgeName, BOOLEAN, 0, 1);
         edgeToOps[std::make_pair(op, user)] = edge;
         // This constraint enforces topological order, by forcing successor
         // operations to have a bigger larger index in the topological order
@@ -1036,7 +1036,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
     // Linearization of dataLatency * shiftReg
     CPVar latencyMulShiftReg =
-        model->addVar("latencyMulShiftReg", CPVar::INTEGER, 0, 100);
+        model->addVar("latencyMulShiftReg", INTEGER, 0, 100);
     model->addConstr(latencyMulShiftReg <= dataLatency);
     model->addConstr(latencyMulShiftReg <= 100 * shiftReg);
     model->addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);

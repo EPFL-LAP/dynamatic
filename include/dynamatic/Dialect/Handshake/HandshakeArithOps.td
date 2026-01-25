@@ -25,6 +25,7 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     SameOperandsAndResultType,
+    JoinLikeOpInterface,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
   let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);

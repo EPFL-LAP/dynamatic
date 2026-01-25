@@ -54,19 +54,18 @@ static void initMILPVariables(std::unique_ptr<CPSolver> &model, ArchSet &archs,
 
   // Create a variable for each basic block
   for (unsigned bb : bbs)
-    vars.bbs[bb] =
-        model->addVar("sBB_" + std::to_string(bb), CPVar::BOOLEAN, 0, 1);
+    vars.bbs[bb] = model->addVar("sBB_" + std::to_string(bb), BOOLEAN, 0, 1);
 
   // Create a variable for each arch
   for (ArchBB *arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
-    vars.archs[arch] = model->addVar(arcName, CPVar::BOOLEAN, 0, 1);
+    vars.archs[arch] = model->addVar(arcName, BOOLEAN, 0, 1);
     maxTrans = std::max(maxTrans, arch->numTrans);
   }
 
   // Create a variable to hold the maximum number of CFDFC executions
-  vars.numExecs = model->addVar("varMaxExecs", CPVar::INTEGER, 0, maxTrans);
+  vars.numExecs = model->addVar("varMaxExecs", INTEGER, 0, maxTrans);
 }
 
 /// Sets the MILP objective, which is to maximize the sum over all archs of
@@ -77,7 +76,7 @@ static void setObjective(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
 
     // vars.numExecs * var is not a linear term, we should linearize it
     auto numExecsTimesVar =
-        model->addVar("numExec*" + var.name, CPVar::INTEGER, 0, std::nullopt);
+        model->addVar("numExec*" + var.getName(), INTEGER, 0, std::nullopt);
     constexpr double bigM = 1e4;
 
     // - If var == 0: 0 <= w <= 0

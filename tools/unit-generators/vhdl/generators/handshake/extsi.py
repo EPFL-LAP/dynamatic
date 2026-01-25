@@ -6,8 +6,8 @@ def generate_extsi(name, params):
     output_bitwidth = params["output_bitwidth"]
 
     body = f"""
-  outs({output_bitwidth} - 1 downto {input_bitwidth}) <= ({output_bitwidth} - {input_bitwidth} - 1 downto 0 => ins({input_bitwidth} - 1));
-  outs({input_bitwidth} - 1 downto 0)            <= ins;
+  outs({output_bitwidth - 1} downto {input_bitwidth}) <= (others => ins({input_bitwidth - 1}));
+  outs({input_bitwidth - 1} downto 0)            <= ins;
     """
 
     return generate_unary(
