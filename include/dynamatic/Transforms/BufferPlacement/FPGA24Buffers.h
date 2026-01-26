@@ -6,7 +6,19 @@
 //
 //===------------------------------------------------------------------===//
 //
-// TODO
+// This algorithm is based on the paper: [Xu, Josipović, FPGA'24]
+// (https://dl.acm.org/doi/10.1145/3626202.3637570)
+// The paper implements a two-step approach to buffer placement:
+// 1. Latency Balancing: This LP can be used to balance the latency of the
+// circuit by calculating the extra latency to be added to each channel in order
+// to equalize the latency of all paths in the circuit.
+// 2. Occupancy Balancing: It takes the results of the latency balancing LP and
+// uses them to calculate the number of slots to be used for each channel in
+// order to balance the occupancy of the circuit.
+//
+// We run these LPs on two specific patterns: reconvergent paths and
+// synchronizing cycles. Their definitions & implementations are provided in the
+// `LatencyAndOccupancyBalancingSupport.{h,cpp}` file.
 //
 //===------------------------------------------------------------------===//
 
@@ -32,6 +44,8 @@ struct LatencyBalancingResult {
   DenseMap<Value, unsigned> channelExtraLatency;
   /// Target intiation interval.
   double targetII;
+  /// Target intiation interval per CFDFC.
+  DenseMap<CFDFC *, double> cfdfcTargetIIs;
 };
 
 /// Helper struct that pairs a reconvergent path with its corresponding
@@ -77,6 +91,9 @@ private:
   /// Computed minimum feasible Initiation Interval across all CFDFCs (set by
   /// addCycleTimeConstraints).
   double computedII = 1.0;
+
+  /// Computed minimum feasible Initiation Interval per CFDFC.
+  DenseMap<CFDFC *, double> computedCFDFCIIs;
 
   void addLatencyVariables();
 

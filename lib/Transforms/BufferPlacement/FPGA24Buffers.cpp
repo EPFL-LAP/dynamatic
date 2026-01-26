@@ -47,7 +47,7 @@ using namespace dynamatic::buffer::fpga24;
 static constexpr double BIG_M = 1000.0;
 
 /// Weight for stall penalty vs latency cost (>> LATENCY_WEIGHT to prioritize
-/// stalls). (Paper: TODO)
+/// stalls). See usage in (Paper: Section 4, Equation 7)
 static constexpr double LATENCY_WEIGHT = 1.0;
 static constexpr double STALL_WEIGHT = 1000.0;
 
@@ -348,25 +348,6 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
     LLVM_DEBUG(llvm::errs()
                << "[LP1]     -> " << allPaths.size() << " simple paths\n");
 
-    /// TODO(ziad): Evaluate if limiting the number of simple paths is really
-    /// necessary.
-    // constexpr size_t maxSimplePaths = 100;
-    // if (allPaths.size() > maxSimplePaths) {
-    //   LLVM_DEBUG(llvm::errs()
-    //              << "[LP1]     WARNING: Too many paths, marking as
-    //              imbalanced\n");
-    //   model->addConstr(patternImbalanced == 1,
-    //                    "tooManyPaths_rp_" + std::to_string(pathIdx));
-    //   continue;
-    // }
-
-    // if (allPaths.size() < 2) {
-    //   /// Not actually reconvergent, no balancing needed
-    //   model->addConstr(patternImbalanced == 0,
-    //                    "notReconvergent_rp_" + std::to_string(pathIdx));
-    //   continue;
-    // }
-
     /// Build latency expressions for each path.
     /// Latency(p) = sum(D_u for units u in p) + sum(L_c for channels c in p)
     /// where D_u is unit latency (constant) and L_c is extra latency (variable)
@@ -405,7 +386,6 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
 
     /// Debug: Log path latencies for this reconvergent pattern (only for first
     /// few patterns with different base latencies)
-    /// TODO(ziad): Remove this after making sure the LP is working correctly.
     static int debugPathCount = 0;
     if (pathBaseLatencies.size() >= 2) {
       double minLat =
@@ -467,21 +447,6 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
                              BIG_M * patternImbalanced,
                          baseName + "_b");
       }
-
-      // TODO(ziad): Uncomment for better II on circuits with high-latency
-      // components. This +1 margin is NOT in the paper but helps achieve 2000
-      // cycles with fir.c for some reason..... double maxBaseLat =
-      //     *std::max_element(pathBaseLatencies.begin(),
-      //     pathBaseLatencies.end());
-      // double minBaseLat =
-      //     *std::min_element(pathBaseLatencies.begin(),
-      //     pathBaseLatencies.end());
-      // bool hasLatencyImbalance = (maxBaseLat - minBaseLat) > 0.5;
-      // if (hasLatencyImbalance) {
-      //   model->addConstr(pathLatencies[i] >= maxBaseLat + 1,
-      //                    "minLat_rp_" + std::to_string(pathIdx) + "_" +
-      //                        std::to_string(i));
-      // }
     }
   }
 }
@@ -669,6 +634,7 @@ void LatencyBalancingMILP::addCycleTimeConstraints() {
 
     /// Track the maximum II across all CFDFCs
     computedII = std::max(computedII, iiCFC);
+    computedCFDFCIIs[cfdfc] = iiCFC;
 
     LLVM_DEBUG(llvm::errs()
                << "[LP1]   CFDFC " << cfdfcIdx << ": " << cycles.size()
@@ -680,7 +646,6 @@ void LatencyBalancingMILP::addCycleTimeConstraints() {
       const SimpleCycle &cycle = cycles[cycleIdx];
 
       /// Debug: Show channels on this cycle
-      /// TODO(ziad): Remove this after making sure the LP is working correctly.
       LLVM_DEBUG({
         llvm::errs() << "[LP1]     Cycle " << cycleIdx << " channels: ";
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {
@@ -739,10 +704,6 @@ void LatencyBalancingMILP::setLatencyBalancingObjective() {
     objective += LATENCY_WEIGHT * chVars.extraLatency;
   }
 
-  /// Minimize by maximizing negative
-  /// There is no .setMinimizeObjective() method, so we maximize the negative of
-  /// the objective.
-  /// TODO(ziad): Clarify with Jiahui if this is the correct approach.
   model->setMaximizeObjective(-objective);
 }
 
@@ -766,6 +727,7 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
   }
 
   result.targetII = computedII;
+  result.cfdfcTargetIIs = computedCFDFCIIs;
   LLVM_DEBUG(llvm::errs() << "[LP1] Computed target II = " << computedII
                           << "\n");
   return result;
@@ -854,15 +816,39 @@ void OccupancyBalancingLP::setup() {
                           << " occupancy variables\n");
 
   /// (Paper: Section 5, Equation 8): N_c >= L_c / II
-  size_t constraintCount = 0;
-  for (Value channel : allChannels) {
-    /// Get L_c from the latency balancing's results.
-    unsigned latency = 0;
-    if (latencyResult.channelExtraLatency.count(channel)) {
-      latency = latencyResult.channelExtraLatency.lookup(channel);
-    }
-    double minOccupancy = static_cast<double>(latency) / targetII;
+  /// We enforce this for the global II, but also for each CFDFC's specific II
+  /// to ensure sufficient buffering in faster loops.
+  /// (Paper: Section 5, Equation 15): Making the required occupancy the
+  /// maximum of all CFDFCs' II.
 
+  DenseMap<Value, double> requiredOccupancy;
+
+  // Initialize with global II constraint
+  for (Value channel : allChannels) {
+    unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
+    requiredOccupancy[channel] = static_cast<double>(latency) / targetII;
+  }
+
+  // Update by taking the maximum of the per-CFDFC constraints
+  for (CFDFC *cfdfc : cfdfcs) {
+    double cfdfcII = latencyResult.cfdfcTargetIIs.lookup(cfdfc);
+    if (cfdfcII < 1.0)
+      continue;
+
+    for (Value channel : cfdfc->channels) {
+      if (requiredOccupancy.count(channel)) {
+        unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
+        double specificOcc = static_cast<double>(latency) / cfdfcII;
+        if (specificOcc > requiredOccupancy[channel]) {
+          requiredOccupancy[channel] = specificOcc;
+        }
+      }
+    }
+  }
+
+  // Add constraints
+  size_t constraintCount = 0;
+  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
     LLVM_DEBUG(llvm::errs()
                    << "[LP2***] minOccupancy = " << minOccupancy
                    << " channel = " << getUniqueName(*channel.getUses().begin())
@@ -873,27 +859,7 @@ void OccupancyBalancingLP::setup() {
     constraintCount++;
   }
   LLVM_DEBUG(llvm::errs() << "[LP2]   Added " << constraintCount
-                          << " N_c >= L_c/II constraints\n");
-
-  /// Path consistency constraints (Paper: Section 5, Equation 11)
-  /// NOTE: The per-channel constraint N_c >= L_c / II from above
-  /// should be sufficient when LP1 correctly balances latency. The path sum
-  /// constraint can cause occupancy to concentrate on channels where latency
-  /// wasn't added (e.g., on mux outputs instead of fork outputs), leading to
-  /// transparent FIFOs instead of registers.
-  ///
-  /// For now, we rely on N_c >= L_c / II to distribute occupancy
-  /// proportionally to where latency was added by LP1. This ensures DV buffers
-  /// are placed where needed.
-  ///
-  /// TODO(ziad): Revisit path occupancy constraints. Equation 11
-  /// says paths should have equal occupancy, but implementing this as a sum
-  /// constraint allows the solver to concentrate occupancy arbitrarily.
-  /// I have no idea why this is happening, but adding it makes everything
-  /// worse.
-  LLVM_DEBUG(
-      llvm::errs()
-      << "[LP2]   Skipping path sum constraints (relying on N_c >= L_c/II)\n");
+                          << " N_c >= L_c/II constraints (max over CFDFCs)\n");
 
   /// Add cycle capacity constraints
   /// (Paper: Section 5, Equation 12): Occupancy(cycle) <= B
@@ -926,7 +892,7 @@ void OccupancyBalancingLP::setup() {
     // weight it with 1.
     objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
   }
-  /// Again, as above, we minimize by maximizing the negative.
+
   model->setMaximizeObjective(-objective);
 
   markReadyToOptimize();
@@ -1119,7 +1085,6 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
                           << " channels\n");
 
   /// Debug: Verify cycle latencies after LP1
-  /// TODO(ziad): Remove this after making sure the LP is working correctly.
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
     for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcPtrs.size(); ++cfdfcIdx) {
@@ -1244,7 +1209,7 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
     if (!isa<handshake::MemoryControllerOp, handshake::LSQOp>(op))
       continue;
 
-    // Get the 'di_end' and 'idx_end' signals 
+    // Get the 'di_end' and 'idx_end' signals
     for (Value res : op.getResults()) {
       // Check if this is a control-type output ('di_end' and 'idx_end' are
       // control)
@@ -1260,10 +1225,14 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
                    << getUniqueName(*res.getUses().begin()) << "\n");
       }
     }
+
+    LLVM_DEBUG(llvm::errs()
+               << "Note: these buffers are added to the output of the memory "
+                  "controller, they get rid of the stalls after the memory "
+                  "controller, but they themselves stall the circuit.\n");
   }
 
   /// Debug: Log final placed buffers
-  /// TODO(ziad): Remove this after making sure the LP is working correctly.
   LLVM_DEBUG(llvm::errs() << "Final buffer placement:\n");
   for (auto &[channel, result] : placement) {
     if (result.numOneSlotDV > 0 || result.numFifoNone > 0 ||
