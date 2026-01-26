@@ -458,6 +458,8 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   gaussianElimination(matrix);
   size_t rows = matrix.size1();
   size_t cols = matrix.size2();
+  ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+  uid++;
   for (size_t row = 0; row < rows; ++row) {
     bool canAnnotate = true;
     for (size_t col = 0; col < nLambda; ++col) {
@@ -480,10 +482,11 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
     if (coefs.size() > 0) {
-      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
-      propertyTable.push_back(p.toJSON());
-      uid++;
+      p.addEquation(coefs, names);
     }
+  }
+  if (p.getEquations().size() > 0) {
+    propertyTable.push_back(p.toJSON());
   }
   /*
   for (auto &expr : equations) {

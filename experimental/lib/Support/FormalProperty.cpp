@@ -352,15 +352,11 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 
 // Reconvergent path flow
 
-ReconvergentPathFlow::ReconvergentPathFlow(
-    unsigned long id, TAG tag, const std::vector<int> &coefficients,
-    const std::vector<std::string> &names)
-    : FormalProperty(id, tag, TYPE::RPF),
-      coefficients{coefficients}, names{names} {}
+ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
+    : FormalProperty(id, tag, TYPE::RPF) {}
 
 llvm::json::Value ReconvergentPathFlow::extraInfoToJSON() const {
-  return llvm::json::Object(
-      {{COEFFICIENTS_LIT, coefficients}, {NAMES_LIT, names}});
+  return llvm::json::Object({{EQUATIONS_LIT, equations}});
 }
 
 std::unique_ptr<ReconvergentPathFlow>
@@ -371,8 +367,7 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper || !mapper.map(COEFFICIENTS_LIT, prop->coefficients) ||
-      !mapper.map(NAMES_LIT, prop->names))
+  if (!mapper || !mapper.map(EQUATIONS_LIT, prop->equations))
     return nullptr;
 
   return prop;
