@@ -23,11 +23,27 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+/// Tracks a handshake merge whose input will be resolved later.
+struct PendingMerge {
+  /// The MergeOp that needs one of its operands patched later.
+  handshake::MergeOp mergeOp;
+
+  /// Index of the operand in the merge that will be updated (usually 1).
+  unsigned operandIndex;
+
+  /// The original CF value that will later be remapped to handshake.
+  Value originalCFValue;
+
+  PendingMerge(handshake::MergeOp op, unsigned idx, Value cfVal)
+      : mergeOp(op), operandIndex(idx), originalCFValue(cfVal) {}
+};
+
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
 void addRegenOperandConsumer(PatternRewriter &rewriter,
                              dynamatic::handshake::FuncOp &funcOp,
-                             Operation *consumerOp, Value operand);
+                             Operation *consumerOp, Value operand,
+                             mlir::CFGLoopInfo &loopInfo);
 
 /// This function implements the suppression mechanism over a pair made of a
 /// producer and a consumer (see `addSupp` description).
@@ -40,7 +56,7 @@ void addSuppOperandConsumer(PatternRewriter &rewriter,
 /// adding some merges to the network, to that this can be done. The new
 /// merge is moved inside of the loop, and it works like a reassignment
 /// (cfr. FPGA'22, Section V.C).
-void addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
+// void addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 /// Given each pairs of producers and consumers within the circuit, the
 /// producer might create a token which is never used by the corresponding
@@ -54,9 +70,11 @@ void addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 /// work as explicit phi functions. If `removeTerminators` is true, the `cf`
 /// terminators in the function are modified to stop feeding the successive
 /// blocks.
-LogicalResult addGsaGates(Region &region, PatternRewriter &rewriter,
-                          const gsa::GSAAnalysis &gsa, Backedge startValue,
-                          bool removeTerminators = true);
+LogicalResult addGsaGates(
+    Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
+    Backedge startValue,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
+    bool removeTerminators = true);
 
 /// For each non-init merge in the IR, run the GSA analysis to obtain its GSA
 /// equivalent, then use `addGsaGates` to instantiate such operations in the IR.
