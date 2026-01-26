@@ -523,44 +523,6 @@ void WriteModData::writeSignalDeclarations(
   }
 }
 
-void WriteModData::writeStallAssertion() {
-  auto isNotBlockArg = [](auto valAndName) -> bool {
-    return !isa<BlockArgument>(valAndName.first);
-  };
-
-  for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
-    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
-        .Case<ChannelType>([&](ChannelType channelType) {
-          // [START REMOVE THIS]
-          std::string name = valueAndName.second;
-          os << "process(clk)\n";
-          os << "begin\n";
-          os << llvm::formatv(
-              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
-              "\"Stall in channel {0} -> {1}\" "
-              "severity note;\n",
-              getInternalSignalName(name, SignalType::VALID),
-              getInternalSignalName(name, SignalType::READY));
-          os << "end process;\n";
-          // [END REMOVE THIS]
-        })
-        .Case<ControlType>([&](auto type) {
-          // [START REMOVE THIS]
-          std::string name = valueAndName.second;
-          os << "process(clk)\n";
-          os << "begin\n";
-          os << llvm::formatv(
-              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
-              "\"Stall in channel {0} -> {1}\" "
-              "severity note;\n",
-              getInternalSignalName(name, SignalType::VALID),
-              getInternalSignalName(name, SignalType::READY));
-          os << "end process;\n";
-          // [END REMOVE THIS]
-        });
-  }
-}
-
 void WriteModData::writeSignalAssignments(
     SignalAssignmentWriter writeAssignment) {
   auto addValid = [&](StringRef dst, StringRef src) -> void {
