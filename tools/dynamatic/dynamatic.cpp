@@ -97,8 +97,7 @@ struct FrontendState {
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
 
-
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -133,7 +132,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -198,7 +197,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -206,7 +205,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -268,13 +267,15 @@ public:
 class SetOutputDir : public Command {
 public:
   SetOutputDir(FrontendState &state)
-      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
     addPositionalArg({"out_dir", "out dir name"});
   }
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class Compile : public Command {
 public:
@@ -660,7 +661,8 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
   llvm::StringRef outputDir = args.positionals.front();
 
   // reject trivial bad cases
-  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
@@ -708,8 +710,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22" || it->second == "fpga24" || it->second == "costaware" ||
-        it->second == "mapbuf") {
+        it->second == "fpl22" || it->second == "fpga24" ||
+        it->second == "costaware" || it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
