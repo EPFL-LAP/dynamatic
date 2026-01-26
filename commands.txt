@@ -1,7 +1,0 @@
-View the waveform through ModelSim:
-
-`vsim vsim.wlf`
-
-Check the list of stalls:
-
-`grep Stall fir/out/sim/result.txt | sort | uniq`
