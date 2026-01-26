@@ -27,7 +27,7 @@
 #include <numeric>
 #include <queue>
 
-#define DEBUG_TYPE "buffer-placement"
+#define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 
 // Make the graph boost analyzable.
 // NOTE: Moving this to the header file will cause linking errors.
