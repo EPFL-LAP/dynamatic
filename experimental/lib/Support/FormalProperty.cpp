@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EFNAO;
   if (s == "CSOAFAF")
     return FormalProperty::TYPE::CSOAFAF;
+  if (s == "PSSFO")
+    return FormalProperty::TYPE::PSSFO;
 
   return std::nullopt;
 }
@@ -45,6 +47,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EFNAO";
   case TYPE::CSOAFAF:
     return "CSOAFAF";
+  case TYPE::PSSFO:
+    return "PSSFO";
   }
 }
 
@@ -102,6 +106,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::PSSFO:
+    return PathSingleSentForkOutput::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -299,6 +305,32 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
       !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
       !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
       !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
+    return nullptr;
+
+  return prop;
+}
+
+PathSingleSentForkOutput::PathSingleSentForkOutput(
+    unsigned long id, TAG tag, const std::vector<std::string> &forkOps,
+    const std::vector<unsigned> &outputIdxs)
+    : FormalProperty(id, tag, TYPE::PSSFO), forkOps{forkOps},
+      outputIdxs{outputIdxs} {}
+
+llvm::json::Value PathSingleSentForkOutput::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{FORK_OPS_LIT, forkOps}, {OUTPUT_IDXS_LIT, outputIdxs}});
+}
+
+std::unique_ptr<PathSingleSentForkOutput>
+PathSingleSentForkOutput::fromJSON(const llvm::json::Value &value,
+                                   llvm::json::Path path) {
+  auto prop = std::make_unique<PathSingleSentForkOutput>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(FORK_OPS_LIT, prop->forkOps) ||
+      !mapper.map(OUTPUT_IDXS_LIT, prop->outputIdxs))
     return nullptr;
 
   return prop;
