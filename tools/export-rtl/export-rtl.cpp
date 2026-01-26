@@ -264,8 +264,6 @@ struct WriteModData {
   /// Writes the module's internal signal declarations.
   void writeSignalDeclarations(SignalDeclarationWriter writeDeclaration);
 
-  void writeStallAssertion();
-
   using SignalAssignmentWriter = void (*)(const llvm::Twine &dst,
                                           const llvm::Twine &src,
                                           raw_indented_ostream &os);
@@ -866,8 +864,6 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os.unindent();
   os << "\nbegin\n\n";
   os.indent();
-
-  data.writeStallAssertion();
 
   // Architecture implementation
   data.writeSignalAssignments(
