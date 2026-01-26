@@ -561,10 +561,11 @@ LogicalResult ftd::createPhiNetworkDeps(
 /// direct or complement) return its corresponding circuit equivalent. This
 /// means, either we obtain the output of the operation determining the
 /// condition, or we add a `not` to complement.
-static Value boolVariableToCircuit(PatternRewriter &rewriter,
-                                   experimental::boolean::BoolExpression *expr,
-                                   Block *block, const ftd::BlockIndexing &bi,
-                                   bool needsChannelify = true) {
+static Value boolVariableToCircuit(
+    PatternRewriter &rewriter, experimental::boolean::BoolExpression *expr,
+    Block *block, const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
+    bool needsChannelify = true) {
 
   // Convert the expression into a single condition (for instance, `c0` or
   // `~c0`).
@@ -577,6 +578,18 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
     return nullptr;
 
   auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
+
+  // If there is a risk that values are not finalized yet,
+  // pendingMuxOperands will be a non-nullptr
+  if (pendingMuxOperands != nullptr) {
+    // Create backedge of the same type
+    BackedgeBuilder beb(rewriter, block->front().getLoc());
+    Backedge be = beb.get(ftd::channelifyType(condition.getType()));
+    // Remember how to resolve it later
+    (*pendingMuxOperands)[condition].push_back(be);
+    // Use backedge as mux condition
+    condition = be;
+  }
 
   // Add a not if the condition is negated.
   if (singleCond->isNegated) {
@@ -595,14 +608,16 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
 
 /// Get a circuit out a boolean expression, depending on the different kinds
 /// of expressions you might have.
-static Value boolExpressionToCircuit(PatternRewriter &rewriter,
-                                     BoolExpression *expr, Block *block,
-                                     const ftd::BlockIndexing &bi,
-                                     bool needsChannelify = true) {
+static Value boolExpressionToCircuit(
+    PatternRewriter &rewriter, BoolExpression *expr, Block *block,
+    const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
+    bool needsChannelify = true) {
 
   // Variable case
   if (expr->type == ExpressionType::Variable)
-    return boolVariableToCircuit(rewriter, expr, block, bi, needsChannelify);
+    return boolVariableToCircuit(rewriter, expr, block, bi, pendingMuxOperands,
+                                 needsChannelify);
 
   // Constant case (either 0 or 1)
   rewriter.setInsertionPointToStart(block);
@@ -624,12 +639,14 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi,
-                          bool needsChannelify = true) {
+static Value bddToCircuit(
+    PatternRewriter &rewriter, BDD *bdd, Block *block,
+    const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
+    bool needsChannelify = true) {
   if (!bdd->successors.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi,
-                                   needsChannelify);
+                                   pendingMuxOperands, needsChannelify);
 
   rewriter.setInsertionPointToStart(block);
 
@@ -637,11 +654,14 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   // creates other muxes in a hierarchical way)
   SmallVector<Value> muxOperands;
   muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().first,
-                                     block, bi, needsChannelify));
+                                     block, bi, pendingMuxOperands,
+                                     needsChannelify));
   muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().second,
-                                     block, bi, needsChannelify));
-  Value muxCond = boolExpressionToCircuit(rewriter, bdd->boolVariable, block,
-                                          bi, needsChannelify);
+                                     block, bi, pendingMuxOperands,
+                                     needsChannelify));
+  Value muxCond =
+      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi,
+                              pendingMuxOperands, needsChannelify);
 
   // Create the multiplxer and add it to the rest of the circuit
   auto muxOp = rewriter.create<handshake::MuxOp>(
@@ -678,10 +698,11 @@ getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
 
 void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                   handshake::FuncOp &funcOp,
-                                  Operation *consumerOp, Value operand) {
+                                  Operation *consumerOp, Value operand,
+                                  mlir::CFGLoopInfo &loopInfo) {
 
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  // mlir::DominanceInfo domInfo;
+  // mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
   BlockIndexing bi(funcOp.getBody());
   auto startValue = (Value)funcOp.getArguments().back();
 
@@ -728,7 +749,8 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
   auto createRegenMux = [&](CFGLoop *loop) -> handshake::MuxOp {
     rewriter.setInsertionPointToStart(loop->getHeader());
-    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
+
+    // regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
     // Determine the loop exit condition:
     // - If the condition spans multiple cofactors, build a BDD and
@@ -741,7 +763,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     if (size(cofactorList) > 1) {
       BDD *bdd = buildBDD(exitCondition, cofactorList);
       conditionValue =
-          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
+          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, nullptr, false);
     } else
       conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
@@ -759,7 +781,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
     auto selectSignal = initMergeOp.getResult();
-    selectSignal.setType(channelifyType(selectSignal.getType()));
+    // selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
     auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
@@ -1003,6 +1025,8 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
                                  handshake::FuncOp &funcOp,
                                  Operation *consumerOp, Value operand) {
 
+  llvm::errs() << "\n\n\t\tHI from addSuppOperandConsumer\n\n";
+
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
@@ -1136,38 +1160,38 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }
 
-void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
+// void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 
-  // Set of original operations in the IR
-  std::vector<Operation *> consumersToCover;
-  for (Operation &consumerOp : funcOp.getOps())
-    consumersToCover.push_back(&consumerOp);
+//   // Set of original operations in the IR
+//   std::vector<Operation *> consumersToCover;
+//   for (Operation &consumerOp : funcOp.getOps())
+//     consumersToCover.push_back(&consumerOp);
 
-  for (auto *consumerOp : consumersToCover) {
-    for (auto operand : consumerOp->getOperands())
-      addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
-  }
-}
+//   for (auto *consumerOp : consumersToCover) {
+//     for (auto operand : consumerOp->getOperands())
+//       addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
+//   }
+// }
 
-void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
+// void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 
-  // Set of original operations in the IR
-  std::vector<Operation *> consumersToCover;
-  for (Operation &consumerOp : funcOp.getOps())
-    consumersToCover.push_back(&consumerOp);
+//   // Set of original operations in the IR
+//   std::vector<Operation *> consumersToCover;
+//   for (Operation &consumerOp : funcOp.getOps())
+//     consumersToCover.push_back(&consumerOp);
 
-  // For each producer/consumer relationship
-  for (Operation *consumerOp : consumersToCover) {
-    for (Value operand : consumerOp->getOperands())
-      addRegenOperandConsumer(rewriter, funcOp, consumerOp, operand);
-  }
-}
+//   // For each producer/consumer relationship
+//   for (Operation *consumerOp : consumersToCover) {
+//     for (Value operand : consumerOp->getOperands())
+//       addRegenOperandConsumer(rewriter, funcOp, consumerOp, operand);
+//   }
+// }
 
-LogicalResult experimental::ftd::addGsaGates(Region &region,
-                                             PatternRewriter &rewriter,
-                                             const gsa::GSAAnalysis &gsa,
-                                             Backedge startValue,
-                                             bool removeTerminators) {
+LogicalResult experimental::ftd::addGsaGates(
+    Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
+    Backedge startValue,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    bool removeTerminators) {
 
   using namespace experimental::gsa;
   BlockIndexing bi(region);
@@ -1184,6 +1208,25 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
+
+  // This function operates in two modes:
+  // (1) Called from handshake transformation passes where all values are
+  // already handshake channels.
+  // (2) Called early in CF-to-handshake conversion
+  // when some CF values are still present.
+  // The last two parameters distinguish the modes: for (1) they are
+  // nullptr/false, for (2) they are non-null/true.
+  //
+  // In mode (1), no special management is needed: Muxes are inserted with all
+  // connections finalized immediately.
+  //
+  // In mode (2), Mux operands are created as backedge placeholders. We maintain
+  // a side structure mapping these placeholders to their corresponding
+  // handshake values, which allows us to replace the backedges later, once the
+  // handshake values are fully finalized. In case of Mux fed from a Mux tree,
+  // the pendingMuxOperands is propoagated to the Mux decomposition tree to
+  // store all cf values involved. In case the Mux is fed from a Merge only the
+  // cf values feeding the Merge will be pushed to the pendingMuxOperands
 
   struct MissingGsa {
     // Index of the GSA function to modify
@@ -1223,7 +1266,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       // Checks whether one index is empty
       int nullOperand = -1;
 
-      // For each of its operand
+      // For each of its operands
       for (auto *operand : gate->operands) {
         // If the input is another GSA function, then a dummy value is used as
         // operand and the operations will be reconnected later on.
@@ -1239,7 +1282,19 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           operands.emplace_back(nullptr);
         } else {
           auto val = std::get<Value>(operand->input);
-          operands.emplace_back(val);
+          // If there is no risk that values are not finalized yet,
+          // pendingMuxOperands will be a nullptr
+          if (pendingMuxOperands == nullptr)
+            operands.emplace_back(val);
+          else {
+            // Create backedge of the same type
+            BackedgeBuilder beb(rewriter, block.front().getLoc());
+            Backedge be = beb.get(ftd::channelifyType(val.getType()));
+            // Use backedge as mux operand
+            operands.emplace_back(be);
+            // Remember how to resolve it later
+            (*pendingMuxOperands)[val].push_back(be);
+          }
         }
         operandIndex++;
       }
@@ -1251,14 +1306,27 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       // - Otherwise, use the simple terminating condition of the block
       Value conditionValue;
       if (size(gate->cofactorList) > 1) {
-        // Apply a BDD expansion to the loop exit expression and the list of
-        // cofactors
         BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
-        // Convert the boolean expression obtained through BDD to a circuit
-        conditionValue =
-            bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
-      } else
-        conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
+        // Convert the boolean expression obtained through BDD to a circuit,
+        // passing pendingMuxOperands so that the function internally adds a
+        // backedge for every value involved
+        conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(), bi,
+                                      pendingMuxOperands, false);
+      } else {
+        Value oldCond = gate->conditionBlock->getTerminator()->getOperand(0);
+
+        // If there is a risk that values are not finalized yet,
+        // pendingMuxOperands will be a non-nullptr
+        if (pendingMuxOperands != nullptr) {
+          // Create backedge of the same type
+          BackedgeBuilder beb(rewriter, block.front().getLoc());
+          Backedge be = beb.get(ftd::channelifyType(oldCond.getType()));
+          // Remember how to resolve it later
+          (*pendingMuxOperands)[oldCond].push_back(be);
+          // Use backedge as mux condition
+          conditionValue = be;
+        }
+      }
 
       // If the function is MU, then we create a merge
       // and use its result as condition
@@ -1280,7 +1348,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
         // Replace the new condition value
         conditionValue = initMergeOp->getResult(0);
-        //conditionValue.setType(channelifyType(conditionValue.getType()));
+        conditionValue.setType(channelifyType(conditionValue.getType()));
 
         // Add the activation constant driven by the backedge value, which will
         // be then updated with the real start value, once available
@@ -1302,8 +1370,9 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(loc, gate->result.getType(),
-                                                   conditionValue, operands);
+      auto mux = rewriter.create<handshake::MuxOp>(
+          loc, ftd::channelifyType(gate->result.getType()), conditionValue,
+          operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
       // later removed
@@ -1372,7 +1441,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
     }
   }
 
-    for (Block &block : region) {
+  for (Block &block : region) {
     block.print(llvm::errs());
   }
   return success();
@@ -1397,7 +1466,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
       continue;
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
     if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa,
-                                startValueBackedge, false)))
+                                startValueBackedge, nullptr, false)))
       return failure();
 
     // Get rid of the merge
