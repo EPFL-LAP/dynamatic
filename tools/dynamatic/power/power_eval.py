@@ -79,6 +79,7 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
     print("[INFO] Generating power evaluation script")
 
     # Normalize HDL selection
+    # For now, verilog-beta is treated as verilog
     hdl = _normalize_hdl(hdl)
 
     # Resolve paths
@@ -97,14 +98,13 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
         return
 
     check_else_create(power_dir)
-    check_else_create(verify_dir)
 
     tb_file = _find_tb_file(sim_src_dir, kernel_name)
     if not tb_file:
         print(f"[ERROR] Testbench not found in {sim_src_dir}")
         return
 
-    # Generate the xdc file for synthesis in Vivado
+    # Generate the xdc file for synthesis and implementation in Vivado
     xdc_dict = {
         "tcp": clock_period,
         "halftcp": clock_period / 2
@@ -148,15 +148,13 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
     post_impl_time_vcd = os.path.join(verify_dir, "post_impl_time.vcd")
 
     post_synth_fun_rpt = os.path.join(power_dir, "post_synth_fun_power.rpt")
-    post_synth_fun_xml = os.path.join(power_dir, "post_synth_fun_power.xml")
     post_synth_time_rpt = os.path.join(power_dir, "post_synth_time_power.rpt")
 
     post_impl_fun_rpt = os.path.join(power_dir, "post_impl_fun_power.rpt")
-    post_impl_fun_xml = os.path.join(power_dir, "post_impl_fun_power.xml")
     post_impl_time_rpt = os.path.join(power_dir, "post_impl_time_power.rpt")
 
     flatten_line = ""
-    if flatten_hierarchy == "none":
+    if not flatten_hierarchy:
         flatten_line = (
             "set_property STEPS.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY none "
             "[get_runs synth_1]"
@@ -205,7 +203,6 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
         "# =============================================================",
         f"read_saif -file {post_synth_fun_saif}",
         f"report_power -file {post_synth_fun_rpt}",
-        f"report_power -file {post_synth_fun_xml} -format xml",
         "reset_switching_activity -all",
         "",
         f"read_saif -file {post_synth_time_saif}",
@@ -257,7 +254,6 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
             "# =============================================================",
             f"read_saif -file {post_impl_fun_saif}",
             f"report_power -file {post_impl_fun_rpt}",
-            f"report_power -file {post_impl_fun_xml} -format xml",
             "reset_switching_activity -all",
             "",
             f"read_saif -file {post_impl_time_saif}",
@@ -327,13 +323,11 @@ if __name__ == "__main__":
         default="synth"
     )
     p.add_argument(
-        "--flatten-hierarchy",
-        choices=["none", "default"],
-        required=False,
-        default="none",
+        "--flatten_hierarchy",
+        action="store_true",
         help=(
-            "Control hierarchy flattening during synthesis. Use 'none' to emit "
-            "the FLATTEN_HIERARCHY none property, or 'default' for the fully flattened flow."
+            "Control hierarchy flattening during synthesis. With 'false' to emit "
+            "the FLATTEN_HIERARCHY none property, or 'true' for the fully flattened flow."
         ),
     )
     p.add_argument("--vivado_cmd", type=str, required=False, help="Vivado command", default="vivado")
@@ -346,6 +340,7 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
+    # Default to synthesis stage if not specified
     stage = args.stage if args.stage is not None else "synth"
 
     main(

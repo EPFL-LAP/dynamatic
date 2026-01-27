@@ -1,5 +1,4 @@
-vivado_power_evaluation_tcl = r"""
-# Date: %date
+vivado_power_evaluation_tcl = r"""# Date: %date
 # Simulation with XSim + SAIF dump + power extraction
 # Command %vivado_cmd -mode batch -source power_extraction.tcl
 # =============================================================
@@ -19,11 +18,10 @@ set XDC_FILE   %xdc_file
 # SAIF output
 set SAIF_OUT   %saif_pre
 
-
 # =============================================================
 # 1. Create an in-memory project
 # =============================================================
-create_project -force -part xc7k160tfbg484-1 pre_synth_sim
+create_project -force -part xc7k160tfbg484-1 power_eval_proj
 
 # Optional but often helpful for clean compilation behavior
 set_property target_language %target_language [current_project]
@@ -80,7 +78,6 @@ close_sim
 
 %{synth_block}
 %{impl_block}
-
 # =============================================================
 # Exit
 # =============================================================
