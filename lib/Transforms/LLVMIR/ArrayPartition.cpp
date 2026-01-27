@@ -38,7 +38,11 @@
 #define DEBUG_TYPE "array-partition"
 
 #include <boost/throw_exception.hpp>
-void boost::throw_exception(std::exception const &e) { std::abort(); }
+
+// See https://github.com/EPFL-LAP/dynamatic/issues/690
+namespace boost {
+void throw_exception(std::exception const &e) { std::abort(); }
+} // namespace boost
 
 using namespace llvm;
 using namespace polly;
@@ -314,11 +318,10 @@ DimInfoOfAllDimensions extractDimInfo(const isl::set &range,
       assert(reachableIndices.size() == 1);
       info.emplace_back(reachableIndices.front(), 1, reachableIndices.size());
     } else if (diffs.size() != 1) {
-      LLVM_DEBUG(llvm::errs()
-                     << "Dim " << i << " doesn't a single step!\nIndices:\n";
-                 for (auto idx : reachableIndices) {
-                   llvm::errs() << "Index" << idx << "\n";
-                 });
+      LLVM_DEBUG(
+          llvm::errs() << "Dim " << i << " doesn't a single step!\nIndices:\n";
+          for (auto idx
+               : reachableIndices) { llvm::errs() << "Index" << idx << "\n"; });
       info.emplace_back(0,
                         /* step = 1 indicates that we can't squash the array
                            into a smaller one currently */

@@ -25,6 +25,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -47,7 +48,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf");
+    FPGA24("fpga24"), COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 namespace dynamatic {
 namespace buffer {
@@ -190,6 +191,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[FPGA24] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 
@@ -570,7 +572,7 @@ static void logCFDFCUnions(FuncInfo &info, Logger &log,
 template <typename MILP, typename... Args>
 static inline LogicalResult
 checkLoggerAndSolve(Logger *logger, StringRef milpName,
-                    BufferPlacement &placement, Args &&...args) {
+                    BufferPlacement &placement, Args &&... args) {
   if (logger) {
     return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
                            milpName);
@@ -643,6 +645,12 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "out_of_cycle", placement, solverKind, timeout, info, timingDB,
         targetCP);
   }
+
+  if (algorithm == FPGA24) {
+    fpga24::FPGA24Buffers solver(solverKind, timeout, info, timingDB, targetCP);
+    return solver.solve(placement);
+  }
+
   if (algorithm == COST_AWARE) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
