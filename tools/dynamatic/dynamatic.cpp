@@ -398,19 +398,25 @@ class PowerEval : public Command {
 public:
   static constexpr llvm::StringLiteral HDL = "hdl";
   static constexpr llvm::StringLiteral STAGE = "stage";
+  static constexpr llvm::StringLiteral FLATTEN_HIERARCHY = "flatten-hierarchy";
 
   PowerEval(FrontendState &state)
       : Command(
-            "power-eval",
+            "evaluate-power",
             "Runs the Vivado flow and vector-based power evaluation at "
             "different design stages,"
             "using switching activity from simulation based on XSIM in Vivado.",
             state) {
     addOption({HDL, "HDL type, vhdl or verilog"});
     addOption({STAGE,
-               "Stage (synth or impl) to perform simuulation with xsim and "
+               "Stage (synth or impl) to perform simulation with xsim and "
                "vector-based power "
-               "evaluation, synthesis or implementation, defaul : synth"});
+               "evaluation, synthesis or implementation, default : synth"});
+    addOption(
+        {FLATTEN_HIERARCHY,
+         "Control hierarchy flattening during synthesis. If set, the "
+         "fully flattened flow is used. If not set, the FLATTEN_HIERARCHY "
+         "none property is emitted."});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -936,6 +942,20 @@ CommandResult PowerEval::execute(CommandArguments &args) {
     }
   }
 
+  // Get flatten hierarchy configuration
+  std::string flattenHierarchy = "1";
+
+  if (auto it = args.options.find(FLATTEN_HIERARCHY);
+      it != args.options.end()) {
+    if (it->second == "0" || it->second == "1") {
+      flattenHierarchy = it->second;
+    } else {
+      llvm::errs() << "Unknow flatten hierarchy option '" << it->second
+                   << "', possible options are '0' (not set) and '1' (set).\n";
+      return CommandResult::FAIL;
+    }
+  }
+
   std::string script =
       state.dynamaticPath + "/tools/dynamatic/power/power_eval.py";
 
@@ -945,7 +965,8 @@ CommandResult PowerEval::execute(CommandArguments &args) {
     "--output_dir", state.getOutputDir(),
     "--kernel_name", state.getKernelName(),
     "--hdl", hdl,
-    "--synth", stage,
+    "--stage", stage,
+    (flattenHierarchy == "1" ? "--flatten_hierarchy" : ""),
     "--cp", floatToString(state.targetCP, 3)
   );
   // clang-format on
