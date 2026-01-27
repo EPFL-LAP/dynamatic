@@ -16,7 +16,7 @@ synth_design -top $TOP_DESIGN -part xc7k160tfbg484-1 -no_iobuf -mode out_of_cont
 
 # Report power
 read_saif -file %saif
-report_power -file %{report_folder}/power_analysis.rpt
+report_power -file %{report_folder}/power_estimation.rpt
 
 # Ciao!
 exit

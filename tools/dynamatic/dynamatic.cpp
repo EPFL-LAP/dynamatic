@@ -97,7 +97,6 @@ struct FrontendState {
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
 
-
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
@@ -268,13 +267,15 @@ public:
 class SetOutputDir : public Command {
 public:
   SetOutputDir(FrontendState &state)
-      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
     addPositionalArg({"out_dir", "out dir name"});
   }
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class Compile : public Command {
 public:
@@ -375,11 +376,48 @@ public:
 
 class EstimatePower : public Command {
 public:
+  static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral STAGE = "stage";
+
   EstimatePower(FrontendState &state)
       : Command("estimate-power",
                 "Estimate the power consumption of the design using switching "
                 "activity from simulation.",
-                state) {}
+                state) {
+    addOption({HDL, "HDL type, vhdl or verilog"});
+    addOption({STAGE,
+               "The netlist used for functional simulation (pre or post "
+               "synthesis) in Modelsim to generate SAIF file, options are "
+               "'pre' and 'post' (default : 'pre')"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class PowerEval : public Command {
+public:
+  static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral STAGE = "stage";
+  static constexpr llvm::StringLiteral FLATTEN_HIERARCHY = "flatten-hierarchy";
+
+  PowerEval(FrontendState &state)
+      : Command(
+            "evaluate-power",
+            "Runs the Vivado flow and vector-based power evaluation at "
+            "different design stages,"
+            "using switching activity from simulation based on XSIM in Vivado.",
+            state) {
+    addOption({HDL, "HDL type, vhdl or verilog"});
+    addOption({STAGE,
+               "Stage (synth or impl) to perform simulation with xsim and "
+               "vector-based power "
+               "evaluation, synthesis or implementation, default : synth"});
+    addOption(
+        {FLATTEN_HIERARCHY,
+         "Control hierarchy flattening during synthesis. If set, the "
+         "fully flattened flow is used. If not set, the FLATTEN_HIERARCHY "
+         "none property is emitted."});
+  }
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -660,7 +698,8 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
   llvm::StringRef outputDir = args.positionals.front();
 
   // reject trivial bad cases
-  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
@@ -788,7 +827,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, floatToString(state.targetCP, 2));
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -825,14 +864,109 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  // Get the HDL configuration
+  std::string hdl = "vhdl";
+
+  if (auto it = args.options.find(HDL); it != args.options.end()) {
+    if (it->second == "verilog") {
+      hdl = "verilog";
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
+    } else if (it->second != "vhdl") {
+      llvm::errs() << "Unknow HDL '" << it->second
+                   << "', possible options are 'vhdl',"
+                      " and 'verilog'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  // Get simulation stage configuration
+  std::string stage = "pre";
+
+  if (auto it = args.options.find(STAGE); it != args.options.end()) {
+    if (it->second == "pre" || it->second == "post") {
+      stage = it->second;
+    } else {
+      llvm::errs() << "Unknow stage '" << it->second
+                   << "', possible options are 'pre' and 'post'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
   std::string script =
-      state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
+      state.dynamaticPath + "/tools/dynamatic/power/estimate_power.py";
 
   // clang-format off
   return execCmd(
     "python", script,
     "--output_dir", state.getOutputDir(),
     "--kernel_name", state.getKernelName(),
+    "--hdl", hdl,
+    "--synth", stage,
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
+}
+
+CommandResult PowerEval::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  // Get the HDL configuration
+  std::string hdl = "vhdl";
+
+  if (auto it = args.options.find(HDL); it != args.options.end()) {
+    if (it->second == "verilog") {
+      hdl = "verilog";
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
+    } else if (it->second != "vhdl") {
+      llvm::errs() << "Unknow HDL '" << it->second
+                   << "', possible options are 'vhdl',"
+                      " and 'verilog'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  // Get simulation stage configuration
+  std::string stage = "synth";
+
+  if (auto it = args.options.find(STAGE); it != args.options.end()) {
+    if (it->second == "synth" || it->second == "impl") {
+      stage = it->second;
+    } else {
+      llvm::errs() << "Unknow stage '" << it->second
+                   << "', possible options are 'synth' and 'impl'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  // Get flatten hierarchy configuration
+  std::string flattenHierarchy = "1";
+
+  if (auto it = args.options.find(FLATTEN_HIERARCHY);
+      it != args.options.end()) {
+    if (it->second == "0" || it->second == "1") {
+      flattenHierarchy = it->second;
+    } else {
+      llvm::errs() << "Unknow flatten hierarchy option '" << it->second
+                   << "', possible options are '0' (not set) and '1' (set).\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/power/power_eval.py";
+
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--hdl", hdl,
+    "--stage", stage,
+    (flattenHierarchy == "1" ? "--flatten_hierarchy" : ""),
     "--cp", floatToString(state.targetCP, 3)
   );
   // clang-format on
@@ -911,6 +1045,7 @@ int main(int argc, char **argv) {
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
   commands.add<EstimatePower>(state);
+  commands.add<PowerEval>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 
