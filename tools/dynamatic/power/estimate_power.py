@@ -10,8 +10,6 @@ import argparse
 from pdb import run
 import shutil
 
-from numpy import power
-
 # Import file templates
 from script_templates import *
 
@@ -271,7 +269,7 @@ if __name__ == "__main__":
         ),
         default="pre"
     )
-    p.add_argument("--vivado_cmd", type=str, required=False, help="Vivado command", default="vivado")
+    p.add_argument("--vivado_cmd", type=str, required=False, help="Vivado command", default="vivado-2019.1.1 vivado")
     p.add_argument("--cp", type=float, required=True, help="Clock period for synthesis")
 
     args = p.parse_args()
