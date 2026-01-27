@@ -261,15 +261,15 @@ void LatencyBalancingMILP::addLatencyVariables() {
     /// L_c: extra latency to add to the channel for balancing (integer >= 0).
     /// (Paper: Section 4, Table 1)
     chVars.extraLatency =
-        model->addVar("L_" + name, CPVar::INTEGER, 0, std::nullopt);
+        model->addVar("L_" + name, INTEGER, 0, std::nullopt);
 
     /// S_c: whether the channel is stalled due to imbalance (binary).
     /// (Paper: Section 4, Table 1)
-    chVars.stalled = model->addVar("S_" + name, CPVar::BOOLEAN, 0, 1);
+    chVars.stalled = model->addVar("S_" + name, BOOLEAN, 0, 1);
 
     /// R_c: whether the channel has L > 0, i.e., channel cut (binary).
     /// (Paper: Section 4, Table 1)
-    chVars.bufPresent = model->addVar("R_" + name, CPVar::BOOLEAN, 0, 1);
+    chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
   }
 
   LLVM_DEBUG(llvm::errs() << "[LP1]   Created " << vars.channelVars.size()
@@ -291,14 +291,14 @@ void LatencyBalancingMILP::addLatencyVariables() {
   vars.reconvergentPathVars.resize(reconvergentPaths.size());
   for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
     vars.reconvergentPathVars[i].imbalanced =
-        model->addVar("s_rp_" + std::to_string(i), CPVar::BOOLEAN, 0, 1);
+        model->addVar("s_rp_" + std::to_string(i), BOOLEAN, 0, 1);
   }
 
   /// Create pattern imbalance variables for synchronizing cycles
   vars.syncCycleVars.resize(syncCyclePairs.size());
   for (size_t i = 0; i < syncCyclePairs.size(); ++i) {
     vars.syncCycleVars[i].imbalanced =
-        model->addVar("s_sc_" + std::to_string(i), CPVar::BOOLEAN, 0, 1);
+        model->addVar("s_sc_" + std::to_string(i), BOOLEAN, 0, 1);
   }
 
   LLVM_DEBUG(llvm::errs() << "[LP1]   Created " << reconvergentPaths.size()
@@ -809,7 +809,7 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Table 2)
   for (Value channel : allChannels) {
     std::string name = getUniqueName(*channel.getUses().begin());
-    CPVar var = model->addVar("n_" + name, CPVar::REAL, 0.0, MAX_OCCUPANCY);
+    CPVar var = model->addVar("n_" + name, REAL, 0.0, MAX_OCCUPANCY);
     channelOccupancy[channel] = var;
   }
   LLVM_DEBUG(llvm::errs() << "[LP2]   Created " << channelOccupancy.size()
