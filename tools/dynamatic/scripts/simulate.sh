@@ -66,8 +66,8 @@ cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR" 2> /dev/null
 # Copy TB supplementary files (memory model, etc.)
 if [ "$HDL_TYPE" = "verilog" ]; then
   cp "$RESOURCE_DIR/templates_verilog/template_tb_join.v" "$COSIM_HDL_SRC_DIR/tb_join.v"
-  cp "$RESOURCE_DIR/templates_verilog/template_two_port_RAM.v" "$COSIM_HDL_SRC_DIR/two_port_RAM.sv"
-  cp "$RESOURCE_DIR/templates_verilog/template_single_argument.v" "$COSIM_HDL_SRC_DIR/single_argument.sv"
+  cp "$RESOURCE_DIR/templates_verilog/template_two_port_RAM.sv" "$COSIM_HDL_SRC_DIR/two_port_RAM.sv"
+  cp "$RESOURCE_DIR/templates_verilog/template_single_argument.sv" "$COSIM_HDL_SRC_DIR/single_argument.sv"
   cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
   cp "$RESOURCE_DIR/verilator_main.cpp" "$HLS_VERIFY_DIR/verilator_main.cpp"
 else

@@ -172,7 +172,7 @@ end
 always @(posedge tb_clk) begin
     if (tb_global_valid && tb_global_ready) begin
         $display("Simulation done! Latency = %0d cycles",
-                 ($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD));
+                $floor(($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)));
     end
 end
   

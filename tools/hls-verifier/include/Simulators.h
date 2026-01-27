@@ -224,6 +224,22 @@ public:
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getVerilatorShFilePath(), ec);
 
+    os << "# Verilating (translate the desing into an executable)\n";
+    os << "# --trace: enables wavefrom cration\n";
+    os << "# --Mdir: specifies the './verilator' directory as working "
+          "directory\n";
+    os << "# -cc: Verilator output is C++\n";
+    os << "# --exe: Generates executable with 'verilator_main.cpp' as main "
+          "function\n";
+    os << "# --trace-underscore: Enable coverage of signals that start with "
+          "and underscore\n";
+    os << "# --Wno-UNOPTFLAT: ignores warnings about disabled signal "
+          "optimization\n";
+    os << "# --top-module: 'tb' is specified as top level module\n";
+    os << "# --timing: Enables support for timing constructs (e.g. wait "
+          "statements)\n";
+    os << "# --Wno-REALCVT: Ignores a real number being rounded to an integer "
+          "(during calculation of the kernel's latency)\n";
     os << "verilator --trace -Mdir ./verilator -cc ";
 
     for (auto &it : filelistVerilog)
