@@ -393,58 +393,88 @@ endmodule
 //
 
 module {mc_control_name} (
-  input  clk,
-  input  rst,
+  input  wire clk,
+  input  wire rst,
+
   // start input control
-  input  memStart_valid,
-  output memStart_ready,
+  input  wire memStart_valid,
+  output wire memStart_ready,
+
   // end output control
-  output memEnd_valid,
-  input  memEnd_ready,
+  output wire memEnd_valid,
+  input  wire memEnd_ready,
+
   // "no more requests" input control
-  input  ctrlEnd_valid,
-  output ctrlEnd_ready,
+  input  wire ctrlEnd_valid,
+  output wire ctrlEnd_ready,
+
   // all requests completed
-  input  allRequestsDone
+  input  wire allRequestsDone
 );
-  reg memIdle = 1;
-  reg memDone = 0;
-  reg memAckCtrl = 0;
 
-  assign memStart_ready = memIdle;
-  assign memEnd_valid   = memDone;
-  assign ctrlEnd_ready  = memAckCtrl;
+  // FSM states
+  localparam IDLE    = 1'b0;
+  localparam RUNNING = 1'b1;
 
+  reg fsm_q;
+  reg no_more_requests_q;
+
+  wire fsm_running;
+  wire function_return;
+
+  // FSM running flag
+  assign fsm_running = (fsm_q == RUNNING);
+
+  // Function return condition
+  // 1. No more requests
+  // 2. All requests done
+  // 3. MemEnd ready
+  // 4. FSM is running
+  assign function_return =
+      no_more_requests_q &
+      allRequestsDone &
+      memEnd_ready &
+      fsm_running;
+
+  // Ready to start only when IDLE
+  assign memStart_ready = (fsm_q == IDLE);
+
+  // Memory end is valid when returning conditions met (except ready)
+  assign memEnd_valid =
+      no_more_requests_q &
+      allRequestsDone &
+      fsm_running;
+
+  // Accept ctrlEnd only once per execution
+  assign ctrlEnd_ready = ~no_more_requests_q;
+
+  // FSM state register
   always @(posedge clk) begin
     if (rst) begin
-      memIdle    <= 1;
-      memDone    <= 0;
-      memAckCtrl <= 0;
+      fsm_q <= IDLE;
     end else begin
-      memIdle    <= memIdle;
-      memDone    <= memDone;
-      memAckCtrl <= memAckCtrl;
-
-      // determine when the memory has completed all requests
-      if (ctrlEnd_valid && allRequestsDone) begin
-        memDone    <= 1;
-        memAckCtrl <= 1;
-      end
-
-      // acknowledge the 'ctrlEnd' control
-      if (ctrlEnd_valid && memAckCtrl) begin
-        memAckCtrl <= 0;
-      end
-
-      // determine when the memory is idle
-      if (memStart_valid && memIdle) begin
-        memIdle <= 0;
-      end
-      if (memDone && memEnd_ready) begin
-        memIdle <= 1;
-        memDone <= 0;
+      if (fsm_q == IDLE) begin
+        if (memStart_valid) begin
+          fsm_q <= RUNNING;
+        end
+      end else if (function_return) begin
+        fsm_q <= IDLE;
       end
     end
   end
+
+  // no_more_requests register
+  always @(posedge clk) begin
+    if (rst) begin
+      no_more_requests_q <= 1'b0;
+    end else begin
+      if (function_return) begin
+        no_more_requests_q <= 1'b0;
+      end else if (ctrlEnd_valid) begin
+        no_more_requests_q <= 1'b1;
+      end
+    end
+  end
+
 endmodule
 """
