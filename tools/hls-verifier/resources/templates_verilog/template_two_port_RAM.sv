@@ -1,3 +1,4 @@
+// This file is in SystemVerilog to use the string type in read_token.
 
 `timescale 1 ns / 1 ps
 

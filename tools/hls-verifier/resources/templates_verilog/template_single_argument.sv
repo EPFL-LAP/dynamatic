@@ -1,3 +1,5 @@
+// This file is in SystemVerilog to use the string type in read_token.
+
 module single_argument (
     clk,
     rst,
@@ -85,8 +87,9 @@ initial begin : file_to_mem
             read_token(fp, token);
 
             // wait for done
-            @(posedge clk);
-            wait (done);
+            while (done != 1'b1) begin
+                @(posedge clk);
+            end
 
             // read data
             read_token(fp, token);
