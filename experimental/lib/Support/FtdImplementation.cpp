@@ -32,9 +32,6 @@ using namespace dynamatic::experimental::boolean;
 /// Annotation to use in the IR when an operation needs to be skipped by the FTD
 /// algorithm.
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
-/// Annotation to use when a suppression branch is added which needs to go
-/// through the suppression mechanism again.
-constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
 /// Annotation to to identify muxes inserted with the `addGsaGates`
 /// functionalities.
 constexpr llvm::StringLiteral FTD_EXPLICIT_MU("ftd.MU");
@@ -1433,7 +1430,7 @@ static void insertDirectSuppression(
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
 
-  bool debuglog = true;
+  bool debuglog = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuaqin/new2/dynamatic-scripts/TempOutputs/";
   std::string cfgFile = dir + funcName + "_localcfg.txt";
@@ -1753,23 +1750,75 @@ static void insertDirectSuppression(
     }
 
     if (!bi.isLess(muxConditionBlock, producerBlock)) {
-      if (consumer->getOperand(1) == connection) {
-        if (debuglog) {
-          out << "MuxCondN  = "
-              << (selectOperandCondition->boolNegate())->toString() << "\n";
-          selectOperandCondition->boolNegate();
-        }
-        fCons = BoolExpression::boolAnd(fCons,
-                                        selectOperandCondition->boolNegate());
-      } else {
-        if (debuglog) {
-          out << "MuxCond  = " << selectOperandCondition->toString() << "\n";
+      Operation *currentMuxOp = consumer;
+      Value currentConnection = connection;
+      bool isChainActive = true;
+      while (isChainActive) {
+        if (currentMuxOp->getOperand(1) == currentConnection) {
+          if (debuglog) {
+            out << "      [Cascade] Condition for Mux: " << *currentMuxOp
+                << "\n";
+          }
+          selectOperandCondition = selectOperandCondition->boolNegate();
+          if (debuglog) {
+            out << "      Negated : " << selectOperandCondition->toString()
+                << "\n";
+          }
+        } else {
+          if (debuglog) {
+            out << "      [Cascade] Keep Condition for Mux: " << *currentMuxOp
+                << "\n";
+            out << "      Original: " << selectOperandCondition->toString()
+                << "\n";
+          }
         }
         fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
+        Operation *nextMuxOp = nullptr;
+        Value currentResult = currentMuxOp->getResult(0);
+
+        for (auto *user : currentResult.getUsers()) {
+          if (llvm::isa<handshake::MuxOp>(user) &&
+              user->hasAttr(FTD_EXPLICIT_GAMMA) &&
+              user->getBlock() == currentMuxOp->getBlock()) {
+
+            unsigned connectionCount = 0;
+            if (user->getOperand(1) == currentResult) 
+              connectionCount++;
+            if (user->getOperand(2) == currentResult) 
+              connectionCount++;
+
+            if (connectionCount == 1) {
+              nextMuxOp = user;
+              break;
+            }
+          }
+        }
+
+        if (nextMuxOp) {
+          if (debuglog) {
+            out << "    -> Found Cascaded Gamma Mux: " << *nextMuxOp << "\n";
+          }
+          Value nextConditionVal = nextMuxOp->getOperand(0);
+          Block *nextCondBlock = returnMuxConditionBlock(nextConditionVal);
+          if (!bi.isLess(nextCondBlock, producerBlock)) {
+            selectOperandCondition =
+                BoolExpression::parseSop(bi.getBlockCondition(nextCondBlock));
+            currentMuxOp = nextMuxOp;
+            currentConnection = currentResult;
+          } else {
+            isChainActive = false;
+            if (debuglog)
+              out << "    -> End with Condition Before Producer.\n";
+          }
+        } else {
+          isChainActive = false;
+          if (debuglog)
+            out << "    -> End of Gamma Mux Chain.\n";
+        }
       }
     }
   }
-
+  fCons = fCons->boolMinimize();
   if (debuglog) {
     out << "fCons  = " << fCons->toString() << "\n";
   }
@@ -1785,22 +1834,7 @@ static void insertDirectSuppression(
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
     std::set<std::string> blocks = fSup->getVariables();
 
-    DenseMap<Block *, unsigned> rank;
-    unsigned i = 0;
-    for (Block *b : decisionGraph->topoOrder)
-      if (auto *ob = decisionGraph->origMap.lookup(b))
-        rank[ob] = i++;
-
-    std::vector<std::string> cofactorList;
-    cofactorList.reserve(blocks.size());
-    std::vector<std::pair<unsigned, std::string>> tmp;
-    for (auto &var : blocks)
-      if (auto blkOpt = bi.getBlockFromCondition(var))
-        if (rank.count(*blkOpt))
-          tmp.emplace_back(rank[*blkOpt], var);
-    llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
-    for (auto &p : tmp)
-      cofactorList.push_back(p.second);
+    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
     if (debuglog) {
       llvm::errs() << "[CofactorList] ";
       for (const auto &s : cofactorList)
@@ -1974,11 +2008,8 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
-    // A conditional branch should undergo the suppression mechanism only if it
-    // has the `FTD_NEW_SUPP` annotation, set in `addMoreSuppressionInLoop`. In
-    // any other cases, suppressing a branch ends up with incorrect results.
-    if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
-        !producerOp->hasAttr(FTD_NEW_SUPP))
+    // In any cases, suppressing a branch ends up with incorrect results.
+    if (llvm::isa<handshake::ConditionalBranchOp>(producerOp))
       return;
 
     // Skip the prod-cons if the consumer is part of the operations
