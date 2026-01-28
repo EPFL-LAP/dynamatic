@@ -95,12 +95,12 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     /// Returns the argument name at the given index.
     StringAttr getArgName(unsigned idx) {
-      return getArgNames()[idx].cast<StringAttr>();
+      return mlir::cast<StringAttr>(getArgNames()[idx]);
     }
 
     /// Returns the result name at the given index.
     StringAttr getResName(unsigned idx) {
-      return getResNames()[idx].cast<StringAttr>();
+      return mlir::cast<StringAttr>(getResNames()[idx]);
     }
 
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
@@ -109,7 +109,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     /// safely.
     LogicalResult verifyType() {
       auto type = getFunctionTypeAttr().getValue();
-      if (!type.isa<FunctionType>())
+      if (!llvm::isa<FunctionType>(type))
         return emitOpError(
             "requires '" + getFunctionTypeAttrName().getValue() +
             "' attribute of function type");
@@ -136,7 +136,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
 // InstanceOp
 def InstanceOp : Handshake_Op<"instance", [
-    CallOpInterface,
     HasClock,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
@@ -196,7 +195,7 @@ def InstanceOp : Handshake_Op<"instance", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
-      (*this)->setAttr(getModuleAttrName(), callee.get<mlir::SymbolRefAttr>());
+      (*this)->setAttr(getModuleAttrName(), cast<mlir::SymbolRefAttr>(callee));
     }
 
     /// Get the control operand of this instance op
@@ -1012,7 +1011,7 @@ def RAMOp : Handshake_Op<"ram", []>  {
     Example: Using handshake.RAMOp in the C++ API.
     ```c++
     // Building a new RAMOp
-    builder.create<handshake::RAMOp>(type, elementAttr);
+    handshake::RAMOp::create(builder, type, elementAttr);
 
     // Access its initialValue
     std::optional<ElementsAttr> initialValue = ramOp.getInitialValue();

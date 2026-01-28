@@ -514,7 +514,7 @@ def OutputOp : HWOp<"output", [Terminator, HasParent<"HWModuleOp">,
   let arguments = (ins Variadic<AnyType>:$outputs);
 
   let builders = [
-    OpBuilder<(ins), "build($_builder, $_state, std::nullopt);">
+    OpBuilder<(ins), "build($_builder, $_state, {});">
   ];
 
   let assemblyFormat = "attr-dict ($outputs^ `:` qualified(type($outputs)))?";

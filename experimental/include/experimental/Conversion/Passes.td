@@ -20,7 +20,7 @@ include "dynamatic/Support/Passes.td"
 // FtdCfToHandshake
 //===----------------------------------------------------------------------===//
 
-def FtdCfToHandshake : DynamaticPass<"ftd-lower-cf-to-handshake"> {
+def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake"> {
   let summary = "Lowers func and cf dialects to handshake with fast token delivery";
   let description = [{
     The fast token delivery (FTD) methodology was described by 
@@ -33,7 +33,6 @@ def FtdCfToHandshake : DynamaticPass<"ftd-lower-cf-to-handshake"> {
     As the algorithm does not require any parameter, no input is necessary. This pass can 
     be used through the flag "--fast-token-delivery" at compile tile in dynamatic.
   }];
-  let constructor = "dynamatic::experimental::ftd::createFtdCfToHandshake()";
 }
 
 #endif // EXPERIMENTAL_CONVERSION_PASSES_TD

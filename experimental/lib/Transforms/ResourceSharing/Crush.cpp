@@ -415,12 +415,10 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
            "The sharing wrapper has an incorrect number of output ports.");
 
     builder.setInsertionPoint(*group.begin());
-    handshake::SharingWrapperOp wrapperOp =
-        builder.create<handshake::SharingWrapperOp>(
-            sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
-            sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
-            credits.size(), sharedOp->getNumOperands(),
-            (unsigned)round(latency));
+    handshake::SharingWrapperOp wrapperOp = handshake::SharingWrapperOp::create(
+        builder, sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
+        sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
+        credits.size(), sharedOp->getNumOperands(), (unsigned)round(latency));
 
     // Replace original connection from op->successor to
     // sharingWrapper->successor

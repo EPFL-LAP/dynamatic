@@ -49,7 +49,7 @@ ModulePort::Direction hw::flip(ModulePort::Direction direction) {
 
 bool hw::isValidIndexBitWidth(Value index, Value array) {
   hw::ArrayType arrayType =
-      hw::getCanonicalType(array.getType()).dyn_cast<hw::ArrayType>();
+      dyn_cast<hw::ArrayType>(hw::getCanonicalType(array.getType()));
   assert(arrayType && "expected array type");
   unsigned indexWidth = index.getType().getIntOrFloatBitWidth();
   auto requiredWidth = llvm::Log2_64_Ceil(arrayType.getNumElements());
@@ -122,12 +122,12 @@ LogicalResult hw::checkParameterInContext(
     bool disallowParamRefs) {
   // Literals are always ok.  Their types are already known to match
   // expectations.
-  if (value.isa<IntegerAttr>() || value.isa<FloatAttr>() ||
-      value.isa<StringAttr>() || value.isa<ParamVerbatimAttr>())
+  if (isa<IntegerAttr>(value) || isa<FloatAttr>(value) ||
+      isa<StringAttr>(value) || isa<ParamVerbatimAttr>(value))
     return success();
 
   // Check both subexpressions of an expression.
-  if (auto expr = value.dyn_cast<ParamExprAttr>()) {
+  if (auto expr = dyn_cast<ParamExprAttr>(value)) {
     for (auto op : expr.getOperands())
       if (failed(checkParameterInContext(op, moduleParameters, instanceError,
                                          disallowParamRefs)))
@@ -137,7 +137,7 @@ LogicalResult hw::checkParameterInContext(
 
   // Parameter references need more analysis to make sure they are valid within
   // this module.
-  if (auto parameterRef = value.dyn_cast<ParamDeclRefAttr>()) {
+  if (auto parameterRef = dyn_cast<ParamDeclRefAttr>(value)) {
     auto nameAttr = parameterRef.getName();
 
     // Don't allow references to parameters from the default values of a
@@ -153,7 +153,7 @@ LogicalResult hw::checkParameterInContext(
 
     // Find the corresponding attribute in the module.
     for (auto param : moduleParameters) {
-      auto paramAttr = param.cast<ParamDeclAttr>();
+      auto paramAttr = cast<ParamDeclAttr>(param);
       if (paramAttr.getName() != nameAttr)
         continue;
 
@@ -269,7 +269,7 @@ ParseResult ConstantOp::parse(OpAsmParser &parser, OperationState &result) {
 
 LogicalResult ConstantOp::verify() {
   // If the result type has a bitwidth, then the attribute must match its width.
-  if (getValue().getBitWidth() != getType().cast<IntegerType>().getWidth())
+  if (getValue().getBitWidth() != cast<IntegerType>(getType()).getWidth())
     return emitError(
         "hw.constant attribute bitwidth doesn't match return type");
 
@@ -299,7 +299,7 @@ void ConstantOp::build(OpBuilder &builder, OperationState &result,
 /// an int64_t.  Use APInt's instead.
 void ConstantOp::build(OpBuilder &builder, OperationState &result, Type type,
                        int64_t value) {
-  auto numBits = type.cast<IntegerType>().getWidth();
+  auto numBits = cast<IntegerType>(type).getWidth();
   build(builder, result, APInt(numBits, (uint64_t)value, /*isSigned=*/true));
 }
 
@@ -309,7 +309,7 @@ void ConstantOp::getAsmResultNames(
   auto intCst = getValue();
 
   // Sugar i1 constants with 'true' and 'false'.
-  if (intTy.cast<IntegerType>().getWidth() == 1)
+  if (cast<IntegerType>(intTy).getWidth() == 1)
     return setNameFn(getResult(), intCst.isZero() ? "false" : "true");
 
   // Otherwise, build a complex name with the value and type.
@@ -330,11 +330,11 @@ OpFoldResult ConstantOp::fold(FoldAdaptor adaptor) {
 
 static LogicalResult checkAttributes(Operation *op, Attribute attr, Type type) {
   // If this is a type alias, get the underlying type.
-  if (auto typeAlias = type.dyn_cast<TypeAliasType>())
+  if (auto typeAlias = dyn_cast<TypeAliasType>(type))
     type = typeAlias.getCanonicalType();
 
-  if (auto structType = type.dyn_cast<StructType>()) {
-    auto arrayAttr = attr.dyn_cast<ArrayAttr>();
+  if (auto structType = dyn_cast<StructType>(type)) {
+    auto arrayAttr = dyn_cast<ArrayAttr>(attr);
     if (!arrayAttr)
       return op->emitOpError("expected array attribute for constant of type ")
              << type;
@@ -348,8 +348,8 @@ static LogicalResult checkAttributes(Operation *op, Attribute attr, Type type) {
       if (failed(checkAttributes(op, attr, fieldInfo.type)))
         return failure();
     }
-  } else if (auto arrayType = type.dyn_cast<ArrayType>()) {
-    auto arrayAttr = attr.dyn_cast<ArrayAttr>();
+  } else if (auto arrayType = dyn_cast<ArrayType>(type)) {
+    auto arrayAttr = dyn_cast<ArrayAttr>(attr);
     if (!arrayAttr)
       return op->emitOpError("expected array attribute for constant of type ")
              << type;
@@ -363,8 +363,8 @@ static LogicalResult checkAttributes(Operation *op, Attribute attr, Type type) {
       if (failed(checkAttributes(op, attr, elementType)))
         return failure();
     }
-  } else if (auto arrayType = type.dyn_cast<UnpackedArrayType>()) {
-    auto arrayAttr = attr.dyn_cast<ArrayAttr>();
+  } else if (auto arrayType = dyn_cast<UnpackedArrayType>(type)) {
+    auto arrayAttr = dyn_cast<ArrayAttr>(attr);
     if (!arrayAttr)
       return op->emitOpError("expected array attribute for constant of type ")
              << type;
@@ -379,14 +379,14 @@ static LogicalResult checkAttributes(Operation *op, Attribute attr, Type type) {
       if (failed(checkAttributes(op, attr, elementType)))
         return failure();
     }
-  } else if (auto enumType = type.dyn_cast<EnumType>()) {
-    auto stringAttr = attr.dyn_cast<StringAttr>();
+  } else if (auto enumType = dyn_cast<EnumType>(type)) {
+    auto stringAttr = dyn_cast<StringAttr>(attr);
     if (!stringAttr)
       return op->emitOpError("expected string attribute for constant of type ")
              << type;
-  } else if (auto intType = type.dyn_cast<IntegerType>()) {
+  } else if (auto intType = dyn_cast<IntegerType>(type)) {
     // Check the attribute kind is correct.
-    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    auto intAttr = dyn_cast<IntegerAttr>(attr);
     if (!intAttr)
       return op->emitOpError("expected integer attribute for constant of type ")
              << type;
@@ -456,9 +456,8 @@ FunctionType hw::getModuleType(Operation *moduleOrInstance) {
       .Case<HWModuleLike>(
           [](auto mod) { return mod.getHWModuleType().getFuncType(); })
       .Default([](Operation *op) {
-        return cast<mlir::FunctionOpInterface>(op)
-            .getFunctionType()
-            .cast<FunctionType>();
+        return cast<FunctionType>(
+            cast<mlir::FunctionOpInterface>(op).getFunctionType());
       });
 }
 
@@ -560,7 +559,7 @@ static void modifyModuleArgs(
     while (!insertArgs.empty() && insertArgs[0].first == argIdx) {
       auto port = insertArgs[0].second;
       if (port.dir == ModulePort::Direction::InOut &&
-          !port.type.isa<InOutType>())
+          !isa<InOutType>(port.type))
         port.type = InOutType::get(port.type);
       auto sym = port.getSym();
       Attribute attr =
@@ -676,7 +675,7 @@ void HWModuleOp::build(OpBuilder &builder, OperationState &result,
   for (auto port : ports.getInputs()) {
     auto loc = port.loc ? Location(port.loc) : unknownLoc;
     auto type = port.type;
-    if (port.isInOut() && !type.isa<InOutType>())
+    if (port.isInOut() && !isa<InOutType>(type))
       type = InOutType::get(type);
     body->addArgument(type, loc);
   }
@@ -708,7 +707,7 @@ void HWModuleOp::build(OpBuilder &builder, OperationState &odsState,
   modBuilder(builder, accessor);
   // Create output operands.
   llvm::SmallVector<Value> outputOperands = accessor.getOutputOperands();
-  builder.create<hw::OutputOp>(odsState.location, outputOperands);
+  hw::OutputOp::create(builder, odsState.location, outputOperands);
 }
 
 void HWModuleOp::modifyPorts(
@@ -942,12 +941,11 @@ ParseResult HWModuleGeneratedOp::parse(OpAsmParser &parser,
   return parseHWModuleOp<HWModuleGeneratedOp>(parser, result, GenMod);
 }
 
-FunctionType getHWModuleOpType(Operation *op) {
+static FunctionType getHWModuleOpType(Operation *op) {
   if (auto mod = dyn_cast<HWModuleLike>(op))
     return mod.getHWModuleType().getFuncType();
-  return cast<mlir::FunctionOpInterface>(op)
-      .getFunctionType()
-      .cast<FunctionType>();
+  return cast<FunctionType>(
+      cast<mlir::FunctionOpInterface>(op).getFunctionType());
 }
 
 template <typename ModuleTy>
@@ -1021,7 +1019,7 @@ static LogicalResult verifyModuleCommon(HWModuleLike module) {
 
   // Check parameter default values are sensible.
   for (auto param : module->getAttrOfType<ArrayAttr>("parameters")) {
-    auto paramAttr = param.cast<ParamDeclAttr>();
+    auto paramAttr = cast<ParamDeclAttr>(param);
 
     // Check that we don't have any redundant parameter names.  These are
     // resolved by string name: reuse of the same name would cause ambiguities.
@@ -1034,7 +1032,7 @@ static LogicalResult verifyModuleCommon(HWModuleLike module) {
     if (!value)
       continue;
 
-    auto typedValue = value.dyn_cast<TypedAttr>();
+    auto typedValue = dyn_cast<TypedAttr>(value);
     if (!typedValue)
       return module->emitOpError("parameter ")
              << paramAttr << " should have a typed value; has value " << value;
@@ -1072,7 +1070,7 @@ LogicalResult HWModuleOp::verify() {
                                          getInputTypes(), getInputLocs())) {
     if (arg.getType() != type)
       return emitOpError("block argument types should match signature types");
-    if (arg.getLoc() != loc.cast<LocationAttr>())
+    if (arg.getLoc() != cast<LocationAttr>(loc))
       return emitOpError(
           "block argument locations should match signature locations");
   }
@@ -1268,7 +1266,7 @@ HWModuleGeneratedOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   auto paramRef = referencedKindOp.getRequiredAttrs();
   auto dict = (*this)->getAttrDictionary();
   for (auto str : paramRef) {
-    auto strAttr = str.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(str);
     if (!strAttr)
       return emitError("Unknown attribute type, expected a string");
     if (!dict.get(strAttr.getValue()))
@@ -1458,9 +1456,8 @@ LogicalResult
 InstanceChoiceOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   for (Attribute name : getModuleNamesAttr()) {
     if (failed(instance_like_impl::verifyInstanceOfHWModule(
-            *this, name.cast<FlatSymbolRefAttr>(), getInputs(),
-            getResultTypes(), getArgNames(), getResultNames(), getParameters(),
-            symbolTable))) {
+            *this, cast<FlatSymbolRefAttr>(name), getInputs(), getResultTypes(),
+            getArgNames(), getResultNames(), getParameters(), symbolTable))) {
       return failure();
     }
   }
@@ -1678,7 +1675,7 @@ void ArrayCreateOp::build(OpBuilder &b, OperationState &state,
 }
 
 LogicalResult ArrayCreateOp::verify() {
-  unsigned returnSize = getType().cast<ArrayType>().getNumElements();
+  unsigned returnSize = cast<ArrayType>(getType()).getNumElements();
   if (getInputs().size() != returnSize)
     return failure();
   return success();
@@ -1823,8 +1820,8 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
 
   if (sliceSize == 1) {
     // slice(a, n) -> create(a[n])
-    auto get = rewriter.create<ArrayGetOp>(op.getLoc(), op.getInput(),
-                                           op.getLowIndex());
+    auto get = ArrayGetOp::create(rewriter, op.getLoc(), op.getInput(),
+                                  op.getLowIndex());
     rewriter.replaceOpWithNewOp<ArrayCreateOp>(op, op.getType(),
                                                get.getResult());
     return success();
@@ -1834,7 +1831,7 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
   if (!offsetOpt)
     return failure();
 
-  auto inputOp = op.getInput().getDefiningOp();
+  auto *inputOp = op.getInput().getDefiningOp();
   if (auto inputSlice = dyn_cast_or_null<ArraySliceOp>(inputOp)) {
     // slice(slice(a, n), m) -> slice(a, n + m)
     if (inputSlice == op)
@@ -1847,7 +1844,7 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
 
     uint64_t offset = *offsetOpt + *inputOffsetOpt;
     auto lowIndex =
-        rewriter.create<ConstantOp>(op.getLoc(), inputIndex.getType(), offset);
+        ConstantOp::create(rewriter, op.getLoc(), inputIndex.getType(), offset);
     rewriter.replaceOpWithNewOp<ArraySliceOp>(op, op.getType(),
                                               inputSlice.getInput(), lowIndex);
     return success();
@@ -1888,10 +1885,11 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
       } else {
         // Slice the required bits from the input.
         unsigned width = inputSize == 1 ? 1 : llvm::Log2_64_Ceil(inputSize);
-        auto lowIndex = rewriter.create<ConstantOp>(
-            op.getLoc(), rewriter.getIntegerType(width), sliceStart);
-        chunks.push_back(rewriter.create<ArraySliceOp>(
-            op.getLoc(), hw::ArrayType::get(elemTy, cutSize), input, lowIndex));
+        auto lowIndex = ConstantOp::create(
+            rewriter, op.getLoc(), rewriter.getIntegerType(width), sliceStart);
+        chunks.push_back(ArraySliceOp::create(
+            rewriter, op.getLoc(), hw::ArrayType::get(elemTy, cutSize), input,
+            lowIndex));
       }
 
       sliceStart = 0;
@@ -1953,19 +1951,19 @@ static void printArrayConcatTypes(OpAsmPrinter &p, Operation *,
 void ArrayConcatOp::build(OpBuilder &b, OperationState &state,
                           ValueRange values) {
   assert(!values.empty() && "Cannot build array of zero elements");
-  ArrayType arrayTy = values[0].getType().cast<ArrayType>();
+  ArrayType arrayTy = cast<ArrayType>(values[0].getType());
   Type elemTy = arrayTy.getElementType();
   assert(llvm::all_of(values,
                       [elemTy](Value v) -> bool {
-                        return v.getType().isa<ArrayType>() &&
-                               v.getType().cast<ArrayType>().getElementType() ==
+                        return isa<ArrayType>(v.getType()) &&
+                               cast<ArrayType>(v.getType()).getElementType() ==
                                    elemTy;
                       }) &&
          "All values must be of ArrayType with the same element type.");
 
   uint64_t resultSize = 0;
   for (Value val : values)
-    resultSize += val.getType().cast<ArrayType>().getNumElements();
+    resultSize += cast<ArrayType>(val.getType()).getNumElements();
   build(b, state, ArrayType::get(elemTy, resultSize), values);
 }
 
@@ -1975,7 +1973,7 @@ OpFoldResult ArrayConcatOp::fold(FoldAdaptor adaptor) {
   for (size_t i = 0, e = getNumOperands(); i < e; ++i) {
     if (!inputs[i])
       return {};
-    llvm::copy(inputs[i].cast<ArrayAttr>(), std::back_inserter(array));
+    llvm::copy(cast<ArrayAttr>(inputs[i]), std::back_inserter(array));
   }
   return ArrayAttr::get(getContext(), array);
 }
@@ -2270,7 +2268,7 @@ LogicalResult StructExplodeOp::fold(FoldAdaptor adaptor,
   auto input = adaptor.getInput();
   if (!input)
     return failure();
-  llvm::copy(input.cast<ArrayAttr>(), std::back_inserter(results));
+  llvm::copy(cast<ArrayAttr>(input), std::back_inserter(results));
   return success();
 }
 
@@ -2298,7 +2296,7 @@ void StructExplodeOp::getAsmResultNames(
 
 void StructExplodeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                             Value input) {
-  StructType inputType = input.getType().dyn_cast<StructType>();
+  StructType inputType = dyn_cast<StructType>(input.getType());
   assert(inputType);
   SmallVector<Type, 16> fieldTypes;
   for (auto field : inputType.getElements())
@@ -2425,7 +2423,7 @@ OpFoldResult StructExtractOp::fold(FoldAdaptor adaptor) {
 
 LogicalResult StructExtractOp::canonicalize(StructExtractOp op,
                                             PatternRewriter &rewriter) {
-  auto inputOp = op.getInput().getDefiningOp();
+  auto *inputOp = op.getInput().getDefiningOp();
 
   // b = extract(inject(x["a"], v0)["b"]) => extract(x, "b")
   if (auto structInject = dyn_cast_or_null<StructInjectOp>(inputOp)) {
@@ -2512,7 +2510,7 @@ OpFoldResult StructInjectOp::fold(FoldAdaptor adaptor) {
   if (!input || !newValue)
     return {};
   SmallVector<Attribute> array;
-  llvm::copy(input.cast<ArrayAttr>(), std::back_inserter(array));
+  llvm::copy(cast<ArrayAttr>(input), std::back_inserter(array));
   array[getFieldIndex()] = newValue;
   return ArrayAttr::get(getContext(), array);
 }
@@ -2560,8 +2558,8 @@ LogicalResult StructInjectOp::canonicalize(StructInjectOp op,
     auto it = fields.find(elements[fieldIndex].name);
     if (it == fields.end())
       continue;
-    input = rewriter.create<StructInjectOp>(op.getLoc(), ty, input, fieldIndex,
-                                            it->second);
+    input = StructInjectOp::create(rewriter, op.getLoc(), ty, input, fieldIndex,
+                                   it->second);
   }
 
   rewriter.replaceOp(op, input);
@@ -2675,8 +2673,8 @@ void UnionExtractOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 // the index. If the array is constructed from a constant by a bitcast
 // operation, we can fold into a constant.
 OpFoldResult ArrayGetOp::fold(FoldAdaptor adaptor) {
-  auto inputCst = adaptor.getInput().dyn_cast_or_null<ArrayAttr>();
-  auto indexCst = adaptor.getIndex().dyn_cast_or_null<IntegerAttr>();
+  auto inputCst = dyn_cast_or_null<ArrayAttr>(adaptor.getInput());
+  auto indexCst = dyn_cast_or_null<IntegerAttr>(adaptor.getIndex());
 
   if (inputCst) {
     // Constant array index.
@@ -2695,7 +2693,7 @@ OpFoldResult ArrayGetOp::fold(FoldAdaptor adaptor) {
 
   // array_get(bitcast(c), i) -> c[i*w+w-1:i*w]
   if (auto bitcast = getInput().getDefiningOp<hw::BitcastOp>()) {
-    auto intTy = getType().dyn_cast<IntegerType>();
+    auto intTy = dyn_cast<IntegerType>(getType());
     if (!intTy)
       return {};
     auto bitcastInputOp = bitcast.getInput().getDefiningOp<hw::ConstantOp>();
@@ -2746,7 +2744,7 @@ LogicalResult ArrayGetOp::canonicalize(ArrayGetOp op,
 
     uint64_t offset = *offsetOpt + *idxOpt;
     auto newOffset =
-        rewriter.create<ConstantOp>(op.getLoc(), offsetOp.getType(), offset);
+        ConstantOp::create(rewriter, op.getLoc(), offsetOp.getType(), offset);
     rewriter.replaceOpWithNewOp<ArrayGetOp>(op, inputSlice.getInput(),
                                             newOffset);
     return success();
@@ -2763,8 +2761,9 @@ LogicalResult ArrayGetOp::canonicalize(ArrayGetOp op,
       }
 
       unsigned indexWidth = size == 1 ? 1 : llvm::Log2_64_Ceil(size);
-      auto newIdxOp = rewriter.create<ConstantOp>(
-          op.getLoc(), rewriter.getIntegerType(indexWidth), elemIndex);
+      auto newIdxOp =
+          ConstantOp::create(rewriter, op.getLoc(),
+                             rewriter.getIntegerType(indexWidth), elemIndex);
 
       rewriter.replaceOpWithNewOp<ArrayGetOp>(op, input, newIdxOp);
       return success();

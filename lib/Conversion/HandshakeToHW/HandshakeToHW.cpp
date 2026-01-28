@@ -1112,16 +1112,16 @@ hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
     StringAttr modNameAttr = builder.getStringAttr(extModName);
     RewriterBase::InsertPoint instInsertPoint = builder.saveInsertionPoint();
     builder.setInsertionPointToEnd(topLevelModOp.getBody());
-    extModOp = builder.create<hw::HWModuleExternOp>(loc, modNameAttr,
-                                                    modBuilder.getPortInfo());
+    extModOp = hw::HWModuleExternOp::create(builder, loc, modNameAttr,
+                                            modBuilder.getPortInfo());
     discriminator.setParameters(extModOp);
     builder.restoreInsertionPoint(instInsertPoint);
   }
 
   // Now create the instance corresponding to the external module
   StringAttr instNameAttr = builder.getStringAttr(instName);
-  return builder.create<hw::InstanceOp>(loc, extModOp, instNameAttr,
-                                        instOperands);
+  return hw::InstanceOp::create(builder, loc, extModOp, instNameAttr,
+                                instOperands);
 }
 
 hw::ModulePortInfo ModuleBuilder::getPortInfo() {
@@ -1157,8 +1157,8 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 /// Handshake function. Fills in the lowering state object with information
 /// that will allow the conversion pass to connect memory interface to their
 /// top-level IO later on.
-hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
-                                   ModuleLoweringState &state) {
+static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
+                                          ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
   handshake::PortNamer portNames(funcOp);
 
@@ -1199,18 +1199,20 @@ public:
     });
 
     addTargetMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
+                                 ValueRange inputs, Location loc) -> Value {
+      // NOTE (@Jiahui17): Taking the solution here
+      // https://github.com/llvm/circt/blob/main/lib/Dialect/ESI/Passes/ESILowerTypes.cpp
       if (inputs.size() != 1)
-        return std::nullopt;
+        return mlir::Value();
       return inputs[0];
     });
 
     addSourceMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
+                                 ValueRange inputs, Location loc) -> Value {
+      // NOTE (@Jiahui17): Taking the solution here
+      // https://github.com/llvm/circt/blob/main/lib/Dialect/ESI/Passes/ESILowerTypes.cpp
       if (inputs.size() != 1)
-        return std::nullopt;
+        return mlir::Value();
       return inputs[0];
     });
   }
@@ -1279,7 +1281,7 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
 
   // Create non-external HW module to replace the function with
   rewriter.setInsertionPoint(funcOp);
-  auto modOp = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), name, modInfo);
+  auto modOp = hw::HWModuleOp::create(rewriter, funcOp.getLoc(), name, modInfo);
 
   // Move the block from the Handshake function to the new HW module, after
   // which the Handshake function becomes empty and can be deleted
@@ -1846,8 +1848,8 @@ hw::InstanceOp ConverterBuilder::createInstance(hw::HWModuleOp wrapperOp,
   // Create an instance of the converter
   StringAttr name = builder.getStringAttr("mem_to_bram_converter_" + memName);
   builder.setInsertionPoint(circuitOp);
-  hw::InstanceOp converterInstOp = builder.create<hw::InstanceOp>(
-      circuitOp.getLoc(), converterModOp, name, instOperands);
+  hw::InstanceOp converterInstOp = hw::InstanceOp::create(
+      builder, circuitOp.getLoc(), converterModOp, name, instOperands);
 
   // Resolve backedges in the wrapped circuit operands and in the wrapper's
   // outputs
@@ -1910,8 +1912,8 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
 
   builder.setInsertionPointToEnd(topModOp.getBody());
   StringAttr modNameAttr = builder.getStringAttr(extModName);
-  extModOp = builder.create<hw::HWModuleExternOp>(
-      circuitMod->getLoc(), modNameAttr, modBuilder.getPortInfo());
+  extModOp = hw::HWModuleExternOp::create(
+      builder, circuitMod->getLoc(), modNameAttr, modBuilder.getPortInfo());
 
   extModOp->setAttr(RTL_NAME_ATTR_NAME, StringAttr::get(ctx, HW_NAME));
   SmallVector<NamedAttribute> parameters;
@@ -1990,8 +1992,8 @@ static hw::HWModuleOp createEmptyWrapperMod(
 
   // Create the wrapper
   builder.setInsertionPointToEnd(state.modOp.getBody());
-  hw::HWModuleOp wrapperOp = builder.create<hw::HWModuleOp>(
-      circuitOp.getLoc(),
+  hw::HWModuleOp wrapperOp = hw::HWModuleOp::create(
+      builder, circuitOp.getLoc(),
       StringAttr::get(ctx, circuitOp.getSymName() + "_wrapper"),
       wrapperBuilder.getPortInfo());
   builder.setInsertionPointToStart(wrapperOp.getBodyBlock());
@@ -2054,8 +2056,8 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
   }
 
   // Create the wrapped circuit instance inside the wrapper
-  hw::InstanceOp circuitInstOp = builder.create<hw::InstanceOp>(
-      circuitOp.getLoc(), circuitOp,
+  hw::InstanceOp circuitInstOp = hw::InstanceOp::create(
+      builder, circuitOp.getLoc(), circuitOp,
       builder.getStringAttr(circuitOp.getSymName() + "_wrapped"),
       circuitOperands);
 

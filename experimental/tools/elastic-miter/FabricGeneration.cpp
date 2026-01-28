@@ -14,8 +14,6 @@
 #include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -28,8 +26,8 @@ using namespace dynamatic::handshake;
 
 namespace dynamatic::experimental {
 
-void setHandshakeName(OpBuilder &builder, Operation *op,
-                      const std::string &name) {
+static void setHandshakeName(OpBuilder &builder, Operation *op,
+                             const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
   op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, nameAttr);
 }
@@ -63,13 +61,13 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
                       NamedAttribute argNamedAttr,
                       NamedAttribute resNamedAttr) {
 
-  ArrayRef<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
+  SmallVector<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
 
   FunctionType funcType = builder.getFunctionType(inputTypes, outputTypes);
 
   // Create the new function
-  FuncOp newFuncOp =
-      builder.create<FuncOp>(builder.getUnknownLoc(), name, funcType, funcAttr);
+  FuncOp newFuncOp = FuncOp::create(builder, builder.getUnknownLoc(), name,
+                                    funcType, funcAttr);
 
   // Add an entry block to the function
   Block *newEntryBlock = newFuncOp.addEntryBlock();
@@ -96,7 +94,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   // on the LHS resNames but are prefixed with EQ_
   SmallVector<Attribute> prefixedResAttr;
   for (Attribute attr : lhsFuncOp.getResNames()) {
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     if (strAttr) {
       prefixedResAttr.push_back(
           builder.getStringAttr("EQ_" + strAttr.getValue().str()));
@@ -121,7 +119,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
   for (Type type : lhsFuncOp.getResultTypes()) {
     // If the type is a handshake::ControlType, keep it
-    if (type.isa<handshake::ControlType>()) {
+    if (isa<handshake::ControlType>(type)) {
       outputTypes.push_back(type);
     } else {
       // Otherwise replace it with !handshake.channel<i1>
@@ -170,7 +168,7 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
 
   // Check that arguments are all handshake.channel or handshake.control type
   for (Type ty : funcOp.getArgumentTypes()) {
-    if (!ty.isa<ChannelType, ControlType>()) {
+    if (!isa<ChannelType, ControlType>(ty)) {
       llvm::errs() << "All arguments need to be of handshake.channel or "
                       "handshake.control type\n";
       return failure();
@@ -179,7 +177,7 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
 
   // Check that results are all handshake.channel or handshake.control type
   for (Type ty : funcOp.getResultTypes()) {
-    if (!ty.isa<ChannelType, ControlType>()) {
+    if (!isa<ChannelType, ControlType>(ty)) {
       llvm::errs() << "All results need to be of handshake.channel or "
                       "handshake.control type\n";
       return failure();
@@ -252,7 +250,7 @@ createReachabilityCircuit(MLIRContext &context,
 
     std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
-    NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
+    NDWireOp ndWireOp = NDWireOp::create(builder, funcOp.getLoc(), arg);
     setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
 
     // Use the newly created NDwire's output instead of the original argument in
@@ -263,7 +261,7 @@ createReachabilityCircuit(MLIRContext &context,
     }
 
     Attribute attr = funcOp.getArgNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), arg.getType()));
   }
@@ -289,7 +287,7 @@ createReachabilityCircuit(MLIRContext &context,
 
     std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
-    NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
+    NDWireOp endNDWireOp = NDWireOp::create(builder, endOp->getLoc(), result);
     setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
 
     // Use the newly created NDwire's output instead of the original argument in
@@ -299,7 +297,7 @@ createReachabilityCircuit(MLIRContext &context,
         op->replaceUsesOfWith(result, endNDWireOp.getResult());
     }
     Attribute attr = funcOp.getResNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.results.push_back(
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
@@ -394,22 +392,22 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
     LazyForkOp forkOp =
-        builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
+        LazyForkOp::create(builder, newFuncOp.getLoc(), miterArg, 2);
     setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
-    BufferOp lhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResults()[BB_IN], bufferSlots,
+    BufferOp lhsBufferOp = BufferOp::create(
+        builder, forkOp.getLoc(), forkOp.getResults()[BB_IN], bufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    BufferOp rhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResults()[1], bufferSlots,
+    BufferOp rhsBufferOp = BufferOp::create(
+        builder, forkOp.getLoc(), forkOp.getResults()[1], bufferSlots,
         dynamatic::handshake::BufferType::FIFO_BREAK_DV);
     setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
     setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
 
     NDWireOp lhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), lhsBufferOp.getResult());
+        NDWireOp::create(builder, forkOp.getLoc(), lhsBufferOp.getResult());
     NDWireOp rhsNDWireOp =
-        builder.create<NDWireOp>(forkOp.getLoc(), rhsBufferOp.getResult());
+        NDWireOp::create(builder, forkOp.getLoc(), rhsBufferOp.getResult());
     setHandshakeAttributes(builder, lhsNDWireOp, BB_IN, lhsNdwName);
     setHandshakeAttributes(builder, rhsNDWireOp, BB_IN, rhsNdwName);
 
@@ -429,7 +427,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       op->replaceUsesOfWith(rhsArg, rhsNDWireOp.getResult());
 
     Attribute attr = lhsFuncOp.getArgNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
   }
@@ -471,33 +469,33 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     NDWireOp rhsEndNDWireOp;
 
     lhsEndNDWireOp =
-        builder.create<NDWireOp>(nextLocation->getLoc(), lhsResult);
+        NDWireOp::create(builder, nextLocation->getLoc(), lhsResult);
     rhsEndNDWireOp =
-        builder.create<NDWireOp>(nextLocation->getLoc(), rhsResult);
+        NDWireOp::create(builder, nextLocation->getLoc(), rhsResult);
 
     setHandshakeAttributes(builder, lhsEndNDWireOp, BB_OUT, lhsNDwName);
     setHandshakeAttributes(builder, rhsEndNDWireOp, BB_OUT, rhsNDwName);
 
-    BufferOp lhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), lhsEndNDWireOp.getResult(), bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
-    BufferOp rhsEndBufferOp = builder.create<BufferOp>(
-        nextLocation->getLoc(), rhsEndNDWireOp.getResult(), bufferSlots,
-        dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    BufferOp lhsEndBufferOp = BufferOp::create(
+        builder, nextLocation->getLoc(), lhsEndNDWireOp.getResult(),
+        bufferSlots, dynamatic::handshake::BufferType::FIFO_BREAK_DV);
+    BufferOp rhsEndBufferOp = BufferOp::create(
+        builder, nextLocation->getLoc(), rhsEndNDWireOp.getResult(),
+        bufferSlots, dynamatic::handshake::BufferType::FIFO_BREAK_DV);
 
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
-    if (lhsResult.getType().isa<handshake::ControlType>()) {
-      ValueRange joinInputs = {lhsEndBufferOp.getResult(),
-                               rhsEndBufferOp.getResult()};
+    if (isa<handshake::ControlType>(lhsResult.getType())) {
+      SmallVector<Value> joinInputs = {lhsEndBufferOp.getResult(),
+                                       rhsEndBufferOp.getResult()};
       JoinOp joinOp =
-          builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
+          JoinOp::create(builder, builder.getUnknownLoc(), joinInputs);
       setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);
       miterResultValues.push_back(joinOp.getResult());
     } else {
-      CmpIOp compOp = builder.create<CmpIOp>(
-          builder.getUnknownLoc(), CmpIPredicate::eq,
+      CmpIOp compOp = CmpIOp::create(
+          builder, builder.getUnknownLoc(), CmpIPredicate::eq,
           lhsEndBufferOp.getResult(), rhsEndBufferOp.getResult());
       setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
       miterResultValues.push_back(compOp.getResult());
@@ -509,14 +507,14 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     config.eq.push_back(eqName);
 
     Attribute attr = lhsFuncOp.getResNames()[i];
-    auto strAttr = attr.dyn_cast<StringAttr>();
+    auto strAttr = dyn_cast<StringAttr>(attr);
     // The result name is prefixed with EQ_
     config.results.push_back(
         std::make_pair("EQ_" + strAttr.getValue().str(), lhsResult.getType()));
   }
 
   EndOp newEndOp =
-      builder.create<EndOp>(builder.getUnknownLoc(), miterResultValues);
+      EndOp::create(builder, builder.getUnknownLoc(), miterResultValues);
   setHandshakeAttributes(builder, newEndOp, BB_OUT, "end");
 
   // Delete old end operation, we can only have one end operation in a

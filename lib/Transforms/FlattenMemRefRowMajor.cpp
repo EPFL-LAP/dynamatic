@@ -49,7 +49,7 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
 
   if (numIndices == 0) {
     // Singleton memref (e.g. memref<i32>) - return 0
-    return rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0))
+    return arith::ConstantOp::create(rewriter, loc, rewriter.getIndexAttr(0))
         .getResult();
   }
 
@@ -85,24 +85,22 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
     // Multiply product by the current index operand
     if (llvm::isPowerOf2_64(dimProduct)) {
       auto constant =
-          rewriter
-              .create<arith::ConstantOp>(
-                  loc, rewriter.getIndexAttr(llvm::Log2_64(dimProduct)))
+          arith::ConstantOp::create(
+              rewriter, loc, rewriter.getIndexAttr(llvm::Log2_64(dimProduct)))
               .getResult();
-      partialIdx =
-          rewriter.create<arith::ShLIOp>(loc, partialIdx, constant).getResult();
+      partialIdx = arith::ShLIOp::create(rewriter, loc, partialIdx, constant)
+                       .getResult();
     } else {
-      auto constant =
-          rewriter
-              .create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimProduct))
-              .getResult();
-      partialIdx =
-          rewriter.create<arith::MulIOp>(loc, partialIdx, constant).getResult();
+      auto constant = arith::ConstantOp::create(
+                          rewriter, loc, rewriter.getIndexAttr(dimProduct))
+                          .getResult();
+      partialIdx = arith::MulIOp::create(rewriter, loc, partialIdx, constant)
+                       .getResult();
     }
 
     // Sum up with the prior lower dimension accessors
     auto sumOp =
-        rewriter.create<arith::AddIOp>(loc, accumulatedArrayIndex, partialIdx);
+        arith::AddIOp::create(rewriter, loc, accumulatedArrayIndex, partialIdx);
     accumulatedArrayIndex = sumOp.getResult();
   }
   return accumulatedArrayIndex;
@@ -110,7 +108,7 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
 
 static bool hasMultiDimMemRef(ValueRange values) {
   return llvm::any_of(values, [](Value v) {
-    auto memref = v.getType().dyn_cast<MemRefType>();
+    auto memref = dyn_cast<MemRefType>(v.getType());
     if (!memref)
       return false;
     return !isUniDimensional(memref);
@@ -296,8 +294,9 @@ struct CondBranchOpConversion
   matchAndRewrite(mlir::cf::CondBranchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-        op, adaptor.getCondition(), adaptor.getTrueDestOperands(),
-        adaptor.getFalseDestOperands(), op.getTrueDest(), op.getFalseDest());
+        op, adaptor.getCondition(), op.getTrueDest(),
+        adaptor.getTrueDestOperands(), op.getFalseDest(),
+        adaptor.getFalseDestOperands());
     return success();
   }
 };
@@ -336,7 +335,7 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
           calledFunction, op.getCallee(), funcType);
     else
       newFuncOp =
-          rewriter.create<func::FuncOp>(op.getLoc(), op.getCallee(), funcType);
+          func::FuncOp::create(rewriter, op.getLoc(), op.getCallee(), funcType);
     newFuncOp.setVisibility(SymbolTable::Visibility::Private);
 
     return success();
@@ -380,7 +379,7 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
     });
 
     auto resultsConverted = llvm::all_of(op.getResultTypes(), [](Type type) {
-      if (auto memref = type.dyn_cast<MemRefType>())
+      if (auto memref = dyn_cast<MemRefType>(type))
         return isUniDimensional(memref);
       return true;
     });

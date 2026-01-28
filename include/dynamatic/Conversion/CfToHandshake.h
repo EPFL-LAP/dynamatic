@@ -35,6 +35,10 @@ public:
   CfToHandshakeTypeConverter();
 };
 
+/// CfToHandshake replaces MLIR block diagrams with merge-like ops.
+/// This data type records this mapping.
+using BlockArgToMergeResult = DenseMap<BlockArgument, OpResult>;
+
 /// Converts a func-level function into a handshake-level function. The function
 /// signature gets an extra control-only argument to represent the starting
 /// point of the control network. If the function did not return any result, a
@@ -110,12 +114,16 @@ public:
   /// use which interface. The backedge builder is used to create temporary
   /// values for the data input to converted load ports. A flag for FTD is also
   /// introduced to tweak the rewriting process.
-  virtual LogicalResult
-  convertMemoryOps(handshake::FuncOp funcOp,
-                   ConversionPatternRewriter &rewriter,
-                   const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
-                   BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
-                   bool isFtd = false) const;
+  virtual LogicalResult convertMemoryOps(
+      // clang-format off
+      handshake::FuncOp funcOp,
+      ConversionPatternRewriter &rewriter,
+      const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
+      BackedgeBuilder &edgeBuilder,
+      MemInterfacesInfo &memInfo,
+      bool isFtd = false
+      // clang-format on
+  ) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group
@@ -129,10 +137,10 @@ public:
   /// - Both a `handhsake::MemoryControllerOp` and `handhsake::LSQOp` will be
   /// instantiated if some but not all of its accesses indicate that they should
   /// connect to an LSQ.
-  virtual LogicalResult
-  verifyAndCreateMemInterfaces(handshake::FuncOp funcOp,
-                               ConversionPatternRewriter &rewriter,
-                               MemInterfacesInfo &memInfo) const;
+  virtual LogicalResult verifyAndCreateMemInterfaces(
+      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+      MemInterfacesInfo &memInfo,
+      const BlockArgToMergeResult &argReplacements) const;
 
   /// Sets an integer "bb" attribute on each operation to identify the basic
   /// block from which the operation originates in the std-level IR.
@@ -275,10 +283,7 @@ public:
 };
 
 #define GEN_PASS_DECL_CFTOHANDSHAKE
-#define GEN_PASS_DEF_CFTOHANDSHAKE
 #include "dynamatic/Conversion/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
 
 } // namespace dynamatic
 

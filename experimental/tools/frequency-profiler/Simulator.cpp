@@ -88,11 +88,11 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     APInt aparg(width, x);
     return aparg;
   }
-  if (type.isa<mlir::IntegerType>()) {
+  if (isa<mlir::IntegerType>(type)) {
     int64_t x;
     arg >> x;
     int64_t width = type.getIntOrFloatBitWidth();
-    APInt aparg(width, x);
+    APInt aparg(width, x, /*isSigned = */ true, /*implicitTrunc = */ true);
     return aparg;
   }
   if (type.isF32()) {
@@ -107,7 +107,7 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     APFloat aparg(x);
     return aparg;
   }
-  if (auto tupleType = type.dyn_cast<TupleType>()) {
+  if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
     char tmp;
     arg >> tmp;
     assert(tmp == '(' && "tuple should start with '('");
@@ -160,9 +160,9 @@ static unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
   mlir::Type elementType = type.getElementType();
   int64_t width = elementType.getIntOrFloatBitWidth();
   for (int i = 0; i < allocationSize; ++i) {
-    if (elementType.isa<mlir::IntegerType>()) {
+    if (isa<mlir::IntegerType>(elementType)) {
       store[ptr][i] = APInt(width, 0);
-    } else if (elementType.isa<mlir::FloatType>()) {
+    } else if (isa<mlir::FloatType>(elementType)) {
       store[ptr][i] = APFloat(0.0);
     } else {
       fatalValueError("Unknown result type!\n", elementType);
@@ -227,7 +227,8 @@ LogicalResult StdExecuter::execute(mlir::arith::ShLIOp, std::vector<Any> &in,
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount,
+            /* isSigned = */ true, /*implicitTrunc = */ true);
   out[0] = shifted;
   return success();
 }
@@ -237,7 +238,8 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount,
+            /* isSigned = */ true, /*implicitTrunc = */ true);
   out[0] = shifted;
   return success();
 }
@@ -246,6 +248,7 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+
   auto shifted =
       APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
   out[0] = shifted;
@@ -874,9 +877,9 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
 
   for (unsigned i = 0; i < numInputs; ++i) {
     mlir::Type type = ftype.getInput(i);
-    if (type.isa<mlir::MemRefType>()) {
+    if (isa<mlir::MemRefType>(type)) {
       // We require this memref type to be fully specified.
-      auto memreftype = type.dyn_cast<mlir::MemRefType>();
+      auto memreftype = llvm::dyn_cast<mlir::MemRefType>(type);
 
       // emptyDims: the dynamic dimension type of alloca takes an array of
       // dimensions. We cannot pass an temporary object "{}" to a reference type
@@ -917,7 +920,7 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
   // }
   auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
   modOp.walk([&](memref::GlobalOp gblOp) {
-    auto memreftype = gblOp.getTypeAttr().getValue().dyn_cast<MemRefType>();
+    auto memreftype = dyn_cast<MemRefType>(gblOp.getTypeAttr().getValue());
     // emptyDims: the dynamic dimension type of alloca takes an array of
     // dimensions. We cannot pass an temporary object "{}" to a reference type
     // "std::vector<Any> &". So we construct an empty array here.
@@ -938,13 +941,13 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
     // If the GlobalOp has a dense initializer, use it the initialize the memory
     // content:
     mlir::Attribute initValueAttr = gblOp.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       mlir::Type elemType = denseAttr.getElementType();
-      if (elemType.isa<mlir::IntegerType>()) {
+      if (isa<mlir::IntegerType>(elemType)) {
         for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APInt>())) {
           programStackMemory[pointer][id] = val;
         }
-      } else if (elemType.isa<mlir::FloatType>()) {
+      } else if (isa<mlir::FloatType>(elemType)) {
         for (auto [id, val] : llvm::enumerate(denseAttr.getValues<APFloat>())) {
           programStackMemory[pointer][id] = val;
         }

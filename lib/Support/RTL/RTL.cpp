@@ -247,11 +247,11 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
 }
 
 static std::string serializeExtraSignalsInner(const Type &type) {
-  assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
+  assert(isa<handshake::ExtraSignalsTypeInterface>(type) &&
          "type should be ChannelType or ControlType");
 
   handshake::ExtraSignalsTypeInterface extraSignalsType =
-      type.cast<handshake::ExtraSignalsTypeInterface>();
+      cast<handshake::ExtraSignalsTypeInterface>(type);
 
   std::string extraSignalsValue;
   llvm::raw_string_ostream extraSignals(extraSignalsValue);

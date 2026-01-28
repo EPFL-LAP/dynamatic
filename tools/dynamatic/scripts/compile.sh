@@ -21,12 +21,12 @@ FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
 
-LLVM=$DYNAMATIC_DIR/polygeist/llvm-project
+LLVM=$DYNAMATIC_DIR/llvm-project
 LLVM_BINS=$DYNAMATIC_DIR/bin
 export PATH=$PATH:$LLVM_BINS
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+CLANGXX_BIN="$LLVM_BINS/clang++"
 LLVM_OPT="$LLVM_BINS/opt"
 LLVM_TO_STD_TRANSLATION_BIN="$DYNAMATIC_DIR/build/bin/translate-llvm-to-std"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -144,7 +144,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
 # - lowerswitch: Convert switch case into branches.
-# - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
+# - instcombine: combine operations. 
 # - loop-rotate: canonicalize loops to do-while loops
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
@@ -204,6 +204,7 @@ $LLVM_TO_STD_TRANSLATION_BIN \
    -o "$F_CF"
 exit_on_fail "Failed to convert to std dialect" \
   "Converted to std dialect"
+
 
 # cf transformations (dynamatic)
 # - "drop-unlist-functions": Dropping the functions that are not needed in HLS

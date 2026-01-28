@@ -174,7 +174,7 @@ getInputArguments(handshake::FuncOp *funcOp) {
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
     if (Ty type = dyn_cast<Ty>(arg.getType())) {
-      std::string argName = portAttr.dyn_cast<StringAttr>().data();
+      std::string argName = dyn_cast<StringAttr>(portAttr).data();
       interfaces.emplace_back(type, argName);
     }
   }
@@ -188,7 +188,7 @@ getOutputArguments(handshake::FuncOp *funcOp) {
 
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
-    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    std::string argName = dyn_cast<StringAttr>(portAttr).str();
     if (Ty type = dyn_cast<Ty>(resType)) {
       interfaces.emplace_back(type, argName);
     }

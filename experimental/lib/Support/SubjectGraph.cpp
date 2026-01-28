@@ -187,7 +187,7 @@ void BaseSubjectGraph::buildSubjectGraphConnections() {
       // Store the Result Number of the input operand in the
       // inputSubjectGraphToResultNumber map.
       inputSubjectGraphToResultNumber[inputSubjectGraph] =
-          inputOperand.cast<OpResult>().getResultNumber();
+          mlir::cast<OpResult>(inputOperand).getResultNumber();
     }
   }
 
@@ -758,7 +758,7 @@ BlackBoxSubjectGraph::BlackBoxSubjectGraph(Operation *op)
     unsigned int inputDataWidth;
     // Check if the input comes directly from top FuncOp, in which case it
     // should be skipped.
-    if (auto blockArg = op->getOperand(i).dyn_cast<BlockArgument>()) {
+    if (auto blockArg = llvm::dyn_cast<BlockArgument>(op->getOperand(i))) {
       llvm::TypeSwitch<Operation *, void>(
           blockArg.getParentBlock()->getParentOp())
           .Case<handshake::FuncOp>(
@@ -766,12 +766,12 @@ BlackBoxSubjectGraph::BlackBoxSubjectGraph(Operation *op)
           .Default([&](auto) {});
     }
     // Determine the data width of the input channel
-    if (op->getOperand(i).getType().isa<handshake::ChannelType>() ||
-        op->getOperand(i).getType().isa<handshake::ControlType>()) {
+    if (isa<handshake::ChannelType>(op->getOperand(i).getType()) ||
+        isa<handshake::ControlType>(op->getOperand(i).getType())) {
       inputDataWidth =
           handshake::getHandshakeTypeBitWidth(op->getOperand(i).getType());
     } else {
-      if (!op->getOperand(i).getType().isa<MemRefType>()) {
+      if (!isa<MemRefType>(op->getOperand(i).getType())) {
         llvm::errs() << "Operand Type: " << op->getOperand(i).getType() << "\n";
         op->emitError("Unsupported Blackbox Input Type");
       }
@@ -802,12 +802,12 @@ BlackBoxSubjectGraph::BlackBoxSubjectGraph(Operation *op)
   for (unsigned int i = 0; i < numOutputs; i++) {
     unsigned int outputDataWidth;
     // Determine the data width of the output channel
-    if (op->getResult(i).getType().isa<handshake::ChannelType>() ||
-        op->getResult(i).getType().isa<handshake::ControlType>()) {
+    if (isa<handshake::ChannelType>(op->getResult(i).getType()) ||
+        isa<handshake::ControlType>(op->getResult(i).getType())) {
       outputDataWidth =
           handshake::getHandshakeTypeBitWidth(op->getResult(i).getType());
     } else {
-      if (!op->getResult(i).getType().isa<MemRefType>()) {
+      if (!isa<MemRefType>(op->getResult(i).getType())) {
         llvm::errs() << "Result Type: " << op->getResult(i).getType() << "\n";
         op->emitError("Unsupported Blackbox Output Type");
       }

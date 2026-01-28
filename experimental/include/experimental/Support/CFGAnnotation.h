@@ -27,6 +27,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include <variant>
 
 namespace dynamatic {
 namespace experimental {

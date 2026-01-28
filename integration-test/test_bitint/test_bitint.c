@@ -1,5 +1,8 @@
 #include "dynamatic/Integration.h"
 
+// NOTE: This currently doesn't work in Clang!
+// waiting for https://github.com/llvm/llvm-project/pull/161796 to be merged
+
 #define AccumType unsigned _BitInt(32)
 #define DataType unsigned _BitInt(16)
 #define WeightType unsigned _BitInt(5)

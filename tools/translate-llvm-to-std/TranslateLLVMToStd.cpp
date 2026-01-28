@@ -48,7 +48,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
   if (llvmType->isX86_FP80Ty()) {
     llvm::errs() << "Warning: using x86_fp80 type in MLIR translation. This "
                     "type is not currently supported\n";
-    return mlir::FloatType::getF80(context);
+    return mlir::Float80Type::get(context);
   }
   LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
@@ -184,8 +184,8 @@ void TranslateLLVMToStd::translateFunction(llvm::Function *llvmFunc) {
   }
 
   auto funcType = builder.getFunctionType(argTypes, resTypes);
-  auto funcOp = builder.create<func::FuncOp>(builder.getUnknownLoc(),
-                                             llvmFunc->getName(), funcType);
+  auto funcOp = func::FuncOp::create(builder, builder.getUnknownLoc(),
+                                     llvmFunc->getName(), funcType);
 
   initializeBlocksAndBlockMapping(llvmFunc, funcOp);
 
@@ -239,8 +239,9 @@ void TranslateLLVMToStd::translateGlobalVars() {
       initialValueAttr = convertInitializerToDenseElemAttr(globalVar, ctx);
     }
 
-    auto globalOp = builder.create<memref::GlobalOp>(
+    auto globalOp = memref::GlobalOp::create(
         // clang-format off
+        builder,
         UnknownLoc::get(ctx),
         symNameAttr,
         visibilityAttr,
@@ -289,9 +290,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   } else if (auto *returnOp = dyn_cast<llvm::ReturnInst>(inst)) {
     if (returnOp->getNumOperands() == 1) {
       mlir::Value arg = valueMap[inst->getOperand(0)];
-      builder.create<func::ReturnOp>(loc, arg);
+      func::ReturnOp::create(builder, loc, arg);
     } else {
-      builder.create<func::ReturnOp>(loc);
+      func::ReturnOp::create(builder, loc);
     }
   } else if (isa<llvm::PHINode>(inst)) {
     // At this stage, Phi nodes are all converted to the block arguments
@@ -372,8 +373,8 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
 
         if (auto *intConst = dyn_cast<ConstantInt>(val)) {
           APInt intVal = intConst->getValue();
-          auto constOp = builder.create<arith::ConstantIntOp>(
-              loc, intVal.getSExtValue(), intVal.getBitWidth());
+          auto constOp = arith::ConstantIntOp::create(
+              builder, loc, intVal.getSExtValue(), intVal.getBitWidth());
           valueMap[val] = constOp->getResult(0);
           loc = constOp->getLoc();
         }
@@ -381,13 +382,13 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
         if (auto *floatConst = dyn_cast<llvm::ConstantFP>(val)) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF32Type());
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
-            auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF64Type());
+            auto constOp = arith::ConstantFloatOp::create(
+                builder, loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
@@ -411,8 +412,8 @@ void TranslateLLVMToStd::createGetGlobals(llvm::Function *llvmFunc) {
 
           auto memrefType = globalOp.getType();
 
-          auto getGlobalOp = builder.create<memref::GetGlobalOp>(
-              loc, memrefType, globalOp.getSymName());
+          auto getGlobalOp = memref::GetGlobalOp::create(
+              builder, loc, memrefType, globalOp.getSymName());
 
           valueMap[val] = getGlobalOp.getResult();
         }
@@ -499,7 +500,7 @@ void TranslateLLVMToStd::translateICmpInst(llvm::ICmpInst *inst) {
   }
 
   auto op =
-      builder.create<arith::CmpIOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpIOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
@@ -530,7 +531,7 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
     // clang-format on
   }
   auto op =
-      builder.create<arith::CmpFOp>(UnknownLoc::get(ctx), predicate, lhs, rhs);
+      arith::CmpFOp::create(builder, UnknownLoc::get(ctx), predicate, lhs, rhs);
   valueMap[inst] = op->getResult(0);
 }
 
@@ -711,8 +712,9 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
     SmallVector<mlir::Value> trueOperands =
         getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
     mlir::Value condition = valueMap[inst->getCondition()];
-    builder.create<cf::CondBranchOp>(
+    cf::CondBranchOp::create(
         // clang-format off
+        builder,
         loc,
         condition,
         blockMap[trueDestBB],
@@ -794,7 +796,7 @@ void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
   auto memrefType = MemRefType::get(/*shape =*/{arraySize},
                                     getMLIRType(baseElementType, ctx));
 
-  auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
+  auto allocaOp = memref::AllocaOp::create(builder, loc, memrefType);
   valueMap[allocaInst] = allocaOp->getResult(0);
 }
 
