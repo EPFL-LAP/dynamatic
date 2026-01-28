@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "HlsLogging.h"
-#include "HlsVhdlTb.h"
+#include "HlsTb.h"
 #include "Simulators.h"
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"

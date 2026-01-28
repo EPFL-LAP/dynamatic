@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "HlsVhdlTb.h"
+#include "HlsTb.h"
 #include "VerificationContext.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
