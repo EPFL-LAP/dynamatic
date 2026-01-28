@@ -29,14 +29,17 @@ static const std::string C_OUT_DIR = "C_OUT";
 static const std::string VSIM_SCRIPT_FILE = "simulation_vsim.do";
 static const std::string GHDL_SCRIPT_FILE = "simulation_ghdl.sh";
 static const std::string XSIM_SCRIPT_FILE = "simulation_xsim.prj";
+static const std::string VERILATOR_SCRIPT_FILE = "simulation_verilator.sh";
 static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
+
+enum HdlType { VHDL, VERILOG };
 
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp, bool vivadoFPU)
+                      handshake::FuncOp *funcOp, bool vivadoFPU, HdlType hdl)
       : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
-        vivadoFPU(vivadoFPU) {}
+        vivadoFPU(vivadoFPU), simLanguage(hdl) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -52,15 +55,23 @@ struct VerificationContext {
   // Whether to use Vivado FPU for floating-point operations
   bool vivadoFPU;
 
+  // Wheter to use VHDL or VERILOG for the testbench
+  HdlType simLanguage;
+
   bool useVivadoFPU() const { return vivadoFPU; }
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
   }
 
+  std::string getVerilogTestbenchPath() const {
+    return getHdlSrcDir() + SEP + "tb_" + kernelName + ".v";
+  }
+
   std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }
   std::string getGhdlShFilePath() const { return GHDL_SCRIPT_FILE; }
   std::string getXsimPrjFilePath() const { return XSIM_SCRIPT_FILE; }
+  std::string getVerilatorShFilePath() const { return VERILATOR_SCRIPT_FILE; }
 
   std::string getCOutDir() const { return simPath + SEP + C_OUT_DIR; }
 

@@ -70,6 +70,9 @@ static cl::opt<bool> exitOnFailure(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
 
+static constexpr llvm::StringLiteral VHDL("vhdl");
+static constexpr llvm::StringLiteral VERILOG("verilog");
+
 namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
@@ -92,11 +95,11 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  llvm::StringLiteral hdl = VHDL;
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
-
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
@@ -268,13 +271,15 @@ public:
 class SetOutputDir : public Command {
 public:
   SetOutputDir(FrontendState &state)
-      : Command("set-output-dir", "Sets the name of the dir to perform HLS in. If not set, defaults to 'out'", state) {
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
     addPositionalArg({"out_dir", "out dir name"});
   }
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class Compile : public Command {
 public:
@@ -660,7 +665,8 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
   llvm::StringRef outputDir = args.positionals.front();
 
   // reject trivial bad cases
-  if (outputDir.empty() || outputDir == "." || outputDir == ".." || outputDir.endswith("/"))
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
@@ -749,6 +755,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+      state.hdl = VERILOG;
     } else if (it->second == "verilog-beta") {
       hdl = "verilog-beta";
     } else if (it->second == "smv") {
@@ -780,15 +787,28 @@ CommandResult Simulate::execute(CommandArguments &args) {
     } else {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
-                      "'xsim', and 'vsim'.\n";
+                      "'xsim', 'vsim' and 'verilator'.\n";
       return CommandResult::FAIL;
     }
+  }
+
+  if (simulator == "ghdl" && state.hdl != VHDL) {
+    llvm::errs() << "Simulator 'ghdl' is not compatible with this HDL. Use "
+                    "'vsim', 'xsim' or 'verilator'. \n";
+    return CommandResult::FAIL;
+  }
+
+  if (simulator == "verilator" && state.hdl != VERILOG) {
+    llvm::errs()
+        << "Simulator 'verilator' is not compatible with this HDL. Use "
+           "'vsim', 'xsim' or 'ghdl'. \n";
+    return CommandResult::FAIL;
   }
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, state.hdl);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
