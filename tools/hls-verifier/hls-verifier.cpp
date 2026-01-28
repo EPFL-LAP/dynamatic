@@ -33,6 +33,8 @@
 #include <string>
 #include <utility>
 
+#include "llvm/Support/Timer.h"
+
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
@@ -213,7 +215,12 @@ int main(int argc, char **argv) {
 
   // Run the simulator to simulate the testbench and write the outputs to the
   // VHDL_OUT
-  simulator->execSimulation();
+  {
+    llvm::Timer timer("sim-timer", "Simulator runtime");
+    timer.startTimer();
+    simulator->execSimulation();
+    timer.stopTimer();
+  }
 
   if (succeeded(compareCAndVhdlOutputs(ctx))) {
     logInf(LOG_TAG, "C and VHDL outputs match");
