@@ -341,14 +341,18 @@ struct ReplicateSourceIntoConstant : OpRewritePattern<handshake::ForkOp> {
         [&](Operation *op) {
           if (isa<
                   // clang-format off
-                handshake::TruncIOp,
-                handshake::ExtSIOp,
-                handshake::ExtUIOp,
-                handshake::ConstantOp
+                  handshake::TruncIOp,
+                  handshake::ExtSIOp,
+                  handshake::ExtUIOp,
+                  handshake::ConstantOp
                   // clang-format on
                   >(op)) {
             opsToReplicate.push_back(op);
-            return isDrivenByConstRecursive(op->getOperand(0).getDefiningOp());
+            Value inputOprd = op->getOperand(0);
+            if (Operation *defOp = inputOprd.getDefiningOp(); defOp)
+              return isDrivenByConstRecursive(defOp);
+            assert(isa<BlockArgument>(inputOprd));
+            return false;
           }
           return isa<handshake::SourceOp>(op);
         };
