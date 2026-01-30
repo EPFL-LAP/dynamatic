@@ -882,22 +882,6 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  // Get the HDL configuration
-  std::string hdl = "vhdl";
-
-  if (auto it = args.options.find(HDL); it != args.options.end()) {
-    if (it->second == "verilog") {
-      hdl = "verilog";
-    } else if (it->second == "verilog-beta") {
-      hdl = "verilog-beta";
-    } else if (it->second != "vhdl") {
-      llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl',"
-                      " and 'verilog'.\n";
-      return CommandResult::FAIL;
-    }
-  }
-
   // Get simulation stage configuration
   std::string stage = "pre";
 
@@ -919,7 +903,7 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
     "python", script,
     "--output_dir", state.getOutputDir(),
     "--kernel_name", state.getKernelName(),
-    "--hdl", hdl,
+    "--hdl", state.hdl,
     "--synth", stage,
     "--cp", floatToString(state.targetCP, 3)
   );
@@ -930,22 +914,6 @@ CommandResult PowerEval::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
-
-  // Get the HDL configuration
-  std::string hdl = "vhdl";
-
-  if (auto it = args.options.find(HDL); it != args.options.end()) {
-    if (it->second == "verilog") {
-      hdl = "verilog";
-    } else if (it->second == "verilog-beta") {
-      hdl = "verilog-beta";
-    } else if (it->second != "vhdl") {
-      llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl',"
-                      " and 'verilog'.\n";
-      return CommandResult::FAIL;
-    }
-  }
 
   // Get simulation stage configuration
   std::string stage = "synth";
@@ -982,7 +950,7 @@ CommandResult PowerEval::execute(CommandArguments &args) {
     "python", script,
     "--output_dir", state.getOutputDir(),
     "--kernel_name", state.getKernelName(),
-    "--hdl", hdl,
+    "--hdl", state.hdl,
     "--stage", stage,
     (flattenHierarchy == "1" ? "--flatten_hierarchy" : ""),
     "--cp", floatToString(state.targetCP, 3)
