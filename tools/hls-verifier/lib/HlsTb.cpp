@@ -25,9 +25,11 @@
 using std::tuple;
 
 namespace {
-std::string formatTimeNs(double ns) {
+std::string formatTimeNs(double ns, HdlType simLanguage) {
   std::ostringstream os;
-  os << std::fixed << std::setprecision(2) << ns << " ns";
+  os << std::fixed << std::setprecision(2) << ns;
+  if (simLanguage == VHDL)
+    os << " ns";
   return os.str();
 }
 } // namespace
@@ -456,7 +458,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
     c.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
   declareConstant(ctx, os, "HALF_CLK_PERIOD", TIME,
-                  formatTimeNs(ctx.getclockPeriod() / 2.0));
+                  formatTimeNs(ctx.getclockPeriod() / 2.0, ctx.simLanguage));
   declareConstant(ctx, os, "RESET_LATENCY", TIME, "8.00");
   declareConstant(ctx, os, "TRANSACTION_NUM", INTEGER, to_string(1));
 }
