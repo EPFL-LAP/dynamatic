@@ -28,8 +28,6 @@ namespace {
 std::string formatTimeNs(double ns, HdlType simLanguage) {
   std::ostringstream os;
   os << std::fixed << std::setprecision(2) << ns;
-  if (simLanguage == VHDL)
-    os << " ns";
   return os.str();
 }
 } // namespace
