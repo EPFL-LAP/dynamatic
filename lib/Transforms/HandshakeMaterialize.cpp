@@ -25,6 +25,11 @@
 using namespace mlir;
 using namespace dynamatic;
 
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEMATERIALIZE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+
 /// Determines whether the value should be concerned by materialization rules;
 /// only SSA values with dataflow semantics must have a single use.
 static inline bool eligibleForMaterialization(Value val) {
@@ -399,6 +404,8 @@ struct HandshakeMaterializePass
     : public dynamatic::impl::HandshakeMaterializeBase<
           HandshakeMaterializePass> {
 
+  using HandshakeMaterializeBase::HandshakeMaterializeBase;
+
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -424,10 +431,13 @@ struct HandshakeMaterializePass
         // clang-format off
         MinimizeForkSizes,
         EliminateForksToForks,
-        EraseSingleOutputForks,
-        ReplicateSourceIntoConstant
+        EraseSingleOutputForks
         // clang-format on
         >(ctx);
+
+    if (this->replicateConstants)
+      patterns.add<ReplicateSourceIntoConstant>(ctx);
+
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -440,8 +450,3 @@ struct HandshakeMaterializePass
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMaterialize() {
-  return std::make_unique<HandshakeMaterializePass>();
-}
