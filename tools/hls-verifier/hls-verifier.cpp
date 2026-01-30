@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "HlsLogging.h"
-#include "HlsVhdlTb.h"
+#include "HlsTb.h"
 #include "Simulators.h"
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -32,6 +32,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+
+#include "llvm/Support/Timer.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -140,12 +142,18 @@ int main(int argc, char **argv) {
       cl::value_desc("vivado-fpu"), cl::init(false));
 
   cl::opt<std::string> simulatorType(
-      "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
+      "simulator",
+      cl::desc("Simulator of choice (options: xsim, ghdl, vsim, verilator)"),
       cl::value_desc("Simulator of choice"), cl::init("vsim"));
 
-  cl::opt<double> clockPeriod(
-      "clock-period", cl::desc("Clock period in ns"),
-      cl::value_desc("clock period"), cl::init(4.0));
+  cl::opt<double> clockPeriod("clock-period", cl::desc("Clock period in ns"),
+                              cl::value_desc("clock period"), cl::init(4.0));
+
+  cl::opt<std::string> hdlType("hdl",
+                               cl::desc("HDL used for simulation. Can either "
+                                        "be 'vhdl' (default) or 'verilog'"),
+                               cl::value_desc("HDL for simulation"),
+                               cl::init("vhdl"));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -182,8 +190,10 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
+  HdlType hdl = (hdlType == "verilog") ? VERILOG : VHDL;
+
   VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU,
-                          clockPeriod);
+                          clockPeriod, hdl);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
@@ -196,6 +206,8 @@ int main(int argc, char **argv) {
     simulator = std::make_unique<VSimSimulator>(&ctx);
   } else if (simulatorType == "xsim") {
     simulator = std::make_unique<XSimSimulator>(&ctx);
+  } else if (simulatorType == "verilator") {
+    simulator = std::make_unique<Verilator>(&ctx);
   } else {
     logErr(LOG_TAG, "Wrong Simulator (use vsim, xsim, ghdl, verilator)");
     return 1;
@@ -207,7 +219,12 @@ int main(int argc, char **argv) {
 
   // Run the simulator to simulate the testbench and write the outputs to the
   // VHDL_OUT
-  simulator->execSimulation();
+  {
+    llvm::Timer timer("sim-timer", "Simulator runtime");
+    timer.startTimer();
+    simulator->execSimulation();
+    timer.stopTimer();
+  }
 
   if (succeeded(compareCAndVhdlOutputs(ctx))) {
     logInf(LOG_TAG, "C and VHDL outputs match");

@@ -19,6 +19,7 @@ CLOCK_PERIOD=$8
 if [ -z "$CLOCK_PERIOD" ]; then
   CLOCK_PERIOD="4.0"
 fi
+HDL_TYPE=$9
 
 # Generated directories/files
 SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
@@ -68,11 +69,19 @@ cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR"
 cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR" 2> /dev/null
 
 # Copy TB supplementary files (memory model, etc.)
-cp "$RESOURCE_DIR/templates_vhdl/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
-cp "$RESOURCE_DIR/templates_vhdl/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
-cp "$RESOURCE_DIR/templates_vhdl/template_single_argument.vhd" "$COSIM_HDL_SRC_DIR/single_argument.vhd"
-cp "$RESOURCE_DIR/templates_vhdl/template_simpackage.vhd" "$COSIM_HDL_SRC_DIR/simpackage.vhd"
-cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
+if [ "$HDL_TYPE" = "verilog" ]; then
+  cp "$RESOURCE_DIR/templates_verilog/template_tb_join.v" "$COSIM_HDL_SRC_DIR/tb_join.v"
+  cp "$RESOURCE_DIR/templates_verilog/template_two_port_RAM.sv" "$COSIM_HDL_SRC_DIR/two_port_RAM.sv"
+  cp "$RESOURCE_DIR/templates_verilog/template_single_argument.sv" "$COSIM_HDL_SRC_DIR/single_argument.sv"
+  cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
+  cp "$RESOURCE_DIR/verilator_main.cpp" "$HLS_VERIFY_DIR/verilator_main.cpp"
+else
+  cp "$RESOURCE_DIR/templates_vhdl/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
+  cp "$RESOURCE_DIR/templates_vhdl/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
+  cp "$RESOURCE_DIR/templates_vhdl/template_single_argument.vhd" "$COSIM_HDL_SRC_DIR/single_argument.vhd"
+  cp "$RESOURCE_DIR/templates_vhdl/template_simpackage.vhd" "$COSIM_HDL_SRC_DIR/simpackage.vhd"
+  cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
+fi
 
 # Compile kernel's main function to generate inputs and golden outputs for the
 # simulation
@@ -95,6 +104,7 @@ if [ "$VIVADO_FPU" = "true" ]; then
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
   --clock-period="$CLOCK_PERIOD" \
+  --hdl="$HDL_TYPE" \
   --vivado-fpu \
   > "../report.txt" 2>&1
 else
@@ -104,6 +114,7 @@ else
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
   --clock-period="$CLOCK_PERIOD" \
+  --hdl="$HDL_TYPE" \
   > "../report.txt" 2>&1
 fi
 exit_on_fail "Simulation failed" "Simulation succeeded"
