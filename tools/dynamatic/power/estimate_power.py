@@ -61,8 +61,9 @@ def main(output_dir, kernel_name, hdl, clock_period, vivado_cmd="vivado", post_s
         print(f"[ERROR] {hdl_src_folder} not found. Please run the 'write-hdl' command")
         return
 
-    # For both VHDL and Verilog, the testbench is in tb_<kernel_name>.vhd
-    tb_file = os.path.join(output_dir, "sim", "HDL_SRC", f"tb_{kernel_name}.vhd")
+    # For both VHDL and Verilog
+    tb_file_name = f"tb_{kernel_name}.vhd" if hdl == "vhdl" else f"tb_{kernel_name}.v"
+    tb_file = os.path.join(output_dir, "sim", "HDL_SRC", tb_file_name)
     if not os.path.exists(tb_file):
         print(f"[ERROR] {tb_file} not found. Please run the 'simulate' command")
         return
@@ -95,11 +96,12 @@ def main(output_dir, kernel_name, hdl, clock_period, vivado_cmd="vivado", post_s
     sim_hdl_inputs.append(f"project addfile {tb_file}")
     
     # Add verilog files if hdl set to verilog
+    sim_folder = os.path.join(output_dir, "sim", "HDL_SRC")
     if hdl == "verilog":
         sim_hdl_inputs.extend([
-            f"project addfile {hdl_src_folder}/{f}"
-            for f in sorted(os.listdir(hdl_src_folder))
-            if f.endswith(".v")
+            f"project addfile {sim_folder}/{f}"
+            for f in sorted(os.listdir(sim_folder))
+            if f.endswith(".v") or f.endswith(".sv")
     ])
 
     # which file is included varies on pre/post synth workflow
@@ -107,7 +109,7 @@ def main(output_dir, kernel_name, hdl, clock_period, vivado_cmd="vivado", post_s
     if hdl != "verilog":
         sim_hdl_inputs.remove(f"project addfile {hdl_src_folder}/{kernel_name}.vhd")
     else:
-        sim_hdl_inputs.remove(f"project addfile {hdl_src_folder}/{kernel_name}.v")
+        sim_hdl_inputs.remove(f"project addfile {sim_folder}/{kernel_name}.v")
     sim_hdl_inputs = "\n".join(sim_hdl_inputs)
     
     
@@ -118,12 +120,12 @@ def main(output_dir, kernel_name, hdl, clock_period, vivado_cmd="vivado", post_s
     # As a list of imports for report_power.tcl
     if hdl == "verilog":
         synth_hdl_inputs = "\n" + "\n".join(
-            f"read_verilog $VHDL_SRC/{f}"
+            f"read_verilog $HDL_SRC/{f}"
             for f in sorted(os.listdir(hdl_src_folder))
             if f.endswith(".v")) 
     else: 
         synth_hdl_inputs = "\n".join(
-            f"read_vhdl -vhdl2008 $VHDL_SRC/{f}"
+            f"read_vhdl -vhdl2008 $HDL_SRC/{f}"
             for f in sorted(os.listdir(hdl_src_folder))
             if f.endswith(".vhd"))
 
