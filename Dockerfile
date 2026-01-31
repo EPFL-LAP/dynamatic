@@ -26,12 +26,14 @@ RUN \
   ninja-build python3 openjdk-21-jdk \
   graphviz git curl gzip libreadline-dev \
   libboost-all-dev pkg-config coinor-cbc \
-  coinor-libcbc-dev
+  coinor-libcbc-dev verilator ghdl
 # [END Installing the dependency]
 
 # [START Create a user called "dynamatic"]
 # Add a user
-RUN useradd -m dynamatic
+RUN groupadd --gid 1000 dynamatic && \
+  useradd --uid 1000 --gid dynamatic --shell /bin/bash --create-home dynamatic
+
 USER dynamatic
 ARG workdir="/home/dynamatic"
 WORKDIR $workdir
