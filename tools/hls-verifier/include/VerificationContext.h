@@ -37,9 +37,10 @@ enum HdlType { VHDL, VERILOG };
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp, bool vivadoFPU, HdlType hdl)
+                      handshake::FuncOp *funcOp, bool vivadoFPU,
+                      double clockPeriod, HdlType hdl)
       : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
-        vivadoFPU(vivadoFPU), simLanguage(hdl) {}
+        vivadoFPU(vivadoFPU), clockPeriod(clockPeriod), simLanguage(hdl) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -55,10 +56,14 @@ struct VerificationContext {
   // Whether to use Vivado FPU for floating-point operations
   bool vivadoFPU;
 
+  // Clock period in nanoseconds
+  double clockPeriod;
+
   // Wheter to use VHDL or VERILOG for the testbench
   HdlType simLanguage;
 
   bool useVivadoFPU() const { return vivadoFPU; }
+  double getclockPeriod() const { return clockPeriod; }
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";

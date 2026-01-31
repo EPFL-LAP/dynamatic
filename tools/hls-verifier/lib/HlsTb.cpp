@@ -6,7 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iomanip>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,14 @@
 #include "llvm/Support/FormatVariadic.h"
 
 using std::tuple;
+
+namespace {
+std::string formatTimeNs(double ns, HdlType simLanguage) {
+  std::ostringstream os;
+  os << std::fixed << std::setprecision(2) << ns;
+  return os.str();
+}
+} // namespace
 
 // A Helper struct for connecting dynamatic's MemRef argument to a two-port RAM.
 // This grouping makes codegen more consistent in their code style, and
@@ -445,7 +455,8 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
     ChannelToEndConnector c(type, argName);
     c.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
-  declareConstant(ctx, os, "HALF_CLK_PERIOD", TIME, "2.00");
+  declareConstant(ctx, os, "HALF_CLK_PERIOD", TIME,
+                  formatTimeNs(ctx.getclockPeriod() / 2.0, ctx.simLanguage));
   declareConstant(ctx, os, "RESET_LATENCY", TIME, "8.00");
   declareConstant(ctx, os, "TRANSACTION_NUM", INTEGER, to_string(1));
 }
