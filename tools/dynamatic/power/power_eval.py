@@ -123,11 +123,14 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
         print(f"[ERROR] No RTL sources found in {hdl_src_dir}")
         return
 
-    # Collect simulation sources (VHDL support files and testbench)
-    sim_files = _list_files(sim_src_dir, [".vhd"])
+    # Collect simulation sources
     if hdl == "vhdl":
+        sim_files = _list_files(sim_src_dir, [".vhd"])
         design_vhd = f"{kernel_name}.vhd"
         sim_files = [f for f in sim_files if f != design_vhd]
+    else:
+        sim_files = _list_files(sim_src_dir, [".sv"])
+        sim_files.append("tb_join.v")
     sim_files = [f for f in sim_files if f != os.path.basename(tb_file)]
 
     # Build lists for TCL
@@ -243,8 +246,8 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
             f"open_vcd {post_impl_time_vcd}",
             "log_vcd",
             "",
-            "# For now, we force the simulation to stop after 8000ns",
-            "run 8000ns",
+            "# Only works for Verilog designs for now",
+            "run all",
             "close_saif",
             "close_vcd",
             "close_sim",
