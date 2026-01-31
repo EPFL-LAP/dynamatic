@@ -125,7 +125,7 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
 
     # Collect simulation sources
     if hdl == "vhdl":
-        sim_files = _list_files(sim_src_dir, [".vhd"])
+        sim_files = [f for f in _list_files(sim_src_dir, [".vhd"]) if f not in rtl_files]
         design_vhd = f"{kernel_name}.vhd"
         sim_files = [f for f in sim_files if f != design_vhd]
     else:
@@ -247,7 +247,7 @@ def main(output_dir, kernel_name, hdl, clock_period, stage, flatten_hierarchy,
             "log_vcd",
             "",
             "# Only works for Verilog designs for now",
-            "run all",
+            "run 8000ns",
             "close_saif",
             "close_vcd",
             "close_sim",
@@ -345,6 +345,11 @@ if __name__ == "__main__":
 
     # Default to synthesis stage if not specified
     stage = args.stage if args.stage is not None else "synth"
+    
+    # Exit when the hdl is VHDL
+    if args.hdl == "vhdl":
+        print("[ERROR] VHDL flow is not supported yet for power evaluation. Please use Verilog backend instead.")
+        exit(1)
 
     main(
         args.output_dir,
