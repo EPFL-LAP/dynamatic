@@ -396,7 +396,12 @@ static bool isShiftByConstantImpl(Operation *op) {
                 handshake::ForkOp
                 // clang-format on
                 >(op)) {
-          return isShiftByConstantRecursive(op->getOperand(0).getDefiningOp());
+
+          Value oprd = op->getOperand(0);
+          if (Operation *defOp = oprd.getDefiningOp(); defOp)
+            return isShiftByConstantRecursive(defOp);
+          assert(isa<BlockArgument>(oprd));
+          return false;
         }
         return isa<handshake::ConstantOp>(op);
       };
