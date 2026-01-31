@@ -10,6 +10,7 @@
 #ifndef HLS_VERIFIER_SIMULATORS_H
 #define HLS_VERIFIER_SIMULATORS_H
 
+#include "Utilities.h"
 #include "VerificationContext.h"
 #include "dynamatic/Support/System.h"
 #include "mlir/Support/LogicalResult.h"
@@ -44,8 +45,8 @@ public:
   XSimSimulator(VerificationContext *context) : Simulator(context) {}
 
   void execSimulation() const override {
-    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "-s", "tb",
-         "-R");
+    exec("xelab", "-prj", ctx->getXsimPrjFilePath(), "work.tb", "--timescale",
+         "1ns/1ps", "-s", "tb", "-R");
   }
 
   mlir::LogicalResult generateScripts() const override {
@@ -53,6 +54,8 @@ public:
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".vhd");
     vector<string> filelistVerilog =
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
 
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getXsimPrjFilePath(), ec);
@@ -63,11 +66,16 @@ public:
     for (auto &it : filelistVerilog)
       os << "verilog work " << it << "\n";
 
+    for (auto &it : fileListSystemVerilog)
+      os << "sv work " << it << "\n";
+
     return mlir::success();
   }
 };
 
 class GHDLSimulator : public Simulator {
+
+  const StringLiteral simulatorName = "ghdl";
 
 public:
   GHDLSimulator(VerificationContext *context) : Simulator(context) {}
@@ -114,7 +122,7 @@ public:
     //  - --std=08 : use the VHDL-2008 standard for compilation
     //  - -fsynopsys : allow the use of synopsys non-standard packages
     //    (e.g.std_logic_arith, std_logic_signed, etc.). These packages would
-    //    otherwise produce an error. -frelaxed : generates warining instead of
+    //    otherwise produce an error. -frelaxed : generates warnings instead of
     //    errors
     // [End Flag explanation]
 
@@ -124,16 +132,16 @@ public:
           "VHDL-2008 standard and allows the use of synopsys non-standard "
           "packages\n";
     for (auto &it : filelistVhdl)
-      os << "ghdl -i --std=08 -fsynopsys " << it << "\n";
+      os << simulatorName << " -i --std=08 -fsynopsys " << it << "\n";
 
     // -m compiles a design in the correct compilation order
     os << "# Compiles the design in the correct compilation order, and relaxes "
           "some rules to only cause warnings instead of errors\n";
-    os << "ghdl -m --std=08 -fsynopsys -frelaxed tb\n";
+    os << simulatorName << " -m --std=08 -fsynopsys -frelaxed tb\n";
 
     // -r runs the simulation
     os << "# Runs the Simulation with top-level unit tb\n";
-    os << "ghdl -r --std=08 -fsynopsys tb\n";
+    os << simulatorName << " -r --std=08 -fsynopsys -frelaxed tb\n";
 
     os << "# Exits the script\n";
     os << "exit 0";
@@ -156,6 +164,8 @@ public:
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".vhd");
     vector<string> filelistVerilog =
         getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
 
     std::error_code ec;
     llvm::raw_fd_ostream os(ctx->getModelsimDoFilePath(), ec);
@@ -173,6 +183,9 @@ public:
     for (auto &it : filelistVerilog)
       os << "project addfile " << it << "\n";
 
+    for (auto &it : fileListSystemVerilog)
+      os << "project addfile " << it << "\n";
+
     os << "project calculateorder\n";
     os << "project compileall\n";
     if (ctx->useVivadoFPU()) {
@@ -183,6 +196,63 @@ public:
     os << "log -r *\n";
     os << "run -all\n";
     os << "exit\n";
+
+    return mlir::success();
+  }
+};
+
+class Verilator : public Simulator {
+
+public:
+  Verilator(VerificationContext *context) : Simulator(context) {}
+
+  void execSimulation() const override {
+    exec("bash", ctx->getVerilatorShFilePath());
+  }
+
+  mlir::LogicalResult generateScripts() const override {
+
+    vector<string> filelistVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".v");
+    vector<string> fileListSystemVerilog =
+        getListOfFilesInDirectory(ctx->getHdlSrcDir(), ".sv");
+
+    if (filelistVerilog.empty()) {
+      return mlir::failure();
+    }
+
+    std::error_code ec;
+    llvm::raw_fd_ostream os(ctx->getVerilatorShFilePath(), ec);
+
+    os << "# Verilating (translate the desing into an executable)\n";
+    os << "# --trace: enables wavefrom cration\n";
+    os << "# --Mdir: specifies the './verilator' directory as working "
+          "directory\n";
+    os << "# -cc: Verilator output is C++\n";
+    os << "# --exe: Generates executable with 'verilator_main.cpp' as main "
+          "function\n";
+    os << "# --trace-underscore: Enable coverage of signals that start with "
+          "and underscore\n";
+    os << "# --Wno-UNOPTFLAT: ignores warnings about disabled signal "
+          "optimization\n";
+    os << "# --top-module: 'tb' is specified as top level module\n";
+    os << "# --timing: Enables support for timing constructs (e.g. wait "
+          "statements)\n";
+    os << "# --Wno-REALCVT: Ignores a real number being rounded to an integer "
+          "(during calculation of the kernel's latency)\n";
+    os << "verilator --trace -Mdir ./verilator -cc ";
+
+    for (auto &it : filelistVerilog)
+      os << it << " ";
+    for (auto &it : fileListSystemVerilog)
+      os << it << " ";
+
+    os << "--exe verilator_main.cpp --trace-underscore --Wno-UNOPTFLAT "
+          "--top-module tb --timing -Wno-REALCVT\n";
+
+    os << "make -j -C ./verilator/ -f Vtb.mk Vtb\n";
+
+    os << "./verilator/Vtb\n";
 
     return mlir::success();
   }

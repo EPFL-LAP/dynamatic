@@ -22,7 +22,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
-  LLVMMarkMemoryDependencies.cpp
+  HandshakeTreeHeightReduction.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
@@ -39,3 +39,4 @@ add_dynamatic_library(DynamaticTransforms
 )
 
 add_subdirectory(BufferPlacement)
+add_subdirectory(LLVMIR)

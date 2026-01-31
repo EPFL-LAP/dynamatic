@@ -363,4 +363,61 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
+//===----------------------------------------------------------------------===//
+// EagerForkLikeOpInterface
+//===----------------------------------------------------------------------===//
+
+int ForkOp::getNumEagerOutputs() { return getNumResults(); }
+
+int ControlMergeOp::getNumEagerOutputs() { return 2; }
+
+//===----------------------------------------------------------------------===//
+// BufferLikeOpInterface
+//===----------------------------------------------------------------------===//
+
+int ControlMergeOp::getNumSlots() { return 1; }
+
+int LoadOp::getNumSlots() { return 2; }
+
+//===----------------------------------------------------------------------===//
+// ShiftLikeArithOpInterface
+//===----------------------------------------------------------------------===//
+
+static bool isShiftByConstantImpl(Operation *op) {
+  auto rhs = op->getOperand(1);
+  // Recursively visit the predecessor
+  std::function<bool(Operation *)> isShiftByConstantRecursive =
+      [&](Operation *op) {
+        if (isa<
+                // clang-format off
+                handshake::TruncIOp,
+                handshake::ExtSIOp,
+                handshake::ExtUIOp,
+                handshake::ForkOp
+                // clang-format on
+                >(op)) {
+
+          Value oprd = op->getOperand(0);
+          if (Operation *defOp = oprd.getDefiningOp(); defOp)
+            return isShiftByConstantRecursive(defOp);
+          assert(isa<BlockArgument>(oprd));
+          return false;
+        }
+        return isa<handshake::ConstantOp>(op);
+      };
+  return isShiftByConstantRecursive(rhs.getDefiningOp());
+}
+
+bool ShLIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
+}
+
+bool ShRSIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
+}
+
+bool ShRUIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
+}
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

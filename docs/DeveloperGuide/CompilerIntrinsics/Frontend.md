@@ -30,11 +30,11 @@ The output of Dynamatic's C frontend is an MLIR IR written in standard MLIR dial
 
 Notable optimizations that we need from the LLVM project:
 - `mem2reg`: Suppressing allocas (allocate memory on the heap) into regs.
-- `instcombine`: Performing local DAG-to-DAG rewriting. Notably, this canonicalizes a chain of `getelementptr` instructions (GEPs).
+- `instcombine`: Performing local DAG-to-DAG rewriting. 
 - `loop-rotate`: Transforming loops to do-while loops as much as possible.
 - `simplifycfg`, `loopsimplify`: reducing the number of BBs (fewer branches).
 - `consthoist`: Moving constants around.
-- `licm`: Applying loop-invariant code motion to make the loops simplier.
+- `licm`: Applying loop-invariant code motion to move the code outside the loop (which makes the loops simpler).
 
 > [!NOTE]
 > **Design choice**. These LLVM IR transformations and analyses are crucial to the quality of Dynamatic-produced circuits, and porting them to MLIR requires significant effort. Therefore, we switched from Polygeist to an LLVM IR-based frontend.
@@ -55,7 +55,7 @@ The translation between LLVM IR and the standard dialects (especially the subset
 > - LLVM uses void ptrs for array inputs (both for fixed-size arrays `int arr[10][20]` and arrays with unbounded length `int * arr`). While in standard dialect, we use MemRef types `memref<10 * 20 * i32>` for referencing an array.
 > - LLVM does not represent constants as operations, while in MILR, constants must be "materialized" as explicit constant operations.
 > - LLVM has explicit SSA Phi nodes. MLIR replaces the Phis by block arguments.
-> - The MemRef dialect does not have a special GEP operation for the array index calculation (e.g., `a[0][1]`); instead, it has a high-level syntax like `%result = memref.load [%memrefValue] %dim0, %dim1`. Therefore, GEPs are replaced by a direct connection between indices to the loads/stores. 
+> - The MemRef dialect does not have a special GEP operation for the array index calculation (e.g., `a[0][1]`); instead, it has a high-level syntax like `%result = memref.load [%memrefValue] %dim0, %dim1`. We directly flatten the arrays into 1D and replace GEPs with multiplications and additions.
 > - In LLVM, global values can be referenced by GEPs, but in MLIR MemRef dialect, global values can only be referenced via `get_global` op via the `sym_name` symbol attached to the global op.
 
 ### Type Conversion for Function Arguments
@@ -80,15 +80,45 @@ For each LLVM function, Dynamatic performs the following translation:
 1. **Constant materialization**. Create a corresponding `arith::ConstantOp` for each constant input of each `llvm::Instruction *` in LLVM IR.
 2. **Block conversion**. Create an MLIR block for every basic block in LLVM. Remember the BB mappings (see the list above). For every Phi output in LLVM, it creates the corresponding block argument in MLIR (for each array function argument, the original C code is used to recover the correct MemRef type). Remember the value mappings (see the list above).
 3. **Global conversion**. Create a MemRef global operation for each global variable in LLVM.
-4. **Instruction translation**. Create an operation in MLIR for each LLVM operation from the input values (retrieved from the value mapping). Exception: GEP are removed and the indices are directly connected to the loads and stores.
+4. **Instruction translation**. Create an operation in MLIR for each LLVM operation from the input values (retrieved from the value mapping).
 
 > [!NOTE]
 > The syntax of the GEP instruction in LLVM is often simplified/shortened. This requires a sophisticated conversion rule for GEP. Check out the LLVM documentation on [caveats of GEP syntax](https://llvm.org/docs/GetElementPtr.html) for more details.
 
-> [!IMPORTANT]
-> The `instCombine` pass must be applied before the conversion to eliminate a
-> chain of GEPs.
+## Memory Dependency Analysis (LLVM IR)
 
-## Memory Dependency Analysis
+Source: `lib/Transforms/LLVMIR/MemDepAnalysis.cpp`
 
 TODO
+
+## Array Paritioning Pass (LLVM IR)
+
+Source: `lib/Transforms/LLVMIR/ArrayPartition.cpp`
+
+This pass groups memory accesses that have overlapping, and create smaller
+memory banks if the index calculation are simple increment functions (start,
+step, elems).
+
+Usage:
+
+```
+# NOTE: without "--polly-process-unprofitable", polly ignores certain small loops
+$LLVM_BINS/opt -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
+  -polly-process-unprofitable \
+  -passes="array-partition" \
+  -debug -debug-only="array-partition" \
+  "$F_CLANG_OPTIMIZED_DEPENDENCY" \
+  > "$F_CLANG_OPTIMIZED_DEPENDENCY_PARTITIONED"
+
+$LLVM_BINS/opt -S \
+  -passes="instcombine" \
+  "$F_CLANG_OPTIMIZED_DEPENDENCY_PARTITIONED" \
+  > "$F_CLANG_EXPORT"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_EXPORT" ...
+```
+
+This pass assumes that previous calls to instcombine will combine a chain of
+GEPs (no longer true in the newest LLVM version).

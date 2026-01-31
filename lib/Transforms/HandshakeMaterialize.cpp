@@ -25,6 +25,11 @@
 using namespace mlir;
 using namespace dynamatic;
 
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEMATERIALIZE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+
 /// Determines whether the value should be concerned by materialization rules;
 /// only SSA values with dataflow semantics must have a single use.
 static inline bool eligibleForMaterialization(Value val) {
@@ -324,6 +329,66 @@ struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
   }
 };
 
+/// Replace
+/// - Before: source -> constant -> fork -> {use1, use2, use3, ...}
+/// - After:  {source -> constant -> use1, source -> constant -> use2, ...}
+struct ReplicateSourceIntoConstant : OpRewritePattern<handshake::ForkOp> {
+  using mlir::OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+
+    // size = 2 because it is generally source -> constant
+    SmallVector<Operation *, 2> opsToReplicate;
+
+    // Check if the fork delivers constants like above:
+    std::function<bool(Operation *)> isDrivenByConstRecursive =
+        [&](Operation *op) {
+          if (isa<
+                  // clang-format off
+                  handshake::TruncIOp,
+                  handshake::ExtSIOp,
+                  handshake::ExtUIOp,
+                  handshake::ConstantOp
+                  // clang-format on
+                  >(op)) {
+            opsToReplicate.push_back(op);
+            Value inputOprd = op->getOperand(0);
+            if (Operation *defOp = inputOprd.getDefiningOp(); defOp)
+              return isDrivenByConstRecursive(defOp);
+            assert(isa<BlockArgument>(inputOprd));
+            return false;
+          }
+          return isa<handshake::SourceOp>(op);
+        };
+
+    Operation *definingOp = forkOp.getOperand().getDefiningOp();
+
+    // e.g., function argument
+    if (!definingOp)
+      return failure();
+
+    if (!isDrivenByConstRecursive(definingOp))
+      return failure();
+
+    for (auto res : forkOp.getResults()) {
+      // Replicate the source -> constant network:
+      auto srcOp = rewriter.create<handshake::SourceOp>(forkOp.getLoc());
+      inheritBB(forkOp, srcOp);
+      Value oprd = srcOp.getResult();
+      for (auto *op : llvm::reverse(opsToReplicate)) {
+        Operation *dupOp = rewriter.clone(*op);
+        dupOp->setOperand(0, oprd);
+        dupOp->removeAttr(NameAnalysis::ATTR_NAME);
+        oprd = dupOp->getResult(0);
+      }
+      rewriter.replaceAllUsesWith(res, oprd);
+    }
+
+    return success();
+  }
+};
+
 /// Driver for the materialization pass, materializing the IR in three
 /// sequential steps.
 /// 1. First, forks and sinks are inserted within Handshake functions to ensure
@@ -338,6 +403,8 @@ struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
 struct HandshakeMaterializePass
     : public dynamatic::impl::HandshakeMaterializeBase<
           HandshakeMaterializePass> {
+
+  using HandshakeMaterializeBase::HandshakeMaterializeBase;
 
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
@@ -360,9 +427,17 @@ struct HandshakeMaterializePass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns
-        .add<MinimizeForkSizes, EliminateForksToForks, EraseSingleOutputForks>(
-            ctx);
+    patterns.add<
+        // clang-format off
+        MinimizeForkSizes,
+        EliminateForksToForks,
+        EraseSingleOutputForks
+        // clang-format on
+        >(ctx);
+
+    if (this->replicateConstants)
+      patterns.add<ReplicateSourceIntoConstant>(ctx);
+
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -375,8 +450,3 @@ struct HandshakeMaterializePass
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMaterialize() {
-  return std::make_unique<HandshakeMaterializePass>();
-}

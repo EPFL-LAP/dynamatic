@@ -25,6 +25,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include <variant>
 
+#define DEBUG_TYPE "arith-reduce-strength"
+
 using namespace mlir;
 using namespace dynamatic;
 
@@ -254,7 +256,7 @@ struct MulReduceStrength : public OpRewritePattern<arith::MulIOp> {
   using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
 
   MulReduceStrength(unsigned maxAdderDepth, MLIRContext *ctx)
-      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth){};
+      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth) {};
 
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {
@@ -321,7 +323,7 @@ MulReduceStrength::getPosConstantOperand(Value mulOperand) const {
       if (IntegerAttr intAttr = dyn_cast<IntegerAttr>(cstOp.getValue()))
         if (auto cstValue = intAttr.getValue(); cstValue.isStrictlyPositive())
           return cstValue;
-  return {};
+  return std::nullopt;
 }
 
 std::shared_ptr<OpTree>
@@ -363,45 +365,20 @@ MulReduceStrength::getBitwiseAdderTree(APInt &cst, Value mulOperand) const {
       shiftLeaves.push_back(OpTreeOperand(mulOperand));
   }
 
-  // Create trees for the first (possibly incomplete) level of adders
-  TreeOperands adderLeaves;
-  for (size_t i = 0, j = 0; i < numLeafAdders; ++i, j += 2)
-    adderLeaves.push_back(std::make_shared<OpTree>(
-        OpTree(OpType::ADD, shiftLeaves[j], shiftLeaves[j + 1])));
+  // Building a binary arithmetic tree with the minimum height.
+  std::function<OpTreeOperand(ArrayRef<OpTreeOperand>)> buildTree =
+      [&](ArrayRef<OpTreeOperand> vals) -> OpTreeOperand {
+    if (vals.size() == 1)
+      return vals[0];
+    auto mid = vals.size() / 2;
+    auto lhs = buildTree(vals.take_front(mid));
+    auto rhs = buildTree(vals.drop_front(mid));
+    return std::make_shared<OpTree>(OpTree(OpType::ADD, lhs, rhs));
+  };
 
-  // If the first layer of adders is incomplete, add the leftover shift leaves
-  // as the missing adders to get a "full first layer of adders"
-  for (size_t i = (1 << numLeafAdders); i < shiftLeaves.size(); ++i)
-    adderLeaves.push_back(std::move(shiftLeaves[i]));
-  assert(adderLeaves.size() == maxLeafAdders && "size first level wrong");
+  OpTreeOperand tree = buildTree(shiftLeaves);
 
-  if (treeDepth == 1) {
-    // We are already at the tree's root, return the top-level adder
-    assert(adderLeaves.size() == 1 && "tree should be collapsed to one adder");
-    std::shared_ptr<OpTree> *treeRoot =
-        std::get_if<std::shared_ptr<OpTree>>(&adderLeaves[0]);
-    assert(treeRoot && "root node doesn't have correct type");
-    return std::move(*treeRoot);
-  }
-
-  // Go up each level of the tree till we reach the top. Use two pointers on
-  // tree operands to avoid multiple vector allocations
-  TreeOperands *current = &adderLeaves;
-  TreeOperands nextData;
-  TreeOperands *next = &nextData;
-  for (size_t numAdders = 1 << (treeDepth - 2); numAdders > 0;
-       numAdders >>= 1) {
-    next->clear();
-    for (size_t i = 0, j = 0; i < numAdders; ++i, j += 2)
-      next->push_back(std::make_shared<OpTree>(
-          OpTree(OpType::ADD, (*current)[j], (*current)[j + 1])));
-    std::swap(current, next);
-  }
-
-  // We are at the tree's root, return the top-level adder
-  assert(current->size() == 1 && "tree should be collapsed to one adder");
-  std::shared_ptr<OpTree> *treeRoot =
-      std::get_if<std::shared_ptr<OpTree>>(&(*current)[0]);
+  auto *treeRoot = std::get_if<std::shared_ptr<dynamatic::OpTree>>(&tree);
   assert(treeRoot && "root node doesn't have correct type");
   return std::move(*treeRoot);
 }
@@ -475,7 +452,11 @@ struct ArithReduceStrengthPass
     config.enableRegionSimplification = false;
 
     RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceMulNegOneUsers, PromoteSignedCmp>(ctx);
+    patterns.add<ReplaceMulNegOneUsers
+                 // TODO (Jiahui17): This pattern doesn't work in CF, only works
+                 // in SCF (which we are not using now).
+                 //,PromoteSignedCmp
+                 >(ctx);
     /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
     /// Ultimately, this should be driven by models of component delays (same
     /// as for buffer placement) as well as a general optimization strategy

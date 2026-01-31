@@ -11,13 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "HlsLogging.h"
-#include "HlsVhdlTb.h"
+#include "HlsTb.h"
 #include "Simulators.h"
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -33,7 +32,8 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
+
+#include "llvm/Support/Timer.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -42,6 +42,8 @@ using namespace dynamatic;
 static const char SEP = std::filesystem::path::preferred_separator;
 
 static const string LOG_TAG = "HLS_VERIFIER";
+
+namespace {
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
@@ -81,7 +83,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
     }
   }
 
-  for (auto [argName, type] : argAndTypeMap) {
+  for (const auto &[argName, type] : argAndTypeMap) {
     std::string vhdlOutFile =
         ctx.getHdlOutDir() + SEP + "output_" + argName + ".dat";
 
@@ -116,6 +118,8 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   return mlir::success();
 }
 
+} // namespace
+
 int main(int argc, char **argv) {
 
   cl::opt<std::string> simPathName(
@@ -138,8 +142,15 @@ int main(int argc, char **argv) {
       cl::value_desc("vivado-fpu"), cl::init(false));
 
   cl::opt<std::string> simulatorType(
-      "simulator", cl::desc("Simulator of choice (options: xsim, ghdl, vsim)"),
-      cl::value_desc("Simulator of choice"), cl::init("ghdl"));
+      "simulator",
+      cl::desc("Simulator of choice (options: xsim, ghdl, vsim, verilator)"),
+      cl::value_desc("Simulator of choice"), cl::init("vsim"));
+
+  cl::opt<std::string> hdlType("hdl",
+                               cl::desc("HDL used for simulation. Can either "
+                                        "be 'vhdl' (default) or 'verilog'"),
+                               cl::value_desc("HDL for simulation"),
+                               cl::init("vhdl"));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -176,7 +187,9 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU);
+  HdlType hdl = (hdlType == "verilog") ? VERILOG : VHDL;
+
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU, hdl);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
@@ -189,6 +202,8 @@ int main(int argc, char **argv) {
     simulator = std::make_unique<VSimSimulator>(&ctx);
   } else if (simulatorType == "xsim") {
     simulator = std::make_unique<XSimSimulator>(&ctx);
+  } else if (simulatorType == "verilator") {
+    simulator = std::make_unique<Verilator>(&ctx);
   } else {
     logErr(LOG_TAG, "Wrong Simulator (use vsim, xsim, ghdl, verilator)");
     return 1;
@@ -200,7 +215,12 @@ int main(int argc, char **argv) {
 
   // Run the simulator to simulate the testbench and write the outputs to the
   // VHDL_OUT
-  simulator->execSimulation();
+  {
+    llvm::Timer timer("sim-timer", "Simulator runtime");
+    timer.startTimer();
+    simulator->execSimulation();
+    timer.stopTimer();
+  }
 
   if (succeeded(compareCAndVhdlOutputs(ctx))) {
     logInf(LOG_TAG, "C and VHDL outputs match");

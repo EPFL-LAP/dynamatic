@@ -216,7 +216,8 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType
+  HasClock, SameOperandsAndResultType,
+  BufferLikeOpInterface,
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -345,7 +346,9 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   }];
 }
 
-def ForkOp : Handshake_ForkOp<"fork"> {
+def ForkOp : Handshake_ForkOp<"fork", [
+  DeclareOpInterfaceMethods<EagerForkLikeOpInterface, []>
+]> {
   let summary = "eager fork operation";
   let description = [{
     A single input is replicated to N outputs and distributed to each
@@ -449,6 +452,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
+  DeclareOpInterfaceMethods<EagerForkLikeOpInterface, []>,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -511,6 +516,7 @@ def BranchOp : Handshake_Op<"br", [
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
+  JoinLikeOpInterface,
   AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
   IsIntSizedChannel<1, "conditionOperand">,
@@ -876,7 +882,8 @@ def LoadOp : Handshake_MemPortOp<"load", [
   AllExtraSignalsMatch<["address", "dataResult"]>,
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"data">
+  IsSimpleHandshake<"data">,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
@@ -924,6 +931,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
       return (idx == 0) ? "addrOut" : "dataOut";
     }
   }];
+
 }
 
 def StoreOp : Handshake_MemPortOp<"store", [

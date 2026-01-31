@@ -25,6 +25,7 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     SameOperandsAndResultType,
+    JoinLikeOpInterface,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
   let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);
@@ -270,9 +271,6 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 }
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
   LatencyInterface
 ]>{
     let summary = "Signed integer division.";
@@ -288,9 +286,6 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
 }
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
   LatencyInterface
 ]>
 {
@@ -303,6 +298,14 @@ def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi"> {
 
 def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui"> {
   let summary = "Outputs the maximum between two input unsigned integers";
+}
+
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+  let summary = "Outputs the minimum between two input signed integers";
+}
+
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+  let summary = "Outputs the minimum between two input unsigned integers";
 }
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
@@ -375,15 +378,21 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   }];
 }
 
-def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli"> {
+def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical left shift.";
 }
 
-def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi"> {
+def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Arithmetic right shift.";
 }
 
-def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
+def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui", [
+  DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
+]> {
   let summary = "Logical right shift.";
 }
 
@@ -416,7 +425,8 @@ def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
 }
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
-  IsFloatSizedChannel<32, "out">
+  IsFloatSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   // NOTE:
   // - This operation always translates an unsigned integer of any size into an
@@ -434,7 +444,8 @@ def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp",[
   IsIntSizedChannel<32, "in">,
-  IsFloatSizedChannel<32, "out">
+  IsFloatSizedChannel<32, "out">,
+  LatencyInterface
 ]> {
   let summary = "Converts a signed integer to float.";
 }

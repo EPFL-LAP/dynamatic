@@ -81,7 +81,9 @@ static cl::opt<std::string> propertyFilename("property-database", cl::Optional,
 static cl::opt<HDL>
     hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
         cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
+                   clEnumValN(HDL::VHDL, "vhdl-beta", "VHDL Beta"),
                    clEnumValN(HDL::VERILOG, "verilog", "Verilog"),
+                   clEnumValN(HDL::VERILOG, "verilog-beta", "Verilog Beta"),
                    clEnumValN(HDL::SMV, "smv", "SMV")),
         cl::cat(mainCategory));
 
@@ -135,7 +137,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -158,7 +160,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -331,7 +333,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -978,6 +980,7 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   if (failed(createInternalSignals(data)))
     return failure();
 
+  os << "`timescale 1ns / 1ps\n\n";
   os << "module " << modOp.getSymName() << "(\n";
 
   os.indent();
@@ -1026,6 +1029,7 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
     HDL hdl(dynamatic::HDL::VERILOG);
     std::string moduleName;
     SmallVector<KeyValuePair> genericParams;
+    std::string archName = "arch";
 
     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
         .Case<hw::HWModuleOp>(
@@ -1035,11 +1039,20 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           genericParams = match.getGenericParameterValues().takeVector();
+          archName = match.getConcreteArchName();
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
-    os << moduleName << " ";
+    if (archName != "" && archName != "arch") {
+      // HACK: Verilog does not have the concept of architectures. Therefore, we
+      // use this parameter to specify an alternative module name when
+      // generating Verilog code, particularly when the desired module name
+      // differs from the concrete module name.
+      os << archName << " ";
+    } else {
+      os << moduleName << " ";
+    }
 
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
@@ -1242,6 +1255,37 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
+    } else if (auto *p =
+                   llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
+      unsigned numOut = p->getNumEagerForkOutputs();
+      std::string opName = p->getOwner();
+      std::vector<std::string> outNames{numOut};
+      for (unsigned i = 0; i < numOut; ++i) {
+        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
+              .str();
+      // e.g. count(fork0.sent_0, fork0.sent_1) < 2
+      // for operation "fork0" with 2 eager outputs
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
+                   property.get())) {
+      unsigned numOut = p->getNumEagerForkOutputs();
+      std::string forkName = p->getForkOp();
+      std::string bufferName = p->getBufferOp();
+      int bufferSlot = p->getBufferSlot();
+      std::vector<std::string> forkOutNames{numOut};
+      for (unsigned i = 0; i < numOut; ++i) {
+        forkOutNames[i] = llvm::formatv("{0}.sent_{1}", forkName, i).str();
+      }
+      std::string bufferFull =
+          llvm::formatv("{0}.full_{1}", bufferName, bufferSlot).str();
+      std::string propertyString =
+          llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
+                        bufferFull)
+              .str();
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
@@ -1362,6 +1406,10 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)
       os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+    else if (tag == FormalProperty::TAG::INVAR) {
+      os << "-- " << id << "\n";
+      os << "INVAR " << property << ";\n";
+    }
   });
 
   return success();
@@ -1423,11 +1471,12 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
 /// file named like the module inside the output directory. Fails if the
 /// output file cannot be created or if the module cannot be converted to
 /// RTL; succeeds otherwise.
-static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
+static LogicalResult writeModule(std::unique_ptr<RTLWriter> &writer,
+                                 hw::HWModuleOp modOp) {
   // Open the file in which we will create the module, it is named like the
   // module itself
   std::string filepath =
-      writer.exportInfo.outputPath.str() + sys::path::get_separator().str() +
+      writer->exportInfo.outputPath.str() + sys::path::get_separator().str() +
       modOp.getSymName().str() + "." + getHDLExtension(hdl).str();
 
   std::error_code ec;
@@ -1437,7 +1486,7 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
                                 << filepath << "\": " << ec.message();
   }
   raw_indented_ostream os(fileStream);
-  return writer.write(modOp, os);
+  return writer->write(modOp, os);
 }
 
 int main(int argc, char **argv) {
@@ -1498,27 +1547,25 @@ int main(int argc, char **argv) {
   FormalPropertyInfo propertyInfo(table, outputPath);
 
   // Create an RTL writer
-  RTLWriter *writer;
+  std::unique_ptr<RTLWriter> writer;
   switch (hdl) {
   case HDL::VHDL:
-    writer = new VHDLWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VHDLWriter>(info, propertyInfo, hdl);
     break;
   case HDL::VERILOG:
-    writer = new VerilogWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VerilogWriter>(info, propertyInfo, hdl);
     break;
   case HDL::SMV:
-    writer = new SMVWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<SMVWriter>(info, propertyInfo, hdl);
     break;
   }
 
   // Write each module's RTL implementation to a separate file
   for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
-    if (failed(writeModule(*writer, hwModOp))) {
-      delete writer;
+    if (failed(writeModule(writer, hwModOp))) {
       return 1;
     }
   }
 
-  delete writer;
   return 0;
 }

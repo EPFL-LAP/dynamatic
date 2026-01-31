@@ -62,9 +62,14 @@ public:
       model = std::make_unique<GurobiSolver>(timeout);
       break;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#ifdef DYNAMATIC_ENABLE_CBC
     case CPSolver::CBC:
       model = std::make_unique<CbcSolver>(timeout);
       break;
+#endif // DYNAMATIC_ENABLE_CBC
+    case CPSolver::DEFAULT:
+      llvm_unreachable("Default option should not be used! Check if you have "
+                       "correctly installed one of CBC or GUROBI milp solver!");
     }
   };
 
@@ -85,6 +90,22 @@ public:
       model->write(writeTo + "_model.lp");
     }
     model->optimize();
+
+    switch (model->status) {
+    case CPSolver::INFEASIBLE:
+      llvm::errs() << "The model is infeasible!\n";
+      return failure();
+    case CPSolver::UNBOUNDED:
+      llvm::errs() << "The model is unbounded!\n";
+      return failure();
+    case CPSolver::UNKNOWN:
+      llvm::errs() << "The model has an unknown state!\n";
+      return failure();
+    case CPSolver::ERROR:
+      llvm::errs() << "There is an error during the model solving!\n";
+      return failure();
+    }
+
     // Optimize the model
     if (!writeTo.empty()) {
       // Logging the MILP model

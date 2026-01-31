@@ -601,7 +601,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     solverKind = CPSolver::GUROBI;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   } else if (solver == "cbc") {
+#ifdef DYNAMATIC_ENABLE_CBC
     solverKind = CPSolver::CBC;
+#else
+    llvm::report_fatal_error("CBC not installed!");
+#endif // DYNAMATIC_ENABLE_CBC
   } else {
     llvm::errs() << "Solver type: " << solver << " is not supported!\n";
     llvm::report_fatal_error("Unsupported solver type!");

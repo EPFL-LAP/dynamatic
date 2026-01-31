@@ -70,6 +70,9 @@ static cl::opt<bool> exitOnFailure(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
 
+static constexpr llvm::StringLiteral VHDL("vhdl");
+static constexpr llvm::StringLiteral VERILOG("verilog");
+
 namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
@@ -92,9 +95,11 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  llvm::StringLiteral hdl = VHDL;
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
+  std::string outputDir = "out";
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
@@ -119,7 +124,7 @@ struct FrontendState {
   }
 
   inline std::string getOutputDir() const {
-    return getKernelDir() + getSeparator() + "out";
+    return getKernelDir() + getSeparator() + outputDir;
   }
 
   std::string makeAbsolutePath(StringRef path);
@@ -263,6 +268,19 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
+class SetOutputDir : public Command {
+public:
+  SetOutputDir(FrontendState &state)
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
+    addPositionalArg({"out_dir", "out dir name"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
@@ -272,6 +290,7 @@ public:
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
+  static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -298,6 +317,8 @@ public:
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
                           "accesses, use with caution!"});
+    addFlag({STRAIGHT_TO_QUEUE,
+             "Use straight to queue to connect the circuit to the LSQ"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -330,7 +351,7 @@ public:
                 "and the hls-verifier tool",
                 state) {
     addOption({SIMULATOR, "The simulator to use for verification, options are "
-                          "'ghdl' (default option: GHDL), 'vsim' (ModelSim), "
+                          "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
                           "'xsim' (Vivado), 'verilator' (Verilator)"});
   }
   CommandResult execute(CommandArguments &args) override;
@@ -352,6 +373,17 @@ public:
   Synthesize(FrontendState &state)
       : Command("synthesize",
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
+                state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class EstimatePower : public Command {
+public:
+  EstimatePower(FrontendState &state)
+      : Command("estimate-power",
+                "Estimate the power consumption of the design using switching "
+                "activity from simulation.",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
@@ -624,6 +656,27 @@ CommandResult SetSrc::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetOutputDir::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty output dir\n";
+    return CommandResult::FAIL;
+  }
+
+  llvm::StringRef outputDir = args.positionals.front();
+
+  // reject trivial bad cases
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
+    return CommandResult::FAIL;
+
+  // reject illegal chars
+  if (outputDir.find_first_of("*?<>|\"") != llvm::StringRef::npos)
+    return CommandResult::FAIL;
+
+  state.outputDir = outputDir.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetCP::execute(CommandArguments &args) {
   if (args.positionals.empty()) {
     llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
@@ -656,6 +709,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string straightToQueue =
+      args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -686,7 +741,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver);
+                 fastTokenDelivery, milpSolver, straightToQueue);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -700,13 +755,14 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+      state.hdl = VERILOG;
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
     } else if (it->second == "smv") {
       hdl = "smv";
-    } else if (it->second == "vhdl-beta") {
-      hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', 'vhdl-beta',"
+                   << "', possible options are 'vhdl',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
@@ -731,15 +787,28 @@ CommandResult Simulate::execute(CommandArguments &args) {
     } else {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
-                      "'xsim', and 'vsim'.\n";
+                      "'xsim', 'vsim' and 'verilator'.\n";
       return CommandResult::FAIL;
     }
+  }
+
+  if (simulator == "ghdl" && state.hdl != VHDL) {
+    llvm::errs() << "Simulator 'ghdl' is not compatible with this HDL. Use "
+                    "'vsim', 'xsim' or 'verilator'. \n";
+    return CommandResult::FAIL;
+  }
+
+  if (simulator == "verilator" && state.hdl != VERILOG) {
+    llvm::errs()
+        << "Simulator 'verilator' is not compatible with this HDL. Use "
+           "'vsim', 'xsim' or 'ghdl'. \n";
+    return CommandResult::FAIL;
   }
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator);
+                 simulator, state.hdl);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -769,6 +838,24 @@ CommandResult Synthesize::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
                  state.getKernelName(), floatToString(state.targetCP, 3),
                  floatToString(state.targetCP / 2, 3));
+}
+
+CommandResult EstimatePower::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
+
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
 }
 
 static StringRef removeComment(StringRef input) {
@@ -810,7 +897,17 @@ static void help(FrontendCommands &commands) {
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
+
+  // Only show our own arguments in the help message
+  cl::HideUnrelatedOptions(mainCategory);
+
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Dynamatic Frontend. \nThis is our external help message, for arguments "
+      "which are passed directly to the binary. \nYou may find our internal "
+      "help message more helpful, which describes the arguments which are "
+      "passed to our custom shell. \nThe internal help message can be accessed "
+      "by running this binary with no arguments, and then writing 'help'.\n");
 
   // Get current working directory
   SmallString<128> cwd;
@@ -827,11 +924,13 @@ int main(int argc, char **argv) {
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
+  commands.add<SetOutputDir>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
+  commands.add<EstimatePower>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 

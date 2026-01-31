@@ -57,6 +57,7 @@ protected:
   bool isBlackbox = false;
 
   void loadBlifFile(std::initializer_list<unsigned int> inputs,
+                    std::map<std::string, unsigned int> parameters,
                     std::string toAppend = "");
 
   // Helper function to connect the input nodes of the current module
@@ -234,6 +235,7 @@ private:
   unsigned int dataWidth = 0;
   unsigned int addrType = 0;
   ChannelSignals addrInSignals;
+  ChannelSignals dataFromMemSignals;
   ChannelSignals addrOutSignals;
   ChannelSignals dataOutSignals;
 
@@ -249,6 +251,7 @@ private:
   unsigned int addrType = 0;
   ChannelSignals dataInSignals;
   ChannelSignals addrInSignals;
+  ChannelSignals dataToMemSignals;
   ChannelSignals addrOutSignals;
 
 public:
@@ -333,6 +336,21 @@ public:
   BranchSinkSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
+};
+
+class BlackBoxSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int numInputs = 0;
+  unsigned int numOutputs = 0;
+  std::vector<ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> outputNodes;
+  std::vector<unsigned int> skippingInputIndices;
+  std::vector<unsigned int> skippingOutputIndices;
+
+public:
+  BlackBoxSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
 class BufferSubjectGraph : public BaseSubjectGraph {

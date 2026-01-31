@@ -35,6 +35,7 @@
 #include "llvm/Support/JSON.h"
 #include <fstream>
 #include <ostream>
+#include <unordered_set>
 
 using namespace llvm;
 using namespace mlir;
@@ -65,6 +66,13 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
+  LogicalResult annotateEagerForkNotAllOutputSent(ModuleOp modOp);
+  LogicalResult
+  annotateCopiedSlotsRec(std::unordered_set<std::string> &visitedSet,
+                         handshake::EagerForkLikeOpInterface &originFork,
+                         Operation &curOp);
+  LogicalResult annotateCopiedSlots(Operation &op);
+  LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -136,6 +144,85 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
   return success();
 }
 
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
+    ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        EagerForkNotAllOutputSent p(uid, FormalProperty::TAG::INVAR, forkOp);
+
+        propertyTable.push_back(p.toJSON());
+        uid++;
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
+    std::unordered_set<std::string> &visitedSet,
+    handshake::EagerForkLikeOpInterface &originFork, Operation &curOp) {
+
+  // If this operation has been visited, there is nothing to do
+  std::string id = getUniqueName(&curOp).str();
+  if (auto iter = visitedSet.find(id); iter != visitedSet.end()) {
+    return success();
+  }
+  visitedSet.insert(id);
+
+  // If this operation contains a slot, the copied slot has been found and can
+  // be annotated
+  if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
+    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, bufferOp,
+                                     originFork);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+    return success();
+  }
+
+  if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
+    // TODO: Which of the previous paths should be followed?
+    return success();
+  }
+
+  // Only JoinLikeOps or single-operand ops are remaining, but ideally a
+  // dyn_cast would happen for either case
+  for (auto value : curOp.getOperands()) {
+    Operation *prevOpPtr = value.getDefiningOp();
+    if (prevOpPtr == nullptr)
+      // if there is no defining op, the value must be a constant, and does not
+      // need to be annotated
+      continue;
+    Operation &prevOp = *prevOpPtr;
+    if (failed(annotateCopiedSlotsRec(visitedSet, originFork, prevOp))) {
+      return failure();
+    }
+  }
+
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateCopiedSlots(Operation &op) {
+  std::unordered_set<std::string> visitedSet = {};
+  if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+    return annotateCopiedSlotsRec(visitedSet, forkOp, op);
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (failed(annotateCopiedSlots(op)))
+        return failure();
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -143,6 +230,12 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
+  if (annotateInvariants) {
+    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
+      return signalPassFailure();
+    if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+  }
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 

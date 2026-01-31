@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
@@ -25,7 +26,9 @@ public:
   enum class TAG { OPT, INVAR, ERROR };
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
-    VEQ /* Valid EQuivalence */
+    VEQ /* Valid EQuivalence */,
+    EFNAO /* Eager Fork Not All Output sent */,
+    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
   };
 
   TAG getTag() const { return tag; }
@@ -149,6 +152,80 @@ private:
   inline static const StringLiteral TARGET_CHANNEL_LIT = "target_channel";
   inline static const StringLiteral OWNER_INDEX_LIT = "owner_index";
   inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
+};
+
+// An eager fork propagates an incoming token to each output as soon as the
+// output is ready, and keeps track of which outputs already have a token sent
+// across them through the `sent` state. When the token has been sent to all
+// outputs, the token at the input is consumed and the states of the fork are
+// reset. The state where all outputs are in the `sent` state simultaneously is
+// unreachable, as the fork resets as soon as this state would be reached. See
+// invariant 1 of https://ieeexplore.ieee.org/document/10323796 for more
+// details.
+class EagerForkNotAllOutputSent : public FormalProperty {
+public:
+  std::string getOwner() { return ownerOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<EagerForkNotAllOutputSent>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  EagerForkNotAllOutputSent() = default;
+  EagerForkNotAllOutputSent(unsigned long id, TAG tag,
+                            handshake::EagerForkLikeOpInterface &op);
+  ~EagerForkNotAllOutputSent() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::EFNAO;
+  }
+
+private:
+  std::string ownerOp;
+  unsigned numEagerForkOutputs;
+  inline static const StringLiteral OWNER_OP_LIT = "owner_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+};
+
+// When an eager fork is `sent` state for at least one of its outputs, it is
+// considered `active`. When transitioning to the `active` state, the `ready`
+// signal is false, and the incoming token is blocked. Because of this, all
+// slots immediately before the fork (i.e. copied slots) must be full. More
+// formally, a copied slot of a fork is defined as a slot that has a path
+// towards the fork without any other slots on it. See invariant 2 of
+// https://ieeexplore.ieee.org/document/10323796 for more details
+class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
+public:
+  std::string getForkOp() { return forkOp; }
+  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::string getBufferOp() { return bufferOp; }
+  unsigned getBufferSlot() { return bufferSlot; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  CopiedSlotsOfActiveForkAreFull() = default;
+  CopiedSlotsOfActiveForkAreFull(unsigned long id, TAG tag,
+                                 handshake::BufferLikeOpInterface &bufferOp,
+                                 handshake::EagerForkLikeOpInterface &forkOp);
+  ~CopiedSlotsOfActiveForkAreFull() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::CSOAFAF;
+  }
+
+private:
+  std::string forkOp;
+  unsigned numEagerForkOutputs;
+  std::string bufferOp;
+  unsigned bufferSlot;
+  inline static const StringLiteral FORK_OP_LIT = "fork_op";
+  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
+  inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
 
 class FormalPropertyTable {

@@ -4,6 +4,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   CFDFC.cpp
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
+  LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
@@ -21,6 +22,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+  DynamaticConstraintProgramming
 
   )
 
@@ -32,11 +34,13 @@ if (GUROBI_FOUND)
   )
 endif()
 
+if (CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
 target_link_libraries(DynamaticBufferPlacement
   PUBLIC
   ${CBC_LIBRARIES}
   ${CLPCORE_LIBRARIES}
   ${OSI_LIBRARIES}
 )
+endif()
 
 

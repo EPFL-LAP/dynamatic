@@ -62,11 +62,19 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   };
 
   // Add to the list of operands of the new gate all the values which were not
-  // already used
-  // TODO: Edit senders if needed
+  // already used.
+  // Since in STQ one block can't be producer of more than one phi operand,
+  // sender logic is not needed.
+
+  // Handle self-dependent merges: if the merge uses its own result as an input,
+  // record that operand so it can be reconnected to the generated phi later.
+  SmallVector<GateInput *> selfInputs;
+
   for (Value v : mergeOp.getOperands()) {
     if (!isAlreadyPresent(v)) {
       GateInput *gateInput = new GateInput(v);
+      if (v == mergeOp.getResult())
+        selfInputs.push_back(gateInput);
       gateInputList.push_back(gateInput);
       operands.push_back(gateInput);
     }
@@ -74,11 +82,16 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
 
   // If the list of operands is not empty (i.e. the phi has at least
   // one input), add it to the phis associated to that block
+  Gate *newPhi = nullptr;
   if (!operands.empty()) {
-    Gate *newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
-                            ++uniqueGateIndex);
+    newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
+                      ++uniqueGateIndex);
     gatesPerBlock[block].push_back(newPhi);
   }
+
+  // Reconnect self-dependent operands to the newly created Phi
+  for (GateInput *gi : selfInputs)
+    gi->input = newPhi;
 
   convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
@@ -413,8 +426,9 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
+  auto gatesSnapshot = gatesPerBlock;
   // For each block
-  for (auto const &[phiBlock, phis] : gatesPerBlock) {
+  for (auto const &[phiBlock, phis] : gatesSnapshot) {
 
     // For each phi
     for (Gate *phi : phis) {
