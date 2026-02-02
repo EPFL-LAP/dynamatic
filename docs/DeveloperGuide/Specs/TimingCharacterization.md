@@ -4,7 +4,7 @@ This document describes how Dynamatic obtains the timing characteristics of the 
 
 Dynamatic uses a [Python script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/main.py) to obtain the timing characterization.
 
-**NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the structure of the [timing information file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/components-vivado.json). When generating new dataflow units, try to follow the same structure as other dataflow units (in the timing information file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
+**NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the structure of the [timing information file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/components.json). When generating new dataflow units, try to follow the same structure as other dataflow units (in the timing information file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
 
 ## What is Unit Characterization?
 
