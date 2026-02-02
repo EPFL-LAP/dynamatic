@@ -224,8 +224,7 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-#include <boost/numeric/ublas/matrix.hpp>
-
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 // The structs FlowVariable and FlowExpression together form a DSL that help
 // with writing flow equations. A similar DSL exists for constraint programming
 // in `ConstraintProgramming.h`, but it is not reused for the following reasons:
@@ -333,7 +332,9 @@ void operator+=(FlowExpression &left, const FlowVariable &right) {
 }
 
 // Used to assign dense indices to FlowVariables based on a list of
-// FlowExpression, i.e. indices 0 to n-1 are used for n variables
+// FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
+// lambda variables with low indices to ensure they are eliminated first within
+// the row-echelon form
 class IndexMap {
   std::unordered_map<FlowVariable, size_t> map;
   std::vector<FlowVariable> variables;
@@ -384,83 +385,9 @@ public:
     }
   }
 };
-} // namespace
 
-using MatIntType = boost::numeric::ublas::matrix<int>;
-void swapRows(MatIntType &m, size_t row1, size_t row2) {
-  size_t cols = m.size2();
-  for (size_t i = 0; i < cols; ++i) {
-    int t = m(row1, i);
-    m(row1, i) = m(row2, i);
-    m(row2, i) = t;
-  }
-}
-
-void printMatrix(MatIntType &m) {
-  size_t rows = m.size1();
-  size_t cols = m.size2();
-  for (size_t row = 0; row < rows; ++row) {
-    for (size_t col = 0; col < cols; ++col) {
-      printf("%2d,", m(row, col));
-    }
-    printf("\n");
-  }
-}
-
-void gaussianElimination(MatIntType &m) {
-  size_t rows = m.size1();
-  size_t cols = m.size2();
-
-  // h: row index
-  // k: leading non-zero position
-  size_t h = 0, k = 0;
-  while (h < rows && k < cols) {
-    int pivotRow = -1;
-
-    int pivotValue = std::numeric_limits<int>::max();
-
-    // Find the row to pivot around
-    for (size_t i = h; i < rows; ++i) {
-      if (m(i, k) != 0) {
-        if (std::abs(m(i, k)) < std::abs(pivotValue)) {
-          pivotValue = m(i, k);
-          pivotRow = i;
-        }
-      }
-    }
-
-    // no row with non-zero index at k -> look at next column
-    if (pivotRow == -1) {
-      ++k;
-      continue;
-    }
-
-    swapRows(m, h, pivotRow);
-    if (pivotValue < 0) {
-      for (size_t i = k; i < cols; ++i) {
-        m(h, i) *= -1;
-      }
-    }
-
-    // eliminate other rows
-    for (size_t i = h + 1; i < rows; ++i) {
-      int factorPivot = m(h, k);
-      int factorRow = m(i, k);
-      for (size_t j = k; j < cols; ++j) {
-        m(i, j) *= factorPivot;
-        m(i, j) -= factorRow * m(h, j);
-      }
-    }
-    ++h;
-    ++k;
-  }
-}
-
-LogicalResult
-HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
-  // The equations are represented by a FlowExpression that is equal to zero
+std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
   std::vector<FlowExpression> equations{};
-
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
@@ -468,13 +395,8 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
       assert(!(i1 == i2) && "expected internal channels to be different");
 
-      for (auto res : op.getResults()) {
-        if (!isChannelToBeChecked(res)) {
-          llvm::errs() << "skipping channel from " << getUniqueName(&op)
-                       << "\n";
-          continue;
-        }
-        for (auto [i, use] : llvm::enumerate(res.getUses())) {
+      for (auto [i, res] : llvm::enumerate(op.getResults())) {
+        for (auto &use : res.getUses()) {
           unsigned j = use.getOperandNumber();
           Operation &nextOp = *use.getOwner();
           assert(nextOp.getOperands().size() > j);
@@ -486,16 +408,47 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
         }
       }
 
+      // A general structure for an operation is assumed:
+      // in1, in2, ... -> Join/Merge/Mux -> internal channel 1
+      // internal channel 1 -> slots? -> internal channel 2
+      // internal channel 2 -> fork -> out1, out2, ...
+      //
+      // Some operations do not follow this structure, and should be handled
+      // separately to avoid making false assumptions.
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+        // From inspecting .td declaration... probably a better way of doing
+        // this
+        int addressInputIndex = 0;
+        int dataOutputIndex = 1;
+        FlowVariable in = FlowVariable::inputChannel(&op, addressInputIndex);
+        FlowVariable out = FlowVariable::outputChannel(&op, dataOutputIndex);
+        FlowVariable addrSlot = FlowVariable::slot(&op, 0);
+        FlowVariable dataSlot = FlowVariable::slot(&op, 1);
+
+        equations.push_back(in - i1 - addrSlot);
+        equations.push_back(i2 - out - dataSlot);
+        continue;
+      }
+      if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
+        continue;
+      }
+
       // Join operation, merge operation, or mux
       if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
-        if (isa<handshake::MuxOp>(op)) {
-          // mux
+        if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+          // mux : select input has same as output lambda, data inputs act like
+          // merge
+          Value a = muxOp.getSelectOperand();
+          unsigned selectIndex = -1;
+          for (auto &use : a.getUses()) {
+            selectIndex = use.getOperandNumber();
+          }
+          assert(selectIndex != (unsigned)-1);
           FlowExpression dataEq = -i1;
           for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
             FlowVariable chVar = FlowVariable::inputChannel(&op, i);
-            if (i == 0) {
+            if (i == selectIndex) {
               // select channel
-              // TODO: is the select input actually index 0?
               equations.push_back(chVar - i1);
             } else {
               // dataEq : sum(dataChannelLambda) = outputChannelLambda
@@ -520,6 +473,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 
       if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
         // TODO: handle multiple slots
+        if (bufferOp.getNumSlots() != 1) {
+          llvm::errs() << getUniqueName(&op) << " has multiple slots\n";
+        }
+        assert(bufferOp.getNumSlots() == 1);
         FlowVariable full = FlowVariable::slot(&op, 0);
         equations.push_back(i1 - full - i2);
       } else {
@@ -534,8 +491,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
           FlowVariable result = FlowVariable::outputChannel(&op, i);
           equations.push_back(i2 + sent - result);
         }
+      } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
+        continue;
       } else {
-        // fork: all outputs have same tokens in as out
+        // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result = FlowVariable::outputChannel(&op, i);
           equations.push_back(i2 - result);
@@ -543,36 +502,38 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
   }
+  return equations;
+}
+} // namespace
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  // The equations are represented by a FlowExpression that is equal to zero
+  std::vector<FlowExpression> equations = extractLocalEquations(modOp);
+
+  // Map all variables used in `equations` to an index in the matrix
   IndexMap indices(equations);
   indices.verify();
 
-  llvm::errs() << equations.size() << " equations\n";
-  llvm::errs() << indices.size() << " variables\n";
-  llvm::errs() << indices.getNLambdas() << " lambdas\n";
+  // matrix with one row per equation, and column per variable
+  MatIntType matrix(MatIntZero(equations.size(), indices.size()));
 
-  MatIntType matrix(boost::numeric::ublas::zero_matrix<int>(equations.size(),
-                                                            indices.size()));
-
-  printf("Before Filling: \n");
-  printMatrix(matrix);
-
+  // insert equations into the matrix
   for (auto [row, expr] : llvm::enumerate(equations)) {
     for (auto [key, value] : expr.terms) {
       unsigned index = indices.getIndex(key);
       matrix(row, index) = (int)value;
     }
   }
-  printf("Before Gaussian: \n");
-  printMatrix(matrix);
+
+  // bring to row-echelon form
   gaussianElimination(matrix);
-  printf("After Gaussian: \n");
-  printMatrix(matrix);
 
   size_t rows = matrix.size1();
   size_t cols = matrix.size2();
-  ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
-  uid++;
-  size_t allZeros = 0;
+  // ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+  // uid++;
+
   for (size_t row = 0; row < rows; ++row) {
     bool canAnnotate = true;
     for (size_t col = 0; col < indices.getNLambdas(); ++col) {
@@ -596,17 +557,18 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
     if (coefs.size() > 0) {
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+      uid++;
       p.addEquation(coefs, names);
-    } else {
-      allZeros++;
+      if (p.getEquations().size() > 0) {
+        propertyTable.push_back(p.toJSON());
+      }
     }
   }
-  llvm::errs() << allZeros << " rows all zero\n";
-  llvm::errs() << p.getEquations().size() << " equations\n";
+  /*
   if (p.getEquations().size() > 0) {
     propertyTable.push_back(p.toJSON());
   }
-  /*
   for (auto &expr : equations) {
     std::vector<int> coefs{};
     std::vector<std::string> names{};
