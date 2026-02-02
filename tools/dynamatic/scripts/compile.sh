@@ -322,6 +322,8 @@ else
 
   echo_info "Set to use \"$MILP_SOLVER\" to solve buffer placement MILP!"
 
+  mkdir -p "$COMP_DIR/buffer-placement"
+
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
