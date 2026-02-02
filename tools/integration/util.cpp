@@ -51,6 +51,7 @@ int runIntegrationTest(IntegrationTestData &config) {
              << (config.useSharing ? " --sharing" : "")
              << (config.useRigidification ? " --rigidification" : "")
              << (config.useFtd ? " --fast-token-delivery" : "")
+             << (config.disableLsq ? " --disable-lsq" : "")
              << " --milp-solver " << config.milpSolver << std::endl;
   // clang-format on
 

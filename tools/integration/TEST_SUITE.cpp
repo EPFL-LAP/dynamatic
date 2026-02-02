@@ -93,6 +93,7 @@ TEST_P(FtdWithSimpleBuffersFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
+      .disableLsq = true,
       .milpSolver = "cbc",
       .bufferAlgorithm = "on-merges",
       .useFtd = true,
@@ -336,7 +337,9 @@ INSTANTIATE_TEST_SUITE_P(
       "matvec",
       "kernel_2mm",
       "kernel_3mm",
-      "kmp"
+      "kmp",
+      "gcd",
+      "bicg"
       ),
       [](const auto &info) { return info.param; });
 
