@@ -254,26 +254,23 @@ if [[ $PREBUILT_LLVM -eq 0 ]]; then
 
 else
 
-prepare_to_build_project "Dynamatic" "build"
+  prepare_to_build_project "Dynamatic" "build"
 
-URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-project-x86_64-linux-b06546b.tar.gz"
-FILE=$(realpath "./llvm-project-x86_64.tar.gz")
-CHECKSUM="sha256:08addb3c1f6e03cd36d78ab8f34b3d778d2d335a9566e96932a42579715be9c5"
+  URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
+  PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
 
-# Download only if the file doesn't exist
-if [ ! -f "$FILE" ]; then
-    echo "Downloading $FILE..."
-    wget -O "$FILE" "$URL"
-    exit_on_fail "Failed to download the prebuilt llvm-project!"
-fi
+  # Download only if the file doesn't exist
+  if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+      echo "Downloading $PREBUILT_LLVM_TARBALL..."
+      wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
+      exit_on_fail "Failed to download the prebuilt llvm-project!"
+  fi
 
-# Verify checksum
-echo "$CHECKSUM  $FILE" | sha256sum -c -
-exit_on_fail "Failed to verify the checksum of the prebuilt llvm-project!"
-
-# untar the file 
-echo "Setting the llvm-project to the prebuilt one:"
-tar -xf "$BUILD_DIR/llvm-project.tar.gz" -C "$BUILD_DIR/llvm-project/"
+  # untar the file 
+  mkdir -p "$SCRIPT_CWD/build/llvm-project/"
+  echo "Unzipping the prebuilt llvm-project!"
+  tar -xf "$PREBUILT_LLVM_TARBALL" -C "$SCRIPT_CWD/build/llvm-project/"
+  exit_on_fail "Failed to untar the prebuilt llvm-project!"
 
 fi
 
@@ -327,13 +324,21 @@ fi
 
 prepare_to_build_project "Dynamatic" "build"
 
+
+# The location of the cmake configurations of polly is different after installed
+if [[ $PREBUILT_LLVM -eq 0 ]]; then
+  POLLY_CMAKE_DIR="$LLVM_DIR/tools/polly/lib/cmake/polly"
+else 
+  POLLY_CMAKE_DIR="$LLVM_DIR/lib/cmake/polly"
+fi
+
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
       -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
       -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
       -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
-      -DPolly_DIR="$LLVM_DIR/tools/polly/lib/cmake/polly" \
+      -DPolly_DIR="$POLLY_CMAKE_DIR" \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \

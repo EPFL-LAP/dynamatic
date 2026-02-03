@@ -157,6 +157,29 @@ protected:
   /// determined by the buffer placement MILP.
   virtual void instantiateBuffers(BufferPlacement &placement,
                                   std::vector<CFDFC> &cfdfcs);
+
+  CPSolver::SolverKind getSolverKind() {
+    CPSolver::SolverKind solverKind;
+
+    if (solver == "gurobi") {
+#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
+      llvm::report_fatal_error("Gurobi not installed!");
+#else
+      solverKind = CPSolver::GUROBI;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    } else if (solver == "cbc") {
+#ifdef DYNAMATIC_ENABLE_CBC
+      solverKind = CPSolver::CBC;
+#else
+      llvm::report_fatal_error("CBC not installed!");
+#endif // DYNAMATIC_ENABLE_CBC
+    } else {
+      llvm::errs() << "Solver type: " << solver << " is not supported!\n";
+      llvm::report_fatal_error("Unsupported solver type!");
+    }
+
+    return solverKind;
+  }
 };
 
 } // namespace buffer
@@ -478,6 +501,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
+  auto solverKind = getSolverKind();
+
   // Store all archs in a set. We use a pointer to each arch as the key type to
   // allow us to modify their frequencies during CFDFC extractions without
   // messing up key hashes
@@ -507,7 +532,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     // Try to extract the next CFDFC
     int milpStat;
     if (failed(extractCFDFC(info.funcOp, archs, bbs, selectedArchs, numExecs,
-                            logPath, &milpStat)))
+                            solverKind, logPath, &milpStat)))
       return info.funcOp->emitError()
              << "CFDFC extraction MILP failed with status " << milpStat << ". "
              << getGurobiOptStatusDesc(milpStat);
@@ -592,24 +617,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     os << "Selected MILP solver: " << solver << "\n\n";
   }
 
-  CPSolver::SolverKind solverKind;
-
-  if (solver == "gurobi") {
-#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-    llvm::report_fatal_error("Gurobi not installed!");
-#else
-    solverKind = CPSolver::GUROBI;
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-  } else if (solver == "cbc") {
-#ifdef DYNAMATIC_ENABLE_CBC
-    solverKind = CPSolver::CBC;
-#else
-    llvm::report_fatal_error("CBC not installed!");
-#endif // DYNAMATIC_ENABLE_CBC
-  } else {
-    llvm::errs() << "Solver type: " << solver << " is not supported!\n";
-    llvm::report_fatal_error("Unsupported solver type!");
-  }
+  CPSolver::SolverKind solverKind = getSolverKind();
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
