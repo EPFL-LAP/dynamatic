@@ -41,7 +41,9 @@ protected:
 class BasicFixture : public BaseFixture {};
 // Use CBC MILP solver to test a subset of MiscBenchmarks (CBC is slower than
 // Gurobi)
+#ifdef DYNAMATIC_ENABLE_CBC
 class CBCSolverFixture : public BaseFixture {};
+#endif // DYNAMATIC_ENABLE_CBC
 // Use FPL22 placement algorithm on a small subset of MiscBenchmarks
 class FPL22Fixture : public BaseFixture {};
 class MemoryFixture : public BaseFixture {};
@@ -68,6 +70,7 @@ TEST_P(BasicFixture, basic) {
   logPerformance(config.simTime);
 }
 
+#ifdef DYNAMATIC_ENABLE_CBC
 TEST_P(CBCSolverFixture, basic) {
   IntegrationTestData config{
       // clang-format off
@@ -84,6 +87,7 @@ TEST_P(CBCSolverFixture, basic) {
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
+#endif // DYNAMATIC_ENABLE_CBC
 
 #if 0
 TEST_P(FPL22Fixture, basic) {
@@ -292,6 +296,7 @@ INSTANTIATE_TEST_SUITE_P(
       ),
       [](const auto &info) { return info.param; });
 
+#ifdef DYNAMATIC_ENABLE_CBC
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 INSTANTIATE_TEST_SUITE_P(
     Tiny, CBCSolverFixture,
@@ -304,6 +309,7 @@ INSTANTIATE_TEST_SUITE_P(
       "matvec"
       ),
       [](const auto &info) { return info.param; });
+#endif // DYNAMATIC_ENABLE_CBC
 
 #if 0
 // Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
