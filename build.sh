@@ -28,6 +28,7 @@ List of options:
   --experimental-enable-xls            : enable experimental xls integration
   --enable-leq-binaries                : download binaries for elastic-miter equivalence
                                          checking
+  --use-prebuilt-llvm                  : download and use the prebuilt LLVM
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -137,7 +138,8 @@ BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
 SKIP_LLVM=0
-LLVM_DIR="$PWD/llvm-project"
+PREBUILT_LLVM=0
+LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
 PARSE_ARG=""
@@ -153,9 +155,6 @@ do
       if [[ $GODOT_PATH != /* ]]; then
         GODOT_PATH="../$GODOT_PATH"
       fi
-      PARSE_ARG=""
-    elif [[ $PARSE_ARG == "llvm-path" ]]; then
-      LLVM_DIR="$arg"
       PARSE_ARG=""
     elif [[ $PARSE_ARG == "llvm-parallel-link-jobs" ]]; then
       LLVM_PARALLEL_LINK_JOBS="$arg"
@@ -184,6 +183,10 @@ do
               ;;
           "--llvm-parallel-link-jobs")
               PARSE_ARG="llvm-parallel-link-jobs"
+              ;;
+          "--use-prebuilt-llvm")
+              PREBUILT_LLVM=1
+              LLVM_DIR="$PWD/build/llvm-project"
               ;;
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
@@ -222,11 +225,11 @@ echo "##########################################################################
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
 
-if [[ $SKIP_LLVM -eq 0 ]]; then
+if [[ $PREBUILT_LLVM -eq 0 ]]; then
 
-  #### Polygeist ####
+  #### llvm-project ####
 
-  prepare_to_build_project "LLVM" "$LLVM_DIR/build"
+  prepare_to_build_project "LLVM" "$LLVM_DIR"
 
   # CMake
   if should_run_cmake ; then
@@ -250,11 +253,28 @@ if [[ $SKIP_LLVM -eq 0 ]]; then
   fi
 
 else
-  echo "Skipping LLVM build. IMPORTANT: Verify that the path of llvm-project in the script tools/dynamatic/scripts/compile.sh is the same"
-  if [[ ! -d "$LLVM_DIR" ]]; then
-    echo "LLVM directory not found: $LLVM_DIR"
-    exit 1
-  fi
+
+prepare_to_build_project "Dynamatic" "build"
+
+URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-project-x86_64-linux-b06546b.tar.gz"
+FILE=$(realpath "./llvm-project-x86_64.tar.gz")
+CHECKSUM="sha256:08addb3c1f6e03cd36d78ab8f34b3d778d2d335a9566e96932a42579715be9c5"
+
+# Download only if the file doesn't exist
+if [ ! -f "$FILE" ]; then
+    echo "Downloading $FILE..."
+    wget -O "$FILE" "$URL"
+    exit_on_fail "Failed to download the prebuilt llvm-project!"
+fi
+
+# Verify checksum
+echo "$CHECKSUM  $FILE" | sha256sum -c -
+exit_on_fail "Failed to verify the checksum of the prebuilt llvm-project!"
+
+# untar the file 
+echo "Setting the llvm-project to the prebuilt one:"
+tar -xf "$BUILD_DIR/llvm-project.tar.gz" -C "$BUILD_DIR/llvm-project/"
+
 fi
 
 #### XLS ####
@@ -310,10 +330,10 @@ prepare_to_build_project "Dynamatic" "build"
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
-      -DMLIR_DIR="$LLVM_DIR/build/lib/cmake/mlir" \
-      -DLLVM_DIR="$LLVM_DIR/build/lib/cmake/llvm" \
-      -DCLANG_DIR="$LLVM_DIR/build/lib/cmake/clang" \
-      -DPolly_DIR="$LLVM_DIR/build/tools/polly/lib/cmake/polly" \
+      -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+      -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
+      -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
+      -DPolly_DIR="$LLVM_DIR/tools/polly/lib/cmake/polly" \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -348,8 +368,8 @@ if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja .. \
-        -DMLIR_DIR="$LLVM_DIR/build/lib/cmake/mlir" \
-        -DLLVM_DIR="$LLVM_DIR/build/lib/cmake/llvm" \
+        -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+        -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -385,9 +405,9 @@ cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
 
-create_symlink "$LLVM_DIR/build/bin/clang++"
-create_symlink "$LLVM_DIR/build/bin/opt"
-create_symlink "$LLVM_DIR/build/bin/clang"
+create_symlink "$LLVM_DIR/bin/clang++"
+create_symlink "$LLVM_DIR/bin/opt"
+create_symlink "$LLVM_DIR/bin/clang"
 create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
@@ -408,7 +428,7 @@ create_generator_symlink build/bin/exp-sharing-wrapper-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 
 # Create symbolic links to clang headers (standard c library for clang)
-create_include_symlink "$LLVM_DIR/clang/lib/Headers"
+create_include_symlink "$LLVM_DIR/lib/clang/18/include"
 
 
 if [[ $GODOT_PATH != "" ]]; then
