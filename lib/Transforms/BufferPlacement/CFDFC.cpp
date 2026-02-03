@@ -355,15 +355,29 @@ void dynamatic::buffer::getDisjointBlockUnions(
   }
 }
 
-LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
-                                              ArchSet &archs, BBSet &bbs,
-                                              ArchSet &selectedArchs,
-                                              unsigned &numExecs,
-                                              const std::string &logPath,
-                                              int *milpStat) {
+LogicalResult dynamatic::buffer::extractCFDFC(
+    handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
+    ArchSet &selectedArchs, unsigned &numExecs, CPSolver::SolverKind solverKind,
+    const std::string &logPath, int *milpStat) {
   // Create an MILP model for CFDFC extraction (NOTE: since the problem is
   // small, we could use CBC here).
-  std::unique_ptr<CPSolver> model = std::make_unique<CbcSolver>();
+  std::unique_ptr<CPSolver> model;
+
+  switch (solverKind) {
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  case CPSolver::GUROBI:
+    model = std::make_unique<GurobiSolver>();
+    break;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+#ifdef DYNAMATIC_ENABLE_CBC
+  case CPSolver::CBC:
+    model = std::make_unique<CbcSolver>();
+    break;
+#endif // DYNAMATIC_ENABLE_CBC
+  case CPSolver::DEFAULT:
+    llvm_unreachable("Default option should not be used! Check if you have "
+                     "correctly installed one of CBC or GUROBI milp solver!");
+  }
 
   // Create all MILP variables we need
   MILPVars vars;
