@@ -46,12 +46,16 @@ target_link_libraries(dynamatic-opt
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+)
 
+if (DYNAMATIC_ENABLE_CBC AND CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
+target_link_libraries(dynamatic-opt
+  PUBLIC
   ${CBC_LIBRARIES}
   ${CLPCORE_LIBRARIES}
   ${OSI_LIBRARIES}
 )
-
+endif()
 
 if(DYNAMATIC_ENABLE_XLS)
   target_link_libraries(dynamatic-opt
