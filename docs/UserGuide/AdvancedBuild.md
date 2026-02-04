@@ -128,6 +128,16 @@ To reduce the build script's execution time when re-building the project regular
 > [!TIP]
 > If the CMake configuration of each submodule and of the superproject has not changed since the last build script's invocation and the --force flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script.
 
+### Enable Cbc MILP Solver
+
+If you have difficulty installing the Gurobi solver or getting a license, you may use the open-source alternative Cbc solver instead:
+
+```sh
+sudo apt-get install coinor-cbc 
+# Build Dynamatic with Cbc enabled.
+./build.sh --enable-cbc
+```
+
 ## 4. Interactive Dataflow Circuit Visualizer
 
 The repository contains an optionally built tool that allows you to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at visual-dataflow/godot-cpp (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
