@@ -1,7 +1,9 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
-#include "dynamatic/Support/System.h"
+#include "dynamatic/Support/LLVM.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/LineIterator.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
@@ -14,42 +16,32 @@ using namespace dynamatic;
 // Utility functions
 // -------------------------------------------------------------
 
-#include "llvm/Support/LineIterator.h"
-#include "llvm/Support/MemoryBuffer.h"
-
-namespace {
-bool containsInvalid(StringRef filePath) {
-  // 1. Open the file
-  auto bufferOrErr = llvm::MemoryBuffer::getFile(filePath);
-  if (std::error_code ec = bufferOrErr.getError())
-    return false;
-
-  // 2. Access the buffer as a StringRef
-  llvm::StringRef content = bufferOrErr.get()->getBuffer();
-
-  // 3. Search for both variations
-  // .contains() is available in newer LLVM; otherwise use .find() != npos
-  return content.contains("invalid") || content.contains("Invalid");
-}
-} // namespace
-
+// HACK: since we don't assign any names to the MILP model, we use this global
+// variable to distingush between different MILP models.
 static unsigned int modelCount = 0;
 
 namespace dynamatic {
 namespace detail {
 
-LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
+// Solution parser:
+//
+// Example:
+// Optimal - objective value 9900.00000000
+//       0 numExec_times_sArc_0_1               0                       1
+//       1 numExec_times_sArc_1_2               0                       1
+//       2 numExec_times_sArc_2_2            9900                       1
+//       3 numExec_times_sArc_2_3               0                       1
+// NOTE: sometimes Cbc will not disable the variable whose solution is 0.0.
+mlir::LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
   auto bufferOrErr = llvm::MemoryBuffer::getFile(soluFileName);
   if (!bufferOrErr)
-    return failure();
+    return mlir::failure();
 
   llvm::line_iterator it(*bufferOrErr->get(), /*SkipBlanks=*/true);
 
-  // NOTE: The default constructor of llvm::line_iterator is the "end" iterator
-  llvm::line_iterator end;
-
   // ---- First line: status + objective value ----
-  if (it == end)
+  // NOTE: The default constructor of llvm::line_iterator is the "end" iterator
+  if (it == llvm::line_iterator())
     return failure();
 
   {
@@ -77,23 +69,18 @@ LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
       valueStr.getAsDouble(objectiveValue);
     }
   }
-
   ++it;
-
   // ---- Remaining lines: variable assignments ----
-  for (; it != end; ++it) {
+  for (; it != llvm::line_iterator(); ++it) {
     // Example:
-    // "1 numExec_times_sArc_1_1             999                       1"
-
+    // "1 numExec_times_sArc_1_1 999 1"
     std::stringstream ss(it->str());
     int index;
     std::string varName;
     double value;
-
     ss >> index >> varName >> value;
     if (ss.fail())
       continue;
-
     results[varName] = value;
   }
 
@@ -698,6 +685,20 @@ void CbcSolver::writeLp(llvm::StringRef filepath) const {
   }
 
   os << "End\n";
+}
+
+static bool containsInvalid(StringRef filePath) {
+  // 1. Open the file
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(filePath);
+  if (std::error_code ec = bufferOrErr.getError())
+    return false;
+
+  // 2. Access the buffer as a StringRef
+  llvm::StringRef content = bufferOrErr.get()->getBuffer();
+
+  // 3. Search for both variations
+  // .contains() is available in newer LLVM; otherwise use .find() != npos
+  return content.contains("invalid") || content.contains("Invalid");
 }
 
 void CbcSolver::optimize() {

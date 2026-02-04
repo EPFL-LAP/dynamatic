@@ -324,7 +324,6 @@ struct CbcSoluParser {
   std::map<std::string, double> results;
   CPSolver::Status status;
   double objectiveValue;
-
   mlir::LogicalResult parseSolverOutput(llvm::StringRef soluFileName);
 };
 } // namespace detail
@@ -359,12 +358,7 @@ public:
   void setMaximizeObjective(const LinExpr &expr) override;
   void optimize() override;
   void write(llvm::StringRef filePath) const override {
-    // HACK: This implementation bypasses the log level and prints some warning
-    // messages to stdout; this pollutes the final mlir output.
-    //
-    // Therefore, this write command currently doesn't do anything.
-    //
-    // solver.writeLp(filePath.str().c_str());
+    this->writeLp(filePath);
   }
 
   void writeSol(llvm::StringRef filePath) const override;
