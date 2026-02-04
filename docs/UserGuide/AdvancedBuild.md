@@ -53,19 +53,12 @@ Once Gurobi is set up, you can change the buffer placement algorithm using the `
 
 ## 2. Cloning
 
-The repository is set up so that Polygeist and LLVM are shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.
-
-For Polygeist:
-
-```sh
-cd dynamatic/polygeist
-git fetch --unshallow
-```
+The repository is set up so that LLVM is shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.
 
 For LLVM:
 
 ```sh
-cd dynamatic/polygeist/llvm-project
+cd dynamatic/llvm-project
 git fetch --unshallow
 ```
 
@@ -80,9 +73,8 @@ This section provides some insights into our custom build script, **build.sh**, 
 The build script successively builds all parts of the project using CMake and Ninja. In order, it builds
 
   1. LLVM (with MLIR and clang as additional tools),
-  2. Polygeist (our C/C++ frontend for MLIR),
-  3. Dynamatic, and
-  4. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#4-interactive-dataflow-circuit-visualizer)).
+  2. Dynamatic, and
+  3. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#4-interactive-dataflow-circuit-visualizer)).
 
 It creates build folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a **`bin`** folder in the top-level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
