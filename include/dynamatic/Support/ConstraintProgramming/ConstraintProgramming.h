@@ -8,6 +8,8 @@
 /// For example usage of this API, please refer to
 /// `dynamatic/unittests/Support/ConstraintProgramming/CPTest.cpp`
 #pragma once
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <map>
@@ -15,11 +17,6 @@
 #include <optional>
 #include <set>
 #include <string>
-
-#ifdef DYNAMATIC_ENABLE_CBC
-#include "coin/CbcModel.hpp"
-#include "coin/OsiClpSolverInterface.hpp"
-#endif // DYNAMATIC_ENABLE_CBC
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -30,6 +27,7 @@ namespace dynamatic {
 enum VarType { REAL, INTEGER, BOOLEAN };
 /// Forward declaration
 namespace detail {
+
 /// Remark: the user of "ConstraintProgramming.h" should not use anything in
 /// detail::.
 ///
@@ -53,6 +51,12 @@ struct CPVarImpl {
                      std::optional<double> lowerBound = /* -inf */ std::nullopt,
                      std::optional<double> upperBound = /* +inf */ std::nullopt)
       : name(name), type(type), lowerBound(lowerBound), upperBound(upperBound) {
+
+    if (name.empty() || !std::all_of(name.begin(), name.end(), [](char c) {
+          return isalnum(c) || c == '_';
+        }))
+      llvm::report_fatal_error("CPVar's name must be non empty and only "
+                               "contain alphanumeric or _ characters");
   }
 };
 } // namespace detail
@@ -127,6 +131,7 @@ struct LinExpr {
     negated.constant = -constant;
     return negated;
   }
+  std::string writeLp() const;
 };
 
 LinExpr operator+(const CPVar &left, double right);
@@ -182,6 +187,9 @@ struct TempConstr {
   // The LHS expression. RHS is omitted because it is always set to zero.
   QuadExpr expr;
   Predicate pred;
+
+  // Write the constraint in the lp format.
+  std::string writeLp() const;
 };
 
 TempConstr operator<=(const QuadExpr &lhs, const QuadExpr &rhs);
@@ -219,7 +227,7 @@ public:
 
   // Solver timeout in second.
   // If timeout <= 0, then this option is ignored.
-  int timeout;
+  int timeout = -1;
 
   // Maximum number of threads used in MILP solving
   int maxThreads;
@@ -311,20 +319,31 @@ public:
 
 #ifdef DYNAMATIC_ENABLE_CBC
 
+namespace detail {
+struct CbcSoluParser {
+  std::map<std::string, double> results;
+  CPSolver::Status status;
+  double objectiveValue;
+  mlir::LogicalResult parseSolverOutput(llvm::StringRef soluFileName);
+};
+} // namespace detail
+
 class CbcSolver : public CPSolver {
 
-  OsiClpSolverInterface solver;
-  std::map<CPVar, int> variables; // map Var -> column index
+  std::set<CPVar> variables;
   std::set<std::string> names;
+
+  detail::CbcSoluParser solution;
+
+  // Multiple constraints might have the same name (e.g., the same empty name).
+  // So here we use a vector of pairs instead of map
+  std::vector<std::pair<std::string, TempConstr>> constraints;
+  LinExpr maxObjective;
 
 public:
   CbcSolver(int timeout = -1 /* default = no timeout */,
             int maxThreads = -1 /* note: currently this option has no effect */)
-      : CPSolver(timeout, CBC, maxThreads) {
-    // Suppress the solver's output
-    solver.messageHandler()->setLogLevel(-1);
-    solver.getModelPtr()->messageHandler()->setLogLevel(-1);
-  }
+      : CPSolver(timeout, CBC, maxThreads) {}
 
   CPVar addVar(const CPVar &var) override;
   CPVar addVar(const std::string &name, VarType type, std::optional<double> lb,
@@ -339,12 +358,7 @@ public:
   void setMaximizeObjective(const LinExpr &expr) override;
   void optimize() override;
   void write(llvm::StringRef filePath) const override {
-    // HACK: This implementation bypasses the log level and prints some warning
-    // messages to stdout; this pollutes the final mlir output.
-    //
-    // Therefore, this write command currently doesn't do anything.
-    //
-    // solver.writeLp(filePath.str().c_str());
+    this->writeLp(filePath);
   }
 
   void writeSol(llvm::StringRef filePath) const override;
@@ -352,6 +366,8 @@ public:
   double getValue(const CPVar &var) const override;
 
   double getObjective() const override;
+
+  void writeLp(llvm::StringRef) const;
 
   // [START LLVM RTTI prerequisites]
   static bool classof(const CbcSolver *b) { return true; }

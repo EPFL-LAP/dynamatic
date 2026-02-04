@@ -29,6 +29,7 @@ List of options:
   --enable-leq-binaries                : download binaries for elastic-miter equivalence
                                          checking
   --use-prebuilt-llvm                  : download and use the prebuilt LLVM
+  --enable-cbc                         : enable the CBC milp solver
   --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
@@ -140,6 +141,7 @@ GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
 PREBUILT_LLVM=0
 BUILD_CHIESEL_LSQ=0
+CMAKE_DYNAMATIC_ENABLE_CBC=""
 LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
@@ -198,6 +200,9 @@ do
               ;;
           "--enable-leq-binaries")
               CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES="-DDYNAMATIC_ENABLE_LEQ_BINARIES=ON"
+              ;;
+          "--enable-cbc")
+              CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
               ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
@@ -346,6 +351,7 @@ if should_run_cmake ; then
       $CMAKE_COMPILERS \
       $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
       $CMAKE_DYNAMATIC_ENABLE_XLS \
+      $CMAKE_DYNAMATIC_ENABLE_CBC \
       $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   exit_on_fail "Failed to cmake dynamatic"
 fi
