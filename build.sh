@@ -29,6 +29,7 @@ List of options:
   --enable-leq-binaries                : download binaries for elastic-miter equivalence
                                          checking
   --use-prebuilt-llvm                  : download and use the prebuilt LLVM
+  --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -137,8 +138,8 @@ BUILD_TYPE="Debug"
 BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
-SKIP_LLVM=0
 PREBUILT_LLVM=0
+BUILD_CHIESEL_LSQ=0
 LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
@@ -191,16 +192,15 @@ do
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
               ;;
-          "--skip-llvm")
-              SKIP_LLVM=1
-              PARSE_ARG="llvm-path"
-              ;;
           "--experimental-enable-xls")
               ENABLE_XLS_INTEGRATION=1
               CMAKE_DYNAMATIC_ENABLE_XLS="-DDYNAMATIC_ENABLE_XLS=ON"
               ;;
           "--enable-leq-binaries")
               CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES="-DDYNAMATIC_ENABLE_LEQ_BINARIES=ON"
+              ;;
+          "--build-legacy-lsq")
+              BUILD_CHIESEL_LSQ=1
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -254,7 +254,8 @@ if [[ $PREBUILT_LLVM -eq 0 ]]; then
 
 else
 
-  prepare_to_build_project "Dynamatic" "build"
+  #### llvm-project (prebuilt) ####
+  prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
 
   URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
   PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
@@ -342,7 +343,10 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS $CMAKE_DYNAMATIC_ENABLE_XLS $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
+      $CMAKE_COMPILERS \
+      $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
+      $CMAKE_DYNAMATIC_ENABLE_XLS \
+      $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
@@ -356,14 +360,16 @@ fi
 
 # Build Chisel generators
 
-echo_subsection "Building LSQ generator"
+if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
+  echo_subsection "Building LSQ generator"
 
-LSQ_GEN_PATH="tools/backend/lsq-generator-chisel"
-LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar"
-cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
-sbt assembly
-exit_on_fail "Failed to build LSQ generator"
-chmod +x $LSQ_GEN_JAR
+  LSQ_GEN_PATH="tools/backend/lsq-generator-chisel"
+  LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar"
+  cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
+  sbt assembly
+  exit_on_fail "Failed to build LSQ generator"
+  chmod +x $LSQ_GEN_JAR
+fi
 
 #### visual-dataflow ####
 
@@ -430,7 +436,10 @@ create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
 create_generator_symlink build/bin/exp-sharing-wrapper-generator
-create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+
+if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
+  create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+fi 
 
 # Create symbolic links to clang headers (standard c library for clang)
 create_include_symlink "$LLVM_DIR/lib/clang/18/include"
