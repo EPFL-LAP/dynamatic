@@ -24,6 +24,8 @@ static unsigned int modelCount = 0;
 namespace dynamatic {
 namespace detail {
 
+#ifdef DYNAMATIC_ENABLE_CBC
+
 // Solution parser:
 //
 // Example:
@@ -87,6 +89,7 @@ mlir::LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
 
   return success();
 }
+#endif // DYNAMATIC_ENABLE_CBC
 
 // Avoid cyclic dependency in the overloading.
 static LinExpr addVarConstImpl(const CPVar &left, double right) {
