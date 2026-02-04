@@ -16,22 +16,29 @@
 # 
 
 # [START Installing the dependency]
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y update 
+RUN apt-get -y install software-properties-common
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt-get -y upgrade
 RUN \
   apt-get install -y \
   --option APT::Immediate-Configure=false \
-  clang lld ccache cmake \
+  sudo vim clang lld ccache cmake wget \
   ninja-build python3 openjdk-21-jdk \
   graphviz git curl gzip libreadline-dev \
   libboost-all-dev pkg-config coinor-cbc \
-  coinor-libcbc-dev
+  coinor-libcbc-dev python3.12 \
+  python3.12-venv python3.12-dev \
+  ghdl verilator
+RUN python3.12 --version
 # [END Installing the dependency]
 
 # [START Create a user called "dynamatic"]
 # Add a user
-RUN useradd -m dynamatic
+RUN useradd -m dynamatic && \
+    echo "dynamatic ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 USER dynamatic
 ARG workdir="/home/dynamatic"
 WORKDIR $workdir
@@ -48,10 +55,9 @@ RUN sbt --version
 # [END Install SBT]
 
 # [START Clone and build the latest Dynamatic]
-RUN git clone \
-  --recurse-submodules \
+RUN git clone --depth 1 \
   "https://github.com/EPFL-LAP/dynamatic.git" "$workdir/dynamatic"
 
 RUN cd "$workdir/dynamatic" && \
-  bash "./build.sh" --release
+  bash "./build.sh" --release --use-prebuilt-llvm
 # [END Clone and build the latest Dynamatic]
