@@ -63,6 +63,8 @@ LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
       status = CPSolver::Status::INFEASIBLE;
     } else if (line.startswith("Unbounded")) {
       status = CPSolver::Status::UNBOUNDED;
+    } else if (line.startswith("Stopped on time")) {
+      status = CPSolver::Status::NONOPTIMAL;
     } else {
       status = CPSolver::Status::UNKNOWN;
     }
@@ -363,7 +365,6 @@ std::string LinExpr::writeLp() const {
   ss << std::fixed;
   unsigned count = 0;
   for (auto &[term, coeff] : this->terms) {
-    llvm::errs() << "[DEBUG] name " << term.impl->name << "\n";
     if (coeff == 0.0)
       continue;
     if (count == 0) {
@@ -606,8 +607,10 @@ CPVar CbcSolver::addVar(const std::string &name, VarType type,
 }
 
 double CbcSolver::getValue(const CPVar &var) const {
-  llvm::errs() << "[DEBUG]!! " << var.impl->name << "\n";
-  // This means some internal naming is malformed. Should not be user's fault.
+  // NOTE: Cbc rename the variables if the lp file is malformed or the variable
+  // contains invalid char. In this case, the Cbc log file will report that.
+  // We abort the MLIR solving if the the Cbc log file reports that some
+  // variable names are invalid.
   if (!this->solution.results.count(var.impl->name)) {
     return 0.0;
   }
@@ -647,7 +650,7 @@ void CbcSolver::writeLp(llvm::StringRef filepath) const {
   }
   os << "\n\n";
 
-  unsigned numBool = 0, numInt = 0, numReal = 0;
+  unsigned numBool = 0, numInt = 0;
 
   for (const auto &v : variables) {
     if (v.impl->type == BOOLEAN)
@@ -655,7 +658,7 @@ void CbcSolver::writeLp(llvm::StringRef filepath) const {
     else if (v.impl->type == INTEGER)
       ++numInt;
     else if (v.impl->type == REAL)
-      ++numReal;
+      continue;
     else
       // Shouldn't be caused by invalid user input
       llvm_unreachable("Unknown type");
@@ -693,15 +696,6 @@ void CbcSolver::writeLp(llvm::StringRef filepath) const {
     }
     os << "\n\n";
   }
-
-  // if (numReal) {
-  //   os << "Real\n";
-  //   for (const auto &v : variables) {
-  //     if (v.impl->type == REAL)
-  //       os << v.impl->name << " ";
-  //   }
-  //   os << "\n\n";
-  // }
 
   os << "End\n";
 }
