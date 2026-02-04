@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 using namespace dynamatic;
 
@@ -343,7 +344,7 @@ static std::string formatCoeffAndName(double coeff, const CPVar &v) {
   if (std::abs(coeff) == 1.0) {
     return v.impl->name;
   }
-  ss << std::fixed << std::abs(coeff) << " " + v.impl->name;
+  ss << std::abs(coeff) << " " + v.impl->name;
   return ss.str();
 }
 
@@ -656,11 +657,11 @@ void CbcSolver::writeLp(llvm::StringRef filepath) const {
     if (v.impl->type == BOOLEAN)
       continue;
     if (v.impl->upperBound) {
-      os << v.impl->name << " <= " << llvm::format("%.2f", *v.impl->upperBound)
+      os << v.impl->name << " <= " << llvm::format("%.6f", *v.impl->upperBound)
          << "\n";
     }
     if (v.impl->lowerBound) {
-      os << v.impl->name << " >= " << llvm::format("%.2f", *v.impl->lowerBound)
+      os << v.impl->name << " >= " << llvm::format("%.6f", *v.impl->lowerBound)
          << "\n";
     }
   }
@@ -702,9 +703,18 @@ static bool containsInvalid(StringRef filePath) {
 }
 
 void CbcSolver::optimize() {
-  std::string lpFile = llvm::formatv("cbc_model_{0}.lp", modelCount);
-  std::string solFile = llvm::formatv("cbc_solution_{0}.sol", modelCount);
-  std::string redirectFile = llvm::formatv("cbc_output_{0}.log", modelCount);
+
+  // To make sure that parallel running MILP instances will generate different
+  // files, we append the name with the ID of the current thread.
+  std::stringstream ss;
+  ss << std::this_thread::get_id();
+  uint64_t id = std::stoull(ss.str());
+
+  std::string lpFile = llvm::formatv("cbc_model_{0}_{1}.lp", id, modelCount);
+  std::string solFile =
+      llvm::formatv("cbc_solution_{0}_{1}.sol", id, modelCount);
+  std::string redirectFile =
+      llvm::formatv("cbc_output_{0}_{1}.log", id, modelCount);
   modelCount += 1;
   this->writeLp(lpFile);
 
