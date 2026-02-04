@@ -47,5 +47,4 @@ jobs:
 
       - name: Build Dynamatic (release, prebuilt LLVM)
         run: |
-          cd dynamatic
           bash ./build.sh --release --use-prebuilt-llvm
