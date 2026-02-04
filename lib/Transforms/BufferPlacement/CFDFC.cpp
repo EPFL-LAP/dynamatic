@@ -75,8 +75,8 @@ static void setObjective(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   for (auto &[_, var] : vars.archs) {
 
     // vars.numExecs * var is not a linear term, we should linearize it
-    auto numExecsTimesVar =
-        model->addVar("numExec*" + var.getName(), INTEGER, 0, std::nullopt);
+    auto numExecsTimesVar = model->addVar("numExec_times_" + var.getName(),
+                                          INTEGER, 0, std::nullopt);
     constexpr double bigM = 1e4;
 
     // - If var == 0: 0 <= w <= 0
