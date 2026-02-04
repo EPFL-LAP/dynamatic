@@ -46,11 +46,6 @@ jobs:
       - name: Verify Python 3.12
         run: python3.12 --version
 
-      - name: Clone Dynamatic
-        run: |
-          git clone --depth 1 \
-            https://github.com/EPFL-LAP/dynamatic.git
-
       - name: Build Dynamatic (release, prebuilt LLVM)
         run: |
           cd dynamatic
