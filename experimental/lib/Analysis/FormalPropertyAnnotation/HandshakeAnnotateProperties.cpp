@@ -230,8 +230,7 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-LogicalResult
-HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
+LogicalResult HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
     const std::unordered_set<std::string> &visitedSet,
     const std::vector<std::string> &prevForks,
     const std::vector<unsigned> &prevIdxs, Operation &curOp,
@@ -269,11 +268,13 @@ HandshakeAnnotatePropertiesPass::annotatePathSingleForkSentRec(
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         auto nextForks = prevForks;
         nextForks.push_back(id);
-        if (failed(annotatePathSingleForkSentRec(newVisited, nextForks, nextIdxs, *op, true))) {
+        if (failed(annotatePathSingleForkSentRec(newVisited, nextForks,
+                                                 nextIdxs, *op, true))) {
           return failure();
         }
       } else {
-        if (failed(annotatePathSingleForkSentRec(newVisited, prevForks, nextIdxs, *op, false))) {
+        if (failed(annotatePathSingleForkSentRec(newVisited, prevForks,
+                                                 nextIdxs, *op, false))) {
           return failure();
         }
       }
@@ -291,8 +292,8 @@ HandshakeAnnotatePropertiesPass::annotatePathSingleForkSent(ModuleOp modOp) {
         std::vector<unsigned> outputs{};
         std::unordered_set<std::string> visited{};
         names.push_back(getUniqueName(&op).str());
-        if (failed(annotatePathSingleForkSentRec(visited, names, outputs,
-                                                     op, true))) {
+        if (failed(annotatePathSingleForkSentRec(visited, names, outputs, op,
+                                                 true))) {
           return failure();
         }
       }
