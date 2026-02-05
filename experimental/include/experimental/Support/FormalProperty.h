@@ -27,9 +27,9 @@ public:
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
-    EFNAO /* Eager Fork Not All Output sent */,
-    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
-    PSSFO,   /* Path Single Sent Fork Output */
+    EagerForkNotAllOutputSent,       /* Eager Fork Not All Output sent */
+    CopiedSlotsOfActiveForksAreFull, /* Copied Slots Of Active Forks Are Full */
+    PathSingleSentForkOutput,        /* Path Single Sent Fork Output */
   };
 
   TAG getTag() const { return tag; }
@@ -179,7 +179,7 @@ public:
   ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::EFNAO;
+    return fp->getType() == TYPE::EagerForkNotAllOutputSent;
   }
 
 private:
@@ -215,7 +215,7 @@ public:
   ~CopiedSlotsOfActiveForkAreFull() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::CSOAFAF;
+    return fp->getType() == TYPE::CopiedSlotsOfActiveForksAreFull;
   }
 
 private:
@@ -253,7 +253,7 @@ public:
   ~PathSingleSentForkOutput() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::PSSFO;
+    return fp->getType() == TYPE::PathSingleSentForkOutput;
   }
 
 private:
