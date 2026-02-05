@@ -429,6 +429,9 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         equations.push_back(i2 - out - dataSlot);
         continue;
       }
+      if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+        continue;
+      }
       if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
         continue;
       }
