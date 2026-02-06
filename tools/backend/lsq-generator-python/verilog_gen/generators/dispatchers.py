@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.signals import *
 from verilog_gen.operators import *
 
@@ -102,7 +102,7 @@ class PortToQueueDispatcher:
         # When we generate VHDL entity and architecture, we can use this context as a local variable.
         # We only need to get the context as a parameter when we instantiate the module.
         # It saves all information we need when we generate VHDL entity and architecture code.
-        ctx = VHDLContext()
+        ctx = Context()
 
         ctx.tabLevel = 1
         ctx.tempCount = 0
@@ -196,7 +196,7 @@ class PortToQueueDispatcher:
 
     def instantiate(
         self,
-        ctx:                VHDLContext,
+        ctx:                Context,
         port_payload_i:        LogicVecArray,
         port_valid_i:       LogicArray,
         port_ready_o:       LogicArray,
@@ -415,7 +415,7 @@ class QueueToPortDispatcher:
         # When we generate VHDL entity and architecture, we can use this context as a local variable.
         # We only need to get the context as a parameter when we instantiate the module.
         # It saves all information we need when we generate VHDL entity and architecture code.
-        ctx = VHDLContext()
+        ctx = Context()
 
         ctx.tabLevel = 1
         ctx.tempCount = 0
@@ -512,7 +512,7 @@ class QueueToPortDispatcher:
 
     def instantiate(
         self,
-        ctx:                VHDLContext,
+        ctx:                Context,
         port_payload_o:        LogicVecArray,
         port_valid_o:       LogicArray,
         port_ready_i:       LogicArray,

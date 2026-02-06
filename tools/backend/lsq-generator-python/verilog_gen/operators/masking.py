@@ -1,10 +1,10 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
 
 
-def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse=False) -> str:
+def CyclicPriorityMasking(ctx: Context, dout, din, base, reverse=False) -> str:
     """
     Parameters:
         dout (LogicVecArray, LogicArray, LogicVec):

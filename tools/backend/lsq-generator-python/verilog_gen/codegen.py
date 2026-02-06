@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 import verilog_gen.generators.group_allocator as group_allocator
 import verilog_gen.generators.dispatchers as dispatchers
 import verilog_gen.generators.lsq as lsq
@@ -7,7 +7,7 @@ import verilog_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(path_rtl, configs):
-    ctx = VHDLContext()
+    ctx = Context()
 
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()

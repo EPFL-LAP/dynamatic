@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.signals import *
 from verilog_gen.operators import *
 from verilog_gen.configs import Configs
@@ -83,7 +83,7 @@ class LSQ:
 
         """
 
-        ctx = VHDLContext()
+        ctx = Context()
 
         # Initialize the global parameters
         ctx.tabLevel = 1

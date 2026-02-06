@@ -1,9 +1,9 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 
 
-def Op(ctx: VHDLContext, out, *list_in) -> str:
+def Op(ctx: Context, out, *list_in) -> str:
     """
     Generates a proper VHDL assignment statement.
 

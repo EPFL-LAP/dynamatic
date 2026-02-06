@@ -1,10 +1,10 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
 
 
-def VecToArray(ctx: VHDLContext, dout, din) -> str:
+def VecToArray(ctx: Context, dout, din) -> str:
     """
     Converts LogicVec to LogicArray
 
@@ -24,7 +24,7 @@ def VecToArray(ctx: VHDLContext, dout, din) -> str:
     return str_ret
 
 
-def BitsToOH(ctx: VHDLContext, dout, din) -> str:
+def BitsToOH(ctx: Context, dout, din) -> str:
     """
     Convert a binary vector into its one-hot representation in VHDL.
 
@@ -41,7 +41,7 @@ def BitsToOH(ctx: VHDLContext, dout, din) -> str:
     return str_ret
 
 
-def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
+def BitsToOHSub1(ctx: Context, dout, din) -> str:
     """
     Convert a binary vector into its one-hot representation in VHDL.
     The result one-hot representation should be cyclic right shifted.
@@ -59,7 +59,7 @@ def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
     return str_ret
 
 
-def OHToBits(ctx: VHDLContext, dout, din) -> str:
+def OHToBits(ctx: Context, dout, din) -> str:
     """
     Generate VHDL code to convert a one-hot vector into its binary index.
 

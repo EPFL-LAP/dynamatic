@@ -1,9 +1,9 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 
 
-def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
+def WrapAdd(ctx: Context, out, in_a, in_b, max: int) -> str:
     """
     if "max" is power of 2:
         out = in_a + in_b
@@ -38,7 +38,7 @@ def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
     return str_ret
 
 
-def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
+def WrapAddConst(ctx: Context, out, in_a, const: int, max: int) -> str:
     """
     if "max" is power of 2:
         out = in_a + const
@@ -63,7 +63,7 @@ def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
     return str_ret
 
 
-def WrapSub(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
+def WrapSub(ctx: Context, out, in_a, in_b, max: int) -> str:
     """
     if "max" is power of 2:
         out = in_a - in_b

@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
@@ -16,7 +16,7 @@ from verilog_gen.operators import *
 # Reduce():
 #   Detects the type of `din` and dispatches to the appropriate implementation.
 
-def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
+def ReduceLogicVec(ctx: Context, dout, din, operator, length) -> str:
     """
     Recursively reduce the vector "din" by "operator".
 
@@ -68,7 +68,7 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
     return str_ret
 
 
-def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
+def ReduceLogicArray(ctx: Context, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of LogicArray "din" by "operator".
 
@@ -91,7 +91,7 @@ def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
     return str_ret
 
 
-def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
+def ReduceLogicVecArray(ctx: Context, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of the LogicVecArray "din" by "operator".
 
@@ -144,7 +144,7 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
     return str_ret
 
 
-def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
+def Reduce(ctx: Context, dout, din, operator, comment: bool = True) -> str:
     """
     Execute reduction based on the type of "din"
 

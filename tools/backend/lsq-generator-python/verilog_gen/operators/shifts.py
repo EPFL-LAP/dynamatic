@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 
@@ -15,7 +15,7 @@ from verilog_gen.signals import *
 # CyclicLeftShift():
 #   Detects the type of `din` and dispatches to the appropriate implementation.
 
-def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
+def RotateLogicVec(ctx: Context, dout, din, distance, layer) -> str:
     """
     Recursively perform a cyclic left shift of the vector "din" by the amount 
     specified in "distance".
@@ -62,7 +62,7 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
     return str_ret
 
 
-def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
+def RotateLogicArray(ctx: Context, dout, din, distance, layer) -> str:
     """
     Recursively perform a cyclic left shift of LogicArray "din" by the amount 
     specified in "distance".
@@ -89,7 +89,7 @@ def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     return str_ret
 
 
-def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
+def RotateLogicVecArray(ctx: Context, dout, din, distance, layer) -> str:
     """
     Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount 
     specified in "distance".
@@ -123,7 +123,7 @@ def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     return str_ret
 
 
-def CyclicLeftShift(ctx: VHDLContext, dout, din, distance) -> str:
+def CyclicLeftShift(ctx: Context, dout, din, distance) -> str:
     """
     Execute a cyclic left shift operation based on the type of "din"
 

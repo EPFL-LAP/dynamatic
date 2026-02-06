@@ -1,7 +1,7 @@
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
 # ===----------------------------------------------------------------------===#
-class VHDLContext:
+class Context:
     """
     A context object to replace global variables for VHDL code generation.
     Holds indentation level, temporary name counter, and initialization strings.

@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from verilog_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from verilog_gen.utils import MaskLess
@@ -83,7 +83,7 @@ class GroupAllocator:
         # When we generate VHDL entity and architecture, we can use this context as a local variable.
         # We only need to get the context as a parameter when we instantiate the module.
         # It saves all information we need when we generate VHDL entity and architecture code.
-        ctx = VHDLContext()
+        ctx = Context()
 
         ctx.tabLevel = 1
         ctx.tempCount = 0
@@ -257,7 +257,7 @@ class GroupAllocator:
 
     def instantiate(
         self,
-        ctx:                VHDLContext,
+        ctx:                Context,
         group_init_valid_i: LogicArray,
         group_init_ready_o: LogicArray,
         ldq_tail_i:         LogicVec,

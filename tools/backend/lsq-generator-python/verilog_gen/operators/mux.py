@@ -1,4 +1,4 @@
-from verilog_gen.context import VHDLContext
+from verilog_gen.context import Context
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
@@ -12,7 +12,7 @@ from verilog_gen.operators import *
 # MuxIndex : Generate a VHDL array-index expression for selecting an element.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
-def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
+def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
     """
     Generate a one-hot multiplexer: for each element of "din", 
     write that bit/vector into a temporary and then OR-reduce into "dout".
@@ -80,7 +80,7 @@ def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
     return str_ret
 
 
-def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
+def Mux1HROM(ctx: Context, dout, din, sel, func=IntToBits) -> str:
     """
     Generate a one-hot ROM multiplexer for LSQ port index allocation,
     Load-Store Order Matrix construction, and tracking load/store numbers.
@@ -170,7 +170,7 @@ def MuxIndex(din, sel) -> str:
     return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
 
 
-def MuxLookUp(ctx: VHDLContext, dout, din, sel) -> str:
+def MuxLookUp(ctx: Context, dout, din, sel) -> str:
     """
     Generate a conditional "when/else" lookup multiplexer in VHDL.
 
