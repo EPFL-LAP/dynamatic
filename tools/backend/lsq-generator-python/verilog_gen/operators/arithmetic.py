@@ -1,6 +1,6 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
+from verilog_gen.context import VHDLContext
+from verilog_gen.utils import *
+from verilog_gen.signals import *
 
 
 def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:

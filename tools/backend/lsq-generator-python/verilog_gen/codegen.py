@@ -1,9 +1,9 @@
-from vhdl_gen.context import VHDLContext
-import vhdl_gen.generators.group_allocator as group_allocator
-import vhdl_gen.generators.dispatchers as dispatchers
-import vhdl_gen.generators.lsq as lsq
+from verilog_gen.context import VHDLContext
+import verilog_gen.generators.group_allocator as group_allocator
+import verilog_gen.generators.dispatchers as dispatchers
+import verilog_gen.generators.lsq as lsq
 
-import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import verilog_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(path_rtl, configs):

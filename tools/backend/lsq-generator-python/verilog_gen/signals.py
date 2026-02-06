@@ -12,8 +12,8 @@
 # std_logic bit
 #
 
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
+from verilog_gen.context import VHDLContext
+from verilog_gen.utils import *
 
 
 class Logic:

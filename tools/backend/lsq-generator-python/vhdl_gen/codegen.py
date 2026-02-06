@@ -7,14 +7,14 @@ import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(path_rtl, configs):
-    ctx = VHDLContext()
+    _ = VHDLContext()
 
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()
 
     name = configs.name + '_core'
     # empty the file
-    file = open(f'{path_rtl}/{name}.vhd', 'w').close()
+    _ = open(f'{path_rtl}/{name}.vhd', 'w').close()
 
     # Group Allocator
     ga = group_allocator.GroupAllocator(

@@ -1,5 +1,5 @@
-import vhdl_gen.generators.group_allocator as group_allocator
-import vhdl_gen.generators.dispatchers as dispatchers
+import verilog_gen.generators.group_allocator as group_allocator
+import verilog_gen.generators.dispatchers as dispatchers
 
 
 class LSQ_Submodules:
