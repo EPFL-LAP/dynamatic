@@ -116,6 +116,34 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 > [!NOTE]
 > This flag defaults to a value of 2
 
+### Dockerfile
+
+Dynamatic includes a `Dockerfile` that configures all the open-source dependencies. To build the dockerfile, run the following command in the root directory of Dynamatic:
+
+```bash
+$ docker build -t dynamatic-image .
+```
+
+The docker image is has a user called "ubuntu".
+To launch the Docker container, run the following command in the root directory of dynamatic:
+
+```bash 
+$ docker run -it -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash
+```
+
+which will launch the Docker container and mount the current dynamatic directory in `/home/ubuntu/dynamatic`.
+
+Then you can proceed with building and running Dynamatic, for example:
+
+```bash
+$ cd /home/ubuntu/dynamatic
+# Build Dynamatic using the prebuilt LLVM and enable CBC-related features.
+$ bash build.sh --use-prebuilt-llvm --enable-cbc
+```
+
+> [!NOTE]
+> We mount Dynamatic in the container since if we build it inside the docker image, it losses the states after shutting down.
+
 ### Forcing CMake Re-Configuration
 
 To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using CMake if it sees that a CMake cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a Debug build to a Release build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake.
