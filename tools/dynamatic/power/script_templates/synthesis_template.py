@@ -5,7 +5,7 @@ base_synthesis_tcl = r"""
 # Date: %date
 # Define global variable
 set TOP_DESIGN %design
-set VHDL_SRC %hdlsrc
+set HDL_SRC %hdlsrc
 
 # Read all source files
 %inputs
