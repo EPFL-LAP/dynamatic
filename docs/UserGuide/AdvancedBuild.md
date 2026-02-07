@@ -53,19 +53,12 @@ Once Gurobi is set up, you can change the buffer placement algorithm using the `
 
 ## 2. Cloning
 
-The repository is set up so that Polygeist and LLVM are shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.
-
-For Polygeist:
-
-```sh
-cd dynamatic/polygeist
-git fetch --unshallow
-```
+The repository is set up so that LLVM is shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.
 
 For LLVM:
 
 ```sh
-cd dynamatic/polygeist/llvm-project
+cd dynamatic/llvm-project
 git fetch --unshallow
 ```
 
@@ -80,9 +73,8 @@ This section provides some insights into our custom build script, **build.sh**, 
 The build script successively builds all parts of the project using CMake and Ninja. In order, it builds
 
   1. LLVM (with MLIR and clang as additional tools),
-  2. Polygeist (our C/C++ frontend for MLIR),
-  3. Dynamatic, and
-  4. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#4-interactive-dataflow-circuit-visualizer)).
+  2. Dynamatic, and
+  3. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#4-interactive-dataflow-circuit-visualizer)).
 
 It creates build folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a **`bin`** folder in the top-level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
@@ -124,6 +116,34 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 > [!NOTE]
 > This flag defaults to a value of 2
 
+### Dockerfile
+
+Dynamatic includes a `Dockerfile` that configures all the open-source dependencies. To build the dockerfile, run the following command in the root directory of Dynamatic:
+
+```bash
+$ docker build -t dynamatic-image .
+```
+
+The docker image is has a user called "ubuntu".
+To launch the Docker container, run the following command in the root directory of dynamatic:
+
+```bash 
+$ docker run -it -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash
+```
+
+which will launch the Docker container and mount the current dynamatic directory in `/home/ubuntu/dynamatic`.
+
+Then you can proceed with building and running Dynamatic, for example:
+
+```bash
+$ cd /home/ubuntu/dynamatic
+# Build Dynamatic using the prebuilt LLVM and enable CBC-related features.
+$ bash build.sh --use-prebuilt-llvm --enable-cbc
+```
+
+> [!NOTE]
+> We mount Dynamatic in the container since if we build it inside the docker image, it losses the states after shutting down.
+
 ### Forcing CMake Re-Configuration
 
 To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using CMake if it sees that a CMake cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a Debug build to a Release build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake.
@@ -135,6 +155,16 @@ To reduce the build script's execution time when re-building the project regular
 
 > [!TIP]
 > If the CMake configuration of each submodule and of the superproject has not changed since the last build script's invocation and the --force flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script.
+
+### Enable Cbc MILP Solver
+
+If you have difficulty installing the Gurobi solver or getting a license, you may use the open-source alternative Cbc solver instead:
+
+```sh
+sudo apt-get install coinor-cbc 
+# Build Dynamatic with Cbc enabled.
+./build.sh --enable-cbc
+```
 
 ## 4. Interactive Dataflow Circuit Visualizer
 

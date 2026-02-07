@@ -34,13 +34,3 @@ if (GUROBI_FOUND)
   )
 endif()
 
-if (CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
-target_link_libraries(DynamaticBufferPlacement
-  PUBLIC
-  ${CBC_LIBRARIES}
-  ${CLPCORE_LIBRARIES}
-  ${OSI_LIBRARIES}
-)
-endif()
-
-

@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 if (MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c- /GR-")
 else ()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -frtti")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
 endif ()
 
 include(FindPackageHandleStandardArgs)
@@ -173,38 +173,25 @@ endif()
 # CBC solver setup
 #-------------------------------------------------------------------------------
 
-# Find the CBC, Osi, Clp libraries
-find_package(PkgConfig REQUIRED)
+if(DYNAMATIC_ENABLE_CBC)
+  # Find the CBC, Osi, Clp libraries
+  find_package(PkgConfig REQUIRED)
 
-# Use pkg-config to get include dirs and libs
-# This command sets 
-# - *_INCLUDE_DIRS
-# - *_LIBRARY_DIRS
-# But these variable will not be automatically discovered by the target.
-pkg_check_modules(CBC QUIET cbc)
-pkg_check_modules(CLPCORE QUIET clp)
-pkg_check_modules(OSI QUIET osi)
+  # Use pkg-config to get include dirs and libs
+  # This command sets 
+  # - *_INCLUDE_DIRS
+  # - *_LIBRARY_DIRS
+  # But these variable will not be automatically discovered by the target.
+  pkg_check_modules(CBC QUIET cbc)
 
-if(CBC_FOUND AND CLPCORE_FOUND AND OSI_FOUND)
-  message(STATUS "CBC available via pkg-config")
-  # This command makes the include directory of CBC discoverable
-  include_directories(dynamatic-opt PRIVATE
-    ${CBC_INCLUDE_DIRS}
-    ${CLPCORE_INCLUDE_DIRS}
-    ${OSI_INCLUDE_DIRS}
-  )
-  add_compile_definitions(DYNAMATIC_ENABLE_CBC)
-else()
-  message(STATUS "One or more of cbc, clp, and osi are missing! Disabling the CBC.")
+  if(CBC_FOUND)
+    message(STATUS "CBC available via pkg-config")
+    # This command makes the include directory of CBC discoverable
+    add_compile_definitions(DYNAMATIC_ENABLE_CBC)
+  else()
+    message(STATUS "cbc is missing! Disabling the CBC-related feature in Dynamatic.")
+  endif()
 endif()
-
-# This command makes the link directory of CBC discoverable
-# Without this, -lCbc would not work on some distros
-link_directories(dynamatic-opt PRIVATE
-  ${CBC_LIBRARY_DIRS}
-  ${CLPCORE_LIBRARY_DIRS}
-  ${OSI_LIBRARY_DIRS}
-)
 
 #-------------------------------------------------------------------------------
 # Python (Virtual Environment)

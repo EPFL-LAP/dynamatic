@@ -1,0 +1,50 @@
+name: Build and Test Dynamatic on Ubuntu Latest
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 openjdk-21-jdk \
+            graphviz git curl gzip libreadline-dev \
+            libboost-all-dev pkg-config coinor-cbc \
+            coinor-libcbc-dev python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
+
+      - name: Build Dynamatic (release, prebuilt LLVM)
+        run: |
+          bash ./build.sh --release --use-prebuilt-llvm

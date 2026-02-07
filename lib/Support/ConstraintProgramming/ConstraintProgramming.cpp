@@ -1,7 +1,15 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+#include "dynamatic/Support/LLVM.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/LineIterator.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <thread>
 
 using namespace dynamatic;
 
@@ -9,8 +17,79 @@ using namespace dynamatic;
 // Utility functions
 // -------------------------------------------------------------
 
+// HACK: since we don't assign any names to the MILP model, we use this global
+// variable to distingush between different MILP models.
+static unsigned int modelCount = 0;
+
 namespace dynamatic {
 namespace detail {
+
+#ifdef DYNAMATIC_ENABLE_CBC
+
+// Solution parser:
+//
+// Example:
+// Optimal - objective value 9900.00000000
+//       0 numExec_times_sArc_0_1               0                       1
+//       1 numExec_times_sArc_1_2               0                       1
+//       2 numExec_times_sArc_2_2            9900                       1
+//       3 numExec_times_sArc_2_3               0                       1
+// NOTE: sometimes Cbc will not disable the variable whose solution is 0.0.
+mlir::LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(soluFileName);
+  if (!bufferOrErr)
+    return mlir::failure();
+
+  llvm::line_iterator it(*bufferOrErr->get(), /*SkipBlanks=*/true);
+
+  // ---- First line: status + objective value ----
+  // NOTE: The default constructor of llvm::line_iterator is the "end" iterator
+  if (it == llvm::line_iterator())
+    return failure();
+
+  {
+    // Example:
+    // "Optimal - objective value 999.00000000"
+    StringRef line = *it;
+
+    if (line.startswith("Optimal")) {
+      status = CPSolver::Status::OPTIMAL;
+    } else if (line.startswith("Infeasible")) {
+      status = CPSolver::Status::INFEASIBLE;
+    } else if (line.startswith("Unbounded")) {
+      status = CPSolver::Status::UNBOUNDED;
+    } else if (line.startswith("Stopped on time")) {
+      status = CPSolver::Status::NONOPTIMAL;
+    } else {
+      status = CPSolver::Status::UNKNOWN;
+    }
+
+    // Extract objective value
+    auto pos = line.find("objective value");
+    if (pos != StringRef::npos) {
+      StringRef valueStr =
+          line.drop_front(pos + strlen("objective value")).trim();
+      valueStr.getAsDouble(objectiveValue);
+    }
+  }
+  ++it;
+  // ---- Remaining lines: variable assignments ----
+  for (; it != llvm::line_iterator(); ++it) {
+    // Example:
+    // "1 numExec_times_sArc_1_1 999 1"
+    std::stringstream ss(it->str());
+    int index;
+    std::string varName;
+    double value;
+    ss >> index >> varName >> value;
+    if (ss.fail())
+      continue;
+    results[varName] = value;
+  }
+
+  return success();
+}
+#endif // DYNAMATIC_ENABLE_CBC
 
 // Avoid cyclic dependency in the overloading.
 static LinExpr addVarConstImpl(const CPVar &left, double right) {
@@ -263,6 +342,67 @@ TempConstr operator==(const QuadExpr &lhs, const QuadExpr &rhs) {
   return c;
 }
 
+static std::string formatCoeffAndName(double coeff, const CPVar &v) {
+  std::stringstream ss;
+  if (std::abs(coeff) == 1.0) {
+    return v.impl->name;
+  }
+  ss << std::abs(coeff) << " " + v.impl->name;
+  return ss.str();
+}
+
+std::string LinExpr::writeLp() const {
+  std::stringstream ss;
+  ss << std::fixed;
+  unsigned count = 0;
+  for (auto &[term, coeff] : this->terms) {
+    if (coeff == 0.0)
+      continue;
+    if (count == 0) {
+      ss << (coeff > 0 ? "" : "- ") << formatCoeffAndName(coeff, term);
+    } else {
+      ss << (coeff > 0 ? " + " : " - ") << formatCoeffAndName(coeff, term);
+    }
+    count += 1;
+  }
+  if (0.0 != std::abs(constant))
+    ss << (this->constant > 0 ? " + " : " - ") << std::abs(this->constant);
+  return ss.str();
+}
+
+std::string TempConstr::writeLp() const {
+  if (!this->expr.quadTerms.empty())
+    llvm::report_fatal_error("Quandratic formula is unsupported!");
+
+  LinExpr linexpr = this->expr.linexpr;
+
+  std::stringstream ss;
+  ss << std::fixed;
+  unsigned count = 0;
+  for (auto &[term, coeff] : linexpr.terms) {
+    if (coeff == 0.0)
+      continue;
+    if (count == 0) {
+      ss << (coeff > 0 ? "" : "- ") << formatCoeffAndName(coeff, term);
+    } else {
+      ss << (coeff > 0 ? " + " : " - ") << formatCoeffAndName(coeff, term);
+    }
+    count += 1;
+  }
+
+  if (this->pred == EQ)
+    ss << " = ";
+  else if (this->pred == LE)
+    ss << " <= ";
+  else
+    llvm::report_fatal_error("unknown predicate");
+
+  // TODO: not sure if we can put the constant on the LHS.
+  // Put the constant in the RHS and flip the sign
+  ss << (linexpr.constant > 0 ? " -" : "") << std::abs(linexpr.constant);
+  return ss.str();
+}
+
 // -------------------------------------------------------------
 // GurobiSolver method implementations
 // ------------------------------------------------------------
@@ -446,26 +586,8 @@ CPVar CbcSolver::addVar(const CPVar &var) {
     llvm::report_fatal_error("Adding variable with duplicated names is not "
                              "permitted! Aborting...");
   }
-
-  double lb = var.impl->lowerBound.value_or(-1e20);
-  double ub = var.impl->upperBound.value_or(1e20);
-
-  int colIndex = solver.getNumCols();
-
-  // Add an empty column for this variable
-  solver.addCol(0, nullptr, nullptr, lb, ub, 0.0);
-  variables[var] = colIndex;
-
-  // Set variable type
-  if (var.impl->type == INTEGER)
-    solver.setInteger(colIndex);
-  else if (var.impl->type == BOOLEAN) {
-    solver.setInteger(colIndex);
-    solver.setColUpper(colIndex, 1.0);
-    solver.setColLower(colIndex, 0.0);
-  } // REAL is default
-
   names.insert(var.impl->name);
+  variables.insert(var);
   return var;
 }
 
@@ -476,58 +598,169 @@ CPVar CbcSolver::addVar(const std::string &name, VarType type,
 }
 
 double CbcSolver::getValue(const CPVar &var) const {
-  if (status != OPTIMAL && status != NONOPTIMAL) {
-    llvm::errs() << "Solution is not available while retrieving "
-                 << var.impl->name << "!\n";
-    llvm::report_fatal_error("Cannot retrieve the value of variable!");
+  // NOTE: Cbc rename the variables if the lp file is malformed or the variable
+  // contains invalid char. In this case, the Cbc log file will report that.
+  // We abort the MLIR solving if the the Cbc log file reports that some
+  // variable names are invalid.
+  if (!this->solution.results.count(var.impl->name)) {
+    return 0.0;
   }
-  return solver.getColSolution()[variables.at(var)];
+  return this->solution.results.at(var.impl->name);
 }
 
 void CbcSolver::writeSol(llvm::StringRef filePath) const {
-  if (status != OPTIMAL && status != NONOPTIMAL) {
-    llvm::report_fatal_error("Calling writeSol before the model was solved!");
-  }
-
-  std::ofstream solLogFile(filePath.str());
-  if (solLogFile.is_open()) {
-    for (auto &[var, _] : variables) {
-      solLogFile << var.impl->name << " = " << getValue(var) << "\n";
+  // Update solver with solution for getValue
+  std::ofstream myfile(filePath.str());
+  if (myfile.is_open()) {
+    for (const auto &var : variables) {
+      myfile << var.impl->name << " = " << getValue(var) << "\n";
     }
+
+    myfile << this->getObjective() << "\n";
   } else {
     llvm::errs() << "Unable to open file: " << filePath << "!\n";
     llvm::report_fatal_error("Unable to open file!");
   }
 }
 
-void CbcSolver::optimize() {
-  CbcModel model(solver);
-  // Disable all output
-  // 0 = no output, 1 = minimal, higher = more verbose
-  model.setLogLevel(-1);
+void CbcSolver::writeLp(llvm::StringRef filepath) const {
 
-  if (this->timeout > 0) {
-    model.setMaximumSeconds(timeout);
+  std::error_code ec;
+  llvm::raw_fd_ostream os(filepath, ec);
+
+  if (ec) {
+    llvm::errs() << "Error opening file: " << ec.message() << "\n";
+    return;
+  }
+  os << "Maximize\n";
+  os << this->maxObjective.writeLp() << "\n";
+
+  os << "Subject to\n";
+  for (const auto &[name, constr] : constraints) {
+    os << constr.writeLp() << "\n";
+  }
+  os << "\n\n";
+
+  unsigned numBool = 0, numInt = 0;
+
+  for (const auto &v : variables) {
+    if (v.impl->type == BOOLEAN)
+      ++numBool;
+    else if (v.impl->type == INTEGER)
+      ++numInt;
+    else if (v.impl->type == REAL)
+      continue;
+    else
+      // Shouldn't be caused by invalid user input
+      llvm_unreachable("Unknown type");
   }
 
-  model.setRandomSeed(0);
+  // Print the bounds:
+  for (const auto &v : variables) {
+    if (v.impl->type == BOOLEAN)
+      continue;
+    if (v.impl->upperBound) {
+      os << v.impl->name << " <= " << llvm::format("%.6f", *v.impl->upperBound)
+         << "\n";
+    }
+    if (v.impl->lowerBound) {
+      os << v.impl->name << " >= " << llvm::format("%.6f", *v.impl->lowerBound)
+         << "\n";
+    }
+  }
 
-  model.branchAndBound();
+  // Declare the data types
+  if (numBool) {
+    os << "Binary\n";
+    for (const auto &v : variables) {
+      if (v.impl->type == BOOLEAN)
+        os << v.impl->name << " ";
+    }
+    os << "\n\n";
+  }
 
-  int stat = model.status();
-  if (stat == 0) // optimal
-    status = OPTIMAL;
-  else if (stat == 1) // stopped, feasible solution
-    status = NONOPTIMAL;
-  else if (stat == 2) // infeasible
-    status = INFEASIBLE;
-  else if (stat == 3) // unbounded
-    status = UNBOUNDED;
+  if (numInt) {
+    os << "General\n";
+    for (const auto &v : variables) {
+      if (v.impl->type == INTEGER)
+        os << v.impl->name << " ";
+    }
+    os << "\n\n";
+  }
+
+  os << "End\n";
+}
+
+static bool containsInvalid(StringRef filePath) {
+  // 1. Open the file
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(filePath);
+  if (std::error_code ec = bufferOrErr.getError())
+    return false;
+
+  // 2. Access the buffer as a StringRef
+  llvm::StringRef content = bufferOrErr.get()->getBuffer();
+
+  // 3. Search for both variations
+  // .contains() is available in newer LLVM; otherwise use .find() != npos
+  return content.contains("invalid") || content.contains("Invalid");
+}
+
+void CbcSolver::optimize() {
+
+  // To make sure that parallel running MILP instances will generate different
+  // files, we append the name with the ID of the current thread.
+  std::stringstream ss;
+  ss << std::this_thread::get_id();
+  uint64_t id = std::stoull(ss.str());
+
+  std::string lpFile = llvm::formatv("cbc_model_{0}_{1}.lp", id, modelCount);
+  std::string solFile =
+      llvm::formatv("cbc_solution_{0}_{1}.sol", id, modelCount);
+  std::string redirectFile =
+      llvm::formatv("cbc_output_{0}_{1}.log", id, modelCount);
+  modelCount += 1;
+  this->writeLp(lpFile);
+
+  std::string errMsg;
+  bool executionFailed;
+  // Find the program in the PATH
+  auto programName = llvm::sys::findProgramByName("cbc");
+  std::error_code ec = programName.getError();
+  if (ec) {
+    llvm::report_fatal_error("Could not find cbc in the path!\n");
+  }
+
+  std::vector<std::optional<StringRef>> redirects = {std::nullopt, redirectFile,
+                                                     std::nullopt};
+
+  int exitCode;
+
+  if (this->timeout > 0)
+    exitCode = llvm::sys::ExecuteAndWait(
+        *programName,
+        {"cbc", lpFile, "sec", std::to_string(timeout), "solve", "solu",
+         solFile},
+        std::nullopt, redirects, 0, 0, &errMsg, &executionFailed);
   else
-    status = ERROR;
+    exitCode = llvm::sys::ExecuteAndWait(
+        *programName, {"cbc", lpFile, "solve", "solu", solFile}, std::nullopt,
+        redirects, 0, 0, &errMsg, &executionFailed);
 
-  // Update solver with solution for getValue
-  solver.setColSolution(model.bestSolution());
+  if (exitCode != 0) {
+    llvm::errs() << "Cbc failed with exit code " << exitCode << "!\n";
+    llvm::report_fatal_error("Cbc failed!");
+  }
+
+  if (containsInvalid(redirectFile)) {
+    std::string errMsg = "The file " + lpFile +
+                         " is invalid for Cbc! See the logfile" + redirectFile;
+    llvm::report_fatal_error(StringRef(errMsg));
+  }
+
+  if (auto res = this->solution.parseSolverOutput(solFile); failed(res))
+    llvm::report_fatal_error("The solution is malformed!\n");
+
+  this->status = this->solution.status;
 }
 
 double CbcSolver::getObjective() const {
@@ -535,56 +768,18 @@ double CbcSolver::getObjective() const {
     llvm::report_fatal_error("Cannot retrieve the objective because the "
                              "solution is not available!");
   }
-  return solver.getObjValue();
+
+  return this->solution.objectiveValue;
 }
 
 void CbcSolver::setMaximizeObjective(const LinExpr &expr) {
-  // Create objective array
-  std::vector<double> obj(solver.getNumCols(), 0.0);
-  for (auto &[var, coeff] : expr.terms) {
-    // Set objective in solver
-    solver.setObjCoeff(variables.at(var), coeff);
-  }
-
-  // CBC minimizes by default; for maximize, multiply by -1
-  solver.setObjSense(-1.0);
+  this->maxObjective = expr;
 }
 
 void CbcSolver::addConstr(const TempConstr &constraint,
                           llvm::StringRef constrName) {
-  if (!constraint.expr.quadTerms.empty()) {
-    llvm::report_fatal_error(
-        "Cbc solver does not support quadratic constraints! Aborting");
-  }
 
-  auto linearPart = constraint.expr.linexpr;
-
-  int numCoeffs = linearPart.terms.size();
-  std::vector<int> indices;
-  std::vector<double> values;
-
-  for (auto &[var, coeff] : constraint.expr.linexpr.terms) {
-    indices.push_back(variables.at(var));
-    values.push_back(coeff);
-  }
-
-  double rowLower, rowUpper;
-  if (constraint.pred == LE) {
-    rowLower = -1e20;
-    rowUpper = -linearPart.constant;
-  } else if (constraint.pred == EQ) {
-    rowLower = -linearPart.constant;
-    rowUpper = -linearPart.constant;
-  } else {
-    llvm_unreachable("Unknown predicate!");
-  }
-
-  CoinPackedVector row;
-
-  // Add elements to the row vector
-  row.setVector(numCoeffs, indices.data(), values.data());
-
-  solver.addRow(row, rowLower, rowUpper, constrName.str());
+  this->constraints.emplace_back(constrName, constraint);
 }
 #endif // DYNAMATIC_ENABLE_CBC
 

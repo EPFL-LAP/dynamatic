@@ -21,7 +21,7 @@ Most of our dependencies are provided as standard packages on most Linux distrib
 On `apt`-based Linux distributions:
 ```sh
 apt-get update
-apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev libboost-all-dev pkg-config coinor-cbc coinor-libcbc-dev
+apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev libboost-all-dev pkg-config 
 ```
 Note that you may need super user privileges for any package installation. You can use **sudo** before entering the commands
 
@@ -44,7 +44,7 @@ These are optional tools which you can see how to [install](../UserGuide/Advance
 > Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
 **2. Cloning the Project and Its Submodules**  
-Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). To instruct git to clone the appropriate versions submodules used by Dynamatic, we enable the `--recurse-submodules` flag.  
+Dynamatic depends on a fork of [LLVM/MLIR](https://github.com/EPFL-LAP/llvm-project). To instruct git to clone the appropriate versions submodules used by Dynamatic, we enable the `--recurse-submodules` flag.  
 ```sh
 git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
 ```
@@ -56,6 +56,14 @@ Run the build script from the directory created by the clone command (see the [a
 cd dynamatic
 chmod +x ./build.sh
 ./build.sh --release
+```
+
+The commands above might take quite some time to finish since we need to build LLVM. Alternatively, the `build.sh` script can downloads a prebuilt LLVM and link Dynamatic against that instead. If this is preferred, you could run the following command:
+
+```sh
+cd dynamatic
+chmod +x ./build.sh
+./build.sh --release --use-prebuilt-llvm
 ```
 
 **4. Run the Dynamatic Testsuite**  

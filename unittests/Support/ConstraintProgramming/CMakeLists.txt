@@ -13,10 +13,6 @@ target_link_libraries(
 
   LLVMSupport
   DynamaticConstraintProgramming
-
-  ${CBC_LIBRARIES}
-  ${CLPCORE_LIBRARIES}
-  ${OSI_LIBRARIES}
 )
 
 enable_testing()
