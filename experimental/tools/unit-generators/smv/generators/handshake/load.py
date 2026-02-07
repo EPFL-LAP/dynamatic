@@ -24,6 +24,8 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   dataFromMem_ready := inner_data_one_slot_break_r.ins_ready;
   dataOut := inner_data_one_slot_break_r.outs;
   dataOut_valid := inner_data_one_slot_break_r.outs_valid;
+  full_0 := inner_addr_one_slot_break_r.full_0;
+  full_1 := inner_data_one_slot_break_r.full_0;
 
 {generate_one_slot_break_r(f"{name}__addr_one_slot_break_r", {ATTR_BITWIDTH: addr_type.bitwidth})}
 {generate_one_slot_break_r(f"{name}__data_one_slot_break_r", {ATTR_BITWIDTH: data_type.bitwidth})}

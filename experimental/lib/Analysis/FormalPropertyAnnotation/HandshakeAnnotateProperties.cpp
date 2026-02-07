@@ -73,6 +73,7 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
+  LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
@@ -223,6 +224,368 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
+// The structs FlowVariable and FlowExpression together form a DSL that help
+// with writing flow equations. A similar DSL exists for constraint programming
+// in `ConstraintProgramming.h`, but it is not reused for the following reasons:
+// 1. FlowExpression uses integer coefficients, whereas CPVars have doubles as
+// coefficients
+// 2. Metadata that is necessary for FlowExpressions can easily be added (type,
+// operation, index)
+// 3. No name is necessary, as a variable is uniquely defined by the metadata
+// 4. Dedicated conversion function to a matrix, as this is necessary anyway
+struct FlowVariable {
+  enum TYPE { full, sent, inputLambda, outputLambda, internalLambda };
+  TYPE type;
+  // `typeIndex` has a different meaning depending on `type`:
+  // `full` => index of slot that is full
+  // `sent` => index of output that is sent
+  // `inputLambda` => index of operand channel
+  // `outputLambda` => index of result channel
+  // `internalLambda` => index of internal channel
+  unsigned typeIndex;
+  Operation *op;
+
+  // utility functions for initializing variables
+  static FlowVariable internalChannel(Operation *op, unsigned index) {
+    return (FlowVariable){FlowVariable::TYPE::internalLambda, index, op};
+  }
+  static FlowVariable inputChannel(Operation *op, unsigned index) {
+    return (FlowVariable){FlowVariable::TYPE::inputLambda, index, op};
+  }
+  static FlowVariable outputChannel(Operation *op, unsigned index) {
+    return (FlowVariable){FlowVariable::TYPE::outputLambda, index, op};
+  }
+  static FlowVariable slot(Operation *op, unsigned index) {
+    return (FlowVariable){FlowVariable::TYPE::full, index, op};
+  }
+  static FlowVariable sentOutput(Operation *op, unsigned index) {
+    return (FlowVariable){FlowVariable::TYPE::sent, index, op};
+  }
+
+  bool operator==(const FlowVariable &other) const {
+    return type == other.type && typeIndex == other.typeIndex && op == other.op;
+  }
+
+  bool isLambda() const {
+    return type == FlowVariable::TYPE::inputLambda ||
+           type == FlowVariable::TYPE::outputLambda ||
+           type == FlowVariable::TYPE::internalLambda;
+  }
+
+  std::string getName() const {
+    switch (type) {
+    case full:
+      return llvm::formatv("{0}.full_{1}", getUniqueName(op), typeIndex).str();
+    case sent:
+      return llvm::formatv("{0}.sent_{1}", getUniqueName(op), typeIndex).str();
+    case inputLambda:
+    case outputLambda:
+    case internalLambda:
+      assert(false && "lambda channels are not named");
+    };
+  }
+};
+
+// Hash implementation required so that FlowVariable can be used in an
+// unordered_map
+template <>
+struct std::hash<FlowVariable> {
+  size_t operator()(const FlowVariable &var) const {
+    using std::hash;
+    return (hash<FlowVariable::TYPE>()(var.type) ^
+            hash<unsigned>()(var.typeIndex) ^ hash<Operation *>()(var.op));
+  }
+};
+
+namespace {
+// Only the operators that are used have been implemented...
+struct FlowExpression {
+  std::unordered_map<FlowVariable, int> terms;
+  FlowExpression() = default;
+  FlowExpression(const FlowVariable &v) { terms[v] = 1; };
+};
+
+FlowExpression operator-(FlowVariable v) {
+  FlowExpression f{};
+  f.terms[v] = -1;
+  return f;
+}
+FlowExpression operator-(FlowVariable left, FlowVariable right) {
+  FlowExpression f{};
+  f.terms[left] = 1;
+  f.terms[right] -= 1;
+  return f;
+}
+FlowExpression operator+(FlowVariable left, FlowVariable right) {
+  FlowExpression f{};
+  f.terms[left] = 1;
+  f.terms[right] += 1;
+  return f;
+}
+FlowExpression operator-(FlowExpression left, FlowVariable right) {
+  left.terms[right] -= 1;
+  return left;
+}
+void operator+=(FlowExpression &left, const FlowVariable &right) {
+  left.terms[right] += 1;
+}
+
+// Used to assign dense indices to FlowVariables based on a list of
+// FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
+// lambda variables with low indices to ensure they are eliminated first within
+// the row-echelon form
+class IndexMap {
+  std::unordered_map<FlowVariable, size_t> map;
+  std::vector<FlowVariable> variables;
+  size_t nLambdas;
+
+public:
+  size_t getNLambdas() { return nLambdas; }
+  size_t size() { return variables.size(); }
+  size_t getIndex(FlowVariable v) { return map[v]; }
+  FlowVariable getVariable(size_t index) { return variables[index]; }
+  void verify() {
+    assert(map.size() == variables.size());
+    for (size_t i = 0; i < variables.size(); ++i) {
+      FlowVariable a = variables[i];
+      size_t j = map[a];
+      assert(i == j);
+    }
+    for (auto [key, value] : map) {
+      assert(variables[value] == key);
+    }
+  }
+
+  IndexMap() = default;
+  IndexMap(const std::vector<FlowExpression> &exprs) {
+    size_t index = 0;
+    // annotate lambdas first
+    for (auto &expr : exprs) {
+      for (auto [key, value] : expr.terms) {
+        if (!key.isLambda())
+          continue;
+        if (map.count(key) == 0) {
+          map[key] = index;
+          ++index;
+          variables.push_back(key);
+        }
+      }
+    }
+    nLambdas = index;
+    // annotate remaining variables
+    for (auto &expr : exprs) {
+      for (auto [key, value] : expr.terms) {
+        if (map.count(key) == 0) {
+          map[key] = index;
+          ++index;
+          variables.push_back(key);
+        }
+      }
+    }
+  }
+};
+
+std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
+  std::vector<FlowExpression> equations{};
+  // annotate equations derived from operations
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      FlowVariable i1 = FlowVariable::internalChannel(&op, 1);
+      FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
+      assert(!(i1 == i2) && "expected internal channels to be different");
+
+      for (auto [i, res] : llvm::enumerate(op.getResults())) {
+        for (auto &use : res.getUses()) {
+          unsigned j = use.getOperandNumber();
+          Operation &nextOp = *use.getOwner();
+          assert(nextOp.getOperands().size() > j);
+          FlowVariable forward = FlowVariable::outputChannel(&op, i);
+          FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
+          // forward and back represent the same channel but from different
+          // sides, so their lambdas have to be equal
+          equations.push_back(forward - back);
+        }
+      }
+
+      // A general structure for an operation is assumed:
+      // in1, in2, ... -> Join/Merge/Mux -> internal channel 1
+      // internal channel 1 -> slots? -> internal channel 2
+      // internal channel 2 -> fork -> out1, out2, ...
+      //
+      // Some operations do not follow this structure, and should be handled
+      // separately to avoid making false assumptions.
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+        // From inspecting .td declaration... probably a better way of doing
+        // this
+        int addressInputIndex = 0;
+        int dataOutputIndex = 1;
+        FlowVariable in = FlowVariable::inputChannel(&op, addressInputIndex);
+        FlowVariable out = FlowVariable::outputChannel(&op, dataOutputIndex);
+        FlowVariable addrSlot = FlowVariable::slot(&op, 0);
+        FlowVariable dataSlot = FlowVariable::slot(&op, 1);
+
+        equations.push_back(in - i1 - addrSlot);
+        equations.push_back(i2 - out - dataSlot);
+        continue;
+      }
+      if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
+        continue;
+      }
+
+      // Join operation, merge operation, or mux
+      if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
+        if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+          // mux : select input has same as output lambda, data inputs act like
+          // merge
+          Value a = muxOp.getSelectOperand();
+          unsigned selectIndex = -1;
+          for (auto &use : a.getUses()) {
+            selectIndex = use.getOperandNumber();
+          }
+          assert(selectIndex != (unsigned)-1);
+          FlowExpression dataEq = -i1;
+          for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
+            FlowVariable chVar = FlowVariable::inputChannel(&op, i);
+            if (i == selectIndex) {
+              // select channel
+              equations.push_back(chVar - i1);
+            } else {
+              // dataEq : sum(dataChannelLambda) = outputChannelLambda
+              dataEq += chVar;
+            }
+          }
+          equations.push_back(dataEq);
+        } else {
+          // merge : the sum of input lambdas is the output lambda
+          FlowExpression mergeEq = -i1;
+          for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
+            mergeEq += FlowVariable::inputChannel(&op, i);
+          }
+          equations.push_back(mergeEq);
+        }
+      } else {
+        // join : for every input, lambda_in = lambda_out
+        for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
+          equations.push_back(FlowVariable::inputChannel(&op, i) - i1);
+        }
+      }
+
+      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
+        // TODO: handle multiple slots
+        if (bufferOp.getNumSlots() != 1) {
+          llvm::errs() << getUniqueName(&op) << " has multiple slots\n";
+        }
+        assert(bufferOp.getNumSlots() == 1);
+        FlowVariable full = FlowVariable::slot(&op, 0);
+        equations.push_back(i1 - full - i2);
+      } else {
+        equations.push_back(i1 - i2);
+      }
+
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        // eagerfork: for every channel, either same tokens in as out, or in
+        // `sent` state and in = out - 1
+        for (auto [i, channel] : llvm::enumerate(op.getResults())) {
+          FlowVariable sent = FlowVariable::sentOutput(&op, i);
+          FlowVariable result = FlowVariable::outputChannel(&op, i);
+          equations.push_back(i2 + sent - result);
+        }
+      } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
+        continue;
+      } else {
+        // lazy fork: all outputs have same tokens in as out
+        for (auto [i, channel] : llvm::enumerate(op.getResults())) {
+          FlowVariable result = FlowVariable::outputChannel(&op, i);
+          equations.push_back(i2 - result);
+        }
+      }
+    }
+  }
+  return equations;
+}
+} // namespace
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  // The equations are represented by a FlowExpression that is equal to zero
+  std::vector<FlowExpression> equations = extractLocalEquations(modOp);
+
+  // Map all variables used in `equations` to an index in the matrix
+  IndexMap indices(equations);
+  indices.verify();
+
+  // matrix with one row per equation, and column per variable
+  MatIntType matrix(MatIntZero(equations.size(), indices.size()));
+
+  // insert equations into the matrix
+  for (auto [row, expr] : llvm::enumerate(equations)) {
+    for (auto [key, value] : expr.terms) {
+      unsigned index = indices.getIndex(key);
+      matrix(row, index) = (int)value;
+    }
+  }
+
+  // bring to row-echelon form
+  gaussianElimination(matrix);
+
+  size_t rows = matrix.size1();
+  size_t cols = matrix.size2();
+  // ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+  // uid++;
+
+  for (size_t row = 0; row < rows; ++row) {
+    bool canAnnotate = true;
+    for (size_t col = 0; col < indices.getNLambdas(); ++col) {
+      if (matrix(row, col) != 0) {
+        canAnnotate = false;
+        break;
+      }
+    }
+
+    if (!canAnnotate) {
+      continue;
+    }
+
+    std::vector<int> coefs{};
+    std::vector<std::string> names{};
+
+    for (size_t col = indices.getNLambdas() + 1; col < cols; ++col) {
+      if (matrix(row, col) != 0) {
+        coefs.push_back(matrix(row, col));
+        names.push_back(indices.getVariable(col).getName());
+      }
+    }
+    if (coefs.size() > 0) {
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+      uid++;
+      p.addEquation(coefs, names);
+      if (p.getEquations().size() > 0) {
+        propertyTable.push_back(p.toJSON());
+      }
+    }
+  }
+  /*
+  if (p.getEquations().size() > 0) {
+    propertyTable.push_back(p.toJSON());
+  }
+  for (auto &expr : equations) {
+    std::vector<int> coefs{};
+    std::vector<std::string> names{};
+    for (auto [key, value] : expr.terms) {
+      assert(metaData.count(key) == 1);
+      coefs.push_back((int)value);
+      names.push_back(key.getName());
+    }
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+  }
+  */
+
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -234,6 +597,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+    if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
   }
 
