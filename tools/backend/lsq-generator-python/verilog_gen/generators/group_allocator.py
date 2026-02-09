@@ -90,7 +90,7 @@ class GroupAllocator:
         ctx.signalInitString = ''
         ctx.portInitString = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
         ctx.regInitString = '\tprocess (clk, rst) is\n' + '\tbegin\n'
-        arch = []
+        arch = ''
 
         # IOs
         group_init_valid_i = LogicArray(
@@ -132,15 +132,15 @@ class GroupAllocator:
         empty_stores = LogicVec(ctx, 'empty_stores', 'w',
                                 self.configs.emptyStAddrW)
 
-        arch.append(WrapSub(ctx, loads_sub, ldq_head_i,
-                        ldq_tail_i, self.configs.numLdqEntries))
-        arch.append(WrapSub(ctx, stores_sub, stq_head_i,
-                        stq_tail_i, self.configs.numStqEntries))
+        arch += WrapSub(ctx, loads_sub, ldq_head_i,
+                        ldq_tail_i, self.configs.numLdqEntries)
+        arch += WrapSub(ctx, stores_sub, stq_head_i,
+                        stq_tail_i, self.configs.numStqEntries)
 
-        arch.append(Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
-                   '(', '\'0\'', '&', loads_sub, ')'))
-        arch.append(Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
-                   '(', '\'0\'', '&', stores_sub, ')'))
+        arch += Op(ctx, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
+                   '(', '\'0\'', '&', loads_sub, ')')
+        arch += Op(ctx, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
+                   '(', '\'0\'', '&', stores_sub, ')')
 
         # Generate handshake signals
         group_init_ready = LogicArray(
@@ -149,13 +149,13 @@ class GroupAllocator:
             ctx, 'group_init_hs', 'w', self.configs.numGroups)
 
         for i in range(0, self.configs.numGroups):
-            arch.append(Op(ctx, group_init_ready[i],
+            arch += Op(ctx, group_init_ready[i],
                        '\'1\'', 'when',
                        '(', empty_loads,  '>=', (
                 self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
                 '(', empty_stores, '>=', (
                 self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
-                'else', '\'0\''))
+                'else', '\'0\'')
 
         if (self.configs.gaMulti):
             group_init_and = LogicArray(
@@ -164,19 +164,19 @@ class GroupAllocator:
                                   self.configs.numGroups)
             ga_rr_mask.regInit()
             for i in range(0, self.configs.numGroups):
-                arch.append(Op(ctx, group_init_and[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i]))
-                arch.append(Op(ctx, group_init_ready_o[i], group_init_hs[i]))
+                arch += Op(ctx, group_init_and[i],
+                           group_init_ready[i], 'and', group_init_valid_i[i])
+                arch += Op(ctx, group_init_ready_o[i], group_init_hs[i])
             arch += CyclicPriorityMasking(ctx, group_init_hs,
                                           group_init_and, ga_rr_mask)
             for i in range(0, self.configs.numGroups):
-                arch.append(Op(ctx, (ga_rr_mask, (i+1) %
-                                 self.configs.numGroups), (group_init_hs, i)))
+                arch += Op(ctx, (ga_rr_mask, (i+1) %
+                                 self.configs.numGroups), (group_init_hs, i))
         else:
             for i in range(0, self.configs.numGroups):
-                arch.append(Op(ctx, group_init_ready_o[i], group_init_ready[i]))
-                arch.append(Op(ctx, group_init_hs[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i]))
+                arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
+                arch += Op(ctx, group_init_hs[i],
+                           group_init_ready[i], 'and', group_init_valid_i[i])
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
@@ -190,51 +190,51 @@ class GroupAllocator:
         ga_ls_order_temp = LogicVecArray(
             ctx, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         if (self.configs.ldpAddrW > 0):
-            arch.append(Mux1HROM(ctx, ldq_port_idx_rom,
-                             self.configs.gaLdPortIdx, group_init_hs))
+            arch += Mux1HROM(ctx, ldq_port_idx_rom,
+                             self.configs.gaLdPortIdx, group_init_hs)
         if (self.configs.stpAddrW > 0):
-            arch.append(Mux1HROM(ctx, stq_port_idx_rom,
-                             self.configs.gaStPortIdx, group_init_hs))
-        arch.append(Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
-                         group_init_hs, MaskLess))
-        arch.append(Mux1HROM(ctx, num_loads,
-                         self.configs.gaNumLoads, group_init_hs))
-        arch.append(Mux1HROM(ctx, num_stores,
-                         self.configs.gaNumStores, group_init_hs))
-        arch.append(Op(ctx, num_loads_o, num_loads))
-        arch.append(Op(ctx, num_stores_o, num_stores))
+            arch += Mux1HROM(ctx, stq_port_idx_rom,
+                             self.configs.gaStPortIdx, group_init_hs)
+        arch += Mux1HROM(ctx, ga_ls_order_rom, self.configs.gaLdOrder,
+                         group_init_hs, MaskLess)
+        arch += Mux1HROM(ctx, num_loads,
+                         self.configs.gaNumLoads, group_init_hs)
+        arch += Mux1HROM(ctx, num_stores,
+                         self.configs.gaNumStores, group_init_hs)
+        arch += Op(ctx, num_loads_o, num_loads)
+        arch += Op(ctx, num_stores_o, num_stores)
 
         ldq_wen_unshifted = LogicArray(
             ctx, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
         stq_wen_unshifted = LogicArray(
             ctx, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
         for i in range(0, self.configs.numLdqEntries):
-            arch.append(Op(ctx, ldq_wen_unshifted[i],
+            arch += Op(ctx, ldq_wen_unshifted[i],
                        '\'1\'', 'when',
                        num_loads, '>', (i, self.configs.ldqAddrW),
                        'else', '\'0\''
-                       ))
+                       )
         for i in range(0, self.configs.numStqEntries):
-            arch.append(Op(ctx, stq_wen_unshifted[i],
+            arch += Op(ctx, stq_wen_unshifted[i],
                        '\'1\'', 'when',
                        num_stores, '>', (i, self.configs.stqAddrW),
                        'else', '\'0\''
-                       ))
+                       )
 
         # Shift the arrays
         if (self.configs.ldpAddrW > 0):
-            arch.append(CyclicLeftShift(ctx, ldq_port_idx_o,
-                                    ldq_port_idx_rom, ldq_tail_i))
+            arch += CyclicLeftShift(ctx, ldq_port_idx_o,
+                                    ldq_port_idx_rom, ldq_tail_i)
         if (self.configs.stpAddrW > 0):
-            arch.append(CyclicLeftShift(ctx, stq_port_idx_o,
-                                    stq_port_idx_rom, stq_tail_i))
-        arch.append(CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i))
-        arch.append(CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i))
+            arch += CyclicLeftShift(ctx, stq_port_idx_o,
+                                    stq_port_idx_rom, stq_tail_i)
+        arch += CyclicLeftShift(ctx, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
+        arch += CyclicLeftShift(ctx, stq_wen_o, stq_wen_unshifted, stq_tail_i)
         for i in range(0, self.configs.numLdqEntries):
-            arch.append(CyclicLeftShift(ctx,
-                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i))
-        arch.append(CyclicLeftShift(ctx, ga_ls_order_o,
-                                ga_ls_order_temp, ldq_tail_i))
+            arch += CyclicLeftShift(ctx,
+                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
+        arch += CyclicLeftShift(ctx, ga_ls_order_o,
+                                ga_ls_order_temp, ldq_tail_i)
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
@@ -252,7 +252,7 @@ class GroupAllocator:
             file.write('\nend entity;\n\n')
             file.write(f'architecture arch of {self.module_name} is\n')
             file.write(ctx.signalInitString)
-            file.write('begin\n' + ''.join(arch) + '\n')
+            file.write('begin\n' + arch + '\n')
             file.write(ctx.regInitString + 'end architecture;\n')
 
     def instantiate(
