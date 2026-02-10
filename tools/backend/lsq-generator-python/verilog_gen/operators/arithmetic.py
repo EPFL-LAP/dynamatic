@@ -1,4 +1,6 @@
 from verilog_gen.context import Context
+from verilog_gen.emitters.emitter import Emitter
+from verilog_gen.operators.assign import Op
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 
@@ -63,7 +65,7 @@ def WrapAddConst(ctx: Context, out, in_a, const: int, max: int) -> str:
     return str_ret
 
 
-def WrapSub(ctx: Context, out, in_a, in_b, max: int) -> str:
+def WrapSub(em: Emitter, out, in_a, in_b, max: int) -> str:
     """
     if "max" is power of 2:
         out = in_a - in_b
@@ -74,15 +76,13 @@ def WrapSub(ctx: Context, out, in_a, in_b, max: int) -> str:
             out = (in_a + max) - in_b
     """
 
-    str_ret = ctx.get_current_indent() + '-- WrapSub Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})\n'
+    em.add_comment('WrapSub Begin')
+    em.add_comment(f'WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})')
     if (isPow2(max)):
-        str_ret += ctx.get_current_indent() + f'{out.getNameWrite()} <= ' + \
-            f'std_logic_vector(unsigned({in_a.getNameRead()}) - unsigned({in_b.getNameRead()}));\n'
+        em.add_assignment(Op(em, out, f'std_logic_vector(unsigned({in_a.getNameRead()})', '-', f'unsigned({in_b.getNameRead()}))'))
     else:
-        str_ret += ctx.get_current_indent() + f'{out.getNameWrite()} <= ' + \
+        em.add_assignment(Op(em, out,
             f'std_logic_vector(unsigned({in_a.getNameRead()}) - unsigned({in_b.getNameRead()})) ' + \
-            f'when {in_a.getNameRead()} >= {in_b.getNameRead()} else\n' + '\t'*(ctx.tabLevel+1) + \
-            f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));\n'
-    str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
-    return str_ret
+            f'when {in_a.getNameRead()} >= {in_b.getNameRead()} else\n' + '\t'*(em.tabLevel+1) + \
+            f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));'))
+    em.add_comment('WrapSub End')
