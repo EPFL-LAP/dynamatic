@@ -22,6 +22,8 @@ class VHDLEmitter(Emitter):
         self.PORT_END_STR = '\n\t);'
         self.portInitString = ''
 
+        self.REG_INIT_STR = '\tprocess (clk, rst) is\n\tbegin\n'
+        self.REG_END_STR = '\tend process;\n'
         self.regInitString = ''
         self.statementString = ''
 
@@ -61,7 +63,7 @@ class VHDLEmitter(Emitter):
     def add_assignment(self, op: str):
         self.statementString += op;
 
-    def to_string(self, module_name: str) -> str:
+    def to_string(self, module_name: str, write_regs=True) -> str:
         return self.library + \
                 f'entity {module_name} is\n' + \
                 self.PORT_INIT_STR + self.portInitString + self.PORT_END_STR + \
@@ -69,4 +71,5 @@ class VHDLEmitter(Emitter):
                 f'architecture arch of {module_name} is\n' + \
                 self.signalInitString + \
                 'begin\n' + self.statementString + '\n' + \
-                self.regInitString + 'end architecture;\n'
+                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs else '') \
+                + 'end architecture;\n'

@@ -89,7 +89,6 @@ class GroupAllocator:
         em.tabLevel = 1
         em.tempCount = 0
         em.signalInitString = ''
-        em.add_reg_str('\tprocess (clk, rst) is\n' + '\tbegin\n')
 
         # IOs
         group_init_valid_i = LogicArray(
@@ -235,14 +234,8 @@ class GroupAllocator:
         CyclicLeftShift(em, ga_ls_order_o,
                                 ga_ls_order_temp, ldq_tail_i)
 
-        ######   Write To File  ######
-        if (self.configs.gaMulti):
-            em.regInitString += '\tend process;\n'
-        else:
-            em.regInitString = ''
-
         # Write to the file
-        output_str = em.to_string(self.module_name)
+        output_str = em.to_string(self.module_name, write_regs=self.configs.gaMulti)
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
             file.write(output_str)
 
