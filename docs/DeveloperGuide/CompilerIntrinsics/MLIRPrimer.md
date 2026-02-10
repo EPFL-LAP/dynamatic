@@ -132,29 +132,30 @@ For example, the following describes a Tablegen definition of the BranchOp used
 in Dynamatic (some details omitted).
 
 ```
-def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType
+def ConditionalBranchOp : Handshake_Op<"cond_br", [
+  JoinLikeOpInterface,
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
+  IsIntSizedChannel<1, "conditionOperand">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let summary = "branch operation";
-  let arguments = (ins HandshakeType:$operand);
-  let results = (outs HandshakeType:$result);
+  let summary = "conditional branch operation";
+
+  let arguments = (ins ChannelType:$conditionOperand,
+                       HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult,
+                      HandshakeType:$falseResult);
 
   let assemblyFormat = [{
-    $operand attr-dict `:` custom<HandshakeType>(type($result))
+    $conditionOperand `,` $dataOperand attr-dict
+      `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
-
-  // Extra declarations that will be inserted into the generated C++ files.
-  // They are implemented in lib/Dialect/Handshake/HandshakeOps.cpp
   let extraClassDeclaration = [{
-    // Utility methods for getting the result channel when the condition is
-    // true/false
-    // Example:
-    // if (auto branchOp = llvm::dyn_cast<dynamatic::handshake::BranchOp>(op)) {
-    //   Value trueResultChannel = branchOp.getTrueResult();
-    // }
-    mlir::Value getTrueResult();
-    mlir::Value getFalseResult();
-  }]
+    // These are the indices into the dests list.
+    enum { trueIndex = 0, falseIndex = 1 };
+  }];
 }
 ```
 
@@ -167,10 +168,9 @@ MLIR will generate:
 > Tablegen is a very concise format, which makes it very easy to update the IR
 > definition. Therefore, to make sure that the IR definition and its
 > documentation do not go out of sync, it is very common to directly document
-> how each IR operation works in these tablegen files.
-> 
-> As you can see in the Tablegen definition of the BranchOp above, it contains
-> example of how to use the class methods.
+> how each IR operation works in these tablegen files. Developers often add
+> usage examples of class methods of these custom MLIR ops in the Tablegen
+> files. 
 
 ## Traversing the IR Using the C++ API
 
