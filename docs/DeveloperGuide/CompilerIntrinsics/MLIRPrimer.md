@@ -142,6 +142,19 @@ def BranchOp : Handshake_Op<"br", [
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
   }];
+
+  // Extra declarations that will be inserted into the generated C++ files.
+  // They are implemented in lib/Dialect/Handshake/HandshakeOps.cpp
+  let extraClassDeclaration = [{
+    // Utility methods for getting the result channel when the condition is
+    // true/false
+    // Example:
+    // if (auto branchOp = llvm::dyn_cast<dynamatic::handshake::BranchOp>(op)) {
+    //   Value trueResultChannel = branchOp.getTrueResult();
+    // }
+    mlir::Value getTrueResult();
+    mlir::Value getFalseResult();
+  }]
 }
 ```
 
@@ -155,6 +168,9 @@ MLIR will generate:
 > definition. Therefore, to make sure that the IR definition and its
 > documentation do not go out of sync, it is very common to directly document
 > how each IR operation works in these tablegen files.
+> 
+> As you can see in the Tablegen definition of the BranchOp above, it contains
+> example of how to use the class methods.
 
 ## Traversing the IR Using the C++ API
 
