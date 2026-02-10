@@ -27,8 +27,9 @@ public:
   enum class TYPE {
     AOB /* Absence Of Backpressure */,
     VEQ /* Valid EQuivalence */,
-    EFNAO /* Eager Fork Not All Output sent */,
-    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
+    EagerForkNotAllOutputSent,       /* Eager Fork Not All Output sent */
+    CopiedSlotsOfActiveForksAreFull, /* Copied Slots Of Active Forks Are Full */
+    PathSingleSentForkOutput,        /* Path Single Sent Fork Output */
   };
 
   TAG getTag() const { return tag; }
@@ -178,7 +179,7 @@ public:
   ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::EFNAO;
+    return fp->getType() == TYPE::EagerForkNotAllOutputSent;
   }
 
 private:
@@ -214,7 +215,7 @@ public:
   ~CopiedSlotsOfActiveForkAreFull() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::CSOAFAF;
+    return fp->getType() == TYPE::CopiedSlotsOfActiveForksAreFull;
   }
 
 private:
@@ -226,6 +227,40 @@ private:
   inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
+};
+
+// For any path that does not contain any slots, only at most a single fork
+// output along that path can be in the `sent` state. In other words, if there
+// is a path containing two fork outputs in the `sent` state, there has to be a
+// slot containing a token between them, as the earlier `sent` output duplicated
+// a token onto this path, and the later `sent` output blocks the token from
+// leaving the path. See invariant 3 of
+// https://ieeexplore.ieee.org/document/10323796 for more details
+class PathSingleSentForkOutput : public FormalProperty {
+public:
+  std::vector<std::string> getForkOps() { return forkOps; }
+  std::vector<unsigned> getOutputIdxs() { return outputIdxs; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<PathSingleSentForkOutput>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  PathSingleSentForkOutput() = default;
+  PathSingleSentForkOutput(unsigned long id, TAG tag,
+                           const std::vector<std::string> &forkOps,
+                           const std::vector<unsigned> &outputIdxs);
+  ~PathSingleSentForkOutput() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::PathSingleSentForkOutput;
+  }
+
+private:
+  std::vector<std::string> forkOps;
+  std::vector<unsigned> outputIdxs;
+  inline static const StringLiteral FORK_OPS_LIT = "fork_ops";
+  inline static const StringLiteral OUTPUT_IDXS_LIT = "output_idxs";
 };
 
 class FormalPropertyTable {

@@ -28,9 +28,11 @@ FormalProperty::typeFromStr(const std::string &s) {
   if (s == "VEQ")
     return FormalProperty::TYPE::VEQ;
   if (s == "EFNAO")
-    return FormalProperty::TYPE::EFNAO;
+    return FormalProperty::TYPE::EagerForkNotAllOutputSent;
   if (s == "CSOAFAF")
-    return FormalProperty::TYPE::CSOAFAF;
+    return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
+  if (s == "PSSFO")
+    return FormalProperty::TYPE::PathSingleSentForkOutput;
 
   return std::nullopt;
 }
@@ -41,10 +43,12 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "AOB";
   case TYPE::VEQ:
     return "VEQ";
-  case TYPE::EFNAO:
+  case TYPE::EagerForkNotAllOutputSent:
     return "EFNAO";
-  case TYPE::CSOAFAF:
+  case TYPE::CopiedSlotsOfActiveForksAreFull:
     return "CSOAFAF";
+  case TYPE::PathSingleSentForkOutput:
+    return "PSSFO";
   }
 }
 
@@ -97,11 +101,13 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return AbsenceOfBackpressure::fromJSON(value, path.field(INFO_LIT));
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::EFNAO:
+  case TYPE::EagerForkNotAllOutputSent:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::CSOAFAF:
+  case TYPE::CopiedSlotsOfActiveForksAreFull:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::PathSingleSentForkOutput:
+    return PathSingleSentForkOutput::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -243,7 +249,7 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
-    : FormalProperty(id, tag, TYPE::EFNAO) {
+    : FormalProperty(id, tag, TYPE::EagerForkNotAllOutputSent) {
   ownerOp = getUniqueName(forkOp).str();
   numEagerForkOutputs = forkOp.getNumEagerOutputs();
 }
@@ -273,7 +279,7 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
     unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
-    : FormalProperty(id, tag, TYPE::CSOAFAF) {
+    : FormalProperty(id, tag, TYPE::CopiedSlotsOfActiveForksAreFull) {
   forkOp = getUniqueName(forkOpI).str();
   numEagerForkOutputs = forkOpI.getNumEagerOutputs();
   bufferOp = getUniqueName(bufferOpI).str();
@@ -299,6 +305,32 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
       !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
       !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
       !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
+    return nullptr;
+
+  return prop;
+}
+
+PathSingleSentForkOutput::PathSingleSentForkOutput(
+    unsigned long id, TAG tag, const std::vector<std::string> &forkOps,
+    const std::vector<unsigned> &outputIdxs)
+    : FormalProperty(id, tag, TYPE::PathSingleSentForkOutput), forkOps{forkOps},
+      outputIdxs{outputIdxs} {}
+
+llvm::json::Value PathSingleSentForkOutput::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{FORK_OPS_LIT, forkOps}, {OUTPUT_IDXS_LIT, outputIdxs}});
+}
+
+std::unique_ptr<PathSingleSentForkOutput>
+PathSingleSentForkOutput::fromJSON(const llvm::json::Value &value,
+                                   llvm::json::Path path) {
+  auto prop = std::make_unique<PathSingleSentForkOutput>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(FORK_OPS_LIT, prop->forkOps) ||
+      !mapper.map(OUTPUT_IDXS_LIT, prop->outputIdxs))
     return nullptr;
 
   return prop;
