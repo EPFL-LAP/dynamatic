@@ -1,10 +1,10 @@
-from verilog_gen.context import Context
+from verilog_gen.emitters.emitter import Emitter
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
 
 
-def CyclicPriorityMasking(ctx: Context, dout, din, base, reverse=False) -> str:
+def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
     """
     Parameters:
         dout (LogicVecArray, LogicArray, LogicVec):
@@ -55,66 +55,61 @@ def CyclicPriorityMasking(ctx: Context, dout, din, base, reverse=False) -> str:
                      010
     """
 
-    str_ret = ctx.get_current_indent() + '-- Priority Masking Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- CyclicPriorityMask({dout.name}, {din.name}, {base.name})\n'
-    ctx.use_temp()
+    em.add_comment('Priority Masking Begin')
+    em.add_comment(f'CyclicPriorityMask({dout.name}, {din.name}, {base.name})')
+    em.use_temp()
     if (type(din) == LogicVecArray):
         assert (reverse == False)
         for i in range(0, din.size):
             size = din.length
-            double_in = LogicVec(ctx, ctx.get_temp(f'double_in_{i}'), 'w', size*2)
+            double_in = LogicVec(em, em.get_temp(f'double_in_{i}'), 'w', size*2)
             for j in range(0, size):
-                str_ret += Op(ctx, (double_in, j), (din, j, i))
-                str_ret += Op(ctx, (double_in, j+size), (din, j, i))
-            double_out = LogicVec(ctx, ctx.get_temp(f'double_out_{i}'), 'w', size*2)
-            str_ret += Op(ctx, double_out, double_in, 'and', 'not',
+                em.add_assignment(Op(em, (double_in, j), (din, j, i)))
+                em.add_assignment(Op(em, (double_in, j+size), (din, j, i)))
+            double_out = LogicVec(em, em.get_temp(f'double_out_{i}'), 'w', size*2)
+            em.add_assignment(Op(em, double_out, double_in, 'and', 'not',
                           'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
-                          )
+                          ))
             for j in range(0, size):
-                str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(j, i)} <= ' + \
-                    f'{double_out.getNameRead(j)} or {double_out.getNameRead(j+size)};\n'
+                em.add_assignment(Op(em, (dout, j, i), (double_out, j), 'or' (double_out, j+size)))
     else:
         if reverse:
             if (type(din) == LogicArray):
                 size = din.length
             else:
                 size = din.size
-            double_in = LogicVec(ctx, ctx.get_temp('double_in'), 'w', size*2)
+            double_in = LogicVec(em, em.get_temp('double_in'), 'w', size*2)
             for i in range(0, size):
-                str_ret += Op(ctx, (double_in, i), (din, size-1-i))
-                str_ret += Op(ctx, (double_in, i+size), (din, size-1-i))
-            base_rev = LogicVec(ctx, ctx.get_temp('base_rev'), 'w', size)
+                em.add_assignment(Op(em, (double_in, i), (din, size-1-i)))
+                em.add_assignment(Op(em, (double_in, i+size), (din, size-1-i)))
+            base_rev = LogicVec(em, em.get_temp('base_rev'), 'w', size)
             for i in range(0, size):
-                str_ret += Op(ctx, (base_rev, i), (base, size-1-i))
-            double_out = LogicVec(ctx, ctx.get_temp('double_out'), 'w', size*2)
-            str_ret += Op(ctx, double_out, double_in, 'and', 'not',
+                str_ret += Op(em, (base_rev, i), (base, size-1-i))
+            double_out = LogicVec(em, em.get_temp('double_out'), 'w', size*2)
+            em.add_assignment(Op(em, double_out, double_in, 'and', 'not',
                           'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base_rev, ')', ')'
-                          )
+                          ))
             for i in range(0, size):
-                str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(size-1-i)} <= ' + \
-                    f'{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)};\n'
+                em.add_assignment(Op(em, (dout, size-1-i), (double_out, i), 'or', (double_out, i+size)))
         else:
             if (type(din) == LogicArray):
                 size = din.length
-                double_in = LogicVec(ctx, ctx.get_temp('double_in'), 'w', size*2)
+                double_in = LogicVec(em, em.get_temp('double_in'), 'w', size*2)
                 for i in range(0, size):
-                    str_ret += Op(ctx, (double_in, i), (din, i))
-                    str_ret += Op(ctx, (double_in, i+size), (din, i))
+                    em.add_assignment(Op(em, (double_in, i), (din, i)))
+                    em.add_assignment(Op(em, (double_in, i+size), (din, i)))
             else:
                 size = din.size
-                double_in = LogicVec(ctx, ctx.get_temp('double_in'), 'w', size*2)
-                str_ret += Op(ctx, double_in, din, '&', din)
-            double_out = LogicVec(ctx, ctx.get_temp('double_out'), 'w', size*2)
-            str_ret += Op(ctx, double_out, double_in, 'and', 'not',
+                double_in = LogicVec(em, em.get_temp('double_in'), 'w', size*2)
+                em.add_assignment(Op(em, double_in, din, '&', din))
+            double_out = LogicVec(em, em.get_temp('double_out'), 'w', size*2)
+            em.add_assignment(Op(em, double_out, double_in, 'and', 'not',
                           'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
-                          )
+                          ))
             if (type(dout) == LogicVec):
-                str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= ' + \
-                    f'{double_out.getNameRead()}({size-1} downto 0) or ' + \
-                    f'{double_out.getNameRead()}({2*size-1} downto {size});\n'
+                em.add_assignment(Op(em, dout, f'{double_out.getNameRead()}({size-1} downto 0) or ' + \
+                    f'{double_out.getNameRead()}({2*size-1} downto {size})'))
             else:
                 for i in range(0, size):
-                    str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= ' + \
-                        f'{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)};\n'
-    str_ret += ctx.get_current_indent() + '-- Priority Masking End\n\n'
-    return str_ret
+                    em.add_assignment(Op(em, (dout, i), f'{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)}'))
+    em.add_comment('Priority Masking End\n')
