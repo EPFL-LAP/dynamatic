@@ -1,4 +1,5 @@
 from verilog_gen.context import Context
+from verilog_gen.emitters.emitter import Emitter
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 from verilog_gen.operators import *
@@ -80,7 +81,7 @@ def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
     return str_ret
 
 
-def Mux1HROM(ctx: Context, dout, din, sel, func=IntToBits) -> str:
+def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
     """
     Generate a one-hot ROM multiplexer for LSQ port index allocation,
     Load-Store Order Matrix construction, and tracking load/store numbers.
@@ -130,37 +131,34 @@ def Mux1HROM(ctx: Context, dout, din, sel, func=IntToBits) -> str:
         It has 1 load. that "dout" indicates 1.
     """
 
-    str_ret = ctx.get_current_indent() + '-- Mux1H For Rom Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- Mux1H({dout.name}, {sel.name})\n'
-    ctx.use_temp()
+    em.add_comment('Mux1H For Rom Begin')
+    em.add_comment(f'Mux1H({dout.name}, {sel.name})')
+    em.use_temp()
     mlen = sel.length
     size = dout.size
     str_zero = Zero(size)
     if (type(dout) == LogicVecArray):
         length = dout.length
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'-- Loop {i}\n'
-            mux = LogicVecArray(ctx, ctx.get_temp(f'mux_{i}'), 'w', mlen, size)
+            em.add_comment(f'Loop {i}')
+            mux = LogicVecArray(em, em.get_temp(f'mux_{i}'), 'w', mlen, size)
             for j in range(0, mlen):
                 str_value = func(GetValue(din[j], i), size)
                 if (str_value == str_zero):
-                    str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(j)} <= {str_zero};\n'
+                    em.add_assignment(Op(em, (mux, j), str_zero))
                 else:
-                    str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(j)} <= {str_value} ' + \
-                        f'when {sel.getNameRead(j)} else {str_zero};\n'
-            str_ret += Reduce(ctx, dout[i], mux, 'or', False)
+                    em.add_assignment(Op(em, (mux, j), str_value, 'when', (sel, j), 'else', str_zero))
+            Reduce(em, dout[i], mux, 'or', False)
     else:   # type(dout) == LogicVec
-        mux = LogicVecArray(ctx, ctx.get_temp(f'mux'), 'w', mlen, size)
+        mux = LogicVecArray(em, em.get_temp(f'mux'), 'w', mlen, size)
         for j in range(0, mlen):
             str_value = func(din[j], size)
             if (str_value == str_zero):
-                str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(j)} <= {str_zero};\n'
+                em.add_assignment(Op(em, (mux, j), str_zero))
             else:
-                str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(j)} <= {str_value} ' + \
-                    f'when {sel.getNameRead(j)} else {str_zero};\n'
-        str_ret += Reduce(ctx, dout, mux, 'or', False)
-    str_ret += ctx.get_current_indent() + '-- Mux1H For Rom End\n\n'
-    return str_ret
+                em.add_assignment(Op(em, (mux, j), str_value, 'when', (sel, j), 'else', str_zero))
+        Reduce(em, dout, mux, 'or', False)
+    em.add_comment('Mux1H For Rom End\n')
 
 
 def MuxIndex(din, sel) -> str:
