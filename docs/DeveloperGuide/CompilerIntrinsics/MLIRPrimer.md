@@ -257,12 +257,12 @@ correspond to the `mlir::Value` C++ type. All values are typed using either a
 built-in type or a custom user-defined type (the type of a value is itself a
 C++ type called `Type`).
 
-Values are either produced by [operations](#operations) as operation results
+Values are either produced by operations as operation results
 (`mlir::OpResult`, which is a subtype of `mlir::Value`) or are defined by
-[blocks](#blocks) as part of their block arguments (`mlir::BlockArgument`, also
-a subtype of `mlir::Value`). They are consumed by [operations](#operations) as
-operation operands. A value may have 0 or more uses, but should have exactly
-one producer (an operation or a block).
+blocks as part of their block arguments (`mlir::BlockArgument`, also a subtype
+of `mlir::Value`). They are consumed by operations as operation operands. A
+value may have 0 or more uses, but should have exactly one producer (an
+operation or a block).
 
 For example, consider the following MLIR snippet:
 
@@ -327,7 +327,7 @@ for (mlir::Operation *user : value.getUsers())
   llvm::outs() << "Value is used as an operand of operation " << user << "\n";
 ```
 
-## Operations
+## Analyzing MLIR Operations
 
 In MLIR, everything is about operations. Operations are like "opaque functions"
 to MLIR; they may represent some abstraction (e.g., a function, with a
@@ -379,7 +379,7 @@ else
   llvm::outs() << "Integer attribute attr-name does not exist\n";
 ```
 
-### Manipulating the Operation Based on its Type
+### Important: Manipulating the Operation Based on its Type
 
 This part explains how we can analyze and manipulate MLIR operation of a specific type.
 
@@ -558,7 +558,7 @@ values would have been usable by the region's parent operation operands.
 A function body (i.e., the region inside a `mlir::func::FuncOp` operation) is
 an example of an SSACFG region, where each block represents a control-free
 sequence of operations that executes sequentially. The last operation of each
-block, called the *terminator operation* (see the [next sextion](#blocks)),
+block, called the *terminator operation* (see the section on `Block`),
 identifies where control flow goes next; either to another block, called a
 *successor block* in this context, inside the function body (in the case of a
 *branch*-like operation) or back to the parent operation (in the case of a
@@ -578,14 +578,14 @@ graph regions, the order of operations within a block and the order of blocks
 in a region is not semantically meaningful and non-terminator operations may be
 freely reordered.
 
-## [Blocks](https://mlir.llvm.org/docs/LangRef/#blocks)
+## Blocks
 
 A block is an ordered list of MLIR operations. The last operation in a block
 must be a terminator operation, unless it is the single block of a region whose
 parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an
 operation).
 
-As mentioned in the [prior section on MLIR values](#values), blocks may have
+As mentioned in the prior section on MLIR values, blocks may have
 block arguments. 
 
 Blocks in MLIR take a list of block arguments, notated in a function-like way.
