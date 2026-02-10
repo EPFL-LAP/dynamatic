@@ -1,24 +1,10 @@
 # An MLIR Primer
 
 This tutorial introduces you to MLIR and its core constructs. This document is
-useful to get an initial idea of how MLIR works and of how to manipulate its
+useful to get an initial idea of how MLIR works and how to manipulate its
 data-structures.
 
-## Table of Contents
-
-- [High-level structure](#high-level-structure) | What are the core data-structures used throughout MLIR?
-- [Traversing the IR](#traversing-the-ir) | How does one traverse the recursive IR top-to-bottom and bottom-to-top?
-- [Values](#values) | What are values and how are they used by operations?
-- [Operations](#operations) | What are operations and how does one manipulate them?
-- [Regions](#regions) | What are regions and what kind of abstraction can they map to?
-- [Blocks](#blocks) | What are blocks and block arguments?
-- [Attributes](#attributes) | What are attributes and what are they used for?
-- [Dialects](#dialects) | What are MLIR dialects?
-- [Printing to the console](#printing-to-the-console) | What are the various ways of printing to the console?
-
 ## High-Level Structure
-
-Also check out the [official documentation on this part](https://mlir.llvm.org/docs/LangRef/#high-level-structure).
 
 MLIR has graph-like data structure: every IR contains nodes, called
 `Operation`s, and edges, called `Value`s. Each `Value` is the result of exactly
@@ -64,12 +50,13 @@ module {
 }
 ```
 
-The file above describes a MLIR moduleOp (`module`), which contains a funcOp
-(`func.func` with name `fir`) that represents an MLIR function. The prefix
-`func.*` indicates the specific dialect that the op belongs to (we will discuss
-the concept of dialect later: they are just a way to organize the operations).
-This function has an internal region with 3 blocks: `^bb0` (omitted in the
-text), `^bb1`, and `^bb2`. And each block contains a list of operations.
+The file above describes a MLIR module operation (`module`), which contains a
+function operation (`func.func` with name `fir`) that represents an MLIR
+function. The prefix `func.*` indicates the specific dialect that the op
+belongs to (we will discuss the concept of dialect later: they are just a way
+to organize the operations). This function has an internal region with 3
+blocks: `^bb0` (omitted in the text), `^bb1`, and `^bb2`. And each block
+contains a list of operations.
 
 For example, the following operation has two operand values (`%1` and `%9`) and
 produces one result values `%10`.
@@ -86,15 +73,96 @@ hierarchy repeats.
 So far, we have seen how MLIR represents operations, values, and hierarchies.
 In the following, we will discuss how to analyze them using the C++ API of MLIR
 
-## Traversing the IR
+For more details on the MLIR language, check out this
+[documentation](https://mlir.llvm.org/docs/LangRef/#high-level-structure).
+
+### MLIR Dialect
+
+Dialects: MLIR manages extensibility using *dialects*, which provide a logical
+grouping of Ops, attributes and types under a unique namespace. Dialects
+themselves do not introduce any new semantics but serve as a logical grouping
+mechanism that provides common Op functionality (e.g., constant folding
+behavior for all ops in the dialect).
+
+The dialect namespace appears as a dot-separated prefix in the opcode.
+
+For example, the following operation is an `addi` operation in the `arith` dialect.
+```mlir
+%10 = arith.addi %1, %9 : i32
+```
+
+For example, the following operation is a `func` operation in the `func` dialect.
+```mlir
+func.func @fir(%arg0: memref<1000xi32>, %arg1: memref<1000xi32>) -> i32 {
+    // ignore the details inside the function. 
+}
+```
+
+Dynamatic uses many dialects:
+- Dynamatic uses the built-in MLIR dialects (i.e., available from the upstream
+  MLIR repo): *ControlFlow*, *arith*, *math*, and *memref* dialects to model a
+  software IR.
+- Dynamatic uses the *Handshake* dialect to model dataflow circuits.
+
+In the next section, we will see how MLIR facilitates the definition of custom
+dialects and operations. For this tutorial, let's focus on where to find
+important definitions we can use to write MLIR analysis and transformation
+passes.
+
+## Reviewing the Definitions of the MLIR Operations and Dialects
+
+Defining an intermediate representation in C++ is very complex; one has to
+define a complex class hierarchy for operations, values, attributes,
+interfaces, and so on. For each specific class, there are also a lot of details
+to implement, for example, we need to define different constructors, the
+printer, and the parser.
+
+MLIR greatly simplifies this process: it uses the Tablegen format to define IR,
+which will be automatically translated into C++ files that can be
+included in the regular C++ files. The tablegen definitions are usually stored
+in files named with a suffix ".td".
+
+### What is the Tablegen Format?
+
+The Tablegen format is a domain-specific language used in the MLIR framework to
+define custom IR operations and types. The MLIR infrastructure translates these
+files into C++ files that can be included in the C++ source tree. 
+
+For example, the following describes a Tablegen definition of the BranchOp used
+in Dynamatic (some details omitted).
+
+```
+def BranchOp : Handshake_Op<"br", [
+  Pure, SameOperandsAndResultType
+]> {
+  let summary = "branch operation";
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($result))
+  }];
+}
+```
+
+MLIR will generate:
+- Declaration of the data structures: typically included in the CPP headers.
+- Some default implementations of various methods for creating, analyzing, and
+  manipulating these data structures: typically included in the CPP source files.
+
+> [!NOTE]
+> Tablegen is a very concise format, which makes it very easy to update the IR
+> definition. Therefore, to make sure that the IR definition and its
+> documentation do not go out of sync, it is very common to directly document
+> how each IR operation works in these tablegen files.
+
+## Traversing the IR Using the C++ API
 
 This section presents different examples of how to use the C++ API to traverse
 a hierarchical IR. We describe the IR traversal in two directions:
 - From top to bottom: we recursively visit the operations in lower levels. 
 - From bottom to top: we start from a lower leve and traverse the parent
   hierarchies.
-
-Also check out the [official documentation on this part](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#traversing-the-ir-nesting).
 
 ### From Top to Bottom
 
@@ -132,7 +200,7 @@ block.walk([&](mlir::Operation *op) {
 
 ### From Bottom to Top
 
-One may also get the parent entities of a given operation/region/block.
+One may also get the parent entities of a given operation, region, or block.
 
 ```cpp
 // Let op be an Operation*
@@ -164,7 +232,9 @@ mlir::Operation *regionParentOp = parentRegion->getParentOp();
 assert(parentOp == regionParentOp);
 ```
 
-## Values
+For more details on IR traversal, check out this [documentation](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#traversing-the-ir-nesting).
+
+## Analyzing MLIR Values
 
 Values are the edges of the graph-like structure that MLIR models. They
 correspond to the `mlir::Value` C++ type. All values are typed using either a
@@ -241,7 +311,7 @@ for (mlir::Operation *user : value.getUsers())
   llvm::outs() << "Value is used as an operand of operation " << user << "\n";
 ```
 
-## [Operations](https://mlir.llvm.org/docs/LangRef/#operations)
+## Operations
 
 In MLIR, everything is about operations. Operations are like "opaque functions"
 to MLIR; they may represent some abstraction (e.g., a function, with a
@@ -297,7 +367,6 @@ else
 
 This part explains how we can analyze and manipulate MLIR operation of a specific type.
 
-[official documentation](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/#op-vs-operation-using-mlir-operations):
 
 As we saw above, you can manipulate any operation in MLIR using the `Operation`
 type (often through an `Operation*`) which provides a generic API into an
@@ -446,9 +515,10 @@ block.walk([&](Operation *op) {
 });
 ```
 
-## [Regions](https://mlir.llvm.org/docs/LangRef/#regions)
+For more details on how to analyze and transform an MLIR operation, check out [this documentation](https://mlir.llvm.org/docs/LangRef/#operations).
 
-Check out also the [language reference](https://mlir.llvm.org/docs/LangRef/#regions).
+## Regions
+
 
 A region is an ordered list of MLIR blocks. The semantics within a region is
 not imposed by the IR. Instead, the containing operation defines the semantics
@@ -515,15 +585,11 @@ of control-flow dependent values. They remove the need for [*PHI*
 nodes](https://en.wikipedia.org/wiki/Static_single-assignment_form#Converting_to_SSA)
 that many other SSA IRs employ (like LLVM IR).
 
-Check out also the [language reference](https://mlir.llvm.org/docs/LangRef/#blocks) on this part.
+For more details on MLIR region and block, check out this [documentation](https://mlir.llvm.org/docs/LangRef/#blocks).
 
-## [Attributes](https://mlir.llvm.org/docs/LangRef/#attributes)
+## Attributes
 
-For this section, you are simply invited to read [the relevant part of the
-language reference](https://mlir.llvm.org/docs/LangRef/#attributes), which is
-very short.
-
-In summary, attributes are used to attach data/information to operations that
+MLIR attributes are used to attach data/information to operations that
 cannot be expressed using a value operand. Additionally, attributes allow us to
 propagate meta-information about operations down the lowering pipeline. This is
 useful whenever, for example, some analysis can only be performed at a "high IR
@@ -533,11 +599,10 @@ using attributes, and these attributes would then be propagated through
 lowering passes until the IR reaches the level where the information must be
 acted upon.
 
-## [Dialects](https://mlir.llvm.org/docs/LangRef/#dialects)
+For more details on the MLIR attributes, check out this [documentation](https://mlir.llvm.org/docs/LangRef/#attributes).
 
-For this section, you are also simply invited to read [the relevant part of the
-language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is
-very short.
+
+## Dialects
 
 The *Handshake* dialect, defined in the `dynamatic::handshake` namespace, is
 core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside
@@ -546,7 +611,9 @@ core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside
 operations (i.e., dataflow components), which together make up a dataflow
 circuit.
 
-## Printing to the console
+For more details on the MLIR dialects, check out this [documentation](https://mlir.llvm.org/docs/LangRef/#dialects).
+
+## Printing to the Console
 
 ### Printing to stdout and stderr
 
@@ -576,7 +643,7 @@ llvm::errs() << "This will be printed on stderr!\n"
 > explicitly print anything to stdout yourself**, as it will mix up with the IR
 > text serialization. Instead, all error messages should go to stderr.
 
-### Printing information related to an operation
+### Printing Information Related to an Operation
 
 You will regularly want to print a message to stdout/stderr and attach it to a
 specific operation that it relates to. While you could just use `llvm::outs()`
