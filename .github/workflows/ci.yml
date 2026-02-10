@@ -4,10 +4,14 @@ on:
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
   pull_request:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
   
   push:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
 
 concurrency:
