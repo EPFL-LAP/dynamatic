@@ -1,8 +1,10 @@
 # An MLIR Primer
 
-This tutorial will introduce you to MLIR and its core constructs. It is intended as a short and very incomplete yet pragmatic first look into the framework for newcomers, and will provide you with valuable "day-0" information that you're likely to need as soon as you start developing in Dynamatic. At many points, this tutorial will reference the official and definitely more complete [MLIR documentation](https://mlir.llvm.org/docs/), which you are invited to look up whenever you require more in-depth information about a particular concept. While this document is useful to get an initial idea of how MLIR works and of how to manipulate its data-structures, we strongly recommend the reader to follow a "learn by doing" philosophy. Reading documentation, especially of complex frameworks like MLIR, will only get you so far. Practice is the path toward actual understanding and mastering in the long run.
+This tutorial introduces you to MLIR and its core constructs. This document is
+useful to get an initial idea of how MLIR works and of how to manipulate its
+data-structures.
 
-## Table of contents
+## Table of Contents
 
 - [High-level structure](#high-level-structure) | What are the core data-structures used throughout MLIR?
 - [Traversing the IR](#traversing-the-ir) | How does one traverse the recursive IR top-to-bottom and bottom-to-top?
@@ -14,21 +16,90 @@ This tutorial will introduce you to MLIR and its core constructs. It is intended
 - [Dialects](#dialects) | What are MLIR dialects?
 - [Printing to the console](#printing-to-the-console) | What are the various ways of printing to the console?
 
-## [High-level structure](https://mlir.llvm.org/docs/LangRef/#high-level-structure)
+## High-Level Structure
 
-From the [language reference](https://mlir.llvm.org/docs/LangRef):
+Also check out the [official documentation on this part](https://mlir.llvm.org/docs/LangRef/#high-level-structure).
 
-> MLIR is fundamentally based on a graph-like data structure of nodes, called `Operation`s, and edges, called `Value`s. Each `Value` is the result of exactly one `Operation` or `BlockArgument`, and has a `Value` `Type` defined by the type system. Operations are contained in `Block`s and `Block`s are contained in `Region`s. `Operation`s are also ordered within their containing block and `Block`s are ordered in their containing region, although this order may or may not be semantically meaningful in a given kind of region). Operations may also contain regions, enabling hierarchical structures to be represented.
+MLIR has graph-like data structure: every IR contains nodes, called
+`Operation`s, and edges, called `Value`s. Each `Value` is the result of exactly
+one `Operation` or `BlockArgument`, and has a `Value` `Type` defined by the
+type system. An operation has a list of operand values and a list of result
+values.
 
-All of these data-structures can be manipulated in C++ using their respective types (which are typesetted in the above paragraph). In addition, they can all be printed to a text file (by convention, a file with the `.mlir` extension) and parsed back to their in-memory representation at any point.
+Operations are contained in `Block`s, and `Block`s are contained in `Region`s.
+`Operation`s are ordered within their containing block and `Block`s are ordered
+in their containing region. Operations may also contain regions, enabling
+hierarchical structures to be represented.
 
-To summarize, every MLIR file (`*.mlir`) is recursively nested. It starts with a top-level operation (often, an `mlir::ModuleOp`) which may contain nested regions, each of which may contain an ordered list of nested blocks, each of which may contain an ordered list of nested operations, after which the hierarchy repeats.
+All these data structures can be manipulated in C++ using their respective
+types. In addition, they can be printed to a text file (by convention, a file
+with the `.mlir` extension) and parsed back to their in-memory representation
+at any point. For example, the following is a textual representation of an MLIR
+file:
 
-## [Traversing the IR](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#traversing-the-ir-nesting)
+```mlir
+module {
+  func.func @fir(%arg0: memref<1000xi32>, %arg1: memref<1000xi32>) -> i32 {
+    %c0_i32 = arith.constant 0 : i32
+    %c999_i32 = arith.constant 999 : i32
+    %c1_i32 = arith.constant 1 : i32
+    %c1000_i32 = arith.constant 1000 : i32
+    cf.br ^bb1(%c0_i32, %c0_i32 : i32, i32)
+  ^bb1(%0: i32, %1: i32):  // 2 preds: ^bb0, ^bb1
+    %2 = arith.extui %0 : i32 to i64
+    %3 = arith.index_cast %2 : i64 to index
+    %4 = memref.load %arg1[%3] {handshake.name = "load0"} : memref<1000xi32>
+    %5 = arith.subi %c999_i32, %0 : i32
+    %6 = arith.extui %5 : i32 to i64
+    %7 = arith.index_cast %6 : i64 to index
+    %8 = memref.load %arg0[%7] {handshake.name = "load1"} : memref<1000xi32>
+    %9 = arith.muli %4, %8 : i32
+    %10 = arith.addi %1, %9 : i32
+    %11 = arith.addi %0, %c1_i32 : i32
+    %12 = arith.cmpi ult, %11, %c1000_i32 : i32
+    cf.cond_br %12, ^bb1(%11, %10 : i32, i32), ^bb2(%10 : i32)
+  ^bb2(%13: i32):  // pred: ^bb1
+    return %13 : i32
+  }
+}
+```
 
-### From top to bottom
+The file above describes a MLIR moduleOp (`module`), which contains a funcOp
+(`func.func` with name `fir`) that represents an MLIR function. The prefix
+`func.*` indicates the specific dialect that the op belongs to (we will discuss
+the concept of dialect later: they are just a way to organize the operations).
+This function has an internal region with 3 blocks: `^bb0` (omitted in the
+text), `^bb1`, and `^bb2`. And each block contains a list of operations.
 
-Thanks to MLIR's recursively nested structure, it is very easy to traverse the entire IR recursively. Consider the following C++ function which finds and recursively traverses all operations nested within a provided operation.
+For example, the following operation has two operand values (`%1` and `%9`) and
+produces one result values `%10`.
+```
+%10 = arith.addi %1, %9 : i32
+```
+
+To summarize, every MLIR file (`*.mlir`) is recursively nested. It starts with
+a top-level operation (often, an `mlir::ModuleOp`) which may contain nested
+regions, each of which may contain an ordered list of nested blocks, each of
+which may contain an ordered list of nested operations, after which the
+hierarchy repeats.
+
+So far, we have seen how MLIR represents operations, values, and hierarchies.
+In the following, we will discuss how to analyze them using the C++ API of MLIR
+
+## Traversing the IR
+
+This section presents different examples of how to use the C++ API to traverse
+a hierarchical IR. We describe the IR traversal in two directions:
+- From top to bottom: we recursively visit the operations in lower levels. 
+- From bottom to top: we start from a lower leve and traverse the parent
+  hierarchies.
+
+Also check out the [official documentation on this part](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#traversing-the-ir-nesting).
+
+### From Top to Bottom
+
+Consider the following C++ function which finds and recursively
+traverses all operations nested within a provided operation.
 
 ```cpp
 void traverseIRFromOperation(mlir::Operation *op) {
@@ -43,7 +114,11 @@ void traverseIRFromOperation(mlir::Operation *op) {
 }
 ```
 
-MLIR also exposes the [`walk` method](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#walkers) on the `Operation`, `Region`, and `block` types. `walk` takes as single argument a callback method that will be invoked recursively for all operations recursively nested under the receiving entity.
+MLIR also exposes the [`walk`
+method](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#walkers)
+on the `Operation`, `Region`, and `block` types. `walk` takes as single
+argument a callback method that will be invoked recursively for all operations
+recursively nested under the receiving entity.
 
 ```cpp
 // Let block be a Block&
@@ -55,7 +130,7 @@ block.walk([&](mlir::Operation *op) {
 });
 ```
 
-### From bottom to top
+### From Bottom to Top
 
 One may also get the parent entities of a given operation/region/block.
 
@@ -69,14 +144,17 @@ mlir::Operation* op = ...;
 
 // Get the parent block the operation immediately belongs to
 mlir::Block *parentBlock = op->getBlock();
+
 // Get the parent region the operation immediately belongs to
 mlir::Region *parentRegion = op->getParentRegion();
+
 // Get the parent operation the operation immediately belongs to
 mlir::Operation *parentOp = op->getParentOp();
 
 // Get the parent region the block immediately belongs to
 mlir::Region *blockParentRegion = parentBlock->getParent();
 assert(parentRegion == blockParentRegion);
+
 // Get the parent operation the block immediately belongs to
 mlir::Operation *blockParentOp = parentBlock->getParentOp();
 assert(parentOp == blockParentOp);
@@ -88,9 +166,30 @@ assert(parentOp == regionParentOp);
 
 ## Values
 
-Values are the edges of the graph-like structure that MLIR models. Their corresponding C++ type is `mlir::Value`. All values are typed using either a built-in type or a custom user-defined type (the type of a value is itself a C++ type called `Type`), which may change at runtime but is subject to verification constraints imposed by the context in which the value is used. Values are either produced by [operations](#operations) as operation results (`mlir::OpResult`, which is a subtype of `mlir::Value`) or are defined by [blocks](#blocks) as part of their block arguments (`mlir::BlockArgument`, also a subtype of `mlir::Value`). They are consumed by [operations](#operations) as operation operands. A value may have 0 or more uses, but should have exactly one producer (an operation or a block).
+Values are the edges of the graph-like structure that MLIR models. They
+correspond to the `mlir::Value` C++ type. All values are typed using either a
+built-in type or a custom user-defined type (the type of a value is itself a
+C++ type called `Type`).
 
-The following C++ snippet shows how to identify the type and producer of a value and prints the index of the producer's operation result/block argument that the value corresponds to.
+Values are either produced by [operations](#operations) as operation results
+(`mlir::OpResult`, which is a subtype of `mlir::Value`) or are defined by
+[blocks](#blocks) as part of their block arguments (`mlir::BlockArgument`, also
+a subtype of `mlir::Value`). They are consumed by [operations](#operations) as
+operation operands. A value may have 0 or more uses, but should have exactly
+one producer (an operation or a block).
+
+For example, consider the following MLIR snippet:
+
+```mlir
+%result0 = cfx.phi %operand0, %operand1 { bbID = 0 } : (i32, i32) -> i32
+%result1 = arith.addi %result0, %operand2 { bbID = 0 } : (i32, i32) -> i32
+```
+in this example, the value `%result0` produced by operation `cfx.phi` is used
+by operation `arith.addi`.
+
+The following C++ snippet shows how to identify the type and producer of a
+value and prints the index of the producer's operation result/block argument
+that the value corresponds to.
 
 ```cpp
 // Let value be a Value
@@ -118,7 +217,10 @@ if (mlir::Operation *definingOp = value.getDefiningOp()) {
 }
 ```
 
-The following C++ snippet shows how to iterate through all the operations that use a particular value as operand. Note that the number of uses may be equal *or larger* than the number of users because a single user may use the same value multiple times (but at least once) in its operands.
+The following C++ snippet shows how to iterate through all the operations that
+use a particular value as operand. Note that the number of uses may be equal
+*or larger* than the number of users because a single user may use the same
+value multiple times (but at least once) in its operands.
 
 ```cpp
 // Let value be a Value
@@ -141,7 +243,12 @@ for (mlir::Operation *user : value.getUsers())
 
 ## [Operations](https://mlir.llvm.org/docs/LangRef/#operations)
 
-In MLIR, everything is about operations. Operations are like "opaque functions" to MLIR; they may represent some abstraction (e.g., a function, with a `mlir::func::FuncOp` operation) or perform some computation (e.g., an integer addition, with a `mlir::arith::AddIOp`). There is no fixed set of operations; users may define their own operations with custom semantics and use them at the same time as MLIR-defined operations. Operations:
+In MLIR, everything is about operations. Operations are like "opaque functions"
+to MLIR; they may represent some abstraction (e.g., a function, with a
+`mlir::func::FuncOp` operation) or perform some computation (e.g., an integer
+addition, with a `mlir::arith::AddIOp`). There is no fixed set of operations;
+users may define their own operations with custom semantics and use them at the
+same time as MLIR-defined operations. Operations:
 
 - are identified by a unique string
 - can take 0 or more operands
@@ -153,9 +260,6 @@ The C++ snippet below shows how to get an operation's information from C++.
 ```cpp
 // Let op be an Operation*
 mlir::Operation* op = ...;
-
-// Get the unique string identifying the type of operation
-mlir::StringRef name = op->getName().getStringRef();
 
 // Get all operands of the operation
 mlir::OperandRange allOperands = op->getOperands();
@@ -189,30 +293,74 @@ else
   llvm::outs() << "Integer attribute attr-name does not exist\n";
 ```
 
-### [Op vs Operation](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/#op-vs-operation-using-mlir-operations)
+### Manipulating the Operation Based on its Type
 
-As we saw above, you can manipulate any operation in MLIR using the "opaque" `Operation` type (usually, you do so through an `Operation*`) which provides a generic API into an operation instance. However, there exists another type, `Op`, whose derived classes model a specific type of operation (e.g., an integer addition with a `mlir::arith::AddIOp`). From the [official documentation](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/#op-vs-operation-using-mlir-operations):
+This part explains how we can analyze and manipulate MLIR operation of a specific type.
 
-> `Op` derived classes act as smart pointer wrapper around a `Operation*`, provide operation-specific accessor methods, and type-safe properties of operations. (...) A side effect of this design is that we always pass around `Op` derived classes “by-value”, instead of by reference or pointer.
+[official documentation](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/#op-vs-operation-using-mlir-operations):
 
-Whenever you want to manipulate an operation of a specific type, you should do so through its actual type that derives from `Op`. Fortunately, it is easy to identify the actual type of an `Operation*` using MLIR's casting infrastructure. The following snippet shows a few different methods to check whether an opaque `Operation*` is actually an integer addition (`mlir::arith::AddIOp`).
+As we saw above, you can manipulate any operation in MLIR using the `Operation`
+type (often through an `Operation*`) which provides a generic API into an
+operation instance. In practice, we want to perform analysis and manipulate the
+IR based on the specific type of that IR. This is extremely easy in MLIR.
+
+For example, consider that we have an operation:
+```c++
+mlir::Operation op = ...;
+```
+MLIR has a very convinent way of checking if the op is of a specific type.
+
+```c++
+if (llvm::isa<mlir::arith:AddIOp>(op)) {
+    // Do something if the op is an "AddIOp" from the arith MLIR dialect
+}
+```
+
+MLIR also has a very convinent way of transforming (casting) that operation to that type.
+
+```c++
+if (auto addOp = llvm::dyn_cast<mlir::arith:AddIOp>(op)) {
+    // Do something if the op is an "AddIOp" from the arith MLIR dialect
+    Value lhsVal = addOp.getLhs();
+    ...
+}
+```
+
+How does MLIR enable all of these? The following describes this mechanism.
+
+#### How Does MLIR Enable this Abstraction? Op vs. Operation
+
+There exists another type, `Op`, whose derived classes model a specific type of
+operation (e.g., an integer addition with a `mlir::arith::AddIOp`). 
+
+`Op` derived classes act as smart pointer wrapper around a `Operation*`,
+provide operation-specific accessor methods, and type-safe properties of
+operations. A side effect of this design is that we always pass around `Op`
+derived classes “by-value”, instead of by reference or pointer.
+
+If you need to manipulate an operation of a specific type, you should do
+so through its actual type that derives from `Op`. Fortunately, it is easy to
+identify the actual type of an `Operation*` using MLIR's casting
+infrastructure. The following snippet shows a few different methods to check
+whether an opaque `Operation*` is actually an integer addition
+(`mlir::arith::AddIOp`).
 
 ```cpp
 // Let op be an Operation*
 mlir::Operation* op = ...;
 
 // Method 1: isa followed by cast
-if (mlir::isa<mlir::arith::AddIOp>(op)) {
+if (llvm::isa<mlir::arith::AddIOp>(op)) {
   // We now op is actually an integer addition, so we can safely cast it
-  // (mlir::cast fails if the operation is not of the indicated type)
+  // (`llvm::cast` fails if the operation is not of the indicated type)
   mlir::arith::AddIOp addOp = mlir::cast<mlir::arith::AddIOp>(op); 
   llvm::outs() << "op is an integer addition!\n";
 }
 
 // Method 2: dyn_cast followed by nullptr check
-// dyn_cast returns a valid pointer if the operation is of the indicated type
-// and returns nullptr otherwise
-mlir::arith::AddIOp addOp = mlir::dyn_cast<mlir::arith::AddIOp>(op)
+// `llvm::dyn_cast` returns a valid pointer if the operation is of the indicated
+// type and returns nullptr otherwise
+auto addOp = llvm::dyn_cast<mlir::arith::AddIOp>(op)
 if (addOp) {
   llvm::outs() << "op is an integer addition!\n";
 }
@@ -220,12 +368,25 @@ if (addOp) {
 // Method 3: simultaneous dyn_cast and nullptr check
 // Using the following syntax, we can simultaneously assign addOp and check if
 // it is a nullptr  
-if (mlir::arith::AddIOp addOp = mlir::dyn_cast<mlir::arith::AddIOp>(op)) {
+if (mlir::arith::AddIOp addOp = llvm::dyn_cast<mlir::arith::AddIOp>(op)) {
   llvm::outs() << "op is an integer addition!\n";
 }
 ```
 
-Once you have a specific derived class of `Op` on hand, you can access methods that are specific to the operation type in question. For example, for all operation operands, MLIR will automatically generate an accessor method with the name `get<operand name in CamelCase>`. For example, `mlir::arith::AddIOp` has two operands named `lhs` and `rhs` that represent, respectively, the left-hand-side and right-hand-side of the addition. It is possible to get these operands using their name instead of their index with the following code.
+> [!NOTE]
+> `llvm::dyn_cast`, `llvm::cast`, and `llvm::isa` are some of the dynamic
+> runtime type information (RTTI) features provided by LLVM. They are used
+> extensively to analyze MLIR operations. Please check out [LLVM's RTTI
+> documentation](https://llvm.org/docs/ProgrammersManual.html#the-isa-cast-and-dyn-cast-templates).
+
+
+Once you have a specific derived class of `Op` on hand, you can access methods
+that are specific to the operation type in question. For example, for all
+operation operands, MLIR will automatically generate an accessor method with
+the name `get<operand name in CamelCase>`. For example, `mlir::arith::AddIOp`
+has two operands named `lhs` and `rhs` that represent, respectively, the
+left-hand-side and right-hand-side of the addition. It is possible to get these
+operands using their name instead of their index with the following code.
 
 ```cpp
 // Let addOp be an integer Operation
@@ -242,7 +403,9 @@ mlir::Value rhs = addO.getRhs();
 assert(secondOperand == rhs);
 ```
 
-When iterating over the operations inside a region or block, it's possible to only iterate over operations of a specific type using the `getOps<OpTy>` method.
+When iterating over the operations inside a region or block, it's possible to
+only iterate over operations of a specific type using the `getOps<OpTy>`
+method.
 
 ```cpp
 // Let region be a Region&
@@ -264,7 +427,8 @@ for (Block &block : region.getBlocks())
       llvm::outs() << "Found an integer operation!\n";
 ```
 
-The `walk` method similarly allows one to specify a type of operation to recursively iterate on inside the callback's signature.
+The `walk` method similarly allows one to specify a type of operation to
+recursively iterate on inside the callback's signature.
 
 ```cpp
 // Let block be a Block&
@@ -284,45 +448,112 @@ block.walk([&](Operation *op) {
 
 ## [Regions](https://mlir.llvm.org/docs/LangRef/#regions)
 
-From the [language reference](https://mlir.llvm.org/docs/LangRef/#regions):
+Check out also the [language reference](https://mlir.llvm.org/docs/LangRef/#regions).
 
-> A region is an ordered list of MLIR blocks. The semantics within a region is not imposed by the IR. Instead, the containing operation defines the semantics of the regions it contains. MLIR currently defines two kinds of regions: SSACFG regions, which describe control flow between blocks, and Graph regions, which do not require control flow between blocks.
+A region is an ordered list of MLIR blocks. The semantics within a region is
+not imposed by the IR. Instead, the containing operation defines the semantics
+of the regions it contains. MLIR currently defines two kinds of regions: SSACFG
+regions, which describe control flow between blocks, and Graph regions, which
+do not require control flow between blocks.
 
-The first block in a region, called the *entry block*, is special; its arguments also serve as the region's arguments. The source of these arguments is defined by the semantics of the parent operation. When control flow enters a region, it always begins in the *entry block*. Regions may also produce a list of values when control flow leaves the region. Again, the parent operation defines the relation between the region results and its own results. All values defined within a region are not visible from outside the region (they are [encapsulated](https://mlir.llvm.org/docs/LangRef/#value-scoping)). However, by default, a region can reference values defined outside of itself if these values would have been usable by the region's parent operation operands.  
+The first block in a region, called the *entry block*, is special; its
+arguments also serve as the region's arguments. The source of these arguments
+is defined by the semantics of the parent operation. When control flow enters a
+region, it always begins in the *entry block*. Regions may also produce a list
+of values when control flow leaves the region. Again, the parent operation
+defines the relation between the region results and its own results. All values
+defined within a region are not visible from outside the region (they are
+[encapsulated](https://mlir.llvm.org/docs/LangRef/#value-scoping)). However, by
+default, a region can reference values defined outside of itself if these
+values would have been usable by the region's parent operation operands.  
 
-A function body (i.e., the region inside a `mlir::func::FuncOp` operation) is an  example of an SSACFG region, where each block represents a control-free sequence of operations that executes sequentially. The last operation of each block, called the *terminator operation* (see the [next sextion](#blocks)), identifies where control flow goes next; either to another block, called a *successor block* in this context, inside the function body (in the case of a *branch*-like operation) or back to the parent operation (in the case of a *return*-like operation).
+### SSA Regions
 
-Graph regions, on the other hand, can only contain a single basic block and are appropriate to represent concurrent semantics without control flow. This makes them the perfect representation for dataflow circuits which have no notion of sequential execution. In particular (from the [language reference](https://mlir.llvm.org/docs/LangRef/#graph-regions))
+A function body (i.e., the region inside a `mlir::func::FuncOp` operation) is
+an example of an SSACFG region, where each block represents a control-free
+sequence of operations that executes sequentially. The last operation of each
+block, called the *terminator operation* (see the [next sextion](#blocks)),
+identifies where control flow goes next; either to another block, called a
+*successor block* in this context, inside the function body (in the case of a
+*branch*-like operation) or back to the parent operation (in the case of a
+*return*-like operation).
 
-> All values defined in the graph region as results of operations are in scope within the region and can be accessed by any other operation in the region. In graph regions, the order of operations within a block and the order of blocks in a region is not semantically meaningful and non-terminator operations may be freely reordered.
+### Graph Regions
+
+Graph regions, on the other hand, can only contain a single basic block and are
+appropriate to represent concurrent semantics without control flow. This makes
+them the perfect representation for dataflow circuits which have no notion of
+sequential execution. In particular (from the [language
+reference](https://mlir.llvm.org/docs/LangRef/#graph-regions))
+
+All values defined in the graph region as results of operations are in scope
+within the region and can be accessed by any other operation in the region. In
+graph regions, the order of operations within a block and the order of blocks
+in a region is not semantically meaningful and non-terminator operations may be
+freely reordered.
 
 ## [Blocks](https://mlir.llvm.org/docs/LangRef/#blocks)
 
-A block is an ordered list of MLIR operations. The last operation in a block must be a terminator operation, unless it is the single block of a region whose parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an operation).
+A block is an ordered list of MLIR operations. The last operation in a block
+must be a terminator operation, unless it is the single block of a region whose
+parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an
+operation).
 
-As mentioned in the [prior section on MLIR values](#values), blocks may have block arguments. From the [language reference](https://mlir.llvm.org/docs/LangRef/#blocks):
+As mentioned in the [prior section on MLIR values](#values), blocks may have
+block arguments. 
 
-> Blocks in MLIR take a list of block arguments, notated in a function-like way. Block arguments are bound to values specified by the semantics of individual operations. Block arguments of the entry block of a region are also arguments to the region and the values bound to these arguments are determined by the semantics of the parent operation. Block arguments of other blocks are determined by the semantics of terminator operations (e.g., branch-like operations) which have the block as a successor.
+Blocks in MLIR take a list of block arguments, notated in a function-like way.
+Block arguments are bound to values specified by the semantics of individual
+operations. Block arguments of the entry block of a region are also arguments
+to the region and the values bound to these arguments are determined by the
+semantics of the parent operation. Block arguments of other blocks are
+determined by the semantics of terminator operations (e.g., branch-like
+operations) which have the block as a successor.
 
-In SSACFG regions, these block arguments often implicitly represent the passage of control-flow dependent values. They remove the need for [*PHI* nodes](https://en.wikipedia.org/wiki/Static_single-assignment_form#Converting_to_SSA) that many other SSA IRs employ (like LLVM IR).
+In SSACFG regions, these block arguments often implicitly represent the passage
+of control-flow dependent values. They remove the need for [*PHI*
+nodes](https://en.wikipedia.org/wiki/Static_single-assignment_form#Converting_to_SSA)
+that many other SSA IRs employ (like LLVM IR).
+
+Check out also the [language reference](https://mlir.llvm.org/docs/LangRef/#blocks) on this part.
 
 ## [Attributes](https://mlir.llvm.org/docs/LangRef/#attributes)
 
-For this section, you are simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#attributes), which is very short.
+For this section, you are simply invited to read [the relevant part of the
+language reference](https://mlir.llvm.org/docs/LangRef/#attributes), which is
+very short.
 
-In summary, attributes are used to attach data/information to operations that cannot be expressed using a value operand. Additionally, attributes allow us to propagate meta-information about operations down the lowering pipeline. This is useful whenever, for example, some analysis can only be performed at a "high IR level" but its results only become relevant at a "low IR level". In these situations, the analysis's results would be attached to relevant operations using attributes, and these attributes would then be propagated through lowering passes until the IR reaches the level where the information must be acted upon.
+In summary, attributes are used to attach data/information to operations that
+cannot be expressed using a value operand. Additionally, attributes allow us to
+propagate meta-information about operations down the lowering pipeline. This is
+useful whenever, for example, some analysis can only be performed at a "high IR
+level" but its results only become relevant at a "low IR level". In these
+situations, the analysis's results would be attached to relevant operations
+using attributes, and these attributes would then be propagated through
+lowering passes until the IR reaches the level where the information must be
+acted upon.
 
 ## [Dialects](https://mlir.llvm.org/docs/LangRef/#dialects)
 
-For this section, you are also simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is very short.
+For this section, you are also simply invited to read [the relevant part of the
+language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is
+very short.
 
-The *Handshake* dialect, defined in the `dynamatic::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit.
+The *Handshake* dialect, defined in the `dynamatic::handshake` namespace, is
+core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside
+[graph regions](#regions). Throughout the repository, whenever we mention
+"*Handshake*-level IR", we are referring to an IR that contains *Handshake*
+operations (i.e., dataflow components), which together make up a dataflow
+circuit.
 
 ## Printing to the console
 
 ### Printing to stdout and stderr
 
-LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr), see their usage below.
+LLVM/MLIR has wrappers around the standard program output streams that you
+should use whenever you would like something displayed on the console. These
+are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr), see their
+usage below.
 
 ```cpp
 // Let op be an Operation*
@@ -340,11 +571,20 @@ llvm::errs() << "This will be printed on stderr!\n"
 ```
 
 > [!CAUTION]
-> Dynamatic's optimizer prints the IR resulting from running all the passes it was asked to run to standard output. As a consequence **you should never explicitly print anything to stdout yourself**, as it will mix up with the IR text serialization. Instead, all error messages should go to stderr.
+> Dynamatic's optimizer prints the IR resulting from running all the passes it
+> was asked to run to standard output. As a consequence **you should never
+> explicitly print anything to stdout yourself**, as it will mix up with the IR
+> text serialization. Instead, all error messages should go to stderr.
 
 ### Printing information related to an operation
 
-You will regularly want to print a message to stdout/stderr and attach it to a specific operation that it relates to. While you could just use `llvm::outs()` or `llvm::errs()` and pipe the operation in question after the message (as shown above), MLIR has very convenient methods that allow you to achieve the same task more elegantly in code and with automatic output formatting; the operation instance will be (pretty-)printed with your custom message next to it.
+You will regularly want to print a message to stdout/stderr and attach it to a
+specific operation that it relates to. While you could just use `llvm::outs()`
+or `llvm::errs()` and pipe the operation in question after the message (as
+shown above), MLIR has very convenient methods that allow you to achieve the
+same task more elegantly in code and with automatic output formatting; the
+operation instance will be (pretty-)printed with your custom message next to
+it.
 
 ```cpp
 // Let op be an Operation*
