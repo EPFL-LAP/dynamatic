@@ -74,11 +74,9 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
-  bool isChannelToBeChecked(OpResult res);
 };
-} // namespace
 
-bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
+bool isChannelToBeChecked(OpResult res) {
   // The channel connected to EndOp, MemoryControllerOp, and LSQOp don't appear
   // in the properties database for the following reasons:
   // - EndOp: the operation doesn't exist in the output model; the property
@@ -97,6 +95,7 @@ bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
                     handshake::LSQOp>(*user);
       });
 }
+} // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
@@ -280,9 +279,11 @@ struct FlowVariable {
     case sent:
       return llvm::formatv("{0}.sent_{1}", getUniqueName(op), typeIndex).str();
     case inputLambda:
+      return llvm::formatv("{0}.in_{1}", getUniqueName(op), typeIndex).str();
     case outputLambda:
+      return llvm::formatv("{0}.out_{1}", getUniqueName(op), typeIndex).str();
     case internalLambda:
-      assert(false && "lambda channels are not named");
+      return llvm::formatv("{0}.#{1}", getUniqueName(op), typeIndex).str();
     };
   }
 };
@@ -304,6 +305,30 @@ struct FlowExpression {
   std::unordered_map<FlowVariable, int> terms;
   FlowExpression() = default;
   FlowExpression(const FlowVariable &v) { terms[v] = 1; };
+  void debug() {
+    std::string txt = "0 = ";
+    bool first = true;
+    for (auto [key, value] : terms) {
+      if (!first) {
+        if (value > 0) {
+          txt += " + ";
+        } else if (value < 0) {
+          txt += " - ";
+        }
+      } else {
+        if (value < 0)
+          txt += "-";
+        first = false;
+      }
+      if (abs(value) == 1) {
+        txt += key.getName();
+
+      } else {
+        txt += llvm::formatv("{0} * {1}", value, key.getName()).str();
+      }
+    }
+    llvm::errs() << txt << "\n";
+  }
 };
 
 FlowExpression operator-(FlowVariable v) {
@@ -395,7 +420,10 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
       assert(!(i1 == i2) && "expected internal channels to be different");
 
+      // Annotate channel equations
       for (auto [i, res] : llvm::enumerate(op.getResults())) {
+        if (!isChannelToBeChecked(res))
+          continue;
         for (auto &use : res.getUses()) {
           unsigned j = use.getOperandNumber();
           Operation &nextOp = *use.getOwner();
@@ -553,7 +581,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     std::vector<int> coefs{};
     std::vector<std::string> names{};
 
-    for (size_t col = indices.getNLambdas() + 1; col < cols; ++col) {
+    for (size_t col = indices.getNLambdas(); col < cols; ++col) {
       if (matrix(row, col) != 0) {
         coefs.push_back(matrix(row, col));
         names.push_back(indices.getVariable(col).getName());
