@@ -141,6 +141,7 @@ GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
 PREBUILT_LLVM=0
 BUILD_CHIESEL_LSQ=0
+ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 LLVM_DIR="$PWD/llvm-project/build"
 
@@ -203,6 +204,7 @@ do
               ;;
           "--enable-cbc")
               CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
+              ENABLE_CBC=1
               ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
@@ -445,6 +447,10 @@ create_generator_symlink build/bin/exp-sharing-wrapper-generator
 
 if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
   create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+fi 
+
+if [[ ENABLE_CBC -eq 1 ]]; then
+  create_symlink "../build/cbc/bin/cbc"
 fi 
 
 # Create symbolic links to clang headers (standard c library for clang)

@@ -174,22 +174,17 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(DYNAMATIC_ENABLE_CBC)
-  # Find the CBC, Osi, Clp libraries
-  find_package(PkgConfig REQUIRED)
+  if (UNIX)
+    FetchContent_Declare(
+      cbc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/cbc
+      URL https://github.com/coin-or/Cbc/releases/download/releases%2F2.10.12/Cbc-releases.2.10.12-x86_64-ubuntu22-gcc1140-static.tar.gz
+    )
 
-  # Use pkg-config to get include dirs and libs
-  # This command sets 
-  # - *_INCLUDE_DIRS
-  # - *_LIBRARY_DIRS
-  # But these variable will not be automatically discovered by the target.
-  pkg_check_modules(CBC QUIET cbc)
-
-  if(CBC_FOUND)
-    message(STATUS "CBC available via pkg-config")
-    # This command makes the include directory of CBC discoverable
-    add_compile_definitions(DYNAMATIC_ENABLE_CBC)
+    FetchContent_MakeAvailable(cbc)
   else()
-    message(STATUS "cbc is missing! Disabling the CBC-related feature in Dynamatic.")
+    message(FATAL_ERROR "Cbc integration is not tested on the OS you use!")
   endif()
 endif()
 
