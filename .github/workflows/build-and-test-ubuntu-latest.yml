@@ -50,4 +50,4 @@ jobs:
 
       - name: Build Dynamatic (release, prebuilt LLVM)
         run: |
-          bash ./build.sh --release --use-prebuilt-llvm
+          bash ./build.sh --release --use-prebuilt-llvm --enable-cbc
