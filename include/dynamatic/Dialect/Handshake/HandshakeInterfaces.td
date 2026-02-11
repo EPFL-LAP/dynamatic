@@ -89,6 +89,11 @@ def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
      }],
      "int", "getNumEagerOutputs", (ins)
    >,
+   InterfaceMethod<[{
+       Get all the states as std::vector<EagerForkSent>
+     }],
+     "std::vector<EagerForkSent>", "getInternalSentStates", (ins "::mlir::Operation *" : $op)
+   >,
   ];
 }
 
