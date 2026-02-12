@@ -30,6 +30,7 @@ endif ()
 
 include(FindPackageHandleStandardArgs)
 find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
+find_package(Boost REQUIRED COMPONENTS)
 
 # Build Dynamatic with ccache if the package is present
 set(DYNAMATIC_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")
@@ -143,12 +144,67 @@ endfunction()
 find_package(GUROBI)
 if (GUROBI_FOUND)
   include_directories(${GUROBI_INCLUDE_DIRS})
+
+  # [START Check if the gurobi license is correctly set]
+  execute_process(
+      COMMAND gurobi_cl --license
+      OUTPUT_VARIABLE GRB_LICENSE_VERSION
+      RESULT_VARIABLE GRB_LICENSE_RESULT
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+
+  if(GRB_LICENSE_RESULT EQUAL 0)
+      message(STATUS "gurobi_cl found and the license is correctly set.")
+  else()
+      message(FATAL_ERROR "gurobi_cl not found or the license is not correctly
+      set. Please check out
+      https://github.com/EPFL-LAP/dynamatic/blob/main/docs/UserGuide/AdvancedBuild.md#1-gurobi")
+  endif()
+  # [END Check if the gurobi license is correctly set]
+
 else()
   message(WARNING "Gurobi wasn't found, the buffer placement algorithms \
                    that requires solving MILPs will not be built with the \
                    project.")
   add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
 endif()
+
+#-------------------------------------------------------------------------------
+# CBC solver setup
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_CBC)
+  # Find the CBC, Osi, Clp libraries
+  find_package(PkgConfig REQUIRED)
+
+  # Use pkg-config to get include dirs and libs
+  # This command sets 
+  # - *_INCLUDE_DIRS
+  # - *_LIBRARY_DIRS
+  # But these variable will not be automatically discovered by the target.
+  pkg_check_modules(CBC QUIET cbc)
+
+  if(CBC_FOUND)
+    message(STATUS "CBC available via pkg-config")
+    # This command makes the include directory of CBC discoverable
+    add_compile_definitions(DYNAMATIC_ENABLE_CBC)
+  else()
+    message(STATUS "cbc is missing! Disabling the CBC-related feature in Dynamatic.")
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Python (Virtual Environment)
+#-------------------------------------------------------------------------------
+
+find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
+
+set(VENV_DIR "${CMAKE_BINARY_DIR}/python3-venv")
+
+add_custom_target(python-venv ALL
+    COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR}
+    COMMENT "Creating Python virtual environment (Python ${Python3_VERSION})"
+)
 
 #-------------------------------------------------------------------------------
 # XLS Integration (experimental)
@@ -190,9 +246,33 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
     URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
   )
 
-  FetchContent_MakeAvailable(dot2smv)
+  FetchContent_Declare(
+    nuXmv
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR ${EXT_BIN_DIR}/nuXmv
+    URL https://nuxmv.fbk.eu/theme/download.php?file=nuXmv-2.1.0-linux64.tar.xz
+  )
+
+  FetchContent_MakeAvailable(dot2smv nuXmv)
+
+  # Inform our compiler infrastructure that NuSMV is available.
+  add_compile_definitions(DYNAMATIC_ENABLE_LEQ_BINARIES)
 endif()
 
+# We use GoogleTest for regression tests
+FetchContent_Declare(
+  googletest
+  DOWNLOAD_EXTRACT_TIMESTAMP true
+  URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+)
+
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# TODO: Use the JSON package from Boost instead.
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 
 #-------------------------------------------------------------------------------
 # Directory setup
@@ -204,3 +284,5 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
+

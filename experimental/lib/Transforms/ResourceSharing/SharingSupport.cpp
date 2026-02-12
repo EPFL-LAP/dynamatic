@@ -16,6 +16,7 @@
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+namespace {
 // This recursive function traverses the CFC and calculates a post-order, i.e.,
 // if there is a path from node_1 to node_2, then in the returned relative
 // order, node_1 < node_2.
@@ -56,6 +57,7 @@ void recursiveDfsAssignSCCId(Operation *op,
         recursiveDfsAssignSCCId(ch->producer, assigned, cfChannels, currSCCId);
   }
 }
+} // namespace
 
 // For a given CFC (specified as the set of units and channels), find the list
 // of SCCs.

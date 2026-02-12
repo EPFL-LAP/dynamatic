@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
   CPBuffers.cpp
+  LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp
   Johnson.cpp
   Reconvergence.cpp
@@ -24,6 +25,8 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+  DynamaticConstraintProgramming
+
   )
 
 if (GUROBI_FOUND)

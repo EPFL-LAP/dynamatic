@@ -1,0 +1,17 @@
+from generators.support.arith_binary import generate_arith_binary
+
+
+def generate_shli(name, params):
+    bitwidth = params["bitwidth"]
+
+    body = f"""
+  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs({bitwidth} - 2 downto 0)))));
+    """
+
+    return generate_arith_binary(
+        name=name,
+        handshake_op="shli",
+        bitwidth=bitwidth,
+        body=body,
+        extra_signals=params.get("extra_signals", None)
+    )

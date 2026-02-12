@@ -350,7 +350,8 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
 }
 
 bool dynamatic::cannotBelongToCFG(Operation *op) {
-  return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
+  return isa<handshake::MemoryOpInterface, handshake::SinkOp, handshake::RAMOp>(
+      op);
 }
 
 HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {

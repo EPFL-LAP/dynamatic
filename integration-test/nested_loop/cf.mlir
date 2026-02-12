@@ -19,7 +19,7 @@ module {
     %7 = arith.muli %5, %6 {handshake.name = "muli1"} : i32
     %8 = arith.addi %3, %2 {handshake.name = "addi0"} : i32
     %9 = arith.index_cast %8 {handshake.name = "index_cast2"} : i32 to index
-    memref.store %7, %arg2[%9] {handshake.deps = #handshake<deps[<"store0" (0)>]>, handshake.name = "store0"} : memref<1000xi32>
+    memref.store %7, %arg2[%9] {handshake.deps = #handshake<deps[["store0", 0]]>, handshake.name = "store0"} : memref<1000xi32>
     %10 = arith.cmpi slt, %7, %c1000_i32 {handshake.name = "cmpi0"} : i32
     %12 = arith.addi %3, %c1_i32 {handshake.name = "addi1"} : i32
     cf.cond_br %10, ^bb2(%12 : i32), ^bb4 {handshake.name = "cond_br0"}

@@ -53,9 +53,10 @@ constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 /// Annotation to use when a suppression branch is added which needs to go
 /// through the suppression mechanism again.
 constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
-/// Annotation to use for a multiplxer crated with the `addGsaGates`
-/// functionalities. This will no go through the FTD process.
-constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+/// Annotation to to identify muxes inserted with the `addGsaGates`
+/// functionalities.
+constexpr llvm::StringLiteral FTD_EXPLICIT_MU("ftd.MU");
+constexpr llvm::StringLiteral FTD_EXPLICIT_GAMMA("ftd.GAMMA");
 /// Temporary annotation to be used with merges created with the
 /// `createPhiNetwork` functionality, which will then be converted into muxes.
 constexpr llvm::StringLiteral NEW_PHI("nphi");
@@ -78,8 +79,8 @@ static Block *returnMuxConditionBlock(Value muxCondition) {
       break;
     }
   }
-  assert(muxConditionBlock &&
-         "Mux condition must be feeding any block terminator.");
+  if (!muxConditionBlock)
+    muxConditionBlock = muxCondition.getParentBlock();
   return muxConditionBlock;
 }
 
@@ -228,6 +229,11 @@ experimental::ftd::enumeratePaths(Block *start, Block *end,
 
   // Find all the paths from the producer to the consumer, using a DFS
   std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
+
+  // If the start and end block are the same (e.g., BB0 to BB0) and there is no
+  // real path between them, then consider the sop = 1
+  if (start == end && allPaths.size() == 0)
+    sop = BoolExpression::boolOne();
 
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
@@ -559,6 +565,125 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
+/// Starting from a boolean expression which is a single variable (either
+/// direct or complement) return its corresponding circuit equivalent. This
+/// means, either we obtain the output of the operation determining the
+/// condition, or we add a `not` to complement.
+static Value boolVariableToCircuit(PatternRewriter &rewriter,
+                                   experimental::boolean::BoolExpression *expr,
+                                   Block *block, const ftd::BlockIndexing &bi,
+                                   bool needsChannelify = true) {
+
+  // Convert the expression into a single condition (for instance, `c0` or
+  // `~c0`).
+  SingleCond *singleCond = static_cast<SingleCond *>(expr);
+
+  // Use the BlockIndexing to access the block corresponding to such condition
+  // and access its terminator to determine the condition.
+  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
+  if (!conditionOpt.has_value())
+    return nullptr;
+
+  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
+
+  // Add a not if the condition is negated.
+  if (singleCond->isNegated) {
+    rewriter.setInsertionPointToStart(block);
+    auto notOp = rewriter.create<handshake::NotOp>(
+        block->getOperations().front().getLoc(),
+        ftd::channelifyType(condition.getType()), condition);
+    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    return notOp->getResult(0);
+  }
+  if (needsChannelify) {
+    condition.setType(ftd::channelifyType(condition.getType()));
+  }
+  return condition;
+}
+
+/// Get a circuit out a boolean expression, depending on the different kinds
+/// of expressions you might have.
+static Value boolExpressionToCircuit(PatternRewriter &rewriter,
+                                     BoolExpression *expr, Block *block,
+                                     const ftd::BlockIndexing &bi,
+                                     bool needsChannelify = true) {
+
+  // Variable case
+  if (expr->type == ExpressionType::Variable)
+    return boolVariableToCircuit(rewriter, expr, block, bi, needsChannelify);
+
+  // Constant case (either 0 or 1)
+  rewriter.setInsertionPointToStart(block);
+  auto sourceOp = rewriter.create<handshake::SourceOp>(
+      block->getOperations().front().getLoc());
+  Value cnstTrigger = sourceOp.getResult();
+
+  auto intType = rewriter.getIntegerType(1);
+  auto cstAttr = rewriter.getIntegerAttr(
+      intType, (expr->type == ExpressionType::One ? 1 : 0));
+
+  auto constOp = rewriter.create<handshake::ConstantOp>(
+      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
+
+  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+
+  return constOp.getResult();
+}
+
+/// Convert a `BDD` object as obtained from the bdd expansion to a
+/// circuit
+static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+                          const ftd::BlockIndexing &bi,
+                          bool needsChannelify = true) {
+  if (!bdd->successors.has_value())
+    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi,
+                                   needsChannelify);
+
+  rewriter.setInsertionPointToStart(block);
+
+  // Get the two operands by recursively calling `bddToCircuit` (it possibly
+  // creates other muxes in a hierarchical way)
+  SmallVector<Value> muxOperands;
+  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().first,
+                                     block, bi, needsChannelify));
+  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().second,
+                                     block, bi, needsChannelify));
+  Value muxCond = boolExpressionToCircuit(rewriter, bdd->boolVariable, block,
+                                          bi, needsChannelify);
+
+  // Create the multiplxer and add it to the rest of the circuit
+  auto muxOp = rewriter.create<handshake::MuxOp>(
+      block->getOperations().front().getLoc(), muxOperands[0].getType(),
+      muxCond, muxOperands);
+  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+
+  return muxOp.getResult();
+}
+
+static BoolExpression *
+getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
+                     mlir::CFGLoopInfo &li, const ftd::BlockIndexing &bi) {
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+
+  // Sort the cofactors alphabetically
+  std::sort(cofactorList->begin(), cofactorList->end());
+
+  return fLoopExit;
+}
+
 std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                                       handshake::FuncOp &funcOp,
                                                       Operation *consumerOp,
@@ -568,12 +693,15 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  BlockIndexing bi(funcOp.getBody());
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
-  // it comes from the explicit phi process or if it is a generic operation to
-  // skip
-  if (consumerOp->hasAttr(FTD_REGEN) || consumerOp->hasAttr(FTD_EXPLICIT_PHI) ||
+  // it comes from the explicit gsa gate insertion process or if it is a generic
+  // operation to skip
+  if (consumerOp->hasAttr(FTD_REGEN) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_GAMMA) ||
+      consumerOp->hasAttr(FTD_EXPLICIT_MU) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
     return newUnits;
@@ -614,9 +742,20 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(loop->getHeader());
     regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
-    // Get the condition for the block exiting
-    Value conditionValue =
-        loop->getExitingBlock()->getTerminator()->getOperand(0);
+    // Determine the loop exit condition:
+    // - If the condition spans multiple cofactors, build a BDD and
+    //   translate it into a circuit.
+    // - Otherwise, use the simple terminating condition of the exiting block
+    Value conditionValue;
+    std::vector<std::string> cofactorList;
+    BoolExpression *exitCondition =
+        getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
+    if (size(cofactorList) > 1) {
+      BDD *bdd = buildBDD(exitCondition, cofactorList);
+      conditionValue =
+          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
+    } else
+      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
     // Create the false constant to feed `init`
     // auto constOp =
@@ -673,6 +812,62 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   return newUnits;
 }
 
+// Returns true if loop is a while loop, detected by the loop header being
+// also a loop exit and not a loop latch
+static bool isWhileLoop(CFGLoop *loop) {
+  if (!loop)
+    return false;
+
+  Block *headerBlock = loop->getHeader();
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  SmallVector<Block *> latchBlocks;
+  loop->getLoopLatches(latchBlocks);
+
+  return llvm::is_contained(exitBlocks, headerBlock) &&
+         !llvm::is_contained(latchBlocks, headerBlock);
+}
+
+using PairOperandConsumer = std::pair<Value, Operation *>;
+
+// Find the closest loop exit between a producer inside the loop and a consumer
+// outside the loop.
+static Block *findClosestLoopExit(Operation *consumer, Value connection,
+                                  const ftd::BlockIndexing &bi,
+                                  SmallVector<Block *> exitBlocks) {
+  // Find all the paths from the producer to the consumer using DFS
+  std::vector<std::vector<Block *>> allPaths =
+      findAllPaths(connection.getParentBlock(), consumer->getBlock(), bi);
+
+  Block *closestExit = nullptr;
+  unsigned minDistance = std::numeric_limits<unsigned>::max();
+
+  // For every path from producer to consumer , check if it passes through any
+  // of the loop’s exit blocks.
+  for (const auto &path : allPaths) {
+    bool foundInThisPath = false;
+    for (unsigned i = 0; i < path.size() && !foundInThisPath; ++i) {
+      Block *pathBlock = path[i];
+      for (Block *exitBlock : exitBlocks) {
+        if (pathBlock == exitBlock) {
+          // Update the closest exit if this one is nearer to the producer
+          if (i < minDistance) {
+            minDistance = i;
+            closestExit = exitBlock;
+          }
+          foundInThisPath = true;
+          break;
+        }
+      }
+    }
+  }
+
+  assert(closestExit &&
+         "No loop exit found in any path between producer and consumer.");
+  return closestExit;
+}
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
@@ -782,73 +977,35 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
   handshake::ConditionalBranchOp branchOp;
 
-  // Case in which there is only one termination block
-  if (Block *loopExit = loop->getExitingBlock(); loopExit) {
+  // Do not add the branch in case of a while loop with backward edge
+  if (btlt == BackwardRelationship && isWhileLoop(loop))
+    return connection;
 
-    // Do not add the branch in case of a while loop with backward edge
-    if (btlt == BackwardRelationship &&
-        bi.isGreater(connection.getParentBlock(), loopExit))
-      return connection;
+  std::vector<std::string> cofactorList;
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+  BoolExpression *fLoopExit = getLoopExitCondition(loop, &cofactorList, li, bi);
+  // Choose the closest loop exit to the producer and place the suppression
+  // there
+  Block *loopExit = findClosestLoopExit(consumer, connection, bi, exitBlocks);
 
-    // Get the termination operation, which is supposed to be conditional
-    // branch.
-    Operation *loopTerminator = loopExit->getTerminator();
-    assert(isa<cf::CondBranchOp>(loopTerminator) &&
-           "Terminator condition of a loop exit must be a conditional "
-           "branch.");
+  // Apply a BDD expansion to the loop exit expression and the list of
+  // cofactors
+  BDD *bdd = buildBDD(fLoopExit, cofactorList);
 
-    // A conditional branch is now to be added next to the loop terminator, so
-    // that the token can be suppressed
-    auto *exitCondition = getBlockLoopExitCondition(loopExit, loop, li, bi);
-    auto conditionValue =
-        boolVariableToCircuit(rewriter, exitCondition, loopExit, bi);
+  // Convert the boolean expression obtained through BDD to a circuit
+  Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
 
-    rewriter.setInsertionPointToStart(loopExit);
+  Operation *loopTerminator = loopExit->getTerminator();
+  assert(isa<cf::CondBranchOp>(loopTerminator) &&
+         "Terminator condition of a loop exit must be a conditional "
+         "branch.");
 
-    // Since only one output is used, the other one will be connected to sink
-    // in the materialization pass, as we expect from a suppress branch
-    branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        loopExit->getOperations().back().getLoc(),
-        ftd::getListTypes(connection.getType()), conditionValue, connection);
+  rewriter.setInsertionPointToStart(loopExit);
 
-  } else {
-
-    std::vector<std::string> cofactorList;
-    SmallVector<Block *> exitBlocks;
-    loop->getExitingBlocks(exitBlocks);
-    loopExit = exitBlocks.front();
-
-    BoolExpression *fLoopExit = BoolExpression::boolZero();
-
-    // Get the list of all the cofactors related to possible exit conditions
-    for (Block *exitBlock : exitBlocks) {
-      BoolExpression *blockCond =
-          getBlockLoopExitCondition(exitBlock, loop, li, bi);
-      fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-      cofactorList.push_back(bi.getBlockCondition(exitBlock));
-    }
-
-    // Sort the cofactors alphabetically
-    std::sort(cofactorList.begin(), cofactorList.end());
-
-    // Apply a BDD expansion to the loop exit expression and the list of
-    // cofactors
-    BDD *bdd = buildBDD(fLoopExit, cofactorList);
-
-    // Convert the boolean expression obtained through BDD to a circuit
-    Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
-
-    Operation *loopTerminator = loopExit->getTerminator();
-    assert(isa<cf::CondBranchOp>(loopTerminator) &&
-           "Terminator condition of a loop exit must be a conditional "
-           "branch.");
-
-    rewriter.setInsertionPointToStart(loopExit);
-
-    branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        loopExit->getOperations().front().getLoc(),
-        ftd::getListTypes(connection.getType()), branchCond, connection);
-  }
+  branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+      loopExit->getOperations().front().getLoc(),
+      ftd::getListTypes(connection.getType()), branchCond, connection);
 
   Value newConnection = btlt == MoreProducerThanConsumers
                             ? branchOp.getTrueResult()
@@ -878,13 +1035,12 @@ static void insertDirectSuppression(
   Block *consumerBlock = consumer->getBlock();
   Value muxCondition = nullptr;
 
-  bool accountMuxCondition =
-      llvm::isa<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
-      (consumer->getOperand(1) == connection ||
-       consumer->getOperand(2) == connection) &&
-      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock;
+  // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
+  // gate and the producer is one of its data inputs
+  bool accountMuxCondition = llvm::isa<handshake::MuxOp>(consumer) &&
+                             consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
+                             (consumer->getOperand(1) == connection ||
+                              consumer->getOperand(2) == connection);
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
@@ -987,7 +1143,8 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   // Do not take into account conditional branch
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
-      !consumerOp->hasAttr("drawing"))
+      !consumerOp->hasAttr("drawing") &&
+      consumerOp->getOperand(0) != operand)
     return newUnits;
 
   // The consumer block is the block which contains the consumer
@@ -1145,6 +1302,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
                                              bool removeTerminators) {
 
   using namespace experimental::gsa;
+  BlockIndexing bi(region);
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplexer driven by
@@ -1218,10 +1376,21 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         operandIndex++;
       }
 
-      // The condition value is provided by the `condition` field of the phi
-      rewriter.setInsertionPointAfterValue(gate->result);
-      Value conditionValue =
-          gate->conditionBlock->getTerminator()->getOperand(0);
+      // Get the condition for the block exiting
+      // Determine the gate exit condition:
+      // - If the condition spans multiple cofactors, build a BDD and
+      //   translate it into a circuit.
+      // - Otherwise, use the simple terminating condition of the block
+      Value conditionValue;
+      if (size(gate->cofactorList) > 1) {
+        // Apply a BDD expansion to the loop exit expression and the list of
+        // cofactors
+        BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+        // Convert the boolean expression obtained through BDD to a circuit
+        conditionValue =
+            bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
+      } else
+        conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
 
       // If the function is MU, then we create a merge
       // and use its result as condition
@@ -1281,9 +1450,11 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         rewriter.replaceAllUsesWith(gate->result, mux.getResult());
 
       gsaList.insert({gate->index, mux});
-      mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
 
-      newUnits.push_back(mux);
+      if (gate->gsaGateFunction == MuGate)
+        mux->setAttr(FTD_EXPLICIT_MU, rewriter.getUnitAttr());
+      else
+        mux->setAttr(FTD_EXPLICIT_GAMMA, rewriter.getUnitAttr());
     }
   }
 

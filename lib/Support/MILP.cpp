@@ -12,7 +12,6 @@
 
 #include "dynamatic/Support/MILP.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 std::string dynamatic::getGurobiOptStatusDesc(int status) {
   switch (status) {
   case 1:
@@ -39,4 +38,3 @@ std::string dynamatic::getGurobiOptStatusDesc(int status) {
            "optimization_status_codes.html for more details";
   }
 }
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

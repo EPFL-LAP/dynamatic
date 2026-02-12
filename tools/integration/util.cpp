@@ -18,8 +18,8 @@
 
 using json = nlohmann::json;
 
-bool runSubprocess(const std::vector<std::string> &args,
-                   const fs::path &outputPath) {
+static bool runSubprocess(const std::vector<std::string> &args,
+                          const fs::path &outputPath) {
   std::ostringstream command;
   command << args[0];
   for (size_t i = 1; i < args.size(); ++i) {
@@ -30,15 +30,11 @@ bool runSubprocess(const std::vector<std::string> &args,
   return std::system(command.str().c_str()) == 0;
 };
 
-int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath,
-                       bool useVerilog) {
-  fs::path path =
-      customPath.value_or(fs::path(DYNAMATIC_ROOT) / "integration-test") /
-      name / (name + ".c");
+int runIntegrationTest(IntegrationTestData &config) {
+  fs::path cSourcePath =
+      config.benchmarkPath / config.name / (config.name + ".c");
 
-  std::cout << "[INFO] Running " << name << std::endl;
-  std::string tmpFilename = "tmp_" + name + ".dyn";
+  std::string tmpFilename = "tmp_" + config.name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
     std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
@@ -46,18 +42,44 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
   }
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
-             << "set-src " << path.string() << std::endl
-             << "compile" << std::endl
-             << "write-hdl --hdl " << (useVerilog ? "verilog" : "vhdl")
-             << std::endl
-             << "simulate" << std::endl
-             << "exit" << std::endl;
+             << "set-src " << cSourcePath.string() << std::endl
+             << "set-clock-period 5" << std::endl;
+
+  // clang-format off
+  scriptFile << "compile"
+             << " --buffer-algorithm " << config.bufferAlgorithm
+             << (config.useSharing ? " --sharing" : "")
+             << (config.useRigidification ? " --rigidification" : "")
+             << " --milp-solver " << config.milpSolver << std::endl;
+  // clang-format on
+
+  // Assert testVHDL or testVerilog is true
+  if (!config.testVHDL && !config.testVerilog) {
+    std::cout << "[ERROR] Either testVHDL or testVerilog must be true"
+              << std::endl;
+    return -1;
+  }
+  // Verify Verilog works correctly
+  if (config.testVerilog) {
+    scriptFile << "write-hdl --hdl verilog" << std::endl
+               << "simulate" << std::endl;
+  }
+  // Verify VHDL works correctly
+  if (config.testVHDL) {
+    // By default, the report containing the simulation time is re-written
+    // during the second simulation (i.e., the VHDL simulation).
+    scriptFile << "write-hdl --hdl vhdl" << std::endl
+               << "simulate" << std::endl;
+  }
+  scriptFile << "exit" << std::endl;
 
   scriptFile.close();
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
-  fs::path dynamaticOutPath = path.parent_path() / "out" / "dynamatic_out.txt";
-  fs::path dynamaticErrPath = path.parent_path() / "out" / "dynamatic_err.txt";
+  fs::path dynamaticOutPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
+  fs::path dynamaticErrPath =
+      cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
   if (!fs::exists(dynamaticOutPath.parent_path())) {
     fs::create_directories(dynamaticOutPath.parent_path());
   }
@@ -71,8 +93,9 @@ int runIntegrationTest(const std::string &name, int &outSimTime,
 
   int status = system(cmd.c_str());
   if (status == 0) {
-    fs::path logFilePath = path.parent_path() / "out" / "sim" / "report.txt";
-    outSimTime = getSimulationTime(logFilePath);
+    fs::path logFilePath =
+        cSourcePath.parent_path() / "out" / "sim" / "report.txt";
+    config.simTime = getSimulationTime(logFilePath);
   }
 
   return status;
@@ -94,7 +117,9 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
                                   "dynamatic" / "scripts" / "simulate.sh";
 
   const std::string RTL_CONFIG =
-      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
+      fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl.json";
+
+  const std::string SIMULATOR_NAME = "vsim"; // modelsim
 
   fs::path cFilePath =
       fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
@@ -157,7 +182,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
 
   fs::path handshakeBuffered = compOutDir / "handshakeBuffered.mlir";
   std::string timingModel =
-      (fs::path(DYNAMATIC_ROOT) / "data" / "components-flopoco.json").string();
+      (fs::path(DYNAMATIC_ROOT) / "data" / "components.json").string();
   if (!runSubprocess(
           {DYNAMATIC_OPT_BIN, handshakeTransformed.string(),
            "--handshake-set-buffering-properties=version=fpga20",
@@ -251,7 +276,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   std::cout << "Simulator launching\n";
   if (std::system((SIMULATE_SH + " " + DYNAMATIC_ROOT + " " +
                    cFileDir.string() + " " + outDir.string() + " " + name +
-                   " \"\" " + "false")
+                   " \"\" " + "false" + " " + SIMULATOR_NAME)
                       .c_str()) != 0) {
     std::cerr << "Failed to simulate\n";
     return false;

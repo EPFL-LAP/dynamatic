@@ -23,9 +23,24 @@
 
 namespace fs = std::filesystem;
 
-int runIntegrationTest(const std::string &name, int &outSimTime,
-                       const std::optional<fs::path> &customPath = std::nullopt,
-                       bool useVerilog = false);
+struct IntegrationTestData {
+  // Configurations
+  std::string name;
+  fs::path benchmarkPath;
+  bool testVerilog;
+  bool testVHDL = true; // default to true
+  // Use resource sharing to reduce the functional unit usage.
+  bool useSharing = false;
+  // Use model checking to remove redundant logic.
+  bool useRigidification = false;
+  std::string milpSolver = "gurobi";
+  std::string bufferAlgorithm = "fpga20";
+
+  // Results
+  int simTime;
+};
+
+int runIntegrationTest(IntegrationTestData &config);
 bool runSpecIntegrationTest(const std::string &name, int &outSimTime);
 int getSimulationTime(const fs::path &logFile);
 

@@ -18,12 +18,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -118,9 +122,9 @@ namespace {
 struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LoadOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+  LoadOpConversion(NameAnalysis &namer, TypeConverter &converter,
                    MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), namer(namer) {};
 
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -134,21 +138,22 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
                        loadOp.getMemRefType());
     memref::LoadOp flatLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         loadOp, adaptor.getMemref(), SmallVector<Value>{finalIdx});
-    memOpLowering.recordReplacement(loadOp, flatLoadOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, flatLoadOp);
+    namer.replaceOp(loadOp, flatLoadOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement.
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
 };
 
 struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  StoreOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+  StoreOpConversion(NameAnalysis &namer, TypeConverter &converter,
                     MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), namer(namer) {};
 
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
@@ -163,13 +168,75 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
     memref::StoreOp flatStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         storeOp, adaptor.getValue(), adaptor.getMemref(),
         SmallVector<Value>{finalIdx});
-    memOpLowering.recordReplacement(storeOp, flatStoreOp);
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp, flatStoreOp);
+    namer.replaceOp(storeOp, flatStoreOp);
     return success();
   }
 
 private:
   /// Used to record the operation replacement.
-  MemoryOpLowering &memOpLowering;
+  NameAnalysis &namer;
+};
+
+// This rewrite pattern rewrites the global ops to make the memref they
+// return and the initial values they hold one-dimensional.
+struct GlobalOpConversion : public OpConversionPattern<memref::GlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+
+    // - isUniDimensional: The global op is already one dimensional, so the
+    // rewrite pattern can report that nothing is done.
+    // - !type.hasStaticShape(): The global op does not have a static shape, no
+    // transformation is applied. In this case, if the op is not 1-dimensional,
+    // the rewrite pass will signal a failure.
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+
+    auto newType =
+        MemRefType::get({type.getNumElements()}, type.getElementType());
+
+    // If the global op has an initial value and it is a dense element
+    // attribute, then we reshape both the type and the initial value then
+    // return.
+    if (auto attr = op.getInitialValue()) {
+      if (auto denseAttr = dyn_cast<DenseElementsAttr>(*attr)) {
+        auto newDenseType = RankedTensorType::get({type.getNumElements()},
+                                                  type.getElementType());
+        rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+            op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+            TypeAttr::get(newType), denseAttr.reshape(newDenseType),
+            op.getConstantAttr(), op.getAlignmentAttr());
+        return success();
+      }
+    }
+
+    // If the global op does not have an initial value, then we reshape the
+    // memref type then return.
+    rewriter.replaceOpWithNewOp<memref::GlobalOp>(
+        op, op.getSymNameAttr(), op.getSymVisibilityAttr(),
+        TypeAttr::get(newType), op.getInitialValueAttr(), op.getConstantAttr(),
+        op.getAlignmentAttr());
+    return success();
+  }
+};
+
+struct GetGlobalConversion : public OpConversionPattern<memref::GetGlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+    auto newType =
+        MemRefType::get({type.getNumElements()}, type.getElementType());
+    rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
+                                                     op.getNameAttr());
+    return success();
+  }
 };
 
 struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
@@ -184,6 +251,22 @@ struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
     MemRefType newType = MemRefType::get(
         SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
     rewriter.replaceOpWithNewOp<memref::AllocOp>(op, newType);
+    return success();
+  }
+};
+
+struct AllocaOpConversion : public OpConversionPattern<memref::AllocaOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor /*adaptor*/,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = op.getType();
+    if (isUniDimensional(type) || !type.hasStaticShape())
+      return failure();
+    MemRefType newType = MemRefType::get(
+        SmallVector<int64_t>{type.getNumElements()}, type.getElementType());
+    rewriter.replaceOpWithNewOp<memref::AllocaOp>(op, newType);
     return success();
   }
 };
@@ -276,6 +359,12 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
   target.addLegalDialect<arith::ArithDialect>();
   target.addDynamicallyLegalOp<memref::AllocOp>(
       [](memref::AllocOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::AllocaOp>(
+      [](memref::AllocaOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::GlobalOp>(
+      [](memref::GlobalOp op) { return isUniDimensional(op.getType()); });
+  target.addDynamicallyLegalOp<memref::GetGlobalOp>(
+      [](memref::GetGlobalOp op) { return isUniDimensional(op.getType()); });
   target.addDynamicallyLegalOp<memref::StoreOp>(
       [](memref::StoreOp op) { return op.getIndices().size() == 1; });
   target.addDynamicallyLegalOp<memref::LoadOp>(
@@ -320,19 +409,26 @@ public:
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
     TypeConverter typeConverter;
-    MemoryOpLowering memOpLowering(getAnalysis<NameAnalysis>());
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     populateTypeConversionPatterns(typeConverter);
 
     RewritePatternSet patterns(ctx);
     SetVector<StringRef> rewrittenCallees;
-    patterns.add<AllocOpConversion, OperandConversionPattern<func::ReturnOp>,
-                 OperandConversionPattern<memref::DeallocOp>,
-                 CondBranchOpConversion,
-                 OperandConversionPattern<memref::DeallocOp>,
-                 OperandConversionPattern<memref::CopyOp>, CallOpConversion>(
-        typeConverter, ctx);
-    patterns.add<LoadOpConversion, StoreOpConversion>(memOpLowering,
-                                                      typeConverter, ctx);
+    patterns.add<
+        // clang-format off
+        AllocOpConversion,
+        AllocaOpConversion,
+        GetGlobalConversion,
+        GlobalOpConversion,
+        OperandConversionPattern<func::ReturnOp>,
+        OperandConversionPattern<memref::DeallocOp>,
+        CondBranchOpConversion,
+        OperandConversionPattern<memref::DeallocOp>,
+        OperandConversionPattern<memref::CopyOp>, CallOpConversion
+        // clang-format on
+        >(typeConverter, ctx);
+    patterns.add<LoadOpConversion, StoreOpConversion>(namer, typeConverter,
+                                                      ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
 
@@ -341,10 +437,6 @@ public:
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
-
-    // Change the name of destination memory acceses in all stored memory
-    // dependencies to reflect the new access names
-    memOpLowering.renameDependencies(modOp);
   }
 };
 

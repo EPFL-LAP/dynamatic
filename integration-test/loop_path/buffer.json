@@ -21,11 +21,18 @@
     "comment": "To achieve better II"
   },
   {
-    "pred": "spec_commit4",
+    "pred": "trunci0",
     "outid": 0,
     "slots": 2,
     "type": "fifo_break_none",
-    "comment": "Buffer non-spec token to prevent II=2 locking"
+    "comment": "Buffer non-spec token to prevent II=2 locking (placed before spec_commit to avoid the effect of non-deterministic naming)"
+  },
+  {
+    "pred": "fork11",
+    "outid": 1,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking (placed before spec_commit to avoid the effect of non-deterministic naming)"
   },
   {
     "pred": "fork11",

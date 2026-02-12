@@ -14,7 +14,7 @@
     "comment": "To achieve better II"
   },
   {
-    "pred": "load5",
+    "pred": "load2",
     "outid": 1,
     "slots": 13,
     "type": "fifo_break_none",

@@ -70,6 +70,9 @@ static cl::opt<bool> exitOnFailure(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
 
+static constexpr llvm::StringLiteral VHDL("vhdl");
+static constexpr llvm::StringLiteral VERILOG("verilog");
+
 namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
@@ -90,14 +93,15 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
-  std::string polygeistPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  llvm::StringLiteral hdl = VHDL;
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
+  std::string outputDir = "out";
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -120,7 +124,7 @@ struct FrontendState {
   }
 
   inline std::string getOutputDir() const {
-    return getKernelDir() + getSeparator() + "out";
+    return getKernelDir() + getSeparator() + outputDir;
   }
 
   std::string makeAbsolutePath(StringRef path);
@@ -132,7 +136,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -214,7 +218,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -222,7 +226,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -233,17 +237,6 @@ public:
       : Command("set-dynamatic-path",
                 "Sets the path to Dynamatic's top-level directory", state) {
     addPositionalArg({"path", "path to Dynamatic's top-level directory"});
-  }
-
-  CommandResult execute(CommandArguments &args) override;
-};
-
-class SetPolygeistPath : public Command {
-public:
-  SetPolygeistPath(FrontendState &state)
-      : Command("set-polygeist-path",
-                "Sets the path to Polygeist installation directory", state) {
-    addPositionalArg({"path", "path to Polygeist installation directory"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -292,14 +285,29 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
+class SetOutputDir : public Command {
+public:
+  SetOutputDir(FrontendState &state)
+      : Command("set-output-dir",
+                "Sets the name of the dir to perform HLS in. If not set, "
+                "defaults to 'out'",
+                state) {
+    addPositionalArg({"out_dir", "out dir name"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
+  static constexpr llvm::StringLiteral MILP_SOLVER = "milp-solver";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
+  static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
   static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
   static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
@@ -316,6 +324,11 @@ public:
                "costaware (throughput- and area-driven buffering), or "
                "'mapbuf' (simultaneous technology mapping and buffer "
                "placement)"});
+    addOption({MILP_SOLVER,
+               "The MILP solvers to use. Values are 'gurobi' (Dynamatic "
+               "needs to be built with Gurobi support) and 'cbc'. The default "
+               "option is gurobi and it will fall back to cbc if gurobi is not "
+               "available."});
     addOption(
         {FORK_FIFO_SIZE,
          "Adds buffers with the specified size to the output of every fork"});
@@ -330,6 +343,8 @@ public:
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
                           "accesses, use with caution!"});
+    addFlag({STRAIGHT_TO_QUEUE,
+             "Use straight to queue to connect the circuit to the LSQ"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -353,12 +368,18 @@ public:
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral SIMULATOR = "simulator";
+
   Simulate(FrontendState &state)
       : Command("simulate",
-                "Simulates the VHDL produced during HDL writing using Modelsim "
+                "Simulates the VHDL produced during HDL writing using a "
+                "simulator of choice "
                 "and the hls-verifier tool",
-                state) {}
-
+                state) {
+    addOption({SIMULATOR, "The simulator to use for verification, options are "
+                          "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
+                          "'xsim' (Vivado), 'verilator' (Verilator)"});
+  }
   CommandResult execute(CommandArguments &args) override;
 };
 
@@ -378,6 +399,17 @@ public:
   Synthesize(FrontendState &state)
       : Command("synthesize",
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
+                state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class EstimatePower : public Command {
+public:
+  EstimatePower(FrontendState &state)
+      : Command("estimate-power",
+                "Estimate the power consumption of the design using switching "
+                "activity from simulation.",
                 state) {}
 
   CommandResult execute(CommandArguments &args) override;
@@ -575,23 +607,22 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
-  // Check whether the path makes sense
-  if (!fs::exists(dynamaticPath + sep + "polygeist")) {
-    llvm::outs() << ERR << "'" << dynamaticPath
-                 << "' doesn't seem to point to Dynamatic, expected to "
-                    "find, for example, a directory named 'polygeist' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(dynamaticPath + sep + "bin")) {
-    llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Dynamatic doesn't "
-                    "seem to have been built.\n";
+  if (!fs::exists(dynamaticPath + sep + "bin" + sep + "dynamatic")) {
+    llvm::outs()
+        << ERR
+        << "No 'dynamatic' executable found in bin/, Dynamatic doesn't "
+           "seem to have been built.\n";
     return CommandResult::FAIL;
   }
 
@@ -599,33 +630,14 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetPolygeistPath::execute(CommandArguments &args) {
-  // Remove the separator at the end of the path if there is one
-  StringRef sep = sys::path::get_separator();
-  std::string polygeistPath = args.positionals.front().str();
-  if (StringRef(polygeistPath).ends_with(sep))
-    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
-
-  // Check whether the path makes sense
-  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
-    llvm::outs()
-        << ERR << "'" << polygeistPath
-        << "' doesn't seem to point to Polygeist, expected to "
-           "find, for example, a directory named 'llvm-project/' there.\n";
-    return CommandResult::FAIL;
-  }
-  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
-    llvm::outs() << ERR
-                 << "No 'bin' directory in provided path, Polygeist doesn't "
-                    "seem to have been built.\n";
-    return CommandResult::FAIL;
-  }
-
-  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
-  return CommandResult::SUCCESS;
-}
-
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR
+                 << "Please specify a valid path such as\n "
+                    "/home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -634,6 +646,14 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
+  if (!fs::exists(vivadoPath)) {
+    llvm::outs() << ERR
+                 << "The path to Vivado does not exist, "
+                    "please specify a valid top-level Vivado directory such "
+                    "as\n /home/username/Xilinx/2025.1/Vivado/\n";
+    return CommandResult::FAIL;
+  }
+
   if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
@@ -646,17 +666,36 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a valid FP unit generator.\n"
+                 << "Options: flopoco, vivado\n";
+    return CommandResult::FAIL;
+  }
+
   StringRef generator = args.positionals.front();
+
   if (generator.empty()) {
-    llvm::outs() << ERR << "Please specify a floating-point units generator.\n";
+    llvm::outs() << ERR << "Please specify a floating-point units generator.\n"
+                 << "Options: flopoco, vivado\n";
     return CommandResult::FAIL;
   }
   state.fpUnitsGenerator = generator.str();
   return CommandResult::SUCCESS;
 }
 CommandResult SetSrc::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty source\n";
+    return CommandResult::FAIL;
+  }
+
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
+  if (!fs::exists(sourcePath)) {
+    llvm::outs() << ERR << "Source path <<" << sourcePath
+                 << ">> does not exist. Kindly enter a valid source path\n";
+    return CommandResult::FAIL;
+  }
+
   if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
                  << "Expected source file to have .c extension, but got '"
@@ -668,7 +707,33 @@ CommandResult SetSrc::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetOutputDir::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a non-empty output dir\n";
+    return CommandResult::FAIL;
+  }
+
+  llvm::StringRef outputDir = args.positionals.front();
+
+  // reject trivial bad cases
+  if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
+      outputDir.endswith("/"))
+    return CommandResult::FAIL;
+
+  // reject illegal chars
+  if (outputDir.find_first_of("*?<>|\"") != llvm::StringRef::npos)
+    return CommandResult::FAIL;
+
+  state.outputDir = outputDir.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetCP::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
+    return CommandResult::FAIL;
+  }
+
   // Parse the float argument and check if the argument is legal.
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
@@ -686,9 +751,18 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  std::string milpSolver = "gurobi";
+#else
+  std::string milpSolver = "cbc";
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
   std::string skippableSeqNListString = "none";
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string straightToQueue =
+      args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
   std::string forkFifoSize = "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
@@ -709,6 +783,10 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
+    milpSolver = it->second;
+  }
+
   if (auto it = args.options.find(FORK_FIFO_SIZE); it != args.options.end()) {
     int val = std::stoi(std::string(it->second));
     forkFifoSize = std::to_string(val);
@@ -726,14 +804,12 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
-  state.polygeistPath = state.polygeistPath.empty()
-                            ? state.dynamaticPath + getSeparator() + "polygeist"
-                            : state.polygeistPath;
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, forkFifoSize, skippableSeqNListString);
+                 fastTokenDelivery, milpSolver, straightToQueue, forkFifoSize, skippableSeqNListString);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -747,13 +823,14 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+      state.hdl = VERILOG;
+    } else if (it->second == "verilog-beta") {
+      hdl = "verilog-beta";
     } else if (it->second == "smv") {
       hdl = "smv";
-    } else if (it->second == "vhdl-beta") {
-      hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl', "
+                   << "', possible options are 'vhdl',"
                       "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
@@ -768,10 +845,38 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
+
+  if (auto it = args.options.find(SIMULATOR); it != args.options.end()) {
+    if (it->second == "vsim" || it->second == "xsim" || it->second == "ghdl" ||
+        it->second == "verilator") {
+      simulator = it->second;
+    } else {
+      llvm::errs() << "Unknow Simulator '" << it->second
+                   << "', possible options are 'ghdl', "
+                      "'xsim', 'vsim' and 'verilator'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  if (simulator == "ghdl" && state.hdl != VHDL) {
+    llvm::errs() << "Simulator 'ghdl' is not compatible with this HDL. Use "
+                    "'vsim', 'xsim' or 'verilator'. \n";
+    return CommandResult::FAIL;
+  }
+
+  if (simulator == "verilator" && state.hdl != VERILOG) {
+    llvm::errs()
+        << "Simulator 'verilator' is not compatible with this HDL. Use "
+           "'vsim', 'xsim' or 'ghdl'. \n";
+    return CommandResult::FAIL;
+  }
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
-                 state.fpUnitsGenerator == "vivado" ? "true" : "false");
+                 state.fpUnitsGenerator == "vivado" ? "true" : "false",
+                 simulator, state.hdl);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -801,6 +906,24 @@ CommandResult Synthesize::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
                  state.getKernelName(), floatToString(state.targetCP, 3),
                  floatToString(state.targetCP / 2, 3));
+}
+
+CommandResult EstimatePower::execute(CommandArguments &args) {
+  // We need the source path to be set
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script =
+      state.dynamaticPath + "/tools/dynamatic/estimate_power/estimate_power.py";
+
+  // clang-format off
+  return execCmd(
+    "python", script,
+    "--output_dir", state.getOutputDir(),
+    "--kernel_name", state.getKernelName(),
+    "--cp", floatToString(state.targetCP, 3)
+  );
+  // clang-format on
 }
 
 static StringRef removeComment(StringRef input) {
@@ -842,7 +965,17 @@ static void help(FrontendCommands &commands) {
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-  cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
+
+  // Only show our own arguments in the help message
+  cl::HideUnrelatedOptions(mainCategory);
+
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Dynamatic Frontend. \nThis is our external help message, for arguments "
+      "which are passed directly to the binary. \nYou may find our internal "
+      "help message more helpful, which describes the arguments which are "
+      "passed to our custom shell. \nThe internal help message can be accessed "
+      "by running this binary with no arguments, and then writing 'help'.\n");
 
   // Get current working directory
   SmallString<128> cwd;
@@ -855,16 +988,17 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
-  commands.add<SetPolygeistPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
+  commands.add<SetOutputDir>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
+  commands.add<EstimatePower>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 

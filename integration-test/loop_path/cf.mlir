@@ -11,7 +11,7 @@ module {
     %2 = memref.load %arg0[%1] {handshake.name = "load0"} : memref<1000xi32>
     %3 = memref.load %arg1[%1] {handshake.name = "load1"} : memref<1000xi32>
     %4 = arith.addi %2, %3 {handshake.name = "addi0"} : i32
-    memref.store %4, %arg2[%1] {handshake.deps = #handshake<deps[<"store0" (0)>]>, handshake.name = "store0"} : memref<1000xi32>
+    memref.store %4, %arg2[%1] {handshake.deps = #handshake<deps[["store0", 0]]>, handshake.name = "store0"} : memref<1000xi32>
     %5 = arith.addi %0, %c1_i32 {handshake.name = "addi1"} : i32
     %6 = arith.subi %c1000_i32, %4 {handshake.name = "subi0"} : i32
     %7 = arith.muli %4, %c5_i32 {handshake.name = "muli0"} : i32

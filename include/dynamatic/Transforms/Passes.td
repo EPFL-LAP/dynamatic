@@ -194,9 +194,9 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     (together with buffer placement) that multiple group allocations to the same
     LSQ never happen on the same cycle.   
   }];
-  let constructor = "dynamatic::createHandshakeMaterialize()";
-  let options =
-    [Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",
+  let options = [Option<"replicateConstants", "replicate-constant", "bool", "false",
+            "If true, replicate all the source->constant per each use.">,
+            Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",
             "Size of the fifo in the output of each fork">];
 }
 
@@ -266,7 +266,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -278,11 +278,12 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     which needs to be setup separately from Dynamatic (and is under a different,
     non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
     "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', 'cp'.">,
+    Option<"solver", "solver", "std::string", "\"gurobi\"",
+    "The MILP solver. Choices are: 'gurobi', 'cbc'">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -311,6 +312,8 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
     "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
     "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 
@@ -373,11 +376,26 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
                                           ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
-    Flattens multidimensional memories and accesses to them into
-    single-dimensional memories using row-major indexing. This pass is almost
-    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
-    of column-major indexing when converting multidimensional load/store
-    operations.}];
+    This pass flattens all multidimensional memories and accesses to them into
+    single-dimensional memories using row-major indexing. Specifically, it
+    transforms all the loads, stores, global, get_global, and alloc(a)
+    operations to use the one dimensional indices and adds the index
+    calculation logic.
+
+    Example: 
+
+    Suppose that A, B, C, and D are constants, i, j, k, and l are iterators.
+    Given an array: my_array[A][B][C][D]; we access it as my_array[i][j][k][l].
+    The goal is to treat it as an one dimensional array my_array[A * B * C * D]
+    and access it through my_array[flattened_index].
+
+    The flattened index is computed as:
+    flattened_index := (B * C * D) * i + (C * D) * j + (D) * k + l
+
+    Additionally, when the multiplier factors are power-of-2 (i.e., the size of
+    the corresponding dimension is a power-of-2), this pass also simplify them
+    to shifts.
+  }];
   let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
 }
 
@@ -493,25 +511,10 @@ def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
   "mlir::LLVM::LLVMDialect"];
 }
 
-def LLVMMarkMemoryDependencies : Pass<"llvm-mark-memory-dependencies"> {
-  let summary = "Annotate the memory dependency data on LLVM dialect using the result from the memory analysis pass.";
 
-  let description = [{The mlir-translate only retains very few types of meta
-  data from the original LLVMIR. This pass assumes that the LLVM IR and MLIR
-  have identically ordered operations and converts the memory dependency
-  metadata nodes in the original IR into MLIR attributes. This pass is a
-  temporary solution: we should eliminate the middle step of converting to LLVM
-  dialect and directly convert from LLVM IR to CF, and implement the dependency
-  annotation logic there.}];
-
-  let options = [
-      Option<"llvmir", "llvmir", "std::string", "",
-            "Path to the LLVM IR file.">,
-    ];
-
-  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
+def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
+  let summary = "Optimizes the arithmetic operation depth in handshake IR.";
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
-
-
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

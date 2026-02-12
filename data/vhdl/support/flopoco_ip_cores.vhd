@@ -4604,14 +4604,14 @@ library std;
 use std.textio.all;
 library work;
 
-entity FPAdd_64bit is
+entity FloatingPointAdder_64bit is
     port (clk, ce : in std_logic;
           X : in  std_logic_vector(11+52+2 downto 0);
           Y : in  std_logic_vector(11+52+2 downto 0);
           R : out  std_logic_vector(11+52+2 downto 0)   );
 end entity;
 
-architecture arch of FPAdd_64bit is
+architecture arch of FloatingPointAdder_64bit is
    component RightShifterSticky53_by_max_55_F500_uid12 is
       port ( clk, ce : in std_logic;
              X : in  std_logic_vector(52 downto 0);

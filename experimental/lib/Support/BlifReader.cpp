@@ -11,9 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "experimental/Support/BlifReader.h"
-#include "gurobi_c++.h"
 #include <fstream>
 #include <queue>
 #include <set>
@@ -30,6 +28,8 @@ void Node::configureIONode(const std::string &type) {
     isInput = true;
   else if (type == ".outputs")
     isOutput = true;
+  else
+    llvm::errs() << "Unknown IO node type: " << type << "\n";
 }
 
 void Node::configureConstantNode() {
@@ -72,9 +72,11 @@ void LogicNetwork::addLatch(const std::string &inputName,
   latches.emplace_back(regInputNode, regOutputNode);
 }
 
-void LogicNetwork::addIONode(const std::string &name, const std::string &type) {
+Node *LogicNetwork::addIONode(const std::string &name,
+                              const std::string &type) {
   Node *node = createNode(name);
   node->configureIONode(type);
+  return node;
 }
 
 void LogicNetwork::addLogicGate(const std::vector<std::string> &nodes,
@@ -234,9 +236,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
         << "The buffer placement algorithm MapBuf expects the BLIF file "
            "at location: '"
         << filename
-        << "' which has not been found. Please refer to the doc for "
-           "more information on how to generate it.\n";
-    assert(false && "Unable to open BLIF file");
+        << "' which has not been found. Unable to open BLIF file.\n";
+    return nullptr;
   }
 
   std::string line;
@@ -271,6 +272,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
     else if ((type == ".inputs") || (type == ".outputs")) {
       std::string nodeName;
       while (iss >> nodeName) {
+        if (nodeName == "rst")
+          continue; // Skip reset signal
         data->addIONode(nodeName, type);
       }
     }
@@ -408,5 +411,3 @@ void BlifWriter::writeToFile(LogicNetwork &network,
   file << ".end\n";
   file.close();
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

@@ -25,7 +25,6 @@ class FuncOp;
 } // namespace handshake
 
 #define GEN_PASS_DECL_HANDSHAKEMATERIALIZE
-#define GEN_PASS_DEF_HANDSHAKEMATERIALIZE
 #include "dynamatic/Transforms/Passes.h.inc"
 
 /// Error message to display when the Handshake function is not materialized.

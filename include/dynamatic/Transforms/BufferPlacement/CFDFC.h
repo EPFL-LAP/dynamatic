@@ -21,6 +21,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Support/LogicalResult.h"
@@ -46,6 +47,15 @@ struct CFDFC {
   mlir::SetVector<Value> backedges;
   /// Number of executions of the CFDFC.
   unsigned numExecs;
+
+  /// (Available after placement) The achieved throughput after the placement
+  double throughput;
+  /// (Available after placement) The number of tokens per unit.
+  mlir::DenseMap<Operation *, double> unitOccupancy;
+  /// (Available after placement) The number of tokens per channel. After
+  /// instantiating the buffers, this value is cleared and transferred to the
+  /// buffer(s).
+  mlir::DenseMap<Value, double> channelOccupancy;
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
@@ -100,6 +110,7 @@ void getDisjointBlockUnions(ArrayRef<CFDFC *> cfdfcs,
 /// `milpStat` is not nullptr, the Gurobi status is saved in it.
 LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
                            ArchSet &selectedArchs, unsigned &numExec,
+                           CPSolver::SolverKind solverKind,
                            const std::string &logPath = "",
                            int *milpStat = nullptr);
 

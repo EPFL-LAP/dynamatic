@@ -23,7 +23,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
-#include "tutorials/CreatingPasses/InitAllPasses.h"
+#include "tutorials/InitAllPasses.h"
 
 #ifdef DYNAMATIC_ENABLE_XLS
 #include "experimental/xls/InitAllDialects.h"
@@ -41,7 +41,6 @@ void registerTestRTLSuppport();
 namespace dynamatic {
 namespace experimental {
 namespace test {
-void registerTestCDGAnalysisPass();
 void registerTestHandshakeSimulator();
 } // namespace test
 } // namespace experimental
@@ -49,7 +48,6 @@ void registerTestHandshakeSimulator();
 
 void registerTestPasses() {
   dynamatic::test::registerTestRTLSuppport();
-  dynamatic::experimental::test::registerTestCDGAnalysisPass();
   dynamatic::experimental::test::registerTestHandshakeSimulator();
 }
 

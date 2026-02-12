@@ -105,6 +105,19 @@ bool ftd::isSameLoopBlocks(Block *source, Block *dest,
   return isSameLoop(li.getLoopFor(source), li.getLoopFor(dest));
 }
 
+//// Recursively check whether `inner` is the same loop as `outer`, or is
+/// nested inside `outer` (i.e., any ancestor of `inner` matches `outer`).
+static bool isSameOrInnerLoop(const CFGLoop *inner, const CFGLoop *outer) {
+  if (!inner || !outer)
+    return false;
+  return (inner == outer || isSameOrInnerLoop(inner->getParentLoop(), outer));
+}
+
+bool ftd::isSameOrInnerLoopBlocks(Block *source, Block *dest,
+                                  const mlir::CFGLoopInfo &li) {
+  return isSameOrInnerLoop(li.getLoopFor(source), li.getLoopFor(dest));
+}
+
 /// Recursive function which allows to obtain all the paths from block `start`
 /// to block `end` using a DFS.
 static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
@@ -112,20 +125,22 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::vector<std::vector<Block *>> &allPaths,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
-                        const ftd::BlockIndexing &bi,
-                        bool blockToTraverseFound) {
+                        const ftd::BlockIndexing &bi, bool blockToTraverseFound,
+                        int endVisitCount) {
 
   // The current block is part of the current path
   path.push_back(start);
   // The current block has been visited
   visited.insert(start);
+  // End is Visited
+  int newEndVisitCount = endVisitCount + (start == end ? 1 : 0);
 
   bool blockFound = (!blockToTraverse || start == blockToTraverse);
 
   // If we are at the end of the path, then add it to the list of paths
-  if (start == end && (blockFound || blockToTraverseFound)) {
+  if (start == end && (blockFound || blockToTraverseFound) && path.size() > 1)
     allPaths.push_back(path);
-  } else {
+  else {
     // Else, for each successor which was not visited, run DFS again
     for (Block *successor : start->getSuccessors()) {
 
@@ -141,9 +156,11 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       if (incorrectPath)
         continue;
 
-      if (!visited.count(successor)) {
+      if (!visited.count(successor) ||
+          (successor == end && newEndVisitCount < 2)) {
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
-                    blocksToAvoid, bi, blockFound || blockToTraverseFound);
+                    blocksToAvoid, bi, blockFound || blockToTraverseFound,
+                    newEndVisitCount);
       }
     }
   }
@@ -161,7 +178,7 @@ ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, blockToTraverse,
-              blocksToAvoid, bi, false);
+              blocksToAvoid, bi, false, 0);
   return allPaths;
 }
 

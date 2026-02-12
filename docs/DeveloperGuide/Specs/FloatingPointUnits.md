@@ -80,6 +80,9 @@ data/vhdl/arith/flopoco/*.vhd
 data/vhdl/arith/vivado/*.vhd
 ```
 
+The same applies to the Verilog backend where the paths are `data/verilog/arith/flopoco/*.vhd` and `data/verilog/arith/flopoco/*.vhd`, respectively.
+
+
 Internally, Dynamatic uses two sets of files to track how they are generated and the delay/latency properties of them:
 
 - Units with Flopoco IP cores: [rtl-config-vhdl-flopoco.json](https://github.com/EPFL-LAP/dynamatic/blob/main/data/rtl-config-vhdl-flopoco.json) (for RTL generation) and [components-flopoco.json](https://github.com/EPFL-LAP/dynamatic/blob/main/data/components-flopoco.json) (for retreiving the delay/latency values).
@@ -87,6 +90,9 @@ Internally, Dynamatic uses two sets of files to track how they are generated and
 
 For more information related to timing information, please refer to [this markdown](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md).
 
+**IMPORTANT**: Flopoco does not currently generate Verilog code. When the Flopoco FPU units are specified, the Verilog backend uses VHDL file which have been modified to adapt to Verilog. Hence, there is a mixed-language (VHDL and Verilog) generation.
+
+**IMPORTANT**: The files used for simulation of the Vivado IPs are specified in VHDL for Modelsim. Hence, when simulating the Verilog modules, the core IP function is specified in VHDL. Hence, there is a mixed-language (VHDL and Verilog) simulation.
 
 ## Performance comparison : FloPoCo vs Vivado
 

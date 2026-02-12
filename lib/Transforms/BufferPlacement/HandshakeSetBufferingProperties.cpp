@@ -38,6 +38,9 @@ static const llvm::StringLiteral
 
 /// Makes the channel unbufferizable.
 static void makeUnbufferizable(Value val) {
+  assert(!val.use_empty() &&
+         "Cannot treat a value without a use as a channel!");
+
   Channel channel(val, true);
   channel.props->maxOpaque = 0;
   channel.props->maxTrans = 0;
@@ -162,8 +165,9 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
 
   // See docs/Specs/Buffering.md
   // Memrefs are not real edges in the graph and are therefore unbufferizable
-  for (BlockArgument arg : funcOp.getArguments())
+  for (BlockArgument arg : funcOp.getArguments()) {
     makeUnbufferizable(arg);
+  }
 
   // Ports of memory interfaces are unbufferizable
   for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {

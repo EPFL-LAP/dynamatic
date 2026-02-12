@@ -16,7 +16,6 @@ print_help_and_exit () {
 
 List of options:
   --release | -r                       : build in \"Release\" mode (default is \"Debug\")
-  --skip-polygeist <polygeist-path>    : skip building POLYGEIST
   --visual-dataflow | -v               : build visual-dataflow's C++ library
   --export-godot | -e <godot-path>     : export the Godot project (requires engine)
   --force | -f                         : force cmake reconfiguration in each (sub)project
@@ -29,6 +28,9 @@ List of options:
   --experimental-enable-xls            : enable experimental xls integration
   --enable-leq-binaries                : download binaries for elastic-miter equivalence
                                          checking
+  --use-prebuilt-llvm                  : download and use the prebuilt LLVM
+  --enable-cbc                         : enable the CBC milp solver
+  --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -93,6 +95,12 @@ create_generator_symlink() {
     ln -f --symbolic ../../$src $dst
 }
 
+create_include_symlink() {
+    local src=$1
+    local dst="build/include/clang_headers"
+    echo "$dst -> $src"
+    ln -fT --symbolic "$src" "$dst"
+}
 
 # Determine whether cmake should be re-configured by looking for a
 # CMakeCache.txt file in the current working directory.
@@ -120,7 +128,6 @@ run_ninja() {
 
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
 CMAKE_LLVM_BUILD_OPTIMIZATIONS="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
-CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS="-DPOLYGEIST_USE_LINKER=lld"
 CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS="-DDYNAMATIC_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
 CMAKE_DYNAMATIC_ENABLE_XLS=""
 CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES=""
@@ -132,8 +139,10 @@ BUILD_TYPE="Debug"
 BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
-SKIP_POLYGEIST=0
-POLYGEIST_DIR="$PWD/polygeist"
+PREBUILT_LLVM=0
+BUILD_CHIESEL_LSQ=0
+CMAKE_DYNAMATIC_ENABLE_CBC=""
+LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
 PARSE_ARG=""
@@ -150,9 +159,6 @@ do
         GODOT_PATH="../$GODOT_PATH"
       fi
       PARSE_ARG=""
-    elif [[ $PARSE_ARG == "polygeist-path" ]]; then
-      POLYGEIST_DIR="$arg"
-      PARSE_ARG=""
     elif [[ $PARSE_ARG == "llvm-parallel-link-jobs" ]]; then
       LLVM_PARALLEL_LINK_JOBS="$arg"
       PARSE_ARG=""
@@ -161,7 +167,6 @@ do
           "--disable-build-opt" | "-o")
               CMAKE_COMPILERS=""
               CMAKE_LLVM_BUILD_OPTIMIZATIONS=""
-              CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS=""
               CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS=""
               ;;
           "--force" | "-f")
@@ -182,12 +187,12 @@ do
           "--llvm-parallel-link-jobs")
               PARSE_ARG="llvm-parallel-link-jobs"
               ;;
+          "--use-prebuilt-llvm")
+              PREBUILT_LLVM=1
+              LLVM_DIR="$PWD/build/llvm-project"
+              ;;
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
-              ;;
-          "--skip-polygeist")
-              SKIP_POLYGEIST=1
-              PARSE_ARG="polygeist-path"
               ;;
           "--experimental-enable-xls")
               ENABLE_XLS_INTEGRATION=1
@@ -195,6 +200,12 @@ do
               ;;
           "--enable-leq-binaries")
               CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES="-DDYNAMATIC_ENABLE_LEQ_BINARIES=ON"
+              ;;
+          "--enable-cbc")
+              CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
+              ;;
+          "--build-legacy-lsq")
+              BUILD_CHIESEL_LSQ=1
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -219,61 +230,54 @@ echo "##########################################################################
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
 
-if [[ $SKIP_POLYGEIST -eq 0 ]]; then
+if [[ $PREBUILT_LLVM -eq 0 ]]; then
 
-  #### Polygeist ####
+  #### llvm-project ####
 
-  prepare_to_build_project "LLVM" "polygeist/llvm-project/build"
+  prepare_to_build_project "LLVM" "$LLVM_DIR"
 
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
         -DLLVM_TARGETS_TO_BUILD="host" \
+        -DLLVM_ENABLE_RTTI=ON \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
         $CMAKE_COMPILERS $CMAKE_LLVM_BUILD_OPTIMIZATIONS
-    exit_on_fail "Failed to cmake polygeist/llvm-project"
+    exit_on_fail "Failed to cmake llvm-project"
   fi
 
   # Build
   run_ninja
-  exit_on_fail "Failed to build polygeist/llvm-project"
+  exit_on_fail "Failed to build llvm-project"
   if [[ ENABLE_TESTS -eq 1 ]]; then
       ninja check-mlir
-      exit_on_fail "Tests for polygeist/llvm-project failed"
-  fi
-
-  prepare_to_build_project "Polygeist" "polygeist/build"
-
-  # CMake
-  if should_run_cmake ; then
-    cmake -G Ninja .. \
-        -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
-        -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
-        -DLLVM_TARGETS_TO_BUILD="host" \
-        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-        $CMAKE_COMPILERS $CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS
-    exit_on_fail "Failed to cmake polygeist"
-  fi
-
-  # Build
-  run_ninja
-  exit_on_fail "Failed to build polygeist"
-  if [[ ENABLE_TESTS -eq 1 ]]; then
-      ninja check-polygeist-opt
-      exit_on_fail "Tests for polygeist failed"
-      ninja check-cgeist
-      exit_on_fail "Tests for polygeist failed"
+      exit_on_fail "Tests for llvm-project failed"
   fi
 
 else
-  echo "Skipping POLYGEIST/LLVM build. IMPORTANT: Verify that the path of polygeist in the script tools/dynamatic/scripts/compile.sh is the same"
-  if [[ ! -d $POLYGEIST_DIR ]]; then
-    echo "POLYGEIST directory not found: $POLYGEIST_DIR"
-    exit 1
+
+  #### llvm-project (prebuilt) ####
+  prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
+
+  URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
+  PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+
+  # Download only if the file doesn't exist
+  if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+      echo "Downloading $PREBUILT_LLVM_TARBALL..."
+      wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
+      exit_on_fail "Failed to download the prebuilt llvm-project!"
   fi
+
+  # untar the file 
+  mkdir -p "$SCRIPT_CWD/build/llvm-project/"
+  echo "Unzipping the prebuilt llvm-project!"
+  tar -xf "$PREBUILT_LLVM_TARBALL" -C "$SCRIPT_CWD/build/llvm-project/"
+  exit_on_fail "Failed to untar the prebuilt llvm-project!"
+
 fi
 
 #### XLS ####
@@ -326,17 +330,29 @@ fi
 
 prepare_to_build_project "Dynamatic" "build"
 
+
+# The location of the cmake configurations of polly is different after installed
+if [[ $PREBUILT_LLVM -eq 0 ]]; then
+  POLLY_CMAKE_DIR="$LLVM_DIR/tools/polly/lib/cmake/polly"
+else 
+  POLLY_CMAKE_DIR="$LLVM_DIR/lib/cmake/polly"
+fi
+
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
-      -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
-      -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
-      -DCLANG_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/clang \
-      -DPolly_DIR="$POLYGEIST_DIR"/llvm-project/build/tools/polly/lib/cmake/polly \
+      -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+      -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
+      -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
+      -DPolly_DIR="$POLLY_CMAKE_DIR" \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS $CMAKE_DYNAMATIC_ENABLE_XLS $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
+      $CMAKE_COMPILERS \
+      $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
+      $CMAKE_DYNAMATIC_ENABLE_XLS \
+      $CMAKE_DYNAMATIC_ENABLE_CBC \
+      $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
@@ -350,14 +366,16 @@ fi
 
 # Build Chisel generators
 
-echo_subsection "Building LSQ generator"
+if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
+  echo_subsection "Building LSQ generator"
 
-LSQ_GEN_PATH="tools/backend/lsq-generator-chisel"
-LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar"
-cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
-sbt assembly
-exit_on_fail "Failed to build LSQ generator"
-chmod +x $LSQ_GEN_JAR
+  LSQ_GEN_PATH="tools/backend/lsq-generator-chisel"
+  LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar"
+  cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
+  sbt assembly
+  exit_on_fail "Failed to build LSQ generator"
+  chmod +x $LSQ_GEN_JAR
+fi
 
 #### visual-dataflow ####
 
@@ -367,8 +385,8 @@ if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja .. \
-        -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
-        -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
+        -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+        -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -404,9 +422,9 @@ cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
 
-create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
-create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
-create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
+create_symlink "$LLVM_DIR/bin/clang++"
+create_symlink "$LLVM_DIR/bin/opt"
+create_symlink "$LLVM_DIR/bin/clang"
 create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
@@ -418,12 +436,21 @@ create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/log2csv
+create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
 create_generator_symlink build/bin/exp-sharing-wrapper-generator
-create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+
+if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
+  create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+fi 
+
+# Create symbolic links to clang headers (standard c library for clang)
+create_include_symlink "$LLVM_DIR/lib/clang/18/include"
+
+
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow
 fi

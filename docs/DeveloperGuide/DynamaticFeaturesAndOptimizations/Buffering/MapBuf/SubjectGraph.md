@@ -158,4 +158,7 @@ Represents fork_dataless and fork modules.
 ### Functions
 1) MuxSubjectGraph(Operation *op): Similar to generateNewName functions in the ForkSubjectGraph, the input names are transformed into forms that allows them to be differentiated easier.
 
+## BlackBoxSubjectGraph
+
+This represents the subject graph of a dataflow module with all input and output ports intentionally left disconnected. Such a representation is required to model special hardware units, including floating-point units, RAMs, and load–store queues (LSQs), that are treated as black boxes in the dataflow.
 
