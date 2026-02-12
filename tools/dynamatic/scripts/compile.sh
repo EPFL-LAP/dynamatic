@@ -22,11 +22,11 @@ MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
-LLVM_BINS=$DYNAMATIC_DIR/bin
-export PATH=$PATH:$LLVM_BINS
+DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
+export PATH=$PATH:$DYNAMATIC_BINS
 
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
-LLVM_OPT="$LLVM_BINS/opt"
+LLVM_OPT="$DYNAMATIC_BINS/opt"
 LLVM_TO_STD_TRANSLATION_BIN="$DYNAMATIC_DIR/build/bin/translate-llvm-to-std"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
@@ -113,7 +113,7 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
 # ------------------------------------------------------------------------------
-$LLVM_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
+$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
   -I "$DYNAMATIC_DIR/include"  \
   -Xclang \
   -ffp-contract=off \
@@ -157,7 +157,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # (Slide 26)
 # ------------------------------------------------------------------------------
 
-$LLVM_BINS/opt -S \
+$LLVM_OPT -S \
   -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
@@ -186,7 +186,7 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 # - ArrayParititon pass currently breaks the SCoP analysis in Polly. Therefore,
 # we need to first attach analysis results to memory ops and then apply memory
 # bank partition.
-$LLVM_BINS/opt -S \
+$LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
