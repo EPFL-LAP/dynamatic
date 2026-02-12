@@ -24,7 +24,8 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE
   ins_ready := !full;
   outs_valid := ins_valid | full;
-  full_0 := full;
+
+  slot_0_full := full;
 """
 
 
@@ -44,7 +45,8 @@ MODULE {name}(ins, ins_valid, outs_ready)
   ins_ready := inner_one_slot_break_r.ins_ready;
   outs_valid := inner_one_slot_break_r.outs_valid;
   outs := inner_one_slot_break_r.full ? data : ins;
-  full_0 := inner_one_slot_break_r.full;
+
+  slot_0_full := inner_one_slot_break_r.slot_0_full;
 
 {_generate_one_slot_break_r_dataless(f"{name}__one_slot_break_r_dataless")}
 """
