@@ -18,28 +18,6 @@
 #include <optional>
 #include <string>
 
-namespace {
-/*
-bool fromJSON(const llvm::json::Value &value,
-            dynamatic::handshake::EagerForkSent &state, llvm::json::Path path) {
-llvm::json::ObjectMapper mapper(value, path);
-std::string opName;
-std::string channelName;
-if (!mapper || !mapper.map(OP_LIT, opName) || !mapper.map(OUTPUT_LIT,
-channelName)) return false; state.channel = nullptr; return false;
-}
-
-llvm::json::Value toJSON(const dynamatic::handshake::EagerForkSent &state) {
-dynamatic::Operation *op = state.channel.getOwner();
-assert(op);
-dynamatic::handshake::PortNamer namer(op);
-return llvm::json::Object(
-    {{OP_LIT, dynamatic::getUniqueName(op)},
-     {OUTPUT_LIT, namer.getOutputName(state.channel.getResultNumber())}});
-}
-*/
-
-} // namespace
 namespace dynamatic {
 
 std::optional<FormalProperty::TYPE>
@@ -278,15 +256,6 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
     channels[i] = state.channelName;
   }
   return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
-
-  // return llvm::json::Object( {{SENT_STATES_LIT, sentStates}});
-  /*
-  std::vector<llvm::json::Value> objs {sentStates.size()};
-  for (auto [i,state] : llvm::enumerate(sentStates)) {
-    objs[i] = ::toJSON(state);
-  }
-  return llvm::json::Object( {{SENT_STATES_LIT, objs}});
-  */
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -306,20 +275,6 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
     prop->sentStates[i] = handshake::EagerForkSent(opName, channelName);
   }
   return prop;
-  /*
-  if (!mapper || !mapper.map(SENT_STATES_LIT, objs))
-    return nullptr;
-
-  for (auto obj : objs) {
-    handshake::EagerForkSent state;
-    bool success = fromJSON(obj, &state, path);
-  }
-  */
-
-  /*
-  if (!mapper || !mapper.map(SENT_STATES_LIT, prop->sentStates))
-    return nullptr;
-  */
 }
 
 // Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
@@ -328,17 +283,25 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
     unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
     : FormalProperty(id, tag, TYPE::CSOAFAF) {
-  forkOp = getUniqueName(forkOpI).str();
-  numEagerForkOutputs = forkOpI.getNumEagerOutputs();
-  bufferOp = getUniqueName(bufferOpI).str();
-  bufferSlot = bufferOpI.getNumSlots() - 1;
+  std::string forkOpName = getUniqueName(forkOpI).str();
+  sentStates = forkOpI.getInternalSentStates(forkOpName);
+  std::string bufferOpName = getUniqueName(bufferOpI).str();
+  auto slots = bufferOpI.getInternalSlotStates(bufferOpName);
+  // last slot is the copied slot!
+  copiedSlot = slots[slots.size() - 1];
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  return llvm::json::Object({{FORK_OP_LIT, forkOp},
-                             {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs},
-                             {BUFFER_OP_LIT, bufferOp},
-                             {BUFFER_SLOT_LIT, bufferSlot}});
+  std::vector<std::string> channels(sentStates.size());
+  std::string forkOpName = sentStates[0].opName;
+  for (auto [i, state] : llvm::enumerate(sentStates)) {
+    assert(state.opName == forkOpName);
+    channels[i] = state.channelName;
+  }
+  return llvm::json::Object({{FORK_OP_LIT, forkOpName},
+                             {FORK_CHANNELS_LIT, channels},
+                             {BUFFER_OP_LIT, copiedSlot.opName},
+                             {BUFFER_SLOT_LIT, copiedSlot.slotName}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -349,12 +312,22 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper || !mapper.map(FORK_OP_LIT, prop->forkOp) ||
-      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
-      !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
-      !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
+  std::string forkOpName;
+  std::vector<std::string> channelNames;
+  if (!mapper || !mapper.map(FORK_OP_LIT, forkOpName) ||
+      !mapper.map(FORK_CHANNELS_LIT, channelNames))
+    return nullptr;
+  prop->sentStates = std::vector<handshake::EagerForkSent>(channelNames.size());
+  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
+    prop->sentStates[i] = handshake::EagerForkSent(forkOpName, channelName);
+  }
+  std::string bufferOpName;
+  std::string slotName;
+  if (!mapper.map(BUFFER_OP_LIT, bufferOpName) ||
+      !mapper.map(BUFFER_SLOT_LIT, slotName))
     return nullptr;
 
+  prop->copiedSlot = handshake::BufferSlotFull(bufferOpName, slotName);
   return prop;
 }
 

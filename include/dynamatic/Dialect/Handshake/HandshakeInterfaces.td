@@ -68,9 +68,9 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   }];
   let methods = [
    InterfaceMethod<[{
-       Get the number of slots.
+       Get the internal state of each slot.
      }],
-     "int", "getNumSlots", (ins)
+     "std::vector<BufferSlotFull>", "getInternalSlotStates", (ins "const std::string &" : $opName)
    >,
   ];
 }

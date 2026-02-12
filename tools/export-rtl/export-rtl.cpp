@@ -1272,16 +1272,16 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
                    property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string forkName = p->getForkOp();
-      std::string bufferName = p->getBufferOp();
-      int bufferSlot = p->getBufferSlot();
-      std::vector<std::string> forkOutNames{numOut};
-      for (unsigned i = 0; i < numOut; ++i) {
-        forkOutNames[i] = llvm::formatv("{0}.sent_{1}", forkName, i).str();
+      std::vector<std::string> forkOutNames(0);
+      for (auto [i, sentState] : llvm::enumerate(p->getSentStates())) {
+        forkOutNames.push_back(llvm::formatv("{0}.{1}_sent", sentState.opName,
+                                             sentState.channelName)
+                                   .str());
       }
+      auto copiedSlot = p->getCopiedSlot();
       std::string bufferFull =
-          llvm::formatv("{0}.full_{1}", bufferName, bufferSlot).str();
+          llvm::formatv("{0}.{1}_full", copiedSlot.opName, copiedSlot.slotName)
+              .str();
       std::string propertyString =
           llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
                         bufferFull)

@@ -47,13 +47,13 @@ struct EagerForkSent : public HandshakeOpInternalState {
 
 struct BufferSlotFull : public HandshakeOpInternalState {
   BufferSlotFull() = default;
-  BufferSlotFull(mlir::Operation *op, unsigned slotIndex)
-      : HandshakeOpInternalState(TYPE::BufferSlotFull), op(op),
-        slotIndex(slotIndex) {}
+  BufferSlotFull(const std::string &opName, const std::string &slotName)
+      : HandshakeOpInternalState(TYPE::BufferSlotFull), opName(opName),
+        slotName(slotName) {}
   ~BufferSlotFull() = default;
 
-  mlir::Operation *op;
-  unsigned slotIndex;
+  std::string opName;
+  std::string slotName;
 };
 
 } // namespace handshake

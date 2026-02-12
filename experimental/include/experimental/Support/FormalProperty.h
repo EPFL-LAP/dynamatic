@@ -21,53 +21,6 @@
 
 namespace dynamatic {
 
-/*
-struct NamedEagerForkSent {
-std::string operation;
-std::string channelName;
-
-NamedEagerForkSent(const dynamatic::handshake::EagerForkSent &state);
-dynamatic::handshake::EagerForkSent
-getUnnamed(dynamatic::NameAnalysis &nameAnalysis) const;
-
-inline static const dynamatic::StringLiteral OPERATION_LIT = "operation";
-inline static const dynamatic::StringLiteral CHANNEL_LIT = "channel";
-};
-
-inline llvm::json::Value toJSON(const NamedEagerForkSent &state) {
-return llvm::json::Object(
-    {{NamedEagerForkSent::OPERATION_LIT, state.operation},
-     {NamedEagerForkSent::CHANNEL_LIT, state.channelName}});
-}
-
-inline bool fromJSON(const llvm::json::Value &value, NamedEagerForkSent &state,
-                   llvm::json::Path path) {
-llvm::json::ObjectMapper mapper(value, path);
-return (mapper &&
-        mapper.map(NamedEagerForkSent::OPERATION_LIT, state.operation) &&
-        mapper.map(NamedEagerForkSent::CHANNEL_LIT, state.channelName));
-}
-inline static const StringLiteral OPERATION_LIT = "operation";
-inline static const StringLiteral OUTPUT_LIT = "channel";
-bool fromJSON(const llvm::json::Value &value,
-            dynamatic::handshake::EagerForkSent &state, llvm::json::Path path) {
-llvm::json::ObjectMapper mapper(value, path);
-std::string opName;
-std::string channelName;
-if (!mapper || !mapper.map(OPERATION_LIT, opName) || !mapper.map(OUTPUT_LIT,
-channelName)) return false; state.channel = nullptr; return false;
-}
-
-llvm::json::Value toJSON(const dynamatic::handshake::EagerForkSent &state) {
-dynamatic::Operation *op = state.channel.getOwner();
-assert(op);
-dynamatic::handshake::PortNamer namer(op);
-return llvm::json::Object(
-    {{OPERATION_LIT, dynamatic::getUniqueName(op)},
-     {OUTPUT_LIT, namer.getOutputName(state.channel.getResultNumber())}});
-}
-*/
-
 class FormalProperty {
 
 public:
@@ -243,10 +196,8 @@ private:
 // https://ieeexplore.ieee.org/document/10323796 for more details
 class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
-  std::string getForkOp() { return forkOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
-  std::string getBufferOp() { return bufferOp; }
-  unsigned getBufferSlot() { return bufferSlot; }
+  std::vector<handshake::EagerForkSent> getSentStates() { return sentStates; }
+  handshake::BufferSlotFull getCopiedSlot() { return copiedSlot; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -264,12 +215,10 @@ public:
   }
 
 private:
-  std::string forkOp;
-  unsigned numEagerForkOutputs;
-  std::string bufferOp;
-  unsigned bufferSlot;
+  std::vector<handshake::EagerForkSent> sentStates;
+  handshake::BufferSlotFull copiedSlot;
   inline static const StringLiteral FORK_OP_LIT = "fork_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };
