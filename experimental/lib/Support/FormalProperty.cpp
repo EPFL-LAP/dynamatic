@@ -103,8 +103,7 @@ llvm::json::Value FormalProperty::toJSON() const {
 }
 
 std::unique_ptr<FormalProperty>
-FormalProperty::fromJSON(NameAnalysis &nameAnalysis,
-                         const llvm::json::Value &value,
+FormalProperty::fromJSON(const llvm::json::Value &value,
                          llvm::json::Path path) {
   std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
@@ -121,8 +120,7 @@ FormalProperty::fromJSON(NameAnalysis &nameAnalysis,
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EFNAO:
-    return EagerForkNotAllOutputSent::fromJSON(nameAnalysis, value,
-                                               path.field(INFO_LIT));
+    return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
@@ -268,28 +266,16 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
-  Operation *op = forkOp;
-  sentStates = forkOp.getInternalSentStates(op);
-  /*
-  std::vector<handshake::EagerForkSent> states =
-  forkOp.getInternalSentStates(op);
-  //sentStates = std::vector<NamedEagerForkSent>(states.size());
-  for (auto [i, state] : llvm::enumerate(states)) {
-    sentStates[i] = state;
-  }
-  */
+  std::string opName = getUniqueName(forkOp).str();
+  sentStates = forkOp.getInternalSentStates(opName);
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   std::vector<std::string> channels(sentStates.size());
-  Operation *op = sentStates[0].channel.getOwner();
-  StringRef opName = getUniqueName(op);
-  llvm::errs() << llvm::formatv("opName {0}: {1}\n", opName, op);
-  handshake::PortNamer namer(op);
+  std::string opName = sentStates[0].opName;
   for (auto [i, state] : llvm::enumerate(sentStates)) {
-    Operation *newOp = state.channel.getOwner();
-    assert(newOp == op);
-    channels[i] = namer.getOutputName(state.channel.getResultNumber());
+    assert(state.opName == opName);
+    channels[i] = state.channelName;
   }
   return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
 
@@ -304,8 +290,7 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
-EagerForkNotAllOutputSent::fromJSON(NameAnalysis &nameAnalysis,
-                                    const llvm::json::Value &value,
+EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
                                     llvm::json::Path path) {
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
@@ -316,19 +301,10 @@ EagerForkNotAllOutputSent::fromJSON(NameAnalysis &nameAnalysis,
   if (!mapper || !mapper.map(OWNER_OP_LIT, opName) ||
       !mapper.map(CHANNELS_LIT, channelNames))
     return nullptr;
-  Operation *op = nameAnalysis.getOp(opName);
-  llvm::errs() << llvm::formatv("opName {0}: 0x{1}\n", opName, op);
-  handshake::PortNamer namer(op);
   prop->sentStates = std::vector<handshake::EagerForkSent>(channelNames.size());
   for (auto [i, channelName] : llvm::enumerate(channelNames)) {
-    for (auto [j, res] : llvm::enumerate(op->getResults())) {
-      if (channelName == namer.getOutputName(j)) {
-        prop->sentStates[i] = res;
-        break;
-      }
-    }
+    prop->sentStates[i] = handshake::EagerForkSent(opName, channelName);
   }
-
   return prop;
   /*
   if (!mapper || !mapper.map(SENT_STATES_LIT, objs))
@@ -382,9 +358,7 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-LogicalResult
-FormalPropertyTable::addPropertiesFromJSON(NameAnalysis &nameAnalysis,
-                                           StringRef filepath) {
+LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database
   std::ifstream inputFile(filepath.str());
   if (!inputFile.is_open()) {
@@ -420,7 +394,7 @@ FormalPropertyTable::addPropertiesFromJSON(NameAnalysis &nameAnalysis,
   }
   for (auto [idx, jsonComponent] : llvm::enumerate(*jsonComponents)) {
     std::unique_ptr<FormalProperty> &property = properties.emplace_back();
-    if (!fromJSON(nameAnalysis, jsonComponent, property, jsonPath.index(idx))) {
+    if (!fromJSON(jsonComponent, property, jsonPath.index(idx))) {
       jsonRoot.printErrorContext(*value, llvm::errs());
       return failure();
     }

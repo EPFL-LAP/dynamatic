@@ -37,17 +37,12 @@ struct HandshakeOpInternalState {
 
 struct EagerForkSent : public HandshakeOpInternalState {
   EagerForkSent() = default;
-  EagerForkSent(mlir::OpResult channel)
-      : HandshakeOpInternalState(TYPE::EagerForkSent), channel(channel) {}
-  EagerForkSent(mlir::Operation *op, unsigned outputIndex)
-      : HandshakeOpInternalState(TYPE::EagerForkSent),
-        channel(op->getResults()[outputIndex]) {
-    assert(op && "Fork operation has to exist");
-    // TODO: assert(isa<EagerForkLikeOpInterface>(op));
-  }
+  EagerForkSent(const std::string &opName, const std::string &channelName)
+      : opName(opName), channelName(channelName) {}
   ~EagerForkSent() = default;
 
-  mlir::OpResult channel;
+  std::string opName;
+  std::string channelName;
 };
 
 struct BufferSlotFull : public HandshakeOpInternalState {

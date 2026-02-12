@@ -63,8 +63,7 @@ private:
 
 void HandshakeRigidificationPass::runDynamaticPass() {
   FormalPropertyTable table;
-  if (failed(
-          table.addPropertiesFromJSON(getAnalysis<NameAnalysis>(), jsonPath)))
+  if (failed(table.addPropertiesFromJSON(jsonPath)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
   for (const auto &property : table.getProperties()) {

@@ -368,10 +368,11 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
 //===----------------------------------------------------------------------===//
 
 int ForkOp::getNumEagerOutputs() { return getNumResults(); }
-std::vector<EagerForkSent> ForkOp::getInternalSentStates(mlir::Operation *op) {
+std::vector<EagerForkSent>
+ForkOp::getInternalSentStates(const std::string &opName) {
   std::vector<EagerForkSent> ret;
   for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSent state(op, i);
+    EagerForkSent state(opName, getResultName(i));
     ret.push_back(state);
   }
   return ret;
@@ -379,10 +380,10 @@ std::vector<EagerForkSent> ForkOp::getInternalSentStates(mlir::Operation *op) {
 
 int ControlMergeOp::getNumEagerOutputs() { return 2; }
 std::vector<EagerForkSent>
-ControlMergeOp::getInternalSentStates(mlir::Operation *op) {
+ControlMergeOp::getInternalSentStates(const std::string &opName) {
   std::vector<EagerForkSent> ret;
   for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSent state(op, i);
+    EagerForkSent state(opName, getResultName(i));
     ret.push_back(state);
   }
   return ret;

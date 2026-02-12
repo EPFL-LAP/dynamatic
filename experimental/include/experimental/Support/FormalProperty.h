@@ -99,8 +99,7 @@ public:
   // Deserializes a formal property from JSON. The return type can be casted to
   // the derived classes to access the extra info
   std::unique_ptr<FormalProperty> static fromJSON(
-      NameAnalysis &nameAnalysis, const llvm::json::Value &value,
-      llvm::json::Path path);
+      const llvm::json::Value &value, llvm::json::Path path);
 
   FormalProperty() = default;
   FormalProperty(unsigned long id, TAG tag, TYPE type)
@@ -218,8 +217,7 @@ public:
   llvm::json::Value extraInfoToJSON() const override;
 
   static std::unique_ptr<EagerForkNotAllOutputSent>
-  fromJSON(NameAnalysis &nameAnalysis, const llvm::json::Value &value,
-           llvm::json::Path path);
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   EagerForkNotAllOutputSent() = default;
   EagerForkNotAllOutputSent(unsigned long id, TAG tag,
@@ -280,20 +278,18 @@ class FormalPropertyTable {
 public:
   FormalPropertyTable() = default;
 
-  LogicalResult addPropertiesFromJSON(NameAnalysis &nameAnalysis,
-                                      StringRef filepath);
+  LogicalResult addPropertiesFromJSON(StringRef filepath);
 
   const std::vector<std::unique_ptr<FormalProperty>> &getProperties() const {
     return properties;
   }
 
-  inline bool fromJSON(NameAnalysis &nameAnalysis,
-                       const llvm::json::Value &value,
+  inline bool fromJSON(const llvm::json::Value &value,
                        std::unique_ptr<FormalProperty> &property,
                        llvm::json::Path path) {
     // fromJson internally allocates the correct space for the class with
     // make_unique and returns a pointer
-    property = FormalProperty::fromJSON(nameAnalysis, value, path);
+    property = FormalProperty::fromJSON(value, path);
 
     return property != nullptr;
   }
