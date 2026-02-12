@@ -8,7 +8,6 @@ add_dynamatic_dialect_library(DynamaticHandshake
   HandshakeOps.cpp
   HandshakeDialect.cpp
   HandshakeInterfaces.cpp
-HandshakeOpInternalState.cpp
   HandshakeTypes.cpp
   MemoryInterfaces.cpp
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
@@ -19,6 +20,53 @@
 #include <optional>
 
 namespace dynamatic {
+
+/*
+struct NamedEagerForkSent {
+std::string operation;
+std::string channelName;
+
+NamedEagerForkSent(const dynamatic::handshake::EagerForkSent &state);
+dynamatic::handshake::EagerForkSent
+getUnnamed(dynamatic::NameAnalysis &nameAnalysis) const;
+
+inline static const dynamatic::StringLiteral OPERATION_LIT = "operation";
+inline static const dynamatic::StringLiteral CHANNEL_LIT = "channel";
+};
+
+inline llvm::json::Value toJSON(const NamedEagerForkSent &state) {
+return llvm::json::Object(
+    {{NamedEagerForkSent::OPERATION_LIT, state.operation},
+     {NamedEagerForkSent::CHANNEL_LIT, state.channelName}});
+}
+
+inline bool fromJSON(const llvm::json::Value &value, NamedEagerForkSent &state,
+                   llvm::json::Path path) {
+llvm::json::ObjectMapper mapper(value, path);
+return (mapper &&
+        mapper.map(NamedEagerForkSent::OPERATION_LIT, state.operation) &&
+        mapper.map(NamedEagerForkSent::CHANNEL_LIT, state.channelName));
+}
+inline static const StringLiteral OPERATION_LIT = "operation";
+inline static const StringLiteral OUTPUT_LIT = "channel";
+bool fromJSON(const llvm::json::Value &value,
+            dynamatic::handshake::EagerForkSent &state, llvm::json::Path path) {
+llvm::json::ObjectMapper mapper(value, path);
+std::string opName;
+std::string channelName;
+if (!mapper || !mapper.map(OPERATION_LIT, opName) || !mapper.map(OUTPUT_LIT,
+channelName)) return false; state.channel = nullptr; return false;
+}
+
+llvm::json::Value toJSON(const dynamatic::handshake::EagerForkSent &state) {
+dynamatic::Operation *op = state.channel.getOwner();
+assert(op);
+dynamatic::handshake::PortNamer namer(op);
+return llvm::json::Object(
+    {{OPERATION_LIT, dynamatic::getUniqueName(op)},
+     {OUTPUT_LIT, namer.getOutputName(state.channel.getResultNumber())}});
+}
+*/
 
 class FormalProperty {
 
@@ -51,7 +99,8 @@ public:
   // Deserializes a formal property from JSON. The return type can be casted to
   // the derived classes to access the extra info
   std::unique_ptr<FormalProperty> static fromJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
+      NameAnalysis &nameAnalysis, const llvm::json::Value &value,
+      llvm::json::Path path);
 
   FormalProperty() = default;
   FormalProperty(unsigned long id, TAG tag, TYPE type)
@@ -164,13 +213,13 @@ private:
 // details.
 class EagerForkNotAllOutputSent : public FormalProperty {
 public:
-  std::string getOwner() { return ownerOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::vector<handshake::EagerForkSent> getSentStates() { return sentStates; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
   static std::unique_ptr<EagerForkNotAllOutputSent>
-  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  fromJSON(NameAnalysis &nameAnalysis, const llvm::json::Value &value,
+           llvm::json::Path path);
 
   EagerForkNotAllOutputSent() = default;
   EagerForkNotAllOutputSent(unsigned long id, TAG tag,
@@ -182,10 +231,9 @@ public:
   }
 
 private:
-  std::string ownerOp;
-  unsigned numEagerForkOutputs;
+  std::vector<handshake::EagerForkSent> sentStates;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral CHANNELS_LIT = "channels";
 };
 
 // When an eager fork is `sent` state for at least one of its outputs, it is
@@ -232,18 +280,20 @@ class FormalPropertyTable {
 public:
   FormalPropertyTable() = default;
 
-  LogicalResult addPropertiesFromJSON(StringRef filepath);
+  LogicalResult addPropertiesFromJSON(NameAnalysis &nameAnalysis,
+                                      StringRef filepath);
 
   const std::vector<std::unique_ptr<FormalProperty>> &getProperties() const {
     return properties;
   }
 
-  inline bool fromJSON(const llvm::json::Value &value,
+  inline bool fromJSON(NameAnalysis &nameAnalysis,
+                       const llvm::json::Value &value,
                        std::unique_ptr<FormalProperty> &property,
                        llvm::json::Path path) {
     // fromJson internally allocates the correct space for the class with
     // make_unique and returns a pointer
-    property = FormalProperty::fromJSON(value, path);
+    property = FormalProperty::fromJSON(nameAnalysis, value, path);
 
     return property != nullptr;
   }

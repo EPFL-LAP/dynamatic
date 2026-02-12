@@ -1257,11 +1257,17 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                                      propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string opName = p->getOwner();
+      auto sentStates = p->getSentStates();
+      unsigned numOut = sentStates.size();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
+        OpResult channel = sentStates[i].channel;
+        Operation *op = channel.getOwner();
+        handshake::PortNamer namer(op);
+        assert(op && "Sent state channel should have owner");
+        StringRef channelName = namer.getOutputName(channel.getResultNumber());
+        outNames[i] = llvm::formatv(
+            "{0}.{1}_sent", getUniqueName(channel.getOwner()), channelName);
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
@@ -1539,9 +1545,10 @@ int main(int argc, char **argv) {
     return 1;
 
   // Pull all the properties from the property database
+  NameAnalysis nameAnalysis(*modOp);
   FormalPropertyTable table;
   if (!propertyFilename.empty() &&
-      failed(table.addPropertiesFromJSON(propertyFilename)))
+      failed(table.addPropertiesFromJSON(nameAnalysis, propertyFilename)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
   FormalPropertyInfo propertyInfo(table, outputPath);

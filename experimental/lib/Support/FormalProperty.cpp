@@ -18,6 +18,28 @@
 #include <optional>
 #include <string>
 
+namespace {
+/*
+bool fromJSON(const llvm::json::Value &value,
+            dynamatic::handshake::EagerForkSent &state, llvm::json::Path path) {
+llvm::json::ObjectMapper mapper(value, path);
+std::string opName;
+std::string channelName;
+if (!mapper || !mapper.map(OP_LIT, opName) || !mapper.map(OUTPUT_LIT,
+channelName)) return false; state.channel = nullptr; return false;
+}
+
+llvm::json::Value toJSON(const dynamatic::handshake::EagerForkSent &state) {
+dynamatic::Operation *op = state.channel.getOwner();
+assert(op);
+dynamatic::handshake::PortNamer namer(op);
+return llvm::json::Object(
+    {{OP_LIT, dynamatic::getUniqueName(op)},
+     {OUTPUT_LIT, namer.getOutputName(state.channel.getResultNumber())}});
+}
+*/
+
+} // namespace
 namespace dynamatic {
 
 std::optional<FormalProperty::TYPE>
@@ -81,7 +103,8 @@ llvm::json::Value FormalProperty::toJSON() const {
 }
 
 std::unique_ptr<FormalProperty>
-FormalProperty::fromJSON(const llvm::json::Value &value,
+FormalProperty::fromJSON(NameAnalysis &nameAnalysis,
+                         const llvm::json::Value &value,
                          llvm::json::Path path) {
   std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
@@ -98,7 +121,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::VEQ:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EFNAO:
-    return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
+    return EagerForkNotAllOutputSent::fromJSON(nameAnalysis, value,
+                                               path.field(INFO_LIT));
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
@@ -244,28 +268,82 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
-  ownerOp = getUniqueName(forkOp).str();
-  numEagerForkOutputs = forkOp.getNumEagerOutputs();
+  Operation *op = forkOp;
+  sentStates = forkOp.getInternalSentStates(op);
+  /*
+  std::vector<handshake::EagerForkSent> states =
+  forkOp.getInternalSentStates(op);
+  //sentStates = std::vector<NamedEagerForkSent>(states.size());
+  for (auto [i, state] : llvm::enumerate(states)) {
+    sentStates[i] = state;
+  }
+  */
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  return llvm::json::Object(
-      {{OWNER_OP_LIT, ownerOp}, {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs}});
+  std::vector<std::string> channels(sentStates.size());
+  Operation *op = sentStates[0].channel.getOwner();
+  StringRef opName = getUniqueName(op);
+  llvm::errs() << llvm::formatv("opName {0}: {1}\n", opName, op);
+  handshake::PortNamer namer(op);
+  for (auto [i, state] : llvm::enumerate(sentStates)) {
+    Operation *newOp = state.channel.getOwner();
+    assert(newOp == op);
+    channels[i] = namer.getOutputName(state.channel.getResultNumber());
+  }
+  return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
+
+  // return llvm::json::Object( {{SENT_STATES_LIT, sentStates}});
+  /*
+  std::vector<llvm::json::Value> objs {sentStates.size()};
+  for (auto [i,state] : llvm::enumerate(sentStates)) {
+    objs[i] = ::toJSON(state);
+  }
+  return llvm::json::Object( {{SENT_STATES_LIT, objs}});
+  */
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
-EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
+EagerForkNotAllOutputSent::fromJSON(NameAnalysis &nameAnalysis,
+                                    const llvm::json::Value &value,
                                     llvm::json::Path path) {
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
-
-  if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerOp) ||
-      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs))
+  std::string opName;
+  std::vector<std::string> channelNames;
+  if (!mapper || !mapper.map(OWNER_OP_LIT, opName) ||
+      !mapper.map(CHANNELS_LIT, channelNames))
     return nullptr;
+  Operation *op = nameAnalysis.getOp(opName);
+  llvm::errs() << llvm::formatv("opName {0}: 0x{1}\n", opName, op);
+  handshake::PortNamer namer(op);
+  prop->sentStates = std::vector<handshake::EagerForkSent>(channelNames.size());
+  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
+    for (auto [j, res] : llvm::enumerate(op->getResults())) {
+      if (channelName == namer.getOutputName(j)) {
+        prop->sentStates[i] = res;
+        break;
+      }
+    }
+  }
 
   return prop;
+  /*
+  if (!mapper || !mapper.map(SENT_STATES_LIT, objs))
+    return nullptr;
+
+  for (auto obj : objs) {
+    handshake::EagerForkSent state;
+    bool success = fromJSON(obj, &state, path);
+  }
+  */
+
+  /*
+  if (!mapper || !mapper.map(SENT_STATES_LIT, prop->sentStates))
+    return nullptr;
+  */
 }
 
 // Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
@@ -304,7 +382,9 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
+LogicalResult
+FormalPropertyTable::addPropertiesFromJSON(NameAnalysis &nameAnalysis,
+                                           StringRef filepath) {
   // Open the properties' database
   std::ifstream inputFile(filepath.str());
   if (!inputFile.is_open()) {
@@ -340,7 +420,7 @@ LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   }
   for (auto [idx, jsonComponent] : llvm::enumerate(*jsonComponents)) {
     std::unique_ptr<FormalProperty> &property = properties.emplace_back();
-    if (!fromJSON(jsonComponent, property, jsonPath.index(idx))) {
+    if (!fromJSON(nameAnalysis, jsonComponent, property, jsonPath.index(idx))) {
       jsonRoot.printErrorContext(*value, llvm::errs());
       return failure();
     }
