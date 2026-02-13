@@ -778,6 +778,27 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   return muxOp.getResult();
 }
 
+static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                          CFGLoopInfo &li,
+                                          const ftd::BlockIndexing &bi) {
+
+  // Get the boolean expression associated to the block exit
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
+  auto *terminatorOperation = loopExit->getTerminator();
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+
+  // If the destination of the false outcome is not the block, then the
+  // condition must be negated
+  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
+    blockCond->boolNegate();
+
+  return blockCond;
+}
+
 static BoolExpression *
 getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
                      mlir::CFGLoopInfo &li, const ftd::BlockIndexing &bi) {
