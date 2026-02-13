@@ -368,16 +368,54 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
 //===----------------------------------------------------------------------===//
 
 int ForkOp::getNumEagerOutputs() { return getNumResults(); }
+std::vector<EagerForkSent>
+ForkOp::getInternalSentStates(const std::string &opName) {
+  std::vector<EagerForkSent> ret;
+  for (size_t i = 0; i < getNumResults(); ++i) {
+    EagerForkSent state(opName, getResultName(i));
+    ret.push_back(state);
+  }
+  return ret;
+}
 
 int ControlMergeOp::getNumEagerOutputs() { return 2; }
+std::vector<EagerForkSent>
+ControlMergeOp::getInternalSentStates(const std::string &opName) {
+  std::vector<EagerForkSent> ret;
+  for (size_t i = 0; i < getNumResults(); ++i) {
+    EagerForkSent state(opName, getResultName(i));
+    ret.push_back(state);
+  }
+  return ret;
+}
 
 //===----------------------------------------------------------------------===//
 // BufferLikeOpInterface
 //===----------------------------------------------------------------------===//
 
-int ControlMergeOp::getNumSlots() { return 1; }
+std::vector<BufferSlotFull>
+ControlMergeOp::getInternalSlotStates(const std::string &opName) {
+  std::vector<BufferSlotFull> ret(1);
+  ret[0] = BufferSlotFull(opName, "slot");
+  return ret;
+}
 
-int LoadOp::getNumSlots() { return 2; }
+std::vector<BufferSlotFull>
+LoadOp::getInternalSlotStates(const std::string &opName) {
+  std::vector<BufferSlotFull> ret(2);
+  ret[0] = BufferSlotFull(opName, "addr");
+  ret[1] = BufferSlotFull(opName, "data");
+  return ret;
+}
+
+std::vector<BufferSlotFull>
+BufferOp::getInternalSlotStates(const std::string &opName) {
+  std::vector<BufferSlotFull> ret(getNumSlots());
+  for (size_t i = 0; i < getNumSlots(); ++i) {
+    ret[i] = BufferSlotFull(opName, "slot_" + std::to_string(i));
+  }
+  return ret;
+}
 
 //===----------------------------------------------------------------------===//
 // ShiftLikeArithOpInterface

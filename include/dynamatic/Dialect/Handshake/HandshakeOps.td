@@ -217,7 +217,7 @@ def InstanceOp : Handshake_Op<"instance", [
 
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType,
-  BufferLikeOpInterface,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
 ]> {
   let summary = "buffer operation";
   let description = [{
