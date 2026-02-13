@@ -48,6 +48,7 @@
   - [Signal Manager](DeveloperGuide/CompilerIntrinsics/SignalManager.md)
   - [Timing Information](DeveloperGuide/CompilerIntrinsics/TimingInformation.md)
   - [Tutorial: Adding New MLIR Operations](DeveloperGuide/CompilerIntrinsics/Tutorials/AddNewMLIROperation.md)
+  - [Cosimulation](DeveloperGuide/CompilerIntrinsics/Cosimulation.md)
 
 - [Design Decision Proposals]()
   - [Add/Remove/Promote Extra Signals](DeveloperGuide/DesignDecisionProposals/AddRemovePromoteExtraSignals.md)
