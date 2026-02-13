@@ -2305,20 +2305,78 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Get the condition for the block exiting
-      // Determine the gate exit condition:
-      // - If the condition spans multiple cofactors, build a BDD and
-      //   translate it into a circuit.
-      // - Otherwise, use the simple terminating condition of the block
       Value conditionValue;
-      if (size(gate->cofactorList) > 1) {
-        // Apply a BDD expansion to the loop exit expression and the list of
-        // cofactors
-        BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
-        // Convert the boolean expression obtained through BDD to a circuit
+      
+      // Determine the gate exit condition
+      if (gate->gsaGateFunction == MuGate) {
+        // For MU gates, we generate the condition based on the 
+        // reaching condition from the loop header back to itself.
+        OpBuilder tmpBuilder(region.getContext());
+        Block *loopHeader = gate->getBlock();
+
+        // 1. Build Local CFG with Prod = Cons = Loop Header
+        // This graph captures the loop-back paths.
+        auto locGraph =
+            buildLocalCFGRegion(tmpBuilder, loopHeader, loopHeader, bi);
+        auto decisionGraph = buildDecisionGraph(*locGraph);
+
+        // 2. Control Dependence Analysis on the Decision Graph
+        ControlDependenceAnalysis locCDA(*decisionGraph->region);
+        auto depsMap = locCDA.getAllBlockDeps();
+        DenseSet<Block *> locConsControlDeps =
+            depsMap[decisionGraph->newCons].allControlDeps;
+
+        // 3. Enumerate paths to get the boolean expression for the backedges
+        // (i.e., condition is True if we are looping back)
+        BoolExpression *fBackedge =
+            enumeratePaths(*decisionGraph, bi, locConsControlDeps);
+
+        // 4. Build BDD
+        std::set<std::string> vars = fBackedge->getVariables();
+        std::vector<std::string> cofactorList(vars.begin(), vars.end());
+
+        // Sort cofactors strictly to ensure consistent BDD structure
+        std::sort(cofactorList.begin(), cofactorList.end(),
+                  [&](const std::string &a, const std::string &b) {
+                    auto idA = bi.getBlockFromCondition(a);
+                    auto idB = bi.getBlockFromCondition(b);
+                    if (!idA || !idB)
+                      return a < b;
+                    return bi.isLess(idA.value(), idB.value());
+                  });
+
+        BDD *bdd = buildBDD(fBackedge, cofactorList);
+
+        // 5. Convert to Circuit.
+        SignalRegistry registry;
+        buildDistributionNetwork(rewriter, bdd, loopHeader, bi, registry);
         conditionValue =
-            bddToCircuit(rewriter, bdd, gate->getBlock(), bi, false);
-      } else
-        conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
+            bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
+
+        // Clean up temporary graphs
+        decisionGraph->containerOp->erase();
+        locGraph->containerOp->erase();
+
+      } else {
+        // [Gamma Logic]
+        if (size(gate->cofactorList) > 1) {
+          // Apply a BDD expansion to the loop exit expression and the list of
+          // cofactors
+          BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+          // Convert the boolean expression obtained through BDD to a circuit
+          // We pass an empty registry, since this is not an expression for suppression 
+          // and does not require distribution.
+          SignalRegistry emptyRegistry;
+          conditionValue =
+              bddToCircuit(rewriter, bdd, gate->getBlock(), emptyRegistry, {}, bi);
+        } else {
+          conditionValue =
+              gate->conditionBlock->getTerminator()->getOperand(0);
+          // Ensure type consistency (Channel vs i1)
+          if (!conditionValue.getType().isa<handshake::ChannelType>())
+             conditionValue.setType(channelifyType(conditionValue.getType()));
+        }
+      }
 
       // If the function is MU, then we create a merge
       // and use its result as condition
