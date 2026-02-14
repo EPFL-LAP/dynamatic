@@ -666,101 +666,6 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
   return term->getOperand(0);
 }
 
-/// Starting from a boolean expression which is a single variable (either
-/// direct or complement) return its corresponding circuit equivalent. This
-/// means, either we obtain the output of the operation determining the
-/// condition, or we add a `not` to complement.
-static Value boolVariableToCircuit(PatternRewriter &rewriter,
-                                   experimental::boolean::BoolExpression *expr,
-                                   Block *block, const ftd::BlockIndexing &bi,
-                                   bool needsChannelify = true) {
-
-  // Convert the expression into a single condition (for instance, `c0` or
-  // `~c0`).
-  SingleCond *singleCond = static_cast<SingleCond *>(expr);
-
-  // Use the BlockIndexing to access the block corresponding to such condition
-  // and access its terminator to determine the condition.
-  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
-  if (!conditionOpt.has_value())
-    return nullptr;
-
-  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
-
-  // Add a not if the condition is negated.
-  if (singleCond->isNegated) {
-    rewriter.setInsertionPointToStart(block);
-    auto notOp = rewriter.create<handshake::NotOp>(
-        block->getOperations().front().getLoc(),
-        ftd::channelifyType(condition.getType()), condition);
-    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-    return notOp->getResult(0);
-  }
-  if (needsChannelify) {
-    condition.setType(ftd::channelifyType(condition.getType()));
-  }
-  return condition;
-}
-
-/// Get a circuit out a boolean expression, depending on the different kinds
-/// of expressions you might have.
-static Value boolExpressionToCircuit(PatternRewriter &rewriter,
-                                     BoolExpression *expr, Block *block,
-                                     const ftd::BlockIndexing &bi,
-                                     bool needsChannelify = true) {
-
-  // Variable case
-  if (expr->type == ExpressionType::Variable)
-    return boolVariableToCircuit(rewriter, expr, block, bi, needsChannelify);
-
-  // Constant case (either 0 or 1)
-  rewriter.setInsertionPointToStart(block);
-  auto sourceOp = rewriter.create<handshake::SourceOp>(
-      block->getOperations().front().getLoc());
-  Value cnstTrigger = sourceOp.getResult();
-
-  auto intType = rewriter.getIntegerType(1);
-  auto cstAttr = rewriter.getIntegerAttr(
-      intType, (expr->type == ExpressionType::One ? 1 : 0));
-
-  auto constOp = rewriter.create<handshake::ConstantOp>(
-      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
-
-  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return constOp.getResult();
-}
-
-/// Convert a `BDD` object as obtained from the bdd expansion to a
-/// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi,
-                          bool needsChannelify = true) {
-  if (!bdd->successors.has_value())
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi,
-                                   needsChannelify);
-
-  rewriter.setInsertionPointToStart(block);
-
-  // Get the two operands by recursively calling `bddToCircuit` (it possibly
-  // creates other muxes in a hierarchical way)
-  SmallVector<Value> muxOperands;
-  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().first,
-                                     block, bi, needsChannelify));
-  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().second,
-                                     block, bi, needsChannelify));
-  Value muxCond = boolExpressionToCircuit(rewriter, bdd->boolVariable, block,
-                                          bi, needsChannelify);
-
-  // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxOperands[0].getType(),
-      muxCond, muxOperands);
-  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return muxOp.getResult();
-}
-
 static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
                                           CFGLoopInfo &li,
                                           const ftd::BlockIndexing &bi) {
@@ -2011,8 +1916,9 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
         getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
     if (size(cofactorList) > 1) {
       BDD *bdd = buildBDD(exitCondition, cofactorList);
+      SignalRegistry emptyRegistry;
       conditionValue =
-          bddToCircuit(rewriter, bdd, loop->getHeader(), bi, false);
+          bddToCircuit(rewriter, bdd, loop->getHeader(), emptyRegistry, {}, bi);
     } else
       conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
 
