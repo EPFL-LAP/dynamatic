@@ -1470,7 +1470,7 @@ static void insertDirectSuppression(
 
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
   // gate and the producer is one of its data inputs
-  bool accountMuxCondition = llvm::isa<handshake::MuxOp>(consumer) &&
+  bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
                              consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                              (consumer->getOperand(1) == connection ||
                               consumer->getOperand(2) == connection);
@@ -1717,7 +1717,7 @@ static void insertDirectSuppression(
     out << "fCons-no-mux  = " << fCons->toString() << "\n";
   }
 
-  if (accountMuxCondition) {
+  if (deliverToGamma) {
     muxCondition = consumer->getOperand(0);
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     BoolExpression *selectOperandCondition =
@@ -1837,12 +1837,24 @@ static void insertDirectSuppression(
         connection);
 
     // Take into account the possibility of a mux to get the condition input
-    // also as data input. In this case, a branch needs to be created, but only
-    // the corresponding data input is affected. The conditions below take into
-    // account this possibility.
-    for (auto &use : connection.getUses()) {
+    // also as data input. In this case, the data input can be optimized to
+    // a constant value, since it is always selected only when its own value
+    // is true or false.
+    for (auto &use : llvm::make_early_inc_range(connection.getUses())) {
       if (use.getOwner() != consumer)
         continue;
+      if (llvm::isa<handshake::MuxOp>(consumer) && 
+          consumer->getOperand(0) == connection &&
+          use.getOperandNumber() != 0) {
+        auto src = rewriter.create<handshake::SourceOp>(consumer->getLoc());
+        auto innerType = connection.getType().cast<handshake::ChannelType>().getDataType();
+        auto attr = rewriter.getIntegerAttr(innerType, (use.getOperandNumber() == 2)); 
+        auto cst = rewriter.create<handshake::ConstantOp>(
+            consumer->getLoc(), connection.getType(), attr, src.getResult());
+        cst->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        use.set(cst.getResult());
+        continue;
+      }
       if (llvm::isa<handshake::MuxOp>(consumer) && use.getOperandNumber() == 0)
         continue;
       use.set(branchOp.getFalseResult());
