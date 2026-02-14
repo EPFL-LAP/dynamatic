@@ -141,23 +141,6 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
   return result;
 };
 
-/// Given two sets containing object of type `Block*`, remove the common
-/// entries.
-static void eliminateCommonBlocks(DenseSet<Block *> &s1,
-                                  DenseSet<Block *> &s2) {
-
-  SmallVector<Block *> intersection;
-  for (auto &e1 : s1) {
-    if (s2.contains(e1))
-      intersection.push_back(e1);
-  }
-
-  for (auto &bb : intersection) {
-    s1.erase(bb);
-    s2.erase(bb);
-  }
-}
-
 /// A lightweight DFS to check if 'end' is reachable from 'start'.
 static bool isReachable(Block *start, Block *end) {
   if (start == end)
@@ -665,7 +648,7 @@ struct SignalRegistry {
 
 /// Retrieves the initial value from BlockIndexing.
 static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
-                              Block *block, const ftd::BlockIndexing &bi) {
+                              const ftd::BlockIndexing &bi) {
   StringRef lookupName = varName;
   if (lookupName.startswith("~")) {
     llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
@@ -839,7 +822,7 @@ static Value boolExpressionToCircuit(
 
     // 2. Fallback
     if (!val) {
-      val = getOriginalValue(rewriter, varName, block, bi);
+      val = getOriginalValue(rewriter, varName, bi);
 
       if (!val) {
         llvm::errs() << "[FTD Error] Variable '" << varName
@@ -891,7 +874,7 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
 
   Value muxCond = registry.lookup(varName, currentPath);
   if (!muxCond) {
-    muxCond = getOriginalValue(rewriter, varName, block, bi);
+    muxCond = getOriginalValue(rewriter, varName, bi);
     assert(muxCond && "Mux condition not found");
     if (!muxCond.getType().isa<handshake::ChannelType>())
       muxCond.setType(ftd::channelifyType(muxCond.getType()));
@@ -1033,7 +1016,7 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   if (!conditionVal) {
     // Fallback: If not in registry, get the original value from the IR
     // (BlockIndexing).
-    conditionVal = getOriginalValue(rewriter, splitVar, nullptr, bi);
+    conditionVal = getOriginalValue(rewriter, splitVar, bi);
   }
   assert(conditionVal && "Splitter condition value not found");
 
@@ -1118,7 +1101,7 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
 
 /// Main entry point
 static void buildDistributionNetwork(PatternRewriter &rewriter, BDD *rootBDD,
-                                     Block *block, const ftd::BlockIndexing &bi,
+                                     const ftd::BlockIndexing &bi,
                                      SignalRegistry &registry) {
   using namespace experimental::boolean;
 
@@ -1167,7 +1150,7 @@ static void buildDistributionNetwork(PatternRewriter &rewriter, BDD *rootBDD,
 
   // 3. Initial Registration and Construct Branch Trees
   for (const auto &var : sortedVars) {
-    Value rawVal = getOriginalValue(rewriter, var, block, bi);
+    Value rawVal = getOriginalValue(rewriter, var, bi);
     if (rawVal) {
       if (!rawVal.getType().isa<handshake::ChannelType>())
         rawVal.setType(ftd::channelifyType(rawVal.getType()));
@@ -1572,7 +1555,7 @@ static void insertDirectSuppression(
 
   bool debuglog = false;
   std::string funcName = funcOp.getName().str();
-  std::string dir = "/home/yuaqin/new2/dynamatic-scripts/TempOutputs/";
+  std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
   std::string cfgFile = dir + funcName + "_localcfg.txt";
   std::string logFile = dir + funcName + "_debuglog.txt";
   std::error_code EC_log;
@@ -1586,14 +1569,6 @@ static void insertDirectSuppression(
                              consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                              (consumer->getOperand(1) == connection ||
                               consumer->getOperand(2) == connection);
-
-  // Get the control dependencies from the producer
-  DenseSet<Block *> prodControlDeps =
-      cdAnalysis[producerBlock].forwardControlDeps;
-
-  // Get the control dependencies from the consumer
-  DenseSet<Block *> consControlDeps =
-      cdAnalysis[consumerBlock].forwardControlDeps;
 
   if (debuglog) {
     out << "[FTD] Producer block: ";
@@ -1636,20 +1611,6 @@ static void insertDirectSuppression(
     }
   }
 
-  // If the mux condition is to be taken into account, then the control
-  // dependencies of the mux conditions are to be added to the consumer control
-  // dependencies
-  if (accountMuxCondition) {
-    muxCondition = consumer->getOperand(0);
-    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
-    DenseSet<Block *> condControlDeps =
-        cdAnalysis[muxConditionBlock].forwardControlDeps;
-    for (auto &x : condControlDeps)
-      consControlDeps.insert(x);
-  }
-
-  // Get rid of common entries in the two sets
-  eliminateCommonBlocks(prodControlDeps, consControlDeps);
   // If producer is unreachable, the suppression is not needed.
   if (!isReachable(entryBlock, producerBlock)) {
     return;
@@ -1847,36 +1808,12 @@ static void insertDirectSuppression(
     printBlockSet("[FTD] locConsControlDeps", locConsControlDeps);
   }
 
-  if (accountMuxCondition) {
-    muxCondition = consumer->getOperand(0);
-    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
-    DenseSet<Block *> condControlDeps =
-        cdAnalysis[muxConditionBlock].forwardControlDeps;
-    if (debuglog) {
-      auto printBlockSet = [&](llvm::StringRef label,
-                               const DenseSet<Block *> &S) {
-        out << label << " = { ";
-        bool first = true;
-        for (Block *b : S) {
-          if (!first)
-            out << ", ";
-          if (b)
-            b->printAsOperand(out);
-          else
-            out << "<null>";
-          first = false;
-        }
-        out << " }\n";
-      };
-
-      printBlockSet("[FTD] muxControlDeps", condControlDeps);
-    }
-  }
   if (debuglog) {
     out << "fCons-no-mux  = " << fCons->toString() << "\n";
   }
 
   if (accountMuxCondition) {
+    muxCondition = consumer->getOperand(0);
     Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
     BoolExpression *selectOperandCondition =
         BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
@@ -1986,7 +1923,7 @@ static void insertDirectSuppression(
     SignalRegistry registry;
     rewriter.setInsertionPointToStart(consumer->getBlock());
     // Build the distribution network
-    buildDistributionNetwork(rewriter, bdd, consumer->getBlock(), bi, registry);
+    buildDistributionNetwork(rewriter, bdd, bi, registry);
     Value branchCond =
         bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
 
@@ -2349,7 +2286,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
         // 5. Convert to Circuit.
         SignalRegistry registry;
-        buildDistributionNetwork(rewriter, bdd, loopHeader, bi, registry);
+        buildDistributionNetwork(rewriter, bdd, bi, registry);
         conditionValue =
             bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
 
