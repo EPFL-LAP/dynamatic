@@ -604,7 +604,7 @@ struct SignalRegistry {
     map[var.str()].push_back({path, val});
   }
 
-  // Finds the best signal source using Longest Prefix Match (LPM).
+  // Finds the best signal source using Longest Prefix Match.
   // Returns the value defined in the deepest matching path context.
   Value lookup(StringRef var, const PathContext &queryPath) {
     std::string v = var.str();
@@ -617,9 +617,6 @@ struct SignalRegistry {
 
     for (auto &entry : map[v]) {
       const PathContext &regPath = entry.first;
-
-      // Filter: A signal defined in a deeper path cannot be used
-      // in a shallower path.
       if (regPath.size() > queryPath.size())
         continue;
 
@@ -1004,36 +1001,62 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   }
 }
 
-/// Main entry point
-static void buildDistributionNetwork(PatternRewriter &rewriter, BDD *rootBDD,
+/// Main entry point of distribution logic.
+static void buildDistributionNetwork(PatternRewriter &rewriter, 
+                                     const ftd::LocalCFG &lcfg,
                                      const ftd::BlockIndexing &bi,
                                      SignalRegistry &registry) {
   using namespace experimental::boolean;
 
   // 1. Collect Variable Requirements
   std::map<std::string, std::vector<VariableRequirement>> varNeeds;
-  std::function<void(BDD *, PathContext)> collect = [&](BDD *node,
-                                                        PathContext path) {
-    if (!node)
+  std::function<void(Block *, PathContext)> collect = [&](Block *curr,
+                                                          PathContext path) {
+
+    // Stop recursion if reaching the consumer or the sink block
+    if (curr == lcfg.newCons || curr == lcfg.sinkBB)
       return;
 
-    std::string var;
-    if (node->boolVariable->type == ExpressionType::Variable) {
-      SingleCond *singleCond = static_cast<SingleCond *>(node->boolVariable);
-      var = singleCond->id;
+    // Find the condition variable
+    Block *origBlock = lcfg.origMap.lookup(curr);
+    std::string var = "";
+    var = bi.getBlockCondition(origBlock);
+
+    // Record the variable requirement
+    if (!var.empty()) {
       varNeeds[var].push_back({var, path});
     }
 
-    if (node->successors.has_value()) {
-      PathContext falsePath = path;
-      falsePath.push_back({var, false});
-      collect(node->successors.value().first, falsePath);
-      PathContext truePath = path;
-      truePath.push_back({var, true});
-      collect(node->successors.value().second, truePath);
+    auto *term = curr->getTerminator();
+    if (!term)
+      return;
+
+    // Handle conditional branches.
+    if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+      if (!var.empty()) {
+        PathContext truePath = path;
+        truePath.push_back({var, true});
+        collect(condBr.getTrueDest(), truePath);
+
+        PathContext falsePath = path;
+        falsePath.push_back({var, false});
+        collect(condBr.getFalseDest(), falsePath);
+      } else {
+        llvm::errs() << "[FTD ERROR] CondBranchOp encountered with empty condition variable at block " 
+                     << origBlock << ". Successors will not be traversed.\n";
+      }
+    } else {
+      // Handle unconditional branches
+      for (Block *succ : term->getSuccessors()) {
+        collect(succ, path);
+      }
     }
   };
-  collect(rootBDD, {});
+
+  // Start collection from the producer block
+  if (lcfg.newProd) {
+    collect(lcfg.newProd, {});
+  }
 
   // 2. Topological Sort
   std::vector<std::string> sortedVars;
@@ -1678,6 +1701,12 @@ static void insertDirectSuppression(
       file << "\n-------------------------------------------------\n";
     }
   }
+
+  SignalRegistry registry;
+  rewriter.setInsertionPointToStart(consumer->getBlock());
+  // Build the distribution network
+  buildDistributionNetwork(rewriter, *decisionGraph, bi, registry);
+
   ControlDependenceAnalysis locCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
@@ -1824,11 +1853,6 @@ static void insertDirectSuppression(
       llvm::errs() << "\n";
     }
     BDD *bdd = buildBDD(fSup, cofactorList);
-
-    SignalRegistry registry;
-    rewriter.setInsertionPointToStart(consumer->getBlock());
-    // Build the distribution network
-    buildDistributionNetwork(rewriter, bdd, bi, registry);
     Value branchCond =
         bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
 
@@ -1843,7 +1867,7 @@ static void insertDirectSuppression(
     for (auto &use : llvm::make_early_inc_range(connection.getUses())) {
       if (use.getOwner() != consumer)
         continue;
-      if (llvm::isa<handshake::MuxOp>(consumer) && 
+      if (llvm::isa<handshake::MuxOp>(consumer) &&
           consumer->getOperand(0) == connection &&
           use.getOperandNumber() != 0) {
         auto src = rewriter.create<handshake::SourceOp>(consumer->getLoc());
@@ -2175,18 +2199,22 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
             buildLocalCFGRegion(tmpBuilder, loopHeader, loopHeader, bi);
         auto decisionGraph = buildDecisionGraph(*locGraph);
 
-        // 2. Control Dependence Analysis on the Decision Graph
+        // 2. Construct distribution circuit and suppression circuit on distribution
+        SignalRegistry registry;
+        buildDistributionNetwork(rewriter, *decisionGraph, bi, registry);
+        
+        // 3. Control Dependence Analysis on the Decision Graph
         ControlDependenceAnalysis locCDA(*decisionGraph->region);
         auto depsMap = locCDA.getAllBlockDeps();
         DenseSet<Block *> locConsControlDeps =
             depsMap[decisionGraph->newCons].allControlDeps;
 
-        // 3. Enumerate paths to get the boolean expression for the backedges
+        // 4. Enumerate paths to get the boolean expression for the backedges
         // (i.e., condition is True if we are looping back)
         BoolExpression *fBackedge =
             enumeratePaths(*decisionGraph, bi, locConsControlDeps);
 
-        // 4. Build BDD
+        // 5. Build BDD
         std::set<std::string> vars = fBackedge->getVariables();
         std::vector<std::string> cofactorList(vars.begin(), vars.end());
 
@@ -2201,10 +2229,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
                   });
 
         BDD *bdd = buildBDD(fBackedge, cofactorList);
-
-        // 5. Convert to Circuit.
-        SignalRegistry registry;
-        buildDistributionNetwork(rewriter, bdd, bi, registry);
+        // 6. Convert to Circuit.
         conditionValue =
             bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
 
