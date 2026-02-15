@@ -1296,21 +1296,17 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 }
 
 /// Constructs a NEW LocalCFG that represents the Decision Graph.
+/// \param rawGraph The source LocalCFG.
+/// \param dependencies The set of blocks (from rawGraph) that are relevant decision nodes.
+/// \param muxConstraints A map {Block* -> bool} enforcing specific values for blocks.
+///                       If a block is in this map, the branch corresponding to !value is wired to Sink.
 static std::unique_ptr<ftd::LocalCFG>
-buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
-  // 1. Analyze
-  ControlDependenceAnalysis cda(*rawGraph.region);
+buildDecisionGraph(const ftd::LocalCFG &rawGraph,
+                   const DenseSet<Block *> &dependencies,
+                   const DenseMap<Block *, bool> &muxConstraints) {
 
   if (!rawGraph.newCons)
     return nullptr;
-
-  // [CRASH FIX] getAllBlockDeps returns by value! Do not use auto& on the map
-  // result. Use the safe accessor provided by CDA which handles lookup safely.
-  auto depsOpt = cda.getBlockAllControlDeps(rawGraph.newCons);
-  if (!depsOpt.has_value())
-    return nullptr;
-
-  DenseSet<Block *> dependencies = depsOpt.value();
 
   // NodeSet: Consumer + Sink + Dependencies
   DenseSet<Block *> nodeSet;
@@ -1398,8 +1394,7 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
       continue;
     }
 
-    // Consumer Logic: MUST Branch to Sink (Preserve buildLocalCFGRegion
-    // behavior)
+    // Consumer Logic: MUST Branch to Sink
     if (oldBlock == rawGraph.newCons) {
       builder.setInsertionPointToEnd(newBlock);
       // In LocalCFG, Consumer always branches to Sink.
@@ -1433,6 +1428,19 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph) {
         newTrue = newL->sinkBB;
       if (!newFalse)
         newFalse = newL->sinkBB;
+
+      // [Constraint Application]
+      // If this block has a constraint, wire the invalid path to Sink.
+      if (muxConstraints.count(oldBlock)) {
+        bool requiredVal = muxConstraints.lookup(oldBlock);
+        if (requiredVal) { 
+          // Require True -> Wire False to Sink
+          newFalse = newL->sinkBB;
+        } else {
+          // Require False -> Wire True to Sink
+          newTrue = newL->sinkBB;
+        }
+      }
 
       builder.create<cf::CondBranchOp>(loc, condBr.getCondition(), newTrue,
                                        newFalse);
@@ -1479,9 +1487,8 @@ static void insertDirectSuppression(
   Block *entryBlock = &funcOp.getBody().front();
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
-  Value muxCondition = nullptr;
 
-  bool debuglog = false;
+  bool debuglog = true;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
   std::string cfgFile = dir + funcName + "_localcfg.txt";
@@ -1494,9 +1501,7 @@ static void insertDirectSuppression(
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
   // gate and the producer is one of its data inputs
   bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
-                             consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
-                             (consumer->getOperand(1) == connection ||
-                              consumer->getOperand(2) == connection);
+                        consumer->hasAttr(FTD_EXPLICIT_GAMMA);
 
   if (debuglog) {
     out << "[FTD] Producer block: ";
@@ -1544,291 +1549,197 @@ static void insertDirectSuppression(
     return;
   }
 
+  // If deliverToGamma is true, we need to trace down the mux chain to find the
+  // root condition block that effectively controls the delivery.
+  if (deliverToGamma) {
+    // Start tracing from the current consumer Mux
+    Operation *lastMuxInChain = consumer;
+    bool isChainActive = true;
+
+    // 1. Trace down the Mux chain within the same block
+    while (isChainActive) {
+      Operation *nextMuxOp = nullptr;
+      Value currentResult = lastMuxInChain->getResult(0);
+
+      for (auto *user : currentResult.getUsers()) {
+        // Condition: User is a Gamma gate in the Same Block
+        if (llvm::isa<handshake::MuxOp>(user) &&
+            user->hasAttr(FTD_EXPLICIT_GAMMA) &&
+            user->getBlock() == lastMuxInChain->getBlock()) {
+
+          // Skip if both data inputs use the connection
+          unsigned connectionCount = 0;
+          if (user->getOperand(1) == currentResult)
+            connectionCount++;
+          if (user->getOperand(2) == currentResult)
+            connectionCount++;
+
+          if (connectionCount != 2) {
+            // Found the next Mux in the chain
+            nextMuxOp = user;
+            break;
+          }
+        }
+      }
+
+      if (nextMuxOp) {
+        lastMuxInChain = nextMuxOp;
+      } else {
+        // End of chain reached
+        isChainActive = false;
+      }
+    }
+
+    // 2. Update producerBlock to be the block defining the condition of the last Mux
+    Value finalCondition = lastMuxInChain->getOperand(0);
+    producerBlock = returnMuxConditionBlock(finalCondition);
+
+    if (debuglog) {
+      out << "[FTD] deliverToGamma: Traced to final Mux: " << *lastMuxInChain << "\n";
+      out << "      Updated Producer Block to Condition Source: ";
+      if (producerBlock)
+        producerBlock->printAsOperand(out);
+      else
+        out << "(null)";
+      out << "\n";
+    }
+  }
+
   // Create a temporary builder to isolate the LocalCFG creation from the
   // main PatternRewriter. This prevents the rewriter from tracking the
   // temporary operations which are later erased manually.
   OpBuilder tmpBuilder(funcOp.getContext());
   auto locGraph =
       buildLocalCFGRegion(tmpBuilder, producerBlock, consumerBlock, bi);
-  if (debuglog) {
-    std::error_code EC;
-    // Append to the same file
-    llvm::raw_fd_ostream file(cfgFile, EC,
-                              static_cast<llvm::sys::fs::OpenFlags>(0x0004));
-    if (!EC) {
-      file << "\n>>> BEFORE TRANSFORM (Decision Graph) <<<\n";
 
-      file << "NewProd: ";
-      if (locGraph->newProd)
-        locGraph->newProd->printAsOperand(file);
-      else
-        file << "null";
+  ControlDependenceAnalysis locCDA(*locGraph->region);
+  DenseSet<Block *> locConsControlDepsTmp =
+      locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
-      file << "\nNewProd (orig): ";
-      if (locGraph->newProd && locGraph->origMap.count(locGraph->newProd)) {
-        if (Block *orig = locGraph->origMap[locGraph->newProd])
-          orig->printAsOperand(file);
-        else
-          file << "null";
-      } else {
-        file << "null";
-      }
-
-      file << "\nNewCons: ";
-      if (locGraph->newCons)
-        locGraph->newCons->printAsOperand(file);
-      else
-        file << "null";
-
-      file << "\nNewCons (orig): ";
-      if (locGraph->newCons && locGraph->origMap.count(locGraph->newCons)) {
-        if (Block *orig = locGraph->origMap[locGraph->newCons])
-          orig->printAsOperand(file);
-        else
-          file << "null";
-      } else {
-        file << "null";
-      }
-
-      file << "\nSink:    ";
-      if (locGraph->sinkBB)
-        locGraph->sinkBB->printAsOperand(file);
-      else
-        file << "null";
-
-      file << "\n\nStructure:\n";
-
-      for (Block &b : locGraph->region->getBlocks()) {
-        file << "  ";
-        b.printAsOperand(file);
-
-        if (locGraph->origMap.count(&b)) {
-          Block *orig = locGraph->origMap[&b];
-          if (orig) {
-            file << " (orig: ";
-            orig->printAsOperand(file);
-            file << ")";
-          }
-        }
-
-        file << " terminates with ";
-        if (auto *term = b.getTerminator()) {
-          file << term->getName() << " -> { ";
-          for (auto it = term->successor_begin(); it != term->successor_end();
-               ++it) {
-            (*it)->printAsOperand(file);
-            file << " ";
-          }
-          file << "}";
-
-          if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-            file << " [T: ";
-            condBr.getTrueDest()->printAsOperand(file);
-            file << ", F: ";
-            condBr.getFalseDest()->printAsOperand(file);
-            file << "]";
-          }
-        } else {
-          file << "NO_TERMINATOR (Deadlock Risk!)";
-        }
-        file << "\n";
-      }
-
-      file << "\n-------------------------------------------------\n";
-    }
-  }
-  // Build Decision Graph based on Local Graph
-  auto decisionGraph = buildDecisionGraph(*locGraph);
-  if (debuglog) {
-    std::error_code EC;
-    // Append to the same file
-    llvm::raw_fd_ostream file(cfgFile, EC,
-                              static_cast<llvm::sys::fs::OpenFlags>(0x0004));
-    if (!EC) {
-      file << "\n>>> AFTER TRANSFORM (Decision Graph) <<<\n";
-      file << "NewProd: ";
-      if (decisionGraph->newProd)
-        decisionGraph->newProd->printAsOperand(file);
-      else
-        file << "null";
-      file << "\nNewCons: ";
-      if (decisionGraph->newCons)
-        decisionGraph->newCons->printAsOperand(file);
-      else
-        file << "null";
-      file << "\nSink:    ";
-      if (decisionGraph->sinkBB)
-        decisionGraph->sinkBB->printAsOperand(file);
-      else
-        file << "null";
-      file << "\n\nStructure:\n";
-
-      for (Block &b : decisionGraph->region->getBlocks()) {
-        file << "  ";
-        b.printAsOperand(file);
-
-        if (decisionGraph->origMap.count(&b)) {
-          Block *orig = decisionGraph->origMap[&b];
-          if (orig) {
-            file << " (orig: ";
-            orig->printAsOperand(file);
-            file << ")";
-          }
-        }
-
-        file << " terminates with ";
-        if (auto *term = b.getTerminator()) {
-          file << term->getName() << " -> { ";
-          for (auto it = term->successor_begin(); it != term->successor_end();
-               ++it) {
-            (*it)->printAsOperand(file);
-            file << " ";
-          }
-          file << "}";
-
-          if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-            file << " [T: ";
-            condBr.getTrueDest()->printAsOperand(file);
-            file << ", F: ";
-            condBr.getFalseDest()->printAsOperand(file);
-            file << "]";
-          }
-        } else {
-          file << "NO_TERMINATOR (Deadlock Risk!)";
-        }
-        file << "\n";
-      }
-      file << "\n-------------------------------------------------\n";
-    }
-  }
-
+  // Map to store specific requirements for Mux Conditions (LocalBlock -> RequiredValue)
+  DenseMap<Block *, bool> muxRequirements;
   SignalRegistry registry;
   rewriter.setInsertionPointToStart(consumer->getBlock());
-  // Build the distribution network
-  buildDistributionNetwork(rewriter, *decisionGraph, bi, registry);
 
-  ControlDependenceAnalysis locCDA(*decisionGraph->region);
-  DenseSet<Block *> locConsControlDepsTmp =
-      locCDA.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
+  // Logic specific to Gamma delivery to identify Mux dependencies
+  if (deliverToGamma) {
+    Operation *currentMuxOp = consumer;
+    Value currentConnection = connection;
+    bool isChainActive = true;
+
+    while (isChainActive) {
+      bool isDataInput = false;
+      bool requiredVal = true;
+
+      // Check how the connection enters the current Mux
+      // If operand(0) == currentConnection, it is the condition input. 
+      // In that case, isDataInput remains false, and we simply traverse 
+      // to the output to find the next mux in the chain.
+      if (!(currentMuxOp->getOperand(0) == currentConnection)) {
+        if (currentMuxOp->getOperand(1) == currentConnection) {
+          // Input 1 is the FALSE input
+          isDataInput = true;
+          requiredVal = false; 
+        } else if (currentMuxOp->getOperand(2) == currentConnection) {
+          // Input 2 is the TRUE input
+          isDataInput = true;
+          requiredVal = true;
+        }
+      }
+
+      if (isDataInput) {
+        // 1. Get the condition value driving this Mux
+        Value muxCondition = currentMuxOp->getOperand(0);
+
+        // 2. Identify the Original Block defining this condition variable
+        // (Using the provided helper function)
+        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+
+        // 3. Find the corresponding Block in the Local CFG
+        // Since locGraph->origMap maps Local->Original, we iterate to reverse lookup.
+        Block *condBlockLocal = nullptr;
+        for (auto it : locGraph->origMap) {
+          if (it.second == muxConditionBlock) {
+            condBlockLocal = it.first;
+            break;
+          }
+        }
+
+        // 4. Add to dependencies and record requirement
+        if (condBlockLocal) {
+          // Add this block to the dependency set so path enumeration observes it
+          locConsControlDepsTmp.insert(condBlockLocal);
+          
+          // Record the specific value required (True/False) to pass this Mux
+          muxRequirements[condBlockLocal] = requiredVal;
+
+          if (debuglog) {
+            out << "[FTD] Added Mux Condition Dependency:\n";
+            out << "      Orig Block: "; muxConditionBlock->printAsOperand(out);
+            out << "\n      Local Block: "; condBlockLocal->printAsOperand(out);
+            out << "\n      Required Value: " << (requiredVal ? "True" : "False") << "\n";
+          }
+        }
+      }
+
+      // 5. Traverse Downstream (Search for cascaded Gamma Muxes)
+      Operation *nextMuxOp = nullptr;
+      Value currentResult = currentMuxOp->getResult(0);
+
+      for (auto *user : currentResult.getUsers()) {
+        // Check if user is a Mux in the same block marked as Gamma
+        if (llvm::isa<handshake::MuxOp>(user) &&
+            user->hasAttr(FTD_EXPLICIT_GAMMA) &&
+            user->getBlock() == currentMuxOp->getBlock()) {
+          // Count how many data inputs use currentResult
+          unsigned connectionCount = 0;
+          if (user->getOperand(1) == currentResult) 
+            connectionCount++;
+          if (user->getOperand(2) == currentResult) 
+            connectionCount++;
+
+          // We only proceed if at most ONE data input comes from the previous mux.
+          // Otherwise, the user is a temporary MUX which we don't care about.
+          if (connectionCount != 2) {
+            nextMuxOp = user;
+            // Update connection for next iteration
+            currentConnection = currentResult;
+            break;
+          }
+        }
+      }
+
+      if (nextMuxOp) {
+        currentMuxOp = nextMuxOp;
+      } else {
+        isChainActive = false;
+        if (debuglog)
+          out << "[FTD] End of Gamma Mux Chain search.\n";
+      }
+    }
+  }
+
+  // --- Common Logic for Building Suppression ---
+  // If deliverToGamma is true, we use the empty constraints to build the distribution
+  // network (so it covers all paths), but we use the muxRequirements to calculate
+  // the specific suppression condition for this path.
+  // If deliverToGamma is false, muxRequirements will be empty, so both graphs are identical.
+
+  DenseMap<Block *, bool> emptyConstraints;
+  auto fullDecisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
+  
+  // Build the distribution network based on the full graph
+  buildDistributionNetwork(rewriter, *fullDecisionGraph, bi, registry);
+
+  // Build the constrained graph for logic calculation
+  auto decisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, muxRequirements);
+  ControlDependenceAnalysis locCDA2(*decisionGraph->region);
+  DenseSet<Block *> locConsControlDeps =
+      locCDA2.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
 
   BoolExpression *fCons =
-      enumeratePaths(*decisionGraph, bi, locConsControlDepsTmp);
+      enumeratePaths(*decisionGraph, bi, locConsControlDeps);
 
-  DenseSet<Block *> locConsControlDeps;
-  for (Block *nb : locConsControlDepsTmp) {
-    Block *orig = decisionGraph->origMap.lookup(nb);
-    if (orig)
-      locConsControlDeps.insert(orig);
-  }
-
-  if (debuglog) {
-    auto printBlockSet = [&](llvm::StringRef label,
-                             const DenseSet<Block *> &S) {
-      out << label << " = { ";
-      bool first = true;
-      for (Block *b : S) {
-        if (!first)
-          out << ", ";
-        if (b)
-          b->printAsOperand(out);
-        else
-          out << "<null>";
-        first = false;
-      }
-      out << " }\n";
-    };
-
-    printBlockSet("[FTD] locConsControlDepsTmp", locConsControlDepsTmp);
-    printBlockSet("[FTD] locConsControlDeps", locConsControlDeps);
-  }
-
-  if (debuglog) {
-    out << "fCons-no-mux  = " << fCons->toString() << "\n";
-  }
-
-  if (deliverToGamma) {
-    muxCondition = consumer->getOperand(0);
-    Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
-    BoolExpression *selectOperandCondition =
-        BoolExpression::parseSop(bi.getBlockCondition(muxConditionBlock));
-    if (debuglog) {
-      out << "[MUX] Mux Condition Block: ";
-      if (muxConditionBlock)
-        muxConditionBlock->printAsOperand(out);
-      else
-        out << "(null)";
-      out << "\n";
-    }
-
-    if (!bi.isLess(muxConditionBlock, producerBlock)) {
-      Operation *currentMuxOp = consumer;
-      Value currentConnection = connection;
-      bool isChainActive = true;
-      while (isChainActive) {
-        if (currentMuxOp->getOperand(1) == currentConnection) {
-          if (debuglog) {
-            out << "      [Cascade] Condition for Mux: " << *currentMuxOp
-                << "\n";
-          }
-          selectOperandCondition = selectOperandCondition->boolNegate();
-          if (debuglog) {
-            out << "      Negated : " << selectOperandCondition->toString()
-                << "\n";
-          }
-        } else {
-          if (debuglog) {
-            out << "      [Cascade] Keep Condition for Mux: " << *currentMuxOp
-                << "\n";
-            out << "      Original: " << selectOperandCondition->toString()
-                << "\n";
-          }
-        }
-        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
-        Operation *nextMuxOp = nullptr;
-        Value currentResult = currentMuxOp->getResult(0);
-
-        for (auto *user : currentResult.getUsers()) {
-          if (llvm::isa<handshake::MuxOp>(user) &&
-              user->hasAttr(FTD_EXPLICIT_GAMMA) &&
-              user->getBlock() == currentMuxOp->getBlock()) {
-
-            unsigned connectionCount = 0;
-            if (user->getOperand(1) == currentResult) 
-              connectionCount++;
-            if (user->getOperand(2) == currentResult) 
-              connectionCount++;
-
-            if (connectionCount == 1) {
-              nextMuxOp = user;
-              break;
-            }
-          }
-        }
-
-        if (nextMuxOp) {
-          if (debuglog) {
-            out << "    -> Found Cascaded Gamma Mux: " << *nextMuxOp << "\n";
-          }
-          Value nextConditionVal = nextMuxOp->getOperand(0);
-          Block *nextCondBlock = returnMuxConditionBlock(nextConditionVal);
-          if (!bi.isLess(nextCondBlock, producerBlock)) {
-            selectOperandCondition =
-                BoolExpression::parseSop(bi.getBlockCondition(nextCondBlock));
-            currentMuxOp = nextMuxOp;
-            currentConnection = currentResult;
-          } else {
-            isChainActive = false;
-            if (debuglog)
-              out << "    -> End with Condition Before Producer.\n";
-          }
-        } else {
-          isChainActive = false;
-          if (debuglog)
-            out << "    -> End of Gamma Mux Chain.\n";
-        }
-      }
-    }
-  }
   fCons = fCons->boolMinimize();
   if (debuglog) {
     out << "fCons  = " << fCons->toString() << "\n";
@@ -1838,6 +1749,51 @@ static void insertDirectSuppression(
   fSup = fSup->boolMinimize();
   if (debuglog) {
     out << "fSupmin  = " << fSup->toString() << "\n";
+  }
+
+  fullDecisionGraph->containerOp->erase();
+  decisionGraph->containerOp->erase();
+  locGraph->containerOp->erase();
+
+  // --- [NEW] Upstream Suppression Logic ---
+  BoolExpression *fSupUp = BoolExpression::boolZero();
+
+  // If deliverToGamma is true, we must also ensure the path from Gamma Root to Data Source is valid.
+  if (deliverToGamma) {
+    Block *upstreamProd = producerBlock; // This was updated earlier to be the Gamma Root
+    Block *upstreamCons = connection.getParentBlock(); // Original Data Source
+
+    if (upstreamProd && upstreamCons && upstreamProd != upstreamCons &&
+        isReachable(entryBlock, upstreamProd)) {
+      
+      OpBuilder tmpBuilder2(funcOp.getContext());
+      auto locGraphUp = buildLocalCFGRegion(tmpBuilder2, upstreamProd, upstreamCons, bi);
+
+      if (locGraphUp->newCons) {
+        // 1. Get dependencies for upstream graph
+        ControlDependenceAnalysis upCDA(*locGraphUp->region);
+        auto upDepsTmp = upCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
+
+        // 2. Build Upstream Decision Graph (No constraints needed)
+        DenseMap<Block *, bool> noConstraints;
+        auto decisionGraphUp = buildDecisionGraph(*locGraphUp, upDepsTmp, noConstraints);
+
+        // 3. Calculate Upstream Logic
+        ControlDependenceAnalysis finalUpCDA(*decisionGraphUp->region);
+        auto upDeps = finalUpCDA.getAllBlockDeps()[decisionGraphUp->newCons].allControlDeps;
+        
+        BoolExpression *fConsUp = enumeratePaths(*decisionGraphUp, bi, upDeps);
+        // Calculate Upstream Suppress Condition (stored separately)
+        fSupUp = fConsUp->boolMinimize()->boolNegate()->boolMinimize();
+
+        if (debuglog) {
+          out << "fSupUp   = " << fSupUp->toString() << "\n";
+        }
+
+        decisionGraphUp->containerOp->erase();
+      }
+      locGraphUp->containerOp->erase();
+    }
   }
 
   // If the activation function is not zero, then a suppress block is to be
@@ -1856,6 +1812,29 @@ static void insertDirectSuppression(
     Value branchCond =
         bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
 
+    // 2. Cascaded Upstream Filter
+    if (fSupUp->type != experimental::boolean::ExpressionType::Zero) {
+        std::set<std::string> blocksUp = fSupUp->getVariables();
+        std::vector<std::string> cofactorListUp(blocksUp.begin(), blocksUp.end());
+        BDD *bddUp = buildBDD(fSupUp, cofactorListUp);
+        
+        // Build the Upstream Condition Circuit
+        Value upBranchCond = bddToCircuit(rewriter, bddUp, consumer->getBlock(), registry, {}, bi);
+
+        // Create the Intermediate Branch
+        // Data Input: branchCond (from Downstream logic)
+        // Condition: upBranchCond (from Upstream logic)
+        auto upBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getListTypes(branchCond.getType()), 
+          upBranchCond, branchCond);
+        
+        upBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+
+        // We use the False result (meaning "Not Suppressed Upstream") as the condition for the next stage
+        branchCond = upBranchOp.getFalseResult();
+    }
+
+    // 3. Final Data Branch
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
         connection);
@@ -1879,13 +1858,9 @@ static void insertDirectSuppression(
         use.set(cst.getResult());
         continue;
       }
-      if (llvm::isa<handshake::MuxOp>(consumer) && use.getOperandNumber() == 0)
-        continue;
       use.set(branchOp.getFalseResult());
     }
   }
-  decisionGraph->containerOp->erase();
-  locGraph->containerOp->erase();
 }
 
 void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
@@ -2197,7 +2172,11 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // This graph captures the loop-back paths.
         auto locGraph =
             buildLocalCFGRegion(tmpBuilder, loopHeader, loopHeader, bi);
-        auto decisionGraph = buildDecisionGraph(*locGraph);
+        ControlDependenceAnalysis locCDATmp(*locGraph->region);
+        DenseSet<Block *> locConsControlDepsTmp =
+            locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+        DenseMap<Block *, bool> emptyConstraints;
+        auto decisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
 
         // 2. Construct distribution circuit and suppression circuit on distribution
         SignalRegistry registry;
