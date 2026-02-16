@@ -131,7 +131,7 @@ class WhenElse(Statement):
         return 0
 
     def _to_str(self, em: Emitter, size) -> str:
-        return f'{self.true_statement.to_str(em, size, self.get_precedence())} {em.WHEN} {self.condition.to_str(em, size, self.get_precedence())} {em.ELSE} {self.false_statement.to_str(em, size, self.get_precedence())}'
+        return em.when_else_to_str(self, size)
 
     def get_type(self) -> str:
         if self.true_statement.get_type() != self.false_statement.get_type():

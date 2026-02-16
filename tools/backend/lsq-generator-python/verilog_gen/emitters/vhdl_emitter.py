@@ -159,6 +159,17 @@ class VHDLEmitter(Emitter):
         val_str = self.fix_type(un.get_type(), un.val.get_type(), val_str)
         return f'{self.get_unop_str(un.op)} {val_str}'
 
+    def when_else_to_str(self, when_else, size: int) -> str:
+        true_str = when_else.true_statement.to_str(self, size, 0)
+        false_str = when_else.false_statement.to_str(self, size, 0)
+        cond_str = when_else.condition.to_str(self, size, 0)
+
+        true_str = self.fix_type('logic', when_else.true_statement.get_type(), true_str)
+        false_str = self.fix_type('logic', when_else.false_statement.get_type(), false_str)
+        cond_str = self.fix_type('bool', when_else.condition.get_type(), cond_str)
+
+        return f'{true_str} when {cond_str} else {false_str}'
+
     def logic_signal_init(self, signal: Logic, sufix: str):
         """
         Appends the appropriate declaration or port line for this signal to a global buffer.
