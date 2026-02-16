@@ -1,6 +1,6 @@
 from verilog_gen.context import Context
-from verilog_gen.signals import *
-from verilog_gen.operators import *
+from verilog_gen.signals import LogicArray, LogicVec, LogicVecArray
+from verilog_gen.operators import Op
 
 
 class PortToQueueDispatcher:

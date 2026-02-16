@@ -44,3 +44,32 @@ class Emitter:
     def comment(self, op: str):
         raise NotImplementedError("Emitter subclasses must implement add_comment()")
 
+    def get_binop_str(self, op) -> str:
+        raise NotImplementedError("Emitter subclasses must implement get_binop_str()")
+
+    def get_unop_str(self, op) -> str:
+        raise NotImplementedError("Emitter subclasses must implement get_unop_str()")
+
+    def get_bit_str(self, bit, size: int) -> str:
+        raise NotImplementedError("Emitter subclasses must implement get_bit_str()")
+
+    def bin_to_str(self, bin, size: int) -> str:
+        raise NotImplementedError("Emitter subclasses must implement bin_to_str()")
+
+    def un_to_str(self, un, size: int) -> str:
+        raise NotImplementedError("Emitter subclasses must implement un_to_str()")
+
+    def assigned_var_to_str(self, var):
+        from verilog_gen.signals import Logic
+        size = 1
+        if type(var) == tuple:
+            if len(var) == 2:
+                str_ret = f'{var[0].getNameWrite(var[1])}'
+            else:
+                str_ret = f'{var[0].getNameWrite(var[1], var[2])}'
+        else:
+            str_ret = f'{var.getNameWrite()}'
+            if (type(var) != Logic):
+                size = var.size
+
+        return str_ret, size

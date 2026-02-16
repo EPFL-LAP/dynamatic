@@ -1,6 +1,6 @@
 from verilog_gen.context import Context
 from verilog_gen.emitters.emitter import Emitter
-from verilog_gen.operators.assign import Op
+from verilog_gen.operators.assign import Op, Val, Bit
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 
@@ -79,10 +79,7 @@ def WrapSub(em: Emitter, out, in_a, in_b, max: int) -> str:
     em.add_comment('WrapSub Begin')
     em.add_comment(f'WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})')
     if (isPow2(max)):
-        em.add_assignment(Op(em, out, f'std_logic_vector(unsigned({in_a.getNameRead()})', '-', f'unsigned({in_b.getNameRead()}))'))
+        em.add_assignment(out, in_a - in_b)
     else:
-        em.add_assignment(Op(em, out,
-            f'std_logic_vector(unsigned({in_a.getNameRead()}) - unsigned({in_b.getNameRead()})) ' + \
-            f'when {in_a.getNameRead()} >= {in_b.getNameRead()} else\n' + '\t'*(em.tabLevel+1) + \
-            f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));'))
+        em.add_assignment(out, (in_a - in_b).when(in_a >= in_b).else_(in_a + Val(max) - in_b))
     em.add_comment('WrapSub End')

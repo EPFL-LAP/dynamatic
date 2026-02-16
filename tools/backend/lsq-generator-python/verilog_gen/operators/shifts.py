@@ -1,7 +1,7 @@
 from verilog_gen.emitters.emitter import Emitter
 from verilog_gen.utils import *
 from verilog_gen.signals import *
-from verilog_gen.operators import Op
+from verilog_gen.operators import Op, Val
 
 
 # ===----------------------------------------------------------------------===#
@@ -49,12 +49,12 @@ def RotateLogicVec(em: Emitter, dout, din, distance, layer) -> str:
     length = din.size
     if (layer == 0):
         for i in range(0, length):
-            em.add_assignment(Op(em, (dout, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
     else:
         em.use_temp()
         res = LogicVec(em, em.get_temp('res'), 'w', length)
         for i in range(0, length):
-            em.add_assignment(Op(em, (res, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
 
         em.add_comment('Layer End')
         RotateLogicVec(em, dout, res, distance, layer-1)
@@ -73,12 +73,12 @@ def RotateLogicArray(em: Emitter, dout, din, distance, layer) -> str:
     length = din.length
     if (layer == 0):
         for i in range(0, length):
-            em.add_assignment(Op(em, (dout, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
     else:
         em.use_temp()
         res = LogicArray(em, em.get_temp('res'), 'w', length)
         for i in range(0, length):
-            em.add_assignment(Op(em, (res, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
         em.add_comment('Layer End')
         RotateLogicArray(em, dout, res, distance, layer-1)
 
@@ -103,12 +103,12 @@ def RotateLogicVecArray(em: Emitter, dout, din, distance, layer) -> str:
     length = din.length
     if (layer == 0):
         for i in range(0, length):
-            em.add_assignment(Op(em, (dout, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
     else:
         em.use_temp()
         res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
         for i in range(0, length):
-            em.add_assignment(Op(em, (res, i), (din, (i-2**layer) % length), 'when', (distance, layer), 'else', (din, i)))
+            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
         em.add_comment('Layer End')
         RotateLogicVecArray(em, dout, res, distance, layer-1)
 

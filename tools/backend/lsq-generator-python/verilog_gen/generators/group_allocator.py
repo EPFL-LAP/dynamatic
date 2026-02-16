@@ -1,6 +1,6 @@
 from verilog_gen.context import Context
 from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from verilog_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from verilog_gen.operators import Val, WhenElse, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking, Bit
 from verilog_gen.utils import MaskLess
 from verilog_gen.configs import Configs
 from verilog_gen.emitters.vhdl_emitter import VHDLEmitter
@@ -135,10 +135,8 @@ class GroupAllocator:
         WrapSub(em, stores_sub, stq_head_i,
                         stq_tail_i, self.configs.numStqEntries)
 
-        em.add_assignment(Op(em, empty_loads, self.configs.numLdqEntries, 'when', ldq_empty_i, 'else',
-                   '(', '\'0\'', '&', loads_sub, ')'))
-        em.add_assignment(Op(em, empty_stores, self.configs.numStqEntries, 'when', stq_empty_i, 'else',
-                   '(', '\'0\'', '&', stores_sub, ')'))
+        em.add_assignment(empty_loads, Val(self.configs.numLdqEntries).when(ldq_empty_i).else_(Bit(0).concat(loads_sub)))
+        em.add_assignment(empty_stores, Val(self.configs.numStqEntries).when(stq_empty_i).else_(Bit(0).concat(stores_sub)))
 
         # Generate handshake signals
         group_init_ready = LogicArray(
@@ -147,13 +145,9 @@ class GroupAllocator:
             em, 'group_init_hs', 'w', self.configs.numGroups)
 
         for i in range(0, self.configs.numGroups):
-            em.add_assignment(Op(em, group_init_ready[i],
-                       '\'1\'', 'when',
-                       '(', empty_loads,  '>=', (
-                self.configs.gaNumLoads[i], self.configs.emptyLdAddrW),  ')', 'and',
-                '(', empty_stores, '>=', (
-                self.configs.gaNumStores[i], self.configs.emptyStAddrW), ')',
-                'else', '\'0\''))
+            em.add_assignment(group_init_ready[i], Bit(1)
+                .when((empty_loads >= Val(self.configs.gaNumLoads[i], self.configs.emptyLdAddrW)) & (empty_stores >= Val(self.configs.gaNumStores[i], self.configs.emptyStAddrW)))
+                .else_(Bit(0)))
 
         if (self.configs.gaMulti):
             group_init_and = LogicArray(
@@ -162,19 +156,16 @@ class GroupAllocator:
                                   self.configs.numGroups)
             ga_rr_mask.regInit()
             for i in range(0, self.configs.numGroups):
-                em.add_assignment(Op(em, group_init_and[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i]))
-                em.add_assignment(Op(em, group_init_ready_o[i], group_init_hs[i]))
+                em.add_assignment(group_init_and[i], group_init_ready[i] & group_init_valid_i[i])
+                em.add_assignment(group_init_ready_o[i], group_init_hs[i])
             CyclicPriorityMasking(em, group_init_hs,
                                           group_init_and, ga_rr_mask)
             for i in range(0, self.configs.numGroups):
-                em.add_assignment(Op(em, (ga_rr_mask, (i+1) %
-                                 self.configs.numGroups), (group_init_hs, i)))
+                em.add_assignment((ga_rr_mask, (i+1) % self.configs.numGroups), Val(group_init_hs, i))
         else:
             for i in range(0, self.configs.numGroups):
-                em.add_assignment(Op(em, group_init_ready_o[i], group_init_ready[i]))
-                em.add_assignment(Op(em, group_init_hs[i],
-                           group_init_ready[i], 'and', group_init_valid_i[i]))
+                em.add_assignment(group_init_ready_o[i], group_init_ready[i])
+                em.add_assignment(group_init_hs[i], group_init_ready[i] & group_init_valid_i[i])
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
@@ -199,25 +190,17 @@ class GroupAllocator:
                  self.configs.gaNumLoads, group_init_hs)
         Mux1HROM(em, num_stores,
                          self.configs.gaNumStores, group_init_hs)
-        em.add_assignment(Op(em, num_loads_o, num_loads))
-        em.add_assignment(Op(em, num_stores_o, num_stores))
+        em.add_assignment(num_loads_o, num_loads)
+        em.add_assignment(num_stores_o, num_stores)
 
         ldq_wen_unshifted = LogicArray(
             em, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
         stq_wen_unshifted = LogicArray(
             em, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
         for i in range(0, self.configs.numLdqEntries):
-            em.add_assignment(Op(em, ldq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_loads, '>', (i, self.configs.ldqAddrW),
-                       'else', '\'0\''
-                       ))
+            em.add_assignment(ldq_wen_unshifted[i], Bit(1).when(Val(num_loads) > Val(i, self.configs.ldqAddrW)).else_(Bit(0)))
         for i in range(0, self.configs.numStqEntries):
-            em.add_assignment(Op(em, stq_wen_unshifted[i],
-                       '\'1\'', 'when',
-                       num_stores, '>', (i, self.configs.stqAddrW),
-                       'else', '\'0\''
-                       ))
+            em.add_assignment(stq_wen_unshifted[i], Bit(1).when(Val(num_stores) > Val(i, self.configs.stqAddrW)).else_(Bit(0)))
 
         # Shift the arrays
         if (self.configs.ldpAddrW > 0):

@@ -1,4 +1,5 @@
 from verilog_gen.emitters.emitter import Emitter
+from verilog_gen.operators.assign import Statement, Bin, Un, BinOp, UnOp, Bit
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
 # ===----------------------------------------------------------------------===#
@@ -60,8 +61,12 @@ class VHDLEmitter(Emitter):
     def add_comment(self, comment: str):
         self.statementString += self.get_current_indent() + f'-- {comment}\n'
 
-    def add_assignment(self, op: str):
-        self.statementString += op;
+    def add_assignment(self, out, statement: Statement):
+        out_str, size = self.assigned_var_to_str(out)
+        statement_str = statement.to_str(self, size, -1)
+        # Assume we only write to logic types
+        statement_str = self.fix_type('logic', statement.get_type(), statement_str)
+        self.statementString += self.get_current_indent() + f'{out_str} <= {statement_str};\n'
 
     def to_string(self, module_name: str, write_regs=True) -> str:
         return self.library + \
@@ -73,3 +78,82 @@ class VHDLEmitter(Emitter):
                 'begin\n' + self.statementString + '\n' + \
                 ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs else '') \
                 + 'end architecture;\n'
+
+    WHEN = 'when'
+    ELSE = 'else'
+
+    BINOP_STRINGS = {
+        BinOp.ADD: '+',
+        BinOp.SUB: '-',
+        BinOp.AND: 'and',
+        BinOp.OR: 'or',
+        BinOp.XOR: 'xor',
+        BinOp.MUL: '*',
+        BinOp.GE: '>=',
+        BinOp.LE: '<=',
+        BinOp.GT: '>',
+        BinOp.LT: '<',
+        BinOp.EQ: '=',
+        BinOp.NEQ: '!=',
+        BinOp.CONCAT: '&'
+    }
+
+    @staticmethod
+    def is_surrounded_by_parentheses(s: str) -> bool:
+        s = s.strip()
+        if not s.startswith('(') or not s.endswith(')'):
+            return False
+
+        depth = 0
+        for i, ch in enumerate(s):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return i == len(s) - 1
+                if depth < 0:
+                    return False
+        return False
+
+    def get_binop_str(self, op: Bin) -> str:
+        if op in self.BINOP_STRINGS:
+            return self.BINOP_STRINGS[op]
+        else:
+            raise ValueError('Invalid binary operator: ' + str(op))
+            
+    def get_unop_str(self, unop: UnOp) -> str:
+        if unop == UnOp.NOT:
+            return 'not'
+        else:
+            raise ValueError('Invalid unary operator')
+
+    def get_bit_str(self, bit: Bit) -> str:
+        if bit.value == 0:
+            return '\'0\''
+        elif bit.value == 1:
+            return '\'1\''
+        else:
+            raise ValueError('Invalid bit value')
+
+    def fix_type(self, own_type: str, child_type: str, child_str: str) -> str:
+        if own_type == 'arith' and child_type == 'logic':
+            return f'unsigned{child_str}' if self.is_surrounded_by_parentheses(child_str) else f'unsigned({child_str})'
+        elif own_type == 'logic' and child_type == 'arith':
+            return f'std_logic_vector{child_str}' if self.is_surrounded_by_parentheses(child_str) else f'std_logic_vector({child_str})'
+        else:
+            return child_str
+
+    def bin_to_str(self, bin: Bin, size: int) -> str:
+        left_str = bin.left.to_str(self, size, bin.get_precedence())
+        right_str = bin.right.to_str(self, size, bin.get_precedence())
+
+        left_str = self.fix_type(bin.get_type(), bin.left.get_type(), left_str)
+        right_str = self.fix_type(bin.get_type(), bin.right.get_type(), right_str)
+
+        return f'{left_str} {self.get_binop_str(bin.op)} {right_str}'
+
+    def un_to_str(self, un: Un, size: int) -> str:
+        val_str = un.val.to_str(self, size, un.get_precedence())
+        val_str = self.fix_type(un.get_type(), un.val.get_type(), val_str)
+        return f'{self.get_unop_str(un.op)} {val_str}'

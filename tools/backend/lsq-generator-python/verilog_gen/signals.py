@@ -14,9 +14,10 @@
 
 from verilog_gen.context import Context
 from verilog_gen.utils import *
+from verilog_gen.statements import Statement
 
 
-class Logic:
+class Logic(Statement):
     """
     A one-bit VHDL std_logic signal.
 
@@ -91,6 +92,9 @@ class Logic:
             return self.name + sufix + '_i'
         elif (self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
+
+    def _to_str(self, em: Context, size) -> str:
+        return self.getNameRead()
 
     def getNameWrite(self, sufix='') -> str:
         """

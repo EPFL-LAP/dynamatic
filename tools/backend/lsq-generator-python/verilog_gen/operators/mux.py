@@ -52,12 +52,16 @@ def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
     str_ret += ctx.get_current_indent() + f'-- Mux1H({dout.name}, {din.name}, {sel.name})\n'
     ctx.use_temp()
 
+    # Local imports to avoid circular import issues when package is being
+    # initialized. Use isinstance checks for robustness.
+    from verilog_gen.signals import LogicVecArray, LogicArray
+
     # din is always LogicVecArray
-    if (type(din) == LogicVecArray):
+    if isinstance(din, LogicVecArray):
         length = din.length
         size = din.size
         mux = LogicVecArray(ctx, ctx.get_temp('mux'), 'w', length, din.size)
-    elif (type(din) == LogicArray):
+    elif isinstance(din, LogicArray):
         length = din.length
         size = None
         mux = LogicArray(ctx, ctx.get_temp('mux'), 'w', length)
@@ -137,7 +141,10 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
     mlen = sel.length
     size = dout.size
     str_zero = Zero(size)
-    if (type(dout) == LogicVecArray):
+    # Local import to avoid circular import during package initialization
+    from verilog_gen.signals import LogicVecArray
+
+    if isinstance(dout, LogicVecArray):
         length = dout.length
         for i in range(0, length):
             em.add_comment(f'Loop {i}')
@@ -145,19 +152,19 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
             for j in range(0, mlen):
                 str_value = func(GetValue(din[j], i), size)
                 if (str_value == str_zero):
-                    em.add_assignment(Op(em, (mux, j), str_zero))
+                    em.add_assignment((mux, j), Val(str_zero))
                 else:
-                    em.add_assignment(Op(em, (mux, j), str_value, 'when', (sel, j), 'else', str_zero))
-            Reduce(em, dout[i], mux, 'or', False)
+                    em.add_assignment((mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero)))
+            Reduce(em, dout[i], mux, BinOp.OR, False)
     else:   # type(dout) == LogicVec
         mux = LogicVecArray(em, em.get_temp(f'mux'), 'w', mlen, size)
         for j in range(0, mlen):
             str_value = func(din[j], size)
             if (str_value == str_zero):
-                em.add_assignment(Op(em, (mux, j), str_zero))
+                em.add_assignment((mux, j), Val(str_zero))
             else:
-                em.add_assignment(Op(em, (mux, j), str_value, 'when', (sel, j), 'else', str_zero))
-        Reduce(em, dout, mux, 'or', False)
+                em.add_assignment((mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero)))
+        Reduce(em, dout, mux, BinOp.OR, False)
     em.add_comment('Mux1H For Rom End\n')
 
 
