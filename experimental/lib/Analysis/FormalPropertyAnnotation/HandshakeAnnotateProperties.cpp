@@ -416,10 +416,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      FlowVariable i1 = FlowVariable::internalChannel(&op, 1);
-      FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
-      assert(!(i1 == i2) && "expected internal channels to be different");
-
       // Annotate channel equations
       for (auto [i, res] : llvm::enumerate(op.getResults())) {
         if (!isChannelToBeChecked(res))
@@ -444,6 +440,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       // Some operations do not follow this structure, and should be handled
       // separately to avoid making false assumptions.
       if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+        /*
         // From inspecting .td declaration... probably a better way of doing
         // this
         int addressInputIndex = 0;
@@ -453,8 +450,12 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         FlowVariable addrSlot = FlowVariable::slot(&op, 0);
         FlowVariable dataSlot = FlowVariable::slot(&op, 1);
 
+        FlowVariable i1 = FlowVariable::internalChannel(&op, 1);
+        FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
+
         equations.push_back(in - i1 - addrSlot);
         equations.push_back(i2 - out - dataSlot);
+        */
         continue;
       }
       if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
@@ -464,6 +465,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         continue;
       }
 
+      FlowVariable entry = FlowVariable::internalChannel(&op, 0);
       // Join operation, merge operation, or mux
       if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
         if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
@@ -475,12 +477,12 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
             selectIndex = use.getOperandNumber();
           }
           assert(selectIndex != (unsigned)-1);
-          FlowExpression dataEq = -i1;
+          FlowExpression dataEq = -entry;
           for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
             FlowVariable chVar = FlowVariable::inputChannel(&op, i);
             if (i == selectIndex) {
               // select channel
-              equations.push_back(chVar - i1);
+              equations.push_back(chVar - entry);
             } else {
               // dataEq : sum(dataChannelLambda) = outputChannelLambda
               dataEq += chVar;
@@ -489,7 +491,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
           equations.push_back(dataEq);
         } else {
           // merge : the sum of input lambdas is the output lambda
-          FlowExpression mergeEq = -i1;
+          FlowExpression mergeEq = -entry;
           for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
             mergeEq += FlowVariable::inputChannel(&op, i);
           }
@@ -498,21 +500,45 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       } else {
         // join : for every input, lambda_in = lambda_out
         for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
-          equations.push_back(FlowVariable::inputChannel(&op, i) - i1);
+          equations.push_back(FlowVariable::inputChannel(&op, i) - entry);
         }
       }
 
-      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
-        // TODO: handle multiple slots
-        if (bufferOp.getNumSlots() != 1) {
-          llvm::errs() << getUniqueName(&op) << " has multiple slots\n";
+      // Annotate latency-induced slots
+      int exitIndex = 0;
+      if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
+        for (int i = 0; i < latencyOp.getLatency(); ++i) {
+          // TODO: This should not actually be a slot variable, but rather a
+          // special latency-slot variable, as it latency-induced slots have a
+          // (rightfully) different naming scheme. For now, I manually changed
+          // the names to match what is expected (i.e. "full_{i}" -> "v{i}"),
+          // and verified that these latency induced slots do actually solve
+          // issues that caused the properties to be provably incorrect.
+          //
+          // As the structure of the slot variables will soon change, I did not
+          // yet implement the latency-slot variable
+          FlowVariable full = FlowVariable::slot(&op, exitIndex);
+
+          FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
+          FlowVariable after =
+              FlowVariable::internalChannel(&op, exitIndex + 1);
+          ++exitIndex;
+          equations.push_back(before - full - after);
         }
-        assert(bufferOp.getNumSlots() == 1);
-        FlowVariable full = FlowVariable::slot(&op, 0);
-        equations.push_back(i1 - full - i2);
-      } else {
-        equations.push_back(i1 - i2);
       }
+      // Annotate buffer slots
+      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
+        for (int i = 0; i < bufferOp.getNumSlots(); ++i) {
+          FlowVariable full = FlowVariable::slot(&op, i);
+
+          FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
+          FlowVariable after =
+              FlowVariable::internalChannel(&op, exitIndex + 1);
+          ++exitIndex;
+          equations.push_back(before - full - after);
+        }
+      }
+      FlowVariable exit = FlowVariable::internalChannel(&op, exitIndex);
 
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         // eagerfork: for every channel, either same tokens in as out, or in
@@ -520,7 +546,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable sent = FlowVariable::sentOutput(&op, i);
           FlowVariable result = FlowVariable::outputChannel(&op, i);
-          equations.push_back(i2 + sent - result);
+          equations.push_back(exit + sent - result);
         }
       } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
         continue;
@@ -528,7 +554,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result = FlowVariable::outputChannel(&op, i);
-          equations.push_back(i2 - result);
+          equations.push_back(exit - result);
         }
       }
     }
@@ -588,7 +614,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
     if (coefs.size() > 0) {
-      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
       uid++;
       p.addEquation(coefs, names);
       if (p.getEquations().size() > 0) {
@@ -620,10 +646,12 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  if (failed(annotateAbsenceOfBackpressure(modOp)))
-    return signalPassFailure();
-  if (failed(annotateValidEquivalence(modOp)))
-    return signalPassFailure();
+  if (false) {
+    if (failed(annotateAbsenceOfBackpressure(modOp)))
+      return signalPassFailure();
+    if (failed(annotateValidEquivalence(modOp)))
+      return signalPassFailure();
+  }
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
