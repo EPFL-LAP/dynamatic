@@ -271,3 +271,6 @@ class VHDLEmitter(Emitter):
                 self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {array.getNameWrite(i)};\n')
         self.add_reg_str('\t\tend if;\n')
 
+
+    def get_file_suffix(self) -> str:
+        return 'vhd'

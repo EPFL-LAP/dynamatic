@@ -3,7 +3,7 @@ from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from verilog_gen.operators import Val, WhenElse, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking, Bit
 from verilog_gen.utils import MaskLess
 from verilog_gen.configs import Configs
-from verilog_gen.emitters.vhdl_emitter import VHDLEmitter
+from verilog_gen.emitters.emitter import Emitter
 
 
 class GroupAllocator:
@@ -47,7 +47,7 @@ class GroupAllocator:
         self.configs = configs
         self.module_name = name + suffix
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, em: Emitter, path_rtl: str) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 
@@ -79,12 +79,6 @@ class GroupAllocator:
             end architecture;
 
         """
-
-        # em: Emitter for code generation state.
-        # When we generate an entity and architecture, we use the emitter to accumulate the code snippets for ports, signals, and statements, exact implementation depends on the syntax.
-        # We only need to get the context as a parameter when we instantiate the module.
-        # It saves all information we need when we generate an entity and architecture code.
-        em = VHDLEmitter()
 
         em.tabLevel = 1
         em.tempCount = 0
@@ -219,7 +213,7 @@ class GroupAllocator:
 
         # Write to the file
         output_str = em.to_string(self.module_name, write_regs=self.configs.gaMulti)
-        with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
+        with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
 
     def instantiate(
