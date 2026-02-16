@@ -112,46 +112,10 @@ class Logic(Statement):
             return self.name + sufix + '_o'
 
     def signalInit(self, sufix='') -> None:
-        """
-        Appends the appropriate declaration or port line for this signal to a global buffer.
-        """
-        if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic;\n')
-        elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic;\n')
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic;\n')
-        elif (self.type == 'i'):
-            self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic')
-        elif (self.type == 'o'):
-            self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic')
+        self.ctx.logic_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
-        """
-        Generates a clocked process snippet that sets up the register's behavior.
-        For example,
-
-        if (rst = '1') then
-            <name>_q <= '0';
-        elsif (rising_edge(clk)) then
-            <name>_q <= <name>_d;
-        end if;
-        """
-        assert (self.type == 'r')
-        if (init != None):
-            self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
-            self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {IntToBits(init)};\n')
-            self.ctx.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
-        else:
-            self.ctx.add_reg_str('\t\tif (rising_edge(clk)) then\n')
-        if (enable != None):
-            self.ctx.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
-            self.ctx.add_reg_str(f'\t\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
-            self.ctx.add_reg_str('\t\t\tend if;\n')
-        else:
-            self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
-        self.ctx.add_reg_str('\t\tend if;\n')
+        self.ctx.logic_reg_init(self, enable, init)
 
 #
 # std_logic_vec
@@ -220,33 +184,10 @@ class LogicVec(Logic):
             return Logic.getNameWrite(self, sufix) + f'({i})'
 
     def signalInit(self, sufix=''):
-        if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic_vector({self.size-1} downto 0);\n')
-        elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic_vector({self.size-1} downto 0);\n')
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic_vector({self.size-1} downto 0);\n')
-        elif (self.type == 'i'):
-            self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic_vector({self.size-1} downto 0)')
-        elif (self.type == 'o'):
-            self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic_vector({self.size-1} downto 0)')
+        self.ctx.logicvec_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
-        assert (self.type == 'r')
-        if (init != None):
-            self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
-            self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {IntToBits(init, self.size)};\n')
-            self.ctx.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
-        else:
-            self.ctx.add_reg_str('\t\tif (rising_edge(clk)) then\n')
-        if (enable != None):
-            self.ctx.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
-            self.ctx.add_reg_str(f'\t\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
-            self.ctx.add_reg_str('\t\t\tend if;\n')
-        else:
-            self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
-        self.ctx.add_reg_str('\t\tend if;\n')
+        self.ctx.logicvec_reg_init(self, enable, init)
 
 #
 # An array of std_logic
@@ -299,24 +240,7 @@ class LogicArray(Logic):
         return Logic(self.ctx, self.name + f'_{i}', self.type, False)
 
     def regInit(self, enable=None, init=None) -> None:
-        assert (self.type == 'r')
-        if (init != None):
-            self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\t{self.getNameRead(i)} <= {IntToBits(init[i])};\n')
-            self.ctx.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
-        else:
-            self.ctx.add_reg_str('\t\tif (rising_edge(clk)) then\n')
-        if (enable != None):
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')
-                self.ctx.add_reg_str(f'\t\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n')
-                self.ctx.add_reg_str('\t\t\tend if;\n')
-        else:
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n')
-        self.ctx.add_reg_str('\t\tend if;\n')
-
+        self.ctx.logicarray_reg_init(self, enable, init)
 #
 # An array of std_logic vector
 #
@@ -369,20 +293,4 @@ class LogicVecArray(LogicVec):
         return LogicVec(self.ctx, self.name + f'_{i}', self.type, self.size, False)
 
     def regInit(self, enable=None, init=None) -> None:
-        assert (self.type == 'r')
-        if (init != None):
-            self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\t{self.getNameRead(i)} <= {IntToBits(init[i], self.size)};\n')
-            self.ctx.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
-        else:
-            self.ctx.add_reg_str('\t\tif (rising_edge(clk)) then\n')
-        if (enable != None):
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')
-                self.ctx.add_reg_str(f'\t\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n')
-                self.ctx.add_reg_str('\t\t\tend if;\n')
-        else:
-            for i in range(0, self.length):
-                self.ctx.add_reg_str(f'\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n')
-        self.ctx.add_reg_str('\t\tend if;\n')
+        self.ctx.logicvecarray_reg_init(self, enable, init)

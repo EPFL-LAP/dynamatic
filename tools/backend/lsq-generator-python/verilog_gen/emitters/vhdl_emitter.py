@@ -1,5 +1,6 @@
 from verilog_gen.emitters.emitter import Emitter
 from verilog_gen.operators.assign import Statement, Bin, Un, BinOp, UnOp, Bit
+from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
 # ===----------------------------------------------------------------------===#
@@ -157,3 +158,116 @@ class VHDLEmitter(Emitter):
         val_str = un.val.to_str(self, size, un.get_precedence())
         val_str = self.fix_type(un.get_type(), un.val.get_type(), val_str)
         return f'{self.get_unop_str(un.op)} {val_str}'
+
+    def logic_signal_init(self, signal: Logic, sufix: str):
+        """
+        Appends the appropriate declaration or port line for this signal to a global buffer.
+        """
+        if (signal.type == 'w'):
+            self.add_signal_str(f'\tsignal {signal.name + sufix} : std_logic;\n')
+        elif (signal.type == 'r'):
+            self.add_signal_str(f'\tsignal {signal.name + sufix}_d : std_logic;\n')
+            self.add_signal_str(f'\tsignal {signal.name + sufix}_q : std_logic;\n')
+        elif (signal.type == 'i'):
+            self.add_port_str(';\n')
+            self.add_port_str(f'\t\t{signal.name + sufix}_i : in std_logic')
+        elif (signal.type == 'o'):
+            self.add_port_str(';\n')
+            self.add_port_str(f'\t\t{signal.name + sufix}_o : out std_logic')
+
+
+    def logicvec_signal_init(self, vec: LogicVec, sufix: str):
+        if (vec.type == 'w'):
+            self.add_signal_str(f'\tsignal {vec.name + sufix} : std_logic_vector({vec.size-1} downto 0);\n')
+        elif (vec.type == 'r'):
+            self.add_signal_str(f'\tsignal {vec.name + sufix}_d : std_logic_vector({vec.size-1} downto 0);\n')
+            self.add_signal_str(f'\tsignal {vec.name + sufix}_q : std_logic_vector({vec.size-1} downto 0);\n')
+        elif (vec.type == 'i'):
+            self.add_port_str(';\n')
+            self.add_port_str(f'\t\t{vec.name + sufix}_i : in std_logic_vector({vec.size-1} downto 0)')
+        elif (vec.type == 'o'):
+            self.add_port_str(';\n')
+            self.add_port_str(f'\t\t{vec.name + sufix}_o : out std_logic_vector({vec.size-1} downto 0)')
+
+    def logic_reg_init(self, logic: Logic, enable=None, init=None) -> None:
+        """
+        Generates a clocked process snippet that sets up the register's behavior.
+        For example,
+
+        if (rst = '1') then
+            <name>_q <= '0';
+        elsif (rising_edge(clk)) then
+            <name>_q <= <name>_d;
+        end if;
+        """
+        assert (logic.type == 'r')
+        if (init != None):
+            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {IntToBits(init)};\n')
+            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+        else:
+            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+        if (enable != None):
+            self.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
+            self.add_reg_str(f'\t\t\t\t{logic.getNameRead()} <= {logic.getNameWrite()};\n')
+            self.add_reg_str('\t\t\tend if;\n')
+        else:
+            self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {logic.getNameWrite()};\n')
+        self.add_reg_str('\t\tend if;\n')
+
+    def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
+        assert (vec.type == 'r')
+        if (init != None):
+            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {IntToBits(init, vec.size)};\n')
+            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+        else:
+            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+        if (enable != None):
+            self.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
+            self.add_reg_str(f'\t\t\t\t{vec.getNameRead()} <= {vec.getNameWrite()};\n')
+            self.add_reg_str('\t\t\tend if;\n')
+        else:
+            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {vec.getNameWrite()};\n')
+        self.add_reg_str('\t\tend if;\n')
+
+
+    def logicarray_reg_init(self, array: LogicArray, enable=None, init=None) -> None:
+        assert (array.type == 'r')
+        if (init != None):
+            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {IntToBits(init[i])};\n')
+            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+        else:
+            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+        if (enable != None):
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')
+                self.add_reg_str(f'\t\t\t\t{array.getNameRead(i)} <= {array.getNameWrite(i)};\n')
+                self.add_reg_str('\t\t\tend if;\n')
+        else:
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {array.getNameWrite(i)};\n')
+        self.add_reg_str('\t\tend if;\n')
+
+
+    def logicvecarray_reg_init(self, array: LogicVecArray, enable=None, init=None) -> None:
+        assert (array.type == 'r')
+        if (init != None):
+            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {IntToBits(init[i], array.size)};\n')
+            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+        else:
+            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+        if (enable != None):
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')
+                self.add_reg_str(f'\t\t\t\t{array.getNameRead(i)} <= {array.getNameWrite(i)};\n')
+                self.add_reg_str('\t\t\tend if;\n')
+        else:
+            for i in range(0, array.length):
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {array.getNameWrite(i)};\n')
+        self.add_reg_str('\t\tend if;\n')
+
