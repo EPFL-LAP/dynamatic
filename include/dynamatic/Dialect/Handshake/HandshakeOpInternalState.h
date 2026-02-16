@@ -13,9 +13,9 @@ struct HandshakeOpInternalState {
     BufferSlotFull,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s) {
-    if (s == "EagerForkSent")
+    if (s == EAGER_FORK_SENT)
       return TYPE::EagerForkSent;
-    if (s == "BufferSlotFull")
+    if (s == BUFFER_SLOT_FULL)
       return TYPE::BufferSlotFull;
     return std::nullopt;
   }
@@ -23,9 +23,9 @@ struct HandshakeOpInternalState {
   static std::string typeToStr(TYPE t) {
     switch (t) {
     case TYPE::EagerForkSent:
-      return "EagerForkSent";
+      return EAGER_FORK_SENT.str();
     case TYPE::BufferSlotFull:
-      return "BufferSlotFull";
+      return BUFFER_SLOT_FULL.str();
     }
   }
 
@@ -33,8 +33,14 @@ struct HandshakeOpInternalState {
   HandshakeOpInternalState(TYPE type) : type(type) {}
   virtual ~HandshakeOpInternalState() = default;
   TYPE type;
+  static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
+  static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
 };
 
+// To define a `sent` state of an eager fork, the exact channel that contains
+// this `sent` state needs to be identified. For this, the operation is
+// identified through `opName` (e.g. "fork1"), and the output of this operations
+// is defined by `channelName` (e.g. "out1")
 struct EagerForkSent : public HandshakeOpInternalState {
   EagerForkSent() = default;
   EagerForkSent(const std::string &opName, const std::string &channelName)

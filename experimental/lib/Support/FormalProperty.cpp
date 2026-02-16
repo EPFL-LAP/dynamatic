@@ -255,6 +255,18 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
     assert(state.opName == opName);
     channels[i] = state.channelName;
   }
+  // Example JSON:
+  // {
+  //   "owner_op": "fork0",
+  //   "channels": ["out0", "out1", "out2"]
+  // }
+  //
+  // or
+  //
+  // {
+  //   "owner_op": "control_merge0",
+  //   "channels": ["outs", "index"]
+  // }
   return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
 }
 

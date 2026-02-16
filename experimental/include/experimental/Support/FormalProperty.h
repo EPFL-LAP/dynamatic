@@ -182,6 +182,7 @@ public:
   }
 
 private:
+  // The `sent` states that cannot be active at the same time
   std::vector<handshake::EagerForkSent> sentStates;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
   inline static const StringLiteral CHANNELS_LIT = "channels";
