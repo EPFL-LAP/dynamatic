@@ -174,14 +174,14 @@ class LogicVec(Logic):
             return Logic.getNameRead(self, sufix)
         else:
             assert (i < self.size)
-            return Logic.getNameRead(self, sufix) + f'({i})'
+            return self.ctx.index_var(Logic.getNameRead(self, sufix), i)
 
     def getNameWrite(self, i=None, sufix='') -> str:
         if (i == None):
             return Logic.getNameWrite(self, sufix)
         else:
             assert (i < self.size)
-            return Logic.getNameWrite(self, sufix) + f'({i})'
+            return self.ctx.index_var(Logic.getNameWrite(self, sufix), i)
 
     def signalInit(self, sufix=''):
         self.ctx.logicvec_signal_init(self, sufix)

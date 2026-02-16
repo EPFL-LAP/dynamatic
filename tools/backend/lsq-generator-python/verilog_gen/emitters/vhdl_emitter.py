@@ -285,3 +285,9 @@ class VHDLEmitter(Emitter):
 
     def get_file_suffix(self) -> str:
         return 'vhd'
+
+    def index_var(self, var_name, index):
+        return f'{var_name}({index})'
+
+    def slice_var(self, var_name, high, low):
+        return f'{var_name}({high} downto {low})'
