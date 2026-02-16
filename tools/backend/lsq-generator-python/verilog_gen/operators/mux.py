@@ -85,7 +85,7 @@ def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
     return str_ret
 
 
-def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
+def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     """
     Generate a one-hot ROM multiplexer for LSQ port index allocation,
     Load-Store Order Matrix construction, and tracking load/store numbers.
@@ -108,8 +108,8 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
             Indicates groups to be allocated. (group_init_hs)
 
         func (callable, optional):
-            Conversion function from integer to LogicVec (default: IntToBits).
-            Either IntToBits() or MaskLess()
+            Conversion function from integer to LogicVec (default: em.int_to_bits).
+            Either em.int_to_bits or MaskLess()
 
     Behavior:
         - type(dout) == LogicVec:
@@ -134,6 +134,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=IntToBits) -> str:
         This means that the currently allocated BB is BB1 (among BB0, BB1, and BB2)
         It has 1 load. that "dout" indicates 1.
     """
+    if func is None: func = em.int_to_bits
 
     em.add_comment('Mux1H For Rom Begin')
     em.add_comment(f'Mux1H({dout.name}, {sel.name})')

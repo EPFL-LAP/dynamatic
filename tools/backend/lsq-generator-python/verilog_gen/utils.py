@@ -405,39 +405,6 @@ def OpTab(out, tabLevel, *list_in) -> str:
 # ===----------------------------------------------------------------------===#
 
 
-def MaskLess(din, size) -> str:
-    """
-    Example:
-        MaskLess(3, 5)  # Output: "00111"
-        MaskLess(2, 6)  # Output: "000011"
-        MaskLess(5, 5)  # Output: "11111"
-        MaskLess(0, 4)  # Output: "0000"
-    """
-    if (din > size):
-        raise ValueError("Unknown value!")
-    return '\"' + '0'*(size-din) + '1'*din + '\"'
-
-
-def IntToBits(din, size=None) -> str:
-    if size == None:
-        if din:
-            return "'1'"
-        else:
-            return "'0'"
-    else:
-        str_ret = '"'
-        for i in range(0, size):
-            if din % 2 == 0:
-                str_ret = "0" + str_ret
-            else:
-                str_ret = "1" + str_ret
-            din = din // 2
-        str_ret = '"' + str_ret
-        if din != 0:
-            raise ValueError("Unknown value!")
-        return str_ret
-
-
 def Zero(size) -> str:
     if size == None:
         return "'0'"

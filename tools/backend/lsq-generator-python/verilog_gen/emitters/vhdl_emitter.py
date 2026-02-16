@@ -214,7 +214,7 @@ class VHDLEmitter(Emitter):
         assert (logic.type == 'r')
         if (init != None):
             self.add_reg_str('\t\tif (rst = \'1\') then\n')
-            self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {IntToBits(init)};\n')
+            self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {self.in_to_bits(init)};\n')
             self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
         else:
             self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
@@ -230,7 +230,7 @@ class VHDLEmitter(Emitter):
         assert (vec.type == 'r')
         if (init != None):
             self.add_reg_str('\t\tif (rst = \'1\') then\n')
-            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {IntToBits(init, vec.size)};\n')
+            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};\n')
             self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
         else:
             self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
@@ -248,7 +248,7 @@ class VHDLEmitter(Emitter):
         if (init != None):
             self.add_reg_str('\t\tif (rst = \'1\') then\n')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {IntToBits(init[i])};\n')
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};\n')
             self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
         else:
             self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
@@ -268,7 +268,7 @@ class VHDLEmitter(Emitter):
         if (init != None):
             self.add_reg_str('\t\tif (rst = \'1\') then\n')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {IntToBits(init[i], array.size)};\n')
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};\n')
             self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
         else:
             self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
@@ -291,3 +291,29 @@ class VHDLEmitter(Emitter):
 
     def slice_var(self, var_name, high, low):
         return f'{var_name}({high} downto {low})'
+
+    def int_to_bits(self, value: int, size: int) -> str:
+        return f'"{value:0{size}b}"'
+
+    @staticmethod
+    def int_to_bits(din, size=None) -> str:
+        if size == None:
+            if din:
+                return "'1'"
+            else:
+                return "'0'"
+        else:
+            return f'"{Emitter.int_to_bin(din, size)}"'
+
+    @staticmethod
+    def mask_less(din, size) -> str:
+        """
+        Example:
+            MaskLess(3, 5)  # Output: "00111"
+            MaskLess(2, 6)  # Output: "000011"
+            MaskLess(5, 5)  # Output: "11111"
+            MaskLess(0, 4)  # Output: "0000"
+        """
+        if (din > size):
+            raise ValueError("Unknown value!")
+        return '\"' + '0'*(size-din) + '1'*din + '\"'

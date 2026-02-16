@@ -1,7 +1,6 @@
 from verilog_gen.context import Context
 from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from verilog_gen.operators import Val, WhenElse, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking, Bit
-from verilog_gen.utils import MaskLess
 from verilog_gen.configs import Configs
 from verilog_gen.emitters.emitter import Emitter
 
@@ -179,7 +178,7 @@ class GroupAllocator:
             Mux1HROM(em, stq_port_idx_rom,
                              self.configs.gaStPortIdx, group_init_hs)
         Mux1HROM(em, ga_ls_order_rom, self.configs.gaLdOrder,
-                 group_init_hs, MaskLess)
+                 group_init_hs, em.mask_less)
         Mux1HROM(em, num_loads,
                  self.configs.gaNumLoads, group_init_hs)
         Mux1HROM(em, num_stores,

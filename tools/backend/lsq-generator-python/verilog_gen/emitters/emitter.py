@@ -73,3 +73,18 @@ class Emitter:
                 size = var.size
 
         return str_ret, size
+
+    @staticmethod
+    def int_to_bin(val: int, size: int) -> str:
+        """
+        Converts an integer to a binary string of the specified size.
+        Example:
+            int_to_bin(5, 8)  # Output: 00000101
+            int_to_bin(10, 4) # Output: 1010
+            int_to_bin(3, 3)  # Output: 011
+            int_to_bin(0, 5)  # Output: 00000
+        """
+        if val < 0 or val >= (1 << size):
+            raise ValueError(f"Value {val} out of range for the specified size {size}")
+
+        return f'{val:0{size}b}'

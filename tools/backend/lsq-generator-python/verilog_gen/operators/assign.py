@@ -11,14 +11,13 @@ class Val(Statement):
 
     def _to_str(self, em: Emitter, size):
         arg = self.var[0] if len(self.var) == 1 else tuple(self.var)
-        from verilog_gen.utils import IntToBits
         if type(arg) == str:
             str_ret = arg
         elif type(arg) == int:
-            str_ret = IntToBits(arg, size)
+            str_ret = em.int_to_bits(arg, size)
         elif type(arg) == tuple:
             if type(arg[0]) == int:
-                str_ret = IntToBits(arg[0], arg[1])
+                str_ret = em.int_to_bits(arg[0], arg[1])
             elif len(arg) == 2:
                 str_ret = arg[0].getNameRead(arg[1])
             else:
