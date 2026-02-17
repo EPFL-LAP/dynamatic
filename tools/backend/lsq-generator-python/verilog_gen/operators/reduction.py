@@ -1,7 +1,7 @@
 from verilog_gen.emitters import Emitter
 from verilog_gen.utils import *
 from verilog_gen.operators import *
-from verilog_gen.ir import BinOp, Val, Bin
+from verilog_gen.ir import Val, Bin
 
 
 # ===----------------------------------------------------------------------===#
@@ -49,12 +49,12 @@ def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
     from verilog_gen.signals import LogicVec
 
     if (length == 1):
-        em.add_assignment(dout, BinOp(Val(din, 0), operator, Val(din, 1)))
+        em.add_assignment(dout, Bin(Val(din, 0), operator, Val(din, 1)))
     else:
         em.use_temp()
         res = LogicVec(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.size - length):
-            em.add_assignment((res, i), BinOp(Val(din, i), operator, Val(din, i+length)))
+            em.add_assignment((res, i), Bin(Val(din, i), operator, Val(din, i+length)))
         for i in range(din.size - length, length):
             em.add_assignment((res, i), Val(din, i))
         em.add_comment('Layer End')
@@ -151,7 +151,7 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
 
     if (comment):
         em.add_comment('Reduction Begin')
-        em.add_comment(f'Reduce({dout.name}, {din.name}, {operator})')
+        em.add_comment(f'Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})')
     if (type(din) == LogicVec):
         if (din.size == 1):
             em.add_assignment(dout, Val(din, 0))
