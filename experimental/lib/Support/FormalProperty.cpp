@@ -244,8 +244,7 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
-  std::string opName = getUniqueName(forkOp).str();
-  sentStates = forkOp.getInternalSentStates(opName);
+  sentStates = forkOp.getInternalSentStates();
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
@@ -295,10 +294,8 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
     unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
     : FormalProperty(id, tag, TYPE::CSOAFAF) {
-  std::string forkOpName = getUniqueName(forkOpI).str();
-  sentStates = forkOpI.getInternalSentStates(forkOpName);
-  std::string bufferOpName = getUniqueName(bufferOpI).str();
-  auto slots = bufferOpI.getInternalSlotStates(bufferOpName);
+  sentStates = forkOpI.getInternalSentStates();
+  auto slots = bufferOpI.getInternalSlotStates();
   // last slot is the copied slot!
   copiedSlot = slots[slots.size() - 1];
 }
