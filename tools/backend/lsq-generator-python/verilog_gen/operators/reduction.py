@@ -70,14 +70,14 @@ def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
     from verilog_gen.signals import LogicArray
 
     if (length == 1):
-        em.add_assignment(Op(em, dout, din[0], operator, din[1]))
+        em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
         res = LogicArray(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.length - length):
-            em.add_assignment(Op(em, res[i], din[i], operator, din[i+length]))
+            em.add_assignment(res[i], Bin(din[i], operator, din[i+length]))
         for i in range(din.length - length, length):
-            em.add_assignment(Op(em, res[i], din[i]))
+            em.add_assignment(res[i], din[i])
         em.add_comment('Layer End')
         ReduceLogicArray(em, dout, res, operator, length//2)
 
@@ -119,14 +119,14 @@ def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
     """
     from verilog_gen.signals import LogicVecArray, LogicArray
     if (length == 1):
-        em.add_assignment(Op(em, dout, din[0], operator, din[1]))
+        em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
         res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
         for i in range(0, din.length - length):
-            em.add_assignment(Op(em, res[i], din[i], operator, din[i+length]))
+            em.add_assignment(res[i], Bin(din[i], operator, din[i+length]))
         for i in range(din.length - length, length):
-            em.add_assignment(Op(em, res[i], din[i]))
+            em.add_assignment(res[i], din[i])
         em.add_comment('Layer End')
         ReduceLogicVecArray(em, dout, res, operator, length//2)
 
