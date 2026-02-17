@@ -327,3 +327,7 @@ class VerilogEmitter(Emitter):
         if (din > size):
             raise ValueError("Unknown value!")
         return f'{size}\'b' + '0'*(size-din) + '1'*din
+    
+    @staticmethod
+    def new() -> Emitter:
+        return VerilogEmitter()

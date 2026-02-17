@@ -344,3 +344,7 @@ class VHDLEmitter(Emitter):
         if (din > size):
             raise ValueError("Unknown value!")
         return '\"' + '0'*(size-din) + '1'*din + '\"'
+    
+    @staticmethod
+    def new() -> Emitter:
+        return VHDLEmitter()
