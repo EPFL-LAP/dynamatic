@@ -12,7 +12,7 @@ class VerilogEmitter(Emitter):
 
     def __init__(self):
         # Indentation level for generated code
-        self.tabLevel = 0
+        self.tabLevel = 1
 
         # Counter for generating unique temporary names
         self.tempCount = 0
@@ -28,6 +28,8 @@ class VerilogEmitter(Emitter):
         self.REG_END_STR = '\tend\n'
         self.regInitString = ''
         self.statementString = ''
+        
+        self.inst_started = False
 
     def get_current_indent(self) -> str:
         return '\t' * self.tabLevel
@@ -72,6 +74,31 @@ class VerilogEmitter(Emitter):
                 '// STATEMENTS\n' + self.statementString + '\n' + \
                 ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs and self.regInitString != '' else '') \
                 + 'endmodule\n'
+
+    def start_instantiation(self, module_name:str, instance_name: str = None) -> str:
+        if self.inst_started: # Sanity check to prevent overlapping instantiations
+            raise ValueError('start_instantiation called while another instantiation is in progress')
+
+        if instance_name is None: instance_name = module_name
+
+        self.inst_started = True
+        self.inst_str = f'{self.get_current_indent()}{module_name} {instance_name} (\n'
+        self.increase_indent()
+
+    def add_map(self, port_name: str, signal_name: str) -> str:
+        if not self.inst_started:
+            raise ValueError('add_map can only be called after start_instantiation')
+        
+        assert isinstance(port_name, str) and isinstance(signal_name, str), "port name and signal name must be strings"
+
+        self.inst_str += f'{self.get_current_indent()}.{port_name}({signal_name}),\n'
+
+    def complete_instantiation(self) -> str:
+        self.inst_started = False
+        self.decrease_indent()
+        self.inst_str += self.get_current_indent() + ');\n'
+        self.statementString += self.inst_str
+        self.inst_str = ''
 
     BINOP_STRINGS = {
         BinOp.ADD: '+',
