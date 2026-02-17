@@ -65,12 +65,12 @@ class VerilogEmitter(Emitter):
         # Assume we only write to logic types
         self.statementString += self.get_current_indent() + f'assign {out_str} = {statement_str};\n'
 
-    def to_string(self, module_name: str, write_regs=True) -> str:
+    def get_definition_str(self, module_name: str, write_regs=True) -> str:
         return f'module {module_name} ' + \
                 self.PORT_INIT_STR + self.portInitString + self.PORT_END_STR + '\n' + \
                 '// SIGNAL INIT\n' + self.signalInitString + '\n' + \
                 '// STATEMENTS\n' + self.statementString + '\n' + \
-                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs else '') \
+                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs and self.regInitString != '' else '') \
                 + 'endmodule\n'
 
     BINOP_STRINGS = {
