@@ -111,7 +111,7 @@ class VerilogEmitter(Emitter):
         BinOp.LE: '<=',
         BinOp.GT: '>',
         BinOp.LT: '<',
-        BinOp.EQ: '=',
+        BinOp.EQ: '==',
         BinOp.NEQ: '!=',
     }
 
@@ -313,7 +313,7 @@ class VerilogEmitter(Emitter):
         if size == None:
             size = 1
 
-        return f'{size}\'b{Emitter.int_to_bin(din, size)}'
+        return f'{size}\'b{Emitter._int_to_bin(din, size)}'
         
     @staticmethod
     def mask_less(din, size) -> str:

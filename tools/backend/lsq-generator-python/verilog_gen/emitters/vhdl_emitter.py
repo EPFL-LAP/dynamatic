@@ -330,7 +330,7 @@ class VHDLEmitter(Emitter):
             else:
                 return "'0'"
         else:
-            return f'"{Emitter.int_to_bin(din, size)}"'
+            return f'"{Emitter._int_to_bin(din, size)}"'
 
     @staticmethod
     def mask_less(din, size) -> str:

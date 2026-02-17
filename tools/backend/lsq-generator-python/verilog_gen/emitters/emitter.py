@@ -75,7 +75,7 @@ class Emitter:
         return str_ret, size
 
     @staticmethod
-    def int_to_bin(val: int, size: int) -> str:
+    def _int_to_bin(val: int, size: int) -> str:
         """
         Converts an integer to a binary string of the specified size.
         Example:
