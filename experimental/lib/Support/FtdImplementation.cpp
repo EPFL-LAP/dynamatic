@@ -54,14 +54,17 @@ static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexi
     Block *userBlock = userOp->getBlock();
 
     if (isa_and_nonnull<cf::CondBranchOp>(userOp) &&
-        userOp->getOperand(0) == muxCondition) {
+        userOp->getOperand(0) == muxCondition &&
+        !(userOp->hasAttr(FTD_OP_TO_SKIP))) {
       if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
         muxConditionBlock = userBlock;
       }
     }
   }
   if (!muxConditionBlock) {
-    llvm::errs() << "Warning: Could not find a block with a terminator condition matching the mux condition. This may lead to incorrect FTD analysis results.\n";
+    llvm::errs() << "Warning: Could not find a block with a terminator ";
+    llvm::errs() << "condition matching the mux condition. This may lead ";
+    llvm::errs() << "to incorrect FTD analysis results.\n";
     muxConditionBlock = muxCondition.getParentBlock();
   }
   return muxConditionBlock;
