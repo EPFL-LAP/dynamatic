@@ -12,7 +12,7 @@ class VHDLEmitter(Emitter):
 
     def __init__(self):
         # Indentation level for generated code
-        self.tabLevel = 0
+        self.tabLevel = 1
 
         # Counter for generating unique temporary names
         self.tempCount = 0
@@ -28,6 +28,8 @@ class VHDLEmitter(Emitter):
         self.REG_END_STR = '\tend process;\n'
         self.regInitString = ''
         self.statementString = ''
+
+        self.inst_started = False
 
         # Default library imports for VHDL
         self.library = 'library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n'
@@ -69,7 +71,7 @@ class VHDLEmitter(Emitter):
         statement_str = self.fix_type('logic', statement.get_type(), statement_str)
         self.statementString += self.get_current_indent() + f'{out_str} <= {statement_str};\n'
 
-    def to_string(self, module_name: str, write_regs=True) -> str:
+    def get_definition_str(self, module_name: str, write_regs=True) -> str:
         return self.library + \
                 f'entity {module_name} is\n' + \
                 self.PORT_INIT_STR + self.portInitString + self.PORT_END_STR + \
@@ -77,11 +79,36 @@ class VHDLEmitter(Emitter):
                 f'architecture arch of {module_name} is\n' + \
                 self.signalInitString + \
                 'begin\n' + self.statementString + '\n' + \
-                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs else '') \
+                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs and self.regInitString != '' else '') \
                 + 'end architecture;\n'
+    
+    def start_instantiation(self, module_name:str, instance_name: str = None) -> str:
+        if self.inst_started: # Sanity check to prevent overlapping instantiations
+            raise ValueError('start_instantiation called while another instantiation is in progress')
 
-    WHEN = 'when'
-    ELSE = 'else'
+        if instance_name is None: instance_name = module_name
+
+        self.inst_started = True
+        self.inst_str = f'{self.get_current_indent()}{instance_name} : entity work.{module_name}\n'
+        self.increase_indent()
+        self.inst_str += f'{self.get_current_indent()}port map(\n'
+        self.increase_indent()
+
+    def add_map(self, port_name: str, signal_name: str) -> str:
+        if not self.inst_started:
+            raise ValueError('add_map can only be called after start_instantiation')
+        
+        assert isinstance(port_name, str) and isinstance(signal_name, str), "port name and signal name must be strings"
+
+        self.inst_str += f'{self.get_current_indent()}{port_name} => {signal_name},\n'
+
+    def complete_instantiation(self) -> str:
+        self.inst_started = False
+        self.decrease_indent()
+        self.inst_str += self.get_current_indent() + ');\n'
+        self.decrease_indent()
+        self.statementString += self.inst_str
+        self.inst_str = ''
 
     BINOP_STRINGS = {
         BinOp.ADD: '+',

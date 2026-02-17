@@ -1,4 +1,3 @@
-from verilog_gen.context import Context
 from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from verilog_gen.operators import Val, WhenElse, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking, Bit
 from verilog_gen.configs import Configs
@@ -211,13 +210,13 @@ class GroupAllocator:
                                 ga_ls_order_temp, ldq_tail_i)
 
         # Write to the file
-        output_str = em.to_string(self.module_name, write_regs=self.configs.gaMulti)
+        output_str = em.get_definition_str(self.module_name, write_regs=self.configs.gaMulti)
         with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
 
     def instantiate(
         self,
-        ctx:                Context,
+        em:                 Emitter,
         group_init_valid_i: LogicArray,
         group_init_ready_o: LogicArray,
         ldq_tail_i:         LogicVec,
@@ -315,62 +314,43 @@ class GroupAllocator:
             end architecture;
         """
 
-        arch = ctx.get_current_indent(
-        ) + f'{self.module_name} : entity work.{self.module_name}\n'
-        ctx.tabLevel += 1
-        arch += ctx.get_current_indent() + f'port map(\n'
-        ctx.tabLevel += 1
+        em.start_instantiation(self.module_name)
 
-        arch += ctx.get_current_indent() + f'rst => rst,\n'
-        arch += ctx.get_current_indent() + f'clk => clk,\n'
+        em.add_map('rst', 'rst')
+        em.add_map('clk', 'clk')
 
         for i in range(0, self.configs.numGroups):
-            arch += ctx.get_current_indent() + \
-                f'group_init_valid_{i}_i => {group_init_valid_i.getNameRead(i)},\n'
+            em.add_map(f'group_init_valid_{i}_i', group_init_valid_i.getNameRead(i))
+        
         for i in range(0, self.configs.numGroups):
-            arch += ctx.get_current_indent() + \
-                f'group_init_ready_{i}_o => {group_init_ready_o.getNameWrite(i)},\n'
+            em.add_map(f'group_init_ready_{i}_o', group_init_ready_o.getNameWrite(i))
 
-        arch += ctx.get_current_indent() + \
-            f'ldq_tail_i => {ldq_tail_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'ldq_head_i => {ldq_head_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'ldq_empty_i => {ldq_empty_i.getNameRead()},\n'
+        em.add_map('ldq_tail_i', ldq_tail_i.getNameRead())
+        em.add_map('ldq_head_i', ldq_head_i.getNameRead())
+        em.add_map('ldq_empty_', ldq_empty_i.getNameRead())
 
-        arch += ctx.get_current_indent() + \
-            f'stq_tail_i => {stq_tail_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'stq_head_i => {stq_head_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'stq_empty_i => {stq_empty_i.getNameRead()},\n'
+        em.add_map('stq_tail_i', stq_tail_i.getNameRead())
+        em.add_map('stq_head_i', stq_head_i.getNameRead())
+        em.add_map('stq_empty_i', stq_empty_i.getNameRead())
 
         for i in range(0, self.configs.numLdqEntries):
-            arch += ctx.get_current_indent() + \
-                f'ldq_wen_{i}_o => {ldq_wen_o.getNameWrite(i)},\n'
-        arch += ctx.get_current_indent() + \
-            f'num_loads_o => {num_loads_o.getNameWrite()},\n'
+            em.add_map(f'ldq_wen_{i}_o', ldq_wen_o.getNameWrite(i))
+
+        em.add_map(f'num_loads_o', num_loads_o.getNameWrite())
+
         if (self.configs.ldpAddrW > 0):
             for i in range(0, self.configs.numLdqEntries):
-                arch += ctx.get_current_indent() + \
-                    f'ldq_port_idx_{i}_o => {ldq_port_idx_o.getNameWrite(i)},\n'
+                em.add_map(f'ldq_port_idx_{i}_o', ldq_port_idx_o.getNameWrite(i))
 
         for i in range(0, self.configs.numStqEntries):
-            arch += ctx.get_current_indent() + \
-                f'stq_wen_{i}_o => {stq_wen_o.getNameWrite(i)},\n'
+            em.add_map(f'stq_wen_{i}_o', stq_wen_o.getNameWrite(i))
         if (self.configs.stpAddrW > 0):
             for i in range(0, self.configs.numStqEntries):
-                arch += ctx.get_current_indent() + \
-                    f'stq_port_idx_{i}_o => {stq_port_idx_o.getNameWrite(i)},\n'
+                em.add_map(f'stq_port_idx_{i}_o', stq_port_idx_o.getNameWrite(i))
 
         for i in range(0, self.configs.numLdqEntries):
-            arch += ctx.get_current_indent() + \
-                f'ga_ls_order_{i}_o => {ga_ls_order_o.getNameWrite(i)},\n'
+            em.add_map(f'ga_ls_order_{i}_o', ga_ls_order_o.getNameWrite(i))
 
-        arch += ctx.get_current_indent() + \
-            f'num_stores_o => {num_stores_o.getNameWrite()}\n'
-
-        ctx.tabLevel -= 1
-        arch += ctx.get_current_indent() + f');\n'
-        ctx.tabLevel -= 1
-        return arch
+        em.add_map('num_stores_o', num_stores_o.getNameWrite())
+        em.complete_instantiation()
+        return em
