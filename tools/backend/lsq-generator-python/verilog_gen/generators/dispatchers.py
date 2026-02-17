@@ -1,7 +1,8 @@
 from verilog_gen.context import Context
 from verilog_gen.signals import LogicArray, LogicVec, LogicVecArray
-from verilog_gen.ir import Op
+from verilog_gen.ir import Op, BinOp, Val, Bit
 from verilog_gen.emitters import Emitter
+from verilog_gen.operators import BitsToOH, Mux1H, Reduce, VecToArray, CyclicPriorityMasking
 
 
 class PortToQueueDispatcher:
@@ -102,87 +103,74 @@ class PortToQueueDispatcher:
 
         # IOs
         port_payload_i = LogicVecArray(
-            ctx, 'port_payload', 'i', self.numPorts, self.bitsW)
-        port_valid_i = LogicArray(ctx, 'port_valid', 'i', self.numPorts)
-        port_ready_o = LogicArray(ctx, 'port_ready', 'o', self.numPorts)
-        entry_alloc_i = LogicArray(ctx, 'entry_alloc', 'i', self.numEntries)
+            em, 'port_payload', 'i', self.numPorts, self.bitsW)
+        port_valid_i = LogicArray(em, 'port_valid', 'i', self.numPorts)
+        port_ready_o = LogicArray(em, 'port_ready', 'o', self.numPorts)
+        entry_alloc_i = LogicArray(em, 'entry_alloc', 'i', self.numEntries)
         entry_payload_valid_i = LogicArray(
-            ctx, 'entry_payload_valid', 'i', self.numEntries)
+            em, 'entry_payload_valid', 'i', self.numEntries)
         if (self.numPorts != 1):
             entry_port_idx_i = LogicVecArray(
-                ctx, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
+                em, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
         entry_payload_o = LogicVecArray(
-            ctx, 'entry_payload', 'o', self.numEntries, self.bitsW)
-        entry_wen_o = LogicArray(ctx, 'entry_wen', 'o', self.numEntries)
-        queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', self.numEntries)
+            em, 'entry_payload', 'o', self.numEntries, self.bitsW)
+        entry_wen_o = LogicArray(em, 'entry_wen', 'o', self.numEntries)
+        queue_head_oh_i = LogicVec(em, 'queue_head_oh', 'i', self.numEntries)
 
         # one-hot port index
         entry_port_idx_oh = LogicVecArray(
-            ctx, 'entry_port_idx_oh', 'w', self.numEntries, self.numPorts)
+            em, 'entry_port_idx_oh', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             if (self.numPorts == 1):
-                arch += Op(ctx, entry_port_idx_oh[i], 1)
+                em.add_assignment(entry_port_idx_oh[i], 1)
             else:
-                arch += BitsToOH(ctx, entry_port_idx_oh[i], entry_port_idx_i[i])
+                BitsToOH(em, entry_port_idx_oh[i], entry_port_idx_i[i])
 
         # Mux for the data/addr
         for i in range(0, self.numEntries):
-            arch += Mux1H(ctx, entry_payload_o[i],
+            Mux1H(em, entry_payload_o[i],
                           port_payload_i, entry_port_idx_oh[i])
 
         # Entries that request data/address from a any port
         entry_ptq_ready = LogicArray(
-            ctx, 'entry_ptq_ready', 'w', self.numEntries)
+            em, 'entry_ptq_ready', 'w', self.numEntries)
         for i in range(0, self.numEntries):
-            arch += Op(ctx, entry_ptq_ready[i], entry_alloc_i[i],
-                       'and', 'not', entry_payload_valid_i[i])
+            em.add_assignment(entry_ptq_ready[i], entry_alloc_i[i] & ~entry_payload_valid_i[i])
 
         # Entry-port pairs that the entry request the data/address from the port
         entry_waiting_for_port = LogicVecArray(
-            ctx, 'entry_waiting_for_port', 'w', self.numEntries, self.numPorts)
+            em, 'entry_waiting_for_port', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
-            arch += Op(ctx, entry_waiting_for_port[i], entry_port_idx_oh[i],
-                       'when', entry_ptq_ready[i], 'else', 0)
+            em.add_assignment(entry_waiting_for_port[i], entry_port_idx_oh[i].when(entry_ptq_ready[i]).else_(Val(0)))
 
         # Reduce the matrix for each entry to get the ready signal:
         # If one or more entries is requesting data/address from a certain port, ready is set high.
-        port_ready_vec = LogicVec(ctx, 'port_ready_vec', 'w', self.numPorts)
-        arch += Reduce(ctx, port_ready_vec, entry_waiting_for_port, 'or')
-        arch += VecToArray(ctx, port_ready_o, port_ready_vec)
+        port_ready_vec = LogicVec(em, 'port_ready_vec', 'w', self.numPorts)
+        Reduce(em, port_ready_vec, entry_waiting_for_port, BinOp.OR)
+        VecToArray(em, port_ready_o, port_ready_vec)
 
         # AND the request signal with valid, it shows entry-port pairs that are both valid and ready.
         entry_port_options = LogicVecArray(
-            ctx, 'entry_port_options', 'w', self.numEntries, self.numPorts)
+            em, 'entry_port_options', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             for j in range(0, self.numPorts):
-                arch += ctx.get_current_indent() + f'{entry_port_options.getNameWrite(i, j)} <= ' \
-                    f'{entry_waiting_for_port.getNameRead(i, j)} and {port_valid_i.getNameRead(j)};\n'
+                em.add_assignment((entry_port_options, i, j), Val(entry_waiting_for_port, i, j) & Val(port_valid_i, j))
 
         # For each port, the oldest entry receives bit this cycle. The priority masking per port(column)
         # generates entry-port pairs that will tranfer data/address this cycle.
         entry_port_transfer = LogicVecArray(
-            ctx, 'entry_port_transfer', 'w', self.numEntries, self.numPorts)
-        arch += CyclicPriorityMasking(ctx, entry_port_transfer,
-                                      entry_port_options, queue_head_oh_i)
+            em, 'entry_port_transfer', 'w', self.numEntries, self.numPorts)
+        CyclicPriorityMasking(em, entry_port_transfer,
+                                  entry_port_options, queue_head_oh_i)
 
         # Reduce for each entry(row), which generates write enable signal for entries
         for i in range(0, self.numEntries):
-            arch += Reduce(ctx, entry_wen_o[i], entry_port_transfer[i], 'or')
+            Reduce(em, entry_wen_o[i], entry_port_transfer[i], BinOp.OR)
 
         ######   Write To File  ######
-        ctx.portInitString += '\n\t);'
-
-        # Write to the file
-        with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
-            file.write('\n\n')
-            file.write(ctx.library)
-            file.write(f'entity {self.module_name} is\n')
-            file.write(ctx.portInitString)
-            file.write('\nend entity;\n\n')
-            file.write(f'architecture arch of {self.module_name} is\n')
-            file.write(ctx.signalInitString)
-            file.write('begin\n' + arch + '\n')
-            file.write('end architecture;\n')
+        output_str = em.get_definition_str(self.module_name)
+        with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
+            file.write(output_str)
 
     def instantiate(
         self,
