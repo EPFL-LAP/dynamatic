@@ -1,5 +1,5 @@
-from verilog_gen.emitters.emitter import Emitter
-from verilog_gen.operators.assign import Statement, Bin, Un, BinOp, UnOp, Bit
+from verilog_gen.emitters import Emitter
+from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization

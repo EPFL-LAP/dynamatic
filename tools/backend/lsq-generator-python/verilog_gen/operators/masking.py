@@ -1,6 +1,6 @@
-from verilog_gen.emitters.emitter import Emitter
+from verilog_gen.emitters import Emitter
 from verilog_gen.utils import isPow2
-from verilog_gen.operators import Op, Val
+from verilog_gen.ir import Op, Val
 
 
 def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:

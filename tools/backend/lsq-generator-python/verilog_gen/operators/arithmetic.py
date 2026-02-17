@@ -1,6 +1,6 @@
 from verilog_gen.context import Context
-from verilog_gen.emitters.emitter import Emitter
-from verilog_gen.operators.assign import Op, Val, Bit
+from verilog_gen.emitters import Emitter
+from verilog_gen.ir import Op, Val, Bit
 from verilog_gen.utils import *
 from verilog_gen.signals import *
 

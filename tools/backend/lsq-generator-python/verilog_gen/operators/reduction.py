@@ -1,6 +1,7 @@
-from verilog_gen.emitters.emitter import Emitter
+from verilog_gen.emitters import Emitter
 from verilog_gen.utils import *
 from verilog_gen.operators import *
+from verilog_gen.ir import BinOp, Val, Bin
 
 
 # ===----------------------------------------------------------------------===#

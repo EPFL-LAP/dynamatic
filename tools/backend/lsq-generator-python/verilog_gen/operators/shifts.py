@@ -1,7 +1,7 @@
-from verilog_gen.emitters.emitter import Emitter
+from verilog_gen.emitters import Emitter
 from verilog_gen.utils import *
 from verilog_gen.signals import *
-from verilog_gen.operators import Op, Val
+from verilog_gen.ir import Op, Val
 
 
 # ===----------------------------------------------------------------------===#

@@ -1,6 +1,7 @@
 from verilog_gen.context import Context
 from verilog_gen.signals import LogicArray, LogicVec, LogicVecArray
-from verilog_gen.operators import Op
+from verilog_gen.ir import Op
+from verilog_gen.emitters import Emitter
 
 
 class PortToQueueDispatcher:
@@ -65,12 +66,13 @@ class PortToQueueDispatcher:
         self.bitsW = bitsW
         self.portAddrW = portAddrW
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, em: Emitter, path_rtl) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
         that passes arguments from a specific access port to a corresponding queue entry.
 
         Parameters:
+            em          : The emitter used to generate the code
             path_rtl    : Output directory for VHDL files.
 
         Output:
@@ -97,18 +99,6 @@ class PortToQueueDispatcher:
                 -- dispatcher logic here
             end architecture;
         """
-
-        # ctx: VHDLContext for code generation state.
-        # When we generate VHDL entity and architecture, we can use this context as a local variable.
-        # We only need to get the context as a parameter when we instantiate the module.
-        # It saves all information we need when we generate VHDL entity and architecture code.
-        ctx = Context()
-
-        ctx.tabLevel = 1
-        ctx.tempCount = 0
-        ctx.signalInitString = ''
-        ctx.portInitString = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
-        arch = ''
 
         # IOs
         port_payload_i = LogicVecArray(

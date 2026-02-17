@@ -12,9 +12,8 @@
 # std_logic bit
 #
 
-from verilog_gen.context import Context
 from verilog_gen.utils import *
-from verilog_gen.statements import Statement
+from verilog_gen.ir import Statement
 
 
 class Logic(Statement):
@@ -46,7 +45,7 @@ class Logic(Statement):
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
 
-    def __init__(self, ctx: Context, name: str, type: str = 'w', init: bool = True) -> None:
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', init: bool = True) -> None:
         """
         init: If True, immediately generates the corresponding std_logic in VHDL.
               True when we instantiate Logic.
@@ -93,7 +92,7 @@ class Logic(Statement):
         elif (self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
 
-    def _to_str(self, em: Context, size) -> str:
+    def _to_str(self, em: Statement, size) -> str:
         return self.getNameRead()
 
     def getNameWrite(self, sufix='') -> str:
@@ -149,7 +148,7 @@ class LogicVec(Logic):
     type = ''
     size = 1
 
-    def __init__(self, ctx: Context, name: str, type: str = 'w', size: int = 1, init: bool = True) -> None:
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', size: int = 1, init: bool = True) -> None:
         Logic.__init__(self, ctx, name, type, False)
         assert (size > 0)
         self.size = size
@@ -215,7 +214,7 @@ class LogicArray(Logic):
     """
     length = 1
 
-    def __init__(self, ctx: Context, name: str, type: str = 'w', length: int = 1):
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1):
         self.length = length
         Logic.__init__(self, ctx, name, type, False)
         self.signalInit()
@@ -268,7 +267,7 @@ class LogicVecArray(LogicVec):
     """
     length = 1
 
-    def __init__(self, ctx: Context, name: str, type: str = 'w', length: int = 1, size: int = 1):
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, size: int = 1):
         self.length = length
         LogicVec.__init__(self, ctx, name, type, size, False)
         self.signalInit()

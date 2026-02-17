@@ -1,6 +1,80 @@
 from enum import Enum
-from verilog_gen.emitters.emitter import Emitter
-from verilog_gen.statements import Statement
+
+class Statement:
+    """
+    Represents a statement base class.
+
+    This class contains common operator overloads and helpers used across the
+    generator. Extracted into its own module to avoid circular imports when
+    `signals.py` needs to reference the type.
+    """
+    def __add__(self, other):
+        return Bin(self, BinOp.ADD, other)
+
+    def __sub__(self, other):
+        return Bin(self, BinOp.SUB, other)
+
+    def __and__(self, other):
+        return Bin(self, BinOp.AND, other)
+
+    def __or__(self, other):
+        return Bin(self, BinOp.OR, other)
+
+    def __xor__(self, other):
+        return Bin(self, BinOp.XOR, other)
+
+    def __mul__(self, other):
+        return Bin(self, BinOp.MUL, other)
+
+    def __invert__(self):
+        return Un(UnOp.NOT, self)
+
+    def __ge__(self, other):
+        return Bin(self, BinOp.GE, other)
+
+    def __le__(self, other):
+        return Bin(self, BinOp.LE, other)
+
+    def __gt__(self, other):
+        return Bin(self, BinOp.GT, other)
+
+    def __lt__(self, other):
+        return Bin(self, BinOp.LT, other)
+
+    def __eq__(self, other):
+        return Bin(self, BinOp.EQ, other)
+
+    def __ne__(self, other):
+        return Bin(self, BinOp.NEQ, other)
+
+    def concat(self, other):
+        return Bin(self, BinOp.CONCAT, other)
+
+    def to_str(self, em: 'Emitter', size, super_precedence: int) -> str:
+        if self.get_precedence() <= super_precedence:
+            return f'({self._to_str(em, size)})'
+        else:
+            return self._to_str(em, size)
+
+    def when(self, condition):
+        self.condition = condition
+        return self
+
+    def else_(self, statement):
+        if getattr(self, 'condition', None) is None:
+            raise ValueError('else_ can only be called after when')
+
+        return WhenElse(self, self.condition, statement)
+
+    def _to_str(self, em: 'Emitter', size) -> str:
+        raise NotImplementedError('Subclasses must implement _to_str method')
+
+    def get_type(self) -> str:
+        return 'logic'
+
+    def get_precedence(self) -> int:
+        # TODO: Cleaner way to handle precedence
+        return 10000
 
 class Val(Statement):
     """
@@ -9,7 +83,7 @@ class Val(Statement):
     def __init__(self, *var):
         self.var = var
 
-    def _to_str(self, em: Emitter, size):
+    def _to_str(self, em: 'Emitter', size):
         arg = self.var[0] if len(self.var) == 1 else tuple(self.var)
         if type(arg) == str:
             str_ret = arg
@@ -64,7 +138,7 @@ class Bin(Statement):
     def get_type(self) -> str:
         return self.op.get_type()
 
-    def _to_str(self, em: Emitter, size: int) -> str:
+    def _to_str(self, em: 'Emitter', size: int) -> str:
         return em.bin_to_str(self, size)
 
 class UnOp(Enum):
@@ -88,7 +162,7 @@ class Un(Statement):
     def get_precedence(self) -> int:
         return self.op.get_precedence()
 
-    def _to_str(self, em: Emitter, size: int) -> str:
+    def _to_str(self, em: 'Emitter', size: int) -> str:
         return em.un_to_str(self, size)
 
 class Bit(Statement):
@@ -103,7 +177,7 @@ class Bit(Statement):
     def get_precedence(self) -> int:
         return 11
 
-    def _to_str(self, em: Emitter, size) -> str:
+    def _to_str(self, em: 'Emitter', size) -> str:
         return em.get_bit_str(self)
 
 class CustomStr(Statement):
@@ -114,7 +188,7 @@ class CustomStr(Statement):
         self.vhdl_str = vhdl_str
         self.verilog_str = verilog_str
 
-    def _to_str(self, em: Emitter, size) -> str:
+    def _to_str(self, em: 'Emitter', size) -> str:
         return em.print_custom_str(self)
 
 class WhenElse(Statement):
@@ -129,7 +203,7 @@ class WhenElse(Statement):
     def get_precedence(self) -> int:
         return 0
 
-    def _to_str(self, em: Emitter, size) -> str:
+    def _to_str(self, em: 'Emitter', size) -> str:
         return em.when_else_to_str(self, size)
 
     def get_type(self) -> str:
