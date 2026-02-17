@@ -369,28 +369,28 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
 //===----------------------------------------------------------------------===//
 
 int ForkOp::getNumEagerOutputs() { return getNumResults(); }
-std::vector<EagerForkSent> ForkOp::getInternalSentStates() {
-  std::vector<EagerForkSent> ret;
+std::vector<EagerForkSentNamer> ForkOp::getInternalSentStates() {
+  std::vector<EagerForkSentNamer> ret;
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of sent states for operation without name");
   for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSent state(nameAttr.str(), getResultName(i));
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
     ret.push_back(state);
   }
   return ret;
 }
 
 int ControlMergeOp::getNumEagerOutputs() { return 2; }
-std::vector<EagerForkSent> ControlMergeOp::getInternalSentStates() {
-  std::vector<EagerForkSent> ret;
+std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStates() {
+  std::vector<EagerForkSentNamer> ret;
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of sent states for operation without name");
   for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSent state(nameAttr.str(), getResultName(i));
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
     ret.push_back(state);
   }
   return ret;
@@ -400,35 +400,35 @@ std::vector<EagerForkSent> ControlMergeOp::getInternalSentStates() {
 // BufferLikeOpInterface
 //===----------------------------------------------------------------------===//
 
-std::vector<BufferSlotFull> ControlMergeOp::getInternalSlotStates() {
-  std::vector<BufferSlotFull> ret(1);
+std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStates() {
+  std::vector<BufferSlotFullNamer> ret(1);
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
-  ret[0] = BufferSlotFull(nameAttr.str(), "slot");
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot");
   return ret;
 }
 
-std::vector<BufferSlotFull> LoadOp::getInternalSlotStates() {
-  std::vector<BufferSlotFull> ret(2);
+std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStates() {
+  std::vector<BufferSlotFullNamer> ret(2);
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
-  ret[0] = BufferSlotFull(nameAttr.str(), "addr");
-  ret[1] = BufferSlotFull(nameAttr.str(), "data");
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "addr");
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), "data");
   return ret;
 }
 
-std::vector<BufferSlotFull> BufferOp::getInternalSlotStates() {
-  std::vector<BufferSlotFull> ret(getNumSlots());
+std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStates() {
+  std::vector<BufferSlotFullNamer> ret(getNumSlots());
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
   for (size_t i = 0; i < getNumSlots(); ++i) {
-    ret[i] = BufferSlotFull(nameAttr.str(), "slot_" + std::to_string(i));
+    ret[i] = BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i));
   }
   return ret;
 }

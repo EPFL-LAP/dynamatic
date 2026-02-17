@@ -7,7 +7,7 @@
 namespace dynamatic {
 namespace handshake {
 
-struct HandshakeOpInternalState {
+struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
     BufferSlotFull,
@@ -29,9 +29,9 @@ struct HandshakeOpInternalState {
     }
   }
 
-  HandshakeOpInternalState() = default;
-  HandshakeOpInternalState(TYPE type) : type(type) {}
-  virtual ~HandshakeOpInternalState() = default;
+  InternalStateNamer() = default;
+  InternalStateNamer(TYPE type) : type(type) {}
+  virtual ~InternalStateNamer() = default;
   TYPE type;
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
@@ -41,22 +41,22 @@ struct HandshakeOpInternalState {
 // this `sent` state needs to be identified. For this, the operation is
 // identified through `opName` (e.g. "fork1"), and the output of this operations
 // is defined by `channelName` (e.g. "out1")
-struct EagerForkSent : public HandshakeOpInternalState {
-  EagerForkSent() = default;
-  EagerForkSent(const std::string &opName, const std::string &channelName)
+struct EagerForkSentNamer : public InternalStateNamer {
+  EagerForkSentNamer() = default;
+  EagerForkSentNamer(const std::string &opName, const std::string &channelName)
       : opName(opName), channelName(channelName) {}
-  ~EagerForkSent() = default;
+  ~EagerForkSentNamer() = default;
 
   std::string opName;
   std::string channelName;
 };
 
-struct BufferSlotFull : public HandshakeOpInternalState {
-  BufferSlotFull() = default;
-  BufferSlotFull(const std::string &opName, const std::string &slotName)
-      : HandshakeOpInternalState(TYPE::BufferSlotFull), opName(opName),
+struct BufferSlotFullNamer : public InternalStateNamer {
+  BufferSlotFullNamer() = default;
+  BufferSlotFullNamer(const std::string &opName, const std::string &slotName)
+      : InternalStateNamer(TYPE::BufferSlotFull), opName(opName),
         slotName(slotName) {}
-  ~BufferSlotFull() = default;
+  ~BufferSlotFullNamer() = default;
 
   std::string opName;
   std::string slotName;
