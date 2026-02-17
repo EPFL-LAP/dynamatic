@@ -46,20 +46,24 @@ constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
 /// Identify the block that has muxCondition as its terminator condition
 /// Note that it is not necessarily the same block defining the muxCondition
-static Block *returnMuxConditionBlock(Value muxCondition) {
+static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexing &bi) {
   Block *muxConditionBlock = nullptr;
 
   for (auto &use : muxCondition.getUses()) {
     Operation *userOp = use.getOwner();
     Block *userBlock = userOp->getBlock();
 
-    if (isa_and_nonnull<cf::CondBranchOp>(userOp)) {
-      muxConditionBlock = userBlock;
-      break;
+    if (isa_and_nonnull<cf::CondBranchOp>(userOp) &&
+        userOp->getOperand(0) == muxCondition) {
+      if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
+        muxConditionBlock = userBlock;
+      }
     }
   }
-  if (!muxConditionBlock)
+  if (!muxConditionBlock) {
+    llvm::errs() << "Warning: Could not find a block with a terminator condition matching the mux condition. This may lead to incorrect FTD analysis results.\n";
     muxConditionBlock = muxCondition.getParentBlock();
+  }
   return muxConditionBlock;
 }
 
@@ -1488,7 +1492,7 @@ static void insertDirectSuppression(
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
 
-  bool debuglog = true;
+  bool debuglog = false;
   bool debuglogCFG = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
@@ -1567,9 +1571,15 @@ static void insertDirectSuppression(
 
     // 2. Update producerBlock to be the block defining the condition of the last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
-    producerBlock = returnMuxConditionBlock(finalCondition);
+    producerBlock = returnMuxConditionBlock(finalCondition, bi);
   }
 
+  if (debuglog && deliverToGamma) {
+    out << "[FTD] New Producer block: ";
+    if (producerBlock)
+      producerBlock->printAsOperand(out);
+    out << "\n";
+  }
   // Create a temporary builder to isolate the LocalCFG creation from the
   // main PatternRewriter. This prevents the rewriter from tracking the
   // temporary operations which are later erased manually.
@@ -1671,7 +1681,7 @@ static void insertDirectSuppression(
       if (isDataInput) {
         if (debuglog) {
           out << "[MUX] Mux Condition Block: ";
-          Block *muxConditionBlock = returnMuxConditionBlock(currentMuxOp->getOperand(0));
+          Block *muxConditionBlock = returnMuxConditionBlock(currentMuxOp->getOperand(0), bi);
           if (muxConditionBlock)
             muxConditionBlock->printAsOperand(out);
           else
@@ -1701,7 +1711,7 @@ static void insertDirectSuppression(
 
         // 2. Identify the Original Block defining this condition variable
         // (Using the provided helper function)
-        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, bi);
 
         // 3. Find the corresponding Block in the Local CFG
         // Since locGraph->origMap maps Local->Original, we iterate to reverse lookup.
@@ -1940,6 +1950,9 @@ static void insertDirectSuppression(
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond =
         bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
+    // We use a separate variable so we don't lose track of the 
+    // original 'connection' value needed for the use-replacement later.
+    Value finalDataInput = connection;
 
     // 2. Cascaded Upstream Filter
     if (fSupUp->type != experimental::boolean::ExpressionType::Zero) {
@@ -1953,17 +1966,16 @@ static void insertDirectSuppression(
       if (bi.isLess(connection.getParentBlock(), producerBlock)) {
         // [Case A] Upstream logic filters the DATA path directly.
         // Create an Intermediate Branch on the 'connection' wire.
-        // Data Input: connection (The data itself)
+        // Data Input: finalDataInput (The data itself)
         // Condition: upBranchCond (from Upstream logic)
         auto upBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(connection.getType()), 
-          upBranchCond, connection);
+          consumer->getLoc(), ftd::getListTypes(finalDataInput.getType()), 
+          upBranchCond, finalDataInput);
         
         upBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
-        // Update 'connection': Only the False result (Not Suppressed) propagates 
-        // to the next stage (Downstream logic).
-        connection = upBranchOp.getFalseResult();
+        // Update: The data feeding the next stage is now the filtered data
+        finalDataInput = upBranchOp.getFalseResult();
 
       } else {
         // [Case B] Upstream logic filters the SUPPRESSION SIGNAL.
@@ -1985,7 +1997,7 @@ static void insertDirectSuppression(
     // 3. Final Data Branch
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
-        connection);
+        finalDataInput);
     branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
     // Take into account the possibility of a mux to get the condition input
