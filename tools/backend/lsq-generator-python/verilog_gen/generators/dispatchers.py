@@ -255,7 +255,7 @@ class PortToQueueDispatcher:
 
         """
 
-        em.start_instantiation(self, f'{self.module_name}_dispatcher', self.module_name)
+        em.start_instantiation(self, self.module_name, f'{self.module_name}_dispatcher')
 
         for i in range(0, self.numPorts):
             em.add_map(f'port_payload_{i}_i', port_payload_i.getNameRead(i))
@@ -450,7 +450,7 @@ class QueueToPortDispatcher:
 
     def instantiate(
         self,
-        ctx:                Context,
+        em:                Emitter,
         port_payload_o:        LogicVecArray,
         port_valid_o:       LogicArray,
         port_ready_i:       LogicArray,
@@ -469,7 +469,7 @@ class QueueToPortDispatcher:
         to the internal dispatcher instance named <self.module_name>_dispatcher.
 
         Parameters:
-            ctx                  : VHDLContext for code generation state.
+            em                  : Emitter for code generation
             port_payload_o          : Output data bits from each queue entry
             port_valid_o         : Valid signal for each input port (Valid data)
             port_ready_i         : Ready signal indicating the queue is ready to send data
@@ -489,7 +489,7 @@ class QueueToPortDispatcher:
             # suffix for Load Data Dispatcher instantiation: '_ldd'
 
             arch += qtp_dispatcher_ldd.instantiate(
-                ctx,
+                em,
                 port_payload_o         = ldp_data_o,
                 port_valid_o        = ldp_data_valid_o,
                 port_ready_i        = ldp_data_ready_i,
@@ -533,43 +533,27 @@ class QueueToPortDispatcher:
             end architecture;
         """
 
-        arch = ctx.get_current_indent(
-        ) + f'{self.module_name}_dispatcher : entity work.{self.module_name}\n'
-        ctx.tabLevel += 1
-        arch += ctx.get_current_indent() + f'port map(\n'
-        ctx.tabLevel += 1
-        arch += ctx.get_current_indent() + f'rst => rst,\n'
-        arch += ctx.get_current_indent() + f'clk => clk,\n'
+        em.start_instatiation(self.module_name, f'{self.module_name}_dispatcher')
+
         for i in range(0, self.numPorts):
             if (port_payload_o != None):
-                arch += ctx.get_current_indent() + \
-                    f'port_payload_{i}_o => {port_payload_o.getNameWrite(i)},\n'
+                em.add_map(f'port_payload_{i}_o', port_payload_o.getNameWrite(i))
         for i in range(0, self.numPorts):
-            arch += ctx.get_current_indent() + \
-                f'port_ready_{i}_i => {port_ready_i.getNameRead(i)},\n'
+            em.add_map(f'port_ready_{i}_i', port_ready_i.getNameRead(i))
         for i in range(0, self.numPorts):
-            arch += ctx.get_current_indent() + \
-                f'port_valid_{i}_o => {port_valid_o.getNameWrite(i)},\n'
+            em.add_map(f'port_valid_{i}_o', port_valid_o.getNameWrite(i))
         for i in range(0, self.numEntries):
-            arch += ctx.get_current_indent() + \
-                f'entry_alloc_{i}_i => {entry_alloc_i.getNameRead(i)},\n'
+            em.add_map(f'entry_alloc_{i}_i', entry_alloc_i.getNameRead(i))
         for i in range(0, self.numEntries):
-            arch += ctx.get_current_indent() + \
-                f'entry_payload_valid_{i}_i => {entry_payload_valid_i.getNameRead(i)},\n'
+            em.add_map(f'entry_payload_valid_{i}_i', entry_payload_valid_i.getNameRead(i))
         for i in range(0, self.numEntries):
             if (self.numPorts != 1):
-                arch += ctx.get_current_indent() + \
-                    f'entry_port_idx_{i}_i => {entry_port_idx_i.getNameRead(i)},\n'
+                em.add_map(f'entry_port_idx_{i}_i', entry_port_idx_i.getNameRead(i))
         for i in range(0, self.numEntries):
             if (entry_payload_i != None):
-                arch += ctx.get_current_indent() + \
-                    f'entry_payload_{i}_i => {entry_payload_i.getNameRead(i)},\n'
+                em.add_map(f'entry_payload_{i}_i', entry_payload_i.getNameRead(i))
         for i in range(0, self.numEntries):
-            arch += ctx.get_current_indent() + \
-                f'entry_reset_{i}_o => {entry_reset_o.getNameWrite(i)},\n'
-        arch += ctx.get_current_indent() + \
-            f'queue_head_oh_i => {queue_head_oh_i.getNameRead()}\n'
-        ctx.tabLevel -= 1
-        arch += ctx.get_current_indent() + f');\n'
-        ctx.tabLevel -= 1
-        return arch
+            em.add_map(f'entry_reset_{i}_o', entry_reset_o.getNameWrite(i))
+        em.add_map(f'queue_head_oh_i', queue_head_oh_i.getNameRead())
+        em.complete_instantiation()
+        return em
