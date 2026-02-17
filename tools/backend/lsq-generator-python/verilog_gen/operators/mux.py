@@ -1,9 +1,8 @@
-from verilog_gen.context import Context
 from verilog_gen.emitters import Emitter
 from verilog_gen.utils import *
-from verilog_gen.signals import *
+from verilog_gen.signals import LogicVecArray, LogicArray, Logic
 from verilog_gen.operators import *
-from verilog_gen.ir import Val, BinOp
+from verilog_gen.ir import Val, BinOp, WhenElse, Bit
 
 
 # ===----------------------------------------------------------------------===#
@@ -14,7 +13,7 @@ from verilog_gen.ir import Val, BinOp
 # MuxIndex : Generate a VHDL array-index expression for selecting an element.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
-def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
+def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
     """
     Generate a one-hot multiplexer: for each element of "din", 
     write that bit/vector into a temporary and then OR-reduce into "dout".
@@ -49,41 +48,34 @@ def Mux1H(ctx: Context, dout, din, sel, j=None) -> str:
           -> selects the third bit: dout = '1'
     """
 
-    str_ret = ctx.get_current_indent() + '-- Mux1H Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- Mux1H({dout.name}, {din.name}, {sel.name})\n'
-    ctx.use_temp()
-
-    # Local imports to avoid circular import issues when package is being
-    # initialized. Use isinstance checks for robustness.
-    from verilog_gen.signals import LogicVecArray, LogicArray
+    em.add_comment('Mux1H Begin')
+    em.add_comment(f'Mux1H({dout.name}, {din.name}, {sel.name})')
+    em.use_temp()
 
     # din is always LogicVecArray
     if isinstance(din, LogicVecArray):
         length = din.length
         size = din.size
-        mux = LogicVecArray(ctx, ctx.get_temp('mux'), 'w', length, din.size)
+        mux = LogicVecArray(em, em.get_temp('mux'), 'w', length, din.size)
     elif isinstance(din, LogicArray):
         length = din.length
         size = None
-        mux = LogicArray(ctx, ctx.get_temp('mux'), 'w', length)
+        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
     else:
         length = din.size
         size = None
-        mux = LogicArray(ctx, ctx.get_temp('mux'), 'w', length)
+        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
 
-    str_zero = Zero(size)
+    str_zero = em.int_to_bits(0, size)
     if (j == None):
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(i)} <= {din.getNameRead(i)} ' +\
-                f'when {sel.getNameRead(i)} = \'1\' else {str_zero};\n'
+            em.add_assignment((mux, i), Val(din, i).when(Val(sel, i) == Bit(1)).else_(Val(str_zero)))
     else:
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{mux.getNameWrite(i)} <= {din.getNameRead(i)} ' +\
-                f'when {sel.getNameRead(i, j)} = \'1\' else {str_zero};\n'
+            em.add_assignment((mux, i), Val(din, i).when(Val(sel, i, j) == Bit(1)).else_(Val(str_zero)))
 
-    str_ret += Reduce(ctx, dout, mux, 'or', False)
-    str_ret += ctx.get_current_indent() + '-- Mux1H End\n\n'
-    return str_ret
+    Reduce(em, dout, mux, BinOp.OR, False)
+    em.add_comment('Mux1H End\n')
 
 
 def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
@@ -143,8 +135,6 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     mlen = sel.length
     size = dout.size
     str_zero = Zero(size)
-    # Local import to avoid circular import during package initialization
-    from verilog_gen.signals import LogicVecArray
 
     if isinstance(dout, LogicVecArray):
         length = dout.length
@@ -170,6 +160,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     em.add_comment('Mux1H For Rom End\n')
 
 
+# TODO: Fix this
 def MuxIndex(din, sel) -> str:
     """
     Generate a VHDL array-index expression for selecting an element
@@ -177,7 +168,8 @@ def MuxIndex(din, sel) -> str:
     return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
 
 
-def MuxLookUp(ctx: Context, dout, din, sel) -> str:
+# TODO: Properly test this
+def MuxLookUp(em: Emitter, dout, din, sel) -> str:
     """
     Generate a conditional "when/else" lookup multiplexer in VHDL.
 
@@ -208,20 +200,26 @@ def MuxLookUp(ctx: Context, dout, din, sel) -> str:
 
     """
 
-    str_ret = ctx.get_current_indent() + '-- MuxLookUp Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- MuxLookUp({dout.name}, {din.name}, {sel.name})\n'
+    em.add_comment('MuxLookUp Begin')
+    em.add_comment(f'MuxLookUp({dout.name}, {din.name}, {sel.name})')
 
     length = din.length
     size = sel.size
-    str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= \n'
 
-    for i in range(0, length):
-        str_ret += ctx.get_current_indent() + f'{din.getNameRead(i)} ' +\
-            f'when ({sel.getNameRead()} = {IntToBits(i, size)}) else\n'
     if (type(dout) == LogicVec):
-        str_ret += ctx.get_current_indent() + f'{Zero(dout.size)};\n'
+        last = Val(0)
     else:
-        str_ret += ctx.get_current_indent() + f'\'0\';\n'
+        last = Bit(0)
 
-    str_ret += ctx.get_current_indent() + '-- MuxLookUp End\n\n'
-    return str_ret
+    if length > 0:
+        top = WhenElse(Val(din, 0), sel == Val(em.int_to_bits(0, size)), None)
+        cur_whenelse = top
+        for i in range(1, length):
+            curr_whenelse.false_statement = WhenElse(Val(din, i), sel == Val(em.int_to_bits(i, size)), None)
+            curr_whenelse = curr_whenelse.false_statement
+        curr_whenelse.false_statement = last
+        em.add_assignment(dout, top)
+    else:
+        em.add_assignment(dout, last)
+
+    em.add_comment('MuxLookUp End\n')
