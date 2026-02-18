@@ -34,5 +34,15 @@ struct HandshakeChooseLSQTypePass
 };
 
 void HandshakeChooseLSQTypePass::runDynamaticPass() {
-  return;
+  ModuleOp module = getOperation();
+
+  auto enumType = handshake::symbolizeLSQType(lsqType);
+  if (!enumType) {
+    module.emitError() << "invalid lsq-type: " << lsqType;
+    return signalPassFailure();
+  }
+
+  module.walk([&](handshake::LSQOp lsq) {
+    lsq.setLsqType(*enumType);
+  });
 }
